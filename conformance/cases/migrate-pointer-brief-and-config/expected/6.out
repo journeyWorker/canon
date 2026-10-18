@@ -6,12 +6,12 @@ subjects (1):
   proposed (1):
     checkout: 0 scenarios, 0 evidenced, 0 reviewed, 0 open blockers
       brief: approved in .canon/changes/c-checkout/brief.md — ana 2026-10-10 — "go"
-      advisory: that approval has no digest, so it does not follow the brief's text; re-approve with `canon brief approve --change c-checkout --by <the human> --note "<their words>"` to bind it
+      advisory: that approval has no digest, so it does not follow the brief's text; re-approve with `canon brief approve --change-id c-checkout --by <the human> --note "<their words>"` to bind it
 
 unowned (2, no @subject): cart.add.01, cart.add.02
 
 next:
   # checkout owns no scenario; specify its behavior, one scenario per behavior
-  canon scenario new <area>.<surface>.01 --title "<behavior>" --subject checkout --case happy
+  canon scenario new <area>.<surface>.01 --title "<behavior>" --subject-id checkout --case happy --actor-id <unit>
   # 2 scenario(s) carry no @subject tag (first: cart.add.01); add `@subject:<id>` above each in its .feature file, then check again: status re-indexes the edited files itself
   canon status

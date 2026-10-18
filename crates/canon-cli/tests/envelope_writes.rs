@@ -35,7 +35,7 @@ fn export_json_is_the_manifest_as_data_with_its_page_in_meta_and_a_next_step() {
     for args in [&["init", "--providers", "none"][..], &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"][..]] {
         assert!(canon(repo, args).status.success());
     }
-    let out = canon(repo, &["export", "--kind", "evidence_record", "--json"]);
+    let out = canon(repo, &["export", "--kind", "evidence", "--json"]);
     let shown = body(&out);
     assert_eq!(shown["meta"]["command"], "export", "{shown}");
     assert!(shown["meta"]["next"].is_array(), "a write carries meta.next: {shown}");
@@ -47,7 +47,7 @@ fn export_json_is_the_manifest_as_data_with_its_page_in_meta_and_a_next_step() {
 
     // With --out the manifest is the file; stdout names it.
     let file = repo.join("manifest.json");
-    let written = body(&canon(repo, &["export", "--kind", "evidence_record", "--out", file.to_str().unwrap(), "--json"]));
+    let written = body(&canon(repo, &["export", "--kind", "evidence", "--out", file.to_str().unwrap(), "--json"]));
     assert_eq!(written["data"]["out"], file.display().to_string(), "{written}");
     let manifest: Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
     assert_eq!(manifest["schema"], "canon.retention.export", "the file is the manifest itself");
@@ -166,7 +166,7 @@ fn learn_rollback_json_is_the_record_as_data_with_a_next_step() {
 
     let out = canon(
         repo,
-        &["learn", "rollback", &candidate.id.to_string(), "--reason", reason, "--actor", "alice", "--signature-file", "rollback.sig", "--approved-at", &at.to_rfc3339_opts(SecondsFormat::Nanos, true), "--repo", ".", "--json"],
+        &["learn", "rollback", &candidate.id.to_string(), "--reason", reason, "--actor-id", "alice", "--signature-file", "rollback.sig", "--approved-at", &at.to_rfc3339_opts(SecondsFormat::Nanos, true), "--repo", ".", "--json"],
     );
     let shown = body(&out);
     assert_eq!(shown["meta"]["command"], "learn rollback", "{shown}");

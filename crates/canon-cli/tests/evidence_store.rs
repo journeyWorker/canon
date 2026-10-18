@@ -54,7 +54,7 @@ fn setup(plan: bool) -> tempfile::TempDir {
 fn scenario(repo: &Path, id: &str, subject: Option<&str>) {
     let mut args = vec!["scenario", "new", id, "--title", "A run ends at zero health", "--case", "failure"];
     if let Some(subject) = subject {
-        args.extend(["--subject", subject]);
+        args.extend(["--subject-id", subject]);
     }
     ok(repo, &args);
     ok(repo, &["inventory", "sync"]);
@@ -65,7 +65,7 @@ fn scenario(repo: &Path, id: &str, subject: Option<&str>) {
 /// `.canon/changes/<change>/brief.md` carries an `Approved:` line.
 fn approve_brief(repo: &Path, subject: &str) {
     let change = format!("c-{subject}");
-    ok(repo, &["change", "new", &change, "--subject", subject, "--title", "The brief"]);
+    ok(repo, &["change", "new", &change, "--subject-id", subject, "--title", "The brief"]);
     let brief = repo.join(".canon/changes").join(&change).join("brief.md");
     // These tests are about evidence, not the brief's format: a pre-0.19 brief is read as before.
     std::fs::write(brief, "# The brief\n\n## Why\n\nThe brief.\n\nApproved: Journey 2026-10-12 — \"승인\"\n").unwrap();

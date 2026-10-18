@@ -10,7 +10,7 @@ subjects (1):
   building (1):
     cart: 1 scenarios, 1 evidenced, 1 reviewed, 1 open blockers
       brief: approved in .canon/changes/c-cart/brief.md — Journey 2026-10-08 — "approved, go ahead"
-      advisory: that approval has no digest, so it does not follow the brief's text; re-approve with `canon brief approve --change c-cart --by <the human> --note "<their words>"` to bind it
+      advisory: that approval has no digest, so it does not follow the brief's text; re-approve with `canon brief approve --change-id c-cart --by <the human> --note "<their words>"` to bind it
 
 unowned: none
 

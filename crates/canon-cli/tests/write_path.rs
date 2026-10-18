@@ -228,7 +228,7 @@ fn a_promote_on_write_commits_only_its_own_record() {
     assert_eq!((staged(repo), committed(repo, "divergence")), (2, 1), "the other reviewer's candidate is still staged");
 
     let all = ok(repo, &["gate", "promote"]);
-    assert!(stdout(&all).contains("canon gate promote: promoted evidence_record=1"), "{}", stdout(&all));
+    assert!(stdout(&all).contains("canon gate promote: promoted evidence=1"), "{}", stdout(&all));
     ok(repo, &["divergence", "promote"]);
     assert_eq!((staged(repo), committed(repo, "evidence_record"), committed(repo, "divergence")), (0, 2, 2));
 }
@@ -287,7 +287,7 @@ fn a_reader_refreshes_a_stale_index_once_and_names_the_files() {
     let dir = init_repo();
     let repo = dir.path();
     ok(repo, &["subject", "new", "runs", "--domain", "dev", "--title", "Runs", "--actor-id", "lead"]);
-    ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure", "--subject", "runs"]);
+    ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure", "--subject-id", "runs"]);
     assert!(scenario_records(repo).is_empty(), "scenario new writes no index record");
 
     let out = ok(repo, &["status", "--json"]);
@@ -338,7 +338,7 @@ fn review_add_and_subject_status_need_no_sync_step() {
     let dir = init_repo();
     let repo = dir.path();
     ok(repo, &["subject", "new", "runs", "--domain", "dev", "--title", "Runs", "--actor-id", "lead"]);
-    ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure", "--subject", "runs"]);
+    ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure", "--subject-id", "runs"]);
     let review = ok(repo, &[
         "review", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--reviewer", "rev", "--pin", "p", "--original-spec-ref", "specs/x.feature",
         "--role", "reviewer", "--actor-id", "rev",
@@ -485,7 +485,7 @@ fn inventory_sync_47_an_unrefreshable_root_fails_the_gate_the_ship_guard_and_sta
     std::fs::create_dir_all(repo.join(".canon")).unwrap();
     std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_evidence: true\n").unwrap();
     ok(repo, &["subject", "new", "demo", "--domain", "game", "--title", "Demo", "--actor-id", "lead"]);
-    ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--subject", "demo", "--case", "failure"]);
+    ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--subject-id", "demo", "--case", "failure"]);
     ok(repo, &evidence("game.run.01"));
     for state in ["specced", "building", "verifying"] {
         ok(repo, &["subject", "status", "demo", "--to", state, "--actor-id", "lead"]);

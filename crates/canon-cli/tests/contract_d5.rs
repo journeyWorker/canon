@@ -29,7 +29,7 @@ fn repo() -> TempDir {
     let r = dir.path();
     ok(r, &["init", "--providers", "none"]);
     ok(r, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(r, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
+    ok(r, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
     ok(r, &["feature", "new", "auth.login", "--title", "Login"]);
     ok(r, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--feature", ".canon/specs/kind=feature/area=auth/login.feature"]);
     ok(r, &["inventory", "sync"]);
@@ -98,15 +98,15 @@ fn divergence_status_projects_each_scenario_row() {
 fn export_projects_each_record_but_keeps_the_manifest_digests() {
     let dir = repo();
     ok(dir.path(), &["evidence", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer"]);
-    let all = body(&run(dir.path(), &["export", "--kind", "evidence_record"]));
+    let all = body(&run(dir.path(), &["export", "--kind", "evidence"]));
     assert_eq!(all["records"].as_array().unwrap().len(), 1);
-    let out = run(dir.path(), &["export", "--kind", "evidence_record", "--fields", "id,digest"]);
+    let out = run(dir.path(), &["export", "--kind", "evidence", "--fields", "id,digest"]);
     let shown = body(&out);
     let mut record_keys = keys(&shown["records"][0]);
     record_keys.sort();
     assert_eq!(record_keys, ["digest", "id"]);
     assert_eq!(shown["content_digests"], all["content_digests"], "the manifest's digests do not depend on the projection");
-    let out = run(dir.path(), &["export", "--kind", "evidence_record", "--fields", "nope", "--json"]);
+    let out = run(dir.path(), &["export", "--kind", "evidence", "--fields", "nope", "--json"]);
     assert_eq!(out.status.code(), Some(2));
     assert_eq!(body(&out)["error"]["code"], "UNKNOWN_FIELD");
 }
@@ -130,7 +130,7 @@ fn usage_errors_name_the_argument_and_its_possible_values() {
     let dir = repo();
     let e = error_of(dir.path(), &["query", "--kind", "nope"]);
     assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("USAGE"), Some("--kind")));
-    assert!(strings(&e["expected"]).contains(&"evidence_record"));
+    assert!(strings(&e["expected"]).contains(&"evidence"));
 
     let e = error_of(dir.path(), &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "nope", "--reviewer", "a", "--summary", "s"]);
     assert_eq!(e["field"], "--severity");
@@ -140,7 +140,7 @@ fn usage_errors_name_the_argument_and_its_possible_values() {
     assert_eq!(e["field"], "--disposition");
     assert_eq!(strings(&e["expected"]), ["open", "fixed", "rejected", "deferred"]);
 
-    let e = error_of(dir.path(), &["change", "new", "x", "--subject", "demo", "--title", "t", "--kind", "nope"]);
+    let e = error_of(dir.path(), &["change", "new", "x", "--subject-id", "demo", "--title", "t", "--kind", "nope"]);
     assert_eq!(e["field"], "--kind");
     assert_eq!(strings(&e["expected"]), ["feature", "chore"]);
 
@@ -173,7 +173,7 @@ fn input_validation_refusals_name_the_field_and_the_accepted_values() {
     assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("QUERY_INVALID_ARGUMENT"), Some("--status")));
     assert!(strings(&e["expected"]).contains(&"proposed"), "{e}");
 
-    let e = error_of(dir.path(), &["query", "--kind", "evidence_record", "--domain", "dev"]);
+    let e = error_of(dir.path(), &["query", "--kind", "evidence", "--domain", "dev"]);
     assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("QUERY_INVALID_ARGUMENT"), Some("--domain")));
 
     let e = error_of(dir.path(), &["finding", "close", "--change-id", "add-login", "--round", "1", "--seq", "1", "--disposition", "fixed"]);

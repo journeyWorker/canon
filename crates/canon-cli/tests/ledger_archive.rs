@@ -160,9 +160,9 @@ fn an_append_moves_the_superseded_versions_and_default_reads_see_the_ledger_only
     }
     assert_eq!(ledger_count(repo, "evidence_record"), 1, "the ledger holds one file per key");
     assert_eq!(archive_count(repo, "evidence_record"), 2, "the two older versions moved to .canon/archive");
-    assert_eq!(query_count(repo, "evidence_record", false), 1);
-    assert_eq!(query_count(repo, "evidence_record", true), 3, "--history returns every version");
-    assert!(canon(repo, &["query", "--kind", "evidence_record", "--history", "--plugin", "p"]).status.code() == Some(2), "--history does not combine with --plugin");
+    assert_eq!(query_count(repo, "evidence", false), 1);
+    assert_eq!(query_count(repo, "evidence", true), 3, "--history returns every version");
+    assert!(canon(repo, &["query", "--kind", "evidence", "--history", "--plugin", "p"]).status.code() == Some(2), "--history does not combine with --plugin");
 }
 
 #[test]
@@ -206,7 +206,7 @@ fn compaction_is_idempotent_and_the_gate_and_status_say_the_same_after_it() {
     let (gate_after, gate_out_after) = gate(repo);
     assert_eq!((gate_before, &gate_out_before), (gate_after, &gate_out_after), "gate check is unchanged by compaction");
     assert_eq!(status_before, status_json(repo), "status is unchanged by compaction");
-    assert_eq!(query_count(repo, "evidence_record", true), 4, "history still has every version");
+    assert_eq!(query_count(repo, "evidence", true), 4, "history still has every version");
 }
 
 #[test]

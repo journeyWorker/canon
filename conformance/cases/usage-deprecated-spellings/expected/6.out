@@ -1,0 +1,13 @@
+{
+  "count": 0,
+  "kind": "review",
+  "meta": {
+    "hasMore": false,
+    "nextCursor": null,
+    "returned": 0,
+    "total": 0
+  },
+  "records": [],
+  "since": null,
+  "violations": 0
+}

@@ -390,11 +390,11 @@ fn status_next_names_the_command_for_each_gap() {
     assert_eq!(
         commands(&report),
         [
-            "canon scenario new world.demo.03 --title \"<what happens on this path>\" --subject demo-subject --case failure",
+            "canon scenario new world.demo.03 --title \"<what happens on this path>\" --subject-id demo-subject --case failure --actor-id <unit>",
             "canon evidence add --scenario-id world.demo.02 --project-id demo --kind test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
             "canon finding close --change-id c-demo-subject --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
             "canon review add --project-id demo --scenario-id world.demo.01 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"",
-            "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject empty-subject --case happy",
+            "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id empty-subject --case happy --actor-id <unit>",
         ]
     );
     assert_eq!(report["nextOmitted"], 0);
@@ -459,7 +459,7 @@ fn status_treats_an_invalid_coverage_policy_as_a_blocking_gap() {
 }
 
 /// Finding 3: with several spec roots, `canon scenario new` refuses a call
-/// without `--project`. Status names the owning root exactly, and the
+/// without `--project-id`. Status names the owning root exactly, and the
 /// suggested command runs as printed.
 #[test]
 fn status_names_the_spec_root_when_several_are_configured() {
@@ -476,26 +476,26 @@ fn status_names_the_spec_root_when_several_are_configured() {
     seed_subject(dir.path(), "empty-subject", SubjectStatus::Building, &[]);
     // A real feature file under the configured `demo` root: an index
     // record no feature file declares is marked removed by the refresh.
-    let authored = run(dir.path(), &["scenario", "new", "world.demo.01", "--title", "seeded", "--subject", "demo-subject", "--case", "happy", "--project", "demo"]);
+    let authored = run(dir.path(), &["scenario", "new", "world.demo.01", "--title", "seeded", "--subject-id", "demo-subject", "--case", "happy", "--project-id", "demo"]);
     assert!(authored.status.success(), "{}", String::from_utf8_lossy(&authored.stderr));
 
     let report = status_json(dir.path());
     let next = commands(&report);
-    let case_step = "canon scenario new world.demo.02 --title \"<what happens on this path>\" --subject demo-subject --case failure --project demo";
+    let case_step = "canon scenario new world.demo.02 --title \"<what happens on this path>\" --subject-id demo-subject --case failure --actor-id <unit> --project-id demo";
     assert_eq!(next[0], case_step, "{report}");
-    assert!(next.contains(&"canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject empty-subject --case happy --project <root-id>".to_string()), "{report}");
+    assert!(next.contains(&"canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id empty-subject --case happy --actor-id <unit> --project-id <root-id>".to_string()), "{report}");
     let empty = report["next"].as_array().unwrap().iter().find(|n| n["command"].as_str().unwrap().contains("empty-subject")).unwrap();
     assert!(empty["why"].as_str().unwrap().ends_with("(spec roots: demo, other)"), "{empty}");
 
     let bin_dir = Path::new(env!("CARGO_BIN_EXE_canon")).parent().unwrap().to_path_buf();
     let path = format!("{}:{}", bin_dir.display(), std::env::var("PATH").unwrap_or_default());
-    let out = Command::new("sh").arg("-c").arg(case_step).env("PATH", path).current_dir(dir.path()).output().unwrap();
-    assert!(out.status.success(), "the suggested command must run as printed: {}", stderr(&out));
+    let out = Command::new("sh").arg("-c").arg(case_step.replace("<unit>", "unit-a")).env("PATH", path).current_dir(dir.path()).output().unwrap();
+    assert!(out.status.success(), "the suggested command must run once its placeholder is filled: {}", stderr(&out));
     let written = stdout(&out);
     assert!(written.contains("wrote `@world.demo.02` to ") && written.contains("/specs/demo/"), "written under the demo root: {written}");
 }
 
-/// One spec root: no `--project`, which `canon scenario new` would not need.
+/// One spec root: no `--project-id`, which `canon scenario new` would not need.
 #[test]
 fn status_omits_the_spec_root_flag_with_one_root() {
     let dir = repo();
@@ -503,7 +503,7 @@ fn status_omits_the_spec_root_flag_with_one_root() {
     seed_subject(dir.path(), "demo-subject", SubjectStatus::Building, &[]);
     seed_scenario(dir.path(), "world.demo.01", Some("demo-subject"), Some("happy"));
     let report = status_json(dir.path());
-    assert!(commands(&report).iter().all(|c| !c.contains("--project ")), "{report}");
+    assert!(commands(&report).iter().filter(|c| c.starts_with("canon scenario new") || c.starts_with("canon feature new")).all(|c| !c.contains("--project-id ")), "{report}");
 }
 
 #[test]
@@ -648,7 +648,7 @@ fn context_status_61_an_unapproved_brief_is_the_only_human_step_and_blocks_the_m
     let whys: Vec<&str> = report["next"].as_array().unwrap().iter().filter(|n| n["actor"] == "human").map(|n| n["why"].as_str().unwrap()).collect();
     assert!(whys[0].contains(".canon/changes/c-demo-subject/brief.md"), "{}", whys[0]);
     for why in &whys {
-        assert!(why.contains("`canon brief approve --change ") && why.contains("--by <the human> --note"), "{why}");
+        assert!(why.contains("`canon brief approve --change-id ") && why.contains("--by <the human> --note"), "{why}");
         assert!(why.contains("`canon evidence add` refuses demo-subject's scenarios and tasks"), "{why}");
     }
     let demo = subject(&report, "demo-subject");
@@ -832,7 +832,7 @@ fn context_status_64_an_external_change_is_answered_in_a_canon_brief_that_points
     assert!(
         why.contains(".canon/changes/c-live/brief.md does not exist yet")
             && why.contains("create .canon/changes/c-live/brief.md holding a `Source: plans/changes/c-live/proposal.md` line")
-            && why.contains("`canon brief approve --change c-live --by <the human> --note"),
+            && why.contains("`canon brief approve --change-id c-live --by <the human> --note"),
         "{why}"
     );
     let text = stdout(&run(dir.path(), &["status"]));
@@ -966,7 +966,7 @@ fn status_with_no_feature_scenarios_points_at_writing_them() {
     let commands = commands(&report);
     assert_eq!(
         commands,
-        ["canon feature new <area>.<surface> --title \"<feature>\"", "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject demo-subject --case happy"],
+        ["canon feature new <area>.<surface> --title \"<feature>\" --actor-id <unit>", "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id demo-subject --case happy --actor-id <unit>"],
         "{report}"
     );
     assert!(!commands.iter().any(|c| c.contains("inventory sync")), "{report}");
@@ -1005,7 +1005,7 @@ fn context_status_66_a_proposed_subject_with_an_unapproved_brief_asks_only_the_h
     assert!(human_steps(&report).is_empty(), "{report}");
     assert_eq!(
         commands(&report),
-        ["canon feature new <area>.<surface> --title \"<feature>\"", "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject demo-subject --case happy"],
+        ["canon feature new <area>.<surface> --title \"<feature>\" --actor-id <unit>", "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id demo-subject --case happy --actor-id <unit>"],
         "{report}"
     );
 }
@@ -1030,9 +1030,9 @@ fn context_status_67_a_proposed_subject_with_no_brief_keeps_its_steps_and_its_br
     assert_eq!(
         commands(&report),
         [
-            "canon feature new <area>.<surface> --title \"<feature>\"",
-            "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject bare-subject --case happy",
-            "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject draft-subject --case happy",
+            "canon feature new <area>.<surface> --title \"<feature>\" --actor-id <unit>",
+            "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id bare-subject --case happy --actor-id <unit>",
+            "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id draft-subject --case happy --actor-id <unit>",
         ],
         "{report}"
     );
@@ -1062,7 +1062,7 @@ fn context_status_68_no_step_names_a_sync_while_readers_refresh() {
     let report = status_json(dir.path());
     assert_eq!(report["nextOmitted"], 0, "{report}");
     let steps = report["next"].as_array().unwrap();
-    let empty = steps.iter().find(|n| n["command"].as_str().unwrap().contains("--subject empty-subject")).unwrap_or_else(|| panic!("{report}"));
+    let empty = steps.iter().find(|n| n["command"].as_str().unwrap().contains("--subject-id empty-subject")).unwrap_or_else(|| panic!("{report}"));
     assert_eq!(empty["why"], "empty-subject owns no scenario; specify its behavior, one scenario per behavior", "{report}");
     let unowned = steps.last().unwrap();
     assert_eq!(unowned["command"], "canon status", "{report}");
