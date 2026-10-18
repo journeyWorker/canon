@@ -134,3 +134,106 @@ Feature: context capability
     When the capability outline is printed
     Then its second line warns that the gate requires no evidence, failure cases or review here
     And the schema outline follows after a blank line
+
+  # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:happy
+  @context.capability.14
+  Scenario: One concept has one flag spelling across every command
+    Given the whole command tree as `canon schema --all --json` and `canon schema <command> --json` show it
+    When every visible flag of every command is read
+    Then no two flags differ only by an -id suffix
+    And change, project, subject, actor, scenario, session and run each appear only as --<name>-id
+
+  # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:happy
+  @context.capability.15
+  Scenario: A --kind value never carries the _record suffix
+    Given the --kind options of query, export and purge
+    When their accepted values are listed by `canon schema <command> --json`
+    Then every value is a record kind without the _record suffix, so evidence_record is evidence
+    And the record's own kind field, the ledger directories and the canon.yaml routing keys keep their stored names
+
+  # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:happy
+  @context.capability.16
+  Scenario: A deprecated flag spelling still runs, warns once on stderr and is named in meta.deprecated
+    Given a repo with a change and a brief
+    When `canon brief check --change <slug> --json` runs, the spelling 0.23 took
+    Then it runs as `--change-id <slug>` would and exits the same
+    And stderr carries exactly one line, `canon brief check: --change is deprecated — use --change-id (removed in 0.25.0)`
+    And the JSON envelope's meta.deprecated holds one entry with used `--change`, use `--change-id` and removedIn 0.25.0, and is absent when no deprecated spelling was used
+
+  # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:happy
+  @context.capability.17
+  Scenario: A deprecated --kind value still runs and warns with the value to use instead
+    Given a repo with no records
+    When `canon query --kind review_record --json` runs
+    Then it reads the review records as `--kind review` does
+    And stderr carries exactly one line, `canon query: --kind review_record is deprecated — use --kind review (removed in 0.25.0)`
+    And meta.deprecated holds one entry with used `--kind review_record` and use `--kind review`
+
+  # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:edge
+  @context.capability.18
+  Scenario: Help hides the deprecated spellings and schema lists them per option
+    Given the help of a command that renamed a flag, and of query
+    When the help is printed
+    Then it shows --change-id and the kinds without the _record suffix, and none of the deprecated spellings
+    And `canon schema <command> --json` lists each renamed option's old spellings as deprecatedAliases
+    And the --kind option of query, export and purge lists its old values as deprecatedValues, each with the value to use
+
+  # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:edge
+  @context.capability.19
+  Scenario: A token after -- or the value of an option is never read as a deprecated spelling
+    Given a command line that carries a deprecated spelling only after `--`, or as the value of another option
+    When the command runs
+    Then nothing is rewritten and no deprecation line is printed
+    And `--change=<slug>` with an equals sign is read as the deprecated spelling like `--change <slug>`
+
+  # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:failure
+  @context.capability.20
+  Scenario: A usage error names the canonical spelling, not the deprecated one
+    Given a command that accepts a deprecated spelling
+    When it runs without the value of that option
+    Then the usage error names the canonical option, `--change-id`, never the deprecated one
+    And it exits 2 with a hint
+
+  # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:edge
+  @context.capability.21
+  Scenario: A scenario batch line may still carry the deprecated key names and warns once
+    Given an NDJSON file for `canon scenario new --from` whose lines use the keys subject, change and project
+    When the batch runs
+    Then every scenario is written as with subject-id, change-id and project-id
+    And stderr carries one deprecation line for each deprecated key used, however many lines use it
+
+  # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:failure
+  @context.capability.22
+  Scenario: A checker over the command tree reports a concept spelled two ways
+    Given a list of commands whose flags include both --change and --change-id
+    When the one-name checker runs over it
+    Then it reports the split by the two spellings and the commands that carry each
+    And a concept written without its -id suffix and a --kind value ending in _record are each reported
+
+  # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
+  @subject:context-capability
+  @case:happy
+  @context.capability.23
+  Scenario: Gate promote tallies the staged kinds by the names --kind takes
+    Given a staged evidence record and a staged finding
+    When `canon gate promote` runs
+    Then its tally reads `evidence=1, finding=1`, the names `canon query --kind` takes
+    And with nothing staged, the line that lists the promotable kinds uses the same names
