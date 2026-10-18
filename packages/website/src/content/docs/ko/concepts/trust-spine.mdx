@@ -215,6 +215,13 @@ confirmed, owed, refuted 개수를 보여줍니다.
 남고, 새 기록은 자기 파일을 기준으로 다시 리뷰됩니다. audit도 같은 방식으로
 refuted를 대체하므로, 반례가 confirmed audit에 딸려 가지 않습니다.
 
+스위트 일괄에서는 테스트 리포트가 각 테스트의 파일을 실어 나릅니다. Playwright의
+JUnit 리포터는 테스트가 첨부한 것(`testInfo.attach(name, {path})` 또는
+`screenshot: 'on'`)을 테스트 케이스마다 붙이고, 각 기록은 자기 테스트의
+파일만 묶습니다. 리포트가 이름 붙이지 않은 파일은
+`--artifact <scenario-id>=<path>`로 묶으며, 일괄에서 경로만 준 `--artifact`는
+거부됩니다.
+
 ## 실험 기능: 증거 바인딩
 
 증거 기록은 신고입니다 — canon은 `--ref`를 실행하지 않으며, 팀이 쓰는 모든

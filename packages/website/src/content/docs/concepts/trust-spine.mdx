@@ -135,7 +135,7 @@ different verdict or a different set of cases, and the review is stale —
 `unreviewed-promotion` naming the spec, the evidence, or both. Recording
 the suite again with the same verdicts from the same cases is new evidence
 that says the same thing, so the review stays current. A chore, which adds
-no scenarios, is reviewed as a change instead: `canon review add --change
+no scenarios, is reviewed as a change instead: `canon review add --change-id
 <slug>` pins its brief, and shipping needs that one review. Only a `signed`
 review counts; a reviewer run recorded `--outcome indeterminate` or
 `unavailable` is a gap, and the latest review per reviewer wins. Reviews
@@ -227,6 +227,12 @@ record, in one add or in a suite batch, and there is no drop flag: history
 keeps the earlier records, and a new record is reviewed on its own files. An
 audit replaces a refutation the same way, so a counterexample never rides
 along into a confirming audit.
+
+In a suite batch the test report carries each test's files: Playwright's JUnit
+reporter attaches, per test case, what a test attaches
+(`testInfo.attach(name, {path})`, or `screenshot: 'on'`), and each record binds
+only its own tests' files. A file the report does not name goes with
+`--artifact <scenario-id>=<path>`; a bare `--artifact` in a batch is refused.
 
 ## Experimental: evidence binding
 
