@@ -209,7 +209,7 @@ rollback이 아니며 rollback record도 만들지 않습니다. 명시적 rollb
 별도 작업입니다:
 
 ```bash
-canon learn rollback 01J...ULID --reason "regression" --actor alice \
+canon learn rollback 01J...ULID --reason "regression" --actor-id alice \
   --signature-file rollback.sig --approved-at 2026-10-02T12:00:00Z \
   --contradicting-trajectory-id 01J...TRAJECTORY --repo .
 ```

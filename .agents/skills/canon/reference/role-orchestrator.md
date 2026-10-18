@@ -10,7 +10,7 @@ Every line is complete; fill the `<placeholders>`.
 
 ```bash
 canon status --as orchestrator --json --fields next,waitingOn   # at the start and when resuming
-canon brief approve --change <slug> --by "<the human>" --note "<their words>" --as orchestrator --json
+canon brief approve --change-id <slug> --by "<the human>" --note "<their words>" --as orchestrator --json
 canon subject status <subject-id> --to <proposed|specced|building|verifying|shipped> --actor-id <unit> --as orchestrator --json
 canon subject status <subject-id> --to verifying --reason "<why>" --actor-id <unit> --as orchestrator --json   # reopen a shipped subject (--reason is required here; any other transition accepts it as a note)
 canon policy show --as orchestrator --json            # policy digest and its approval: approved, changed, unreadable or unapproved
@@ -82,7 +82,7 @@ change, then `--to shipped` again. A chore on a shipped subject (`change
 new … --kind chore` names the reopen command) is approved first, then
 reopened the same way; shipping again needs the whole suite evidenced after
 the chore's approval (the implementer's `evidence add --all-scenarios`) and
-one change-level review of the chore from the reviewer (`review add --change
+one change-level review of the chore from the reviewer (`review add --change-id
 <slug>`): the order is approval, evidence, review. A blocker closed
 `fixed` needs the suite again. The refusal names the scenarios and
 the command; never override them. `canon status` flags a shipped subject

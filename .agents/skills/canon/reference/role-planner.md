@@ -12,17 +12,17 @@ Every line is complete; fill the `<placeholders>`.
 ```bash
 canon status --as planner --json                      # once, at the start
 canon subject new <subject-id> --domain <domain> --title "<title>" --actor-id <unit> --as planner --json
-canon change new <slug> --subject <subject-id> --title "<title>" --as planner --json
-canon change new <slug> --subject <subject-id> --kind chore --title "<title>" --as planner --json
-canon subject adopt <slug> --subject <other-subject-id> --as planner --json
-canon brief check --change <slug> --as planner --json
-canon brief approve --change <slug> --by "<the human>" --note "<their words>" --as planner --json
+canon change new <slug> --subject-id <subject-id> --title "<title>" --as planner --json
+canon change new <slug> --subject-id <subject-id> --kind chore --title "<title>" --as planner --json
+canon subject adopt <slug> --subject-id <other-subject-id> --as planner --json
+canon brief check --change-id <slug> --as planner --json
+canon brief approve --change-id <slug> --by "<the human>" --note "<their words>" --as planner --json
 ```
 
 After the first `status`, follow `meta.next` of each write. `brief check`
 lists blockers and advisories; bare `canon brief --as planner` names the next
 steps. While the brief has blockers, `status` and `change new`'s `meta.next`
-send you to write it (`write the brief: canon brief check --change <slug>
+send you to write it (`write the brief: canon brief check --change-id <slug>
 lists N blockers`); the human step appears only once the brief is clean and
 unapproved. A policy that no longer matches its approval fails closed
 (`POLICY_CHANGED_SINCE_APPROVAL`): never edit it; the human re-approves.
@@ -80,7 +80,7 @@ category, invariants, checks, out of scope) and approved like any brief, one
 human stop. A chore adds no scenarios: the
 implementer runs the subject's suite again and binds it with
 `canon evidence add --all-scenarios …`, then the reviewer records one
-change-level review of the chore (`canon review add --change <slug>`). On a
+change-level review of the chore (`canon review add --change-id <slug>`). On a
 shipped subject `change new` prints the reopen command for the orchestrator
 (`subject status <id> --to verifying --reason "<why>"`); the subject cannot
 ship again until the suite is evidenced after the chore's approval. Work that

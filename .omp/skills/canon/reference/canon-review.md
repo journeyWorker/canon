@@ -142,7 +142,7 @@ canon review add --project-id <root-id> --scenario-id <id> [--scenario-id <id>].
   [--outcome signed|indeterminate|unavailable] \
   [--reviewer-provider <p>] [--reviewer-model <m>] [--reviewer-harness <h>] \
   [--artifact <path>]... [--max-artifact-mib <MiB>]
-canon review add --project-id <root> --change <slug> --reviewer <who> --pin <sha-or-ref> \
+canon review add --project-id <root> --change-id <slug> --reviewer <who> --pin <sha-or-ref> \
   --role reviewer (--upstream-ref <ref> | --original-spec-ref <ref>) …   # a chore, below
 ```
 
@@ -169,18 +169,18 @@ that is not a scenario id, refuses the call (exit 2) and writes no review.
 This is also the batch re-pin after `canon evidence add` reports reviews
 it made stale (see `canon-gate`).
 
-### A chore is reviewed as a change (`--change`, 0.23)
+### A chore is reviewed as a change (`--change-id`, 0.23)
 
 A chore adds no scenarios, and recording the suite again after it leaves
 every scenario review current (a review pins the evidence's verdict and
 checks, so the same verdicts from the same cases change nothing). What the
 chore needs instead is one change-level review: the reviewer signs its
-invariants and checks against the diff with `canon review add --change
+invariants and checks against the diff with `canon review add --change-id
 <slug> …`, in place of `--scenario-id`. The review pins the chore's brief
 (its digest, less the `Approved:` line), so an edit to the brief stales it,
 and `--to shipped` refuses a chore with no signed, current change-level
 review (`spec_coverage.require_review.distinct_actor` asks it of a reviewer
-and session that did not attest the subject's evidence). `--change` takes a
+and session that did not attest the subject's evidence). `--change-id` takes a
 chore's slug and refuses a feature change.
 
 ### What the reviewer looked at (artifacts)
