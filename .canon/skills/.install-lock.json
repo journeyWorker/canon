@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "canon_version": "0.23.0",
-  "source_commit": "82bc7ff958f1ed075cd61c9062b01c3663f38b68",
+  "canon_version": "0.24.0",
+  "source_commit": "13b759c53a0310a90f8b2bb7a7883222b4003c85",
   "source_hash": "sha256:cef9f113b6c561580ee14d66d506d3346104693e1e4839896b485a18e6b94af0",
   "providers": [
     "claude",
