@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-022-p2-impl",
+    "role": "implementer",
+    "session_id": "canon-022-p2-impl"
+  },
+  "at": "2026-10-16T17:40:43.694284611Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test status context_status_61_an_unapproved_brief_is_the_only_human_step_and_blocks_the_move_on"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 50,
+  "scenario_id": "context.status.61",
+  "schema": 1,
+  "staging_id": "d556d3bb561c",
+  "verdict": "faithful"
+}

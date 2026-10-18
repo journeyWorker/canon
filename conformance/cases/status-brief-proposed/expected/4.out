@@ -15,5 +15,5 @@ subjects (1):
 unowned: none
 
 next:
-  # cart: .canon/changes/cart-v1/brief.md has no `Approved:` line (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses cart's scenarios and tasks until it is recorded; once the human answers, record their words with `canon brief approve --change cart-v1 --by <the human> --note "<their words>"` (one call records the brief and the policy approval)
-  human: stop and report the brief in .canon/changes/cart-v1/brief.md; build and attest nothing for cart until the human answers (one answer approves brief and policy)
+  # cart: write the brief: `canon brief check --change cart-v1` lists 7 blocker(s) in .canon/changes/cart-v1/brief.md; once it has none, stop and report it to the human, and build and attest nothing for cart until the human answers (one answer approves brief and policy)
+  canon brief check --change cart-v1

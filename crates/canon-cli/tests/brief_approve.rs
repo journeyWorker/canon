@@ -167,3 +167,80 @@ fn a_line_in_a_fence_is_not_an_approval_and_does_not_leave_the_digest() {
     std::fs::write(brief_path(repo), brief.replace("Mallory", "Eve")).unwrap();
     assert!(status_text(repo).contains("BRIEF_CHANGED_SINCE_APPROVAL"), "{}", status_text(repo));
 }
+
+/// `canon status --json --fields next,waitingOn`, as `role` when given.
+fn next_as(repo: &Path, role: Option<&str>) -> Value {
+    let mut args = vec!["status", "--json", "--fields", "next,waitingOn"];
+    args.extend(role.map(|role| ["--as", role]).into_iter().flatten());
+    let out = run(repo, &args);
+    assert!(out.status.success(), "{}", stderr(&out));
+    serde_json::from_slice(&out.stdout).unwrap()
+}
+
+/// context.status.71 (0.22 D3, #70): while `canon brief check` finds
+/// blockers, the unapproved brief's step is the planner's, not the human's;
+/// the evidence guard still refuses.
+#[test]
+fn context_status_71_a_brief_that_still_fails_brief_check_is_the_planners_to_write() {
+    let dir = TempDir::new().unwrap();
+    let repo = dir.path();
+    ok(repo, &["init", "--providers", "none"]);
+    ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
+    let created = run(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login", "--as", "planner"]);
+    assert!(created.status.success(), "{}", stderr(&created));
+    let printed = stdout(&created);
+    assert!(printed.contains("next: canon brief check --change add-login — demo: write the brief"), "{printed}");
+    assert!(!printed.contains("waiting on human") && !printed.contains("human:"), "{printed}");
+
+    // The skeleton, then a brief with one placeholder left: the planner's step either way.
+    for (draft, blockers) in [(None, 7), (Some(en_brief("").replace("Visitors lose their cart when they switch devices.", "TODO")), 1)] {
+        if let Some(draft) = draft {
+            std::fs::write(brief_path(repo), draft).unwrap();
+        }
+        let check: Value = serde_json::from_slice(&run(repo, &["brief", "check", "--change", "add-login", "--json"]).stdout).unwrap();
+        assert_eq!(check["counts"]["blockers"], blockers, "{check}");
+        let step = serde_json::json!([{
+            "actor": "agent",
+            "role": "planner",
+            "command": "canon brief check --change add-login",
+            "why": format!("demo: write the brief: `canon brief check --change add-login` lists {blockers} blocker(s) in .canon/changes/add-login/brief.md; once it has none, stop and report it to the human, and build and attest nothing for demo until the human answers (one answer approves brief and policy)"),
+        }]);
+        assert_eq!(next_as(repo, None)["next"], step);
+        let planner = next_as(repo, Some("planner"));
+        assert_eq!(planner["next"], step);
+        assert!(planner["waitingOn"].get("human").is_none(), "{planner}");
+        let orchestrator = next_as(repo, Some("orchestrator"));
+        assert_eq!((orchestrator["next"].as_array().unwrap().len(), &orchestrator["waitingOn"]), (0, &serde_json::json!({ "planner": 1 })), "{orchestrator}");
+    }
+
+    let tasks = repo.join(".canon/changes/add-login/tasks.md");
+    let mut text = std::fs::read_to_string(&tasks).unwrap_or_else(|_| "# Tasks: Add login\n".to_string());
+    text.push_str("\n- [ ] 1 Write the failure-path scenarios\n");
+    std::fs::write(&tasks, text).unwrap();
+    ok(repo, &["ingest", "plans"]);
+    let attest = run(repo, &ATTEST);
+    assert_eq!(attest.status.code(), Some(1), "only the suggested step changes, not the guard: {}", stderr(&attest));
+    assert!(stderr(&attest).contains("unreviewed-promotion demo"), "{}", stderr(&attest));
+}
+
+/// context.status.72 (0.22 D3, #70): a brief `canon brief check` finds
+/// clean, still unapproved, is the human's stop.
+#[test]
+fn context_status_72_once_brief_check_finds_no_blockers_the_unapproved_brief_is_the_humans_stop() {
+    let dir = repo_with_clean_brief();
+    let repo = dir.path();
+    let all = next_as(repo, None);
+    let steps = all["next"].as_array().unwrap();
+    assert_eq!(steps.len(), 1, "{all}");
+    assert_eq!((steps[0]["actor"].as_str(), &steps[0]["role"]), (Some("human"), &Value::Null), "{all}");
+    assert_eq!(
+        steps[0]["command"],
+        "stop and report the brief in .canon/changes/add-login/brief.md; build and attest nothing for demo until the human answers (one answer approves brief and policy)"
+    );
+    let planner = next_as(repo, Some("planner"));
+    assert_eq!((planner["next"].as_array().unwrap().len(), &planner["waitingOn"]), (0, &serde_json::json!({ "human": 1 })), "{planner}");
+
+    ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go."]);
+    let after = next_as(repo, None);
+    assert!(after["next"].as_array().unwrap().iter().all(|step| step["actor"] == "agent"), "{after}");
+}

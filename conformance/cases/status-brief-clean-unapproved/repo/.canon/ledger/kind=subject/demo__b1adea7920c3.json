@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "lead",
+    "role": "implementer"
+  },
+  "at": "2026-10-16T17:32:18.766084268Z",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "proposed",
+  "subject_id": "demo",
+  "summary": "",
+  "title": "Demo"
+}

@@ -1,0 +1,20 @@
+# canon policy level: strict
+# .canon/policy.yaml -- scaffolded by `canon init`.
+#
+# This file is what `canon gate check` grades the work against. A human
+# should review and approve it, and every later change to it, with
+# `canon policy approve --by <who>`: the agent doing the work should not
+# write the rules it is graded by.
+spec_coverage:
+  # Every scenario in the spec corpus needs evidence (`canon evidence
+  # add`). Add `scope: [building, verifying]` to check only scenarios
+  # whose subject is in one of those statuses.
+  require_evidence: true
+  # Every feature surface (`<area>.<surface>`) needs at least one
+  # `@case:failure` scenario, so no feature is specified by its golden
+  # path alone.
+  require_cases: [failure]
+  # Every scenario of a subject in `verifying` or `shipped` needs a
+  # review (`canon review add`) by an actor other than its evidence
+  # author, and an open blocker finding on an adopted change blocks.
+  require_review: {}

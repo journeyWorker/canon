@@ -1,0 +1,10 @@
+{
+  "next": [
+    {
+      "actor": "human",
+      "command": "stop and report the brief in .canon/changes/add-login/brief.md; build and attest nothing for demo until the human answers (one answer approves brief and policy)",
+      "role": null,
+      "why": "demo: .canon/changes/add-login/brief.md has no `Approved:` line (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses demo's scenarios and tasks until it is recorded; once the human answers, record their words with `canon brief approve --change add-login --by <the human> --note \"<their words>\"` (one call records the brief and the policy approval)"
+    }
+  ]
+}

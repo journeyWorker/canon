@@ -189,7 +189,7 @@ Feature: context status
   @case:failure
   @context.status.61
   Scenario: An unapproved brief is the only human step and withholds the move-on
-    Given a verifying subject whose scenarios are all evidenced and reviewed, and whose newest change's brief.md has no "Approved:" line
+    Given a verifying subject whose scenarios are all evidenced and reviewed, and whose newest change's brief.md has no "Approved:" line and no finding canon brief check blocks approval on
     And a building subject that adopts no change
     When canon status runs
     Then the verifying subject gets one step whose actor is human: stop and report the brief, building and attesting nothing for the subject until the human answers, one answer covering brief and policy
@@ -264,7 +264,7 @@ Feature: context status
   @case:failure
   @context.status.66
   Scenario: A proposed subject whose brief is unapproved shows the brief and asks only the human
-    Given a proposed subject owning no scenario, whose newest adopted change has a brief.md with no "Approved:" line, in a repo whose .feature files hold no scenario
+    Given a proposed subject owning no scenario, whose newest adopted change has a brief.md with no "Approved:" line and no finding canon brief check blocks approval on, in a repo whose .feature files hold no scenario
     When canon status runs
     Then the subject shows its brief as not approved, naming that brief.md, in --json and the human form
     And its only next step is the human's: get the brief approved, one human answer covering brief and policy
@@ -314,3 +314,26 @@ Feature: context status
     And its only step is canon subject status with verifying and a reason, which parses as printed
     And the reason says to keep the follow-up in its approved change (never canon change new), then scenario, evidence and review, and ship it again
     And once the reopen is followed the flag and the reopen step are gone
+
+  # canon: {"schema":1,"at":"2026-10-16T17:35:44Z","actor":{"agent_id":"canon-022-p2-impl"}}
+  @subject:context-capability
+  @case:failure
+  @context.status.71
+  Scenario: A brief that still fails canon brief check is the planner's to write, not a stop for the human
+    Given a proposed subject whose newest adopted change's brief.md is the skeleton canon change new wrote, with no "Approved:" line
+    When canon change new prints its next step, and canon status runs with no role, with --as planner and with --as orchestrator
+    Then the subject's only step is the agent's, for the planner: canon brief check --change <slug>
+    And its reason says to write the brief, names the number of blockers canon brief check lists and the brief.md, and says to stop and report it to the human once it has none
+    And no step is addressed to a human: --as planner keeps the step and waits on no human, --as orchestrator waits on the planner, and canon change new prints no "waiting on human"
+    And canon evidence add still refuses the subject's scenarios and tasks: only the suggested step changes, not the guards
+
+  # canon: {"schema":1,"at":"2026-10-16T17:36:12Z","actor":{"agent_id":"canon-022-p2-impl"}}
+  @subject:context-capability
+  @case:happy
+  @context.status.72
+  Scenario: Once canon brief check finds no blockers, the unapproved brief is the human's stop
+    Given a proposed subject whose newest adopted change's brief.md passes canon brief check with no blockers and has no "Approved:" line
+    When canon status runs with no role and with --as planner
+    Then the subject's only step is the human's: stop and report the brief, one answer covering brief and policy
+    And --as planner keeps no step and counts it under waitingOn as human: 1
+    And after canon brief approve records the human's answer, no step is addressed to a human

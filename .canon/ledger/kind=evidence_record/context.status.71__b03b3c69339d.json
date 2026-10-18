@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-022-p2-impl",
+    "role": "implementer",
+    "session_id": "canon-022-p2-impl"
+  },
+  "at": "2026-10-16T17:40:46.692334124Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test brief_approve context_status_71_a_brief_that_still_fails_brief_check_is_the_planners_to_write"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 52,
+  "scenario_id": "context.status.71",
+  "schema": 1,
+  "staging_id": "0d2f772f9b4d",
+  "verdict": "faithful"
+}

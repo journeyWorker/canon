@@ -1,0 +1,10 @@
+# canon's sqlite hot tier (s32 sqlite-hot-backend) -- db file + WAL/SHM sidecars.
+.canon/hot.db*
+# canon's read-access audit log (canon query/export/purge) -- local, never committed.
+.canon/audit/
+# canon's scenario index -- derived from the .feature files, rebuilt by every reader.
+.canon/ledger/kind=scenario/
+# the lock that serializes scenario index rebuilds -- local process state.
+.canon/scenario-index.lock
+# the lock that serializes artifact store writes -- local process state.
+.canon/artifact-store.lock

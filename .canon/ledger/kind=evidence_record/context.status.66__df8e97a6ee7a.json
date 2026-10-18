@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-022-p2-impl",
+    "role": "implementer",
+    "session_id": "canon-022-p2-impl"
+  },
+  "at": "2026-10-16T17:40:45.440551519Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test status context_status_66_a_proposed_subject_with_an_unapproved_brief_asks_only_the_human"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 51,
+  "scenario_id": "context.status.66",
+  "schema": 1,
+  "staging_id": "ee6094834505",
+  "verdict": "faithful"
+}

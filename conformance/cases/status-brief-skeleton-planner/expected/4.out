@@ -1,0 +1,15 @@
+canon brief check: .canon/changes/upgrade-lute-046/brief.md (en) — 7 blocker(s), 0 advisory(ies)
+  blocker brief.placeholder [intent] line 8: What problem this solves, for whom, and why now. One to three sentences.
+    hint: replace the template hint with the section's content
+  blocker brief.placeholder [outcome] line 13: What is observably true once this ships, from the user's side.
+    hint: replace the template hint with the section's content
+  blocker brief.placeholder [flow] line 18: A numbered list; each item starts with its id and reads sees → does → becomes: `…
+    hint: replace the template hint with the section's content
+  blocker brief.placeholder [detail] line 23: One `### F1 …` subheading per flow step, in the flow's order: rules, states and …
+    hint: replace the template hint with the section's content
+  blocker brief.placeholder [acceptance] line 28: Per step: what must be observable, and which failure path is covered. Do not wri…
+    hint: replace the template hint with the section's content
+  blocker brief.placeholder [questions] line 33: What is unresolved and what you assumed; anything that could change policy goes …
+    hint: replace the template hint with the section's content
+  blocker brief.placeholder [out-of-scope] line 38: What this change deliberately does not do. Write `None.` if nothing.
+    hint: replace the template hint with the section's content

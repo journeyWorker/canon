@@ -151,6 +151,18 @@ pub struct Waiver {
 pub struct Counts {
     pub blockers: usize,
     pub advisories: usize,
+    /// The blockers `canon brief approve` refuses on ([`blocks_approval`]):
+    /// while any remain, status gives an unapproved brief's step to the
+    /// planner who writes it, not the human (0.22 D3, #70). Not shown.
+    #[serde(skip)]
+    pub unapprovable: usize,
+}
+
+/// Whether `finding` keeps a brief from being approved: a blocker that is
+/// not a coverage rule, since a scope is approved before its scenarios
+/// exist (0.19 D3).
+pub fn blocks_approval(finding: &Finding) -> bool {
+    finding.severity == Severity::Blocker && !COVERAGE_RULES.contains(&finding.rule.as_ref())
 }
 
 /// What reading a brief found.
@@ -172,7 +184,8 @@ pub struct Evaluation {
 impl Evaluation {
     pub fn counts(&self) -> Counts {
         let blockers = self.findings.iter().filter(|f| f.severity == Severity::Blocker).count();
-        Counts { blockers, advisories: self.findings.len() - blockers }
+        let unapprovable = self.findings.iter().filter(|f| blocks_approval(f)).count();
+        Counts { blockers, advisories: self.findings.len() - blockers, unapprovable }
     }
 
     fn has(&self, rules: &[&str]) -> bool {

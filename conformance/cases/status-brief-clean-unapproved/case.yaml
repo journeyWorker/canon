@@ -1,0 +1,8 @@
+description: "0.22 D3 (#70): a `proposed` subject whose newest change has a .canon/changes brief.md that `canon brief check` finds clean (0 blockers) and that has no `Approved:` line gets the human stop as its only step: `canon status --json --fields next,waitingOn` lists the `human` step, and `--as planner` keeps no step and counts it in `waitingOn.human`"
+steps:
+  - args: [brief, check, --change, add-login]
+    exit: 0
+  - args: [status, --json, --fields, "next,waitingOn"]
+    exit: 0
+  - args: [status, --json, --fields, "next,waitingOn", --as, planner]
+    exit: 0

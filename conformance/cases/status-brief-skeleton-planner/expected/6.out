@@ -1,0 +1,11 @@
+{
+  "next": [
+    {
+      "actor": "agent",
+      "command": "canon brief check --change upgrade-lute-046",
+      "role": "planner",
+      "why": "lute-046-host: write the brief: `canon brief check --change upgrade-lute-046` lists 7 blocker(s) in .canon/changes/upgrade-lute-046/brief.md; once it has none, stop and report it to the human, and build and attest nothing for lute-046-host until the human answers (one answer approves brief and policy)"
+    }
+  ],
+  "waitingOn": {}
+}

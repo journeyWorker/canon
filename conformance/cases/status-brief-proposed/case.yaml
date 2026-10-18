@@ -1,4 +1,4 @@
-description: "`canon status` on a `proposed` subject whose newest adopted change has a .canon/changes brief.md with no `Approved:` line shows the brief as not approved and lists only the `human` step, with no `canon feature new` or `canon scenario new` step, in both the human form and `--json`"
+description: "`canon status` on a `proposed` subject whose newest adopted change has a .canon/changes brief.md with no `Approved:` line shows the brief as not approved and, since that brief is still the skeleton `canon brief check` finds blockers in, lists only the planner's `canon brief check --change cart-v1` step (0.22 D3, #70), with no `canon feature new` or `canon scenario new` step, in both the human form and `--json`"
 steps:
   - args: [init]
     exit: 0

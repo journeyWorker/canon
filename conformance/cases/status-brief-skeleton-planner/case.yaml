@@ -1,0 +1,16 @@
+description: "0.22 D3 (#70): right after `canon change new`, the change's brief.md is the skeleton `canon brief check` finds blockers in, so the subject's only step is the planner's (`actor: agent`, `role: planner`): `canon brief check --change <slug>`, naming the blocker count; `change new` prints it with no `waiting on human`, `--as planner` keeps it with `waitingOn.human` absent, and the human form shows it as an agent step"
+steps:
+  - args: [init, --no-agents-md, --providers, none]
+    exit: 0
+  - args: [subject, new, lute-046-host, --domain, host, --title, Lute 0.46 host, --actor-id, lead]
+    exit: 0
+  - args: [change, new, upgrade-lute-046, --subject, lute-046-host, --title, Upgrade Lute 0.46, --as, planner]
+    exit: 0
+  - args: [brief, check, --change, upgrade-lute-046]
+    exit: 2
+  - args: [status, --json, --fields, "next,waitingOn"]
+    exit: 0
+  - args: [status, --json, --fields, "next,waitingOn", --as, planner]
+    exit: 0
+  - args: [status, --as, orchestrator]
+    exit: 0

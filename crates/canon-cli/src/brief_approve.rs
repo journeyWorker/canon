@@ -21,7 +21,7 @@ use chrono::Utc;
 use serde::Serialize;
 
 use crate::brief::brief_digest;
-use crate::brief_check::{check, Severity};
+use crate::brief_check::check;
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 use crate::policy_approval::ApprovalState;
@@ -76,12 +76,7 @@ pub fn run_approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str,
     // Coverage rules (a flow step with no scenario or no failure case) gate
     // shipping, not approval: the human approves the scope before its
     // scenarios exist, and re-approves a changed scope mid-build (0.19 D3).
-    let blockers: Vec<_> = checked
-        .evaluation
-        .findings
-        .iter()
-        .filter(|f| f.severity == Severity::Blocker && !crate::brief_check::COVERAGE_RULES.contains(&f.rule.as_ref()))
-        .collect();
+    let blockers: Vec<_> = checked.evaluation.findings.iter().filter(|f| crate::brief_check::blocks_approval(f)).collect();
     if !blockers.is_empty() {
         let listed = blockers.iter().map(|f| format!("{} line {}", f.rule, f.line)).collect::<Vec<_>>().join(", ");
         return refuse(

@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-022-p2-impl",
+    "role": "implementer",
+    "session_id": "canon-022-p2-impl"
+  },
+  "at": "2026-10-16T17:40:47.894460470Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test brief_approve context_status_72_once_brief_check_finds_no_blockers_the_unapproved_brief_is_the_humans_stop"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 53,
+  "scenario_id": "context.status.72",
+  "schema": 1,
+  "staging_id": "0436065cbda3",
+  "verdict": "faithful"
+}

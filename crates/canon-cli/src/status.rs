@@ -39,7 +39,7 @@
 //! about the subject it touched, so a write and `canon status` share one
 //! set of rules.
 //!
-//! # The brief (0.16 D1, M7; 0.17 D3)
+//! # The brief (0.16 D1, M7; 0.17 D3; 0.22 D3)
 //! One human answer approves a subject's scope: its brief and the
 //! policy. [`crate::brief::brief_of`] decides whether a subject's brief
 //! is approved, and the `verifying → shipped` guard of `canon subject
@@ -48,17 +48,19 @@
 //! brief to answer (its `.canon/changes/<change>/brief.md`, or an
 //! external openspec `proposal.md` while that canon file does not exist)
 //! and no `Approved:` line in the canon `brief.md` (the brief is
-//! enforced) gets the one `human` step status ever emits, and it is the
-//! subject's only step, whatever its status: the agent stops and reports
-//! the brief, and nothing is built or attested for the subject (no
-//! `feature new`, `scenario new`, `evidence add`, review or status
+//! enforced) gets one step, and it is the subject's only step, whatever
+//! its status. While `canon brief check` finds blockers `canon brief
+//! approve` refuses on, it is the planner's: write the brief (#70: a
+//! skeleton sent to the human told the planner there was nothing to
+//! do). Once there are none, it is a `human` step: the agent stops and
+//! reports the brief, and nothing is built or attested for the subject
+//! (no `feature new`, `scenario new`, `evidence add`, review or status
 //! advance) before the human answers. The step names the canon file to
 //! write, with its `Source:` pointer for an external plan. With no brief
 //! to answer, the `brief:` line still says not approved, as an advisory,
 //! and nothing is withheld. A `proposed` subject shows its brief once its
 //! newest change has one. Evidence attested under a brief
 //! override is listed as a warning ([`crate::brief::override_lines`]).
-//! Every other step is the agent's.
 //!
 //! # A shipped subject whose gate went red (0.18 D3)
 //! Evidence, specs and reviews keep moving after a subject ships. A
@@ -1052,6 +1054,22 @@ fn subject_steps(
     let before = next.len();
 
     if let Some(brief) = summary.brief.as_ref().filter(|brief| brief.enforced) {
+        // A brief still failing `canon brief check` is the planner's to
+        // write: the human is asked only once it could be approved
+        // (0.22 D3, #70). The guards refuse either way.
+        if let (Some(counts), Some(change)) = (brief.findings.filter(|counts| counts.unapprovable > 0), brief.change.as_deref()) {
+            next.push(NextStep {
+                actor: StepActor::Agent,
+                role: Some(Role::Planner),
+                command: format!("canon brief check --change {change}"),
+                why: format!(
+                    "{id}: write the brief: `canon brief check --change {change}` lists {} blocker(s) in {}; once it has none, stop and report it to the human, and build and attest nothing for {id} until the human answers (one answer approves brief and policy)",
+                    counts.unapprovable,
+                    brief.report_in()
+                ),
+            });
+            return;
+        }
         next.push(NextStep {
             actor: StepActor::Human,
             role: None,
