@@ -237,7 +237,7 @@ fn plan_digest(kind: RecordKind, before: DateTime<Utc>, outcome: &PurgeOutcome, 
 pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Option<PurgeMode>, json_output: bool) -> u8 {
     let Some(mode) = mode else {
         return CliError::refused("PURGE_PLAN_REQUIRED", "`canon purge` deletes only a reviewed plan, and none was given")
-            .hint(format!("run `canon purge --kind {} --before {} --plan`, review it, then rerun with `--confirm <planDigest>`", kind.as_str(), before.to_rfc3339()))
+            .hint(format!("run `canon purge --kind {} --before {} --plan`, review it, then rerun with `--confirm <planDigest>`", crate::query::kind_cli_name(kind), before.to_rfc3339()))
             .emit("canon purge", json_output) as u8;
     };
     let result = (|| -> Result<(), RetentionError> {
@@ -278,12 +278,12 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
         let deleted = registry_deleted + learn_deleted;
         append_access_audit(repo, None, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted)?;
         let summary = if confirmed {
-            format!("canon purge --kind {}: {} matched, {} deleted", kind.as_str(), matched, deleted)
+            format!("canon purge --kind {}: {} matched, {} deleted", crate::query::kind_cli_name(kind), matched, deleted)
         } else {
             format!(
                 "canon purge --kind {} --plan: {matched} record(s) would be removed (planDigest {digest}); delete them with `canon purge --kind {} --before {} --confirm {digest}`",
-                kind.as_str(),
-                kind.as_str(),
+                crate::query::kind_cli_name(kind),
+                crate::query::kind_cli_name(kind),
                 before.to_rfc3339()
             )
         };
@@ -294,7 +294,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
         } else {
             // A plan deletes nothing: the one step is the human's review, then the confirm.
             let step = crate::status::NextStep {
-                command: format!("review the plan, then run `canon purge --kind {} --before {} --confirm {digest}`", kind.as_str(), before.to_rfc3339()),
+                command: format!("review the plan, then run `canon purge --kind {} --before {} --confirm {digest}`", crate::query::kind_cli_name(kind), before.to_rfc3339()),
                 why: "the plan only lists what would be removed; deleting takes a reviewed plan digest".into(),
                 actor: crate::status::StepActor::Human,
                 role: None,
@@ -308,7 +308,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
         Err(RetentionError::PlanChanged { expected, actual }) => {
             let _ = append_access_audit(repo, None, "purge", Some(kind), "routed_and_aging_destinations", false, 0, 0);
             CliError::refused("PLAN_CHANGED", format!("the plan digest {expected} no longer matches the data (now {actual}); nothing was deleted"))
-                .hint(format!("run `canon purge --kind {} --before {} --plan` again and review it", kind.as_str(), before.to_rfc3339()))
+                .hint(format!("run `canon purge --kind {} --before {} --plan` again and review it", crate::query::kind_cli_name(kind), before.to_rfc3339()))
                 .emit("canon purge", json_output) as u8
         }
         Err(err) => {

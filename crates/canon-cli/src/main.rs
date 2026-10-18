@@ -33,7 +33,7 @@
 //! (`close-the-open-loops`) adds `canon evidence add` — the missing
 //! AUTHORING half of the gate loop `canon gate promote`/`canon gate
 //! task` already implemented (see `canon_cli::evidence`'s module doc) —
-//! and `canon ingest artifacts --run <RUN_ID>`, the explicit trajectory
+//! and `canon ingest artifacts --run-id <RUN_ID>`, the explicit trajectory
 //! attribution edge. Every other subcommand is a later spec's
 //! responsibility.
 
@@ -47,7 +47,7 @@ use canon_cli::cli_error::CliError;
 use canon_cli::finding::CommitArg;
 use canon_cli::scaffold::AreaSurface;
 use chrono::{DateTime, Timelike, Utc};
-use clap::{CommandFactory, Parser, Subcommand};
+use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(
@@ -215,19 +215,19 @@ enum Command {
         action: SubjectCommand,
     },
     /// Write a plan change (.canon/changes/<slug>/brief.md) and adopt it into a subject
-    #[command(after_help = "Examples:\n  canon change new add-login --subject auth --title 'Add login'")]
+    #[command(after_help = "Examples:\n  canon change new add-login --subject-id auth --title 'Add login'")]
     Change {
         #[command(subcommand)]
         action: ChangeCommand,
     },
     /// Check a change's brief (PRD format) and see the next steps; never edits
-    #[command(after_help = "Examples:\n  canon brief                          State and the next one to three steps\n  canon brief check                    Findings; exit 0 clean, 2 blockers, 1 error\n  canon brief check --change add-login --json\n\nThe brief is the PRD `canon change new` writes: sections are found by their\n`<!-- canon:section <key> role=… -->` marker, never by heading text. Blockers\n(structure) are a missing or out-of-order section, a duplicate flow id, step\ndetail that does not match the flow ids, leftover placeholders, and, once the\nsubject is building, a flow step with no scenario or no failure scenario.\nAdvisories (prose, `language:` en or ko only) apply to normative sections.\nWaive one rule in one section with\n  <!-- canon:waive <rule-id> <section-key> \"<reason>\" -->\nA brief without markers (written before 0.19) checks as `brief.legacy`, an\nadvisory. Without --change, the repo's only live change is checked.")]
+    #[command(after_help = "Examples:\n  canon brief                          State and the next one to three steps\n  canon brief check                    Findings; exit 0 clean, 2 blockers, 1 error\n  canon brief check --change-id add-login --json\n\nThe brief is the PRD `canon change new` writes: sections are found by their\n`<!-- canon:section <key> role=… -->` marker, never by heading text. Blockers\n(structure) are a missing or out-of-order section, a duplicate flow id, step\ndetail that does not match the flow ids, leftover placeholders, and, once the\nsubject is building, a flow step with no scenario or no failure scenario.\nAdvisories (prose, `language:` en or ko only) apply to normative sections.\nWaive one rule in one section with\n  <!-- canon:waive <rule-id> <section-key> \"<reason>\" -->\nA brief without markers (written before 0.19) checks as `brief.legacy`, an\nadvisory. Without --change-id, the repo's only live change is checked.")]
     Brief {
         #[command(subcommand)]
         action: Option<BriefCommand>,
         /// The change to read (default: the repo's only live change)
         #[arg(long, global = true, value_parser = canon_cli::subject::parse_change_id)]
-        change: Option<ChangeId>,
+        change_id: Option<ChangeId>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, global = true, default_value = ".")]
         repo: PathBuf,
@@ -288,7 +288,7 @@ enum Command {
         /// Role scope; with --regime must equal its leading segment
         #[arg(long, value_parser = canon_cli::retrieve::parse_role)]
         role: RoleId,
-        /// Full regime key (<role>/<repo>/<area>/<hash>); mutually exclusive with --domain/--subject
+        /// Full regime key (<role>/<repo>/<area>/<hash>); mutually exclusive with --domain/--subject-id
         #[arg(long, value_parser = canon_cli::retrieve::parse_regime)]
         regime: Option<RegimeKey>,
         /// Derive the regime from a domain slug; mutually exclusive with --regime
@@ -296,7 +296,7 @@ enum Command {
         domain: Option<String>,
         /// Narrow --domain to one subject_id; requires --domain, mutually exclusive with --regime
         #[arg(long, value_parser = canon_cli::retrieve::parse_subject)]
-        subject: Option<SubjectId>,
+        subject_id: Option<SubjectId>,
         /// Top-k cap (default: canon's DEFAULT_K)
         #[arg(short, long)]
         k: Option<usize>,
@@ -680,7 +680,7 @@ enum LearnCommand {
         #[arg(long)]
         reason: String,
         #[arg(long)]
-        actor: String,
+        actor_id: String,
         #[arg(long)]
         signature_file: PathBuf,
         #[arg(long)]
@@ -769,7 +769,7 @@ enum DispatchCommand {
     End {
         /// The RunId (ULID) minted by `canon dispatch begin`
         #[arg(long, value_parser = canon_cli::dispatch::parse_run_id)]
-        run: RunId,
+        run_id: RunId,
         /// Terminal outcome: succeeded or failed
         #[arg(long, value_parser = canon_cli::dispatch::run_status_parser())]
         status: RunStatus,
@@ -833,7 +833,7 @@ enum IngestCommand {
         json: bool,
         /// Attribute this pass's trajectories to a dispatched run (a RunId minted by `canon dispatch begin`)
         #[arg(long, value_name = "RUN_ID", value_parser = canon_cli::dispatch::parse_run_id)]
-        run: Option<RunId>,
+        run_id: Option<RunId>,
     },
     /// Import plans as Change/Task records: canon's own .canon/changes, then the configured external sources (openspec, superpowers)
     Plans {
@@ -1189,7 +1189,7 @@ enum FindingCommand {
 
 #[derive(Subcommand)]
 enum ReviewCommand {
-    /// Write one attributed Review record per scenario (or, with --change, one for a chore change) directly to the ledger, nothing to promote (exactly one provenance ref required). A scenario review pins the scenario's digest and what its latest evidence says (verdict and checks); it counts only while both are unchanged. A change review pins the chore's brief
+    /// Write one attributed Review record per scenario (or, with --change-id, one for a chore change) directly to the ledger, nothing to promote (exactly one provenance ref required). A scenario review pins the scenario's digest and what its latest evidence says (verdict and checks); it counts only while both are unchanged. A change review pins the chore's brief
     #[command(group(clap::ArgGroup::new("provenance").args(["upstream_ref", "original_spec_ref"]).required(true).multiple(false)))]
     Add {
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
@@ -1202,7 +1202,7 @@ enum ReviewCommand {
         scenario_ids_from: Option<String>,
         /// Review a chore change instead of scenarios: its invariants and checks against the diff. Pins the change's brief; an edit to the brief stales it. A chore needs exactly this one review before `--to shipped`
         #[arg(long, value_name = "SLUG", value_parser = canon_cli::query::parse_change_id, conflicts_with_all = ["scenario_ids", "scenario_ids_from"])]
-        change: Option<ChangeId>,
+        change_id: Option<ChangeId>,
         #[arg(long)]
         reviewer: String,
         #[arg(long)]
@@ -1454,14 +1454,14 @@ enum ScenarioCommand {
         /// {"id":"auth.login.02","title":"Sign out","subject":"demo","case":"failure","flow":"F1"}.
         /// Every line is checked first; one bad line writes nothing and `data.items` lists each
         /// `{line, id, error}`. Otherwise `data.items` lists each `{line, id, path}`
-        #[arg(long, value_name = "FILE|-", conflicts_with_all = ["title", "subject", "lane", "case", "flow", "change", "feature", "project"])]
+        #[arg(long, value_name = "FILE|-", conflicts_with_all = ["title", "subject_id", "lane", "case", "flow", "change_id", "feature", "project_id"])]
         from: Option<String>,
         /// The Scenario: header label
         #[arg(long, required_unless_present = "from")]
         title: Option<String>,
         /// Optional subject id tag to pin above the scenario
         #[arg(long, value_parser = canon_cli::subject::parse_subject_id)]
-        subject: Option<SubjectId>,
+        subject_id: Option<SubjectId>,
         /// Optional lane tag to classify the scenario
         #[arg(long, value_parser = canon_cli::scaffold::parse_lane_slug)]
         lane: Option<String>,
@@ -1470,21 +1470,21 @@ enum ScenarioCommand {
         #[arg(long, value_parser = canon_cli::scaffold::parse_lane_slug)]
         case: Option<String>,
         /// The brief flow step this scenario covers (`F1`): writes `@flow:<change>.<F-id>`.
-        /// The change is --change, else the newest change of --subject, else the only live change
+        /// The change is --change-id, else the newest change of --subject-id, else the only live change
         #[arg(long, value_name = "F-ID")]
         flow: Option<String>,
-        /// The change whose brief defines --flow (default: --subject's newest adopted change)
+        /// The change whose brief defines --flow (default: --subject-id's newest adopted change)
         #[arg(long, requires = "flow", value_parser = canon_cli::subject::parse_change_id)]
-        change: Option<ChangeId>,
+        change_id: Option<ChangeId>,
         /// Agent id written into provenance (env: CANON_ACTOR)
         #[arg(long, env = "CANON_ACTOR", default_value = "canon-scaffold")]
-        actor: String,
+        actor_id: String,
         /// Target .feature file (default: derived from <tag>; must live under a specs.roots[] entry)
         #[arg(long)]
         feature: Option<PathBuf>,
         /// Which configured `specs.roots[]` entry to write under, by its id. Required only when the repo configures more than one
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
-        project: Option<ProjectId>,
+        project_id: Option<ProjectId>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -1506,10 +1506,10 @@ enum FeatureCommand {
         title: String,
         /// Agent id written into provenance (env: CANON_ACTOR)
         #[arg(long, env = "CANON_ACTOR", default_value = "canon-scaffold")]
-        actor: String,
+        actor_id: String,
         /// Which configured `specs.roots[]` entry to write under, by its id. Required only when the repo configures more than one
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
-        project: Option<ProjectId>,
+        project_id: Option<ProjectId>,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -1524,7 +1524,7 @@ enum BriefCommand {
     /// Read the brief against the rules: blocker and advisory findings (exit 0 clean, 2 blockers, 1 error)
     Check,
     /// Record the human's approval of the brief, bound to its text; refused while `brief check` has blockers
-    #[command(after_help = "Examples:\n  canon brief approve --change add-login --by Ana --note 'Go. Ship the failure flow too.'\n\nWrites `Approved: <who> <when> — \"<words>\" (brief sha256:<digest>)` into the\nbrief (the digest covers the brief without its `Approved:` lines) and records\n`canon policy approve` in the same call. Edit the brief afterwards and it reads as\nnot approved (BRIEF_CHANGED_SINCE_APPROVAL) until a human answers again and this\nruns again. Run it only from the human's answer, with their words as --note.")]
+    #[command(after_help = "Examples:\n  canon brief approve --change-id add-login --by Ana --note 'Go. Ship the failure flow too.'\n\nWrites `Approved: <who> <when> — \"<words>\" (brief sha256:<digest>)` into the\nbrief (the digest covers the brief without its `Approved:` lines) and records\n`canon policy approve` in the same call. Edit the brief afterwards and it reads as\nnot approved (BRIEF_CHANGED_SINCE_APPROVAL) until a human answers again and this\nruns again. Run it only from the human's answer, with their words as --note.")]
     Approve {
         /// Who approved (the human, not the agent)
         #[arg(long)]
@@ -1544,7 +1544,7 @@ enum ChangeCommand {
         slug: ChangeId,
         /// The existing subject to adopt the change under
         #[arg(long, value_parser = canon_cli::subject::parse_subject_id)]
-        subject: SubjectId,
+        subject_id: SubjectId,
         /// `feature` (default): the PRD brief. `chore`: a short brief for work that
         /// changes how the subject is built or kept, never what it does
         #[arg(long, default_value = "feature", value_parser = canon_cli::brief_template::kind_parser())]
@@ -1597,7 +1597,7 @@ enum SubjectCommand {
         change_id: ChangeId,
         /// The subject to adopt the change under
         #[arg(long, value_parser = canon_cli::subject::parse_subject_id)]
-        subject: SubjectId,
+        subject_id: SubjectId,
         /// Repo root (default: nearest ancestor with a canon.yaml)
         #[arg(long, default_value = ".")]
         repo: PathBuf,
@@ -1827,12 +1827,24 @@ fn run_divergence_add(args: DivergenceAddArgs) -> ExitCode {
     }
 }
 
+/// The clap tree with the deprecated spellings accepted ([`canon_cli::deprecation::apply`]).
+fn cli_command() -> clap::Command {
+    canon_cli::deprecation::apply(Cli::command())
+}
+
 fn main() -> ExitCode {
     set_sigpipe(true);
-    let cli = match Cli::try_parse() {
-        Ok(cli) => cli,
+    let command = cli_command();
+    let mut matches = match command.clone().try_get_matches() {
+        Ok(matches) => matches,
         Err(error) => return usage_error(&error),
     };
+    let cli = match Cli::from_arg_matches_mut(&mut matches) {
+        Ok(cli) => cli,
+        Err(error) => return usage_error(&error.format(&mut command.clone())),
+    };
+    // A deprecated spelling ran: say so once on stderr, and on the JSON envelope (0.24 D2).
+    canon_cli::deprecation::warn(canon_cli::deprecation::scan(&command, &std::env::args().skip(1).collect::<Vec<_>>()));
     // The role is resolved before any command runs, so an unknown `CANON_ROLE` refuses the invocation.
     if let Err(error) = canon_cli::role::init(cli.declared_role) {
         return ExitCode::from(error.emit("canon", argv_wants_json()) as u8);
@@ -1892,7 +1904,7 @@ fn main() -> ExitCode {
         },
         Command::Ingest { action } => match action {
             IngestCommand::Sessions { watch, interval_secs, home, canon_yaml, full, all_workspaces, json } => run_ingest_sessions(&canon_yaml, home.as_deref(), watch, interval_secs, full, all_workspaces, json),
-            IngestCommand::Artifacts { watch, interval_secs, repo, json, run } => run_ingest_artifacts(&repo, watch, interval_secs, json, run.as_ref()),
+            IngestCommand::Artifacts { watch, interval_secs, repo, json, run_id } => run_ingest_artifacts(&repo, watch, interval_secs, json, run_id.as_ref()),
             IngestCommand::Plans { dialect, source, repo, json } => run_ingest_plans(&repo, dialect.as_deref(), source.as_deref(), json),
         },
         Command::Gate { action } => match action {
@@ -2054,7 +2066,7 @@ fn main() -> ExitCode {
                 project_id,
                 scenario_ids,
                 scenario_ids_from,
-                change,
+                change_id,
                 reviewer,
                 pin,
                 upstream_ref,
@@ -2082,7 +2094,7 @@ fn main() -> ExitCode {
                         project_id,
                         scenario_ids,
                         scenario_ids_from,
-                        change,
+                        change: change_id,
                         reviewer,
                         pin,
                         upstream_ref,
@@ -2127,13 +2139,13 @@ fn main() -> ExitCode {
             PluginCommand::Sync { plugin_id, repo, spec_root, json } => run_plugin_sync(&repo, &plugin_id, spec_root.as_deref(), json),
         },
         Command::Scenario { action } => match action {
-            ScenarioCommand::New { tag, from, title, subject, lane, case, flow, change, actor, feature, project, repo, json } => {
+            ScenarioCommand::New { tag, from, title, subject_id, lane, case, flow, change_id, actor_id, feature, project_id, repo, json } => {
                 let at = Utc::now().with_nanosecond(0).expect("0 is a valid nanosecond");
-                let actor = Actor::new_unattributed(&actor);
+                let actor = Actor::new_unattributed(&actor_id);
                 let code = match (from, tag, title) {
                     (Some(source), _, _) => canon_cli::scaffold::run_scenario_batch(&repo, &source, &actor, at, json),
                     (None, Some(tag), Some(title)) => {
-                        let spec = canon_cli::scaffold::ScenarioSpec { tag, title, subject, lane, case, flow, change, feature, project };
+                        let spec = canon_cli::scaffold::ScenarioSpec { tag, title, subject: subject_id, lane, case, flow, change: change_id, feature, project: project_id };
                         canon_cli::scaffold::run_scenario_new(&repo, &spec, &actor, at, json)
                     }
                     (None, _, _) => unreachable!("clap requires <tag> and --title unless --from is given"),
@@ -2142,13 +2154,13 @@ fn main() -> ExitCode {
             }
         },
         Command::Feature { action } => match action {
-            FeatureCommand::New { surface, title, actor, project, repo, json } => run_feature_new(&repo, &surface, &title, project.as_ref(), &actor, json),
+            FeatureCommand::New { surface, title, actor_id, project_id, repo, json } => run_feature_new(&repo, &surface, &title, project_id.as_ref(), &actor_id, json),
         },
         Command::Subject { action } => match action {
             SubjectCommand::New { id, domain, title, summary, owner_role, actor_id, repo, json } => {
                 ExitCode::from(canon_cli::subject::run_new(&repo, &id, &domain, &title, &summary, &owner_role, &actor_id, json) as u8)
             }
-            SubjectCommand::Adopt { change_id, subject, repo, json } => ExitCode::from(canon_cli::subject::run_adopt(&repo, &change_id, &subject, json) as u8),
+            SubjectCommand::Adopt { change_id, subject_id, repo, json } => ExitCode::from(canon_cli::subject::run_adopt(&repo, &change_id, &subject_id, json) as u8),
             SubjectCommand::Status { id, to, override_reason, reason, actor_id, repo, json } => {
                 canon_cli::inventory::refresh_stale_index(&repo, "canon subject status");
                 ExitCode::from(match to {
@@ -2158,12 +2170,12 @@ fn main() -> ExitCode {
             }
         },
         Command::Change { action } => match action {
-            ChangeCommand::New { slug, subject, kind, title, repo, json } => ExitCode::from(canon_cli::change::run_new(&repo, &slug, &subject, kind, &title, json) as u8),
+            ChangeCommand::New { slug, subject_id, kind, title, repo, json } => ExitCode::from(canon_cli::change::run_new(&repo, &slug, &subject_id, kind, &title, json) as u8),
         },
-        Command::Brief { action, change, repo, json } => ExitCode::from(match action {
-            Some(BriefCommand::Check) => canon_cli::brief_check::run_check(&repo, change.as_ref(), json),
-            Some(BriefCommand::Approve { by, note }) => canon_cli::brief_approve::run_approve(&repo, change.as_ref(), &by, &note, json),
-            None => canon_cli::brief_check::run_next(&repo, change.as_ref(), json),
+        Command::Brief { action, change_id, repo, json } => ExitCode::from(match action {
+            Some(BriefCommand::Check) => canon_cli::brief_check::run_check(&repo, change_id.as_ref(), json),
+            Some(BriefCommand::Approve { by, note }) => canon_cli::brief_approve::run_approve(&repo, change_id.as_ref(), &by, &note, json),
+            None => canon_cli::brief_check::run_next(&repo, change_id.as_ref(), json),
         } as u8),
         Command::Init { repo, check_config, no_agents_md, policy, no_policy, providers, language, json } => {
             let policy = (!no_policy).then(|| policy.unwrap_or(canon_cli::policy_level::PolicyLevel::Strict));
@@ -2182,7 +2194,7 @@ fn main() -> ExitCode {
             DemoCommand::Init { repo, json } => ExitCode::from(canon_cli::demo::run_demo_init(&repo, json) as u8),
             DemoCommand::Add(args) => ExitCode::from(canon_cli::demo::run_demo_add(&args.repo, args.json) as u8),
         },
-        Command::Retrieve { role, regime, domain, subject, k, repo, json } => run_retrieve(&repo, &role, regime.as_ref(), domain.as_deref(), subject.as_ref(), k, json),
+        Command::Retrieve { role, regime, domain, subject_id, k, repo, json } => run_retrieve(&repo, &role, regime.as_ref(), domain.as_deref(), subject_id.as_ref(), k, json),
         Command::Report { repo, check, snapshot, json } => run_report(&repo, check, snapshot.as_deref(), json),
         Command::Dashboard { repo, snapshot, port, json } => run_dashboard(&repo, snapshot.as_deref(), port, json),
         Command::RegimeKey { role, repo, area, hash, json } => run_regime_key(&role, &repo, &area, &hash, json),
@@ -2191,8 +2203,8 @@ fn main() -> ExitCode {
                 canon_cli::learn::run_promote_with_evidence(&repo, &strategy_id, dry_run, evaluation.as_deref(), approval.as_deref(), signature.as_deref(), json),
             LearnCommand::Approve { strategy_id, evaluation, principal, repo, json } =>
                 canon_cli::learn::run_approve(&repo, &strategy_id, &evaluation, &principal, json),
-            LearnCommand::Rollback { strategy_id, reason, actor, signature_file, approved_at, contradicting_trajectory_id, repo, json } =>
-                canon_cli::learn::run_rollback(&repo, &strategy_id, &reason, &actor, contradicting_trajectory_id.as_deref(), &signature_file, &approved_at, json),
+            LearnCommand::Rollback { strategy_id, reason, actor_id, signature_file, approved_at, contradicting_trajectory_id, repo, json } =>
+                canon_cli::learn::run_rollback(&repo, &strategy_id, &reason, &actor_id, contradicting_trajectory_id.as_deref(), &signature_file, &approved_at, json),
         },
         Command::Dispatch { action } => match action {
             DispatchCommand::Begin { role, regime, agent_id, provider, model, skill_id, skill_digest, context_manifest, prompt_bundle, task, parent_run, repo, json } => {
@@ -2207,11 +2219,11 @@ fn main() -> ExitCode {
                 };
                 canon_cli::dispatch::run_begin(&repo, &role, &regime, &agent_id, &binding, &metadata, json)
             }
-            DispatchCommand::End { run, status, repo, json } => canon_cli::dispatch::run_end(&repo, run, status, json),
+            DispatchCommand::End { run_id, status, repo, json } => canon_cli::dispatch::run_end(&repo, run_id, status, json),
             DispatchCommand::Diff { repo, json } => canon_cli::dispatch::run_diff(&repo, json),
         },
         Command::Selftest { json } => canon_cli::selftest::run_selftest(json),
-        Command::Schema { path, json, errors, all } => ExitCode::from(canon_cli::schema::run(&Cli::command(), &path, json, errors, all)),
+        Command::Schema { path, json, errors, all } => ExitCode::from(canon_cli::schema::run(&cli_command(), &path, json, errors, all)),
     }
 }
 
@@ -2527,11 +2539,11 @@ fn run_plugin_sync(repo: &std::path::Path, plugin_id: &str, spec_root: Option<&s
     }
 }
 
-/// `canon feature new <area>.<surface> --title <label> [--project
+/// `canon feature new <area>.<surface> --title <label> [--project-id
 /// <id>]` (s16 P5, `canon_cli::scaffold::run_feature_new`'s own doc)
 /// — same single-`Utc::now()`-call discipline as `canon scenario new`.
 /// `2` on a refused invocation (config fault, a spec root the
-/// `--project` rules can't pin down, or an already-existing target
+/// `--project-id` rules can't pin down, or an already-existing target
 /// file), `0` on a fresh file
 /// written.
 fn run_feature_new(repo: &std::path::Path, surface: &AreaSurface, title: &str, project: Option<&ProjectId>, actor_id: &str, json: bool) -> ExitCode {
@@ -2810,7 +2822,7 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
 /// half of canon's join spine, mirroring `run_ingest_sessions`'s
 /// scan-loop shape one level up (`--repo`-resolved, never `--home`).
 ///
-/// `--run` is the explicit attribution edge (s42
+/// `--run-id` is the explicit attribution edge (s42
 /// `close-the-open-loops`, task 3.2) — omitted, a trajectory records no
 /// run rather than a guessed one.
 fn run_ingest_artifacts(repo: &std::path::Path, watch: bool, interval_secs: u64, json: bool, run_id: Option<&RunId>) -> ExitCode {
@@ -3071,14 +3083,14 @@ mod schema_drift {
     /// leaf, so `canon schema` cannot drift from the parser.
     #[test]
     fn schema_metadata_matches_the_command_tree() {
-        let problems = canon_cli::schema::check_metadata(&Cli::command(), canon_cli::schema::META);
+        let problems = canon_cli::schema::check_metadata(&cli_command(), canon_cli::schema::META);
         assert!(problems.is_empty(), "{}", problems.join("\n"));
     }
 
     /// Every clap leaf command carries one example and every example names a leaf.
     #[test]
     fn schema_examples_match_the_command_tree() {
-        let problems = canon_cli::schema::check_examples(&Cli::command());
+        let problems = canon_cli::schema::check_examples(&cli_command());
         assert!(problems.is_empty(), "{}", problems.join("\n"));
     }
 }

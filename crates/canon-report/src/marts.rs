@@ -138,7 +138,7 @@ pub const FLYWHEEL_FUNNEL: MartSpec = MartSpec { view: "mart_flywheel_funnel", o
 ///   `injected_guidance`, and that SAME run has at least one
 ///   trajectory of the SAME role stamped with that run's own id
 ///   (`canon_learn::Trajectory::run_id`, set only by an explicit
-///   `canon ingest artifacts --run`) whose `outcome` is one of the
+///   `canon ingest artifacts --run-id`) whose `outcome` is one of the
 ///   resolved variants (`success`/`failure`/`rolled-back`).
 ///   `proxy` is s40's retained fallback when no such trajectory
 ///   exists: all that is recorded is the recipient run's own terminal

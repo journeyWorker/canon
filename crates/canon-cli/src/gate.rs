@@ -1059,13 +1059,13 @@ fn format_candidate_lines(report: &PromoteReport, dry_run: bool) -> String {
 fn kind_tally(landed: &[Promoted]) -> String {
     STAGED_KINDS
         .iter()
-        .map(|staged| format!("{}={}", staged.kind.as_str(), landed.iter().filter(|p| p.kind == staged.kind).count()))
+        .map(|staged| format!("{}={}", crate::query::kind_cli_name(staged.kind), landed.iter().filter(|p| p.kind == staged.kind).count()))
         .collect::<Vec<_>>()
         .join(", ")
 }
 
 fn promotable_kinds() -> String {
-    STAGED_KINDS.iter().map(|staged| staged.kind.as_str()).collect::<Vec<_>>().join(", ")
+    STAGED_KINDS.iter().map(|staged| crate::query::kind_cli_name(staged.kind)).collect::<Vec<_>>().join(", ")
 }
 
 /// `canon gate install-hooks [--repo] [--event] [--matcher] [--command]

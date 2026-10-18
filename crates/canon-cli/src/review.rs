@@ -31,7 +31,7 @@
 //! scenario with no evidence pins an empty list.
 //!
 //! # A chore is reviewed as a change (0.23 D5)
-//! `--change <slug>` writes one review of a chore change instead of one
+//! `--change-id <slug>` writes one review of a chore change instead of one
 //! per scenario: the reviewer signs the chore's invariants and checks
 //! against the diff. It pins the brief ([`PinnedSpec::Brief`], the digest
 //! [`crate::brief::brief_digest`] computes), so an edit to the brief
@@ -111,7 +111,7 @@ pub struct ReviewAddArgs {
     /// `--scenario-ids-from <file|->`: more ids, one per line, `#`
     /// starting a comment ([`parse_scenario_ids`]).
     pub scenario_ids_from: Option<String>,
-    /// `--change <slug>`: a change-level review of a chore (module doc);
+    /// `--change-id <slug>`: a change-level review of a chore (module doc);
     /// excludes the scenario ids.
     pub change: Option<ChangeId>,
     pub reviewer: String,
@@ -167,7 +167,7 @@ fn requested_scenarios(args: &ReviewAddArgs) -> Result<Vec<ScenarioId>, String> 
         }
     }
     if unique.is_empty() {
-        return Err("no scenario to review: give --scenario-id <id> (repeatable), --scenario-ids-from <file|->, or --change <slug> for a chore".to_string());
+        return Err("no scenario to review: give --scenario-id <id> (repeatable), --scenario-ids-from <file|->, or --change-id <slug> for a chore".to_string());
     }
     Ok(unique)
 }
@@ -212,7 +212,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         Some(change) => match chore_brief_digest(&repo, change) {
             Ok(digest) => Some(digest),
             Err(message) => {
-                return CliError::refused("REVIEW_INVALID_ARGUMENT", message).field("--change").hint("a change-level review is for a chore change whose brief is in the repository; review feature scenarios with --scenario-id").emit("canon review add", args.json);
+                return CliError::refused("REVIEW_INVALID_ARGUMENT", message).field("--change-id").hint("a change-level review is for a chore change whose brief is in the repository; review feature scenarios with --scenario-id").emit("canon review add", args.json);
             }
         },
         None => None,

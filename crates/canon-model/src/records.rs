@@ -855,7 +855,7 @@ pub struct Review {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scenario_id: Option<ScenarioId>,
     /// The change reviewed, on a change-level review (0.23): a chore's
-    /// sign-off, recorded by `canon review add --change`. Absent on a
+    /// sign-off, recorded by `canon review add --change-id`. Absent on a
     /// scenario review.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub change_id: Option<ChangeId>,

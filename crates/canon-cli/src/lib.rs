@@ -14,6 +14,7 @@ pub mod change;
 pub mod context;
 pub mod context_pack;
 pub mod dashboard;
+pub mod deprecation;
 pub mod demo;
 pub mod dispatch;
 pub mod divergence;

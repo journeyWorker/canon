@@ -133,7 +133,7 @@ use crate::tiers::{self, TierCliError};
 /// (contract: "violations print by failure class, exit 1").
 const EXIT_GATED: i32 = 1;
 
-/// `<id>` / `--subject`'s `clap` value parser — grammar-level
+/// `<id>` / `--subject-id`'s `clap` value parser — grammar-level
 /// [`SubjectId::parse`] (kebab-case slug).
 pub fn parse_subject_id(s: &str) -> Result<SubjectId, String> {
     SubjectId::parse(s).map_err(|e| e.to_string())
@@ -406,7 +406,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
     }
 }
 
-/// `canon subject adopt <change_id> --subject <id>` (module doc): link
+/// `canon subject adopt <change_id> --subject-id <id>` (module doc): link
 /// an imported plan [`Change`] to a [`Subject`] via [`adopt_change`],
 /// printing the result. Exit `2` on any refusal or store failure.
 /// Rerunning it on a linked pair writes nothing and exits `0`. A change
@@ -501,12 +501,12 @@ pub(crate) fn lookup_adoption(repo: &Path, subject_id: &SubjectId, change_id: &C
     Ok((find_subject(&registry, subject_id)?, find_change(&registry, change_id)?))
 }
 
-/// `canon subject adopt <change> --subject <subject>`: the command that
+/// `canon subject adopt <change> --subject-id <subject>`: the command that
 /// completes a half-written adoption. Safe to rerun: [`persist_adoption`]
 /// writes only the side that still lacks the link, and nothing once both
 /// carry it.
 pub(crate) fn adopt_command(change_id: &ChangeId, subject_id: &SubjectId) -> String {
-    format!("canon subject adopt {} --subject {}", change_id.as_str(), subject_id.as_str())
+    format!("canon subject adopt {} --subject-id {}", change_id.as_str(), subject_id.as_str())
 }
 
 /// A failed [`persist_adoption`]: the store error, and whether the
