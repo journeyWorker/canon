@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-024",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-024-1"
+  },
+  "at": "2026-10-19T08:50:29.833520Z",
+  "kind": "review",
+  "pin": "da018833",
+  "pins": {
+    "checks": [
+      {
+        "checks": [],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "8e028b34ccd10d2cccc43042b2ceaaff17983a9fd58a135cd6dfc1cbea66453e",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": "feat/0.24"
+  },
+  "reviewer": "canon-reviewer-024",
+  "scenario_id": "evidence.add.97",
+  "schema": 1
+}
