@@ -154,6 +154,18 @@ fn context_capability_15_a_kind_value_never_carries_the_record_suffix() {
         assert!(values.contains(&"evidence".to_string()) && values.contains(&"strategy_item".to_string()), "{command}: {values:?}");
         assert!(values.iter().all(|v| !v.ends_with("_record")), "{command}: {values:?}");
     }
+
+    // The stored names do not move: the record's own `kind`, the ledger directory and the routing key.
+    let dir = repo_with_change();
+    let repo = dir.path();
+    let out = canon_in(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "demo.login.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer"]);
+    assert!(out.status.success(), "{}{}", stdout(&out), stderr(&out));
+    let ledger = repo.join(".canon/ledger/kind=evidence_record");
+    let files: Vec<_> = std::fs::read_dir(&ledger).expect("the ledger directory keeps its stored name").flatten().collect();
+    assert_eq!(files.len(), 1, "{files:?}");
+    let record: Value = serde_json::from_str(&std::fs::read_to_string(files[0].path()).unwrap()).unwrap();
+    assert_eq!(record["kind"], "evidence_record", "{record}");
+    assert!(std::fs::read_to_string(repo.join("canon.yaml")).unwrap().lines().any(|l| l.trim() == "evidence_record: local"), "the canon.yaml routing key keeps its stored name");
 }
 
 // ── the deprecated spellings ─────────────────────────────────────────────
@@ -249,12 +261,16 @@ fn context_capability_17_a_deprecated_kind_value_still_runs_and_warns_with_the_v
 #[test]
 fn context_capability_18_help_hides_the_deprecated_spellings_and_schema_lists_them() {
     let dir = tempfile::tempdir().unwrap();
-    for args in [&["brief", "approve", "--help"][..], &["change", "new", "--help"], &["query", "--help"], &["scenario", "new", "--help"]] {
+    for (args, canonical) in [(&["brief", "approve", "--help"][..], "--change-id"), (&["change", "new", "--help"], "--subject-id"), (&["query", "--help"], "--kind <KIND>"), (&["scenario", "new", "--help"], "--subject-id")] {
         let help = stdout(&canon_in(dir.path(), args));
+        assert!(help.contains(canonical), "{args:?} help shows the canonical `{canonical}`:\n{help}");
         for old in ["--change ", "--change\n", "--subject ", "--subject\n", "--project ", "--actor ", "--run "] {
             assert!(!help.contains(old), "{args:?} help shows the deprecated `{old:?}`:\n{help}");
         }
         assert!(!help.contains("_record"), "{args:?} help shows a _record kind:\n{help}");
+        if args[0] == "query" {
+            assert!(help.contains("evidence") && help.contains("review"), "query help lists the kinds without the suffix:\n{help}");
+        }
     }
 
     let options = |command: &[&str]| -> Vec<Value> {
@@ -302,6 +318,16 @@ fn context_capability_19_a_token_after_the_separator_or_an_option_value_is_never
     // Everything after `--` is positional.
     let after = canon_in(repo, &["schema", "--json", "--", "--change"]);
     assert!(deprecation_lines(&after).is_empty(), "{}", stderr(&after));
+
+    // `--change=<slug>` with an equals sign is a flag, read as the deprecated spelling like `--change <slug>`.
+    let equals = canon_in(repo, &["brief", "check", "--change=add-login", "--json"]);
+    let spaced = canon_in(repo, &["brief", "check", "--change", "add-login", "--json"]);
+    let canonical = canon_in(repo, &["brief", "check", "--change-id", "add-login", "--json"]);
+    let expected = "canon brief check: --change is deprecated — use --change-id (removed in 0.25.0)".to_string();
+    assert_eq!(deprecation_lines(&equals), vec![expected.clone()], "{}", stderr(&equals));
+    assert_eq!(deprecation_lines(&spaced), vec![expected], "{}", stderr(&spaced));
+    assert!(deprecation_lines(&canonical).is_empty(), "{}", stderr(&canonical));
+    assert_eq!(equals.status.code(), canonical.status.code());
 }
 
 /// context.capability.20: a usage error names the canonical spelling.

@@ -82,6 +82,73 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.24.0 release
+
+Version 0.24.0 gives each concept one name across every command, and makes a
+batch of evidence bind each file to the scenario it belongs to. Plan:
+`docs/superpowers/plans/2026-10-18-canon-0.24.0-one-name.md`.
+
+**Why.** Dogfood evals 7–11 (0.19–0.23): every wrong-shape canon call an agent
+made, 0–3 per run and each fixed by its next call, came from names that differ
+between commands (`finding list --change`, `scenario new --project-id`,
+`query --kind review_record`), not from commands it could not find (#85). In
+eval 11 both implementers looped every screenshot into one `--all-scenarios`
+batch, so each of 103 records bound about 30 unrelated files (#83).
+
+### D1–D3: one name per concept (#85)
+
+- A flag whose value is the id of a record or configured entity is
+  `--<noun>-id`: `--change` → `--change-id` (brief approve, brief check, review
+  add, scenario new), `--project` → `--project-id` (feature new, scenario new),
+  `--subject` → `--subject-id` (change new, retrieve, scenario new, subject
+  adopt), `--actor` → `--actor-id` (feature new, learn rollback, scenario new),
+  `--run` → `--run-id` (dispatch end, ingest artifacts).
+- `--kind` values of `query`, `export` and `purge` drop the `_record` suffix:
+  `evidence_record` → `evidence`. The record's own `kind` field, ledger paths
+  and `canon.yaml` routing keys are storage and keep `evidence_record`.
+- Old spellings still run until 0.25.0. Each use prints
+  `canon <command>: --<old> is deprecated — use --<new> (removed in 0.25.0)` on
+  stderr and adds `meta.deprecated: [{used, use, removedIn}]` to JSON;
+  `canon schema <command>` lists them as `deprecatedAliases`; help hides them.
+  `<kind>_record` is accepted for every `--kind`.
+- Everything canon prints for an agent to type back (hints, `meta.next`,
+  examples, help, the skill, the website, the AGENTS block) uses the new names.
+- A contract test walks the command tree and fails when two flags differ only
+  by an `-id` suffix, a listed concept is spelled another way, or a `--kind`
+  value ends in `_record`.
+- `evals/dogfood/trace_check.py` counts naming failures and deprecated spellings.
+
+### D4: attachments by test (#83)
+
+- A report says which file belongs to which test: JUnit `[[ATTACHMENT|<path>]]`
+  lines in a case's `<system-out>` (Playwright's JUnit reporter; relative paths
+  resolve against the report's directory) and Cucumber JSON `embeddings`. A
+  record binds the attachments of the cases it owns, in batch and
+  single-scenario mode alike.
+- `evidence add --all-scenarios` refuses a bare `--artifact <path>` (it would
+  bind to every scenario); `--artifact <scenario-id>=<path>` binds one file to
+  one scenario of the batch. A report attachment that is missing or over the
+  size limit is refused, naming the case and path; nothing is written.
+- Review pins are unchanged: report evidence pins the format and matched case
+  names, so a re-run's new screenshot bytes do not stale a review.
+
+### Upgrading
+
+- Nothing to migrate. Scripts using the old flags or `*_record` kinds keep
+  working with a warning until 0.25.0; switch to the names above.
+- A batch that passed screenshots as bare `--artifact` is now refused: let the
+  report carry them per test, or use `--artifact <scenario-id>=<path>`.
+
+### Conformance changes
+
+- New: `usage-deprecated-spellings` (stderr line, `meta.deprecated`, still
+  runs) and `evidence-add-all-scenarios-attachments`.
+- Re-blessed on the new spellings and the `evidence=N` tally: the change,
+  evidence, finding, gate, review, status and subject cases that type a
+  renamed flag; version strings (`0.23.0` → `0.24.0`).
+
+ACCEPTANCE-PLACEHOLDER: dogfood eval 12
+
 ## 0.23.0 release
 
 Version 0.23.0 keeps only the current decision in canon's working set. A
