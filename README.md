@@ -147,7 +147,22 @@ batch, so each of 103 records bound about 30 unrelated files (#83).
   evidence, finding, gate, review, status and subject cases that type a
   renamed flag; version strings (`0.23.0` → `0.24.0`).
 
-ACCEPTANCE-PLACEHOLDER: dogfood eval 12
+**Acceptance (dogfood eval 12, omp, `language: ko`, orchestrated roles).**
+An orchestrator agent was asked for a collection screen on the shipped game and
+spawned planner, implementer and reviewer subagents running the 0.24 build.
+
+- Wrong-shape canon calls: 0 caused by naming, 0 other (evals 7–11: 0–3 per
+  run, all naming). One deprecated spelling (`scenario new --subject`) ran with
+  its warning and was not used again.
+- Attachments: 127 evidence records, 1.1 attachments on average (3 at most;
+  eval 11: 32.4), none a screenshot of another scenario.
+- 46 canon calls for 24 new scenarios (1.9 per scenario; eval 11: 3.3).
+- Shipped with `canon gate check` clean. The reviewer found a real blocker (a
+  fast double-click on the collection's back button started a run) and signed
+  off its fix after probing it by hand.
+- Turn 2 took 103 minutes, mostly repeated full e2e runs. Closing that blocker
+  `fixed` required re-recording the whole suite (#72's trigger); a narrower
+  re-verification is filed as #87.
 
 ## 0.23.0 release
 
