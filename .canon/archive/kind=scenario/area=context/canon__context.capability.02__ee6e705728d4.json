@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-18T14:54:57.249960531Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "509a1f8c7e739320bb3c072e4f3379b8f9ad05b5a6073f01050363f88774c444",
+  "scenario_id": "context.capability.02",
+  "schema": 1,
+  "source_digest": "65e50bf8317aabeadf72526cd0f66ab37eb14b90fa055f0dcc2982109a750656",
+  "subject_id": "context-capability",
+  "title": "A repo with no canon state at all still resolves the whole surface"
+}

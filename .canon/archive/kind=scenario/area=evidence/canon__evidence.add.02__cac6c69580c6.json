@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-18T14:54:57.274524754Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "1dbef9677497ebe132adb425547e0a364bd6f47d7ece4d6076d97f4e50f62a0e",
+  "scenario_id": "evidence.add.02",
+  "schema": 1,
+  "source_digest": "14cd32c99c08327f4af4c6aa44471fdc69b74ea8559ba3066c3495885bfe35bd",
+  "subject_id": "evidence-attestation",
+  "title": "Promotion assigns the run sequence number, so authoring alone never carries one"
+}

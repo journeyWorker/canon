@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-18T14:54:57.282965044Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "9c558e3591e85d99622ee1ed05163684737c445ae89238ed1b8f6ff8956f384a",
+  "scenario_id": "evidence.add.07",
+  "schema": 1,
+  "source_digest": "14cd32c99c08327f4af4c6aa44471fdc69b74ea8559ba3066c3495885bfe35bd",
+  "subject_id": "evidence-attestation",
+  "title": "A fabrication marker in the summary is refused at authoring, before anything is staged"
+}

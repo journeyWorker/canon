@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-18T14:54:57.316370972Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "1403d46b59a84ab5815ce45e9903fca7eeb0a1a4557e282d3e421e94593ea5df",
+  "scenario_id": "evidence.add.43",
+  "schema": 1,
+  "source_digest": "14cd32c99c08327f4af4c6aa44471fdc69b74ea8559ba3066c3495885bfe35bd",
+  "subject_id": "evidence-attestation",
+  "title": "The drop flags no longer exist"
+}

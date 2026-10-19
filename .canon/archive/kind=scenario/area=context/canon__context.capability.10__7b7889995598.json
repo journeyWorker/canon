@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-18T14:54:57.264353615Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "5cdc7a5b2a19d59f7f4a65dc033d4ef978c10871e3600aaa51bf42104383f912",
+  "scenario_id": "context.capability.10",
+  "schema": 1,
+  "source_digest": "65e50bf8317aabeadf72526cd0f66ab37eb14b90fa055f0dcc2982109a750656",
+  "subject_id": "context-capability",
+  "title": "The policy surface exposes resolved effect-aware risk tiers"
+}

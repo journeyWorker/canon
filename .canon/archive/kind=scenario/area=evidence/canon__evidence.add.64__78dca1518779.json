@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-18T14:54:57.330514773Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "b8b0e8537a3e2ca7af73c7c5359ad27affbb5ddf6e20b942d31e2dfc7389672c",
+  "scenario_id": "evidence.add.64",
+  "schema": 1,
+  "source_digest": "14cd32c99c08327f4af4c6aa44471fdc69b74ea8559ba3066c3495885bfe35bd",
+  "subject_id": "evidence-attestation",
+  "title": "A promotion that refuses the record just staged leaves it staged and exits 1"
+}
