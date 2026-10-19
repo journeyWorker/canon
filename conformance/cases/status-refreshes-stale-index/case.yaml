@@ -5,7 +5,7 @@ steps:
     exit: 0
   - args: [subject, new, cart, --domain, dev, --title, Cart]
     exit: 0
-  - args: [scenario, new, cart.add.01, --title, An empty cart refuses checkout, --case, failure, --subject, cart]
+  - args: [scenario, new, cart.add.01, --title, An empty cart refuses checkout, --case, failure, --subject-id, cart]
     exit: 0
   - args: [status]
     exit: 0

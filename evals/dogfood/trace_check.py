@@ -24,6 +24,56 @@ def text(content):
     return "\n".join(c.get("text", "") for c in content or [] if isinstance(c, dict))
 
 
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+DEPRECATED = re.compile(r"canon ([^:\n]+): (\S+) is deprecated \u2014 use (\S+?)(?: \(removed in ([\d.]+)\))?(?:\s|$)")
+
+
+def error_code(output):
+    """The canon error code in a result text: JSON `"code":"X"` or human `canon <path>: X —` / `error[X]`."""
+    for pattern in (r'"error"\s*:\s*\{[^{}]*?"code"\s*:\s*"([A-Z][A-Z0-9_]+)"',
+                    r"canon [^:\n]+: ([A-Z][A-Z0-9_]+) \u2014", r"error\[([A-Z][A-Z0-9_]+)\]"):
+        match = re.search(pattern, output)
+        if match:
+            return match[1]
+    return None
+
+
+def classify_failure(output):
+    """`naming` for a wrong-shape call caused by a name, else `other`."""
+    output = ANSI.sub("", output)
+    if re.search(r"invalid value '[^']*' for '--kind\b", output):
+        return "naming"
+    for flag in re.findall(r"unexpected argument '(--[\w-]+)'", output):
+        if re.search(r"similar argument exists", output):
+            return "naming"
+        if re.search(re.escape(flag) + r"-id\b", output.replace(f"'{flag}'", "")):
+            return "naming"
+    if error_code(output) == "USAGE":
+        for flag in re.findall(r"(?:unknown|unexpected)[^\n]*?(--[\w-]+)", output):
+            if re.search(re.escape(flag) + r"-id\b|" + re.escape(flag) + r"_record\b", output.replace(flag, "", 1)):
+                return "naming"
+    return "other"
+
+
+def deprecations(output, command):
+    """Deprecated spellings reported in a result: stderr warning lines and JSON `meta.deprecated`."""
+    items = [{"command": f"canon {m[1]}", "used": m[2], "use": m[3], "removed_in": m[4]}
+             for m in DEPRECATED.finditer(ANSI.sub("", output))]
+    seen = {(i["used"], i["use"]) for i in items}
+    decoder = json.JSONDecoder()
+    for match in re.finditer(r'"deprecated"\s*:\s*(?=\[)', output):
+        try:
+            entries, _ = decoder.raw_decode(output, match.end())
+        except ValueError:
+            continue
+        for entry in entries:
+            if isinstance(entry, dict) and (entry.get("used"), entry.get("use")) not in seen:
+                seen.add((entry.get("used"), entry.get("use")))
+                items.append({"command": command, "used": entry.get("used"), "use": entry.get("use"),
+                              "removed_in": entry.get("removedIn")})
+    return items
+
+
 def timestamp(value):
     if isinstance(value, (int, float)):
         return value / 1000
@@ -478,6 +528,7 @@ def analyze(inputs, question_turns=()):
     brief_times = []
     for session in sessions.values():
         session["writes"], session["calls"], session["warnings"] = [], [], []
+        session["wrong_shape"], session["deprecated"] = [], []
         session["brief_stop"] = None
         brief_written = False
         for ordinal, event in enumerate(session["events"]):
@@ -498,6 +549,16 @@ def analyze(inputs, question_turns=()):
                     brief_written = True
                     brief_times.append((session, event["time"]))
             session["calls"].extend({**location, **call} for call in calls)
+            output = text(event["result"].get("content")) if event["result"] and calls else ""
+            for call in calls:
+                if call["exit_code"] not in (None, 0):
+                    session["wrong_shape"].append({
+                        "file": event["file"], "line": event["line"], "command": call["command"],
+                        "exit_code": call["exit_code"], "code": error_code(output),
+                        "class": classify_failure(output)})
+            if calls and output:
+                session["deprecated"].extend({"file": event["file"], "line": event["line"], **d}
+                                             for d in deprecations(output, f"canon {calls[0]['verb']}"))
             session["warnings"].extend({**location, "message": w} for w in warnings)
 
     def root_session(session):
@@ -564,14 +625,23 @@ def analyze(inputs, question_turns=()):
     counts = Counter()
     for report in reports:
         counts.update(report["canon_call_count"])
+    wrong = [item for session in sessions.values() for item in session["wrong_shape"]]
+    deprecated = [item for session in sessions.values() for item in session["deprecated"]]
     return {"hard_checks_passed": not failures, "failures": failures,
             "implementer_sessions": sorted(implementers), "reviewer_sessions": sorted(reviewers),
-            "canon_call_count": dict(sorted(counts.items())), "sessions": reports}
+            "canon_call_count": dict(sorted(counts.items())),
+            "wrong_shape_calls": {"naming": sum(i["class"] == "naming" for i in wrong),
+                                  "other": sum(i["class"] == "other" for i in wrong), "items": wrong},
+            "deprecated_spellings": {"count": len(deprecated), "items": deprecated},
+            "sessions": reports}
 
 
 def render(report):
     lines = [f"Hard checks: {'PASS' if report['hard_checks_passed'] else 'FAIL'} ({len(report['failures'])} violation(s))",
              "Canon calls: " + json.dumps(report["canon_call_count"], sort_keys=True),
+             "Wrong-shape canon calls: {naming} naming, {other} other".format(**{k: report["wrong_shape_calls"][k] for k in ("naming", "other")}),
+             "Deprecated spellings used: " + str(report["deprecated_spellings"]["count"]) + "".join(
+                 f"; {i['command']}: {i['used']} -> {i['use']}" for i in report["deprecated_spellings"]["items"]),
              "Implementer sessions: " + (", ".join(report["implementer_sessions"]) or "none observed"),
              "Reviewer sessions: " + (", ".join(report["reviewer_sessions"]) or "none observed")]
     for session in report["sessions"]:

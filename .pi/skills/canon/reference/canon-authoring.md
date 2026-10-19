@@ -84,7 +84,7 @@ enum, like `lane`.
 ## Subject pinning
 
 Every scenario belongs to a Subject (the durable product unit, see
-`canon-subject`). Write the Subject first, then pin with `--subject`;
+`canon-subject`). Write the Subject first, then pin with `--subject-id`;
 the scenario index carries the tag onto the index record and
 `spec_coverage.scope` filters on it. An unpinned scenario is invisible to
 a scoped gate.
@@ -94,9 +94,9 @@ a scoped gate.
 ```bash
 canon feature new checkout.cart --title "Cart"                       # once per surface
 canon scenario new checkout.cart.01 --title "Adding an item raises the count" \
-  --subject checkout-core --lane behavior --case happy               # once per behavior
+  --subject-id checkout-core --lane behavior --case happy               # once per behavior
 canon scenario new checkout.cart.04 --title "Adding an out-of-stock item is refused" \
-  --subject checkout-core --lane behavior --case failure             # and its failure path
+  --subject-id checkout-core --lane behavior --case failure             # and its failure path
 ```
 
 There is no format or sync step after these: the scaffold writes a
@@ -108,7 +108,7 @@ one of them prints `NOT refreshed`, the corpus has a format violation
 duplicate id; `canon inventory sync` (or `canon format <root>`) names it.
 Fix it and the next command indexes the files (see `canon-inventory`).
 
-- `--actor <id>` (or `CANON_ACTOR` in the environment) puts YOUR id on the
+- `--actor-id <id>` (or `CANON_ACTOR` in the environment) puts YOUR id on the
   provenance line. Default is `canon-scaffold`.
 - **Keep the `# canon:` lines when you fill in the scenario.** Dropping one
   makes `canon inventory sync` abort on `missing-provenance`; restore it
@@ -146,7 +146,7 @@ Fix it and the next command indexes the files (see `canon-inventory`).
 - **A Feature title that is a theme.** "Fidelity of the original
   experience" names no surface. Name the screen.
 - **Hand-stamped provenance.** Eighty lines with one timestamp and the
-  same `agent_id`. Use `canon scenario new --actor`.
+  same `agent_id`. Use `canon scenario new --actor-id`.
 - **Coverage by splitting.** One behavior as two scenarios so two rows go
   green. One behavior, one id.
 - **Runner tags as classification.** `@design`, `@p2`, `@wip` are

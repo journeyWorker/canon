@@ -52,7 +52,7 @@ SELECT * FROM (
 -- `applied = applied_attributed + applied_proxy` must hold for every
 -- row here, exactly as the view guarantees. `implementer` is mixed,
 -- `reviewer` is all-proxy (the shape of a repo that never passes
--- `canon ingest artifacts --run`), `fixer` is all-attributed.
+-- `canon ingest artifacts --run-id`), `fixer` is all-attributed.
 CREATE OR REPLACE TABLE mart_flywheel_funnel AS
 SELECT * FROM (
     VALUES

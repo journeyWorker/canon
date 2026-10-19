@@ -19,7 +19,7 @@
       "format": "date-time"
     },
     "change_id": {
-      "description": "The change reviewed, on a change-level review (0.23): a chore's\nsign-off, recorded by `canon review add --change`. Absent on a\nscenario review.",
+      "description": "The change reviewed, on a change-level review (0.23): a chore's\nsign-off, recorded by `canon review add --change-id`. Absent on a\nscenario review.",
       "anyOf": [
         {
           "$ref": "#/$defs/ChangeId"

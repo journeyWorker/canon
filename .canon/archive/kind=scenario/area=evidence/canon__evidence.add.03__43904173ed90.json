@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-18T14:54:57.276063971Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "559631c163205128bc0670fb1f3e7fb412fa30e0b2f29b1ad68298c867d85449",
+  "scenario_id": "evidence.add.03",
+  "schema": 1,
+  "source_digest": "14cd32c99c08327f4af4c6aa44471fdc69b74ea8559ba3066c3495885bfe35bd",
+  "subject_id": "evidence-attestation",
+  "title": "A scenario-keyed attestation clears exactly the scenario it names"
+}

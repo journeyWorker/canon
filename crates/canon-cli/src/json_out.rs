@@ -12,11 +12,15 @@ use serde_json::{json, Value};
 /// The success envelope for `command` (its canonical path, e.g. `gate check`).
 /// A write command carries `meta.next` (0.21 D2);
 /// here it is empty, for a command with no meaningful next step.
-/// [`data_with_next`] fills it.
+/// [`data_with_next`] fills it. An invocation that used a deprecated spelling
+/// carries `meta.deprecated` ([`crate::deprecation`]).
 pub fn envelope(command: &str, data: Value) -> Value {
     let mut meta = json!({ "command": command });
     if writes(command) {
         meta["next"] = json!([]);
+    }
+    if let Some(deprecated) = crate::deprecation::meta() {
+        meta["deprecated"] = deprecated;
     }
     json!({ "data": data, "meta": meta })
 }

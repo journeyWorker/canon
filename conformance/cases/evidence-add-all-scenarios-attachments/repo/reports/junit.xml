@@ -1,0 +1,16 @@
+<testsuite>
+  <testcase classname="tests/cart.spec.ts" name="cart.add.01 adds">
+    <system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/a/shot.png]]
+]]>
+    </system-out>
+  </testcase>
+  <testcase classname="tests/cart.spec.ts" name="cart.add.02 counts">
+    <system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/b/shot.png]]
+]]>
+    </system-out>
+  </testcase>
+</testsuite>

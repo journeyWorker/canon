@@ -14,8 +14,8 @@ a `specs.roots[]` entry in `canon.yaml` (`root` by default).
 ```bash
 canon status --as implementer --json                  # once, at the start
 canon feature new <area>.<surface> --title "<title>" --as implementer --json
-canon scenario new <area>.<surface>.<nn> --subject <subject-id> --flow <F-id> --case <happy|edge|failure> --title "<title>" --as implementer --json
-canon scenario new --from - --as implementer --json     # many at once: NDJSON on stdin, one {"id","title","subject","flow","case",…} per line
+canon scenario new <area>.<surface>.<nn> --subject-id <subject-id> --flow <F-id> --case <happy|edge|failure> --title "<title>" --as implementer --json
+canon scenario new --from - --as implementer --json     # many at once: NDJSON on stdin, one {"id","title","subject-id","flow","case",…} per line
 canon evidence add --project-id <root-id> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref "<test command>" --actor-id <unit> --session-id <session> --as implementer --json
 canon evidence add --project-id <root-id> --scenario-id <id> --artifact <path> --kind test-run --role implementer --ref "<what it shows>" --actor-id <unit> --session-id <session> --as implementer --json
 canon evidence add --project-id <root-id> --scenario-id <id> --verdict divergent --artifact <path> --kind test-run --role implementer --ref "<the external limit, and where it is tracked>" --actor-id <unit> --session-id <session> --as implementer --json   # honest divergent evidence
@@ -65,10 +65,13 @@ After the first `status`, follow `meta.next` of each write; do not call
    `canon artifacts verify` to ask the store yourself; it refuses, never
    passes, when an object store cannot be reached. Moving an existing store
    (`canon artifacts migrate`) is the repo owner's call: do not run it.
-   For a scenario about what users see, bind its own screenshot or recording
-   with that scenario: `--scenario-id <id> --artifact <path>`. A batch
-   (`--all-scenarios`) binds every file it names to every scenario, so give
-   a batch only the reports; never loop all screenshots into it. An external evaluator's audit is
+   For a scenario about what users see, let the test report carry its
+   screenshots: Playwright's JUnit reporter attaches, per test case, what a
+   test attaches (`testInfo.attach(name, {path})`, or `screenshot: 'on'`), and
+   one `evidence add --all-scenarios --report junit:<path>` binds to each
+   record only its own tests' files. A file the report does not name goes
+   with `--artifact <scenario-id>=<path>`; a bare `--artifact` in a batch is
+   refused. An external evaluator's audit is
    `--kind audit`; canon never generates one. Evidence for a task of an
    imported plan (`--task <id>`) must bind the artifact or report that proves
    the task; a canon command is never that proof. When the behavior cannot
@@ -108,6 +111,6 @@ When every scenario has evidence, the review is the reviewer's session, in a
 separate process: do not review your own change. A chore adds no scenarios:
 once it is approved, run the suite and bind it with `--all-scenarios`;
 shipping needs that evidence newer than the chore's approval, plus the
-reviewer's one change-level review of the chore (`review add --change`).
+reviewer's one change-level review of the chore (`review add --change-id`).
 Scenario reviews stay current when the verdicts and checks are unchanged.
 Reference: `reference/canon-gate.md`.

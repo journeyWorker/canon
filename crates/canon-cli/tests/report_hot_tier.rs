@@ -37,7 +37,7 @@ fn fresh_repo_with_tasks() -> tempfile::TempDir {
     assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
     ok(run_canon(&["init", "--no-agents-md", "--no-policy"], repo), "init");
     ok(run_canon(&["subject", "new", "auth", "--domain", "dev", "--title", "Auth"], repo), "subject new");
-    ok(run_canon(&["change", "new", "add-login", "--subject", "auth", "--title", "Add login"], repo), "change new");
+    ok(run_canon(&["change", "new", "add-login", "--subject-id", "auth", "--title", "Add login"], repo), "change new");
     let tasks = repo.join(".canon/changes/add-login/tasks.md");
     fs::write(&tasks, "- [ ] 1 Write the login scenarios\n- [ ] 2 Implement login\n").unwrap();
     let brief = repo.join(".canon/changes/add-login/brief.md");

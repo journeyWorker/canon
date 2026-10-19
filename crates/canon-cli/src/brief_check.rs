@@ -244,7 +244,7 @@ pub fn flow_tag_value(repo: &Path, subject: Option<&canon_model::SubjectId>, cha
     let change = match (change, subject) {
         (Some(change), _) => change.clone(),
         (None, Some(subject)) => newest_change_of(repo, subject)?,
-        (None, None) => resolve_change(repo, None).map(|(change, _)| change).map_err(|e| format!("{} — {}; pass --change or --subject", e.code, e.message))?,
+        (None, None) => resolve_change(repo, None).map(|(change, _)| change).map_err(|e| format!("{} — {}; pass --change-id or --subject-id", e.code, e.message))?,
     };
     if crate::brief::canon_brief(repo, &change).is_none() {
         return Err(format!("change `{}` has no brief at {}/{}/brief.md; write it with `canon change new`", change.as_str(), paths::CHANGES_DIR, change.as_str()));
@@ -267,7 +267,7 @@ pub fn newest_change_of(repo: &Path, subject: &canon_model::SubjectId) -> Result
     let registry = canon_policy::SchemaRegistry::load();
     let ctx = GateCtx::from_repo(repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &registry, chrono::Utc::now()).map_err(|e| e.to_string()))?;
     let found = latest_subjects(&ctx).into_iter().find(|s| &s.subject_id == subject).ok_or_else(|| format!("no subject `{}`", subject.as_str()))?;
-    subject_change_ids(&ctx, found).pop().ok_or_else(|| format!("subject `{}` has not adopted a change; run `canon change new <slug> --subject {}`", subject.as_str(), subject.as_str()))
+    subject_change_ids(&ctx, found).pop().ok_or_else(|| format!("subject `{}` has not adopted a change; run `canon change new <slug> --subject-id {}`", subject.as_str(), subject.as_str()))
 }
 
 // ───────────────────────────── document scan ─────────────────────────────
@@ -1008,7 +1008,7 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
     if let Some(change) = requested {
         return crate::brief::canon_brief(repo, change)
             .map(|path| (change.clone(), path))
-            .ok_or_else(|| CliError::failed("BRIEF_NOT_FOUND", format!("no brief at {}/{}/brief.md", paths::CHANGES_DIR, change.as_str())).hint("check the slug against the changes directory, or create the change with `canon change new <slug> --subject <id> --title <title>`"));
+            .ok_or_else(|| CliError::failed("BRIEF_NOT_FOUND", format!("no brief at {}/{}/brief.md", paths::CHANGES_DIR, change.as_str())).hint("check the slug against the changes directory, or create the change with `canon change new <slug> --subject-id <id> --title <title>`"));
     }
     let dir = repo.join(paths::CHANGES_DIR);
     let mut live: Vec<(ChangeId, PathBuf)> = std::fs::read_dir(&dir)
@@ -1020,12 +1020,12 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
         .collect();
     live.sort_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
     match live.len() {
-        0 => Err(CliError::failed("NO_BRIEF", format!("no brief under {}/; write one with `canon change new`", paths::CHANGES_DIR)).hint("create one with `canon change new <slug> --subject <id> --title <title>`; it scaffolds brief.md")),
+        0 => Err(CliError::failed("NO_BRIEF", format!("no brief under {}/; write one with `canon change new`", paths::CHANGES_DIR)).hint("create one with `canon change new <slug> --subject-id <id> --title <title>`; it scaffolds brief.md")),
         1 => Ok(live.remove(0)),
         _ => Err(CliError::failed(
             "CHANGE_AMBIGUOUS",
-            format!("{} live changes have a brief ({}); pass --change <slug>", live.len(), live.iter().map(|(c, _)| c.as_str()).collect::<Vec<_>>().join(", ")),
-        ).hint("pass --change <slug> naming one of the listed changes")),
+            format!("{} live changes have a brief ({}); pass --change-id <slug>", live.len(), live.iter().map(|(c, _)| c.as_str()).collect::<Vec<_>>().join(", ")),
+        ).hint("pass --change-id <slug> naming one of the listed changes")),
     }
 }
 
@@ -1088,7 +1088,7 @@ struct CheckJson<'a> {
     waivers: &'a [Waiver],
 }
 
-/// `canon brief check [--change <slug>] [--json]`.
+/// `canon brief check [--change-id <slug>] [--json]`.
 pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let checked = match check(&repo, change) {
@@ -1117,6 +1117,7 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
                     eprintln!("{}", error.human("canon brief check"));
                     value["error"] = error.to_json()["error"].clone();
                 }
+                crate::deprecation::tag_document(&mut value);
                 println!("{}", serde_json::to_string_pretty(&value).expect("a JSON value always serializes"));
             }
             Err(e) => return CliError::failed("SERIALIZE_FAILED", e.to_string()).hint("this is a canon bug: report it together with the command line that produced it").emit("canon brief check", true),
@@ -1203,7 +1204,7 @@ struct NextJson<'a> {
     next: Vec<Step>,
 }
 
-/// Bare `canon brief [--change <slug>] [--json]`: state and next steps.
+/// Bare `canon brief [--change-id <slug>] [--json]`: state and next steps.
 pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let checked = match check(&repo, change) {
@@ -1224,7 +1225,9 @@ pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
     let next = next_steps(ev);
     if json {
         let body = NextJson { change: checked.change.as_str(), brief: &checked.brief, state, counts, next };
-        println!("{}", serde_json::to_string_pretty(&body).unwrap_or_default());
+        let mut document = serde_json::to_value(&body).unwrap_or_default();
+        crate::deprecation::tag_document(&mut document);
+        println!("{}", serde_json::to_string_pretty(&document).unwrap_or_default());
     } else {
         println!("canon brief: {} — {state} ({} blocker(s), {} advisory(ies))", checked.brief, counts.blockers, counts.advisories);
         if next.is_empty() {

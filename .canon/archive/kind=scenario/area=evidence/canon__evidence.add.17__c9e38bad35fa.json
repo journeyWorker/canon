@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-18T14:54:57.301526903Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "6127c08994a6ebd1ebe8f794d1a697e818319b98f2fa4e95ae92feea9f52dadd",
+  "scenario_id": "evidence.add.17",
+  "schema": 1,
+  "source_digest": "14cd32c99c08327f4af4c6aa44471fdc69b74ea8559ba3066c3495885bfe35bd",
+  "subject_id": "evidence-attestation",
+  "title": "The vault stores the bytes of records written before the store existed"
+}

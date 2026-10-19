@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-18T14:54:57.253430129Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "259024125289afb7fefac3207595a880c7b73ea7439db8cdc3ce0c8d30b7b592",
+  "scenario_id": "context.capability.04",
+  "schema": 1,
+  "source_digest": "65e50bf8317aabeadf72526cd0f66ab37eb14b90fa055f0dcc2982109a750656",
+  "subject_id": "context-capability",
+  "title": "The machine form and the human form name exactly the same surface"
+}

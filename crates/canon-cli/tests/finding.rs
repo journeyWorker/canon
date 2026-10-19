@@ -574,7 +574,7 @@ fn gate_promote_tallies_per_kind_and_names_an_empty_staging_area() {
     let empty_out = stdout(&empty);
     assert!(empty_out.contains("nothing staged"), "{empty_out}");
     assert!(empty_out.contains("finding"), "an empty promote must name the kinds it CAN drain: {empty_out}");
-    assert!(empty_out.contains("evidence_record"), "{empty_out}");
+    assert!(empty_out.contains("evidence"), "{empty_out}");
 
     assert!(add(repo, &["--round", "4", "--seq", "1", "--reviewer", "r", "--summary", "first"]).status.success());
     assert!(add(repo, &["--round", "4", "--seq", "2", "--reviewer", "r", "--summary", "second"]).status.success());
@@ -583,7 +583,34 @@ fn gate_promote_tallies_per_kind_and_names_an_empty_staging_area() {
     assert!(promoted.status.success(), "stderr: {}", stderr(&promoted));
     let out = stdout(&promoted);
     assert!(out.contains("finding=2"), "the tally must be readable per kind: {out}");
-    assert!(out.contains("evidence_record=0"), "including the kinds that drained nothing: {out}");
+    assert!(out.contains("evidence=0"), "including the kinds that drained nothing: {out}");
+}
+
+/// context.capability.23: the staged kinds are named as `--kind` takes them
+/// (`evidence`), never by the storage name `evidence_record`, in the tally
+/// and in the line that lists what could be promoted.
+#[test]
+fn context_capability_23_gate_promote_tallies_the_staged_kinds_by_the_names_kind_takes() {
+    let dir = repo();
+    let repo = dir.path();
+
+    let empty = stdout(&run_canon(&["gate", "promote", "--repo", "."], repo));
+    assert!(empty.contains("nothing staged") && empty.contains("(evidence, finding"), "{empty}");
+    assert!(!empty.contains("evidence_record"), "{empty}");
+
+    assert!(add(repo, &["--round", "5", "--seq", "1", "--reviewer", "r", "--summary", "first"]).status.success());
+    let promoted = stdout(&run_canon(&["gate", "promote", "--repo", "."], repo));
+    assert!(promoted.contains("evidence=0, finding=1"), "{promoted}");
+    assert!(!promoted.contains("evidence_record"), "{promoted}");
+
+    // A staged evidence record and a staged finding together: both are named as `--kind` takes them.
+    let evidence = run_canon(&["evidence", "add", "--project-id", "root", "--scenario-id", "a.b.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--repo", "."], repo);
+    assert!(evidence.status.success(), "stderr: {}", stderr(&evidence));
+    assert!(add(repo, &["--round", "5", "--seq", "2", "--reviewer", "r", "--summary", "second"]).status.success());
+    let tally = stdout(&run_canon(&["gate", "promote", "--repo", "."], repo));
+    let tally_line = tally.lines().find(|l| l.starts_with("canon gate promote:")).expect("a tally line");
+    assert!(tally_line.contains("evidence=1, finding=1"), "{tally}");
+    assert!(!tally_line.contains("evidence_record"), "{tally}");
 }
 
 /// Task 2.3. Asserted at the binary boundary because this is the text

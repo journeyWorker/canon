@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-18T14:54:57.277626227Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "29173a457b0e5a55eb05c0ade23886a15ef4f41e393d3e4e36ce8aecb686f6b1",
+  "scenario_id": "evidence.add.04",
+  "schema": 1,
+  "source_digest": "14cd32c99c08327f4af4c6aa44471fdc69b74ea8559ba3066c3495885bfe35bd",
+  "subject_id": "evidence-attestation",
+  "title": "A record keyed to neither a task nor a scenario is refused"
+}

@@ -1,6 +1,6 @@
 {
   "statusVersion": 3,
-  "canonVersion": "0.23.0",
+  "canonVersion": "0.24.0",
   "policy": {
     "present": true,
     "spec_coverage": {
@@ -56,7 +56,7 @@
   "unowned": [],
   "next": [
     {
-      "command": "canon brief check --change cart-v1",
+      "command": "canon brief check --change-id cart-v1",
       "why": "cart: 7 blocker(s): write the brief in .canon/changes/cart-v1/brief.md until `canon brief check` is clean; only then does the human answer it",
       "actor": "agent",
       "role": "planner"

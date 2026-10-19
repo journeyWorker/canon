@@ -187,11 +187,11 @@ pub enum DispatchError {
     #[error("resolving --task `{task_id}` against the plan corpus: {detail}")]
     PlanCorpus { task_id: String, detail: String },
 
-    /// `canon dispatch end --run <id>` found no manifest for `<id>`.
+    /// `canon dispatch end --run-id <id>` found no manifest for `<id>`.
     /// Names the id AND the path consulted, so the usual cause — a run
     /// begun against a DIFFERENT repo root — is readable straight off
     /// the error.
-    #[error("--run `{run_id}` has no dispatch manifest at {path} — only a run begun by `canon dispatch begin` on this repo can be ended")]
+    #[error("--run-id `{run_id}` has no dispatch manifest at {path} — only a run begun by `canon dispatch begin` on this repo can be ended")]
     NoSuchRun { run_id: String, path: String },
 
     /// `canon dispatch end` on a run that already carries `ended_at`.
@@ -201,7 +201,7 @@ pub enum DispatchError {
     /// different status at a later instant, leaving no trace that the
     /// first close ever happened.
     #[error(
-        "--run `{run_id}` already ended at {ended_at} with status `{status}` — ended_at is provenance and re-closing would silently rewrite it; remove the manifest deliberately if the first close was wrong"
+        "--run-id `{run_id}` already ended at {ended_at} with status `{status}` — ended_at is provenance and re-closing would silently rewrite it; remove the manifest deliberately if the first close was wrong"
     )]
     AlreadyEnded { run_id: String, ended_at: String, status: &'static str },
 
@@ -219,7 +219,7 @@ pub enum DispatchError {
     /// is precisely the provenance rewrite `AlreadyEnded` exists to
     /// refuse.
     #[error(
-        "--run `{run_id}` records status `{status}`, which is not a run this command can close — `dispatch end` performs exactly one transition, `running` (with no ended_at) -> a terminal status; repair or remove the manifest deliberately"
+        "--run-id `{run_id}` records status `{status}`, which is not a run this command can close — `dispatch end` performs exactly one transition, `running` (with no ended_at) -> a terminal status; repair or remove the manifest deliberately"
     )]
     NotRunning { run_id: String, status: &'static str },
 
@@ -241,7 +241,7 @@ pub enum DispatchError {
     /// deliberately — the same posture [`DispatchError::AlreadyEnded`]
     /// takes toward a manifest the CLI will not guess about.
     #[error(
-        "--run `{run_id}` is being closed by another process (lock held at {lock_path}) — retry once it finishes, or remove that sidecar if the holder was killed"
+        "--run-id `{run_id}` is being closed by another process (lock held at {lock_path}) — retry once it finishes, or remove that sidecar if the holder was killed"
     )]
     EndInProgress { run_id: String, lock_path: String },
 
@@ -317,7 +317,7 @@ impl DispatchError {
             Self::TaskNotFound { .. } => "task ids look like <change_id>#<n>; open the change's plan document to find the right number".to_string(),
             Self::NoPlanSources { .. } => "write the change's plan document, then run `canon ingest plans` so --task can resolve against it".to_string(),
             Self::PlanCorpus { .. } => "fix the plan document the message names, then run the command again".to_string(),
-            Self::NoSuchRun { .. } => "pass the --run id `canon dispatch begin` printed for this repository".to_string(),
+            Self::NoSuchRun { .. } => "pass the --run-id id `canon dispatch begin` printed for this repository".to_string(),
             Self::AlreadyEnded { .. } => "the run is closed; start a new one with `canon dispatch begin`".to_string(),
             Self::NotRunning { .. } => "only a run in the running state can be ended; start a new one with `canon dispatch begin`".to_string(),
             Self::RunIdMismatch { .. } => "the manifest under .canon was edited or misplaced: restore it from version control, or start a new run with `canon dispatch begin`".to_string(),
@@ -859,7 +859,7 @@ pub fn parse_task_id(s: &str) -> Result<TaskId, String> {
     TaskId::parse(s).map_err(|e| e.to_string())
 }
 
-/// `--parent-run`'s and `--run`'s clap `value_parser`: the `RunId`
+/// `--parent-run`'s and `--run-id`'s clap `value_parser`: the `RunId`
 /// grammar (a ULID). For `--parent-run` this is the ONLY check there
 /// is — see [`DispatchBinding::parent_run_id`] for why the parent's
 /// existence is deliberately not verified.
@@ -1006,7 +1006,7 @@ impl Drop for EndLock {
 /// Deliberately stops there. The LIFECYCLE rung — which states a run
 /// may be in — is each caller's own: [`end`] admits exactly
 /// `(RunStatus::Running, ended_at: None)` because it MUTATES the run,
-/// while a read-only caller (`crate::artifact_ingest`'s `--run`
+/// while a read-only caller (`crate::artifact_ingest`'s `--run-id`
 /// attribution) only needs the run to have been dispatched at all. Both
 /// share this function's identity rungs, which is where a false
 /// attribution would actually come from.

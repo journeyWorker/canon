@@ -230,7 +230,7 @@ implementer --ref "<test command>" …`. Reviews pin what the evidence says
 (its verdict and the identity of its checks), not which record it is, so
 recording the suite again with the same verdicts from the same cases leaves
 every scenario review current. A chore instead needs one change-level
-review of the chore itself (`canon review add --change <slug> …`) before
+review of the chore itself (`canon review add --change-id <slug> …`) before
 `--to shipped`; a changed verdict or case set stales that scenario's
 review as before (and a new `divergence accept`, where the gap remains).
 
@@ -295,7 +295,7 @@ check `canon status` and the ship guard use; see
 `--task`:
 
 ```
-canon evidence add: unreviewed-promotion demo-subject — evidence for world.demo.01: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line, so the human has not answered it; once they do, record their words with `canon brief approve --change c-demo --by <the human> --note "<their words>"`
+canon evidence add: unreviewed-promotion demo-subject — evidence for world.demo.01: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line, so the human has not answered it; once they do, record their words with `canon brief approve --change-id c-demo --by <the human> --note "<their words>"`
 canon evidence add: refused — stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their answer with `canon brief approve --by <the human> --note "<their words>"` only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record
 ```
 
@@ -306,7 +306,7 @@ openspec/changes/c-ext/proposal.md, which canon reads and never edits, so
 its approval lives in that canon file, so the human has not answered it;
 once they do, create .canon/changes/c-ext/brief.md holding a `Source:
 openspec/changes/c-ext/proposal.md` line, then record their words with
-`canon brief approve --change c-ext --by <the human> --note "<their words>"` ``. An `Approved:` line in the
+`canon brief approve --change-id c-ext --by <the human> --note "<their words>"` ``. An `Approved:` line in the
 external `proposal.md` itself is never read.
 
 A subject with no brief to answer (no adopted change, or a newest change
@@ -482,8 +482,14 @@ them: `faithful` when every case passed, `divergent` when one failed,
 claims the same verdict for every record instead. A case whose id is not
 indexed is named and skipped (`skipped <id> — not an indexed scenario`);
 a report no indexed scenario owns is refused (exit 2). The records share
-the stored report and every `--artifact`, and the output lists each
-scenario with its verdict on its own line.
+the stored report, and the output lists each scenario with its verdict on
+its own line. Each record binds the attachments its own cases name in the
+report (a JUnit test case's `[[ATTACHMENT|path]]` lines, which Playwright's
+JUnit reporter writes; a Cucumber JSON embedding), so a test's screenshot
+stays with its scenario. A file the report does not name goes with
+`--artifact <scenario-id>=<path>`; a bare `--artifact <path>` in a batch is
+refused (`EVIDENCE_INVALID_ARGUMENT`). A report attachment that is missing,
+outside the repo or oversized is refused.
 
 It is all or nothing: a claimed `faithful` verdict over a failed case,
 a fabrication marker in `--summary`, an unapproved brief for any

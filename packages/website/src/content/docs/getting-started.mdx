@@ -121,7 +121,7 @@ is attributed, and is fresh — never on a self-report. See
 
    ```bash
    bunx @journeykit/canon subject new auth --domain dev --title "Auth"
-   bunx @journeykit/canon change new add-login --subject auth --title "Add login"
+   bunx @journeykit/canon change new add-login --subject-id auth --title "Add login"
    ```
 
    `change new` writes `.canon/changes/add-login/brief.md` and adopts the
@@ -132,7 +132,7 @@ is attributed, and is fresh — never on a self-report. See
    acceptance, questions and assumptions, out of scope. The agent fills it
    in and runs `canon brief check` until it has no blockers, then stops and
    reports it to the human in that language. When the human approves it,
-   the agent records the answer with `canon brief approve --change add-login
+   the agent records the answer with `canon brief approve --change-id add-login
    --by <the human> --note "<their words>"`, which writes the `Approved:`
    line, bound to the brief's text, and the policy approval together. A
    brief edited afterwards is no longer approved until the human answers

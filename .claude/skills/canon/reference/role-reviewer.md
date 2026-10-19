@@ -10,17 +10,17 @@ Every line is complete; fill the `<placeholders>`. `<root-id>` is the `id` of
 a `specs.roots[]` entry in `canon.yaml` (`root` by default).
 
 ```bash
-canon brief check --change <slug> --as reviewer --json
+canon brief check --change-id <slug> --as reviewer --json
 canon gate check --as reviewer --json                 # once, before review add
 canon finding add --change-id <slug> --round <n> --seq <n> --severity <blocker|should-fix|note> --reviewer <me> --actor-id <me> --session-id <session> --summary "<defect>" --as reviewer --json
 canon finding list --change-id <slug> --open --as reviewer --json
 canon finding close --change-id <slug> --round <n> --seq <n> --disposition fixed --resolution-sha <sha> --as reviewer --json
 canon review add --project-id <root-id> --scenario-id <id> --scenario-id <id> --reviewer <me> --actor-id <me> --role reviewer --session-id <session> --pin <sha> --upstream-ref <ref> --as reviewer --json
 canon review add --project-id <root-id> --scenario-ids-from - --reviewer <me> --actor-id <me> --role reviewer --session-id <session> --pin <sha> --upstream-ref <ref> --as reviewer --json   # ids on stdin, one per line
-canon review add --project-id <root-id> --change <chore-slug> --reviewer <me> --actor-id <me> --role reviewer --session-id <session> --pin <sha> --upstream-ref <ref> --as reviewer --json   # a chore: one change-level review of its invariants and checks against the diff
+canon review add --project-id <root-id> --change-id <chore-slug> --reviewer <me> --actor-id <me> --role reviewer --session-id <session> --pin <sha> --upstream-ref <ref> --as reviewer --json   # a chore: one change-level review of its invariants and checks against the diff
 canon divergence accept --project-id <root-id> --scenario-id <id> --reason "<why the gap stays>" --tracking <issue-url-or-ref> [--expiry YYYY-MM-DD] --reviewer <me> --actor-id <me> --session-id <session> --as reviewer --json
 canon artifacts verify --full --as reviewer --json    # the files the evidence and reviews bind are in the artifact store; refuses when an object store is unreachable
-canon query --kind evidence_record --history --as reviewer --json   # every version, not only the current record
+canon query --kind evidence --history --as reviewer --json   # every version, not only the current record
 ```
 
 `review add` needs `--upstream-ref <ref>` or `--original-spec-ref <path>`;
@@ -104,7 +104,7 @@ ship guard and stays listed as `accepted-divergence` in `status` and
   evidence changes a verdict or the checks and so stales your review, look
   again before you re-pin.
   A chore has no scenarios: review it with one change-level review, `canon
-  review add --project-id <root-id> --change <slug> --reviewer <me> --role
+  review add --project-id <root-id> --change-id <slug> --reviewer <me> --role
   reviewer --pin <sha> --upstream-ref <ref> …`. It signs the chore's
   invariants and checks against the diff and pins its brief, so editing the
   brief stales it. The chore also needs evidence recorded after its approval

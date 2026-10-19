@@ -28,6 +28,7 @@
 use clap::{ArgAction, Command};
 use serde::Serialize;
 
+use crate::deprecation;
 use crate::role::Role;
 
 /// What running a command does to the repo and the machine.
@@ -243,12 +244,27 @@ struct ArgSchema {
     #[serde(skip_serializing_if = "Option::is_none")]
     short: Option<char>,
     aliases: Vec<String>,
+    /// Old spellings of this option that still run and warn (0.24 D2,
+    /// [`crate::deprecation::FLAGS`]); the next minor removes them.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    deprecated_aliases: Vec<String>,
     value_name: Option<String>,
     required: bool,
     repeatable: bool,
     possible_values: Vec<String>,
+    /// Old values of this option that still run and warn, with the value to
+    /// use instead ([`crate::deprecation::KIND_VALUES`]).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    deprecated_values: Vec<DeprecatedValue>,
     default: Vec<String>,
     help: Option<String>,
+}
+
+#[derive(Serialize)]
+struct DeprecatedValue {
+    value: &'static str,
+    #[serde(rename = "use")]
+    replacement: &'static str,
 }
 
 #[derive(Serialize)]
@@ -410,7 +426,7 @@ fn meta_for(path: &str) -> Option<&'static CommandMeta> {
     META.iter().find(|m| m.path == path)
 }
 
-fn arg_schema(arg: &clap::Arg) -> ArgSchema {
+fn arg_schema(command: &str, arg: &clap::Arg) -> ArgSchema {
     let positional = arg.is_positional();
     let action = arg.get_action();
     let (kind, repeatable) = match action {
@@ -420,11 +436,15 @@ fn arg_schema(arg: &clap::Arg) -> ArgSchema {
     };
     let repeatable = repeatable || arg.get_num_args().is_some_and(|r| r.max_values() > 1);
     let name = if positional { arg.get_id().to_string() } else { arg.get_long().map(str::to_string).unwrap_or_else(|| arg.get_id().to_string()) };
+    let deprecated_aliases = if positional { Vec::new() } else { deprecation::flag_aliases(command, &name) };
+    let deprecated_values = if name == "kind" { deprecation::kind_values(command).iter().map(|(value, replacement)| DeprecatedValue { value, replacement }).collect() } else { Vec::new() };
     ArgSchema {
+        aliases: arg.get_all_aliases().map(|a| a.iter().filter(|alias| !deprecated_aliases.contains(&format!("--{alias}"))).map(|s| s.to_string()).collect()).unwrap_or_default(),
+        deprecated_aliases,
+        deprecated_values,
         name,
         kind,
         short: arg.get_short(),
-        aliases: arg.get_all_aliases().map(|a| a.iter().map(|s| s.to_string()).collect()).unwrap_or_default(),
         value_name: if kind == "flag" || kind == "count" {
             None
         } else {
@@ -449,8 +469,8 @@ fn command_schema(canonical: &[String], cmd: &Command) -> CommandSchema {
     let visible = |a: &&clap::Arg| {
         !a.is_hide_set() && !matches!(a.get_action(), clap::ArgAction::Help | clap::ArgAction::HelpShort | clap::ArgAction::HelpLong | clap::ArgAction::Version)
     };
-    let arguments: Vec<ArgSchema> = cmd.get_positionals().filter(visible).map(arg_schema).collect();
-    let options: Vec<ArgSchema> = cmd.get_arguments().filter(|a| !a.is_positional()).filter(visible).map(arg_schema).collect();
+    let arguments: Vec<ArgSchema> = cmd.get_positionals().filter(visible).map(|a| arg_schema(&key, a)).collect();
+    let options: Vec<ArgSchema> = cmd.get_arguments().filter(|a| !a.is_positional()).filter(visible).map(|a| arg_schema(&key, a)).collect();
     let supports_json = options.iter().any(|o| o.name == "json");
     CommandSchema {
         command: key.clone(),

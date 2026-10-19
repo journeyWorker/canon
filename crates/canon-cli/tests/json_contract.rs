@@ -37,7 +37,7 @@ fn scratch_repo() -> TempDir {
     let repo = dir.path();
     ok(repo, &["init", "--providers", "none"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
+    ok(repo, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
     ok(repo, &["feature", "new", "auth.login", "--title", "Login"]);
     ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--feature", ".canon/specs/kind=feature/area=auth/login.feature"]);
     dir
@@ -47,11 +47,9 @@ fn scratch_repo() -> TempDir {
 fn value_for(command: &str, name: &str, regime: &str) -> String {
     let by_command: BTreeMap<(&str, &str), &str> = BTreeMap::from([
         (("evidence add", "kind"), "test-run"),
-        (("export", "kind"), "evidence_record"),
-        (("query", "kind"), "evidence_record"),
-        (("purge", "kind"), "evidence_record"),
-        (("subject adopt", "subject"), "demo"),
-        (("change new", "subject"), "demo"),
+        (("export", "kind"), "evidence"),
+        (("query", "kind"), "evidence"),
+        (("purge", "kind"), "evidence"),
         (("change new", "slug"), "another-change"),
         (("dispatch end", "status"), "succeeded"),
         (("subject new", "id"), "demo-two"),
@@ -63,16 +61,16 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
     match name {
         "repo" => ".",
         "response" => "response.json",
-        "by" | "approval-by" | "principal" | "actor" | "reviewer" => "alice",
+        "by" | "approval-by" | "principal" | "actor-id" | "reviewer" => "alice",
         "note" | "summary" | "reason" | "title" | "name" => "text",
         "slug" | "change-id" | "change_id" => "add-login",
-        "subject" => "demo",
+        "subject-id" => "demo",
         "domain" => "dev",
         "manifest" | "evaluation" | "signature-file" => "missing.json",
         "id" => "sha256:00",
         "role" => "reviewer",
         "regime" => regime,
-        "run" => ULID,
+        "run-id" => ULID,
         "status" => "ok",
         "project-id" => "app-a",
         "scenario-id" => "auth.login.01",

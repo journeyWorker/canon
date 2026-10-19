@@ -316,13 +316,241 @@ fn evidence_add_92_a_batch_file_at_the_same_path_binds_the_new_bytes() {
     let first = latest_of(repo, "shop.cart.01");
     write(repo, "shots/a.png", "frame a, retaken");
 
-    let out = attest_all(repo, "junit:reports/junit.xml", &["--artifact", "shots/a.png"]);
+    let out = attest_all(repo, "junit:reports/junit.xml", &["--artifact", "shop.cart.01=shots/a.png"]);
     assert_eq!(out.status.code(), Some(0), "{}{}", stdout(&out), stderr(&out));
 
     let latest = latest_of(repo, "shop.cart.01");
     assert_eq!(paths_of(&latest), ["reports/junit.xml", "shots/a.png"], "{latest}");
     let digest = |record: &Value, path: &str| record["attachments"].as_array().unwrap().iter().find(|a| a["path"] == path).unwrap()["sha256"].clone();
     assert_ne!(digest(&latest, "shots/a.png"), digest(&first, "shots/a.png"), "new bytes, new digest");
+}
+
+/// A Playwright-style JUnit report (0.24 D4): per case, the
+/// `[[ATTACHMENT|<path>]]` lines of its `<system-out>` CDATA, paths
+/// relative to the report's directory.
+fn playwright_report(cases: &[(&str, &[&str])]) -> String {
+    let mut xml = String::from("<testsuites><testsuite name=\"chromium\">\n");
+    for (name, attachments) in cases {
+        xml.push_str(&format!("<testcase name=\"{name}\" classname=\"tests/shop.spec.ts\" time=\"0.3\">\n<system-out>\n<![CDATA[\n"));
+        for path in *attachments {
+            xml.push_str(&format!("[[ATTACHMENT|{path}]]\n\n"));
+        }
+        xml.push_str("]]>\n</system-out>\n</testcase>\n");
+    }
+    xml.push_str("</testsuite></testsuites>\n");
+    xml
+}
+
+/// Cases 01..03, each with its own screenshot (03 names its twice, and a
+/// second file with the same bytes), under `test-results/`.
+fn playwright_repo() -> tempfile::TempDir {
+    let dir = shop_repo("");
+    let repo = dir.path();
+    for n in 1..=3 {
+        write(repo, &format!("test-results/c{n}/shot.png"), &format!("screenshot of case {n}"));
+    }
+    write(repo, "test-results/c3/again.png", "screenshot of case 3");
+    write(
+        repo,
+        "reports/junit.xml",
+        &playwright_report(&[
+            ("shop.cart.01 adds", &["../test-results/c1/shot.png"]),
+            ("shop.cart.02 counts", &["../test-results/c2/shot.png"]),
+            ("shop.cart.03 keeps", &["../test-results/c3/shot.png", "../test-results/c3/again.png"]),
+        ]),
+    );
+    dir
+}
+
+fn digest_of(path: &Path) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(std::fs::read(path).unwrap()))
+}
+
+/// evidence.add.93 (0.24 D4, #83): each record of a batch binds the
+/// report and the files its own cases name, never another scenario's.
+#[test]
+fn evidence_add_93_a_batch_binds_each_tests_own_attachments() {
+    let dir = playwright_repo();
+    let repo = dir.path();
+
+    let out = attest_all(repo, "junit:reports/junit.xml", &[]);
+    assert_eq!(out.status.code(), Some(0), "{}{}", stdout(&out), stderr(&out));
+
+    assert_eq!(paths_of(&latest_of(repo, "shop.cart.01")), ["reports/junit.xml", "test-results/c1/shot.png"]);
+    assert_eq!(paths_of(&latest_of(repo, "shop.cart.02")), ["reports/junit.xml", "test-results/c2/shot.png"]);
+    assert_eq!(
+        paths_of(&latest_of(repo, "shop.cart.03")),
+        ["reports/junit.xml", "test-results/c3/shot.png"],
+        "two files with one digest are bound once"
+    );
+    for n in 1..=3 {
+        let blob = repo.join(".canon/artifacts/sha256").join(digest_of(&repo.join(format!("test-results/c{n}/shot.png"))));
+        assert!(blob.is_file(), "case {n}'s screenshot is stored by digest");
+    }
+    assert_eq!(stored_blobs(repo), 4, "the report and three distinct screenshots");
+}
+
+/// evidence.add.94: Cucumber embeddings are decoded, stored by digest and
+/// bound to the scenario they belong to.
+#[test]
+fn evidence_add_94_a_cucumber_embedding_is_stored_by_digest() {
+    use base64::Engine;
+    let dir = shop_repo("");
+    let repo = dir.path();
+    let encode = |bytes: &[u8]| base64::engine::general_purpose::STANDARD.encode(bytes);
+    let report = serde_json::json!([{
+        "name": "Cart",
+        "elements": [
+            {"type": "scenario", "name": "adds", "tags": [{"name": "@shop.cart.01"}],
+             "steps": [{"result": {"status": "passed"}, "embeddings": [{"data": encode(b"first frame"), "mime_type": "image/png"}]}]},
+            {"type": "scenario", "name": "counts", "tags": [{"name": "@shop.cart.02"}],
+             "steps": [{"result": {"status": "passed"}, "embeddings": [{"data": encode(b"second frame"), "mime_type": "image/png"}, {"data": encode(b"{}"), "mime_type": "application/json"}]}]}
+        ]
+    }]);
+    write(repo, "reports/cucumber.json", &report.to_string());
+
+    let out = attest_all(repo, "cucumber:reports/cucumber.json", &[]);
+    assert_eq!(out.status.code(), Some(0), "{}{}", stdout(&out), stderr(&out));
+
+    let first = latest_of(repo, "shop.cart.01");
+    assert_eq!(paths_of(&first), ["reports/cucumber.json", "reports/cucumber.json.attachments/adds/1.png"], "{first}");
+    let second = latest_of(repo, "shop.cart.02");
+    assert_eq!(paths_of(&second), ["reports/cucumber.json", "reports/cucumber.json.attachments/counts/1.png", "reports/cucumber.json.attachments/counts/2.json"], "{second}");
+    let sha = |record: &Value, path: &str| record["attachments"].as_array().unwrap().iter().find(|a| a["path"] == path).unwrap()["sha256"].as_str().unwrap().to_string();
+    use sha2::{Digest, Sha256};
+    let digest = format!("{:x}", Sha256::digest(b"first frame"));
+    assert_eq!(sha(&first, "reports/cucumber.json.attachments/adds/1.png"), digest);
+    assert_eq!(std::fs::read(repo.join(".canon/artifacts/sha256").join(&digest)).unwrap(), b"first frame", "the decoded bytes are stored");
+    assert_eq!(stored_blobs(repo), 4, "the report and three embeddings");
+}
+
+/// evidence.add.95: a bare `--artifact` would bind to every record.
+#[test]
+fn evidence_add_95_a_bare_artifact_is_refused_in_a_batch() {
+    let dir = playwright_repo();
+    let repo = dir.path();
+    write(repo, "reports/screens/a.png", "a");
+    let before = evidence_files(repo);
+
+    let out = attest_all(repo, "junit:reports/junit.xml", &["--artifact", "reports/screens/a.png", "--json"]);
+    assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
+    let json: Value = serde_json::from_slice(&out.stderr).or_else(|_| serde_json::from_slice(&out.stdout)).unwrap();
+    assert_eq!(json["error"]["code"], "EVIDENCE_INVALID_ARGUMENT", "{json}");
+    let hint = json["error"]["hint"].as_str().unwrap();
+    assert!(hint.contains("per-test attachments") && hint.contains("--artifact <scenario-id>=<path>"), "{hint}");
+    assert_eq!(evidence_files(repo), before, "a refused add writes nothing");
+    assert_eq!(stored_blobs(repo), 0);
+}
+
+/// evidence.add.96: `--artifact <scenario-id>=<path>` binds one scenario.
+#[test]
+fn evidence_add_96_a_scoped_artifact_binds_one_scenario() {
+    let dir = playwright_repo();
+    let repo = dir.path();
+    write(repo, "notes/qa.md", "qa notes");
+
+    let out = attest_all(repo, "junit:reports/junit.xml", &["--artifact", "shop.cart.02=notes/qa.md"]);
+    assert_eq!(out.status.code(), Some(0), "{}{}", stdout(&out), stderr(&out));
+    assert_eq!(paths_of(&latest_of(repo, "shop.cart.02")), ["notes/qa.md", "reports/junit.xml", "test-results/c2/shot.png"]);
+    assert_eq!(paths_of(&latest_of(repo, "shop.cart.01")), ["reports/junit.xml", "test-results/c1/shot.png"], "no other record binds it");
+
+    // A scenario with no record in the batch (05 owns no case; 09 is not indexed).
+    let before = evidence_files(repo);
+    for id in ["shop.cart.05", "shop.cart.09"] {
+        let out = attest_all(repo, "junit:reports/junit.xml", &["--artifact", &format!("{id}=notes/qa.md")]);
+        assert_eq!(out.status.code(), Some(2), "{id}: {}{}", stdout(&out), stderr(&out));
+        assert!(stderr(&out).contains(&format!("`{id}=")) && stderr(&out).contains("no record in this batch"), "{}", stderr(&out));
+    }
+    assert_eq!(evidence_files(repo), before, "a refused add writes nothing");
+
+    // One scenario on its own: its own id, or a bare path; another id is refused.
+    let single = |artifact: &str| {
+        canon(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent", "--artifact", artifact])
+    };
+    assert_eq!(single("shop.cart.01=notes/qa.md").status.code(), Some(0));
+    assert_eq!(paths_of(&latest_of(repo, "shop.cart.01")), ["notes/qa.md"]);
+    let other = single("shop.cart.02=notes/qa.md");
+    assert_eq!(other.status.code(), Some(2), "{}", stderr(&other));
+    assert!(stderr(&other).contains("scoped to scenario `shop.cart.02`"), "{}", stderr(&other));
+    assert_eq!(single("notes/qa.md").status.code(), Some(0), "a bare path is unchanged");
+}
+
+/// evidence.add.97: a report attachment that is missing, outside the
+/// repository or over the limit refuses the bind.
+#[test]
+fn evidence_add_97_an_unbindable_report_attachment_refuses() {
+    let dir = playwright_repo();
+    let repo = dir.path();
+    let outside = tempfile::tempdir().unwrap();
+    std::fs::write(outside.path().join("o.png"), "outside").unwrap();
+    write(repo, "test-results/big.bin", &"x".repeat(2 * 1024 * 1024));
+    let before = evidence_files(repo);
+
+    let cases: [(&str, String, &str); 3] = [
+        ("missing", "../test-results/gone.png".to_string(), "gone.png"),
+        ("outside", outside.path().join("o.png").to_string_lossy().into_owned(), "o.png"),
+        ("oversized", "../test-results/big.bin".to_string(), "big.bin"),
+    ];
+    for (what, attachment, needle) in cases {
+        write(repo, "reports/bad.xml", &playwright_report(&[("shop.cart.01 adds", &[attachment.as_str()]), ("shop.cart.02 counts", &["../test-results/c2/shot.png"])]));
+        let args: &[&str] = if what == "oversized" { &["--max-artifact-mib", "1"] } else { &[] };
+        let batch = attest_all(repo, "junit:reports/bad.xml", args);
+        assert_eq!(batch.status.code(), Some(2), "{what}: {}{}", stdout(&batch), stderr(&batch));
+        let err = stderr(&batch);
+        assert!(err.contains("case `shop.cart.01 adds`") && err.contains(needle), "{what}: {err}");
+
+        let mut single = vec!["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent", "--report", "junit:reports/bad.xml"];
+        single.extend_from_slice(args);
+        let one = canon(repo, &single);
+        assert_eq!(one.status.code(), Some(2), "{what}: {}{}", stdout(&one), stderr(&one));
+        assert!(stderr(&one).contains("case `shop.cart.01 adds`") && stderr(&one).contains(needle), "{what}: {}", stderr(&one));
+    }
+    assert_eq!(evidence_files(repo), before, "a refused add writes nothing");
+    assert_eq!(stored_blobs(repo), 0);
+}
+
+/// evidence.add.98: one scenario's `--report` binds the files of the
+/// cases matched to it.
+#[test]
+fn evidence_add_98_a_single_scenario_binds_its_cases_attachments() {
+    let dir = playwright_repo();
+    let repo = dir.path();
+
+    ok(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.02", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent", "--report", "junit:reports/junit.xml"]);
+    assert_eq!(paths_of(&latest_of(repo, "shop.cart.02")), ["reports/junit.xml", "test-results/c2/shot.png"]);
+}
+
+/// evidence.add.99 (0.24 D4): review pins hold the report format and the
+/// matched case names, not attachment bytes: a re-run with new
+/// screenshots leaves the review current.
+#[test]
+fn evidence_add_99_new_screenshot_bytes_keep_a_review_current() {
+    let dir = playwright_repo();
+    let repo = dir.path();
+    std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_review:\n    scope: []\n").unwrap();
+    assert!(attest_all(repo, "junit:reports/junit.xml", &[]).status.success());
+    ok(
+        repo,
+        &["review", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--reviewer", "reviewer-2", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--pin", "r1", "--upstream-ref", "tests/cart.rs#shop_cart_01"],
+    );
+    let git = |args: &[&str]| {
+        let out = Command::new("git").args(args).current_dir(repo).env("GIT_AUTHOR_NAME", "t").env("GIT_AUTHOR_EMAIL", "t@t").env("GIT_COMMITTER_NAME", "t").env("GIT_COMMITTER_EMAIL", "t@t").output().unwrap();
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    };
+    git(&["add", "-A"]);
+    git(&["commit", "-q", "-m", "reviewed"]);
+    let gate = || stdout(&canon(repo, &["gate", "check"]));
+    assert!(!gate().contains("unreviewed-promotion shop.cart.01"), "the review is current");
+    let first = latest_of(repo, "shop.cart.01");
+
+    write(repo, "test-results/c1/shot.png", "screenshot of case 1, rerun");
+    let out = attest_all(repo, "junit:reports/junit.xml", &[]);
+    assert_eq!(out.status.code(), Some(0), "{}{}", stdout(&out), stderr(&out));
+    assert!(!stdout(&out).contains("stale"), "no stale-review line: {}", stdout(&out));
+    let latest = latest_of(repo, "shop.cart.01");
+    assert_ne!(latest["attachments"], first["attachments"], "the record binds the new bytes");
+    assert!(!gate().contains("unreviewed-promotion shop.cart.01"), "the review is still current: {}", gate());
 }
 
 /// evidence.add.84: `--task --report` with no scenario id binds every

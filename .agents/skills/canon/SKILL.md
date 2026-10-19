@@ -24,7 +24,7 @@ a feature, a one-line request included. A human is needed once per scope:
   answer until you report: the brief is that report. The one answer
   approves the brief and the policy, `.canon/policy.yaml`, which is what
   the gate grades the work against. Record it only from the human's answer:
-  `canon brief approve --change <slug> --by <the human> --note "<their words>"`.
+  `canon brief approve --change-id <slug> --by <the human> --note "<their words>"`.
   Never edit the policy to make the gate pass: a policy that differs from
   the approved one fails closed (`POLICY_CHANGED_SINCE_APPROVAL`, not
   waivable); stop and ask the human. A brief edited after its
@@ -41,7 +41,7 @@ a feature, a one-line request included. A human is needed once per scope:
   closed `fixed`, and an approved chore, then need the whole suite evidenced
   again (`evidence add --all-scenarios`, for a chore after its approval)
   before it ships, and a chore also needs one change-level review
-  (`review add --change <slug>`).
+  (`review add --change-id <slug>`).
 - When no human can answer one of the brief's questions, write your
   assumption into the brief's Questions and assumptions, build on it, and say
   so in your report. That covers the brief's questions and work inside an
@@ -113,6 +113,10 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   on `error.code`, fix the option `field` names using the `expected` values,
   and follow `error.hint`. Every refusal carries a concrete `hint`: follow
   it. The codes are stable; `canon schema --errors --json` lists them.
+- Flags that name an id are spelled `--<noun>-id` everywhere (`--change-id`,
+  `--project-id`, `--subject-id`, `--scenario-id`, `--actor-id`,
+  `--session-id`), and `--kind` values carry no `_record` suffix
+  (`--kind evidence`).
 - `canon status` sends the planner to write the brief while `brief check`
   has blockers; the human stop appears only when the brief is clean and
   unapproved.

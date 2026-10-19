@@ -193,10 +193,10 @@ pub fn chore_violations(repo: &Path, ctx: &GateContext, subject: &Subject) -> Ve
         .collect()
 }
 
-/// The `canon review add --change` step a chore's review gap names.
+/// The `canon review add --change-id` step a chore's review gap names.
 pub fn chore_review_remedy(change: &ChangeId) -> String {
     format!(
-        "have a reviewer record one review of the chore: `canon review add --project-id <root> --change {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<brief>\"`",
+        "have a reviewer record one review of the chore: `canon review add --project-id <root> --change-id {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<brief>\"`",
         change.as_str()
     )
 }
@@ -205,6 +205,6 @@ pub fn chore_review_remedy(change: &ChangeId) -> String {
 /// re-verification one: the batch command and what follows it.
 pub fn hint(violations: &[&Violation]) -> Option<String> {
     violations.iter().find(|v| is_reverify(v)).map(|_| {
-        "record the suite again for the scenarios named: `canon evidence add --project-id <root> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" --actor-id <unit> --session-id <session>`; reviews stay current while a scenario's verdict and checks are unchanged; a chore also needs its change-level review (`canon review add --change <slug>`), then ship".to_string()
+        "record the suite again for the scenarios named: `canon evidence add --project-id <root> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" --actor-id <unit> --session-id <session>`; reviews stay current while a scenario's verdict and checks are unchanged; a chore also needs its change-level review (`canon review add --change-id <slug>`), then ship".to_string()
     })
 }

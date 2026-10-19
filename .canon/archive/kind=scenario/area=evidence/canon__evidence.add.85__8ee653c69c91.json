@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-18T14:54:57.355696823Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "e5775dcca201343eba545a5e0837c1a8dbc4bc6e389f049c2d670d3e990ad5a4",
+  "scenario_id": "evidence.add.85",
+  "schema": 1,
+  "source_digest": "14cd32c99c08327f4af4c6aa44471fdc69b74ea8559ba3066c3495885bfe35bd",
+  "subject_id": "evidence-attestation",
+  "title": "A Swift Testing event stream binds by display name, then function name"
+}

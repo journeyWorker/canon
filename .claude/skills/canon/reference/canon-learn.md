@@ -179,7 +179,7 @@ record.
 An operator-requested rollback is a distinct authenticated action:
 
 ```bash
-canon learn rollback <strategy_id> --reason "<reason>" --actor alice \
+canon learn rollback <strategy_id> --reason "<reason>" --actor-id alice \
   --signature-file rollback.sig --approved-at 2026-10-02T12:00:00Z \
   [--contradicting-trajectory-id <trajectory_id>] --repo .
 ```

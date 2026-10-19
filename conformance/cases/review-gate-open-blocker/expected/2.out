@@ -1,3 +1,3 @@
 promoted finding -> kind=finding/c-cart__0001__0001__<digest12>.json
-canon gate promote: promoted evidence_record=0, finding=1, divergence=0
+canon gate promote: promoted evidence=0, finding=1, divergence=0
 next: canon evidence add --project-id root --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --actor-id <unit> --session-id <session> --ref "<test command>" — cart: blocker finding c-cart#1.1 was closed fixed (since <ts>) and 1 evidenced scenario(s) (`cart.add.01`) have no evidence recorded after it; the ship guard refuses until each does. Run the whole suite again; a review stays current while the scenario's verdict and checks are unchanged

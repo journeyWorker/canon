@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-18T14:54:57.302991528Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "c1e86a98be237c1f5f7495168cc1cb8726788d3b8e7e1798c6b857de6c85438e",
+  "scenario_id": "evidence.add.18",
+  "schema": 1,
+  "source_digest": "14cd32c99c08327f4af4c6aa44471fdc69b74ea8559ba3066c3495885bfe35bd",
+  "subject_id": "evidence-attestation",
+  "title": "A fresh init never ignores the artifact store"
+}

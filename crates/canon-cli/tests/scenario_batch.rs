@@ -32,7 +32,7 @@ fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
     ok(dir.path(), &["init", "--providers", "none"]);
     ok(dir.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(dir.path(), &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
+    ok(dir.path(), &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
     dir
 }
 
@@ -82,8 +82,8 @@ fn a_batch_writes_what_three_single_calls_write() {
     assert!(json["meta"].get("next").is_some(), "one meta.next for the batch: {json}");
 
     let single = repo();
-    ok(single.path(), &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject", "demo", "--case", "happy"]);
-    ok(single.path(), &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject", "demo", "--lane", "behavior", "--case", "failure"]);
+    ok(single.path(), &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject-id", "demo", "--case", "happy"]);
+    ok(single.path(), &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject-id", "demo", "--lane", "behavior", "--case", "failure"]);
     ok(single.path(), &["scenario", "new", "auth.session.01", "--title", "Session expires"]);
 
     let (a, b) = (features(batch.path()), features(single.path()));

@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-024",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-024-1"
+  },
+  "at": "2026-10-19T08:48:52.316354Z",
+  "change_id": "canon-0-24",
+  "disposition": "open",
+  "file_ref": ".canon/ledger/kind=evidence_record/context.capability.14__fc02448a1a34.json:1-8",
+  "introduced_by": "da01883300d41f897bdad328c5cb07ba3033db1f",
+  "kind": "finding",
+  "reviewer": "canon-reviewer-024",
+  "round": 1,
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Correct the evidence summaries: records claim 9 or 10 tests passed even though each ref filters to one scenario test, so the attested result does not match the command run."
+}

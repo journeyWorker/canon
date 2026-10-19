@@ -99,6 +99,31 @@ class TraceCheckTests(unittest.TestCase):
         encoded = json.dumps(report)
         self.assertIn('"hard_checks_passed": true', encoded)
 
+    def test_counts_naming_failures_and_deprecated_spellings(self):
+        report = self.report("naming_failures.jsonl")
+        self.assertTrue(report["hard_checks_passed"])
+        wrong = report["wrong_shape_calls"]
+        self.assertEqual((wrong["naming"], wrong["other"]), (1, 1))
+        self.assertEqual([(i["command"], i["exit_code"], i["code"], i["class"]) for i in wrong["items"]],
+                         [("canon finding list --change x", 2, None, "naming"),
+                          ("canon change show --change-id missing --json", 1, "NOT_FOUND", "other")])
+        deprecated = report["deprecated_spellings"]
+        self.assertEqual(deprecated["count"], 1)
+        self.assertEqual((deprecated["items"][0]["command"], deprecated["items"][0]["used"], deprecated["items"][0]["use"]),
+                         ("canon finding list", "--change", "--change-id"))
+        rendered = trace_check.render(report)
+        self.assertIn("Wrong-shape canon calls: 1 naming, 1 other", rendered)
+        self.assertIn("Deprecated spellings used: 1", rendered)
+
+    def test_json_usage_error_naming_and_kind_value(self):
+        self.assertEqual(trace_check.classify_failure(
+            '{"error":{"code":"USAGE","message":"error: unexpected argument \'--project\' found"}} --project-id'), "naming")
+        self.assertEqual(trace_check.classify_failure("error: invalid value 'review_record' for '--kind <KIND>'"), "naming")
+        self.assertEqual(trace_check.classify_failure("error: unexpected argument '--zzz' found"), "other")
+        self.assertEqual(trace_check.error_code("canon gate check: GATE_FAILED \u2014 nope"), "GATE_FAILED")
+        found = trace_check.deprecations('{"meta":{"deprecated":[{"used":"--actor","use":"--actor-id","removedIn":"0.25.0"}]}}', "canon x")
+        self.assertEqual([(d["used"], d["use"]) for d in found], [("--actor", "--actor-id")])
+
 
 if __name__ == "__main__":
     unittest.main()

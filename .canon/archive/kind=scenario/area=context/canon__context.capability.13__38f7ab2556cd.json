@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-18T14:54:57.269766854Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "0559b4bea395b8d29554079e6e5cc0dff980bc86aa6d27f6ca160d5a48ab0b3b",
+  "scenario_id": "context.capability.13",
+  "schema": 1,
+  "source_digest": "65e50bf8317aabeadf72526cd0f66ab37eb14b90fa055f0dcc2982109a750656",
+  "subject_id": "context-capability",
+  "title": "The outline header warns when no policy makes the gate enforce coverage"
+}

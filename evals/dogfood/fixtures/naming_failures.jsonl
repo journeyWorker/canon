@@ -1,0 +1,9 @@
+{"type":"session","version":3,"id":"naming","timestamp":"2026-01-01T00:00:00Z","cwd":"/workspace"}
+{"type":"message","id":"u1","message":{"role":"user","content":[{"type":"text","text":"list"}]},"timestamp":"2026-01-01T00:00:01Z"}
+{"type":"message","id":"a1","message":{"role":"assistant","content":[{"type":"toolCall","id":"c1","name":"bash","arguments":{"command":"canon finding list --change x","cwd":"/workspace"}}]},"timestamp":"2026-01-01T00:00:04Z"}
+{"type":"message","id":"r1","message":{"role":"toolResult","toolCallId":"c1","content":[{"type":"text","text":"error: unexpected argument '--change' found\n\n  tip: a similar argument exists: '--change-id'\n\nUsage: canon finding list --change-id <CHANGE_ID>\n\nCommand exited with code 2"}],"isError":true},"timestamp":"2026-01-01T00:00:05Z"}
+{"type":"message","id":"a2","message":{"role":"assistant","content":[{"type":"toolCall","id":"c2","name":"bash","arguments":{"command":"canon change show --change-id missing --json","cwd":"/workspace"}}]},"timestamp":"2026-01-01T00:00:06Z"}
+{"type":"message","id":"r2","message":{"role":"toolResult","toolCallId":"c2","content":[{"type":"text","text":"{\"error\":{\"code\":\"NOT_FOUND\",\"message\":\"no such change\",\"hint\":null,\"retryable\":false}}\n\nCommand exited with code 1"}],"isError":true},"timestamp":"2026-01-01T00:00:07Z"}
+{"type":"message","id":"a3","message":{"role":"assistant","content":[{"type":"toolCall","id":"c3","name":"bash","arguments":{"command":"canon finding list --change x","cwd":"/workspace"}}]},"timestamp":"2026-01-01T00:00:08Z"}
+{"type":"message","id":"r3","message":{"role":"toolResult","toolCallId":"c3","content":[{"type":"text","text":"canon finding list: --change is deprecated \u2014 use --change-id (removed in 0.25.0)\n[]"}],"isError":false},"timestamp":"2026-01-01T00:00:09Z"}
+{"type":"message","id":"z","message":{"role":"assistant","content":[],"stopReason":"stop"},"timestamp":"2026-01-01T00:00:20Z"}
