@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-20T19:44:53.915455Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "93d0b5576b51bfa5a0cfcdb9418559b30cabd49d1d1989de5607c5ab810841e6",
+  "scenario_id": "gate.check.14",
+  "schema": 1,
+  "source_digest": "04459471e31a8212337be2cd2296e21be5d0c824af389b53a250f2e4a07b7858",
+  "subject_id": "gate-trust-spine",
+  "title": "A surface that specifies only its golden path is reported when failure cases are required"
+}

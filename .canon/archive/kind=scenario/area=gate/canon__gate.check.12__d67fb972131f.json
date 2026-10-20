@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-20T19:44:53.908373Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "ede42c7e2f5ae4090f1d9de9a3a4e89bfc018c2a2e25c05863fe67cf6b6d62ea",
+  "scenario_id": "gate.check.12",
+  "schema": 1,
+  "source_digest": "04459471e31a8212337be2cd2296e21be5d0c824af389b53a250f2e4a07b7858",
+  "subject_id": "gate-trust-spine",
+  "title": "A matching high risk tier requires distinct human approvals"
+}

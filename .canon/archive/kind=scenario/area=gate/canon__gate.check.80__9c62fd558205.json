@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-20T19:44:53.996902Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "48b359bfd299ccbf2bfe5bd66ef5e00d1e6b58e1238454594b71dfb0a787fb50",
+  "scenario_id": "gate.check.80",
+  "schema": 1,
+  "source_digest": "04459471e31a8212337be2cd2296e21be5d0c824af389b53a250f2e4a07b7858",
+  "subject_id": "gate-trust-spine",
+  "title": "Gate check re-indexes only the edited feature file and is silent when the index is fresh"
+}

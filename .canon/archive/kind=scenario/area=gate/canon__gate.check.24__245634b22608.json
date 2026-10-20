@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-20T19:44:53.961023Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "0793dedbc5a62b3e18275b9299459b4d22e36190a6e235a4ba0d7ce7da17d928",
+  "scenario_id": "gate.check.24",
+  "schema": 1,
+  "source_digest": "04459471e31a8212337be2cd2296e21be5d0c824af389b53a250f2e4a07b7858",
+  "subject_id": "gate-trust-spine",
+  "title": "An altered stored blob is stale evidence that says it was altered, not gone"
+}

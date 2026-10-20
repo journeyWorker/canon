@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-20T19:44:54.022958Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "3baad17e995d8e6c51e58ba45798a32d56331ab48eae624c232adad869bb27c4",
+  "scenario_id": "gate.check.94",
+  "schema": 1,
+  "source_digest": "04459471e31a8212337be2cd2296e21be5d0c824af389b53a250f2e4a07b7858",
+  "subject_id": "gate-trust-spine",
+  "title": "canon migrate finds a review's scenario in the file it lived in at the pinned commit"
+}

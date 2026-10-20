@@ -1,0 +1,16 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-20T19:44:53.892812Z",
+  "case": "edge",
+  "kind": "scenario",
+  "lane": "behavior",
+  "project_id": "canon",
+  "scenario_digest": "abe7d0cafb49a812e3556cdac77eb5f925ed47b0e7d2eb858fd85fa0f5ef26d6",
+  "scenario_id": "gate.check.10",
+  "schema": 1,
+  "source_digest": "04459471e31a8212337be2cd2296e21be5d0c824af389b53a250f2e4a07b7858",
+  "subject_id": "gate-trust-spine",
+  "title": "A scenario in an excluded lane is outside coverage"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-20T19:44:53.981455Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "d528fa7fec097698fd9e2c1e08f44f0ce811f8c3db98cd5a5a2bc8b2ae28db81",
+  "scenario_id": "gate.check.63",
+  "schema": 1,
+  "source_digest": "04459471e31a8212337be2cd2296e21be5d0c824af389b53a250f2e4a07b7858",
+  "subject_id": "gate-trust-spine",
+  "title": "require_audit scope defaults to claimed-done subjects and its rate bounds are inclusive"
+}
