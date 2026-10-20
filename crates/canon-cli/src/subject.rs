@@ -767,8 +767,11 @@ pub fn run_status(
             if brief_gap.is_some() {
                 fixes.push("get the human's answer to the brief and record it with `canon brief approve`");
             }
-            if waivable.iter().any(canon_gate::review_gate::is_reverify) {
+            let reverify: Vec<&Violation> = waivable.iter().filter(|v| canon_gate::review_gate::is_reverify(v)).collect();
+            if reverify.iter().any(|v| !canon_gate::review_gate::is_scoped_reverify(v)) {
                 fixes.push("record the suite again with `canon evidence add --project-id <root> --all-scenarios --report <format>:<path> …` for the scenarios named (a review stays current while the verdicts and checks are the same)");
+            } else if !reverify.is_empty() {
+                fixes.push("record evidence again for the scenarios named with `canon evidence add --project-id <root> --scenario-id <id> --report <format>:<path> …`, one each (a review stays current while the verdicts and checks are the same)");
             }
             return CliError::failed("SUBJECT_GATE_VIOLATION", lines)
                 .with_exit(EXIT_GATED)

@@ -220,6 +220,7 @@ const CODES: &[(&str, &str)] = &[
     ("FINDING_RESOLUTION_SHA_UNEXPECTED", "--resolution-sha was given with a disposition other than fixed"),
     ("FINDING_SEQ_OCCUPIED", "a finding already holds that change, round and seq"),
     ("FINDING_STAGED", "the finding is still staged and cannot be closed until committed"),
+    ("FINDING_UNKNOWN_SCENARIO", "--scenario-id names a scenario the index does not know"),
     ("FINDING_UNRESOLVABLE_COMMIT", "a commit reference names no commit in this repository"),
     ("FORMAT_VIOLATIONS", "`format` found spec-corpus violations; data.violations names each"),
     ("GATE_TASK_BLOCKED", "`gate task` refused to flip the task: its evidence does not support it"),
