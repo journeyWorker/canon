@@ -223,8 +223,11 @@ accepted divergences: 1 known gap(s) — not failing the gate:
 Re-verification is one rule with two triggers: a blocker whose latest
 disposition is `fixed`, and a chore change once approved, keep the subject
 from shipping until every one of its evidenced scenarios has evidence
-recorded after the close or the approval. The refusal names the scenarios
-and the batch command: `canon evidence add --project-id <root-id>
+recorded after the close or the approval. A blocker that names its
+scenarios (`finding add --scenario-id`) asks only those, and the refusal
+names them with the per-scenario command (`canon evidence add --project-id
+<root-id> --scenario-id <id> --report <format>:<path> …`). Otherwise the
+refusal names the scenarios and the batch command: `canon evidence add --project-id <root-id>
 --all-scenarios --report <format>:<path> --kind test-run --role
 implementer --ref "<test command>" …`. Reviews pin what the evidence says
 (its verdict and the identity of its checks), not which record it is, so

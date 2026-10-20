@@ -70,10 +70,16 @@ work collapsed into one identity.
 canon finding add --change-id <c> --round <n> --seq <n> \
   --severity blocker|should-fix|note --disposition open \
   --reviewer <who> --summary "<one line>" \
-  [--reviewed-sha <sha>] [--file-ref path/to/file.rs:120-134] [--actor-id <id>] [--session-id <id>]
+  [--reviewed-sha <sha>] [--file-ref path/to/file.rs:120-134] [--scenario-id <id> …] [--actor-id <id>] [--session-id <id>]
 canon finding close --change-id <c> --round <n> --seq <n> \
   --disposition fixed --resolution-sha <sha> [--session-id <id>]   # or rejected / deferred / open
 ```
+
+`--scenario-id` (repeatable, each a scenario the index knows; refused with
+`FINDING_UNKNOWN_SCENARIO` otherwise) names the scenarios the finding is
+about. After a `fixed` close, fresh evidence for those scenarios alone
+re-verifies the fix; a finding naming none asks every evidenced scenario of
+the subject, as before. `finding close` copies the list.
 
 Both stage a candidate. Under `write: { promote: auto }` (what
 `canon init` writes) the same run promotes it and the success line names
