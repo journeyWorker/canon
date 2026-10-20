@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-20T19:44:53.958099Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "1587a4f21e704d1e246b7a7b2fa42134727d93a3fafa56da5e76d4672415229a",
+  "scenario_id": "gate.check.23",
+  "schema": 1,
+  "source_digest": "04459471e31a8212337be2cd2296e21be5d0c824af389b53a250f2e4a07b7858",
+  "subject_id": "gate-trust-spine",
+  "title": "An unstored binding the working tree still proves is an advisory, not a violation"
+}

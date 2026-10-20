@@ -1793,6 +1793,13 @@ pub struct Finding {
     /// it would spine nothing.
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
     pub file_ref: Option<String>,
+    /// The scenarios this finding is about (0.24.1, #87), as scenario ids.
+    /// After a `fixed` close, fresh evidence for these alone re-verifies
+    /// the fix; empty (the default, and absent from the wire) means the
+    /// whole subject, as before 0.24.1. An id names the scenario in every
+    /// spec root that carries it; a close inherits the list.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scenario_ids: Vec<ScenarioId>,
 }
 
 /// [`Finding`]'s deserialize-only twin: the SAME wire shape, with no
@@ -1834,6 +1841,8 @@ struct FindingWire {
     introduced_by: Option<Sha>,
     #[serde(default, deserialize_with = "present_value")]
     file_ref: Option<String>,
+    #[serde(default)]
+    scenario_ids: Vec<ScenarioId>,
 }
 
 impl FindingWire {
@@ -1853,6 +1862,7 @@ impl FindingWire {
             resolution_sha: self.resolution_sha,
             introduced_by: self.introduced_by,
             file_ref: self.file_ref,
+            scenario_ids: self.scenario_ids,
         };
         finding.check_coherence()?;
         Ok(finding)
@@ -1913,6 +1923,7 @@ impl Finding {
             resolution_sha: None,
             introduced_by: None,
             file_ref: None,
+            scenario_ids: Vec::new(),
         }
     }
 
@@ -1978,6 +1989,17 @@ impl Finding {
         self
     }
 
+    /// Name the scenarios this finding is about (see
+    /// [`Finding::scenario_ids`]); each id once, in the order given.
+    pub fn with_scenario_ids(mut self, scenario_ids: impl IntoIterator<Item = ScenarioId>) -> Self {
+        for id in scenario_ids {
+            if !self.scenario_ids.contains(&id) {
+                self.scenario_ids.push(id);
+            }
+        }
+        self
+    }
+
     /// Is `self` the SAME finding as `earlier`, differing only in how it
     /// was DISPOSED of?
     ///
@@ -2012,6 +2034,7 @@ impl Finding {
             && self.reviewed_sha == earlier.reviewed_sha
             && self.introduced_by == earlier.introduced_by
             && self.file_ref == earlier.file_ref
+            && self.scenario_ids == earlier.scenario_ids
             // A no-op resubmission is not a transition: it carries no
             // new fact, and admitting it would let an identical body
             // append forever at one key.
@@ -2961,6 +2984,7 @@ mod tests {
             .fixed_by(sha('b'))
             .with_introduced_by(sha('c'))
             .with_file_ref("crates/canon-model/src/records.rs:120-134")
+            .with_scenario_ids([ScenarioId::parse("world.demo.01").unwrap()])
     );
 
     /// `reviewed_sha` is provenance, not identity: a round that read a

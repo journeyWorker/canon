@@ -1111,6 +1111,9 @@ enum FindingCommand {
         /// Where in the tree, as path/to/file.rs:120-134 (line breaks refused)
         #[arg(long)]
         file_ref: Option<String>,
+        /// A scenario this finding is about (repeatable). After a `fixed` close, fresh evidence for these scenarios alone re-verifies the fix; with none named, every evidenced scenario of the subject does. Each must be a scenario the index knows; a close inherits the list
+        #[arg(long = "scenario-id", value_parser = canon_cli::review::parse_scenario_id)]
+        scenario_ids: Vec<ScenarioId>,
         /// The authoring actor's id (recorded as the record's author; line breaks refused)
         #[arg(long, default_value = "canon")]
         actor_id: String,
@@ -2024,6 +2027,7 @@ fn main() -> ExitCode {
                 resolution_sha,
                 introduced_by,
                 file_ref,
+                scenario_ids,
                 actor_id,
                 role,
                 session_id,
@@ -2044,6 +2048,7 @@ fn main() -> ExitCode {
                     resolution_sha,
                     introduced_by,
                     file_ref,
+                    scenario_ids,
                     actor_id,
                     role,
                     session_id,

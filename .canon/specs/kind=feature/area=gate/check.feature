@@ -397,3 +397,34 @@ Feature: gate check
     When canon migrate runs
     Then the first project's review is found at its former root and pinned as current
     And the second project's review is undecidable and pinned as the scenario stands, never matched against the first project's scenario
+
+  # canon: {"schema":1,"at":"2026-10-21T09:00:03Z","actor":{"agent_id":"canon-impl-0241"}}
+  @subject:gate-trust-spine
+  @case:happy
+  @gate.check.97
+  Scenario: A fixed blocker that names its scenarios is re-verified by evidence for those scenarios alone
+    Given a subject with scenarios A and B, both evidenced and reviewed, and a blocker naming only A closed fixed after that evidence
+    When the subject is moved to shipped, and gate check, subject status and status are read
+    Then each refuses naming A only, and the remedy is the per-scenario canon evidence add --scenario-id, never the whole-suite batch
+    And evidence for B recorded after the close does not clear it, and evidence for A recorded before the close does not either
+    And evidence for A recorded after the close clears gate check and the move, while B's evidence stays older than the close
+
+  # canon: {"schema":1,"at":"2026-10-21T09:00:04Z","actor":{"agent_id":"canon-impl-0241"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.check.98
+  Scenario: A fixed blocker that names no scenario still asks every evidenced scenario
+    Given a subject with scenarios A and B, both evidenced, and a blocker naming no scenario closed fixed after that evidence
+    When evidence is recorded after the close for A only
+    Then the move to shipped is refused naming B, with the whole-suite batch as the remedy
+    And once B has evidence after the close the move succeeds
+
+  # canon: {"schema":1,"at":"2026-10-21T10:00:00Z","actor":{"agent_id":"canon-impl-0241"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.check.99
+  Scenario: A scoped re-verification across spec roots names a runnable command for each root
+    Given a blocker closed fixed naming one scenario in one spec root and two in another, all evidenced before the close
+    When the subject is moved to shipped
+    Then the refusal names, per root, canon evidence add with that root's own --project-id and --scenario-id, for each of that root's scenarios
+    And evidence recorded for one root's scenarios leaves only the other root's scenarios named, and recording the last clears the move

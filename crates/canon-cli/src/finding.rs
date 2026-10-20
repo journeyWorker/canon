@@ -315,7 +315,7 @@ use std::process::Command;
 
 use canon_gate::GateCtx;
 use canon_ingest::task_rows::first_row_line_break;
-use canon_model::{Actor, ChangeId, Envelope, Finding, FindingDisposition, FindingSeverity, RawRecord, RecordKind, RoleId, SessionId, Sha};
+use canon_model::{Actor, ChangeId, Envelope, Finding, FindingDisposition, FindingSeverity, RawRecord, RecordKind, RoleId, ScenarioId, SessionId, Sha};
 use canon_store::fold::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
 use canon_store::partition::{content_digest12, resolve_partition};
@@ -475,6 +475,10 @@ pub struct FindingArgs {
     /// Where in the tree, as `path/to/file.rs:120-134`. Refused when it
     /// carries a line separator.
     pub file_ref: Option<String>,
+    /// The scenarios this finding is about (`--scenario-id`, repeatable;
+    /// [`Finding::scenario_ids`]). Each must exist in the scenario index;
+    /// empty names none, and the whole subject re-verifies a `fixed` fix.
+    pub scenario_ids: Vec<ScenarioId>,
     /// The authoring actor's id — the ATTRIBUTION half of what this
     /// command buys. Refused when it carries a line separator.
     pub actor_id: String,
@@ -619,6 +623,12 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     }
     if let Some(file_ref) = &args.file_ref {
         finding = finding.with_file_ref(file_ref.as_str());
+    }
+    if !args.scenario_ids.is_empty() {
+        if let Err(refusal) = check_scenarios_exist(&repo, &args.scenario_ids) {
+            return refusal.emit("canon finding add", args.json);
+        }
+        finding = finding.with_scenario_ids(args.scenario_ids.iter().cloned());
     }
 
     let body = serde_json::to_value(&finding).expect("a Finding always serializes");
@@ -883,6 +893,9 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     if let Some(file_ref) = &existing.file_ref {
         transitioned = transitioned.with_file_ref(file_ref.as_str());
     }
+    // The scenarios it is about carry over: a close takes no list of its
+    // own, and dropping them would widen the re-verification to the suite.
+    transitioned = transitioned.with_scenario_ids(existing.scenario_ids.iter().cloned());
 
     // The predicate `canon gate promote` will re-derive, asserted here
     // so a divergence between this construction and the exemption fails
@@ -1158,6 +1171,28 @@ fn occupied_by(natural_key: &str, staging: &GitTier, committed: &GitTier) -> Res
     Ok(None)
 }
 
+/// Refuse a `--scenario-id` the scenario index does not know, naming it,
+/// so a finding never scopes a re-verification to a scenario that cannot
+/// be evidenced. Matched by id across spec roots, as the finding keys it.
+fn check_scenarios_exist(repo: &Path, ids: &[ScenarioId]) -> Result<(), CliError> {
+    let unreadable = |e: String| {
+        CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again")
+    };
+    let ctx = GateCtx::from_repo(repo).map_err(|e| unreadable(e.to_string()))?;
+    let context = canon_gate::GateContext::load(ctx, &canon_policy::SchemaRegistry::load(), Utc::now()).map_err(|e| unreadable(e.to_string()))?;
+    let indexed = canon_gate::spec_coverage::latest_scenarios(&context);
+    let missing: Vec<String> = ids.iter().filter(|id| !indexed.iter().any(|s| &s.scenario_id == *id)).map(|id| format!("`{}`", id.as_str())).collect();
+    if missing.is_empty() {
+        return Ok(());
+    }
+    Err(CliError::refused(
+        "FINDING_UNKNOWN_SCENARIO",
+        format!("no scenario record for {}; a finding names scenarios the index knows, so fresh evidence for them can re-verify its fix", missing.join(", ")),
+    )
+    .field("--scenario-id")
+    .hint("run `canon inventory sync`, or name an id from `canon query --kind scenario`, then run `canon finding add` again"))
+}
+
 /// The three sha-shaped flags of one `canon finding add`, each resolved
 /// to the full sha its record stores.
 struct ResolvedShas {
@@ -1326,6 +1361,7 @@ mod tests {
             resolution_sha: None,
             introduced_by: None,
             file_ref: None,
+            scenario_ids: Vec::new(),
             actor_id: "canon".to_string(),
             role: RoleId::parse("reviewer").unwrap(),
             session_id: None,

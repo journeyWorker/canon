@@ -103,3 +103,13 @@ Feature: finding close
     When canon finding close --disposition fixed names that commit by a short --resolution-sha
     Then the staged transition records the full sha git resolved it to
     And a short sha that names no commit is refused with exit 2
+
+  # canon: {"schema":1,"at":"2026-10-21T09:00:02Z","actor":{"agent_id":"canon-impl-0241"}}
+  @subject:finding-lifecycle
+  @case:happy
+  @finding.close.81
+  Scenario: A close carries the scenarios the finding names and takes no list of its own
+    Given a committed blocker raised with --scenario-id naming one of a subject's two evidenced scenarios
+    When it is closed fixed with canon finding close, which has no --scenario-id
+    Then the closed version carries the same scenario ids as the version it closes
+    And the subject's ship refusal names that scenario only, until evidence for it is recorded after the close

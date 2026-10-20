@@ -1138,10 +1138,7 @@ fn subject_steps(
             next.push(NextStep {
                 actor: StepActor::Agent,
                 role: Some(Role::Implementer),
-                command: format!(
-                    "canon evidence add --project-id {} --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --actor-id <unit> --session-id <session> --ref \"<test command>\"",
-                    gap.project()
-                ),
+                command: gap.command(),
                 why: gap.why(id),
             });
         }

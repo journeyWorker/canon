@@ -1,0 +1,16 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-20T19:44:53.902310Z",
+  "case": "failure",
+  "kind": "scenario",
+  "lane": "behavior",
+  "project_id": "canon",
+  "scenario_digest": "e001a357b54af480a2aeed01398adf6bd4ac63b04d6d8f9ec7b18c78eb5a200c",
+  "scenario_id": "gate.check.11",
+  "schema": 1,
+  "source_digest": "04459471e31a8212337be2cd2296e21be5d0c824af389b53a250f2e4a07b7858",
+  "subject_id": "gate-trust-spine",
+  "title": "A non-slug entry in exclude_lanes poisons the section rather than vanishing"
+}

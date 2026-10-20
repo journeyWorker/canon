@@ -18,7 +18,7 @@
 use std::path::Path;
 
 use canon_gate::review_gate::{
-    active_require_review, change_review_gap, fixed_blockers, is_reverify, reverify_remedy, reverify_scenarios,
+    active_require_review, change_review_gap, fixed_blockers, is_reverify, is_scoped_reverify, reverify_remedy, reverify_scenarios, scoped_reverify_remedy,
 };
 use canon_gate::freshness::scenarios_without_evidence_after;
 use canon_gate::spec_coverage::subject_change_ids;
@@ -35,6 +35,10 @@ pub struct Gap {
     pub since: DateTime<Utc>,
     /// The `(project_id, scenario_id)` pairs with no evidence after `since`.
     pub scenarios: Vec<(String, String)>,
+    /// The finding names its scenarios (0.24.1, #87), so only `scenarios`
+    /// need evidence, one `canon evidence add --scenario-id` each; the
+    /// rest of the suite is not asked for.
+    pub scoped: bool,
 }
 
 impl Gap {
@@ -42,9 +46,21 @@ impl Gap {
         self.scenarios.iter().map(|(project, id)| (project.as_str(), id.as_str())).collect()
     }
 
-    /// The `canon evidence add … --all-scenarios` step this gap names.
+    /// The `canon evidence add` step this gap names: the batch for the
+    /// whole suite, the per-scenario command for a scoped finding.
     pub fn remedy(&self) -> String {
-        reverify_remedy(&self.pairs())
+        if self.scoped { scoped_reverify_remedy(&self.pairs()) } else { reverify_remedy(&self.pairs()) }
+    }
+
+    /// The `canon status` command for this gap: for a scoped finding, the
+    /// first scenario's own command (`evidence add` takes one scenario; the
+    /// next follows once it is evidenced).
+    pub fn command(&self) -> String {
+        let tail = "--report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --actor-id <unit> --session-id <session> --ref \"<test command>\"";
+        match self.scoped.then(|| self.scenarios.first()).flatten() {
+            Some((project, id)) => format!("canon evidence add --project-id {project} --scenario-id {id} {tail}"),
+            None => format!("canon evidence add --project-id {} --all-scenarios {tail}", self.project()),
+        }
     }
 
     /// `N evidenced scenario(s) (a, b, c, … k more)`.
@@ -60,11 +76,12 @@ impl Gap {
     /// The step's text for `subject` in `canon status`.
     pub fn why(&self, subject: &str) -> String {
         format!(
-            "{subject}: {} (since {}) and {} evidenced scenario(s) ({}) have no evidence recorded after it; the ship guard refuses until each does. Run the whole suite again; a review stays current while the scenario's verdict and checks are unchanged",
+            "{subject}: {} (since {}) and {} evidenced scenario(s) ({}) have no evidence recorded after it; the ship guard refuses until each does. {}; a review stays current while the scenario's verdict and checks are unchanged",
             self.trigger,
             self.since.to_rfc3339_opts(SecondsFormat::Secs, true),
             self.scenarios.len(),
-            self.scenario_list()
+            self.scenario_list(),
+            if self.scoped { "The finding names these scenarios, so evidence for each of them alone is enough" } else { "Run the whole suite again" }
         )
     }
 }
@@ -96,7 +113,7 @@ pub fn chore_gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Gap>
                 .into_iter()
                 .map(|s| (s.project_id.as_str().to_string(), s.scenario_id.as_str().to_string()))
                 .collect();
-            (!scenarios.is_empty()).then(|| Gap { trigger: format!("chore change `{}` approved", change.as_str()), since, scenarios })
+            (!scenarios.is_empty()).then(|| Gap { trigger: format!("chore change `{}` approved", change.as_str()), since, scenarios, scoped: false })
         })
         .collect()
 }
@@ -150,13 +167,11 @@ pub fn gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Gap> {
     if active_require_review(ctx).is_some_and(|(rr, _)| rr.block_on_findings) {
         let changes = subject_change_ids(ctx, subject);
         for fixed in fixed_blockers(ctx).into_iter().filter(|f| changes.contains(&f.finding.change_id)) {
-            let scenarios: Vec<(String, String)> = scenarios_without_evidence_after(ctx, &subject.subject_id, fixed.closed)
-                .into_iter()
-                .map(|s| (s.project_id.as_str().to_string(), s.scenario_id.as_str().to_string()))
-                .collect();
+            let scenarios: Vec<(String, String)> =
+                fixed.unmet(ctx, &subject.subject_id).into_iter().map(|s| (s.project_id.as_str().to_string(), s.scenario_id.as_str().to_string())).collect();
             if !scenarios.is_empty() {
                 let f = fixed.finding;
-                gaps.push(Gap { trigger: format!("blocker finding {}#{}.{} was closed fixed", f.change_id.as_str(), f.round, f.seq), since: fixed.closed, scenarios });
+                gaps.push(Gap { trigger: format!("blocker finding {}#{}.{} was closed fixed", f.change_id.as_str(), f.round, f.seq), since: fixed.closed, scenarios, scoped: fixed.is_scoped() });
             }
         }
     }
@@ -202,9 +217,16 @@ pub fn chore_review_remedy(change: &ChangeId) -> String {
 }
 
 /// The hint a refusal carries when any of `violations` is a
-/// re-verification one: the batch command and what follows it.
+/// re-verification one: the batch command and what follows it, or, when
+/// every such refusal is for a finding that names its scenarios, the
+/// per-scenario command.
 pub fn hint(violations: &[&Violation]) -> Option<String> {
-    violations.iter().find(|v| is_reverify(v)).map(|_| {
-        "record the suite again for the scenarios named: `canon evidence add --project-id <root> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" --actor-id <unit> --session-id <session>`; reviews stay current while a scenario's verdict and checks are unchanged; a chore also needs its change-level review (`canon review add --change-id <slug>`), then ship".to_string()
-    })
+    let reverify: Vec<&&Violation> = violations.iter().filter(|v| is_reverify(v)).collect();
+    if reverify.is_empty() {
+        return None;
+    }
+    if reverify.iter().all(|v| is_scoped_reverify(v)) {
+        return Some("record evidence again for the scenarios named, one command each: `canon evidence add --project-id <root> --scenario-id <id> --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" --actor-id <unit> --session-id <session>`; the rest of the suite needs nothing; reviews stay current while a scenario's verdict and checks are unchanged, then ship".to_string());
+    }
+    Some("record the suite again for the scenarios named: `canon evidence add --project-id <root> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" --actor-id <unit> --session-id <session>`; reviews stay current while a scenario's verdict and checks are unchanged; a chore also needs its change-level review (`canon review add --change-id <slug>`), then ship".to_string())
 }

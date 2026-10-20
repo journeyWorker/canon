@@ -58,7 +58,10 @@
 //! `open-blocker` violation, until every evidenced scenario of each
 //! subject holding its change has an evidence record newer than the
 //! finding's `fixed` record (when it was closed, [`fixed_blockers`]):
-//! evidence recorded before the fix cannot verify it.
+//! evidence recorded before the fix cannot verify it. A finding that
+//! names its scenarios ([`Finding::scenario_ids`], 0.24.1, #87) asks only
+//! those ([`FixedBlocker::unmet`]); one that names none asks every
+//! evidenced scenario.
 //! [`crate::freshness::scenarios_without_evidence_after`] is that rule. A
 //! scenario review stays current when the new evidence says the same
 //! thing (0.23 D5); the finding's close is the reviewer's step. The chore
@@ -232,7 +235,7 @@ pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclud
             let Some(holding) = holders.get(&fixed.finding.change_id) else { continue };
             let mut unmet: BTreeSet<(&str, &str)> = BTreeSet::new();
             for subject in holding {
-                unmet.extend(scenarios_without_evidence_after(ctx, &subject.subject_id, fixed.closed).into_iter().map(|s| (s.project_id.as_str(), s.scenario_id.as_str())));
+                unmet.extend(fixed.unmet(ctx, &subject.subject_id).into_iter().map(|s| (s.project_id.as_str(), s.scenario_id.as_str())));
             }
             if unmet.is_empty() {
                 continue;
@@ -275,8 +278,7 @@ pub fn subject_guard(ctx: &GateContext, require_review: &RequireReview, exclude_
             open_blockers(ctx).into_iter().filter(|f| changes.contains(&f.change_id)).map(|f| open_blocker_violation(f, &[subject_id.as_str()])),
         );
         for fixed in fixed_blockers(ctx).into_iter().filter(|f| changes.contains(&f.finding.change_id)) {
-            let unmet: Vec<(&str, &str)> =
-                scenarios_without_evidence_after(ctx, subject_id, fixed.closed).into_iter().map(|s| (s.project_id.as_str(), s.scenario_id.as_str())).collect();
+            let unmet: Vec<(&str, &str)> = fixed.unmet(ctx, subject_id).into_iter().map(|s| (s.project_id.as_str(), s.scenario_id.as_str())).collect();
             if !unmet.is_empty() {
                 violations.push(fixed_blocker_violation(&fixed, &[subject_id.as_str()], &unmet));
             }
@@ -560,6 +562,27 @@ pub struct FixedBlocker<'a> {
     pub closed: DateTime<Utc>,
 }
 
+impl FixedBlocker<'_> {
+    /// Whether the finding names the scenarios it is about
+    /// ([`Finding::scenario_ids`]), so only those need fresh evidence.
+    pub fn is_scoped(&self) -> bool {
+        !self.finding.scenario_ids.is_empty()
+    }
+
+    /// The scenarios of `subject` that still wait on evidence recorded
+    /// after the close: the evidenced ones the finding names, or, when it
+    /// names none, every evidenced one ([`scenarios_without_evidence_after`]).
+    /// The one answer the corpus rule, the subject guard and `canon status`
+    /// all read, so they cannot disagree.
+    pub fn unmet<'c>(&self, ctx: &'c GateContext, subject: &SubjectId) -> Vec<&'c Scenario> {
+        let mut unmet = scenarios_without_evidence_after(ctx, subject, self.closed);
+        if self.is_scoped() {
+            unmet.retain(|s| self.finding.scenario_ids.contains(&s.scenario_id));
+        }
+        unmet
+    }
+}
+
 /// Every blocker finding whose latest disposition is `fixed`, each with
 /// the time it was closed (the `at` of that latest record).
 pub fn fixed_blockers(ctx: &GateContext) -> Vec<FixedBlocker<'_>> {
@@ -582,6 +605,34 @@ pub fn reverify_remedy(scenarios: &[(&str, &str)]) -> String {
     )
 }
 
+/// The re-verification remedy of a finding that names its scenarios: the
+/// per-scenario `canon evidence add` (it takes one `--scenario-id`, and
+/// no filter on a batch), once for each scenario, grouped by spec root so
+/// each command carries its own `--project-id`. Not the whole-suite batch.
+pub fn scoped_reverify_remedy(scenarios: &[(&str, &str)]) -> String {
+    let mut roots: Vec<(&str, Vec<&str>)> = Vec::new();
+    for (project, id) in scenarios {
+        match roots.iter_mut().find(|(p, _)| p == project) {
+            Some((_, ids)) => ids.push(id),
+            None => roots.push((project, vec![id])),
+        }
+    }
+    if roots.is_empty() {
+        roots.push(("<root>", vec!["<scenario-id>"]));
+    }
+    let commands = roots
+        .iter()
+        .map(|(project, ids)| {
+            let ids = ids.iter().map(|id| format!("`{id}`")).collect::<Vec<_>>().join(", ");
+            format!("`canon evidence add --project-id {project} --scenario-id <id> --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" …` for each of {ids}")
+        })
+        .collect::<Vec<_>>()
+        .join("; and ");
+    format!(
+        "record the evidence again for {SCOPED_MARK} with {commands}; the rest of the suite needs nothing; a scenario review stays current when the verdict and the checks are the same, and a changed verdict or check stales it"
+    )
+}
+
 /// `<first three>, … N more`: the scenarios a re-verification names.
 pub fn reverify_scenarios(scenarios: &[(&str, &str)]) -> String {
     let shown = scenarios.iter().take(3).map(|(_, id)| format!("`{id}`")).collect::<Vec<_>>().join(", ");
@@ -596,6 +647,14 @@ pub fn reverify_scenarios(scenarios: &[(&str, &str)]) -> String {
 pub fn is_reverify(violation: &Violation) -> bool {
     violation.detail.contains(REVERIFY_MARK)
 }
+
+/// Whether `violation` is a re-verification refusal that names only the
+/// scenarios its finding is about ([`scoped_reverify_remedy`]).
+pub fn is_scoped_reverify(violation: &Violation) -> bool {
+    violation.detail.contains(SCOPED_MARK)
+}
+
+const SCOPED_MARK: &str = "the scenarios the finding names";
 
 const REVERIFY_MARK: &str = "no evidence recorded after";
 
@@ -612,7 +671,7 @@ fn fixed_blocker_violation(fixed: &FixedBlocker<'_>, subjects: &[&str], unmet: &
             unmet.len(),
             reverify_scenarios(unmet),
             fixed.closed.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-            reverify_remedy(unmet)
+            if fixed.is_scoped() { scoped_reverify_remedy(unmet) } else { reverify_remedy(unmet) }
         ),
     )
 }

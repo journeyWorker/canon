@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-0241",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-0241-1"
+  },
+  "at": "2026-10-20T20:01:41.370430Z",
+  "change_id": "canon-0-24-1",
+  "disposition": "open",
+  "file_ref": "crates/canon-gate/src/review_gate.rs:604-608",
+  "kind": "finding",
+  "reviewer": "canon-reviewer-0241",
+  "round": 1,
+  "scenario_ids": [
+    "gate.check.97"
+  ],
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Scope re-verification hints to every project root"
+}

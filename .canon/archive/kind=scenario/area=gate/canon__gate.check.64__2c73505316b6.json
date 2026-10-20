@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-20T19:44:53.988067Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "1dbedbbfc288de24c761d9ad534c8a980297032fe256bfe4d753211da1a6ea7f",
+  "scenario_id": "gate.check.64",
+  "schema": 1,
+  "source_digest": "04459471e31a8212337be2cd2296e21be5d0c824af389b53a250f2e4a07b7858",
+  "subject_id": "gate-trust-spine",
+  "title": "A malformed require_audit poisons the spec_coverage section"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-20T19:44:53.879109Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "90501b2480e14600dad78a3b740319d54483336b65c2533531c5aa4cb08478e7",
+  "scenario_id": "gate.check.08",
+  "schema": 1,
+  "source_digest": "04459471e31a8212337be2cd2296e21be5d0c824af389b53a250f2e4a07b7858",
+  "subject_id": "gate-trust-spine",
+  "title": "A policy edit alone tightens the gate with no artifact touched"
+}

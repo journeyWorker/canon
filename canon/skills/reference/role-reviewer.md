@@ -12,7 +12,7 @@ a `specs.roots[]` entry in `canon.yaml` (`root` by default).
 ```bash
 canon brief check --change-id <slug> --as reviewer --json
 canon gate check --as reviewer --json                 # once, before review add
-canon finding add --change-id <slug> --round <n> --seq <n> --severity <blocker|should-fix|note> --reviewer <me> --actor-id <me> --session-id <session> --summary "<defect>" --as reviewer --json
+canon finding add --change-id <slug> --round <n> --seq <n> --severity <blocker|should-fix|note> --reviewer <me> --actor-id <me> --session-id <session> --summary "<defect>" --scenario-id <id> --scenario-id <id> --as reviewer --json   # one --scenario-id per scenario the defect is about
 canon finding list --change-id <slug> --open --as reviewer --json
 canon finding close --change-id <slug> --round <n> --seq <n> --disposition fixed --resolution-sha <sha> --as reviewer --json
 canon review add --project-id <root-id> --scenario-id <id> --scenario-id <id> --reviewer <me> --actor-id <me> --role reviewer --session-id <session> --pin <sha> --upstream-ref <ref> --as reviewer --json
@@ -97,8 +97,12 @@ ship guard and stays listed as `accepted-divergence` in `status` and
 - Sign off in one batch with `review add`, all or nothing. It writes
   directly; nothing to promote. canon stores and re-checks attached bytes
   and never compares images.
-- A blocker you close `fixed` stays blocking until the implementer records
-  the whole suite again (`evidence add --all-scenarios`); your pinned review
+- Pass `--scenario-id` for each scenario a finding is about. A blocker you
+  close `fixed` then stays blocking until the implementer records evidence
+  again for those scenarios alone (`evidence add --scenario-id <id> …`); the
+  close inherits the list. A blocker naming no scenario asks for the whole
+  suite again (`evidence add --all-scenarios`), which on a big suite is
+  a long e2e run for a one-scenario fix, so name them. Your pinned review
   stays current when the new evidence says the same, otherwise look again.
 - Fixes you ask for return as a re-review of the same change. When new
   evidence changes a verdict or the checks and so stales your review, look

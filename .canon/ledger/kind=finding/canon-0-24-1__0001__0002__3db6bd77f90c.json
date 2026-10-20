@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-0241",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-0241-1"
+  },
+  "at": "2026-10-20T20:22:10.968049Z",
+  "change_id": "canon-0-24-1",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/schema_codes.rs:33-34",
+  "kind": "finding",
+  "resolution_sha": "006d4be29d71500530ef98390c9f6cf9247fdeec",
+  "reviewer": "canon-reviewer-0241",
+  "round": 1,
+  "scenario_ids": [
+    "finding.add.32"
+  ],
+  "schema": 1,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Remove impossible FINDING_UNKNOWN_SCENARIO from finding close schema"
+}

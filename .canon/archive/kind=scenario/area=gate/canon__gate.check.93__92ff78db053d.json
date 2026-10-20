@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-20T19:44:54.019349Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "5f2cafa11a3784e600834faef599d1ef1252a1791f11d808a1cf0f7206080f7d",
+  "scenario_id": "gate.check.93",
+  "schema": 1,
+  "source_digest": "04459471e31a8212337be2cd2296e21be5d0c824af389b53a250f2e4a07b7858",
+  "subject_id": "gate-trust-spine",
+  "title": "canon migrate pins a review whose commit or scenario is not in the clone as the scenario stands"
+}
