@@ -82,6 +82,28 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.24.1 release
+
+Patch release for one dogfood finding (eval 12, canon 0.24.0).
+
+- **A fixed blocker re-verifies by the scenarios it names (#87).** `canon
+  finding add` takes a repeatable `--scenario-id` (validated against the
+  scenario index; an unknown id is refused with `FINDING_UNKNOWN_SCENARIO`) and
+  the Finding record stores it as an optional `scenario_ids` list (omitted when
+  empty, so older records read unchanged). `canon finding close` keeps the
+  list of the version it closes. After a `fixed` close, only the named
+  scenarios the subject owns and has evidence for need evidence recorded after
+  the close; `canon gate check`, the ship guard and `canon status` apply the
+  same rule. A finding that names no scenario keeps the 0.22 rule (every
+  evidenced scenario of the subject). In eval 12 one blocker about one button
+  made the implementer re-record all 127 scenarios (about 13 minutes of e2e).
+- The refusal and `meta.next` for a scoped finding name a per-scenario
+  `canon evidence add --project-id <root> --scenario-id <id> …` for each spec
+  root instead of the whole-suite batch. The reviewer role reference says to
+  pass `--scenario-id` for each scenario a finding is about.
+- Conformance: `context-json-policy-summary` lists `scenario_ids`; version
+  strings `0.24.0` → `0.24.1`.
+
 ## 0.24.0 release
 
 Version 0.24.0 gives each concept one name across every command, and makes a
