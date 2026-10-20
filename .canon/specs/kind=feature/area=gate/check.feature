@@ -418,3 +418,13 @@ Feature: gate check
     When evidence is recorded after the close for A only
     Then the move to shipped is refused naming B, with the whole-suite batch as the remedy
     And once B has evidence after the close the move succeeds
+
+  # canon: {"schema":1,"at":"2026-10-21T10:00:00Z","actor":{"agent_id":"canon-impl-0241"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.check.99
+  Scenario: A scoped re-verification across spec roots names a runnable command for each root
+    Given a blocker closed fixed naming one scenario in one spec root and two in another, all evidenced before the close
+    When the subject is moved to shipped
+    Then the refusal names, per root, canon evidence add with that root's own --project-id and --scenario-id, for each of that root's scenarios
+    And evidence recorded for one root's scenarios leaves only the other root's scenarios named, and recording the last clears the move

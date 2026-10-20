@@ -606,12 +606,30 @@ pub fn reverify_remedy(scenarios: &[(&str, &str)]) -> String {
 }
 
 /// The re-verification remedy of a finding that names its scenarios: the
-/// per-scenario `canon evidence add`, not the whole-suite batch.
+/// per-scenario `canon evidence add` (it takes one `--scenario-id`, and
+/// no filter on a batch), once for each scenario, grouped by spec root so
+/// each command carries its own `--project-id`. Not the whole-suite batch.
 pub fn scoped_reverify_remedy(scenarios: &[(&str, &str)]) -> String {
-    let (project, id) = scenarios.first().copied().unwrap_or(("<root>", "<scenario-id>"));
-    let more = if scenarios.len() > 1 { format!(" (once per scenario named: {})", reverify_scenarios(scenarios)) } else { String::new() };
+    let mut roots: Vec<(&str, Vec<&str>)> = Vec::new();
+    for (project, id) in scenarios {
+        match roots.iter_mut().find(|(p, _)| p == project) {
+            Some((_, ids)) => ids.push(id),
+            None => roots.push((project, vec![id])),
+        }
+    }
+    if roots.is_empty() {
+        roots.push(("<root>", vec!["<scenario-id>"]));
+    }
+    let commands = roots
+        .iter()
+        .map(|(project, ids)| {
+            let ids = ids.iter().map(|id| format!("`{id}`")).collect::<Vec<_>>().join(", ");
+            format!("`canon evidence add --project-id {project} --scenario-id <id> --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" …` for each of {ids}")
+        })
+        .collect::<Vec<_>>()
+        .join("; and ");
     format!(
-        "record the evidence again for {SCOPED_MARK} with `canon evidence add --project-id {project} --scenario-id {id} --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" …`{more}; the rest of the suite needs nothing; a scenario review stays current when the verdict and the checks are the same, and a changed verdict or check stales it"
+        "record the evidence again for {SCOPED_MARK} with {commands}; the rest of the suite needs nothing; a scenario review stays current when the verdict and the checks are the same, and a changed verdict or check stales it"
     )
 }
 

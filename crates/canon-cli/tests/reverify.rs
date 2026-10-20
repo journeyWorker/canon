@@ -70,8 +70,12 @@ fn seed_subject(repo: &Path, status: SubjectStatus, changes: &[&str], at: DateTi
 }
 
 fn seed_scenario(repo: &Path, id: &str) {
+    seed_scenario_in(repo, "demo", id);
+}
+
+fn seed_scenario_in(repo: &Path, project: &str, id: &str) {
     let envelope = Envelope::new(1, RecordKind::Scenario, ago(600), actor("canon", "implementer"));
-    let mut scenario = Scenario::new(envelope, ProjectId::parse("demo").unwrap(), ScenarioId::parse(id).unwrap(), "seeded", "", SpecDigest::of(id.as_bytes()));
+    let mut scenario = Scenario::new(envelope, ProjectId::parse(project).unwrap(), ScenarioId::parse(id).unwrap(), "seeded", "", SpecDigest::of(id.as_bytes()));
     scenario.subject_id = Some(SubjectId::parse("demo-subject").unwrap());
     ledger(repo).write(&scenario).unwrap();
 }
@@ -443,7 +447,7 @@ fn gate_check_97_a_fixed_blocker_naming_a_scenario_is_reverified_by_that_scenari
     let err = stderr(&out);
     assert!(err.contains("closed `fixed` but not re-verified") && err.contains("1 evidenced scenario(s) (`world.demo.01`)"), "{err}");
     assert!(!err.contains("world.demo.02"), "B is not named: {err}");
-    assert!(err.contains("--scenario-id world.demo.01") && !err.contains("--all-scenarios"), "the remedy is the per-scenario command: {err}");
+    assert!(err.contains("--scenario-id <id>") && err.contains("for each of `world.demo.01`") && !err.contains("--all-scenarios"), "the remedy is the per-scenario command: {err}");
     let gate = run(r, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(1), "{}", stdout(&gate));
     assert!(stdout(&gate).contains("(`world.demo.01`)") && !stdout(&gate).contains("world.demo.02"), "gate check names A only: {}", stdout(&gate));
@@ -591,4 +595,48 @@ fn finding_add_32_records_the_scenarios_it_names_once_each() {
     let by_seq = |seq: u64| records["records"].as_array().unwrap().iter().find(|f| f["seq"] == seq).unwrap().clone();
     assert_eq!(by_seq(1)["scenario_ids"], serde_json::json!(["world.demo.02", "world.demo.01"]), "{records}");
     assert!(by_seq(2).get("scenario_ids").is_none(), "a finding naming none carries no field: {records}");
+}
+
+/// #87: a finding naming scenarios in two spec roots gets one runnable
+/// command per root, each with its own `--project-id` and that root's
+/// `--scenario-id` values; recording each clears the gate.
+#[test]
+fn gate_check_99_a_scoped_refusal_names_a_command_for_each_spec_root() {
+    let dir = repo();
+    let r = dir.path();
+    two_scenarios(r);
+    seed_scenario_in(r, "other", "world.other.01");
+    seed_scenario_in(r, "other", "world.other.02");
+    let seed_other = |scenario: &str, at: DateTime<Utc>| {
+        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, at, actor("impl-agent", "implementer"));
+        let record = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(scenario).unwrap()), None, EvidenceVerdict::Faithful).with_project_id(ProjectId::parse("other").unwrap());
+        ledger(r).write(&record).unwrap();
+    };
+    for scenario in ["world.other.01", "world.other.02"] {
+        seed_other(scenario, ago(300));
+        let out = run(
+            r,
+            &["review", "add", "--project-id", "other", "--scenario-id", scenario, "--reviewer", "reviewer-2", "--pin", "pin-sha", "--original-spec-ref", "specs/other.feature", "--actor-id", "reviewer-2", "--role", "reviewer"],
+        );
+        assert!(out.status.success(), "review add: {}", stderr(&out));
+    }
+    seed_scoped_blocker(r, ago(200), Some(ago(100)), &["world.demo.01", "world.other.01", "world.other.02"]);
+
+    let out = ship(r);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains("`canon evidence add --project-id demo --scenario-id <id> --report") && err.contains("for each of `world.demo.01`;"), "{err}");
+    assert!(err.contains("`canon evidence add --project-id other --scenario-id <id> --report") && err.contains("for each of `world.other.01`, `world.other.02`;"), "{err}");
+    assert!(!err.contains("world.demo.02") && !err.contains("--all-scenarios"), "{err}");
+
+    // Each root's command clears its own scenarios and no other's.
+    seed_evidence(r, "world.demo.01", ago(50));
+    let out = ship(r);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert!(!stderr(&out).contains("world.demo.01") && stderr(&out).contains("--project-id other --scenario-id <id>") && stderr(&out).contains("`world.other.01`"), "{}", stderr(&out));
+    seed_other("world.other.01", ago(40));
+    assert_eq!(ship(r).status.code(), Some(1));
+    seed_other("world.other.02", ago(30));
+    let out = ship(r);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
 }

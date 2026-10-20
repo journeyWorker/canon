@@ -76,8 +76,9 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
 const TEMPLATED: &[(&str, &[&str])] = &[("divergence", &["divergence resolve", "divergence defer"])];
 
 /// A code spliced into a command's own JSON document (`to_json()`), with no
-/// `emit` to name its command: the command that prints it.
-const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans")];
+/// `emit` to name its command (or a helper whose caller emits it for one
+/// command only): the command that prints it.
+const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans"), ("FINDING_UNKNOWN_SCENARIO", "finding add")];
 
 /// Codes every command can emit, whatever its sources say: a `--json` usage
 /// error, and the refusal of an unknown `CANON_ROLE` before any command runs.

@@ -52,7 +52,9 @@ impl Gap {
         if self.scoped { scoped_reverify_remedy(&self.pairs()) } else { reverify_remedy(&self.pairs()) }
     }
 
-    /// The `canon status` command for this gap.
+    /// The `canon status` command for this gap: for a scoped finding, the
+    /// first scenario's own command (`evidence add` takes one scenario; the
+    /// next follows once it is evidenced).
     pub fn command(&self) -> String {
         let tail = "--report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --actor-id <unit> --session-id <session> --ref \"<test command>\"";
         match self.scoped.then(|| self.scenarios.first()).flatten() {
