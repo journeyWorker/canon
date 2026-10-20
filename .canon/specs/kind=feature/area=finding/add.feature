@@ -144,3 +144,23 @@ Feature: finding add
     Then the add is refused with exit 2 naming the flag and the value
     And outside a git work tree a short sha is refused, since nothing can resolve it
     And nothing is staged
+
+  # canon: {"schema":1,"at":"2026-10-21T09:00:00Z","actor":{"agent_id":"canon-impl-0241"}}
+  @subject:finding-lifecycle
+  @case:happy
+  @finding.add.32
+  Scenario: A finding names the scenarios it is about with a repeatable --scenario-id
+    Given a repository whose index knows two scenarios
+    When canon finding add names one of them twice and the other once through --scenario-id, and a second finding names none
+    Then the first finding's record carries each scenario id once, in the order given
+    And the second finding's record carries no scenario_ids field at all
+
+  # canon: {"schema":1,"at":"2026-10-21T09:00:01Z","actor":{"agent_id":"canon-impl-0241"}}
+  @subject:finding-lifecycle
+  @case:failure
+  @finding.add.33
+  Scenario: A --scenario-id the index does not know is refused with its code
+    Given a repository whose index does not know the scenario id world.demo.99
+    When canon finding add names world.demo.99 through --scenario-id
+    Then the command exits 2 with FINDING_UNKNOWN_SCENARIO, the field --scenario-id and a hint, naming the unknown id
+    And nothing is staged

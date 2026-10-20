@@ -25,6 +25,7 @@ routing:
   change: local
   scenario: local
   evidence_record: local
+  finding: local
 ";
 
 const REQUIRE_REVIEW: &str = "spec_coverage:\n  require_evidence: true\n  require_review: {}\n";
@@ -113,8 +114,14 @@ fn change_review(repo: &Path, change: &str) -> Output {
 }
 
 fn seed_blocker(repo: &Path, raised: DateTime<Utc>, fixed: Option<DateTime<Utc>>) {
+    seed_scoped_blocker(repo, raised, fixed, &[]);
+}
+
+/// [`seed_blocker`] naming the scenarios the finding is about.
+fn seed_scoped_blocker(repo: &Path, raised: DateTime<Utc>, fixed: Option<DateTime<Utc>>, scenarios: &[&str]) {
     let envelope = Envelope::new(1, RecordKind::Finding, raised, actor("reviewer-2", "reviewer"));
-    let finding = Finding::new(envelope, ChangeId::parse("c-demo").unwrap(), 1, 1, FindingSeverity::Blocker, "reviewer-2", "unbounded subprocess wait");
+    let finding = Finding::new(envelope, ChangeId::parse("c-demo").unwrap(), 1, 1, FindingSeverity::Blocker, "reviewer-2", "unbounded subprocess wait")
+        .with_scenario_ids(scenarios.iter().map(|id| ScenarioId::parse(*id).unwrap()));
     ledger(repo).write(&finding).unwrap();
     if let Some(at) = fixed {
         let mut closed = finding.fixed_by(Sha::parse("c".repeat(40)).unwrap());
@@ -404,4 +411,184 @@ fn change_new_on_a_shipped_subject_names_the_reopen() {
     let out = run(dir.path(), &["change", "new", "bump-client", "--subject-id", "demo-subject", "--kind", "chore", "--title", "Bump the client", "--json"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert!(!stdout(&out).contains("--to verifying"), "{}", stdout(&out));
+}
+
+/// A subject with two evidenced, reviewed scenarios (A = `world.demo.01`,
+/// B = `world.demo.02`), both evidenced 300s ago.
+fn two_scenarios(r: &Path) {
+    seed_change(r, "c-demo");
+    seed_subject(r, SubjectStatus::Verifying, &["c-demo"], ago(500));
+    seed_scenario(r, "world.demo.01");
+    seed_scenario(r, "world.demo.02");
+    feature_brief(r);
+    for scenario in ["world.demo.01", "world.demo.02"] {
+        seed_evidence(r, scenario, ago(300));
+        review_add(r, scenario);
+    }
+}
+
+/// #87: a blocker naming scenario A is re-verified by fresh evidence for A
+/// alone: B's evidence stays older than the close and shipping and `gate
+/// check` both clear. Until then the refusal names A only, and its hint is
+/// the per-scenario command, not the whole-suite batch.
+#[test]
+fn gate_check_97_a_fixed_blocker_naming_a_scenario_is_reverified_by_that_scenarios_evidence_alone() {
+    let dir = repo();
+    let r = dir.path();
+    two_scenarios(r);
+    seed_scoped_blocker(r, ago(200), Some(ago(100)), &["world.demo.01"]);
+
+    let out = ship(r);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains("closed `fixed` but not re-verified") && err.contains("1 evidenced scenario(s) (`world.demo.01`)"), "{err}");
+    assert!(!err.contains("world.demo.02"), "B is not named: {err}");
+    assert!(err.contains("--scenario-id world.demo.01") && !err.contains("--all-scenarios"), "the remedy is the per-scenario command: {err}");
+    let gate = run(r, &["gate", "check"]);
+    assert_eq!(gate.status.code(), Some(1), "{}", stdout(&gate));
+    assert!(stdout(&gate).contains("(`world.demo.01`)") && !stdout(&gate).contains("world.demo.02"), "gate check names A only: {}", stdout(&gate));
+
+    let steps = status_steps(r);
+    let command = steps[0]["command"].as_str().unwrap();
+    assert!(command.starts_with("canon evidence add --project-id demo --scenario-id world.demo.01 "), "{}", steps[0]);
+    assert!(!command.contains("--all-scenarios"), "{command}");
+
+    // Evidence for A recorded before the close does not count.
+    seed_evidence(r, "world.demo.01", ago(150));
+    assert_eq!(ship(r).status.code(), Some(1));
+
+    // Evidence for A after the close is enough; B's is still 300s old.
+    seed_evidence(r, "world.demo.01", ago(50));
+    let out = ship(r);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+    assert_eq!(subject_json(r)["status"], "shipped");
+    let gate = run(r, &["gate", "check"]);
+    assert!(!stdout(&gate).contains("not re-verified"), "{}", stdout(&gate));
+}
+
+/// #87: fresh evidence for B does not re-verify a finding about A.
+#[test]
+fn gate_check_97_evidence_for_another_scenario_does_not_reverify_a_scoped_finding() {
+    let dir = repo();
+    let r = dir.path();
+    two_scenarios(r);
+    seed_scoped_blocker(r, ago(200), Some(ago(100)), &["world.demo.01"]);
+    seed_evidence(r, "world.demo.02", ago(50));
+
+    let out = ship(r);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert!(stderr(&out).contains("(`world.demo.01`)") && !stderr(&out).contains("world.demo.02"), "{}", stderr(&out));
+}
+
+/// #87: a finding that names no scenario keeps the 0.22 rule: every
+/// evidenced scenario needs evidence after the close.
+#[test]
+fn gate_check_98_a_fixed_blocker_naming_no_scenario_still_asks_every_evidenced_scenario() {
+    let dir = repo();
+    let r = dir.path();
+    two_scenarios(r);
+    seed_scoped_blocker(r, ago(200), Some(ago(100)), &[]);
+    seed_evidence(r, "world.demo.01", ago(50));
+
+    let out = ship(r);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert!(stderr(&out).contains("(`world.demo.02`)") && stderr(&out).contains("--all-scenarios"), "{}", stderr(&out));
+    seed_evidence(r, "world.demo.02", ago(40));
+    assert!(ship(r).status.success());
+}
+
+fn git(r: &Path, args: &[&str]) -> String {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(r)
+        .args(["-c", "commit.gpgsign=false"])
+        .args(args)
+        .env("GIT_AUTHOR_NAME", "a")
+        .env("GIT_AUTHOR_EMAIL", "a@a")
+        .env("GIT_COMMITTER_NAME", "a")
+        .env("GIT_COMMITTER_EMAIL", "a@a")
+        .output()
+        .expect("git on PATH");
+    assert!(out.status.success(), "git {args:?}: {}", stderr(&out));
+    stdout(&out).trim().to_string()
+}
+
+/// #87 through the CLI: `finding add --scenario-id` names the scenario, the
+/// close inherits it (it takes no list of its own), and the ship refusal
+/// then names that scenario only.
+#[test]
+fn finding_close_81_inherits_the_scenarios_the_finding_names() {
+    let dir = repo();
+    let r = dir.path();
+    two_scenarios(r);
+    git(r, &["init", "-q"]);
+    git(r, &["add", "canon.yaml"]);
+    git(r, &["commit", "-q", "-m", "initial"]);
+    let head = git(r, &["rev-parse", "HEAD"]);
+
+    let add = run(
+        r,
+        &[
+            "finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--reviewer", "reviewer-2", "--summary", "double click", "--scenario-id", "world.demo.01",
+            "--scenario-id", "world.demo.01", "--promote",
+        ],
+    );
+    assert!(add.status.success(), "stderr: {}", stderr(&add));
+    let close = run(r, &["finding", "close", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--disposition", "fixed", "--resolution-sha", &head, "--promote"]);
+    assert!(close.status.success(), "stderr: {}", stderr(&close));
+
+    let listed = run(r, &["query", "--kind", "finding", "--json"]);
+    let records: Value = serde_json::from_str(&stdout(&listed)).unwrap();
+    let fixed: Vec<&Value> = records["records"].as_array().unwrap().iter().filter(|f| f["disposition"] == "fixed").collect();
+    assert_eq!(fixed.len(), 1, "{records}");
+    assert_eq!(fixed[0]["scenario_ids"], serde_json::json!(["world.demo.01"]), "named once, inherited by the close: {}", fixed[0]);
+
+    // The close is newer than every evidence record seeded above.
+    let out = ship(r);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    assert!(stderr(&out).contains("(`world.demo.01`)") && !stderr(&out).contains("world.demo.02"), "{}", stderr(&out));
+    seed_evidence(r, "world.demo.01", Utc::now() + Duration::seconds(5));
+    let out = ship(r);
+    assert!(out.status.success(), "stderr: {}", stderr(&out));
+}
+
+/// #87: a `--scenario-id` no scenario record carries is refused with its
+/// code, the flag and a hint, and nothing is staged.
+#[test]
+fn finding_add_33_refuses_a_scenario_id_the_index_does_not_know() {
+    let dir = repo();
+    let r = dir.path();
+    two_scenarios(r);
+    let out = run(
+        r,
+        &["finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--reviewer", "r", "--summary", "s", "--scenario-id", "world.demo.99", "--json"],
+    );
+    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
+    let body: Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(body["error"]["code"], "FINDING_UNKNOWN_SCENARIO", "{body}");
+    assert_eq!(body["error"]["field"], "--scenario-id", "{body}");
+    assert!(body["error"]["message"].as_str().unwrap().contains("`world.demo.99`"), "{body}");
+    assert!(body["error"]["hint"].is_string(), "{body}");
+    assert!(!r.join(".canon/ledger/_staging/kind=finding").exists() || std::fs::read_dir(r.join(".canon/ledger/_staging/kind=finding")).unwrap().next().is_none(), "nothing staged");
+}
+
+/// #87: `--scenario-id` is repeatable; the record carries each id once, in
+/// the order given, and a finding without the flag carries no field at all.
+#[test]
+fn finding_add_32_records_the_scenarios_it_names_once_each() {
+    let dir = repo();
+    let r = dir.path();
+    two_scenarios(r);
+    let base = ["finding", "add", "--change-id", "c-demo", "--round", "1", "--reviewer", "r", "--summary", "s", "--severity", "should-fix", "--promote"];
+    let named = [&base[..], &["--seq", "1", "--scenario-id", "world.demo.02", "--scenario-id", "world.demo.01", "--scenario-id", "world.demo.02"]].concat();
+    let plain = [&base[..], &["--seq", "2"]].concat();
+    for args in [named, plain] {
+        let out = run(r, &args);
+        assert!(out.status.success(), "stderr: {}", stderr(&out));
+    }
+    let listed = run(r, &["query", "--kind", "finding", "--json"]);
+    let records: Value = serde_json::from_str(&stdout(&listed)).unwrap();
+    let by_seq = |seq: u64| records["records"].as_array().unwrap().iter().find(|f| f["seq"] == seq).unwrap().clone();
+    assert_eq!(by_seq(1)["scenario_ids"], serde_json::json!(["world.demo.02", "world.demo.01"]), "{records}");
+    assert!(by_seq(2).get("scenario_ids").is_none(), "a finding naming none carries no field: {records}");
 }
