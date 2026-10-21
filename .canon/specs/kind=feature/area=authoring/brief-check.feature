@@ -20,7 +20,7 @@ Feature: authoring brief check
     When canon brief check runs
     Then the configured language decides, the findings are judged with its rules, and the text output prints one line, "language: en (configured; the text reads as ko)"
     And the JSON carries languageSource "configured" and a languageNote, and a configured language the text agrees with carries no note
-    And the configured language decides which lists run: a Korean dated decision note draws no prose.decision-history when en is configured
+    And the configured language decides which phrase lists run, but a date is language-independent: with en configured a Korean sentence with a date draws one prose.decision-history finding for the date, and a Korean decision phrase with no date draws none
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
@@ -77,11 +77,11 @@ Feature: authoring brief check
   @case:failure
   @authoring.brief-check.08
   Scenario: Every calendar date and a closed list of decision phrases in normative or Intent text is flagged as decision history
-    Given a brief with ISO, Korean and English dates, undated decision phrases (결정했다, 기로 했다, 회의에서, we decided, as agreed), dates next to 부터, 이후 or after, a quoted label next to a date, and a decision note in a question
+    Given a brief with ISO, Korean and English dates, undated decision phrases (결정했다, 기로 했다, we decided), behavior sentences that use a meeting, an approval or a decision field (회의에서 나가면, approved by a manager, decision on the request, decided to leave), dates next to 부터, 이후 or after, a quoted label next to a date, and a decision note in a question
     When canon brief check runs
     Then each such sentence is one prose.decision-history finding, naming the matched date or phrase, in normative sections, Intent and table cells but not in a question
     And there is no boundary or verb gating, so a date that is part of the behavior (an effective date) or a quoted label is a finding too, and the hint says to keep it and waive it with a reason
-    And a sentence with a date and a phrase is one finding, a waiver clears it, and sentences with no date and no listed phrase (a conditional 합의하면, "agreed to the terms", 결정 버튼) report nothing
+    And a sentence with a date and a phrase is one finding, a waiver clears it, and sentences with no date and no listed phrase (a conditional 합의하면, the behavior sentences above, "agreed to the terms", 결정 버튼) report nothing
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
@@ -97,9 +97,9 @@ Feature: authoring brief check
   @case:failure
   @authoring.brief-check.10
   Scenario: A Korean sentence that does not end in the plain declarative is flagged, with fragments and labels exempt
-    Given a Korean brief with polite (ㅂ니다, ㅂ시다), 십시오 and plain imperative (해라, 하라, 남겨라, 줘라) sentences in list items and paragraphs, a colloquial ~세요 sentence, noun fragments (참가자, 후보자, 상품 하자, 선두 주자), a label item and flow steps in polite endings
+    Given a Korean brief with polite (ㅂ니다, ㅂ시다), 십시오 and plain imperative (해라, 하라, 두라, 넣으라, 남겨라, 줘라) sentences in list items and paragraphs, a colloquial ~세요 sentence, noun fragments (참가자, 후보자, 상품 하자, 선두 주자), a label item, unlabeled noun fragments ending in 라 after a final consonant (달라, 갈라) and flow steps in polite endings
     When canon brief check runs
-    Then each polite, 십시오 or imperative sentence is a prose.ko-ending finding naming the ending, list items included, and a plain word that ends in 니다 (아니다, 지니다) is not polite
+    Then each polite, 십시오 or imperative sentence (no final consonant before 라) is a prose.ko-ending finding naming the ending, list items included, and the open-syllable nouns 보라, 카메라 and 오페라 are known false positives to waive with match, and a plain word that ends in 니다 (아니다, 지니다) is not polite
     And the ~세요 sentence is prose.colloquial's only, and fragments, a label: item, flow steps, questions and none answers report nothing
     And a plain hortative ~자 is flagged outside list items by the generic rule and is not detected in a list item, where it is the noun suffix of 참가자 and 하자, and English text never gets the rule
 
@@ -121,6 +121,7 @@ Feature: authoring brief check
     Given a bad Korean brief and a waiver comment for each new rule and section it shows, with the key brief for the whole-brief length
     When canon brief check runs
     Then every new finding is waived, the output lists each waiver as an advisory, and a waiver for another section clears nothing
+    And a waiver with match="<text>" clears only the rule's findings in that section whose excerpt or matched text contains it (an effective date is waived and the dated decision note beside it stays), one that fits nothing waives nothing, and an empty, unquoted or trailing-text match is brief.waiver-invalid
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold

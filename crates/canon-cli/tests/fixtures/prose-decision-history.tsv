@@ -45,17 +45,17 @@ hit	para	이 동작은 합의했다.
 hit	para	이 동작은 확정했다.
 hit	para	대출 목록은 그대로 두기로 했다.
 hit	para	영수증을 보여 주기로 했다.
-hit	para	회의에서 유지한다.
+clean	para	회의에서 유지한다.
 hit	para	논의 결과 유지한다.
 hit	para	운영자 결정으로 유지한다.
 hit	para	We decided it.
 hit	para	The cap was decided.
-hit	para	The cap was agreed.
-hit	para	As agreed, the cap is 3.
-hit	para	Approved by the PM.
-hit	para	The team decided to keep it.
-hit	para	A decision on caps is pending.
-hit	para	Per the product decision, the cap is 3.
+hit	para	It was agreed to keep the cap.
+clean	para	As agreed, the cap is 3.
+clean	para	Approved by the PM.
+clean	para	The team decided to keep it.
+clean	para	A decision on caps is pending.
+clean	para	Per the product decision, the cap is 3.
 clean	para	이용자가 비밀번호를 변경했으면 다시 로그인한다.
 clean	para	이용자와 사서가 연장에 합의하면 기간이 늘어난다.
 clean	para	정책은 결정 대상이다.
@@ -74,3 +74,12 @@ clean	para	A decision field shows a badge.
 clean	para	Invitees who approved the slot see the new picker.
 clean	para	Settled invoices stay paid.
 clean	para	The cap is three per day.
+hit	para	We agreed on caps.
+clean	para	예약자가 회의에서 나가면 알림이 멈춘다.
+clean	para	Expenses approved by a manager are paid on the next run.
+clean	para	The page shows the reviewer's decision on the request.
+clean	para	If the invitee decided to leave, the slot frees up.
+clean	para	The invitee decided on a slot.
+hit	para	2026-09-14 회의에서 결정했으며 유지한다.
+hit	para	Oct 21에 열린다.
+hit	para	열린다 (21 October 개편).

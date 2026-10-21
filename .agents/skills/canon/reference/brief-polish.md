@@ -137,20 +137,25 @@ background, delete it; if it is a doubt, move it to Questions and assumptions.
 ### `prose.decision-history`
 
 Normative text, Intent and table cells. One finding per sentence that holds
-a calendar date (`2026-10-21`, `2026년 10월`, `10월 21일`, `Oct 21`,
-`21 October`, `October 2026`) or a decision-history phrase (ko: `결정했다`,
-`결정했고`, `결정하여`, `결정됐다`, `정해졌다`, `합의했다`, `확정했다`, `~기로
-했다`, `회의에서`, `논의 결과`, `운영자 결정`; en: "we decided", "was decided",
-"as agreed", "approved by", "decided to", "decision on", "per the … decision").
-There is no gating: a date next to 부터 or after is a finding too. Fix: delete
-the history and write the decision as present behavior; a decision still open
-goes to Questions and assumptions. When the date is part of the behavior (an
-effective date, a deadline) or a quoted label, keep it and waive the rule in
-that section with the reason.
+a calendar date, in any language (`2026-10-21`, `2026년 10월`, `10월 21일`,
+`Oct 21`, `21 October`, `October 2026`), or, in Korean text, one of
+`결정했다`, `결정했고`, `결정하여`, `결정됐다`, `결정되었다`, `정해졌다`, `합의했다`,
+`확정했다`, `~기로 했다`, `논의 결과`, `운영자 결정`, or, in English text, "we
+decided", "we agreed", "was decided", "it was agreed". There is no gating: a
+date next to 부터 or after is a finding too. Fix: delete the history and write
+the decision as present behavior; a decision still open goes to Questions and
+assumptions. When the date is part of the behavior (an effective date, a
+deadline) or a quoted label, keep it and waive it with `match=` set to the
+date, so the waiver clears that date only and every other note in the section
+still draws a finding. Never waive the rule for the whole section.
 
 - en. Before: "On 3 March the team agreed on a grid as the default view." After: "The default view is a grid."
 - ko. 전: "3월 3일 회의에서 기본 보기를 격자로 하기로 했다." 후: "기본 보기는 격자다."
-- waive: `<!-- canon:waive prose.decision-history detail "연체 요금은 2026-12-01부터 적용되는 동작이다" -->`
+- waive one date: `<!-- canon:waive prose.decision-history detail "연체 요금은 2026-12-01부터 적용되는 동작이다" match="2026-12-01" -->`
+
+What it misses: a decision written in other words ("회의에서 정한 대로" is not
+listed on purpose, it reads as behavior). Over-reports: a date that is
+behavior, and the closed-list phrases in behavior text; waive those with `match=`.
 
 ### `prose.ai-vocabulary`
 
@@ -166,16 +171,21 @@ verb and its object.
 
 Korean only. Flagged everywhere, list items included: polite `~ㅂ니다`,
 `~ㅂ니까`, `~ㅂ시다` (합니다, 입니다, 없습니다; a plain word like 아니다 is not
-polite), `~십시오`, and a plain imperative: a terminated sentence, not a `label:`
-item, whose last word ends in 라 after a syllable with the vowel ㅏ ㅓ ㅕ ㅘ ㅝ ㅐ
-(해라, 하라, 남겨라, 줘라, 와라). The `~요` forms in `prose.colloquial`'s list
+polite), `~십시오`, and a plain imperative: a terminated, unlabeled sentence
+whose last word ends in 라 after a syllable with no final consonant (하라,
+해라, 두라, 오라, 넣으라, 남겨라, 줘라). A syllable with a final consonant
+(달라, 갈라) never counts. The `~요` forms in `prose.colloquial`'s list
 (`~세요`, `~해요`, …) belong to that rule. Outside list items any terminated
 sentence not ending in `~다` is flagged, a plain hortative `~자` included. In a
-list item the plain `~자` is not detected: it is the same ending as the noun
-suffix in 참가자, 후보자, 하자, 주자, so keep a hortative out of lists yourself.
-Not flagged: questions, `없음.`, sentences ending in code or a quote, flow
-steps, list fragments without a verb, and a `label:` item. Known false
-positive: a noun ending in 라 after ㅏ/ㅓ (바라). Fix: end the statement in `~다`.
+list item the plain `~자` is not detected: it is the noun suffix in 참가자,
+후보자, 하자, 주자, so keep a hortative out of lists yourself. Not flagged:
+questions, `없음.`, sentences ending in code or a quote, flow steps, list
+fragments without a verb, a `label:` item, and an unterminated list item.
+
+What it over-reports: an open-syllable noun ending in 라 as a terminated list
+item (보라 'purple', 카메라, 오페라); keep it and waive with `match="<the
+sentence's noun>"`. What it misses: a consonant-stem imperative written as
+`~라` (달라 as a verb) and any hortative inside a list. Fix: end the statement in `~다`.
 
 - ko. 전: "목록이 비어 있으면 안내를 보여 줍니다." 후: "목록이 비어 있으면 안내를 보여 준다."
 - ko. 전: "- 재고를 확인해라." 후: "- 재고를 확인한다."
@@ -198,6 +208,7 @@ uses the section key `brief`.
 - `canon brief check --json`: read the `prose.*` findings, then the sections they sit in. Fix by section, not by rule.
 - A finding is a prompt to reread, not a verdict. When the flagged text is the precise term (a state name, a quoted label, a command), keep it and waive that rule in that section:
   `<!-- canon:waive <rule-id> <section-key> "<reason>" -->`
+  To waive one finding and keep the rest of the rule live in that section, add the text the finding names: `<!-- canon:waive <rule-id> <section-key> "<reason>" match="<text>" -->` (an empty or unquoted match is a blocker).
   A waiver is right when the text is a quotation or a fixed term, and wrong when it excuses a sentence you could simply rewrite. One rule, one section, a reason the human can read.
 
 ## The loop
