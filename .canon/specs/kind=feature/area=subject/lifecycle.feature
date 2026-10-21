@@ -395,3 +395,4 @@ Feature: subject lifecycle
     When the subject is reopened and, with b's scenario attested, shipped again
     Then both are refused naming b's brief, and the output names every change set aside, here c
     And without c the refusal is the same, and only an unapproved change nothing is tagged for is ever set aside
+    And canon status does not advise the refused reopen: it says reopening waits for the brief's approval
