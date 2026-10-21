@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T18:58:14.074597980Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "canon/skills/reference/brief-polish.md",
+  "kind": "finding",
+  "reviewed_sha": "bc3c050c9144025bad5de6aedf07411c15d2160d",
+  "reviewer": "canon-reviewer-026",
+  "round": 5,
+  "scenario_ids": [
+    "authoring.brief-check.08"
+  ],
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[probe] The prescribed remedy hides real notes: with no gating, an effective date in Detail is a finding, and brief-polish says to waive the rule 'in that section'. A detail holding '- 연체 요금은 2026-12-01부터 붙는다.' and '- 이 방식은 2026-09-14 회의에서 결정했다.' shows 2 findings; the waiver brief-polish shows ('연체 요금은 2026-12-01부터 적용되는 동작이다') clears both. Waivers are per rule and section, so every section with an effective date or deadline becomes blind to decision history."
+}
