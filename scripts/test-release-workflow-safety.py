@@ -81,5 +81,29 @@ class SupplyChainFixtureTests(unittest.TestCase):
         self.assertTrue(any("lockfile-safe mode" in error for error in errors))
 
 
+class DashboardEmbedTests(unittest.TestCase):
+    def workflow(self, name: str) -> str:
+        return (ROOT.parent / ".github" / "workflows" / name).read_text(encoding="utf-8")
+
+    def test_accepts_the_shipped_workflows(self) -> None:
+        for name in ("build-native.yml", "publish.yml"):
+            self.assertEqual(CHECKER.dashboard_embed_errors(self.workflow(name), name), [])
+
+    def test_rejects_a_build_row_that_skips_the_hand_off(self) -> None:
+        text = self.workflow("publish.yml").replace("CANON_DASHBOARD_DIST:", "UNRELATED:")
+        errors = CHECKER.dashboard_embed_errors(text, "publish.yml")
+        self.assertTrue(any("CANON_DASHBOARD_DIST" in error for error in errors), errors)
+
+    def test_rejects_a_build_job_that_does_not_wait_for_the_app(self) -> None:
+        text = self.workflow("build-native.yml").replace("needs: [safety, dashboard]", "needs: safety")
+        errors = CHECKER.dashboard_embed_errors(text, "build-native.yml")
+        self.assertTrue(any("needs" in error for error in errors), errors)
+
+    def test_rejects_a_second_build_of_the_app(self) -> None:
+        text = self.workflow("publish.yml") + "      - run: bun run --cwd packages/dashboard build\n"
+        errors = CHECKER.dashboard_embed_errors(text, "publish.yml")
+        self.assertTrue(any("exactly one job" in error for error in errors), errors)
+
+
 if __name__ == "__main__":
     unittest.main()

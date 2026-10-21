@@ -3093,26 +3093,31 @@ fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Option<&std::pa
 fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path::Path>, port: u16, json: bool) -> ExitCode {
     match canon_cli::dashboard::prepare(repo, snapshot, port) {
         Ok(bound) => {
-            canon_cli::say!(json, "canon dashboard: app       = {}", bound.dist_dir.display());
+            canon_cli::say!(json, "canon dashboard: app       = {}", bound.app.describe());
             canon_cli::say!(json, "canon dashboard: snapshot  = {}", bound.snapshot_dir.display());
+            let mut warnings = Vec::new();
+            if let canon_cli::dashboard::SnapshotState::Unavailable { reason, fix } = &bound.snapshot {
+                let warning = format!("{reason}; the panels page says so instead of showing panels; to fix it: {fix}");
+                eprintln!("canon dashboard: warning: {warning}");
+                warnings.push(warning);
+            }
+            canon_cli::say!(json, "canon dashboard: briefs    = {}", bound.briefs_url());
             canon_cli::say!(json, "canon dashboard: serving {}", bound.url());
             if json {
                 // The one document: where it serves. The server then runs until the process is stopped.
-                canon_cli::json_out::data(
-                    "dashboard",
-                    serde_json::json!({ "url": bound.url(), "app": bound.dist_dir.display().to_string(), "snapshot": bound.snapshot_dir.display().to_string() }),
-                );
+                let data = serde_json::json!({
+                    "url": bound.url(),
+                    "briefsUrl": bound.briefs_url(),
+                    "app": bound.app.describe(),
+                    "snapshot": bound.snapshot_dir.display().to_string(),
+                    "snapshotAvailable": bound.snapshot == canon_cli::dashboard::SnapshotState::Ready,
+                });
+                canon_cli::json_out::data_with_meta("dashboard", data, serde_json::json!({ "warnings": warnings }));
             }
             bound.serve_forever();
             ExitCode::SUCCESS
         }
-        Err(err) => {
-            let error = match err {
-                canon_cli::dashboard::DashboardError::Config(_) => CliError::refused("DASHBOARD_CONFIG_INVALID", err.to_string()).hint("fix the dashboard settings in canon.yaml (`canon init --check-config` reports what is wrong)"),
-                _ => CliError::failed("DASHBOARD_FAILED", err.to_string()).hint("check that the port is free and the repository is readable, then run `canon dashboard` again"),
-            };
-            ExitCode::from(error.emit("canon dashboard", json) as u8)
-        }
+        Err(err) => ExitCode::from(err.to_cli_error().emit("canon dashboard", json) as u8),
     }
 }
 

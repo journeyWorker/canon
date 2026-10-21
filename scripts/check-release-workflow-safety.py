@@ -129,6 +129,65 @@ def matrix_rows(text: str) -> list[dict[str, str]]:
     return [r for r in rows if "target" in r and "host" in r]
 
 
+DASHBOARD_BUILD_CMD = "bun run --cwd packages/dashboard build"
+
+
+def _job_block(text: str, job: str) -> str:
+    """The lines of a top-level job (2-space-indented key under `jobs:`)."""
+    lines = text.splitlines()
+    start = next((i for i, line in enumerate(lines) if line == f"  {job}:"), None)
+    if start is None:
+        return ""
+    end = len(lines)
+    for i in range(start + 1, len(lines)):
+        if re.match(r"^  [\w-]+:\s*$", lines[i]):
+            end = i
+            break
+    return "\n".join(lines[start:end])
+
+
+def _step_block(job: str, step: str) -> str:
+    """The text of the step named `step` inside a job block."""
+    lines = job.splitlines()
+    start = next((i for i, line in enumerate(lines) if line.strip() == f"- name: {step}"), None)
+    if start is None:
+        return ""
+    end = len(lines)
+    for i in range(start + 1, len(lines)):
+        if re.match(r"^\s*- (name|uses):", lines[i]):
+            end = i
+            break
+    return "\n".join(lines[start:end])
+
+
+def dashboard_embed_errors(text: str, workflow: str) -> list[str]:
+    """`canon dashboard` runs in any repo because every platform binary embeds
+    the same dashboard app (0.25 D2): the app is built by exactly one job,
+    and each build row downloads that build and hands it to `cargo build`
+    as CANON_DASHBOARD_DIST. A row that skips the hand-off ships a binary
+    whose dashboard says "not built".
+    """
+    errors: list[str] = []
+    builds = text.count(DASHBOARD_BUILD_CMD)
+    if builds != 1:
+        errors.append(f"{workflow}: the dashboard app must be built by exactly one job ({DASHBOARD_BUILD_CMD!r} appears {builds} times)")
+    build = _job_block(text, "build")
+    if not build:
+        return errors + [f"{workflow}: no `build` job"]
+    needs = re.search(r"^    needs:\s*(.+)$", build, re.MULTILINE)
+    if not needs or "dashboard" not in needs.group(1):
+        errors.append(f"{workflow}: the build job must `needs` the dashboard job")
+    if "name: dashboard-app" not in build:
+        errors.append(f"{workflow}: the build job must download the `dashboard-app` artifact")
+    cargo = _step_block(build, "Build canon-cli binary")
+    if "CANON_DASHBOARD_DIST:" not in cargo or "cargo build" not in cargo:
+        errors.append(f"{workflow}: the `Build canon-cli binary` step must set CANON_DASHBOARD_DIST for `cargo build`")
+    dashboard = _job_block(text, "dashboard")
+    if "name: dashboard-app" not in dashboard or "bun install --frozen-lockfile" not in dashboard:
+        errors.append(f"{workflow}: the dashboard job must install with the frozen lockfile and upload `dashboard-app`")
+    return errors
+
+
 ERRORS: list[str] = []
 
 
@@ -619,6 +678,10 @@ def main(argv: list[str] | None = None) -> int:
         "setup-bun version drift across workflows: "
         + ", ".join(f"{v} in {sorted(files)}" for v, files in sorted(bun_pins.items())),
     )
+
+    # 9. Every platform row embeds the one dashboard build, in both workflows.
+    ERRORS.extend(dashboard_embed_errors(build_text, "build-native.yml"))
+    ERRORS.extend(dashboard_embed_errors(publish_text, "publish.yml"))
 
     # 7. Repo-root hygiene. An agent-authored patch fragment landed at the
     #    repo root in s43 round 7 and was committed by a `git add -A`: a file
