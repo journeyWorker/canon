@@ -127,11 +127,12 @@ is attributed, and is fresh — never on a self-report. See
    `change new` writes `.canon/changes/add-login/brief.md` and adopts the
    change into the subject; it writes no `tasks.md` (that is an optional
    work note nothing gates on). The brief is a PRD skeleton in
-   `canon.yaml`'s `language:` (`canon init --language ko` writes it): intent,
+   the request's language (`canon.yaml`'s `language:`, which `canon init --language ko` writes, overrides what `canon brief check` detects): intent,
    desired outcome, a user flow of steps `F1`, `F2`, …, step detail,
    acceptance, questions and assumptions, out of scope. The agent fills it
-   in and runs `canon brief check` until it has no blockers, then stops and
-   reports it to the human in that language. When the human approves it,
+   in and runs `canon brief check` until it has no blockers and each prose
+   advisory is fixed or waived with a reason, then stops and reports it to
+   the human in that language. When the human approves it,
    the agent records the answer with `canon brief approve --change-id add-login
    --by <the human> --note "<their words>"`, which writes the `Approved:`
    line, bound to the brief's text, and the policy approval together. A

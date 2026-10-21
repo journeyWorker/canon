@@ -40,4 +40,4 @@ brief has none of them: harden its Invariants and Checks instead.
 - Explaining writes nothing. Asked what a finding means or what a pass would do, answer in chat and leave the brief untouched.
 - No pass requires another as a prerequisite. Run the one the findings or the human point at, in any order.
 - A pass closes only the findings it rechecked: rerun `canon brief check` after the edit and report a finding as closed only when it is gone from that run. Never claim a rule you did not rerun.
-- Write in the brief's language (`language:` in `canon.yaml`). Edits touch `.canon/changes/<slug>/brief.md` only. A brief edited after approval is not approved: it needs a new human answer and `canon brief approve` again.
+- Write in the brief's language (detected from the text; `language:` in `canon.yaml` overrides it). Edits touch `.canon/changes/<slug>/brief.md` only. A brief edited after approval is not approved: it needs a new human answer and `canon brief approve` again.

@@ -24,8 +24,10 @@ After the first `status`, follow `meta.next` of each write. `brief check`
 lists blockers and advisories; bare `canon brief --as planner` names the next
 steps. While the brief has blockers, `status` and `change new`'s `meta.next`
 send you to write it (`write the brief: canon brief check --change-id <slug>
-lists N blockers`); the human step appears only once the brief is clean and
-unapproved. A policy that no longer matches its approval fails closed
+lists N blockers`); then, while prose advisories remain, to the polish pass
+(`polish the brief in <path> (reference/brief-polish.md), then run canon
+brief check --change-id <slug>`, with the advisory count and the top rule
+ids); the human step comes after it. A policy that no longer matches its approval fails closed
 (`POLICY_CHANGED_SINCE_APPROVAL`): never edit it; the human re-approves.
 
 ## Steps
@@ -55,21 +57,37 @@ unapproved. A policy that no longer matches its approval fails closed
    provenance line is the one exception. A PRD: intent, desired outcome, the user flow as
    numbered steps `F1`, `F2`, … (sees → does → becomes), step detail per
    step, acceptance per step with its failure path, questions and
-   assumptions, out of scope. Write it in the `language:` of `canon.yaml`;
-   unset, in the request's language, and add "which language?" to the
-   questions. Anything that could change policy goes to the questions: never
-   decide it yourself. A change that comes from an external plan the human
+   assumptions, out of scope. Write it in the language of the request, or
+   the `language:` of `canon.yaml` when it is set (`brief check` detects the
+   language of the text and reports whether it used the detected or the
+   configured one; a `languageNote` means they disagree: tell the human, and
+   ask "which language?" in the questions). Anything that could change
+   policy goes to the questions: never decide it yourself. A change that
+   comes from an external plan the human
    prepared (an openspec `proposal.md` read through `plans.sources`) gets a
    `brief.md` whose `Source: <path>` line points at the plan; canon never
    edits the plan.
 3. **Check it.** `brief check` (read-only) lists findings: fix every blocker
-   (structure) before you stop; advisories (prose) are optional. Five optional
-   refinement passes, each standing alone and none needing another first:
+   (structure) before you stop. Four optional refinement passes, each
+   standing alone and none needing another first:
    - `reference/brief-shape.md`: structure (sections, order, leftover template text).
    - `reference/brief-clarify.md`: open questions.
    - `reference/brief-harden.md`: flow and step detail agree.
    - `reference/brief-align.md`: scenarios cover the flow.
-   - `reference/brief-polish.md`: prose.
+
+   **Compress, then polish.** Before the human reads it, shorten the brief.
+   A human reads it once, so every sentence has to earn its place:
+   - Per paragraph, keep only sentences that state a condition, an action, a result or a number. Delete the rest.
+   - Three or more parallel items become a list or a table.
+   - Delete a sentence that restates another section: each fact lives in one place (single source of truth).
+   - An assumption goes to Questions and assumptions. A "not doing" list goes to Out of scope.
+
+   Then, when `brief check` reports prose advisories (`prose.*`; `status` and
+   `meta.next` name the step), the polish pass is required before the human
+   stop: follow `reference/brief-polish.md` and rerun `brief check` until
+   the advisories are gone or each remaining one is waived with a reason.
+   It never blocks approval, but you do not hand the human a brief with
+   unexamined advisories.
 4. **Stop for the human.** Report the brief to the human, in the brief's
    language, asking once, and say they can approve it in `canon dashboard`
    (the briefs page, `/briefs.html`) or answer in chat. You never click
