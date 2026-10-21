@@ -1,0 +1,2 @@
+canon finding close: staged kind=finding/c-cart__0001__0001__<digest12>.json — c-cart round 1 seq 1 (open → deferred) — run `canon gate promote` to commit it
+next: canon gate promote — the record is staged, not in the ledger yet; promote it so status and the gate count it

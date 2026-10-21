@@ -1,0 +1,22 @@
+{
+  "change_id": "c-cart",
+  "findings": [
+    {
+      "disposition": "deferred",
+      "file_ref": null,
+      "reason": "next release",
+      "resolution_sha": null,
+      "reviewer": "rev-a",
+      "round": 1,
+      "seq": 1,
+      "severity": "blocker",
+      "summary": "teardown races HMR"
+    }
+  ],
+  "meta": {
+    "hasMore": false,
+    "nextCursor": null,
+    "returned": 1,
+    "total": 1
+  }
+}

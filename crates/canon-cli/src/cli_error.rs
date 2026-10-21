@@ -216,6 +216,7 @@ const CODES: &[(&str, &str)] = &[
     ("FEATURE_OUTSIDE_SPEC_ROOTS", "the feature path is under no configured specs.roots entry"),
     ("FINDING_INVALID_ARGUMENT", "a `finding` argument is empty, malformed or out of range"),
     ("FINDING_NOT_FOUND", "no committed finding at that change, round and seq"),
+    ("FINDING_REASON_REQUIRED", "closing a finding as rejected or deferred needs a one-line --reason"),
     ("FINDING_RESOLUTION_SHA_REQUIRED", "a fixed finding needs --resolution-sha"),
     ("FINDING_RESOLUTION_SHA_UNEXPECTED", "--resolution-sha was given with a disposition other than fixed"),
     ("FINDING_SEQ_OCCUPIED", "a finding already holds that change, round and seq"),

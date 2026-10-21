@@ -6,7 +6,7 @@ steps:
     exit: 0
   - args: [gate, promote]
     exit: 0
-  - args: [finding, close, --change-id, c-cart, --round, "1", --seq, "1", --disposition, rejected]
+  - args: [finding, close, --change-id, c-cart, --round, "1", --seq, "1", --disposition, rejected, --reason, works as designed]
     exit: 0
   - args: [gate, promote]
     exit: 0

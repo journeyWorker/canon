@@ -154,7 +154,7 @@ fn every_write_command_says_whether_it_staged_or_wrote_directly() {
     staged(&["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run smoke 2", "--role", "implementer"], PROMOTED);
     staged(&["finding", "add", "--change-id", "cats", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "r", "--summary", "s", "--no-promote"], STAGED);
     ok(repo, &["gate", "promote"]);
-    staged(&["finding", "close", "--change-id", "cats", "--round", "1", "--seq", "1", "--disposition", "rejected"], PROMOTED);
+    staged(&["finding", "close", "--change-id", "cats", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"], PROMOTED);
     assert!(records_under(repo, "_staging").is_empty(), "nothing is left to promote");
 
     direct(&[
