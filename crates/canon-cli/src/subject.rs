@@ -854,11 +854,11 @@ pub fn run_status(
     // The subject-level brief rules read its scope: a pending draft (no
     // scenario tagged for it) does not freeze the maintenance loop.
     let adopted = changes.len();
-    let (changes, pending_draft) = match &gate_context {
+    let (changes, pending_drafts) = match &gate_context {
         Some(ctx) if ships || reopens => crate::brief::scope_changes(&repo, ctx, &subject, &changes),
-        _ => (changes, None),
+        _ => (changes, Vec::new()),
     };
-    let pending_note: Vec<String> = pending_draft.iter().map(crate::brief::pending_draft_line).collect();
+    let pending_note: Vec<String> = (!pending_drafts.is_empty()).then(|| crate::brief::pending_draft_line(&pending_drafts)).into_iter().collect();
 
     let mut blocking = match (ships, &gate_context) {
         (true, Some(ctx)) => ship_gate_violations(ctx, subject_id),

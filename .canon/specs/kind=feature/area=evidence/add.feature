@@ -616,5 +616,6 @@ Feature: evidence add
   Scenario: A subject built before briefs keeps re-verifying its evidenced scenarios under a draft change
     Given a verifying subject with scenarios already evidenced and no change, which then adopts its first change, a draft
     When evidence is added again for an evidenced untagged scenario, and for one that was never evidenced
-    Then the evidenced one is accepted, being existing behavior attested before any approved scope
+    Then the evidenced one is accepted, being existing behavior attested before any approved scope and before the subject adopted its first change
+    And evidence recorded only after that adoption, for example while the subject was specced, does not exempt the scenario
     And the never-evidenced one is refused BRIEF_UNAPPROVED naming the draft change's brief.md

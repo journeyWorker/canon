@@ -120,7 +120,7 @@ const APPROVED: &str = "Approved: Journey 2026-10-11 — \"승인. 네 가정대
 /// The one `next` step status addresses to a human, for subject `id`
 /// whose newest adopted change is `change` (0.16 M7: stop and report).
 fn brief_step(id: &str, change: &str) -> String {
-    format!("stop and report the brief in .canon/changes/{change}/brief.md; build and attest nothing for {id} until the human answers (one answer approves brief and policy)")
+    format!("stop and report the brief in .canon/changes/{change}/brief.md; build and attest nothing that answers to it until the human answers (one answer approves brief and policy)")
 }
 
 /// The prefix every human step's command starts with.
@@ -649,7 +649,7 @@ fn context_status_61_an_unapproved_brief_is_the_only_human_step_and_blocks_the_m
     assert!(whys[0].contains(".canon/changes/c-demo-subject/brief.md"), "{}", whys[0]);
     for why in &whys {
         assert!(why.contains("`canon brief approve --change-id ") && why.contains("--by <the human> --note"), "{why}");
-        assert!(why.contains("`canon evidence add` refuses demo-subject's scenarios and tasks"), "{why}");
+        assert!(why.contains("`canon evidence add` refuses the scenarios tagged `@flow:c-demo-subject.*` and `c-demo-subject`'s tasks"), "{why}");
     }
     let demo = subject(&report, "demo-subject");
     assert_eq!(
@@ -774,7 +774,7 @@ fn context_status_65_an_older_changes_approval_does_not_cover_a_newer_change() {
     assert_eq!(human_steps(&report), ["demo-subject"], "a change with no brief has no brief to answer: {report}");
     // The newest change is a pending draft: no scenario is tagged for it, so
     // the subject is still shipped for its approved scope and says why.
-    assert_eq!(subject(&report, "demo-subject")["pendingDraft"], "c-scope-two", "{report}");
+    assert_eq!(subject(&report, "demo-subject")["pendingDrafts"], serde_json::json!(["c-scope-two"]), "{report}");
     assert!(commands(&report).iter().any(|c| c.starts_with("canon subject status demo-subject")), "a pending draft does not withhold the ship step: {report}");
     let why = |id: &str| report["next"].as_array().unwrap().iter().find(|n| n["actor"] == "human" && n["why"].as_str().unwrap().starts_with(id)).unwrap()["why"].as_str().unwrap().to_string();
     assert!(why("demo-subject").contains(".canon/changes/c-scope-two/brief.md"), "{}", why("demo-subject"));
@@ -831,7 +831,7 @@ fn context_status_64_an_external_change_is_answered_in_a_canon_brief_that_points
     assert_eq!(human.len(), 1, "{report}");
     assert_eq!(
         human[0]["command"],
-        "stop and report the brief in plans/changes/c-live/proposal.md; build and attest nothing for live-subject until the human answers (one answer approves brief and policy)"
+        "stop and report the brief in plans/changes/c-live/proposal.md; build and attest nothing that answers to it until the human answers (one answer approves brief and policy)"
     );
     let why = human[0]["why"].as_str().unwrap();
     assert!(

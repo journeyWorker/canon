@@ -354,8 +354,8 @@ review waivers: 1 advisory(ies) — not failing the gate:
 The waiver lasts only until the subject's next status write.
 
 `canon subject status <id> --to shipped` also refuses where a brief exists and
-is not approved (the subject's scope, its newest adopted change unless that is a
-pending draft no scenario is tagged `@flow:<change>.*` for, has a canon
+is not approved (the subject's scope, its newest adopted change walking back past pending drafts
+no scenario is tagged `@flow:<change>.*` for, has a canon
 `brief.md` with no `Approved:` line or one the brief's text no longer
 matches, or an external `proposal.md` and no canon `brief.md` yet;
 see `canon-subject`), as an `unreviewed-promotion` naming

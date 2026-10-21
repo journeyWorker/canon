@@ -353,12 +353,6 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
     Some(status)
 }
 
-/// The one line a transition prints when [`scope_changes`] set `draft` aside.
-pub fn pending_draft_line(draft: &ChangeId) -> String {
-    let draft = draft.as_str();
-    format!("`{draft}` is a pending draft (brief not approved, no scenario tagged `@flow:{draft}.*`): not part of this transition, which reads the subject's newest approved change")
-}
-
 /// Whether `change`'s canon `brief.md` carries an `Approved:` line (approved
 /// now, or edited since).
 fn has_approved_line(repo: &Path, change: &ChangeId) -> bool {
@@ -369,28 +363,53 @@ fn has_approved_line(repo: &Path, change: &ChangeId) -> bool {
 
 /// The adopted changes the subject-level brief rules (reopen guard, ship
 /// guard, the brief-structure check) read, whose last is the subject's
-/// scope: the newest adopted change, except that a newest change never
-/// approved (no `Approved:` line) that no scenario owned by the subject is
-/// tagged `@flow:<change>.*` for is a pending draft, and the scope is then
-/// the newest adopted change carrying an `Approved:` line (none: `changes`
-/// unchanged). `canon status` keeps reading the full list, so the draft
-/// still shows as awaiting the human. Returns the scope and, when a pending
-/// draft was set aside, that draft ([`pending_draft_line`] says so).
-pub fn scope_changes(repo: &Path, ctx: &GateContext, subject: &Subject, changes: &[ChangeId]) -> (Vec<ChangeId>, Option<ChangeId>) {
-    let Some(newest) = changes.last() else { return (Vec::new(), None) };
-    if has_approved_line(repo, newest) {
-        return (changes.to_vec(), None);
-    }
-    let tagged = canon_gate::spec_coverage::subject_scenarios(ctx, &subject.subject_id)
+/// scope, and the pending drafts set aside above it. Walking the adopted
+/// changes from the newest back, only a change whose brief was never
+/// approved (no `Approved:` line) and that no scenario owned by the subject
+/// is tagged `@flow:<change>.*` for is set aside; the first change that is
+/// approved (now, or edited since) or has a tagged scenario ends the walk and
+/// is the scope's last. So a tagged unapproved draft anywhere above the
+/// newest approved change blocks. When every adopted change is such a draft,
+/// nothing is set aside and `changes` is returned unchanged. `canon status`
+/// keeps showing the set-aside drafts as awaiting the human.
+pub fn scope_changes(repo: &Path, ctx: &GateContext, subject: &Subject, changes: &[ChangeId]) -> (Vec<ChangeId>, Vec<ChangeId>) {
+    let tagged: Vec<ChangeId> = canon_gate::spec_coverage::subject_scenarios(ctx, &subject.subject_id)
         .into_iter()
-        .any(|s| crate::brief_check::flow_changes_of(repo, &s.project_id, &s.scenario_id).contains(newest));
-    if tagged {
-        return (changes.to_vec(), None);
+        .flat_map(|s| crate::brief_check::flow_changes_of(repo, &s.project_id, &s.scenario_id))
+        .collect();
+    match changes.iter().rposition(|c| has_approved_line(repo, c) || tagged.contains(c)) {
+        Some(at) => (changes[..=at].to_vec(), changes[at + 1..].to_vec()),
+        None => (changes.to_vec(), Vec::new()),
     }
-    match changes.iter().rposition(|c| has_approved_line(repo, c)) {
-        Some(at) => (changes[..=at].to_vec(), Some(newest.clone())),
-        None => (changes.to_vec(), None),
+}
+
+/// The one line a transition prints when [`scope_changes`] set `drafts`
+/// aside, naming every one.
+pub fn pending_draft_line(drafts: &[ChangeId]) -> String {
+    let names = drafts.iter().map(|d| format!("`{}`", d.as_str())).collect::<Vec<_>>().join(", ");
+    let (verb, tags) = if drafts.len() == 1 { ("is a pending draft", format!("`@flow:{}.*`", drafts[0].as_str())) } else { ("are pending drafts", "`@flow:<change>.*`".to_string()) };
+    format!("{names} {verb} (brief not approved, no scenario tagged {tags}): not part of this transition, which reads the subject's newest approved or tagged change")
+}
+
+/// When `subject` first adopted a change: the earliest of its own record
+/// versions (ledger and archive) with a non-empty change list and of the
+/// change versions (ledger and archive) naming it. `None` when the history
+/// cannot tell.
+fn first_adopted_at(ctx: &GateContext, subject: &Subject) -> Option<DateTime<Utc>> {
+    let mut subjects: Vec<Subject> = ctx.subjects.clone();
+    let mut changes: Vec<canon_model::Change> = ctx.changes.clone();
+    if let Some(archive) = canon_store::git_tier::GitTier::new(&ctx.ctx.ledger_root).archive_tier() {
+        use canon_store::tier::{Tier, TierQuery};
+        if let Ok(read) = archive.read(&TierQuery::kind(canon_model::RecordKind::Subject)) {
+            subjects.extend(read.records.iter().filter_map(|r| serde_json::from_value::<Subject>(r.0.clone()).ok()));
+        }
+        if let Ok(read) = archive.read(&TierQuery::kind(canon_model::RecordKind::Change)) {
+            changes.extend(read.records.iter().filter_map(|r| serde_json::from_value::<canon_model::Change>(r.0.clone()).ok()));
+        }
     }
+    let by_subject = subjects.iter().filter(|s| s.subject_id == subject.subject_id && !s.change_ids.is_empty()).map(|s| s.envelope.at);
+    let by_change = changes.iter().filter(|c| c.subject_ids.contains(&subject.subject_id)).map(|c| c.envelope.at);
+    by_subject.chain(by_change).min()
 }
 
 /// The change whose brief a scenario without a `@flow:` tag answers to
@@ -399,8 +418,9 @@ pub fn scope_changes(repo: &Path, ctx: &GateContext, subject: &Subject, changes:
 ///    (approved now, or edited since: [`BriefStatus::changed`] still
 ///    refuses), so a change adopted later does not freeze scenarios an
 ///    approved scope already covers;
-/// 2. otherwise, when the scenario already has an evidence record that
-///    carries no brief override (`evidenced`), none: it is existing
+/// 2. otherwise, when the scenario already has an evidence record, recorded
+///    before the subject first adopted a change and carrying no brief
+///    override (`evidenced`), none: it is existing
 ///    behavior, attested before any approved scope, so a subject built
 ///    before briefs existed keeps re-verifying (a waiver never becomes a
 ///    standing exemption);
@@ -470,6 +490,7 @@ pub fn attested_briefs<'a>(
                                 r.brief_override.is_none()
                                     && r.project_id.as_ref() == Some(project)
                                     && r.scenario_id.as_ref() == Some(id)
+                                    && first_adopted_at(ctx, subject).is_some_and(|first| r.envelope.at < first)
                             })
                     })
                 };

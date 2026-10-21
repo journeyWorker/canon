@@ -37,12 +37,11 @@ a feature, a one-line request included. A human is needed once per scope:
   on a live subject waits on its own scenarios only; `change new` and
   `subject adopt` warn when the subject is live. `canon subject unadopt
   <change> --subject-id <id>` takes a draft change back off (refused once
-  approved). The subject's scope is its newest adopted change, except a
-  pending draft (brief not approved, no scenario of the subject tagged
-  `@flow:<change>.*`): reopen, evidence and ship then read the newest approved
-  change, and the transition prints one line saying the draft is set aside;
-  once a scenario is tagged for it, the subject ships only when it is
-  approved. → `reference/canon-subject.md`
+  approved). The subject's scope is its newest adopted change, walking back
+  past pending drafts (brief not approved, no scenario of the subject tagged
+  `@flow:<change>.*`): reopen, evidence and ship read the newest approved or
+  tagged change, and the transition prints one line naming every draft set
+  aside; a draft a scenario is tagged for blocks until it is approved. → `reference/canon-subject.md`
 - **Inside an approved scope, never stop for a human.** Fixes, follow-ups,
   review rounds and re-reviews stay in the approved change (never
   `canon change new`: a new change is a new scope) and go straight on: scenario,
