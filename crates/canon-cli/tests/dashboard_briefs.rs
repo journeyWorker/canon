@@ -244,7 +244,9 @@ fn report_dashboard_11_lists_the_advisory_findings_of_a_brief_without_blockers()
     let dir = repo_with_briefs();
     let text = clean_brief("Ready change").replace(" ==**F2 covers the failure path.**==", "");
     let lines: Vec<&str> = text.lines().collect();
-    let acceptance_line = lines.iter().position(|l| l.starts_with("- F2:")).unwrap() + 1;
+    // The key-sentence finding sits on the first body line of the acceptance section.
+    let heading = lines.iter().position(|l| l.starts_with("## Acceptance")).unwrap();
+    let acceptance_line = (heading + 1..lines.len()).find(|&i| !lines[i].trim().is_empty()).unwrap() + 1;
     std::fs::write(brief_path(dir.path(), "ready"), &text).unwrap();
     let live = serve(dir.path());
 
@@ -255,8 +257,9 @@ fn report_dashboard_11_lists_the_advisory_findings_of_a_brief_without_blockers()
     let key: Vec<&Value> = findings.iter().filter(|f| f["rule"] == "prose.key-sentence").collect();
     assert_eq!(key.len(), 1, "{ready}");
     assert_eq!((key[0]["severity"].as_str(), key[0]["section"].as_str()), (Some("advisory"), Some("acceptance")));
-    assert!(key[0]["line"].as_u64().unwrap() >= 1 && key[0]["line"].as_u64().unwrap() as usize <= lines.len(), "{} vs {acceptance_line}", key[0]);
-    assert!(key[0]["message"].as_str().is_some_and(|m| !m.is_empty()) && key[0]["hint"].is_string());
+    assert_eq!(key[0]["line"].as_u64(), Some(acceptance_line as u64), "{}", key[0]);
+    assert_eq!(key[0]["message"], "no key sentence", "the matched text is the finding's excerpt");
+    assert!(key[0]["hint"].as_str().is_some_and(|h| h.contains("==**")), "{}", key[0]);
     let advisories = findings.iter().filter(|f| f["severity"] == "advisory").count() as u64;
     assert!(advisories >= 1);
     assert_eq!(ready["counts"], json!({ "blockers": 0, "advisories": advisories }), "{ready}");

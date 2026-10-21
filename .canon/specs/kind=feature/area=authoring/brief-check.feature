@@ -20,6 +20,7 @@ Feature: authoring brief check
     When canon brief check runs
     Then the configured language decides, the findings are judged with its rules, and the text output prints one line, "language: en (configured; the text reads as ko)"
     And the JSON carries languageSource "configured" and a languageNote, and a configured language the text agrees with carries no note
+    And the configured language decides which lists run: a Korean dated decision note draws no prose.decision-history when en is configured
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
@@ -59,7 +60,7 @@ Feature: authoring brief check
     Given a brief citing a file with a line, a code identifier in a span, a plain file path, and the same file on a Source line
     When canon brief check runs
     Then each citation in a sentence is one prose.code-citation finding whose hint names what matched and says to put provenance on one Source line
-    And a Source line inside a judged section, a quoted UI label, a command, a slash between words, a product name such as Next.js or iPhone and a src/dst pair are not flagged
+    And a Source line inside a judged section, a quoted UI label, a command, a slash between words, a product name such as Next.js or iPhone (App.js is a file and is flagged) and a src/dst pair are not flagged
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
@@ -76,9 +77,9 @@ Feature: authoring brief check
   @case:failure
   @authoring.brief-check.08
   Scenario: Dates and decision notes in normative or Intent text are flagged as decision history
-    Given a brief with a dated decision note, an undated one ("we decided", 결정했다) and behavior sentences that only mention agreeing, a meeting or a conditional (합의하면, 변경했으면) in its normative and Intent text, and a decision note in a question
+    Given a brief with a dated decision note (a date next to a past-tense decision verb), an undated one (any stem with 기로 했다) ("we decided", 결정했다) and behavior sentences that only mention agreeing, a meeting or a conditional (합의하면, 변경했으면) in its normative and Intent text, and a decision note in a question
     When canon brief check runs
-    Then each note is a prose.decision-history finding naming the matched date or phrase, except the question's
+    Then a date with 부터, 이후, after or a change verb (added after Oct 21) is behavior and never a note; each note is a prose.decision-history finding naming the matched date or phrase, except the question's
     And a sentence that only says someone agreed to terms, sat in a meeting, changed something on the server or releases on May 3, or a Korean conditional, is not flagged
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
@@ -146,5 +147,5 @@ Feature: authoring brief check
   Scenario: A markdown table is not measured as a sentence
     Given a Korean detail section holding a table of six rows, one row longer than the sentence-length threshold
     When canon brief check runs
-    Then no sentence-length, paragraph-length, parenthetical, phrase or ending finding reads the table rows
+    Then no sentence-length, paragraph-length, parenthetical, phrase or ending finding reads the table rows, while its cells are read for code citations, decision history and stock vocabulary
     And prose.length still counts the table's characters
