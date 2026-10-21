@@ -105,6 +105,8 @@ pub enum DashboardError {
     Config(#[from] crate::report::ReportConfigError),
     #[error("the dashboard app is not built: this canon binary embeds none, and `{DASHBOARD_DIST_DIR}` under {0} is not a build of canon's dashboard")]
     NotBuilt(PathBuf),
+    #[error("the repository {0} does not exist")]
+    RepoMissing(PathBuf),
     #[error("port {0} is already in use")]
     PortInUse(u16),
     #[error("io error: {0}")]
@@ -118,6 +120,7 @@ impl DashboardError {
             DashboardError::Config(_) => CliError::refused("DASHBOARD_CONFIG_INVALID", self.to_string()).hint("fix the dashboard settings in canon.yaml (`canon init --check-config` reports what is wrong)"),
             DashboardError::NotBuilt(_) => CliError::failed("DASHBOARD_NOT_BUILT", self.to_string())
                 .hint("install the release build (`bun add -g @journeykit/canon`), which carries the app; or, in a canon checkout, build it (`bun install --frozen-lockfile && bun run --cwd packages/dashboard build`) and run `canon dashboard` from that checkout"),
+            DashboardError::RepoMissing(_) => CliError::refused("REPO_UNREADABLE", self.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root"),
             DashboardError::PortInUse(_) => CliError::failed("DASHBOARD_PORT_IN_USE", self.to_string()).hint("pass `--port <n>` to serve on another port, or `--port 0` for any free one"),
             DashboardError::Io(_) => CliError::failed("DASHBOARD_FAILED", self.to_string()).hint("the message names the cause: fix it (check that the repository is readable), then run `canon dashboard` again"),
         }
@@ -267,6 +270,9 @@ pub fn prepare(repo: &Path, snapshot: Option<&Path>, port: u16) -> Result<BoundD
 }
 
 fn prepare_with(repo: &Path, snapshot: Option<&Path>, port: u16, embedded: &'static [EmbeddedFile]) -> Result<BoundDashboard, DashboardError> {
+    if !repo.is_dir() {
+        return Err(DashboardError::RepoMissing(repo.to_path_buf()));
+    }
     let (repo, inputs) = resolve_inputs(repo)?;
     let app = resolve_app(&repo, embedded)?;
     let snapshot_dir = resolve_snapshot_dir(&repo, snapshot);
@@ -369,11 +375,10 @@ fn handle_connection(stream: TcpStream, server: &Server) {
         Err(message) => return write_status(&mut stream, 400, &format!("bad request: {message}")),
     };
 
-    if head.path.starts_with("/api/") {
-        if let Err(reply) = guard_host(&head, server.port) {
-            write_reply(&mut stream, &reply);
-            return drain(&mut reader, &head);
-        }
+    // Every route checks `Host` first, the static app and the snapshot included: a rebinding page must read nothing.
+    if let Err(reply) = guard_host(&head, server.port) {
+        write_reply(&mut stream, &reply);
+        return drain(&mut reader, &head);
     }
     match (head.method.as_str(), head.path.as_str()) {
         ("GET", "/api/status") => {
@@ -420,7 +425,7 @@ fn guard_origin(head: &Head, port: u16) -> Result<(), Reply> {
 
 /// The guards of `POST /api/briefs/approve`, run before its body is read,
 /// in this order: the method is `POST`; `Host` is the bound address
-/// (already checked for every `/api/` route); `Origin` is present and the
+/// (already checked for every route); `Origin` is present and the
 /// page's own; `Content-Type` is `application/json`; `Content-Length` is
 /// present and at most [`MAX_BODY`]. Returns the body's length.
 fn approve_guards(head: &Head, port: u16) -> Result<usize, Reply> {

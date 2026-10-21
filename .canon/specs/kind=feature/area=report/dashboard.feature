@@ -88,7 +88,7 @@ Feature: report dashboard
   Scenario: A request that is not the page's own is refused before the brief is read
     Given a request to the approve endpoint with a foreign or missing Origin, a foreign Host, a content type other than application/json, no Content-Length, or a body over 64 KiB
     When the server receives it
-    Then it answers 403 or 400 before the body is read or the brief is opened, and a Host that is not the bound address is refused on every /api route
+    Then it answers 403 or 400 before the body is read or the brief is opened, and a Host that is not the bound address is refused on every route, the app and the live snapshot included
     And the brief file is untouched, while a well-formed request from localhost on the same port is accepted
 
   # canon: {"schema":1,"at":"2026-10-21T11:57:34Z","actor":{"agent_id":"canon-impl-025"}}
