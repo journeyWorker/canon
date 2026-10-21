@@ -252,7 +252,7 @@ fn authoring_brief_check_05_intent_and_questions_are_judged_with_the_style_rules
     let long_sentence = "word ".repeat(40);
     let text = swap(&en, "Team members pick meeting times without seeing who is busy.", &format!("Therefore it is important that members see who is busy, {long_sentence}see `PickerState` and src/picker/state.rs. We decided this on 2026-10-01."));
     let text = swap(&text, "- Assumed: invitees outside the organization share no calendar by default.", "- Is this very hard to build, see `slot_picker` in docs/notes.md?");
-    let text = swap(&text, "Recurring meetings.", "Therefore it is important to skip recurring meetings, see `rrule_parser` and src/rrule.rs, decided on 2026-10-02.");
+    let text = swap(&text, "Recurring meetings.", &format!("Therefore it is important to skip recurring meetings, see `rrule_parser` and src/rrule.rs, decided on 2026-10-02. {}", "Recurring meetings are not part of this change. ".repeat(20)));
     let report = judged(None, &text);
     let intent = rules_in(&report, "intent");
     for rule in ["prose.connective", "prose.evaluative", "prose.code-citation", "prose.decision-history"] {
@@ -264,7 +264,7 @@ fn authoring_brief_check_05_intent_and_questions_are_judged_with_the_style_rules
     let questions = rules_in(&report, "questions");
     assert!(questions.contains(&"prose.degree".to_string()) && questions.contains(&"prose.code-citation".to_string()), "{questions:?}");
     assert!(!questions.contains(&"prose.decision-history".to_string()), "a question may name when something was decided: {questions:?}");
-    assert!(rules_in(&report, "out-of-scope").is_empty(), "{report}");
+    assert!(rules_in(&report, "out-of-scope").is_empty(), "out of scope is not judged, not even for length: {report}");
 }
 
 /// authoring.brief-check.06: `prose.code-citation` names the path,
@@ -291,6 +291,8 @@ fn authoring_brief_check_06_a_code_citation_is_flagged_and_provenance_goes_on_on
     // A command, a slash between words and product names are not citations.
     let commands = swap(&en, "- The invitee row shows the label and no blocks.", "- Run `canon brief check`, read/write access, src/dst pairs, an `iPhone` user and Next.js pages show the label and no blocks.");
     assert!(hits(&judged(None, &commands), "prose.code-citation").is_empty());
+    let app = swap(&en, "- The invitee row shows the label and no blocks.", "- The pick is saved by App.js as usual.");
+    assert_eq!(hits(&judged(None, &app), "prose.code-citation").len(), 1, "App.js is a file; Next.js above is a product");
     let ko_slash = swap(&fixture("good-ko-lantern.md"), "- 반납함은 책 태그를 읽고 대출 목록에서 해당 책을 지운다.", "- 문자/메일 알림과 Next.js로 만든 화면에서 반납함은 책 태그를 읽고 대출 목록에서 해당 책을 지운다.");
     assert!(hits(&judged(None, &ko_slash), "prose.code-citation").is_empty());
 
@@ -345,6 +347,16 @@ fn authoring_brief_check_08_dates_and_decision_notes_are_history_not_behavior() 
     assert_eq!(found, 1);
     let behavior = swap(&en, "- The organizer's pick is saved as usual.", "- An invitee who agreed on the terms appears with busy blocks. Every invitee in the meeting sees the pick. A slot changed on the server is redrawn. The pick is saved on May 3 releases.");
     assert!(hits(&judged(None, &behavior), "prose.decision-history").is_empty());
+    // A date alone is not history: behavior that starts on a date, and the Korean date gate (a date needs a past decision verb).
+    let dated_behavior = swap(&en, "- The organizer's pick is saved as usual.", "- Invitees added after Oct 21 see the new picker. Events updated on Nov 3 show a badge.");
+    assert!(hits(&judged(None, &dated_behavior), "prose.decision-history").is_empty());
+    let ko_dated = swap(&ko, "- 태그를 읽지 못하면 책을 되돌려 주고 대출 목록은 바꾸지 않는다.", "- 2026-12-01부터 연체 시 추가 요금이 붙는다. 2026년 11월 이후 수정된 대출 기록은 다시 보낸다. 10월 21일 이후에 열린다.");
+    assert!(hits(&judged(None, &ko_dated), "prose.decision-history").is_empty());
+    let ko_decided = swap(&ko, "- 태그를 읽지 못하면 책을 되돌려 주고 대출 목록은 바꾸지 않는다.", "- 2026-12-01 회의에서 연체료를 받지 않으며 확정됐다.");
+    assert_eq!(hits(&judged(None, &ko_decided), "prose.decision-history").len(), 1);
+    // Any stem with 기로 했다 is a decision.
+    let ko_gironeun = swap(&ko, "- 태그를 읽지 못하면 책을 되돌려 주고 대출 목록은 바꾸지 않는다.", "- 대출 목록은 그대로 두기로 했다.");
+    assert_eq!(hits(&judged(None, &ko_gironeun), "prose.decision-history").len(), 1);
     // A note with no date is still a note: removing either phrase list fails here.
     let undated = swap(&en, "- The organizer's pick is saved as usual.", "- The pick is saved as usual, because we decided to keep it.");
     assert_eq!(hits(&judged(None, &undated), "prose.decision-history").len(), 1);
@@ -386,8 +398,8 @@ fn authoring_brief_check_10_a_korean_sentence_not_ending_in_da_is_flagged() {
     let text = swap(&ko, "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보낸다.", "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보냅니다.\n- 영수증을 확인하세요.\n- 다음 화면으로 넘어갑시다.\n- 책을 다시 넣으라.\n- 영수증 화면.\n- 영수증을 보여 줌");
     let report = judged(None, &text);
     let endings: Vec<String> = hits(&report, "prose.ko-ending").iter().map(|f| f["hint"].as_str().unwrap().to_string()).collect();
-    assert_eq!(endings.len(), 2, "the list-item imperative is a fragment form and exempt: {report}");
-    assert!(endings[0].contains("`~니다`") && endings[1].contains("`~시다`"), "{endings:?}");
+    assert_eq!(endings.len(), 3, "{report}");
+    assert!(endings[0].contains("`~니다`") && endings[1].contains("`~시다`") && endings[2].contains("`~라`"), "{endings:?}");
     // The polite `~세요` is prose.colloquial's, not reported twice.
     let colloquial = hits(&report, "prose.colloquial");
     assert_eq!(colloquial.len(), 1, "{report}");
@@ -404,8 +416,11 @@ fn authoring_brief_check_10_a_korean_sentence_not_ending_in_da_is_flagged() {
     let polite = swap(&ko, "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보낸다.", "- 영수증은 한 장입니다.\n- 용지가 없습니다.\n- 반납함이 닫힙니다.");
     assert_eq!(hits(&judged(None, &polite), "prose.ko-ending").len(), 3);
     // Noun fragments that end in 자 or 라 are not hortative or imperative, in a list item or a table-free fragment.
-    let nouns = swap(&ko, "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보낸다.", "- 알림 받는 사람: 주최자, 참가자\n- 검토 대상: 후보자\n- 반납 거절 사유: 분실, 파손, 하자.\n- 배경색: 보라");
+    let nouns = swap(&ko, "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보낸다.", "- 알림 받는 사람: 주최자, 참가자\n- 검토 대상: 후보자\n- 반납 거절 사유: 분실, 파손, 하자\n- 배경색: 보라");
     assert!(hits(&judged(None, &nouns), "prose.ko-ending").is_empty());
+    // A terminated imperative or hortative list item is a sentence, whatever the verb.
+    let imperatives = swap(&ko, "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보낸다.", "- 결제 전에 재고를 확인하라.\n- 반납이 끝나면 이용자에게 문자를 보내자.\n- 오류가 나면 사서를 부르십시오.");
+    assert_eq!(hits(&judged(None, &imperatives), "prose.ko-ending").len(), 3);
     // English text never gets it.
     let en = swap(&fixture("good-en-cobalt.md"), "Recurring meetings.", "Recurring meetings are planned.");
     assert!(hits(&judged(None, &en), "prose.ko-ending").is_empty());
@@ -529,4 +544,20 @@ fn authoring_brief_check_15_a_markdown_table_is_not_measured_as_a_sentence() {
     let text = swap(&ko, "### F2 인식 실패\n", &format!("{table}### F2 인식 실패\n"));
     let report = judged(None, &text);
     assert_eq!(rules(&report), Vec::<String>::new(), "no sentence, paragraph, aside or ending rule reads a table: {report}");
+
+    // The token rules read the cells: a path with a line, an identifier, a dated decision note, stock vocabulary.
+    let cells = "| 2026-09-14 회의에서 결정했다 | `src/kiosk/return.rs:31`, `loan_list` | 원활한 경험 |\n";
+    let text = swap(&ko, "### F2 인식 실패\n", &format!("| 항목 | 값 | 비고 |\n|---|---|---|\n{cells}\n### F2 인식 실패\n"));
+    let report = judged(None, &text);
+    let found = rules_in(&report, "detail");
+    for rule in ["prose.decision-history", "prose.code-citation", "prose.ai-vocabulary"] {
+        assert!(found.contains(&rule.to_string()), "{rule} missing from {found:?}");
+    }
+    assert!(!found.contains(&"prose.sentence-length".to_string()) && !found.contains(&"prose.parenthetical".to_string()), "{found:?}");
+
+    // `prose.length` still counts the table's characters.
+    let big: String = (0..40).map(|i| format!("| 상태 {i} | 반납함은 책 태그를 읽고 대출 목록에서 해당 책을 지운 뒤 영수증을 화면과 문자로 보여 준다 | 이용자에게 보인다 |\n")).collect();
+    let text = swap(&ko, "### F2 인식 실패\n", &format!("| 상태 | 동작 | 결과 |\n|---|---|---|\n{big}\n### F2 인식 실패\n"));
+    let report = judged(None, &text);
+    assert_eq!(hits_owned(&report, "prose.length").first().map(String::as_str), Some("detail"), "{report}");
 }

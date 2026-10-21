@@ -816,7 +816,7 @@ const EN_DEGREE: [&str; 3] = ["very", "really", "extremely"];
 // |------------------------|--------------|------------------|-------------------|------------------|
 // | prose.code-citation    | 14 / 472     | 3 / 50           | 0                 | 0                |
 // | prose.parenthetical    | 14 / 38      | 3 / 11           | 0                 | 0                |
-// | prose.decision-history | 14 / 21      | 3 / 20           | 0                 | 0                |
+// | prose.decision-history | 14 / 26      | 3 / 13           | 0                 | 0                |
 // | prose.ai-vocabulary    | 0 / 0        | 3 / 8            | 0                 | 0                |
 // | prose.ko-ending        | 2 / 2        | 3 / 11           | 0                 | 0                |
 // | prose.length           | 14 / 63      | 3 / 4            | 0                 | 0                |
@@ -828,8 +828,9 @@ const EN_DEGREE: [&str; 3] = ["very", "really", "extremely"];
 // 2 findings are polite `~ㅂ니다` sentences in 2 briefs (an earlier count of
 // 17 in 8 briefs included plain `아니다`-type words), and every non-`~다`
 // sentence ending in them is a list-item fragment, which is why a fragment
-// is exempt. `prose.decision-history` needs a decision verb next to a date
-// (or an unambiguous phrase), and still hits all 14. `prose.parenthetical`: private sections
+// is exempt. `prose.decision-history` needs a decision verb or noun (결정, 방침,
+// 합의 …) next to a date, or an unambiguous phrase, and hits all 14; the
+// private dated notes read "<date> 운영자 결정" far more often than a verb. `prose.parenthetical`: private sections
 // carry 4-10 asides per 1000 characters, a good fixture none, so the
 // line sits at more than 4 per 1000 with at least 3 asides. `prose.length`:
 // private Intent sections measure 600-1100 characters (budget 400), whole
@@ -868,11 +869,14 @@ const KO_AI_VOCABULARY: [&str; 15] = ["원활", "매끄러", "매끄럽", "견�
 /// Phrases that make a sentence a decision note (`prose.decision-history`):
 /// who decided what, and when it changed.
 const EN_DECISION_NOTES: [&str; 7] = ["we decided", "it was decided", "was decided", "were decided", "we agreed", "was agreed", "were agreed"];
-/// Verbs that make a sentence with a date a decision note ("changed on Oct 21").
-const EN_DECISION_VERBS: [&str; 10] = ["decided", "agreed", "changed", "chose", "approved", "settled", "renamed", "replaced", "added", "updated"];
-const KO_DECISION_NOTES: [&str; 12] = ["결정했다", "결정하였다", "결정됐다", "결정되었다", "합의했다", "합의하였다", "합의됐다", "합의되었다", "하기로 했다", "하기로 하였다", "하기로 정했다", "논의 결과"];
-/// Verb stems that make a sentence with a date a decision note; a stem inside a conditional (`~하면`, `~했으면`) never counts.
-const KO_DECISION_VERBS: [&str; 10] = ["결정", "합의", "확정", "변경", "추가", "바꿨", "바꾸", "정했", "반영", "수정"];
+/// With a date in the same sentence, only a decision (verb or noun) makes a
+/// sentence a note; a change verb ("added after Oct 21", "updated on Nov 3")
+/// describes behavior that starts on a date.
+const EN_DECISION_VERBS: [&str; 7] = ["decided", "agreed", "settled", "chose", "approved", "ratified", "decision"];
+/// Unambiguous past-tense decision phrases, with the plain `다` ending (so a conditional never matches); `기로 했다` covers any stem.
+const KO_DECISION_NOTES: [&str; 13] = ["결정했다", "결정하였다", "결정됐다", "결정되었다", "합의했다", "합의하였다", "합의됐다", "합의되었다", "확정했다", "기로 했다", "기로 하였다", "기로 결정했다", "논의 결과"];
+/// Decision stems (the verb or its noun: `결정했다`, `운영자 결정`, `방침`) that make a sentence with a date a note; a stem inside a conditional (`~하면`, `~했으면`) never counts.
+const KO_DECISION_VERBS: [&str; 7] = ["결정", "합의", "확정", "방침", "논의", "기로 했", "정했"];
 const EN_MONTHS: [&str; 23] = [
     "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December", "Jan", "Feb", "Mar", "Apr", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
@@ -884,10 +888,14 @@ const SOURCE_EXTENSIONS: [&str; 34] = [
 
 /// Imperative and hortative Korean endings `prose.ko-ending` reports
 /// (the polite `…요` endings in [`KO_COLLOQUIAL`] are `prose.colloquial`'s).
-/// Closed lists: a verb form at the end of a terminated, non-list sentence.
-/// A noun that happens to end in 자 or 라 (참가자, 하자, 보라) is not one.
+/// Product names written `<name>.js`: not file citations. Any other `Name.js` is a file.
+const JS_PRODUCTS: [&str; 14] = ["next", "node", "vue", "nuxt", "three", "express", "ember", "chart", "backbone", "angular", "alpine", "d3", "p5", "react"];
+
+/// Closed lists: a verb form at the end of a sentence with a terminator
+/// (`.`/`!`), in a paragraph or a list item. A noun fragment without a
+/// terminator (참가자, 후보자, 보라) is never one.
 const KO_IMPERATIVE: [&str; 12] = ["하라", "마라", "말라", "가라", "어라", "아라", "으라", "오라", "두라", "쓰라", "내라", "십시오"];
-const KO_HORTATIVE: [&str; 5] = ["하자", "보자", "가자", "주자", "두자"];
+const KO_HORTATIVE: [&str; 9] = ["하자", "보자", "가자", "주자", "두자", "내자", "쓰자", "넣자", "받자"];
 
 /// `prose.parenthetical` fires on a section with at least
 /// [`PAREN_MIN`] asides and more than [`PAREN_PER_1000`] of them per
@@ -977,8 +985,9 @@ fn blocks(section: &Section) -> Vec<Block> {
             continue;
         }
         // A markdown table row is not a sentence: tables are left out of
-        // every sentence, paragraph and aside measurement (their cell text
-        // is not read by any prose rule, but `prose.length` counts it).
+        // every sentence, paragraph, aside and ending measurement. Their cell
+        // text is read by the token rules only (`table_cells`) and counted by
+        // `prose.length`.
         if trimmed.starts_with('|') {
             out.extend(current.take());
             continue;
@@ -1167,8 +1176,8 @@ fn is_path(candidate: &str) -> bool {
     let last = core.rsplit('/').next().unwrap_or(core);
     let has_ext = last.rsplit_once('.').is_some_and(|(stem, ext)| !stem.is_empty() && SOURCE_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()));
     let slashes = core.matches('/').count();
-    // `Next.js`, `Node.js`: a product name, not a file.
-    if slashes == 0 && !has_line && last.ends_with(".js") && last.starts_with(|c: char| c.is_ascii_uppercase()) {
+    // `Next.js`, `Node.js`: a product name, not a file; `App.js` is a file.
+    if slashes == 0 && !has_line && last.rsplit_once('.').is_some_and(|(stem, ext)| ext == "js" && JS_PRODUCTS.contains(&stem.to_ascii_lowercase().as_str())) {
         return false;
     }
     if core.starts_with('/') && !has_ext && !has_line {
@@ -1412,9 +1421,9 @@ fn ko_ending(sentence: &str, item: bool) -> Option<String> {
     if end.ends_with('요') {
         return tilde("요");
     }
-    if terminated && !item {
+    if terminated {
         if let Some(e) = KO_IMPERATIVE.iter().chain(KO_HORTATIVE.iter()).find(|e| end.ends_with(**e)) {
-            return tilde(&e[e.len() - 3..]);
+            return tilde(if e.chars().count() > 2 { e } else { &e[e.len() - 3..] });
         }
     }
     if end.ends_with('다') || item || !terminated {
@@ -1559,6 +1568,14 @@ fn prose(out: &mut Out, section: &Section, shipped: Shipped, scope: Scope) {
             out.push("prose.paragraph-length", key, block.line_at(0), excerpt(&block.text), format!("{} sentences; threshold {PARAGRAPH_SENTENCES}", all.len()));
         }
     }
+    // Table cells: the token rules read them, the sentence rules do not.
+    for (line, cell) in table_cells(section) {
+        let mut hits: Vec<(&'static str, String)> = phrase_hits(shipped, &cell).into_iter().filter(|(rule, _)| *rule == "prose.ai-vocabulary").map(|(rule, phrase)| (rule, format!("matched `{phrase}`; say what the system does or the user sees instead"))).collect();
+        hits.extend(sentence_hits(shipped, &cell, true, scope).into_iter().filter(|(rule, _)| *rule != "prose.ko-ending"));
+        for (rule, hint) in hits {
+            out.push(rule, key, line, excerpt(&cell), hint);
+        }
+    }
     parentheticals(out, section, &blocks);
     if !scope.structure {
         return;
@@ -1573,6 +1590,20 @@ fn prose(out: &mut Out, section: &Section, shipped: Shipped, scope: Scope) {
         };
         out.push("prose.key-sentence", key, line, excerpt_text, hint);
     }
+}
+
+/// The cells of the markdown table rows of `section` with their lines,
+/// separator rows (`|---|:-:|`) left out.
+fn table_cells(section: &Section) -> Vec<(usize, String)> {
+    let mut out = Vec::new();
+    for line in &section.lines {
+        let t = line.text.trim();
+        if !t.starts_with('|') || t.trim_matches(|c: char| matches!(c, '|' | '-' | ':' | ' ')).is_empty() {
+            continue;
+        }
+        out.extend(t.split('|').map(str::trim).filter(|c| !c.is_empty()).map(|c| (line.no, c.to_string())));
+    }
+    out
 }
 
 /// Counts the prose letters of `section`'s lines.
@@ -2045,13 +2076,19 @@ mod tests {
         }
         assert_eq!(decision_history(Shipped::En, "We decided to drop it.").as_deref(), Some("we decided"));
         assert_eq!(decision_history(Shipped::En, "The user agreed to the terms.").as_deref(), None);
-        assert_eq!(decision_history(Shipped::En, "Changed on Oct 21 by hand.").as_deref(), Some("Oct 21"));
+        assert_eq!(decision_history(Shipped::En, "Agreed on Oct 21 by hand.").as_deref(), Some("Oct 21"));
+        for dated_behavior in ["Invitees added after Oct 21 see the new picker.", "Events updated on Nov 3 show a badge.", "Changed on Oct 21 by hand.", "2026-12-01부터 연체 시 추가 요금이 붙는다.", "2026년 11월 이후 수정된 대출 기록은 다시 보낸다."] {
+            assert_eq!(decision_history(if dated_behavior.is_ascii() { Shipped::En } else { Shipped::Ko }, dated_behavior), None, "{dated_behavior}");
+        }
+        assert_eq!(decision_history(Shipped::Ko, "영수증을 보여 주기로 했다.").as_deref(), Some("기로 했다"));
+        assert_eq!(decision_history(Shipped::Ko, "대출 목록은 그대로 두기로 했다.").as_deref(), Some("기로 했다"));
         for behavior in ["An invitee who agreed on the terms sees it.", "Everyone in the meeting sees it.", "A slot changed on the server is redrawn.", "Saved on May 3 releases."] {
             assert_eq!(decision_history(Shipped::En, behavior), None, "{behavior}");
         }
         assert_eq!(decision_history(Shipped::En, "It was decided to keep it.").as_deref(), Some("it was decided"));
         assert_eq!(decision_history(Shipped::Ko, "회의에서 유지하기로 결정했다.").as_deref(), Some("결정했다"));
-        assert_eq!(decision_history(Shipped::Ko, "2026-10-21 변경").as_deref(), Some("2026-10-21"));
+        assert_eq!(decision_history(Shipped::Ko, "2026-10-21 변경").as_deref(), None);
+        assert_eq!(decision_history(Shipped::Ko, "2026-10-21 회의에서 확정됐으며 열린다.").as_deref(), Some("2026-10-21"));
         assert_eq!(decision_history(Shipped::Ko, "2026-10-21 이후에 열린다.").as_deref(), None);
         for conditional in ["비밀번호를 변경했으면 다시 로그인한다.", "연장에 합의하면 기간이 늘어난다.", "10월 21일 전에 변경하면 적용된다."] {
             assert_eq!(decision_history(Shipped::Ko, conditional), None, "{conditional}");
@@ -2084,7 +2121,11 @@ mod tests {
         assert_eq!(end("알림 받는 사람: 주최자, 참가자", true), None);
         assert_eq!(end("검토 대상: 후보자", true), None);
         assert_eq!(end("배경색: 보라", true), None);
-        assert_eq!(end("반납 거절 사유: 하자.", true), None);
+        assert_eq!(end("반납 거절 사유: 하자", true), None);
+        // A terminated imperative or hortative sentence in a list item is flagged.
+        assert_eq!(end("결제 전에 재고를 확인하라.", true).as_deref(), Some("~라"));
+        assert_eq!(end("이용자에게 문자를 보내자.", true).as_deref(), Some("~자"));
+        assert_eq!(end("사서를 부르십시오.", true).as_deref(), Some("~십시오"));
         assert_eq!(end("책을 확인하라.", false).as_deref(), Some("~라"));
         assert_eq!(end("이 규칙은 로그인 화면.", false).as_deref(), Some("…화면"));
         assert_eq!(end("그렇게 해요.", false).as_deref(), None, "~요 in the colloquial list is prose.colloquial's");
