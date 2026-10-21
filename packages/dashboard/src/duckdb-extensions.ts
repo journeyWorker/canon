@@ -1,5 +1,5 @@
 import type { AsyncDuckDBConnection } from "@duckdb/duckdb-wasm";
-import type { BundleVariant } from "./duckdb-bundles";
+import { absoluteUrl, type BundleVariant } from "./duckdb-bundles";
 import parquetExtensionEhUrl from "../vendor/duckdb-extensions/v1.4.3/wasm_eh/parquet.duckdb_extension.wasm?url";
 import parquetExtensionMvpUrl from "../vendor/duckdb-extensions/v1.4.3/wasm_mvp/parquet.duckdb_extension.wasm?url";
 
@@ -24,9 +24,11 @@ import parquetExtensionMvpUrl from "../vendor/duckdb-extensions/v1.4.3/wasm_mvp/
 // happens. `autoinstall_known_extensions`/`autoload_known_extensions` are
 // also disabled first, belt-and-suspenders, so any future core-extension
 // dependency fails loudly instead of silently reaching the network.
+// Absolute, like the bundle URLs (src/duckdb-bundles.ts): the worker
+// resolves this path, and a worker started from a blob: URL has no base.
 const PARQUET_EXTENSION_URL: Record<BundleVariant, string> = {
-  eh: parquetExtensionEhUrl,
-  mvp: parquetExtensionMvpUrl,
+  eh: absoluteUrl(parquetExtensionEhUrl),
+  mvp: absoluteUrl(parquetExtensionMvpUrl),
 };
 
 let loaded = false;
