@@ -43,6 +43,12 @@ pub fn data_with_next(command: &str, data: Value, after: &crate::next::After) {
 
 /// [`data_with_next`] with extra `meta` keys (a page's `nextCursor`, …).
 pub fn data_with_next_and_meta(command: &str, data: Value, after: &crate::next::After, extra_meta: Value) {
+    println!("{}", envelope_with_next(command, data, after, extra_meta));
+}
+
+/// The write envelope [`data_with_next_and_meta`] prints, as a value: for a
+/// caller that answers over a socket instead of stdout.
+pub fn envelope_with_next(command: &str, data: Value, after: &crate::next::After, extra_meta: Value) -> Value {
     let mut envelope = envelope(command, data);
     if let Some(meta) = envelope["meta"].as_object_mut() {
         for extra in [&extra_meta, &after.meta()] {
@@ -51,7 +57,7 @@ pub fn data_with_next_and_meta(command: &str, data: Value, after: &crate::next::
             }
         }
     }
-    println!("{envelope}");
+    envelope
 }
 
 /// Splits a payload that carries its own page `meta` ([`crate::paging`]'s
