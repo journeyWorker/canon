@@ -353,6 +353,12 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
     Some(status)
 }
 
+/// The one line a transition prints when [`scope_changes`] set `draft` aside.
+pub fn pending_draft_line(draft: &ChangeId) -> String {
+    let draft = draft.as_str();
+    format!("`{draft}` is a pending draft (brief not approved, no scenario tagged `@flow:{draft}.*`): not part of this transition, which reads the subject's newest approved change")
+}
+
 /// Whether `change`'s canon `brief.md` carries an `Approved:` line (approved
 /// now, or edited since).
 fn has_approved_line(repo: &Path, change: &ChangeId) -> bool {
@@ -368,21 +374,22 @@ fn has_approved_line(repo: &Path, change: &ChangeId) -> bool {
 /// tagged `@flow:<change>.*` for is a pending draft, and the scope is then
 /// the newest adopted change carrying an `Approved:` line (none: `changes`
 /// unchanged). `canon status` keeps reading the full list, so the draft
-/// still shows as awaiting the human.
-pub fn scope_changes(repo: &Path, ctx: &GateContext, subject: &Subject, changes: &[ChangeId]) -> Vec<ChangeId> {
-    let Some(newest) = changes.last() else { return Vec::new() };
+/// still shows as awaiting the human. Returns the scope and, when a pending
+/// draft was set aside, that draft ([`pending_draft_line`] says so).
+pub fn scope_changes(repo: &Path, ctx: &GateContext, subject: &Subject, changes: &[ChangeId]) -> (Vec<ChangeId>, Option<ChangeId>) {
+    let Some(newest) = changes.last() else { return (Vec::new(), None) };
     if has_approved_line(repo, newest) {
-        return changes.to_vec();
+        return (changes.to_vec(), None);
     }
     let tagged = canon_gate::spec_coverage::subject_scenarios(ctx, &subject.subject_id)
         .into_iter()
         .any(|s| crate::brief_check::flow_changes_of(repo, &s.project_id, &s.scenario_id).contains(newest));
     if tagged {
-        return changes.to_vec();
+        return (changes.to_vec(), None);
     }
     match changes.iter().rposition(|c| has_approved_line(repo, c)) {
-        Some(at) => changes[..=at].to_vec(),
-        None => changes.to_vec(),
+        Some(at) => (changes[..=at].to_vec(), Some(newest.clone())),
+        None => (changes.to_vec(), None),
     }
 }
 
@@ -511,7 +518,7 @@ pub fn adoption_warning(repo: &Path, subject: &Subject, change: &ChangeId) -> Op
         .filter(|brief| brief.enforced)?;
     let (change, subject_id) = (change.as_str(), subject.subject_id.as_str());
     Some(format!(
-        "subject `{subject_id}` is {} and change `{change}` is not approved ({}): the subject's existing scenarios keep accepting evidence, scenarios tagged `@flow:{change}.*` wait for the approval, and `{subject_id}` cannot ship until it is approved; to take the adoption back run `canon subject unadopt {change} --subject-id {subject_id}`",
+        "subject `{subject_id}` is {} and change `{change}` is not approved ({}): the subject's existing scenarios keep accepting evidence, and while no scenario is tagged `@flow:{change}.*` it can still be reopened and shipped for its approved scope; once a scenario is tagged `@flow:{change}.*`, those scenarios wait for the approval and `{subject_id}` cannot ship until the brief is approved; to take the adoption back run `canon subject unadopt {change} --subject-id {subject_id}`",
         serde_json::to_value(subject.status).ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default(),
         brief.unanswered()
     ))

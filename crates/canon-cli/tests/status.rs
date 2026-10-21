@@ -159,7 +159,7 @@ fn status_json(repo: &Path) -> Value {
         match step["actor"].as_str() {
             Some("agent") => {}
             Some("human") => assert!(
-                step["command"].as_str().unwrap().starts_with(BRIEF_STEP_PREFIX),
+                step["command"].as_str().unwrap().starts_with(BRIEF_STEP_PREFIX) || step["command"].as_str().unwrap().starts_with("report the pending draft's brief in "),
                 "the brief is the only step status addresses to a human: {step}"
             ),
             _ => panic!("every step names its actor: {step}"),
@@ -748,8 +748,9 @@ fn context_status_63_a_line_that_only_mentions_approval_does_not_approve() {
 
 /// context.status.65: a fix stays inside the approved change, so
 /// a newer adopted change is a new scope. An approval on an older change
-/// does not cover it: status names the newest change, asks for the human,
-/// and withholds the ship step.
+/// does not cover it: status names the newest change and asks for the
+/// human. While no scenario is tagged for that change it is a pending
+/// draft, marked as not yet part of the scope, and the ship step stays.
 #[test]
 fn context_status_65_an_older_changes_approval_does_not_cover_a_newer_change() {
     let dir = repo();
@@ -771,11 +772,15 @@ fn context_status_65_an_older_changes_approval_does_not_cover_a_newer_change() {
         "no brief for the newest change"
     );
     assert_eq!(human_steps(&report), ["demo-subject"], "a change with no brief has no brief to answer: {report}");
-    assert!(!commands(&report).iter().any(|c| c.starts_with("canon subject status demo-subject")), "an older approval never unlocks the ship step: {report}");
+    // The newest change is a pending draft: no scenario is tagged for it, so
+    // the subject is still shipped for its approved scope and says why.
+    assert_eq!(subject(&report, "demo-subject")["pendingDraft"], "c-scope-two", "{report}");
+    assert!(commands(&report).iter().any(|c| c.starts_with("canon subject status demo-subject")), "a pending draft does not withhold the ship step: {report}");
     let why = |id: &str| report["next"].as_array().unwrap().iter().find(|n| n["actor"] == "human" && n["why"].as_str().unwrap().starts_with(id)).unwrap()["why"].as_str().unwrap().to_string();
     assert!(why("demo-subject").contains(".canon/changes/c-scope-two/brief.md"), "{}", why("demo-subject"));
     let text = stdout(&run(dir.path(), &["status"]));
     assert!(text.contains("      brief: not approved (.canon/changes/c-scope-two/brief.md has no `Approved:` line)\n"), "{text}");
+    assert!(text.contains("`c-scope-two` is a pending draft: not yet part of the subject's scope"), "{text}");
     assert!(text.contains("      brief: not approved (change `c-other-new` has no brief; advisory, nothing to approve yet)\n"), "{text}");
 }
 

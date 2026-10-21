@@ -659,7 +659,9 @@ fn subject_lifecycle_35_adopting_an_unapproved_change_into_a_shipped_subject_war
     let found = warnings(&out);
     assert_eq!(found.len(), 1, "{found:?}");
     assert!(
-        found[0].contains("is shipped") && found[0].contains("canon subject unadopt a --subject-id s"),
+        found[0].contains("is shipped")
+            && found[0].contains("can still be reopened and shipped for its approved scope")
+            && found[0].contains("canon subject unadopt a --subject-id s"),
         "{found:?}"
     );
 }
@@ -697,18 +699,31 @@ fn subject_lifecycle_38_a_pending_draft_does_not_freeze_a_shipped_subject() {
         &["subject", "status", "s", "--to", "verifying", "--reason", "fix the cart"],
     );
     assert!(reopen.status.success(), "{}", stderr(&reopen));
+    assert!(
+        stderr(&reopen).contains("`b` is a pending draft (brief not approved, no scenario tagged `@flow:b.*`): not part of this transition"),
+        "{}",
+        stderr(&reopen)
+    );
     let again = attest(repo, "shop.cart.01", "second run");
     assert!(again.status.success(), "{}", stderr(&again));
-    let ship = run(repo, &["subject", "status", "s", "--to", "shipped"]);
+    let ship = run(repo, &["subject", "status", "s", "--to", "shipped", "--json"]);
     assert!(ship.status.success(), "{}", stderr(&ship));
+    let shipped: Value = serde_json::from_str(&stdout(&ship)).unwrap();
+    assert!(
+        shipped["meta"]["warnings"].to_string().contains("`b` is a pending draft"),
+        "{shipped}"
+    );
 
-    // Status still shows the draft as awaiting the human.
+    // Status still shows the draft as awaiting the human, and as not yet
+    // part of the subject's scope.
     let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();
     let text = status.to_string();
     assert!(
-        text.contains("\"change\":\"b\"") && text.contains("\"approved\":false"),
+        text.contains("\"change\":\"b\"") && text.contains("\"approved\":false") && text.contains("\"pendingDraft\":\"b\""),
         "{text}"
     );
+    let human = stdout(&ok(repo, &["status"]));
+    assert!(human.contains("`b` is a pending draft: not yet part of the subject's scope"), "{human}");
 
     // Once a scenario is tagged for the draft, shipping needs its approval.
     ok(
