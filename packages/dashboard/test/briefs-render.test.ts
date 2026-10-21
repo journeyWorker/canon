@@ -202,3 +202,10 @@ test("report.dashboard.12: the page total counts advisories across briefs and sa
   expect(advisoryTotal([brief({ counts: { blockers: 1, advisories: 1 } })])).toBe("1 advisory in 1 of 1 brief.");
   expect(advisoryTotal([brief({ counts: { blockers: 0, advisories: 0 } })])).toBe("No advisories in the listed briefs.");
 });
+
+test("each brief card names the language it was judged in and where that came from", () => {
+  const detected = toHtml(renderBrief(brief({ language: "ko", languageSource: "detected" }), handlers));
+  expect(detected).toContain("language: ko (detected)");
+  const configured = toHtml(renderBrief(brief({ language: "en", languageSource: "configured", languageNote: "the text reads as ko" }), handlers));
+  expect(configured).toContain("language: en (configured; the text reads as ko)");
+});

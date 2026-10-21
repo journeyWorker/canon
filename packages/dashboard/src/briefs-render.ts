@@ -37,6 +37,8 @@ export interface Brief {
   text: string;
   sha256: string;
   language: string;
+  languageSource?: string;
+  languageNote?: string | null;
   changedSinceApproval: boolean;
   legacy: boolean;
   sections: Section[];
@@ -212,6 +214,7 @@ export function renderBrief(brief: Brief, handlers: BriefHandlers): VNode {
             brief.counts.advisories > 0 ? h("span", { class: "badge badge-advisory" }, advisoryText(brief.counts.advisories)) : null,
           )
         : null,
+      h("p", { class: "brief-language" }, languageText(brief)),
       brief.changedSinceApproval ? h("p", { class: "brief-changed" }, "Edited since it was approved: the approval no longer covers it.") : null,
     ),
     brief.sections.length > 0 ? brief.sections.map(renderSection) : h("pre", { class: "brief-raw" }, brief.text),
@@ -236,6 +239,12 @@ export function renderBrief(brief: Brief, handlers: BriefHandlers): VNode {
     },
   });
   return card;
+}
+
+/** "language: ko (detected)" / "language: en (configured; the text reads as ko)". */
+export function languageText(brief: Pick<Brief, "language" | "languageSource" | "languageNote">): string {
+  const source = brief.languageSource ?? "detected";
+  return `language: ${brief.language} (${source}${brief.languageNote ? `; ${brief.languageNote}` : ""})`;
 }
 
 /** "1 advisory" / "3 advisories". */
