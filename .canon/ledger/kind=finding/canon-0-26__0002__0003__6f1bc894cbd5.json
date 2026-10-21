@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T17:53:23.758886863Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reviewed_sha": "ec056dfc826c47ff0171bb62ae6c7e57ccdf72d5",
+  "reviewer": "canon-reviewer-026",
+  "round": 2,
+  "scenario_ids": [
+    "authoring.brief-check.15",
+    "authoring.brief-check.06",
+    "authoring.brief-check.08"
+  ],
+  "schema": 1,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "[probe] Markdown tables hide citations and history: a detail row '| 2026-09-14 회의에서 결정했다 | `src/kiosk/return.rs:31`, `loan_list` |' draws no finding, because blocks() skips '|' lines for every prose rule. Scenario 15 exempts sentence-length, paragraph-length, parenthetical, phrase and ending findings; code-citation and decision-history are not named, and a planner can move the eval-14 mechanisms into a table to clear them."
+}
