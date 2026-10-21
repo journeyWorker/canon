@@ -1,4 +1,6 @@
-canon brief check: .canon/changes/add-login/brief.md — 0 blocker(s), 1 advisory(ies)
+canon brief check: .canon/changes/add-login/brief.md — 0 blocker(s), 2 advisory(ies)
   language: en (configured; the text reads as ko)
+  advisory prose.decision-history [intent] line 6: 2026-09-14 회의에서 반납 직후 영수증을 보여 주기로 결정했다.
+    hint: matched `2026-09-14`; a brief states behavior, not when it was decided; if the date is part of the behavior (an effective date), keep it and waive with a reason
   advisory prose.code-citation [detail] line 23: 반납함은 책 태그를 읽고 `loan_list`에서 해당 책을 지운다 (`src/kiosk/return.rs:31`).
     hint: matched `loan_list`, `src/kiosk/return.rs:31`; describe the behavior, and put provenance on one `Source:` line

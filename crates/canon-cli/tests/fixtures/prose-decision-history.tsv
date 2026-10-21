@@ -1,0 +1,76 @@
+# expect	kind	sentence ; a Korean row runs in good-ko-lantern, an English row in good-en-cobalt
+hit	para	2026-12-01부터 환불 방침이 바뀐 주문은 다시 계산한다.
+hit	para	11월 3일 이후 논의 중인 항목은 표시하지 않는다.
+hit	para	2026-12-01부터 확정된 주문은 취소할 수 없다.
+hit	para	10월 21일 이후 결정 버튼을 누른 신청은 다시 열 수 없다.
+hit	para	2026년 11월부터 합의된 금액만 청구한다.
+hit	para	10월 21일에 '확정' 상태가 된 주문은 취소할 수 없다.
+hit	para	2026-12-01에 "합의" 표시가 붙은 계약만 보인다.
+hit	para	2026-09-14 회의에서 결정했고 대출 목록은 바꾸지 않는다.
+hit	para	2026-09-14에 결정하여 대출 목록은 바꾸지 않는다.
+hit	para	2026-09-14 회의에서 정해졌다.
+hit	para	처음에는 Restart만 확인을 받으려 했으나 10월 14일에 Quit도 같은 확인을 받도록 바꿨다.
+hit	para	2026-12-01부터 운영자 결정이 적용된다.
+hit	para	2026-12-01에 확정된 주문은 취소할 수 없다.
+hit	para	2026-10-21 운영자 결정.
+hit	para	2026-10-21 운영자 결정 "유료 비교"를 따른다.
+hit	para	10월 21일 방침: 하드 제한.
+hit	para	2026-10-21 합의했다.
+hit	para	2026년 10월 개편.
+hit	para	2026.10.2에 열린다.
+hit	para	2026/10/21부터 열린다.
+hit	para	On 2026-10-21 it changed.
+hit	para	Changed on Oct 21 by hand.
+hit	para	Invitees who approved the slot after Oct 21 see the new picker.
+hit	para	A decision field added on Nov 3 shows a badge.
+hit	para	Events updated on Nov 3 show a badge.
+hit	para	Invitees added after Oct 21 see the new picker.
+hit	para	Invoices that we approved on Oct 21 stay paid.
+hit	para	Slots they chose on Oct 21 stay booked.
+hit	para	The cap was approved on 2026-10-01.
+hit	para	Per the Oct 21 decision, the cap is 3.
+hit	para	As agreed with legal on 2026-10-01, the cap is 3.
+hit	para	Approved by the PM on Oct 21.
+hit	para	The pick is saved on May 3 releases.
+hit	para	Shipped 21 October.
+hit	para	Planned for October 2026.
+hit	para	결정했다.
+hit	para	대출 목록은 바꾸지 않기로 결정했다.
+hit	para	회의 뒤에 결정했고 유지한다.
+hit	para	검토 후 결정하여 유지한다.
+hit	para	범위는 결정됐다.
+hit	para	범위는 결정되었다.
+hit	para	범위가 정해졌다.
+hit	para	이 동작은 합의했다.
+hit	para	이 동작은 확정했다.
+hit	para	대출 목록은 그대로 두기로 했다.
+hit	para	영수증을 보여 주기로 했다.
+hit	para	회의에서 유지한다.
+hit	para	논의 결과 유지한다.
+hit	para	운영자 결정으로 유지한다.
+hit	para	We decided it.
+hit	para	The cap was decided.
+hit	para	The cap was agreed.
+hit	para	As agreed, the cap is 3.
+hit	para	Approved by the PM.
+hit	para	The team decided to keep it.
+hit	para	A decision on caps is pending.
+hit	para	Per the product decision, the cap is 3.
+clean	para	이용자가 비밀번호를 변경했으면 다시 로그인한다.
+clean	para	이용자와 사서가 연장에 합의하면 기간이 늘어난다.
+clean	para	정책은 결정 대상이다.
+clean	para	결정 버튼을 누르면 열린다.
+clean	para	3월에 한 번 점검한다.
+clean	para	반납함은 책 태그를 읽고 대출 목록에서 해당 책을 지운다.
+clean	para	5개월 21일 동안 보관한다.
+clean	para	An invitee who agreed on the terms appears with busy blocks.
+clean	para	Every invitee in the meeting sees the pick.
+clean	para	A slot changed on the server is redrawn.
+clean	para	The user agreed to the terms.
+clean	para	May 5 attempts are allowed.
+clean	para	Version 1.2.3 ships.
+clean	para	Wait 10 seconds.
+clean	para	A decision field shows a badge.
+clean	para	Invitees who approved the slot see the new picker.
+clean	para	Settled invoices stay paid.
+clean	para	The cap is three per day.

@@ -76,11 +76,12 @@ Feature: authoring brief check
   @subject:authoring-scaffold
   @case:failure
   @authoring.brief-check.08
-  Scenario: Dates and decision notes in normative or Intent text are flagged as decision history
-    Given a brief with a dated decision note (a date next to a past-tense decision verb), an undated one (any stem with 기로 했다) ("we decided", 결정했다) and behavior sentences that only mention agreeing, a meeting or a conditional (합의하면, 변경했으면) in its normative and Intent text, and a decision note in a question
+  Scenario: Every calendar date and a closed list of decision phrases in normative or Intent text is flagged as decision history
+    Given a brief with ISO, Korean and English dates, undated decision phrases (결정했다, 기로 했다, 회의에서, we decided, as agreed), dates next to 부터, 이후 or after, a quoted label next to a date, and a decision note in a question
     When canon brief check runs
-    Then a date with 부터, 이후, 까지, after, since or until, a change verb, or a decision word used as a modifier or state (방침이 바뀐, 논의 중인, 확정된, 결정 버튼, who approved the slot) is behavior and never a note, while a clause-ending decision word (운영자 결정, 확정됐다, decided on) is; each note is a prose.decision-history finding naming the matched date or phrase, except the question's
-    And a sentence that only says someone agreed to terms, sat in a meeting, changed something on the server or releases on May 3, or a Korean conditional, is not flagged
+    Then each such sentence is one prose.decision-history finding, naming the matched date or phrase, in normative sections, Intent and table cells but not in a question
+    And there is no boundary or verb gating, so a date that is part of the behavior (an effective date) or a quoted label is a finding too, and the hint says to keep it and waive it with a reason
+    And a sentence with a date and a phrase is one finding, a waiver clears it, and sentences with no date and no listed phrase (a conditional 합의하면, "agreed to the terms", 결정 버튼) report nothing
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
@@ -95,12 +96,12 @@ Feature: authoring brief check
   @subject:authoring-scaffold
   @case:failure
   @authoring.brief-check.10
-  Scenario: A Korean sentence that does not end in the plain declarative is flagged, with fragments and flow steps exempt
-    Given a Korean brief with polite, hortative and imperative sentences, a colloquial ~세요 sentence, noun fragments in list items, with or without a terminator (참가자, 주최자, 후보자, 상품 하자, 선두 주자, 보라), a label with a colon, and flow steps in polite endings
+  Scenario: A Korean sentence that does not end in the plain declarative is flagged, with fragments and labels exempt
+    Given a Korean brief with polite (ㅂ니다, ㅂ시다), 십시오 and plain imperative (해라, 하라, 남겨라, 줘라) sentences in list items and paragraphs, a colloquial ~세요 sentence, noun fragments (참가자, 후보자, 상품 하자, 선두 주자), a label item and flow steps in polite endings
     When canon brief check runs
-    Then each polite sentence and each imperative or hortative sentence that has an argument (재고를 확인하라) is a prose.ko-ending finding naming the ending, and the ~세요 sentence is prose.colloquial's only
-    And fragments, flow steps, questions and none answers report nothing, and English text never gets the rule
-    And a plain form that ends in 니다 (아니다, 지니다, 다닌다) is not polite, while 합니다, 입니다 and 없습니다 are flagged
+    Then each polite, 십시오 or imperative sentence is a prose.ko-ending finding naming the ending, list items included, and a plain word that ends in 니다 (아니다, 지니다) is not polite
+    And the ~세요 sentence is prose.colloquial's only, and fragments, a label: item, flow steps, questions and none answers report nothing
+    And a plain hortative ~자 is flagged outside list items by the generic rule and is not detected in a list item, where it is the noun suffix of 참가자 and 하자, and English text never gets the rule
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
