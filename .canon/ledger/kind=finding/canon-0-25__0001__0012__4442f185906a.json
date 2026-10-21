@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-025",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-025-1"
+  },
+  "at": "2026-10-21T12:31:05.981480621Z",
+  "change_id": "canon-0-25",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewer": "canon-reviewer-025",
+  "round": 1,
+  "scenario_ids": [
+    "report.dashboard.05"
+  ],
+  "schema": 1,
+  "seq": 12,
+  "severity": "should_fix",
+  "summary": "report_dashboard_05 asserts only that sha256 has 64 characters, never that it is the sha256 of the brief file's bytes (06/07 reuse the list's value through the same sha256_hex, so a consistently wrong digest passes). By hand on the release build the digest equals sha256 of the file. Standards pass."
+}

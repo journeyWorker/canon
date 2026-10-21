@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-025",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-025-1"
+  },
+  "at": "2026-10-21T12:31:04.359395046Z",
+  "change_id": "canon-0-25",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewer": "canon-reviewer-025",
+  "round": 1,
+  "scenario_ids": [
+    "context.capability.21"
+  ],
+  "schema": 1,
+  "seq": 7,
+  "severity": "should_fix",
+  "summary": "context_capability_21 tests the removed batch keys subject and project only; the `change` key the scenario names is never tried, and the accepted file uses subject-id and project-id but not change-id, so both Then steps are unproven for change (by hand `change` gets the right hint). Spec-fidelity pass."
+}
