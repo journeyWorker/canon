@@ -9,7 +9,7 @@
   "findings": [
     {
       "excerpt": "2026-09-14 회의에서 반납 직후 영수증을 보여 주기로 결정했다.",
-      "hint": "matched `2026-09-14`; state the behavior as it is; when it was decided and what changed belong in the commit or the plan",
+      "hint": "matched `결정했다`; state the behavior as it is; when it was decided and what changed belong in the commit or the plan",
       "line": 6,
       "rule": "prose.decision-history",
       "section": "intent",

@@ -78,6 +78,10 @@ fn hits<'a>(report: &'a Value, rule: &str) -> Vec<&'a Value> {
     findings(report).into_iter().filter(|f| f["rule"] == rule).collect()
 }
 
+fn hits_owned(report: &Value, rule: &str) -> Vec<String> {
+    hits(report, rule).iter().map(|f| f["section"].as_str().unwrap_or("brief").to_string()).collect()
+}
+
 fn new_rules(report: &Value) -> Vec<String> {
     rules(report).into_iter().filter(|r| NEW_RULES.contains(&r.as_str())).collect()
 }
@@ -172,10 +176,14 @@ fn authoring_brief_check_03_a_section_in_another_script_is_judged_in_its_own_lan
     assert!(in_acceptance.contains(&"prose.connective".to_string()) && in_acceptance.contains(&"prose.degree".to_string()), "{in_acceptance:?}");
     assert!(rules_in(&report, "outcome").is_empty(), "{report}");
 
-    // A configured language is not overridden per section.
-    let configured = judged(Some("ko"), &swap(&en, "- Assumed: invitees outside the organization share no calendar by default.", "- 조직 밖 초대 대상자의 캘린더 공유 기본값을 정해야 합니다."));
-    assert!(rules_in(&configured, "questions").is_empty() || rules_in(&configured, "questions") == ["prose.ko-ending"], "{configured}");
-    assert_eq!(configured["languageSource"], "configured");
+    // A configured language is not overridden per section: the same Korean section that drew prose.ko-ending
+    // above draws nothing when `en` is configured, and the Korean-only rule runs on it when `ko` is.
+    let korean_questions = swap(&en, "- Assumed: invitees outside the organization share no calendar by default.", "- 조직 밖 초대 대상자의 캘린더 공유 기본값을 정해야 합니다.");
+    let configured_en = judged(Some("en"), &korean_questions);
+    assert_eq!(configured_en["languageSource"], "configured");
+    assert_eq!(rules_in(&configured_en, "questions"), Vec::<String>::new(), "{configured_en}");
+    let configured_ko = judged(Some("ko"), &korean_questions);
+    assert_eq!(rules_in(&configured_ko, "questions"), ["prose.ko-ending"], "{configured_ko}");
 }
 
 /// A complete brief (Japanese or Chinese headings and body) with a code
@@ -274,9 +282,17 @@ fn authoring_brief_check_06_a_code_citation_is_flagged_and_provenance_goes_on_on
     assert!(hint.contains("`src/calendar/blocks.ts:42`") && hint.contains("`BlockLayout::draw()`") && hint.contains("`Source:`"), "{hint}");
 
     // The same file on a `Source:` line, and UI text in the flow, are not citations.
-    let sourced = format!("{en}\nSource: src/calendar/blocks.ts:42\n");
+    let sourced = swap(&en, "### F2 No shared calendar", "Source: src/calendar/blocks.ts:42\n\n### F2 No shared calendar");
     let sourced = swap(&sourced, "sees a \"No calendar shared\" label", "sees the `No calendar shared` label and the `Add invitee` button");
-    assert!(hits(&judged(None, &sourced), "prose.code-citation").is_empty());
+    assert!(hits(&judged(None, &sourced), "prose.code-citation").is_empty(), "a Source line inside a judged section is exempt");
+    // Without the exemption the same line in the same section is a citation.
+    let unsourced = swap(&en, "### F2 No shared calendar", "Provenance: src/calendar/blocks.ts:42\n\n### F2 No shared calendar");
+    assert_eq!(hits(&judged(None, &unsourced), "prose.code-citation").len(), 1);
+    // A command, a slash between words and product names are not citations.
+    let commands = swap(&en, "- The invitee row shows the label and no blocks.", "- Run `canon brief check`, read/write access, src/dst pairs, an `iPhone` user and Next.js pages show the label and no blocks.");
+    assert!(hits(&judged(None, &commands), "prose.code-citation").is_empty());
+    let ko_slash = swap(&fixture("good-ko-lantern.md"), "- 반납함은 책 태그를 읽고 대출 목록에서 해당 책을 지운다.", "- 문자/메일 알림과 Next.js로 만든 화면에서 반납함은 책 태그를 읽고 대출 목록에서 해당 책을 지운다.");
+    assert!(hits(&judged(None, &ko_slash), "prose.code-citation").is_empty());
 
     // Korean sentences cite the same way.
     let ko = swap(&fixture("good-ko-lantern.md"), "- 반납함은 책 태그를 읽고 대출 목록에서 해당 책을 지운다.", "- 반납함은 책 태그를 읽고 `loan_list`에서 해당 책을 지운다 (`src/kiosk/return.rs:31`).");
@@ -320,15 +336,22 @@ fn authoring_brief_check_08_dates_and_decision_notes_are_history_not_behavior() 
     assert_eq!(matched[0].0, "intent");
     assert!(matched[0].1.contains("`2026-09-14`"), "{matched:?}");
     assert_eq!(matched[1].0, "detail");
-    assert!(matched[1].1.contains("`10월 21일`"), "{matched:?}");
+    assert!(matched[1].1.contains("`합의했다`"), "{matched:?}");
 
     // English: a date and a decision note are each history; "agreed" in behavior is not.
     let en = fixture("good-en-cobalt.md");
     let dated = swap(&en, "Show each invitee's busy blocks while the organizer chooses a slot.", "Show each invitee's busy blocks while the organizer chooses a slot, as we decided on Oct 21.");
     let found = hits(&judged(None, &dated), "prose.decision-history").len();
     assert_eq!(found, 1);
-    let behavior = swap(&en, "- The organizer's pick is saved as usual.", "- An invitee who agreed to share a calendar appears with busy blocks.");
+    let behavior = swap(&en, "- The organizer's pick is saved as usual.", "- An invitee who agreed on the terms appears with busy blocks. Every invitee in the meeting sees the pick. A slot changed on the server is redrawn. The pick is saved on May 3 releases.");
     assert!(hits(&judged(None, &behavior), "prose.decision-history").is_empty());
+    // A note with no date is still a note: removing either phrase list fails here.
+    let undated = swap(&en, "- The organizer's pick is saved as usual.", "- The pick is saved as usual, because we decided to keep it.");
+    assert_eq!(hits(&judged(None, &undated), "prose.decision-history").len(), 1);
+    let ko_behavior = swap(&ko, "- 태그를 읽지 못하면 책을 되돌려 주고 대출 목록은 바꾸지 않는다.", "- 이용자가 비밀번호를 변경했으면 다시 로그인한다. 이용자와 사서가 연장에 합의하면 기간이 늘어난다.");
+    assert!(hits(&judged(None, &ko_behavior), "prose.decision-history").is_empty());
+    let ko_undated = swap(&ko, "- 태그를 읽지 못하면 책을 되돌려 주고 대출 목록은 바꾸지 않는다.", "- 회의에서 대출 목록은 바꾸지 않기로 결정했다.");
+    assert_eq!(hits(&judged(None, &ko_undated), "prose.decision-history").len(), 1);
 }
 
 /// authoring.brief-check.09: `prose.ai-vocabulary` names the stock word
@@ -349,6 +372,9 @@ fn authoring_brief_check_09_stock_ai_vocabulary_is_named_in_each_language() {
     let ko = swap(&fixture("good-ko-lantern.md"), "반납 직후 화면과 문자로 영수증을 보여 준다.", "원활하고 견고한 반납 경험이 이번 변경의 북극성이다.");
     let found = hits(&judged(None, &ko), "prose.ai-vocabulary").len();
     assert_eq!(found, 1);
+    // The ㅂ-irregular adnominal form is caught too.
+    let smooth = swap(&fixture("good-ko-lantern.md"), "반납 직후 화면과 문자로 영수증을 보여 준다.", "매끄러운 화면으로 영수증을 보여 준다.");
+    assert_eq!(hits(&judged(None, &smooth), "prose.ai-vocabulary").len(), 1);
 }
 
 /// authoring.brief-check.10: `prose.ko-ending` flags a Korean sentence
@@ -360,8 +386,8 @@ fn authoring_brief_check_10_a_korean_sentence_not_ending_in_da_is_flagged() {
     let text = swap(&ko, "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보낸다.", "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보냅니다.\n- 영수증을 확인하세요.\n- 다음 화면으로 넘어갑시다.\n- 책을 다시 넣으라.\n- 영수증 화면.\n- 영수증을 보여 줌");
     let report = judged(None, &text);
     let endings: Vec<String> = hits(&report, "prose.ko-ending").iter().map(|f| f["hint"].as_str().unwrap().to_string()).collect();
-    assert_eq!(endings.len(), 3, "{report}");
-    assert!(endings[0].contains("`~니다`") && endings[1].contains("`~시다`") && endings[2].contains("`~라`"), "{endings:?}");
+    assert_eq!(endings.len(), 2, "the list-item imperative is a fragment form and exempt: {report}");
+    assert!(endings[0].contains("`~니다`") && endings[1].contains("`~시다`"), "{endings:?}");
     // The polite `~세요` is prose.colloquial's, not reported twice.
     let colloquial = hits(&report, "prose.colloquial");
     assert_eq!(colloquial.len(), 1, "{report}");
@@ -377,6 +403,9 @@ fn authoring_brief_check_10_a_korean_sentence_not_ending_in_da_is_flagged() {
     assert!(hits(&judged(None, &plain), "prose.ko-ending").is_empty());
     let polite = swap(&ko, "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보낸다.", "- 영수증은 한 장입니다.\n- 용지가 없습니다.\n- 반납함이 닫힙니다.");
     assert_eq!(hits(&judged(None, &polite), "prose.ko-ending").len(), 3);
+    // Noun fragments that end in 자 or 라 are not hortative or imperative, in a list item or a table-free fragment.
+    let nouns = swap(&ko, "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보낸다.", "- 알림 받는 사람: 주최자, 참가자\n- 검토 대상: 후보자\n- 반납 거절 사유: 분실, 파손, 하자.\n- 배경색: 보라");
+    assert!(hits(&judged(None, &nouns), "prose.ko-ending").is_empty());
     // English text never gets it.
     let en = swap(&fixture("good-en-cobalt.md"), "Recurring meetings.", "Recurring meetings are planned.");
     assert!(hits(&judged(None, &en), "prose.ko-ending").is_empty());
@@ -405,7 +434,16 @@ fn authoring_brief_check_11_a_section_or_brief_over_its_character_budget_is_flag
     let (hint, excerpt) = (total[0]["hint"].as_str().unwrap(), total[0]["excerpt"].as_str().unwrap());
     assert!(excerpt.ends_with("characters in all sections") && hint.contains("budget 4000 for the whole brief"), "{excerpt} / {hint}");
     // English budgets are larger: the same brief length is fine in en.
-    assert!(hits(&judged(None, &fixture("good-en-meadow.md")), "prose.length").is_empty());
+    // An English brief whose detail is over the Korean budget (2500) and under the English one (3500).
+    let en = fixture("good-en-cobalt.md");
+    let filler: String = (0..40).map(|i| format!("- Rule {i}: the invitee row draws one merged block for overlapping busy time.\n")).collect();
+    let en_long = swap(&en, "### F2 No shared calendar", &format!("{filler}\n### F2 No shared calendar"));
+    assert!(hits(&judged(None, &en_long), "prose.length").is_empty(), "within the English budget");
+    let as_ko = hits_owned(&judged(Some("ko"), &en_long), "prose.length");
+    assert!(as_ko.contains(&"detail".to_string()), "the same brief is over the Korean budget when ko is configured: {as_ko:?}");
+    // Out of scope has no budget of its own: a long one is not flagged for itself.
+    let long_scope = swap(&ko, "연체료 정산은 다루지 않는다.", &"연체료 정산은 다루지 않는다. ".repeat(30));
+    assert!(rules_in(&judged(None, &long_scope), "out-of-scope").is_empty());
 }
 
 /// authoring.brief-check.12: each new rule is waived with the existing
