@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T13:39:16.359832841Z",
+  "change_id": "canon-0-25",
+  "disposition": "fixed",
+  "kind": "finding",
+  "reason": "report_dashboard_06 strips the real approved_at key, so the comparison is no longer flaky",
+  "resolution_sha": "574d2c20251c1809e31ae1960b32c4c2fb701d30",
+  "reviewer": "canon-reviewer-025",
+  "round": 3,
+  "scenario_ids": [
+    "report.dashboard.06"
+  ],
+  "schema": 1,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "report_dashboard_06 is flaky: it strips `approvedAt` from both policy.approval.json records before comparing, but the file's key is `approved_at`, so the comparison includes the timestamp and fails whenever the page approval and the CLI approval land in different seconds. Observed: one failure at crates/canon-cli/tests/dashboard_briefs.rs:281 in a full run of the suite, then 8/8 passes. Strip `approved_at` (the brief comparison already masks its timestamp). Standards pass."
+}

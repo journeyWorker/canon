@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.539263398Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "57c1e5b78b7b409c3eee037fd015920720770580d57f4986821b677ca6d2065d",
+  "scenario_id": "subject.lifecycle.15",
+  "schema": 1,
+  "source_digest": "13c4ecfa6a59954daa11711762312b076b1cb0c06d7aaa3615a61cc313e1c3bc",
+  "subject_id": "subject-lifecycle",
+  "title": "An open blocker finding on an adopted change refuses the move until it is closed as fixed"
+}

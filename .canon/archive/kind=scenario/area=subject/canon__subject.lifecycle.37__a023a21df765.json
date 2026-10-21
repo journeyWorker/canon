@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.633153893Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "9e0a4b35cc38572d96176dfe8c5d14cb5d8a5a27dd40d45df19e66b42054b3b1",
+  "scenario_id": "subject.lifecycle.37",
+  "schema": 1,
+  "source_digest": "13c4ecfa6a59954daa11711762312b076b1cb0c06d7aaa3615a61cc313e1c3bc",
+  "subject_id": "subject-lifecycle",
+  "title": "A change with an approved brief is not unadopted"
+}

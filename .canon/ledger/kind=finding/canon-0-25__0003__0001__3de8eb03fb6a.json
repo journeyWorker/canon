@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T13:39:16.098047658Z",
+  "change_id": "canon-0-25",
+  "disposition": "fixed",
+  "kind": "finding",
+  "reason": "the refused reopen and ship now name every change set aside",
+  "resolution_sha": "5eabe5aa839bcbd11852bc1803a899fe3bc27120",
+  "reviewer": "canon-reviewer-025",
+  "round": 3,
+  "scenario_ids": [
+    "subject.lifecycle.39"
+  ],
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "subject.lifecycle.39's Then says the refused reopen and ship 'name every change set aside, here c', but the refusal prints none: shipped subject, approved a, draft b tagged @flow:b.F1, newer untagged draft c; `subject status s --to verifying --reason x` (text and --json) and, on a verifying copy with b's scenario override-attested, `--to shipped` both exit 1 naming only .canon/changes/b/brief.md, with no mention of `c` (pending_draft_line is emitted only on success, via report_subject_warning). subject_lifecycle_39 checks the set-aside line only on a successful ship after retagging, so the test does not prove this step. Spec-fidelity pass."
+}

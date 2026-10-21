@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.637660634Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "6134eb7e5d39f5d97df835230323613a2684494e9e8ab0d30d1c579d8f890e5b",
+  "scenario_id": "subject.lifecycle.38",
+  "schema": 1,
+  "source_digest": "13c4ecfa6a59954daa11711762312b076b1cb0c06d7aaa3615a61cc313e1c3bc",
+  "subject_id": "subject-lifecycle",
+  "title": "A pending draft change does not freeze a shipped subject's reopen, evidence, review and ship"
+}

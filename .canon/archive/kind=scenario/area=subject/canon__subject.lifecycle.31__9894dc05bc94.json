@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.605293384Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "4709681aba0ba33fdb0cdf6bf0bbc5fe9e184bfe94b38763cb5804d4e319c406",
+  "scenario_id": "subject.lifecycle.31",
+  "schema": 1,
+  "source_digest": "13c4ecfa6a59954daa11711762312b076b1cb0c06d7aaa3615a61cc313e1c3bc",
+  "subject_id": "subject-lifecycle",
+  "title": "A reopen needs a reason and a reason needs a reopen"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.547734903Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "7394aabf8c6b774388391aa425dc76bcfeb80d0dfb449acd62366c56574721bd",
+  "scenario_id": "subject.lifecycle.17",
+  "schema": 1,
+  "source_digest": "13c4ecfa6a59954daa11711762312b076b1cb0c06d7aaa3615a61cc313e1c3bc",
+  "subject_id": "subject-lifecycle",
+  "title": "An override never waives the ship gate and a blank reason is refused"
+}

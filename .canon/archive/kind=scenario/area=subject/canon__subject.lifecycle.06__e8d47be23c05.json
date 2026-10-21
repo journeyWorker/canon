@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.501229555Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "8c938e4f3c67b0ea90136ec856b4d669be9a1b21734dbf80902f68814b38b69b",
+  "scenario_id": "subject.lifecycle.06",
+  "schema": 1,
+  "source_digest": "13c4ecfa6a59954daa11711762312b076b1cb0c06d7aaa3615a61cc313e1c3bc",
+  "subject_id": "subject-lifecycle",
+  "title": "Shipping fails closed while a linked scenario carries no verdict at all"
+}

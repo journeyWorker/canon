@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T13:39:16.186946907Z",
+  "change_id": "canon-0-25",
+  "disposition": "fixed",
+  "kind": "finding",
+  "reason": "the stop text was corrected to match what evidence add actually refuses",
+  "resolution_sha": "5eabe5aa839bcbd11852bc1803a899fe3bc27120",
+  "reviewer": "canon-reviewer-025",
+  "round": 3,
+  "scenario_ids": [
+    "evidence.add.102"
+  ],
+  "schema": 1,
+  "seq": 2,
+  "severity": "note",
+  "summary": "The reworded stop text ('`canon evidence add` refuses the scenarios tagged `@flow:<c>.*` and `<c>`'s tasks (and s's untagged scenarios while no adopted change is approved)', blessed in conformance status-brief-unapproved and others) is not true for a scenario evidenced before the subject's first adoption: probed, verifying subject with shop.cart.01 attested before any change, then draft a adopted (no change approved): evidence add for shop.cart.01 exits 0 while that next line is printed. Name the exception or drop the parenthesis."
+}
