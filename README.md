@@ -161,8 +161,9 @@ approval (#103).
 
 ### Upgrading
 
-- Replace any 0.23-era spelling (`--change`, `--project`, `--subject`,
-  `--actor`, `--run`, `--kind evidence_record`) with its `-id` form.
+- The spellings 0.24.0 deprecated are removed in 0.25.0, as announced: replace
+  `--change`, `--project`, `--subject`, `--actor`, `--run` and
+  `--kind evidence_record` with their `-id` and suffix-free forms.
 - `finding close --disposition rejected|deferred` now needs `--reason`.
 - Run `canon skills install` once: it prunes files 0.24 shipped that 0.25 no
   longer does.
