@@ -50,7 +50,7 @@ a feature, a one-line request included. A human is needed once per scope:
 1. **Brief.** The planner writes the PRD brief (`.canon/changes/<slug>/brief.md`), checks it with `canon brief check`, and stops for the human. → `reference/role-planner.md`
 2. **Subject.** `canon subject new`, then `canon change new` (`--kind chore` for work that alters no behavior); the change writes the brief skeleton. → `reference/role-planner.md`
 3. **Scenarios.** `canon scenario new --flow <F-id> --case <case>` per behavior of a flow step, failure paths (`--case failure`) included. → `reference/role-implementer.md`
-4. **Units.** Split the work; each unit has its own actor id and session id, passed on everything it records. A unit never attests another unit's work.
+4. **Units.** Split the work; one unit is one flow step's slice with a named verify command, and each unit has its own actor id and session id, passed on everything it records. A unit never attests another unit's work.
 5. **Implement.** Code with tests named by scenario id (`game.run.01: …`). → `reference/role-implementer.md`
 6. **Evidence.** `canon evidence add` binds the test run to its scenarios. → `reference/role-implementer.md`
 7. **Independent review.** A different session, a separate process with its own session id, that can run the checks it signs off, records `canon finding add` and `canon review add`. Every change. → `reference/role-reviewer.md`
@@ -135,10 +135,10 @@ Load only the reference the current step needs.
 ```bash
 canon init                                   # canon.yaml, starter policy (--policy light|standard|strict, default strict; see canon-policy), AGENTS.md block, commented plans examples
 canon init --providers=claude,codex          # harnesses for the canon skill; without it init asks on a terminal, else takes the detected .claude/.codex/.omp/.pi
-canon skills install                         # follows canon.yaml skills.providers (else the install lock's, else the detected ones; none detected installs nothing)
+canon skills install                         # follows canon.yaml skills.providers (else the install lock's, else the detected ones; none detected installs nothing); prunes projected files the bundle no longer ships when their bytes match the lock, keeps a modified one and reports `kept:`
 canon skills install --providers=claude,codex,omp,pi   # any subset or none; rewrites skills.providers
-canon skills check                           # read-only drift check
-canon skills doctor                          # diagnostics, incl. a stray canon projection for an unselected provider and a projection a formatter rewrote; never deletes user files
+canon skills check                           # read-only drift check; exit 1 (SKILLS_DRIFT) names each orphan, a projected file the bundle no longer ships
+canon skills doctor                          # diagnostics, incl. a stray canon projection for an unselected provider and a projection a formatter rewrote, and `orphan:` lines for projected files the bundle no longer ships; never deletes user files
 ```
 
 `install` and `doctor` end with `owned-paths:`, the globs of every path
@@ -155,6 +155,13 @@ never by assuming a default. The projection is a read-only copy: Claude
 
 ### Route by task
 
+- **Fix a bug:** the approved change if there is one, else the planner (`canon change new`); first a failing run of the scenario (`canon scenario new --case failure`, then `canon evidence add`), then the fix. `reference/role-implementer.md`.
+- **Add or change a feature:** `canon subject new`, `canon change new`, then the brief. `reference/role-planner.md`.
+- **Pure refactor, dependency, build, CI or infra:** `canon change new <slug> --subject-id <id> --kind chore`; data or interface changes are not chores. `reference/role-planner.md`.
+- **Review someone's change:** `CANON_ROLE=reviewer`, `canon brief check --change-id <slug>`. `reference/role-reviewer.md`.
+- **Resume:** `canon status --json`, then follow `meta.next`. `reference/role-orchestrator.md`.
+- **Plan more work on a live subject:** a new change adopted into a live subject; read `reference/canon-subject.md` first. `reference/role-planner.md`.
+- **Upgrade canon in a repo:** `canon migrate --dry-run`. `reference/role-orchestrator.md`.
 - **Your role's steps:** `reference/role-planner.md`, `role-implementer.md`, `role-reviewer.md`, `role-orchestrator.md`.
 - **Where the repo stands, subjects and changes:** `reference/canon-subject.md` (`canon status`, `canon subject new|adopt|status`, `canon change new`).
 - **Write or reorganize `.feature` specs:** `reference/canon-authoring.md` before editing; use the scaffold.

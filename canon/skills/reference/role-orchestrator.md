@@ -48,6 +48,36 @@ shell).
 Order: planner, then (after the human's answer) implementer, then reviewer.
 Give each a unit: its own `--actor-id` and a session id.
 
+### Spawn contract
+
+Every spawn prompt names, in this order: the goal (the change slug and the
+one flow step or review it serves); the scope it owns (the scenarios or
+paths it may write); what it must not touch (the brief, the policy, other
+units' scenarios, anything outside its scope); the command that proves it is
+done (the unit's verify command, or `canon gate check` for the reviewer); and
+its own `--actor-id` and `--session-id`. Two agents never write the same
+paths: give parallel implementers disjoint scopes, and where the harness can
+isolate a child in its own worktree, use it. The child reports what it
+verified apart from what it only claims.
+
+### What each harness gives you
+
+Last reviewed 2026-10-21. A cell marked `verify` is unconfirmed here: check
+the harness before relying on it; a harness version moves faster than this
+text.
+
+| Harness | In-harness subagents | Isolation | Ask the human | Hooks | Skipped |
+|---|---|---|---|---|---|
+| claude (`.claude`) | yes, a subagent tool; a child shares your environment, so pass the role in the task | a subagent can run in its own git worktree | yes, a question tool | yes, in the harness settings; `scripts/canon-retrieve-pre-dispatch.sh` is a sidecar, not installed | none |
+| codex (`.agents`) | `verify`: none when #39 was filed; start the reviewer as a new `codex exec` run | none from canon: use a separate worktree you create | no in `codex exec`; stop and report | `verify` | in-harness spawn, unless a newer version provides it |
+| omp (`.omp`) | yes, the task tool | `verify` | yes, an ask tool | yes | none |
+| pi (`.pi`) | `verify`: assume none; start a new `pi` process | none from canon | `verify` | `verify` | in-harness spawn, isolation |
+
+Where a harness has no subagent tool, the reviewer is still a separate
+process with its own session id: start it from the shell with its own
+`CANON_ROLE=reviewer`. A harness that cannot ask the human means you stop
+and report in your final message; you never assume the answer.
+
 The reviewer is a separate process with its own session id, never your
 session or the implementer's under another label. Start it as a new process
 (a new `codex exec` run, or the harness's subagent), pass nothing of the
@@ -69,6 +99,27 @@ ask the human to re-approve (`canon policy approve --by <human>`) or restore
 the approved policy from git; never edit the policy yourself. Inside an
 approved scope never stop for a human: fixes, follow-ups and re-reviews go
 straight to the implementer and reviewer in the same change.
+
+## Hand off a note, not a copy
+
+A note one session leaves for another (a resume note, a spawn prompt, a
+`Handoff` body) points to artifacts and record ids instead of pasting them:
+name the change slug, the scenario ids, the evidence or finding keys and the
+files, and the next command. Say what was verified (a command that ran, with
+its result) apart from what is only claimed. Redact secrets: tokens, keys,
+passwords and private URLs never go into a note, a `--ref`, a `--summary`
+or a brief. When a `Handoff` body carries a continuation, its `summary`
+holds the next command and the verified claims (`reference/canon-vocab.md`).
+
+## Excuses that fail
+
+| The thought | The reality |
+|---|---|
+| "Edit the policy so the gate passes." | A changed policy fails closed (`POLICY_CHANGED_SINCE_APPROVAL`); ask the human to re-approve or restore it from git. |
+| "The reviewer can be me under another label." | The reviewer is a separate process with its own real session id (#39). |
+| "Approve the brief; the human said they are busy." | Never approve for the human; report the brief and wait. |
+| "Override the refusal to ship." | Fix the gap the refusal names; `--override-reason` does not waive an approval. |
+| "I have corrected this agent before." | A correction repeated across runs belongs in a scenario, the policy or a gate, not more prose. Tell the human. |
 
 ## Move the subject
 

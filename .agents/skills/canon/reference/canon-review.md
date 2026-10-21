@@ -73,7 +73,15 @@ canon finding add --change-id <c> --round <n> --seq <n> \
   [--reviewed-sha <sha>] [--file-ref path/to/file.rs:120-134] [--scenario-id <id> …] [--actor-id <id>] [--session-id <id>]
 canon finding close --change-id <c> --round <n> --seq <n> \
   --disposition fixed --resolution-sha <sha> [--session-id <id>]   # or rejected / deferred / open
+canon finding close --change-id <c> --round <n> --seq <n> \
+  --disposition rejected|deferred --reason "<why, one line>"
 ```
+
+`--reason` is required for `rejected` and `deferred` (refused with
+`FINDING_REASON_REQUIRED` otherwise) and optional for `fixed`. It is stored
+on the closing version, shown by `finding list` as `[reason: …]` and carried
+in the JSON. Give the reason when you reject or defer: it is the only record
+of why the finding was not fixed.
 
 `--scenario-id` (repeatable, each a scenario the index knows; refused with
 `FINDING_UNKNOWN_SCENARIO` otherwise) names the scenarios the finding is
@@ -122,14 +130,18 @@ found it: `--introduced-by self` is a usage error (exit 2) that points at
 
 Severity is the reviewer's own judgement, never a score canon derives.
 
+Write a review's or finding's `--summary` as prose that also names the blast
+radius: what else the change touches that the checks do not exercise. It is
+text in the summary, not a field.
+
 ### Dispositions
 
 | Disposition | Meaning |
 |---|---|
 | `open` | Raised and not yet dealt with. The default on `finding add`; `finding close --disposition open` reopens. |
 | `fixed` | Fixed by a commit. Requires `--resolution-sha <sha>` naming a commit this repo holds; only `fixed` may carry one. |
-| `rejected` | The reviewer's point was considered and declined. |
-| `deferred` | Accepted, but postponed to later work. |
+| `rejected` | The reviewer's point was considered and declined. Needs `--reason`. |
+| `deferred` | Accepted, but postponed to later work. Needs `--reason`. |
 
 ### How findings fold
 

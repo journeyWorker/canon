@@ -36,7 +36,13 @@ unapproved. A policy that no longer matches its approval fails closed
    (`subject adopt`): it then belongs to both,
    and its open blockers gate both. Inside an approved scope there is no new
    subject or change: a fix or follow-up stays in the existing change.
-2. **Write the brief.** A PRD: intent, desired outcome, the user flow as
+2. **Write the brief.** Briefs outlive the code that exists today and are
+   read by sessions that did not write them. Intent says what the product
+   does today, in behavior words, and why that is not enough; Desired outcome
+   says what is true afterwards. Describe an interface by its behavior
+   (inputs, outputs, errors), and keep file paths, line numbers and function
+   names out of the sections that decide the work; a `Source: <path>`
+   provenance line is the one exception. A PRD: intent, desired outcome, the user flow as
    numbered steps `F1`, `F2`, … (sees → does → becomes), step detail per
    step, acceptance per step with its failure path, questions and
    assumptions, out of scope. Write it in the `language:` of `canon.yaml`;
@@ -85,6 +91,28 @@ shipped subject `change new` prints the reopen command for the orchestrator
 (`subject status <id> --to verifying --reason "<why>"`); the subject cannot
 ship again until the suite is evidenced after the chore's approval. Work that
 changes behavior is never a chore: it is a feature change.
+
+### A migration is cut in phases
+
+A migration (a column, a format, a dependency swap) is cut as expand,
+migrate, contract: one change per phase, each adopting only after the
+previous one shipped. A phase that alters nothing a user or a caller can
+observe (a behavior-preserving internal rename, a build step) is a chore. A
+phase that changes data, a public interface or output is never a chore: it
+is a feature change with a PRD brief, whose Acceptance names the down path
+(how it is undone), the safety condition of any backfill (idempotent,
+resumable, checked before and after), and the destructive cleanup (drop the
+old column, delete the old format) in its own later change.
+
+## Excuses that fail
+
+| The thought | The reality |
+|---|---|
+| "The human is unavailable; I will assume the approval." | Never. The brief is the report; stop, and put open questions into Questions and assumptions. |
+| "This could change policy, but I will decide it." | Anything that could change policy goes to the questions. |
+| "A small follow-up needs no new answer." | A follow-up that adds or changes a flow step is a scope change and needs a new `brief approve`. |
+| "This migration is just a chore." | Data, interface or output changes are feature changes. |
+| "Put the file and line in the brief so nobody has to look." | Paths rot; describe behavior. |
 
 ## Hand-off
 
