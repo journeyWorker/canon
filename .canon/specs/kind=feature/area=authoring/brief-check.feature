@@ -79,7 +79,7 @@ Feature: authoring brief check
   Scenario: Dates and decision notes in normative or Intent text are flagged as decision history
     Given a brief with a dated decision note (a date next to a past-tense decision verb), an undated one (any stem with 기로 했다) ("we decided", 결정했다) and behavior sentences that only mention agreeing, a meeting or a conditional (합의하면, 변경했으면) in its normative and Intent text, and a decision note in a question
     When canon brief check runs
-    Then a date with 부터, 이후, after or a change verb (added after Oct 21) is behavior and never a note; each note is a prose.decision-history finding naming the matched date or phrase, except the question's
+    Then a date with 부터, 이후, 까지, after, since or until, a change verb, or a decision word used as a modifier or state (방침이 바뀐, 논의 중인, 확정된, 결정 버튼, who approved the slot) is behavior and never a note, while a clause-ending decision word (운영자 결정, 확정됐다, decided on) is; each note is a prose.decision-history finding naming the matched date or phrase, except the question's
     And a sentence that only says someone agreed to terms, sat in a meeting, changed something on the server or releases on May 3, or a Korean conditional, is not flagged
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
@@ -96,9 +96,9 @@ Feature: authoring brief check
   @case:failure
   @authoring.brief-check.10
   Scenario: A Korean sentence that does not end in the plain declarative is flagged, with fragments and flow steps exempt
-    Given a Korean brief with polite, hortative and imperative sentences, a colloquial ~세요 sentence, noun fragments in list items (참가자, 하자, 보라) and flow steps in polite endings
+    Given a Korean brief with polite, hortative and imperative sentences, a colloquial ~세요 sentence, noun fragments in list items, with or without a terminator (참가자, 주최자, 후보자, 상품 하자, 선두 주자, 보라), a label with a colon, and flow steps in polite endings
     When canon brief check runs
-    Then each polite, hortative and imperative sentence is a prose.ko-ending finding naming the ending, and the ~세요 sentence is prose.colloquial's only
+    Then each polite sentence and each imperative or hortative sentence that has an argument (재고를 확인하라) is a prose.ko-ending finding naming the ending, and the ~세요 sentence is prose.colloquial's only
     And fragments, flow steps, questions and none answers report nothing, and English text never gets the rule
     And a plain form that ends in 니다 (아니다, 지니다, 다닌다) is not polite, while 합니다, 입니다 and 없습니다 are flagged
 
