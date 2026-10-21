@@ -1,0 +1,6 @@
+description: canon dashboard in a repo with no dashboard app to serve is DASHBOARD_NOT_BUILT with the release install and the development build in its hint (a build of canon without CANON_DASHBOARD_DIST embeds no app)
+steps:
+  - args: [dashboard, --port, "0"]
+    exit: 1
+  - args: [dashboard, --port, "0", --json]
+    exit: 1

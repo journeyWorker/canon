@@ -541,15 +541,8 @@ fn content_type(file: &Path) -> &'static str {
 }
 
 fn reason(code: u16) -> &'static str {
-    match code {
-        200 => "OK",
-        400 => "Bad Request",
-        403 => "Forbidden",
-        404 => "Not Found",
-        405 => "Method Not Allowed",
-        409 => "Conflict",
-        _ => "Internal Server Error",
-    }
+    const REASONS: [(u16, &str); 6] = [(200, "OK"), (400, "Bad Request"), (403, "Forbidden"), (404, "Not Found"), (405, "Method Not Allowed"), (409, "Conflict")];
+    REASONS.iter().find(|(c, _)| *c == code).map_or("Internal Server Error", |(_, phrase)| phrase)
 }
 
 fn write_response(stream: &mut TcpStream, code: u16, content_type: &str, body: &[u8], extra: &[(&str, &str)]) {
