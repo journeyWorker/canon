@@ -1800,6 +1800,15 @@ pub struct Finding {
     /// spec root that carries it; a close inherits the list.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scenario_ids: Vec<ScenarioId>,
+    /// Why the closing version closed it (0.25, #98): the rationale a
+    /// `rejected` or `deferred` finding owes its reader, optional on
+    /// `fixed`. Absent on every record written before 0.25 and on an
+    /// `open` finding, and absent from the wire then, so an old record
+    /// re-serializes byte-identically. Part of the disposition
+    /// transition, not of the finding's identity
+    /// ([`Finding::is_disposition_transition_of`]).
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
+    pub reason: Option<String>,
 }
 
 /// [`Finding`]'s deserialize-only twin: the SAME wire shape, with no
@@ -1843,6 +1852,8 @@ struct FindingWire {
     file_ref: Option<String>,
     #[serde(default)]
     scenario_ids: Vec<ScenarioId>,
+    #[serde(default, deserialize_with = "present_value")]
+    reason: Option<String>,
 }
 
 impl FindingWire {
@@ -1863,6 +1874,7 @@ impl FindingWire {
             introduced_by: self.introduced_by,
             file_ref: self.file_ref,
             scenario_ids: self.scenario_ids,
+            reason: self.reason,
         };
         finding.check_coherence()?;
         Ok(finding)
@@ -1924,6 +1936,7 @@ impl Finding {
             introduced_by: None,
             file_ref: None,
             scenario_ids: Vec::new(),
+            reason: None,
         }
     }
 
@@ -1975,6 +1988,12 @@ impl Finding {
         self
     }
 
+    /// Say why it was closed (see [`Finding::reason`]).
+    pub fn with_reason(mut self, reason: impl Into<String>) -> Self {
+        self.reason = Some(reason.into());
+        self
+    }
+
     /// Record the SOURCED introducing commit. There is deliberately no
     /// "guess it" counterpart: if it cannot be sourced, the field stays
     /// `None`, which is one of the two reasons a derived fix-of-fix
@@ -2007,7 +2026,8 @@ impl Finding {
     /// rule makes, and it is stated here rather than there because only
     /// this type knows which of its fields carry identity and which
     /// carry state. Every identity/content field must be byte-equal;
-    /// only `disposition` and its coupled `resolution_sha` may move.
+    /// only `disposition`, its coupled `resolution_sha` and the closing
+    /// `reason` may move.
     /// `Envelope` is excluded deliberately — a transition is authored at
     /// a later instant by whoever closed it, and requiring the original
     /// author's `at` would make closing a finding impossible.
@@ -2985,6 +3005,7 @@ mod tests {
             .with_introduced_by(sha('c'))
             .with_file_ref("crates/canon-model/src/records.rs:120-134")
             .with_scenario_ids([ScenarioId::parse("world.demo.01").unwrap()])
+            .with_reason("covered by the retry in the caller")
     );
 
     /// `reviewed_sha` is provenance, not identity: a round that read a
@@ -3008,7 +3029,7 @@ mod tests {
     #[test]
     fn finding_omits_its_unset_optionals_entirely() {
         let json = serde_json::to_value(finding(1, 1)).unwrap();
-        for field in ["reviewed_sha", "resolution_sha", "introduced_by", "file_ref"] {
+        for field in ["reviewed_sha", "resolution_sha", "introduced_by", "file_ref", "reason"] {
             assert!(json.get(field).is_none(), "an unset `{field}` must be absent from the wire form, not null");
         }
     }
@@ -3025,6 +3046,23 @@ mod tests {
             open.is_disposition_transition_of(&fixed),
             "and it is symmetric by construction: a fix that did not hold reopens, and a ledger that could only close would record half a life"
         );
+    }
+
+    /// The closing reason travels with the disposition move (0.25, #98),
+    /// but a reason change with the disposition held is still no
+    /// transition, and an old record without one reads unchanged.
+    #[test]
+    fn a_reason_rides_a_transition_and_never_makes_one() {
+        let open = finding(3, 2);
+        let rejected = open.clone().rejected().with_reason("works as designed");
+        assert!(rejected.is_disposition_transition_of(&open), "a close that carries its reason is the transition");
+        assert!(!rejected.clone().with_reason("a different story").is_disposition_transition_of(&rejected), "a reason change outside a close is refused");
+
+        let old = serde_json::to_value(finding(3, 2).rejected()).unwrap();
+        assert!(old.get("reason").is_none());
+        let read: Finding = serde_json::from_value(old.clone()).unwrap();
+        assert_eq!(read.reason, None);
+        assert_eq!(serde_json::to_value(&read).unwrap(), old, "an old record re-serializes byte-identically");
     }
 
     /// A resubmission carrying no new fact is not a transition. Without

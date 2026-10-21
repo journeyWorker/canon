@@ -4,6 +4,7 @@
     {
       "disposition": "open",
       "file_ref": null,
+      "reason": null,
       "resolution_sha": null,
       "reviewer": "rev-b",
       "round": 1,

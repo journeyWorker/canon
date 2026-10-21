@@ -22,6 +22,7 @@ Feature: finding close
     Then every one of those fields is byte-identical on the superseding record
     And the sourced introducing commit survives unchanged
     And no command offered any way to edit them
+    And the disposition, the resolution sha and the optional --reason are all a close adds
 
   @subject:finding-lifecycle
   @case:failure
@@ -113,3 +114,63 @@ Feature: finding close
     When it is closed fixed with canon finding close, which has no --scenario-id
     Then the closed version carries the same scenario ids as the version it closes
     And the subject's ship refusal names that scenario only, until evidence for it is recorded after the close
+
+  # canon: {"schema":1,"at":"2026-10-21T11:47:25Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:finding-lifecycle
+  @case:failure
+  @finding.close.82
+  Scenario: Closing rejected or deferred without a reason is refused
+    Given a committed open finding
+    When it is closed rejected, or deferred, with no --reason
+    Then the command refuses with FINDING_REASON_REQUIRED and exit 2, its hint giving the exact command shape
+    And nothing is staged or committed
+
+  # canon: {"schema":1,"at":"2026-10-21T11:47:25Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:finding-lifecycle
+  @case:happy
+  @finding.close.83
+  Scenario: A rejected or deferred close records its reason on the closing version
+    Given a committed open finding
+    When it is closed rejected, or deferred, with --reason "works as designed"
+    Then the closing version carries that reason and the raised version stays without one
+    And canon finding list shows the reason for that finding
+
+  # canon: {"schema":1,"at":"2026-10-21T11:47:25Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:finding-lifecycle
+  @case:happy
+  @finding.close.84
+  Scenario: A fixed close takes a reason but does not need one
+    Given a committed open finding and the commit that fixed it
+    When it is closed fixed with and without --reason
+    Then both closes are admitted
+    And the reason is recorded only when it was given
+
+  # canon: {"schema":1,"at":"2026-10-21T11:47:25Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:finding-lifecycle
+  @case:failure
+  @finding.close.85
+  Scenario: A blank or multi-line reason is refused like a missing one
+    Given a committed open finding
+    When it is closed with a blank --reason, or one holding a line break
+    Then the command refuses with FINDING_REASON_REQUIRED, whatever the disposition
+    And nothing is staged or committed
+
+  # canon: {"schema":1,"at":"2026-10-21T11:47:25Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:finding-lifecycle
+  @case:happy
+  @finding.close.86
+  Scenario: A staged close carrying a reason promotes under write.promote manual
+    Given write.promote is manual and a committed open finding
+    When it is closed rejected with --reason and canon gate promote then runs
+    Then the staged close is promoted with its reason
+    And a staged body that changes the reason without moving the disposition is still refused
+
+  # canon: {"schema":1,"at":"2026-10-21T11:47:25Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:finding-lifecycle
+  @case:edge
+  @finding.close.87
+  Scenario: A finding written before reasons existed reads, lists and closes unchanged
+    Given a finding record committed before reasons existed, with no reason field
+    When it is read, listed and closed fixed
+    Then the untouched record's JSON is byte-identical to what was committed
+    And the list row shows no reason for it

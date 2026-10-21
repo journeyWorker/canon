@@ -40,6 +40,13 @@
     "kind": {
       "$ref": "#/$defs/RecordKind"
     },
+    "reason": {
+      "description": "Why the closing version closed it (0.25, #98): the rationale a\n`rejected` or `deferred` finding owes its reader, optional on\n`fixed`. Absent on every record written before 0.25 and on an\n`open` finding, and absent from the wire then, so an old record\nre-serializes byte-identically. Part of the disposition\ntransition, not of the finding's identity\n([`Finding::is_disposition_transition_of`]).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "resolution_sha": {
       "description": "The commit that closed it — see this type's doc: present iff\n`disposition` is [`FindingDisposition::Fixed`]. PRIVATE for the\nsame reason `disposition` is, and read through\n[`Finding::resolution_sha`].",
       "anyOf": [

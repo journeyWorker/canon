@@ -152,7 +152,7 @@ fn auto_promotes_every_staged_write_and_no_promote_keeps_one_staged() {
 
     ok(repo, &evidence("game.run.01"));
     ok(repo, &["finding", "add", "--change-id", "c-run", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "r", "--summary", "s"]);
-    ok(repo, &["finding", "close", "--change-id", "c-run", "--round", "1", "--seq", "1", "--disposition", "rejected"]);
+    ok(repo, &["finding", "close", "--change-id", "c-run", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"]);
     let sha = "a".repeat(40);
     ok(repo, &["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer"]);
     assert_eq!(staged(repo), 0, "nothing waits for a promote");
@@ -247,7 +247,7 @@ fn evidence_add_67_a_promoted_write_names_only_its_committed_record() {
     let writes: [(&str, Vec<&str>); 4] = [
         ("canon evidence add", evidence("game.run.01")),
         ("canon finding add", vec!["finding", "add", "--change-id", "c-run", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "r", "--summary", "s"]),
-        ("canon finding close", vec!["finding", "close", "--change-id", "c-run", "--round", "1", "--seq", "1", "--disposition", "rejected"]),
+        ("canon finding close", vec!["finding", "close", "--change-id", "c-run", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"]),
         ("canon divergence add", vec!["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer"]),
     ];
     for (command, args) in writes {
