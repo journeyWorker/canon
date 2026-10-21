@@ -1167,3 +1167,208 @@ fn skills_install_58_changed_content_stays_drift() {
     }
     assert!(!out.contains("formatter-rewritten"), "{out}");
 }
+
+/// Where 0.25's pruning tests project a Claude file.
+const CLAUDE_PROJECTION: &str = ".claude/skills/canon";
+
+/// `write_canonical_source` plus two reference files in a directory of
+/// their own: the files a later bundle stops shipping.
+fn write_source_with_retired_references(source: &Path) {
+    write_canonical_source(source);
+    fs::create_dir_all(source.join("reference/retired")).unwrap();
+    fs::write(source.join("reference/retired/old.md"), "# old\n").unwrap();
+    fs::write(source.join("reference/retired/older.md"), "# older\n").unwrap();
+}
+
+/// A bundle that no longer ships `reference/retired/**`, beside the one that
+/// did: the same canon, a release later.
+fn write_pruned_sources(tmp: &Path) -> (std::path::PathBuf, std::path::PathBuf) {
+    let (before, after) = (tmp.join("source-before"), tmp.join("source-after"));
+    write_source_with_retired_references(&before);
+    write_canonical_source(&after);
+    (before, after)
+}
+
+fn stdout_json(output: &std::process::Output) -> serde_json::Value {
+    serde_json::from_slice(&output.stdout).unwrap_or_else(|err| panic!("{err}: {}", String::from_utf8_lossy(&output.stdout)))
+}
+
+/// skills.install.59
+#[test]
+fn skills_install_59_install_prunes_a_dropped_file_whose_bytes_match_the_lock() {
+    let tmp = tempfile::tempdir().unwrap();
+    let target = tmp.path().join("target");
+    let (before, after) = write_pruned_sources(tmp.path());
+    skills::install_canonical(&before, &target, Some("claude")).unwrap();
+    let retired = target.join(CLAUDE_PROJECTION).join("reference/retired");
+    assert!(retired.join("old.md").is_file() && retired.join("older.md").is_file());
+    assert!(read_lock(&target)["files"][format!("{CLAUDE_PROJECTION}/reference/retired/old.md")].is_string());
+
+    let out = canon(&["skills", "install", "--providers", "claude", "--json"], &after, &target);
+    assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
+    let json = stdout_json(&out);
+    let pruned: Vec<&str> = json["data"]["pruned"].as_array().unwrap().iter().map(|entry| entry["path"].as_str().unwrap()).collect();
+    assert_eq!(pruned.len(), 2, "{json}");
+    for name in ["old.md", "older.md"] {
+        assert!(pruned.iter().any(|path| path.ends_with(&format!("{CLAUDE_PROJECTION}/reference/retired/{name}"))), "{json}");
+    }
+    assert_eq!(json["data"]["kept"], serde_json::json!([]), "{json}");
+    assert_eq!(json["data"]["changed"], true);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("pruned: ") && stderr.contains("old.md (claude) — the bundle no longer ships it; its bytes still match the install lock"), "{stderr}");
+
+    assert!(!retired.exists(), "the directory the deletion left empty is removed");
+    let projection = target.join(CLAUDE_PROJECTION);
+    assert!(projection.join("SKILL.md").is_file() && projection.join("reference/topic.md").is_file() && projection.join("scripts/hook.sh").is_file(), "shipped files stay");
+    let files = read_lock(&target)["files"].as_object().unwrap().keys().cloned().collect::<Vec<_>>();
+    assert!(files.iter().all(|key| !key.contains("retired")), "the lock lists only shipped files: {files:?}");
+
+    let rerun = stdout_json(&canon(&["skills", "install", "--providers", "claude", "--json"], &after, &target));
+    assert_eq!(rerun["data"]["changed"], false, "{rerun}");
+    assert_eq!(rerun["data"]["pruned"], serde_json::json!([]));
+    assert_eq!(canon(&["skills", "check", "--providers", "claude"], &after, &target).status.code(), Some(0));
+}
+
+/// skills.install.60
+#[test]
+fn skills_install_60_install_keeps_a_dropped_file_whose_bytes_changed_and_reports_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    let target = tmp.path().join("target");
+    let (before, after) = write_pruned_sources(tmp.path());
+    skills::install_canonical(&before, &target, Some("claude")).unwrap();
+    let retired = target.join(CLAUDE_PROJECTION).join("reference/retired");
+    fs::write(retired.join("old.md"), "# old, with my own notes\n").unwrap();
+
+    let out = canon(&["skills", "install", "--providers", "claude", "--json"], &after, &target);
+    assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
+    let json = stdout_json(&out);
+    let kept = json["data"]["kept"].as_array().unwrap();
+    assert_eq!(kept.len(), 1, "{json}");
+    let path = kept[0]["path"].as_str().unwrap();
+    assert!(path.ends_with(&format!("{CLAUDE_PROJECTION}/reference/retired/old.md")), "{json}");
+    assert_eq!(kept[0]["provider"], "claude");
+    assert!(kept[0]["reason"].as_str().unwrap().contains("differ from the install lock"), "{json}");
+    assert!(kept[0]["hint"].as_str().unwrap().contains(&format!("rm {path}")), "{json}");
+    let pruned = json["data"]["pruned"].as_array().unwrap();
+    assert_eq!(pruned.len(), 1, "the unmodified sibling is still pruned: {json}");
+    assert!(pruned[0]["path"].as_str().unwrap().ends_with("older.md"));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains(&format!("kept: {path} (claude) — the bundle no longer ships it; its bytes differ from the install lock")) && stderr.contains("remove it by hand with"), "{stderr}");
+
+    assert_eq!(fs::read_to_string(retired.join("old.md")).unwrap(), "# old, with my own notes\n", "the edited file is kept byte for byte");
+    assert!(!retired.join("older.md").exists());
+    let files = read_lock(&target)["files"].as_object().unwrap().keys().cloned().collect::<Vec<_>>();
+    assert!(files.iter().all(|key| !key.contains("retired")), "the lock no longer lists the kept file: {files:?}");
+    let rerun = stdout_json(&canon(&["skills", "install", "--providers", "claude", "--json"], &after, &target));
+    assert_eq!(rerun["data"]["changed"], false, "{rerun}");
+    assert_eq!(rerun["data"]["kept"], serde_json::json!([]));
+}
+
+/// skills.install.60: a dropped file swapped for a symlink to a file with
+/// the very bytes the lock recorded is not the file canon wrote: install
+/// keeps the link and never deletes through it.
+#[cfg(unix)]
+#[test]
+fn skills_install_60_a_dropped_file_replaced_by_a_symlink_is_kept_and_never_followed() {
+    let tmp = tempfile::tempdir().unwrap();
+    let target = tmp.path().join("target");
+    let (before, after) = write_pruned_sources(tmp.path());
+    skills::install_canonical(&before, &target, Some("claude")).unwrap();
+    let outside = tmp.path().join("outside.md");
+    fs::write(&outside, "# old\n").unwrap();
+    let link = target.join(CLAUDE_PROJECTION).join("reference/retired/old.md");
+    fs::remove_file(&link).unwrap();
+    std::os::unix::fs::symlink(&outside, &link).unwrap();
+
+    let report = skills::install_canonical(&after, &target, Some("claude")).unwrap();
+    assert_eq!(report.kept.len(), 1, "{report:?}");
+    assert_eq!(report.kept[0].path, link);
+    assert!(fs::symlink_metadata(&link).unwrap().file_type().is_symlink(), "the link stays");
+    assert_eq!(fs::read_to_string(&outside).unwrap(), "# old\n", "the file behind it stays");
+}
+
+/// skills.install.61
+#[test]
+fn skills_install_61_install_prunes_only_selected_providers_and_only_what_the_lock_listed() {
+    let tmp = tempfile::tempdir().unwrap();
+    let target = tmp.path().join("target");
+    let (before, after) = write_pruned_sources(tmp.path());
+    skills::install_canonical(&before, &target, Some("claude,codex")).unwrap();
+    let mine = target.join(CLAUDE_PROJECTION).join("reference/retired/mine.md");
+    fs::write(&mine, "# mine, never in the lock\n").unwrap();
+    let elsewhere = target.join(".claude/skills/canon/reference/notes.md");
+    fs::write(&elsewhere, "# notes\n").unwrap();
+    let codex_old = target.join(".agents/skills/canon/reference/retired/old.md");
+
+    let report = skills::install_canonical(&after, &target, Some("claude")).unwrap();
+    assert_eq!(report.pruned.len(), 2, "{report:?}");
+    assert!(report.pruned.iter().all(|orphan| orphan.provider == skills::Provider::Claude), "{report:?}");
+    assert!(!target.join(CLAUDE_PROJECTION).join("reference/retired/old.md").exists());
+    assert_eq!(fs::read_to_string(&mine).unwrap(), "# mine, never in the lock\n", "a file the lock never listed is never touched, nor the directory holding it");
+    assert!(elsewhere.is_file());
+    assert!(codex_old.is_file() && codex_old.with_file_name("older.md").is_file(), "an unselected provider's projection is untouched");
+    assert!(target.join(".agents/skills/canon/SKILL.md").is_file());
+    assert_eq!(canon(&["skills", "check", "--providers", "claude"], &after, &target).status.code(), Some(0));
+}
+
+/// skills.install.62
+#[test]
+fn skills_install_62_check_and_doctor_name_each_orphan_with_the_fix() {
+    let tmp = tempfile::tempdir().unwrap();
+    let target = tmp.path().join("target");
+    let (before, after) = write_pruned_sources(tmp.path());
+    skills::install_canonical(&before, &target, Some("claude")).unwrap();
+    let retired = target.join(CLAUDE_PROJECTION).join("reference/retired");
+    fs::write(retired.join("older.md"), "# older, edited\n").unwrap();
+    let fix = "canon skills install --providers=claude";
+
+    let check = canon(&["skills", "check", "--providers", "claude"], &after, &target);
+    let out = String::from_utf8_lossy(&check.stdout);
+    assert_eq!(check.status.code(), Some(1), "{out}");
+    let old = retired.join("old.md").display().to_string();
+    let older = retired.join("older.md").display().to_string();
+    assert!(out.contains(&format!("{old} — orphan (claude; the install lock lists it, but this canon's bundle no longer ships it; its bytes still match the install lock; run `{fix}`, which removes it)")), "{out}");
+    assert!(out.contains(&format!("{older} — orphan (claude; the install lock lists it, but this canon's bundle no longer ships it; its bytes differ from the install lock (or it is not a regular file); `canon skills install` keeps it; remove it by hand with `rm {older}` if you do not need it)")), "{out}");
+
+    let json = stdout_json(&canon(&["skills", "check", "--providers", "claude", "--json"], &after, &target));
+    assert_eq!(json["error"]["code"], "SKILLS_DRIFT");
+    assert!(json["error"]["message"].as_str().unwrap().contains(&old), "the error names the orphan: {json}");
+    assert!(json["error"]["hint"].as_str().unwrap().contains(&older), "the hint names what to remove by hand: {json}");
+    let orphans = json["data"]["orphans"].as_array().unwrap();
+    assert_eq!(orphans.len(), 2, "{json}");
+    assert_eq!(orphans.iter().filter(|o| o["modified"] == true).count(), 1, "{json}");
+
+    let doctor = canon(&["skills", "doctor", "--providers", "claude"], &after, &target);
+    let out = String::from_utf8_lossy(&doctor.stdout);
+    assert_eq!(doctor.status.code(), Some(0), "{out}");
+    assert!(out.lines().any(|line| line.starts_with(&format!("orphan: {old} (claude) — ")) && line.ends_with(&format!("run `{fix}`, which removes it"))), "{out}");
+    assert!(out.lines().any(|line| line.starts_with(&format!("orphan: {older} (claude) — ")) && line.contains("keeps it; remove it by hand with `rm")), "{out}");
+    assert!(!out.contains("status: healthy"), "{out}");
+    assert!(retired.join("old.md").is_file() && retired.join("older.md").is_file(), "check and doctor never delete");
+
+    skills::install_canonical(&after, &target, Some("claude")).unwrap();
+    assert!(!retired.join("old.md").exists() && retired.join("older.md").is_file());
+    assert_eq!(canon(&["skills", "check", "--providers", "claude"], &after, &target).status.code(), Some(0));
+    let doctor = canon(&["skills", "doctor", "--providers", "claude"], &after, &target);
+    assert!(String::from_utf8_lossy(&doctor.stdout).contains("status: healthy"));
+}
+
+/// skills.install.62: an orphan of a provider that is not selected is not
+/// named, and a lock entry whose file is already gone is no orphan.
+#[test]
+fn skills_install_62_check_ignores_unselected_providers_and_files_already_gone() {
+    let tmp = tempfile::tempdir().unwrap();
+    let target = tmp.path().join("target");
+    let (before, after) = write_pruned_sources(tmp.path());
+    skills::install_canonical(&before, &target, Some("claude,codex")).unwrap();
+    let report = skills::check(&after, &target, Some("claude,codex")).unwrap();
+    assert_eq!(report.orphans.len(), 4, "two dropped files for each of two providers: {:?}", report.orphans);
+
+    let report = skills::check(&after, &target, Some("claude")).unwrap();
+    assert_eq!(report.orphans.len(), 2);
+    assert!(report.orphans.iter().all(|orphan| orphan.provider == skills::Provider::Claude));
+
+    fs::remove_file(target.join(CLAUDE_PROJECTION).join("reference/retired/old.md")).unwrap();
+    let report = skills::check(&after, &target, Some("claude")).unwrap();
+    assert_eq!(report.orphans.len(), 1, "a file the user already removed is not an orphan: {:?}", report.orphans);
+}
