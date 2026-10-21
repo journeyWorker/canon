@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:23.910979508Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "563e574821057dafa3bbe88c151f26edaf450dfc07a3df594d3681d49b91eaf9",
+  "scenario_id": "subject.lifecycle.22",
+  "schema": 1,
+  "source_digest": "983f3875dadecf3e47e62ef7fd7450ce970bce3c0dc3663cfb9f4eeaaa7f806d",
+  "subject_id": "subject-lifecycle",
+  "title": "Adopting a change that is already linked writes nothing"
+}

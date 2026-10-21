@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:24.155468865Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "40c3334859a59507c998f5c6e5839bb40c37c1221adfb2562c3ce19b1d1b0109",
+  "scenario_id": "skills.install.50",
+  "schema": 1,
+  "source_digest": "840d1910d18437c693fc29662e6235b0ba91e479e55dab88b34b3ae1f94c3a9f",
+  "subject_id": "skills-install",
+  "title": "Codex is detected from its config directory, never from the agents root alone"
+}

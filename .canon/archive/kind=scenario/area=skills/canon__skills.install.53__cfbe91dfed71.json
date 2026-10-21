@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:24.168126180Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "d0ce15c24eff454874d0da458652dbe97631f5bfcba67b0b98190db629b51f02",
+  "scenario_id": "skills.install.53",
+  "schema": 1,
+  "source_digest": "840d1910d18437c693fc29662e6235b0ba91e479e55dab88b34b3ae1f94c3a9f",
+  "subject_id": "skills-install",
+  "title": "A repo set up before 0.17 keeps working from its install lock"
+}

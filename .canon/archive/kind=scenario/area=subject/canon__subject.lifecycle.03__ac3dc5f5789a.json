@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:23.843455338Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "d42ec00d84a133ab4349d70671c7ad50dc347d22fb25db564fe42ddc9f850cb5",
+  "scenario_id": "subject.lifecycle.03",
+  "schema": 1,
+  "source_digest": "983f3875dadecf3e47e62ef7fd7450ce970bce3c0dc3663cfb9f4eeaaa7f806d",
+  "subject_id": "subject-lifecycle",
+  "title": "The forward chain advances one rung at a time and every write folds to one row"
+}

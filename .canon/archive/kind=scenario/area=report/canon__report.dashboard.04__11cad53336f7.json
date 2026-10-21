@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:23.809670512Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "5cc1698eb91898ce7e47ed100ed75ea5ce8e57b9d04a9d428c6645d6d163e038",
+  "scenario_id": "report.dashboard.04",
+  "schema": 1,
+  "source_digest": "d6c5aa1cf05464a7986c748a4509581f87c0f22ca0560e2b52fa23b5b6f12b51",
+  "subject_id": "report-generation",
+  "title": "A repo whose snapshot cannot be generated is still served, says why, and never shows demo data"
+}

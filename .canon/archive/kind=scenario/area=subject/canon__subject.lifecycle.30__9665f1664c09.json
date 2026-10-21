@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:23.941094937Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "af586a6e84242f95c2fdeb8ba59473c75a311c331b537cf61b6ed88facf7242f",
+  "scenario_id": "subject.lifecycle.30",
+  "schema": 1,
+  "source_digest": "983f3875dadecf3e47e62ef7fd7450ce970bce3c0dc3663cfb9f4eeaaa7f806d",
+  "subject_id": "subject-lifecycle",
+  "title": "Reopening outside an approved scope is refused naming the brief to approve"
+}

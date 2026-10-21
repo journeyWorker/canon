@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:24.208445961Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "1a25ee9a8a2e210b161b9f9d0a844d08a9deee7dfe0b1dd1018bf1c8e0fc4e9b",
+  "scenario_id": "skills.install.62",
+  "schema": 1,
+  "source_digest": "840d1910d18437c693fc29662e6235b0ba91e479e55dab88b34b3ae1f94c3a9f",
+  "subject_id": "skills-install",
+  "title": "Check and doctor name each orphan with the fix"
+}

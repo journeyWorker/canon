@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:23.817169247Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "37bbc8ed7e641fb831c3641c910fe291652c39343af188d420863e27c9349d4d",
+  "scenario_id": "report.dashboard.06",
+  "schema": 1,
+  "source_digest": "d6c5aa1cf05464a7986c748a4509581f87c0f22ca0560e2b52fa23b5b6f12b51",
+  "subject_id": "report-generation",
+  "title": "Approving from the page records exactly what canon brief approve records"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:24.151235572Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "8bd15223162b744a0125081cad77e37f507a7150bd5df80acd58e0c4901d3a76",
+  "scenario_id": "skills.install.44",
+  "schema": 1,
+  "source_digest": "840d1910d18437c693fc29662e6235b0ba91e479e55dab88b34b3ae1f94c3a9f",
+  "subject_id": "skills-install",
+  "title": "The skill and the AGENTS.md block stop at the brief and never assume the approval"
+}

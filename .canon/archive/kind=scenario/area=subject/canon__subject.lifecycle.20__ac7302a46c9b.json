@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:23.907230161Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "60063094cd09bd6e36b9d65eb059f6e4361ccc1bbe537213dbe93b686e7d4796",
+  "scenario_id": "subject.lifecycle.20",
+  "schema": 1,
+  "source_digest": "983f3875dadecf3e47e62ef7fd7450ce970bce3c0dc3663cfb9f4eeaaa7f806d",
+  "subject_id": "subject-lifecycle",
+  "title": "One record keyed by a task and a scenario ships the scenario and still flips the task"
+}

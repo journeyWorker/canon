@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T12:53:16.407511619Z",
+  "change_id": "canon-0-25",
+  "disposition": "fixed",
+  "kind": "finding",
+  "reason": "skills_install_62 asserts each orphan entry path provider and hint and that the files and lock are unchanged",
+  "resolution_sha": "f13959bbffd64c09f321ee629a0754631edcd0fb",
+  "reviewer": "canon-reviewer-025",
+  "round": 1,
+  "scenario_ids": [
+    "skills.install.62"
+  ],
+  "schema": 1,
+  "seq": 8,
+  "severity": "should_fix",
+  "summary": "skills_install_62 checks the JSON orphans list only by length and by the count of modified==true; it never asserts each entry's path, provider or fix hint, which the Then step requires in the JSON (by hand the entries carry {path,provider,modified,reason,hint}); read-only is checked as 'files still exist', not bytes/lock unchanged. Spec-fidelity pass."
+}

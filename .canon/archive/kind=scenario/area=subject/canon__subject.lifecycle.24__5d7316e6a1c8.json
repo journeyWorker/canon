@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:23.918435282Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "a86fdc170eca7ade52359b2a02c0bfc379b366183e86f1c7dd83eaa7a40b7f21",
+  "scenario_id": "subject.lifecycle.24",
+  "schema": 1,
+  "source_digest": "983f3875dadecf3e47e62ef7fd7450ce970bce3c0dc3663cfb9f4eeaaa7f806d",
+  "subject_id": "subject-lifecycle",
+  "title": "Shipping is refused while the brief has no Approved line, even with every technical gate passing"
+}

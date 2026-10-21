@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:23.922165530Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "3803365dc7d09ae1f86b0559df431559e9795942f4b8e0c862f48a2f0c48541a",
+  "scenario_id": "subject.lifecycle.25",
+  "schema": 1,
+  "source_digest": "983f3875dadecf3e47e62ef7fd7450ce970bce3c0dc3663cfb9f4eeaaa7f806d",
+  "subject_id": "subject-lifecycle",
+  "title": "An Approved line inside an HTML comment or a code fence does not let the subject ship"
+}

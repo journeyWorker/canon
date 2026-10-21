@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T12:53:16.048970829Z",
+  "change_id": "canon-0-25",
+  "disposition": "fixed",
+  "kind": "finding",
+  "reason": "finding_close_86 stages a correctly named reason-only body and asserts the refusal and the promoted reason",
+  "resolution_sha": "8ba81c655f905c56ea8ed872cb3aeb1a48b8140e",
+  "reviewer": "canon-reviewer-025",
+  "round": 1,
+  "scenario_ids": [
+    "finding.close.86"
+  ],
+  "schema": 1,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "finding_close_86 does not prove its second And: the tampered reason-only body is staged as kind=finding/hand-written.json, so gate promote refuses it on the filename layout rule ('expected kind=finding/c1__0001__0001__<digest>.json ... found hand-written.json', reproduced), never reaching the transition/identity check; deleting that check leaves the test green. It also never asserts the promoted record carries reason 'works as designed' (only counts), and its canon.yaml never sets write.promote: manual. Standards pass. By hand, a correctly named reason-only body is refused for the right reason and the promoted close carries its reason, so the behavior holds; the test does not."
+}
