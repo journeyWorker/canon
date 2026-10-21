@@ -1896,7 +1896,7 @@ fn next_steps(ev: &Evaluation) -> Vec<Step> {
         steps.push(Step { step: "align", why: "a flow step has no scenario, or no failure scenario".to_string() });
     }
     if ev.findings.iter().any(|f| f.rule.starts_with("prose.")) {
-        steps.push(Step { step: "polish", why: "prose advisories remain in the normative sections".to_string() });
+        steps.push(Step { step: "polish", why: "prose advisories remain in the brief".to_string() });
     }
     if ev.counts().blockers == 0 && !ev.approved {
         steps.push(approve_step(ev, "no blockers; the human answers the brief"));
