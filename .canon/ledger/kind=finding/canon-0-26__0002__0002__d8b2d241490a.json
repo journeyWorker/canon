@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T18:06:57.350164711Z",
+  "change_id": "canon-0-26",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reason": "fixed in the round 2 fixes commit",
+  "resolution_sha": "dbb4b80236b089471ab70951f1e7de361d8c8d5e",
+  "reviewed_sha": "ec056dfc826c47ff0171bb62ae6c7e57ccdf72d5",
+  "reviewer": "canon-reviewer-026",
+  "round": 2,
+  "scenario_ids": [
+    "authoring.brief-check.08"
+  ],
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[probe] A dated behavior sentence with a change verb is still decision history: '2026-12-01부터 연체 시 추가 요금이 붙는다.', '2026년 11월 이후 수정된 대출 기록은 다시 보낸다.', 'Invitees added after Oct 21 see the new picker.', 'Events updated on Nov 3 show a badge.' each draw prose.decision-history. KO_DECISION_VERBS (추가, 수정, 변경 …) and EN_DECISION_VERBS (added, updated, changed …) match nouns and participles, not only a past decision; scenario 08 keeps behavior that releases on a date unflagged."
+}

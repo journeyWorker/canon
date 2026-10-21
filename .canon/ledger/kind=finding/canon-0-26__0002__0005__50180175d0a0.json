@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T18:06:57.650612445Z",
+  "change_id": "canon-0-26",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/brief_prose.rs",
+  "kind": "finding",
+  "reason": "fixed in the round 2 fixes commit",
+  "resolution_sha": "dbb4b80236b089471ab70951f1e7de361d8c8d5e",
+  "reviewed_sha": "ec056dfc826c47ff0171bb62ae6c7e57ccdf72d5",
+  "reviewer": "canon-reviewer-026",
+  "round": 2,
+  "scenario_ids": [
+    "authoring.brief-check.08"
+  ],
+  "schema": 1,
+  "seq": 5,
+  "severity": "note",
+  "summary": "[standards] The Korean date-needs-a-decision-verb gate is guarded only by the lib unit test (brief_check::tests::dates_and_decision_notes_are_history_in_each_language); with `date.filter(|_| verb)` replaced by `date`, all 15 brief_prose tests (the bound evidence) stay green. Test 08's Korean behavior sentences carry no date."
+}

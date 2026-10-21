@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T18:06:57.978220845Z",
+  "change_id": "canon-0-26",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/dashboard_briefs.rs",
+  "kind": "finding",
+  "reason": "fixed in the round 2 fixes commit",
+  "resolution_sha": "dbb4b80236b089471ab70951f1e7de361d8c8d5e",
+  "reviewed_sha": "ec056dfc826c47ff0171bb62ae6c7e57ccdf72d5",
+  "reviewer": "canon-reviewer-026",
+  "round": 2,
+  "scenario_ids": [
+    "report.dashboard.11"
+  ],
+  "schema": 1,
+  "seq": 9,
+  "severity": "note",
+  "summary": "[standards] report_dashboard_11 computes the acceptance line but asserts only 1 <= line <= brief length, and 'matched text' only as a non-empty message; a wrong line number would pass."
+}
