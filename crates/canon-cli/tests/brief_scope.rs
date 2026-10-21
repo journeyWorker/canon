@@ -830,6 +830,19 @@ fn subject_lifecycle_39_a_tagged_draft_under_a_newer_untagged_draft_still_blocks
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
     assert!(stderr(&out).contains(".canon/changes/b/brief.md"), "{}", stderr(&out));
     assert!(!stderr(&out).contains(".canon/changes/c/brief.md"), "{}", stderr(&out));
+    assert!(
+        stderr(&out).contains("`c` is a pending draft (brief not approved, no scenario tagged `@flow:c.*`): not part of this transition"),
+        "a refused reopen names what it set aside: {}",
+        stderr(&out)
+    );
+    let json = run(repo, &["subject", "status", "s", "--to", "verifying", "--reason", "fix", "--json"]);
+    assert_eq!(json.status.code(), Some(1));
+    assert!(stdout(&json).contains("`c` is a pending draft"), "{}", stdout(&json));
+
+    // Status does not advise the reopen the guard refuses.
+    let text = stdout(&ok(repo, &["status"]));
+    assert!(text.contains("reopening is refused until the brief above is approved"), "{text}");
+    assert!(!text.contains("reopen with `canon subject status s"), "{text}");
 }
 
 /// subject.lifecycle.39: ship, from verifying, is refused naming b under
@@ -859,6 +872,10 @@ fn subject_lifecycle_39_ship_names_the_tagged_draft_and_every_change_set_aside()
     let ship = run(repo, &["subject", "status", "s", "--to", "shipped"]);
     assert_eq!(ship.status.code(), Some(1), "{}", stderr(&ship));
     assert!(stderr(&ship).contains(".canon/changes/b/brief.md"), "{}", stderr(&ship));
+    assert!(stderr(&ship).contains("`c` is a pending draft"), "a refused ship names what it set aside: {}", stderr(&ship));
+    let json = run(repo, &["subject", "status", "s", "--to", "shipped", "--json"]);
+    assert_eq!(json.status.code(), Some(1));
+    assert!(stdout(&json).contains("`c` is a pending draft"), "{}", stdout(&json));
 
     // Retag shop.cart.03 for a: b and c are both set aside, and the line names both.
     let text = std::fs::read_to_string(&path).unwrap();

@@ -1100,7 +1100,7 @@ fn subject_steps(
                 brief.report_in()
             ),
             why: format!(
-                "{id}: {} (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses the scenarios tagged `@flow:{change}.*` and `{change}`'s tasks (and {id}'s untagged scenarios while no adopted change is approved) until it is recorded; once the human answers, {} (one call records the brief and the policy approval)",
+                "{id}: {} (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses the scenarios tagged `@flow:{change}.*` and `{change}`'s tasks (and {id}'s untagged scenarios not evidenced before {id} adopted its first change, while no adopted change is approved) until it is recorded; once the human answers, {} (one call records the brief and the policy approval)",
                 brief.unanswered(),
                 brief.record()
             ),
@@ -1111,7 +1111,7 @@ fn subject_steps(
     // A shipped subject whose gate went red (0.18 D3) is reopened first:
     // every gap below is follow-up work inside its approved change.
     if status == SubjectStatus::Shipped && !summary.red.is_empty() {
-        let tasks = match summary.brief.as_ref().and_then(|brief| brief.change.as_deref()) {
+        let tasks = match summary.brief.as_ref().and_then(|brief| brief.change.as_deref()).filter(|_| !on_pending_draft(summary)) {
             Some(change) => format!("keep the follow-up in its approved change `{change}` (never `canon change new`)"),
             None => "keep the follow-up in its change".to_string(),
         };
@@ -1435,7 +1435,11 @@ pub fn render(report: &StatusReport) -> String {
                 }
             }
             if !s.red.is_empty() {
-                let _ = writeln!(out, "      gate: red — {}; reopen with `{}`", s.red.join(", "), reopen_command(&s.id));
+                if s.brief.as_ref().is_some_and(|brief| brief.enforced) && !on_pending_draft(s) {
+                    let _ = writeln!(out, "      gate: red — {}; reopening is refused until the brief above is approved (answer it, or `canon subject unadopt` the change, or remove its `@flow:` tags)", s.red.join(", "));
+                } else {
+                    let _ = writeln!(out, "      gate: red — {}; reopen with `{}`", s.red.join(", "), reopen_command(&s.id));
+                }
             }
         }
     }

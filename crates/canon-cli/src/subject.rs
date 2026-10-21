@@ -911,6 +911,7 @@ pub fn run_status(
         if hints.is_empty() {
             hints.push("fix each violation above (`canon gate check` lists them with their causes), then run this transition again".to_string());
         }
+        hints.extend(pending_note.iter().cloned());
         return CliError::failed("SUBJECT_GATE_VIOLATION", lines).with_exit(EXIT_GATED).hint(hints.join("; ")).emit("canon subject status", json);
     }
 
@@ -939,9 +940,10 @@ pub fn run_status(
             return CliError::failed("SUBJECT_GATE_VIOLATION", lines)
                 .with_exit(EXIT_GATED)
                 .hint(format!(
-                    "{}, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject{}",
+                    "{}, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject{}{}",
                     fixes.join("; "),
-                    if review_gaps { " and `canon gate check` keeps listing these gaps" } else { "" }
+                    if review_gaps { " and `canon gate check` keeps listing these gaps" } else { "" },
+                    pending_note.iter().map(|note| format!("; {note}")).collect::<String>()
                 ))
                 .emit("canon subject status", json);
         };
