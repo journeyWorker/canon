@@ -1,7 +1,7 @@
 canon migrate: plan:
   write .canon/changes/c-checkout/brief.md (Source: openspec/changes/c-checkout/proposal.md; Approved: ana 2026-10-10 — "go"); the Approved: line stays in openspec/changes/c-checkout/proposal.md, which canon does not edit
   canon.yaml: skills.providers: [codex] (from the install lock)
-  .gitignore: add .canon/audit/, .canon/ledger/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/
+  .gitignore: add .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/
   canon.yaml: every other byte kept
   rebuild the scenario index (full sync)
   left: 1 openspec change(s) not written by `canon change new` stay where they are, read as an external plan: c-checkout

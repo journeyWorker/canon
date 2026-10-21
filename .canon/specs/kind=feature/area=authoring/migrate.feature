@@ -136,7 +136,17 @@ Feature: canon migrate
   @case:edge
   @authoring.migrate.13
   Scenario: migrate adds the missing managed gitignore lines to an existing block and a second run adds none
-    Given a repo whose gitignore already holds canon's block without the dashboard-snapshot, learn and r2 lines
+    Given a repo whose gitignore already holds canon's block without the scenario archive, dashboard-snapshot, learn and r2 lines
     When canon migrate runs, and again
     Then the first run adds exactly the missing lines under their comments and keeps every other byte of the gitignore
     And the second run adds none
+
+  # canon: {"schema":1,"at":"2026-10-21T17:24:55Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.migrate.14
+  Scenario: migrate adds only the missing line when its managed comment is kept
+    Given a gitignore that kept a managed comment but lost the line under it
+    When canon migrate runs, and again
+    Then the first run writes only the missing line, directly under its comment, and no comment twice
+    And the second run changes nothing

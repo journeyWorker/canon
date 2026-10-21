@@ -113,6 +113,13 @@ pub const AUDIT_GITIGNORE: &str = ".canon/audit/";
 /// `canon init` keeps it out of git.
 pub const SCENARIO_INDEX_GITIGNORE: &str = ".canon/ledger/kind=scenario/";
 
+/// The `.gitignore` line covering the archive of superseded `Scenario`
+/// index versions (`kind=scenario/` under `.canon/archive`): every rewrite
+/// of the derived index moves the previous version there, so it is as
+/// derived as the index itself. No reader needs it for correctness; only
+/// `canon query --history --kind scenario` lists it.
+pub const SCENARIO_ARCHIVE_GITIGNORE: &str = ".canon/archive/kind=scenario/";
+
 /// The advisory lock `canon inventory sync` and every reader's
 /// stale-index refresh hold while they write the scenario index, so two
 /// of them never index the same change twice. An OS file lock
@@ -160,6 +167,7 @@ mod tests {
             DASHBOARD_SNAPSHOT_GITIGNORE,
             R2_LOCAL_GITIGNORE,
             SCENARIO_INDEX_GITIGNORE,
+            SCENARIO_ARCHIVE_GITIGNORE,
             SCENARIO_INDEX_LOCK_FILE,
             ARTIFACT_STORE_LOCK_FILE,
         ];

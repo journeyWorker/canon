@@ -1,9 +1,9 @@
 canon migrate: plan:
-  .gitignore: add .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/
+  .gitignore: add .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/
   rebuild the scenario index (full sync)
   left: .canon stays where it is: the openspec reader cannot read it (invalid-change-id-grammar)
   left: .git stays where it is: the openspec reader cannot read it (invalid-change-id-grammar)
-canon migrate: added to .gitignore: .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/
+canon migrate: added to .gitignore: .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/
   change           moved 1 of 2 file(s) (0.2 KiB); 1 stay
   subject          moved 3 of 4 file(s) (0.8 KiB); 1 stay
 canon ledger compact: moved 4 superseded version(s) to .canon/archive; `canon query --history` reads them
