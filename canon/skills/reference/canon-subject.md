@@ -204,6 +204,19 @@ scenario whose `@subject` owner, or a task whose change
 an adopting subject, has an enforced, unapproved brief, through the same
 check; see `canon-gate`.
 
+**Approval is scoped to the scenarios a change names.** The evidence
+refusal asks the approval of each change the scenario's `@flow:<change>.<F-id>`
+tags name. An untagged scenario answers to the subject's newest adopted
+change whose brief carries an `Approved:` line; if no adopted change ever
+did, a scenario that already has evidence needs no brief, and one without
+evidence answers to the newest adopted change. A task answers to its own
+change. So planning the next change for a `building`, `verifying` or
+`shipped` subject does not freeze re-verification of its existing
+scenarios; scenarios written for the new change (`canon scenario new
+--flow <F-id>` tags them) wait for its approval. The ship guard above is
+unchanged: the subject cannot ship until its newest adopted change is
+approved.
+
 ### The review guard (`spec_coverage.require_review`, opt-in)
 
 When `.canon/policy.yaml` sets `spec_coverage.require_review` (see
@@ -344,6 +357,24 @@ first: a half-done adoption still has that change's open blockers
 counted. If the change write then fails, `adopt` exits `2`, names the
 subject that now lists the change, and prints `canon subject adopt
 <change_id> --subject-id <id>` to complete it.
+
+`canon change new <slug> --subject-id <S>` and `canon subject adopt
+<change> --subject-id <S>` print a warning on stderr, and in JSON
+`meta.warnings`, when `<S>` is `building`, `verifying` or `shipped` and the
+change's brief is not approved: the new change gates the subject's ship until
+its brief is answered.
+
+### Taking a draft change back out: `canon subject unadopt`
+
+```bash
+canon subject unadopt <change> --subject-id <S> --as planner --json
+```
+
+Removes the link on both records and keeps the change and its brief, so the
+draft can be adopted elsewhere (a `proposed` holding subject, say) while the
+live subject keeps shipping. It is refused with `SUBJECT_UNADOPT_REFUSED`
+for a change whose brief carries an `Approved:` line; an unlinked pair is a
+no-op.
 
 ### Starting a new change: `canon change new`
 

@@ -31,6 +31,13 @@ a feature, a one-line request included. A human is needed once per scope:
   approval is not approved (`BRIEF_CHANGED_SINCE_APPROVAL`): it needs a new
   answer. The ship guard and `canon evidence add` refuse an unapproved or
   edited brief, but those are backstops: the stop itself is at step 1.
+- **Approval is scoped.** Evidence for a scenario needs the approval of the
+  changes its `@flow:<change>.<F-id>` tags name, so a new unapproved change
+  on a live subject waits on its own scenarios only; `change new` and
+  `subject adopt` warn when the subject is live. `canon subject unadopt
+  <change> --subject-id <id>` takes a draft change back off (refused once
+  approved). The subject still ships only when its newest adopted change is
+  approved. → `reference/canon-subject.md`
 - **Inside an approved scope, never stop for a human.** Fixes, follow-ups,
   review rounds and re-reviews stay in the approved change (never
   `canon change new`: a new change is a new scope) and go straight on: scenario,
@@ -160,7 +167,7 @@ never by assuming a default. The projection is a read-only copy: Claude
 - **Pure refactor, dependency, build, CI or infra:** `canon change new <slug> --subject-id <id> --kind chore`; data or interface changes are not chores. `reference/role-planner.md`.
 - **Review someone's change:** `CANON_ROLE=reviewer`, `canon brief check --change-id <slug>`. `reference/role-reviewer.md`.
 - **Resume:** `canon status --json`, then follow `meta.next`. `reference/role-orchestrator.md`.
-- **Plan more work on a live subject:** a new change adopted into a live subject; read `reference/canon-subject.md` first. `reference/role-planner.md`.
+- **Plan more work on a live subject:** `canon change new <slug> --subject-id <id>` (it warns until the brief is approved; `canon subject unadopt` parks a draft). `reference/canon-subject.md`, `reference/role-planner.md`.
 - **Upgrade canon in a repo:** `canon migrate --dry-run`. `reference/role-orchestrator.md`.
 - **Your role's steps:** `reference/role-planner.md`, `role-implementer.md`, `role-reviewer.md`, `role-orchestrator.md`.
 - **Where the repo stands, subjects and changes:** `reference/canon-subject.md` (`canon status`, `canon subject new|adopt|status`, `canon change new`).

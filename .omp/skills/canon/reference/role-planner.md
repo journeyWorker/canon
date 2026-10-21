@@ -15,6 +15,7 @@ canon subject new <subject-id> --domain <domain> --title "<title>" --actor-id <u
 canon change new <slug> --subject-id <subject-id> --title "<title>" --as planner --json
 canon change new <slug> --subject-id <subject-id> --kind chore --title "<title>" --as planner --json
 canon subject adopt <slug> --subject-id <other-subject-id> --as planner --json
+canon subject unadopt <slug> --subject-id <subject-id> --as planner --json   # a draft change off a live subject; refused once its brief is approved
 canon brief check --change-id <slug> --as planner --json
 canon brief approve --change-id <slug> --by "<the human>" --note "<their words>" --as planner --json
 ```
@@ -34,7 +35,14 @@ unapproved. A policy that no longer matches its approval fails closed
    `tasks.md` (`tasks.md` is an optional work note nothing gates on). A
    change that also serves another subject is adopted there too
    (`subject adopt`): it then belongs to both,
-   and its open blockers gate both. Inside an approved scope there is no new
+   and its open blockers gate both. Planning the next change for a
+   `building`, `verifying` or `shipped` subject warns (stderr and JSON
+   `meta.warnings`) until its brief is approved: the subject cannot ship
+   before then, but evidence for its existing scenarios is not frozen,
+   because a scenario answers to the changes its `@flow:<change>.<F-id>`
+   tags name (`canon scenario new --flow <F-id>` tags one for this change).
+   To park a draft that should not gate a live subject, `subject unadopt`
+   it and adopt it into a `proposed` subject. Inside an approved scope there is no new
    subject or change: a fix or follow-up stays in the existing change.
 2. **Write the brief.** Briefs outlive the code that exists today and are
    read by sessions that did not write them. Intent says what the product
