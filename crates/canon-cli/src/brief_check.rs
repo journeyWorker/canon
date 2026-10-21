@@ -971,6 +971,13 @@ fn blocks(section: &Section) -> Vec<Block> {
             out.extend(current.take());
             continue;
         }
+        // A markdown table row is not a sentence: tables are left out of
+        // every sentence, paragraph and aside measurement (their cell text
+        // is not read by any prose rule, but `prose.length` counts it).
+        if trimmed.starts_with('|') {
+            out.extend(current.take());
+            continue;
+        }
         if trimmed.starts_with('#') {
             if heading_seen {
                 out.extend(current.take());
@@ -1368,7 +1375,7 @@ fn ko_ending(sentence: &str, item: bool) -> Option<String> {
         return None;
     }
     let tilde = |suffix: &str| Some(format!("~{suffix}"));
-    if end.ends_with("니다") || end.ends_with("니까") {
+    if is_polite_ending(end) {
         return tilde(&end[end.len() - 6..]);
     }
     if end.ends_with("시다") {
@@ -1390,6 +1397,15 @@ fn ko_ending(sentence: &str, item: bool) -> Option<String> {
         return None;
     }
     end.split_whitespace().next_back().map(|w| format!("…{w}"))
+}
+
+/// Whether `end` ends in the polite `~ㅂ니다` / `~ㅂ니까` form: the syllable
+/// before `니다` has the final consonant ㅂ (합니다, 입니다, 없습니다). A word
+/// whose plain form ends in `니다` (아니다, 지니다, 다니다) is not polite.
+fn is_polite_ending(end: &str) -> bool {
+    ["니다", "니까"].iter().any(|tail| {
+        end.strip_suffix(tail).and_then(|head| head.chars().next_back()).is_some_and(|c| ('\u{AC00}'..='\u{D7A3}').contains(&c) && (c as u32 - 0xAC00) % 28 == 17)
+    })
 }
 
 /// `s` without its parenthesized asides.
@@ -2043,6 +2059,13 @@ mod tests {
         assert_eq!(end("영수증을 보냅니다.", true).as_deref(), Some("~니다"));
         assert_eq!(end("영수증 화면", false), None);
         assert_eq!(end("영수증이 열립니다", false).as_deref(), Some("~니다"));
+        // Plain forms that end in 니다 are not polite.
+        for plain in ["가정: 아니다.", "서버는 열쇠를 지니다.", "매일 학교에 다닌다.", "값이 다니다."] {
+            assert_eq!(end(plain, false), None, "{plain}");
+        }
+        for polite in ["이것은 합니다.", "이것은 입니다.", "값이 없습니다.", "갑니다."] {
+            assert_eq!(end(polite, false).as_deref(), Some("~니다"), "{polite}");
+        }
     }
 
     #[test]

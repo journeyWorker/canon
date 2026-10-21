@@ -372,6 +372,11 @@ fn authoring_brief_check_10_a_korean_sentence_not_ending_in_da_is_flagged() {
     assert!(hits(&judged(None, &flow), "prose.ko-ending").is_empty(), "flow-step clauses are exempt");
     let asked = swap(&ko, "- 영수증 용지가 떨어지면 화면 영수증만 보여 주는 것으로 가정한다.", "- 용지가 떨어지면 화면 영수증만 보여 줄까?\n- 없음.");
     assert!(hits(&judged(None, &asked), "prose.ko-ending").is_empty());
+    // Plain forms that end in 니다 (아니다, 지니다, 다닌다) are not polite; 합니다, 입니다, 없습니다 are.
+    let plain = swap(&ko, "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보낸다.", "- 가정: 아니다.\n- 반납함은 태그를 지니다.\n- 이용자는 매일 반납함에 다닌다.");
+    assert!(hits(&judged(None, &plain), "prose.ko-ending").is_empty());
+    let polite = swap(&ko, "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보낸다.", "- 영수증은 한 장입니다.\n- 용지가 없습니다.\n- 반납함이 닫힙니다.");
+    assert_eq!(hits(&judged(None, &polite), "prose.ko-ending").len(), 3);
     // English text never gets it.
     let en = swap(&fixture("good-en-cobalt.md"), "Recurring meetings.", "Recurring meetings are planned.");
     assert!(hits(&judged(None, &en), "prose.ko-ending").is_empty());
@@ -475,4 +480,15 @@ fn authoring_brief_check_14_status_counts_the_findings_of_the_detected_language(
     write_brief(dir.path(), &fixture("good-ko-lantern.md"));
     let status = stdout(&ok(dir.path(), &["status"]));
     assert!(status.contains("brief check: 0 blocker(s), 0 advisory(ies)") || !status.contains("brief check:"), "{status}");
+}
+
+/// authoring.brief-check.15: a markdown table is not read as sentences.
+#[test]
+fn authoring_brief_check_15_a_markdown_table_is_not_measured_as_a_sentence() {
+    let ko = fixture("good-ko-lantern.md");
+    let rows: String = (1..=6).map(|i| format!("| 상태 {i} | 반납함은 책 태그를 읽고 대출 목록에서 해당 책을 지운 뒤 영수증을 화면과 문자로 보여 준다 | 이용자에게 보인다 |\n")).collect();
+    let table = format!("| 상태 | 동작 | 결과 |\n|---|---|---|\n{rows}\n");
+    let text = swap(&ko, "### F2 인식 실패\n", &format!("{table}### F2 인식 실패\n"));
+    let report = judged(None, &text);
+    assert_eq!(rules(&report), Vec::<String>::new(), "no sentence, paragraph, aside or ending rule reads a table: {report}");
 }
