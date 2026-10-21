@@ -1035,7 +1035,6 @@ fn subject_steps(
 ) {
     let id = subject.subject_id.as_str();
     let status = subject.status;
-    let before = next.len();
 
     // A pending draft awaits the human but blocks nothing: its subject keeps
     // building, attesting and shipping for its approved scope.
@@ -1051,6 +1050,8 @@ fn subject_steps(
             ),
         });
     }
+    // The pending-draft step is not a gap: it must not hold back the advance.
+    let before = next.len();
     if let Some(brief) = summary.brief.as_ref().filter(|brief| brief.enforced && summary.pending_draft.is_none()) {
         // A brief `canon brief check` still has blockers for is the planner's
         // to write; the human is asked only once it is clean (0.22 D4).
@@ -1268,7 +1269,11 @@ fn subject_steps(
             why: match status {
                 SubjectStatus::Proposed | SubjectStatus::Specced => format!("{id} has its scenarios and every required case; move it on"),
                 SubjectStatus::Verifying => {
-                    let brief = if summary.brief.as_ref().is_some_and(|brief| brief.approved) { "the brief is approved" } else { "no brief is written to approve" };
+                    let brief = match (&summary.pending_draft, summary.brief.as_ref().is_some_and(|brief| brief.approved)) {
+                        (Some(_), _) => "its approved scope's brief is approved (the newer draft is pending)",
+                        (None, true) => "the brief is approved",
+                        (None, false) => "no brief is written to approve",
+                    };
                     format!("{id}: every scenario is evidenced{reviewed}, with no blocker or case gap, and {brief}; ship it yourself unless the brief says the human ships")
                 }
                 _ => format!("{id}: every scenario is evidenced{reviewed}, with no blocker or case gap"),
