@@ -1436,7 +1436,7 @@ pub fn render(report: &StatusReport) -> String {
             }
             if !s.red.is_empty() {
                 if s.brief.as_ref().is_some_and(|brief| brief.enforced) && !on_pending_draft(s) {
-                    let _ = writeln!(out, "      gate: red — {}; reopening is refused until the brief above is approved (answer it, or `canon subject unadopt` the change, or remove its `@flow:` tags)", s.red.join(", "));
+                    let _ = writeln!(out, "      gate: red — {}; reopening is refused until the brief above is approved (answer it, or remove its `@flow:` tags, after which `canon subject unadopt` can take the change back)", s.red.join(", "));
                 } else {
                     let _ = writeln!(out, "      gate: red — {}; reopen with `{}`", s.red.join(", "), reopen_command(&s.id));
                 }
