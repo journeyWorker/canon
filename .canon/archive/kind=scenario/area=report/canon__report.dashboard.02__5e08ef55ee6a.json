@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:51:47.576885443Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "496fd150e488544c36e097172abaf0951d127be194a06c88f3559c4ee9862995",
+  "scenario_id": "report.dashboard.02",
+  "schema": 1,
+  "source_digest": "e8e30a1d1eb792b35472719012d8f8ef9fe288d9ed679ee0e27eed36aa30e98e",
+  "subject_id": "report-generation",
+  "title": "With no app to serve the dashboard refuses and names how to get one"
+}

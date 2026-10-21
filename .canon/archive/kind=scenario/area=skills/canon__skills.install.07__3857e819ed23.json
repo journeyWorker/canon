@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:51:47.790745595Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "20026dad9ae5b63d1d7401454c7e10218488ea757ba6772beeb93ccc2e27cf38",
+  "scenario_id": "skills.install.07",
+  "schema": 1,
+  "source_digest": "7e460ee5b1d29fca4930fd860fdb915303b4efb96310b6b2bd4eeebd4fb9816d",
+  "subject_id": "skills-install",
+  "title": "An unknown provider is refused before anything is written"
+}

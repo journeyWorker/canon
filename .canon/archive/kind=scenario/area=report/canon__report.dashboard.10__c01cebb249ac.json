@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:51:47.612081242Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "b3a05ceea4594282eb6cff62a22bf6fb20fee79704e8e061b27319b81fa4c5fd",
+  "scenario_id": "report.dashboard.10",
+  "schema": 1,
+  "source_digest": "e8e30a1d1eb792b35472719012d8f8ef9fe288d9ed679ee0e27eed36aa30e98e",
+  "subject_id": "report-generation",
+  "title": "An empty or multi-line answer, an unknown change and a malformed body write nothing"
+}

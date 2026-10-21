@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.964855316Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "c80cc4d3b505f79196fa60d266edf8174814b4ea4596cd40c2d2494b5cccc0e8",
+  "scenario_id": "evidence.add.80",
+  "schema": 1,
+  "source_digest": "1aeb6655507494b4e12662815e0b2d8738f1b193b83192485a6cb440427cdfa2",
+  "subject_id": "evidence-attestation",
+  "title": "One report attests every indexed scenario that owns a case in it, one record each"
+}

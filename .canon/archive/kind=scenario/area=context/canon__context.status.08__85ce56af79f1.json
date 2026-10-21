@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.678856332Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "35320014f20d80888ae5d40a512c95a5175ec65e1efa82bf251629e1c894a5e7",
+  "scenario_id": "context.status.08",
+  "schema": 1,
+  "source_digest": "f87925aa65ca74205807b5d1fccae5481c7dc1d82e72caf341d4b57665029d67",
+  "subject_id": "context-capability",
+  "title": "Status caps the next list at five and counts the rest"
+}

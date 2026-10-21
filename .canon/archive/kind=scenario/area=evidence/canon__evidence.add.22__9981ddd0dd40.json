@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.873074524Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "90082b417c7906fe86bcef6c6ef2a460cb29ff53be7141a0a71ec286dc67fbb8",
+  "scenario_id": "evidence.add.22",
+  "schema": 1,
+  "source_digest": "1aeb6655507494b4e12662815e0b2d8738f1b193b83192485a6cb440427cdfa2",
+  "subject_id": "evidence-attestation",
+  "title": "A report case binds only to its own leading scenario id, never to one it mentions"
+}

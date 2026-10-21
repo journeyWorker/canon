@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:51:47.890926966Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "85183a8b14d0b08a74ba26e62d6ee1548c8283744c2b6ee03548c467e18ce568",
+  "scenario_id": "skills.install.60",
+  "schema": 1,
+  "source_digest": "7e460ee5b1d29fca4930fd860fdb915303b4efb96310b6b2bd4eeebd4fb9816d",
+  "subject_id": "skills-install",
+  "title": "Install keeps a dropped projected file whose bytes changed and says what to do"
+}

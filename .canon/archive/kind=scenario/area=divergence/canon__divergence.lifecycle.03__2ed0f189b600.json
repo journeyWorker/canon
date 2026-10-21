@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:31.924697274Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "0a4f49305f14380fee11e6dbb6d3209053c83eb306a182f30a4bb687ffa4d231",
+  "scenario_id": "divergence.lifecycle.03",
+  "schema": 1,
+  "source_digest": "b2fb7a574036d2f14866efd8257507de149bafae9dd0174182cbf478e0850b1b",
+  "subject_id": "divergence-lifecycle",
+  "title": "Resolving and deferring stage and promote their own record and leave other staged work alone"
+}

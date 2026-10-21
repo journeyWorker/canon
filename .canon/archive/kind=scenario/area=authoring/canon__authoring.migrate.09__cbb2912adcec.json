@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.342820417Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "b2f176832b4000c4721054f589eb08bb239772211469f6cfee152c61526bc1e5",
+  "scenario_id": "authoring.migrate.09",
+  "schema": 1,
+  "source_digest": "17f3f0d629d1cd160448779c6f8b09d47f086c2e41b1ba5272a584c2b5ceaf75",
+  "subject_id": "authoring-scaffold",
+  "title": "A migrate run that stopped before writing canon.yaml is finished by the next run"
+}

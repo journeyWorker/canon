@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.715112936Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "0cf833870678480b6c292d4c6ebe8973577bc59d0009873ea0bd4c88dd05363d",
+  "scenario_id": "context.status.40",
+  "schema": 1,
+  "source_digest": "f87925aa65ca74205807b5d1fccae5481c7dc1d82e72caf341d4b57665029d67",
+  "subject_id": "context-capability",
+  "title": "Status warns that the policy in force is not the approved one"
+}

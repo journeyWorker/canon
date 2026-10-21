@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.761839536Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "19334dc2f7ecc7c72df51d1a84f26e7f9c33b2e8776cbc81631747193175a881",
+  "scenario_id": "context.status.67",
+  "schema": 1,
+  "source_digest": "f87925aa65ca74205807b5d1fccae5481c7dc1d82e72caf341d4b57665029d67",
+  "subject_id": "context-capability",
+  "title": "A proposed subject with no brief to answer keeps its steps, and showing a brief adds no transition check"
+}

@@ -1,0 +1,16 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.268196436Z",
+  "case": "happy",
+  "kind": "scenario",
+  "lane": "behavior",
+  "project_id": "canon",
+  "scenario_digest": "3f6aaddacca2a1542967d799277d2bb2633cdb3dce80799a5492930e5a255cca",
+  "scenario_id": "authoring.scaffold.09",
+  "schema": 1,
+  "source_digest": "fee1e9173653e9eb17b4e7cd845cb0db8ba657352b4e462da47f83659df7a5be",
+  "subject_id": "authoring-scaffold",
+  "title": "The provenance line leads the scenario's tags and carries the actor the author named"
+}

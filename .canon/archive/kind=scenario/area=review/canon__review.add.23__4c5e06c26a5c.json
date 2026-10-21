@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.095249774Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "277fcd2abe562ea7990e942f5c8aac7fae8fa3866ff6def48a565c9594b34475",
+  "scenario_id": "review.add.23",
+  "schema": 1,
+  "source_digest": "c6d5fb358d87950c0bb73ba4984bba92cc3d7fa58da61b0811a1f45c20c076ab",
+  "subject_id": "review-attestation",
+  "title": "A pinned review turns stale when its scenario's evidence says something different"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.114939544Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "d442d53afa285ec9967a37f90ed5c25356e391707ee74ca1f1b3fb18c80d52c0",
+  "scenario_id": "review.add.80",
+  "schema": 1,
+  "source_digest": "c6d5fb358d87950c0bb73ba4984bba92cc3d7fa58da61b0811a1f45c20c076ab",
+  "subject_id": "review-attestation",
+  "title": "One review add signs off several scenarios with one reviewer, pin and set of artifacts"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.276589311Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "d5514d624170872377167ea5ffd660568b1bb77050f7b9b05fee577ee31cc32e",
+  "scenario_id": "authoring.scaffold.12",
+  "schema": 1,
+  "source_digest": "fee1e9173653e9eb17b4e7cd845cb0db8ba657352b4e462da47f83659df7a5be",
+  "subject_id": "authoring-scaffold",
+  "title": "The scaffold writes the case tag after subject and lane"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.969165014Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "a2459381b6d79dc2d9274b771fb7dfddf78100536620f7471f06efd766c741c3",
+  "scenario_id": "evidence.add.81",
+  "schema": 1,
+  "source_digest": "1aeb6655507494b4e12662815e0b2d8738f1b193b83192485a6cb440427cdfa2",
+  "subject_id": "evidence-attestation",
+  "title": "A faithful claim over a batch with any failed case refuses the whole batch"
+}

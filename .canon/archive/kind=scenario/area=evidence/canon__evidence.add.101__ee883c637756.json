@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:58.039990482Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "22f28e3f7c1b7b6a67872a508f09f57bd98696a5d6b80e5ff5b02df3a16fcd0a",
+  "scenario_id": "evidence.add.101",
+  "schema": 1,
+  "source_digest": "1aeb6655507494b4e12662815e0b2d8738f1b193b83192485a6cb440427cdfa2",
+  "subject_id": "evidence-attestation",
+  "title": "A subject whose only change is unapproved, or whose approval was edited, still refuses evidence"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:51:47.777982992Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "e428a411c51decfe5e476d6792e259984797b2bb9c941c68eb699073d660a4ce",
+  "scenario_id": "skills.install.02",
+  "schema": 1,
+  "source_digest": "7e460ee5b1d29fca4930fd860fdb915303b4efb96310b6b2bd4eeebd4fb9816d",
+  "subject_id": "skills-install",
+  "title": "A rerun with no source change reports unchanged rather than rewriting"
+}

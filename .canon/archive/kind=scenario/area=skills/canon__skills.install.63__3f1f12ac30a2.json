@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:51:47.903433498Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "6a2282ce71354904b160fdfdd5766519a02b459d13f4a928078981f8cc104b75",
+  "scenario_id": "skills.install.63",
+  "schema": 1,
+  "source_digest": "7e460ee5b1d29fca4930fd860fdb915303b4efb96310b6b2bd4eeebd4fb9816d",
+  "subject_id": "skills-install",
+  "title": "Install ignores a lock key that is not a plain relative path inside a canon projection"
+}

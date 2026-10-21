@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:51:47.598757342Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "1e4ac65df2065e8737d129bcd20d12bae1085699843cc4986d7806a083cf89bb",
+  "scenario_id": "report.dashboard.07",
+  "schema": 1,
+  "source_digest": "e8e30a1d1eb792b35472719012d8f8ef9fe288d9ed679ee0e27eed36aa30e98e",
+  "subject_id": "report-generation",
+  "title": "A brief that changed since the page loaded is refused and left as it is"
+}

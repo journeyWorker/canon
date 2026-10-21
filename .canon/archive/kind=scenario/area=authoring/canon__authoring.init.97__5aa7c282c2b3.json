@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.327680542Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "77264c3809b4b5233c09c327d5f8dbbf6cc29b450948d14c55dee69ac4b6344c",
+  "scenario_id": "authoring.init.97",
+  "schema": 1,
+  "source_digest": "60819d707d18efd7561d44b1b401d170950a436a714ab172e330893dc4799c06",
+  "subject_id": "authoring-scaffold",
+  "title": "Init re-run on an existing repo adds the canon gitignore lines it lacks"
+}

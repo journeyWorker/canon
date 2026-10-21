@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.674345302Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "ea548188e03fb89469e3e318d62005710241f538195b5f24aa938de63cb52aa1",
+  "scenario_id": "context.status.07",
+  "schema": 1,
+  "source_digest": "f87925aa65ca74205807b5d1fccae5481c7dc1d82e72caf341d4b57665029d67",
+  "subject_id": "context-capability",
+  "title": "Status is a read that exits zero and writes nothing"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.339565393Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "cf939aed97c952b0da50d2f982749d64df9291fbd3be95b4cfd4f196a9d9336a",
+  "scenario_id": "authoring.migrate.07",
+  "schema": 1,
+  "source_digest": "17f3f0d629d1cd160448779c6f8b09d47f086c2e41b1ba5272a584c2b5ceaf75",
+  "subject_id": "authoring-scaffold",
+  "title": "Reviews pinned before the move stay current after the spec root moves into .canon"
+}

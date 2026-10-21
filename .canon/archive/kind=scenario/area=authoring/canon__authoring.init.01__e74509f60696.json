@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.279912306Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "aae618d59e42d76f4a61fc60a941f2fb1692ad58b70932e7b21c082f9061698e",
+  "scenario_id": "authoring.init.01",
+  "schema": 1,
+  "source_digest": "60819d707d18efd7561d44b1b401d170950a436a714ab172e330893dc4799c06",
+  "subject_id": "authoring-scaffold",
+  "title": "A fresh init writes the config, a starter policy, the AGENTS.md block and commented plans examples"
+}

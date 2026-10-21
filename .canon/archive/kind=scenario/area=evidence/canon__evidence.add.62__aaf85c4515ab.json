@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.914100070Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "9bf8e66945a44ae416aac731429cb3bd30b16b11fd7c444a7adb518b3938d678",
+  "scenario_id": "evidence.add.62",
+  "schema": 1,
+  "source_digest": "1aeb6655507494b4e12662815e0b2d8738f1b193b83192485a6cb440427cdfa2",
+  "subject_id": "evidence-attestation",
+  "title": "Auto promotion commits every staged write and no-promote keeps one staged"
+}

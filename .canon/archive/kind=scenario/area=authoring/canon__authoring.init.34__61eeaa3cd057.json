@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.306311975Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "62ddde37f26b645de5ba90c988a903d403ed149165fe2ad81c68240eb26808b0",
+  "scenario_id": "authoring.init.34",
+  "schema": 1,
+  "source_digest": "60819d707d18efd7561d44b1b401d170950a436a714ab172e330893dc4799c06",
+  "subject_id": "authoring-scaffold",
+  "title": "A policy level together with no-policy is refused"
+}

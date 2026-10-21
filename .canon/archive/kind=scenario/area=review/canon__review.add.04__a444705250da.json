@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.079226039Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "a0affe661162e3c80b896f86231932c3c8d31564f7d9efb423798c6aeb6a75ec",
+  "scenario_id": "review.add.04",
+  "schema": 1,
+  "source_digest": "c6d5fb358d87950c0bb73ba4984bba92cc3d7fa58da61b0811a1f45c20c076ab",
+  "subject_id": "review-attestation",
+  "title": "The pinned commit is part of a review's identity"
+}

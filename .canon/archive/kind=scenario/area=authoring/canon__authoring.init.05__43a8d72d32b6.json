@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.286407482Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "b16e48d48f1dd836dcf166c6f7354ce4f61409b78a0217f703c701d5f80b2324",
+  "scenario_id": "authoring.init.05",
+  "schema": 1,
+  "source_digest": "60819d707d18efd7561d44b1b401d170950a436a714ab172e330893dc4799c06",
+  "subject_id": "authoring-scaffold",
+  "title": "A rerun with nothing to refresh refuses to overwrite canon.yaml"
+}

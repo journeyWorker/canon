@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:51:47.808197859Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "c9065ec3847ac7f8afed3625e51885e3db961222987a8cca8d373709d1db67f9",
+  "scenario_id": "skills.install.11",
+  "schema": 1,
+  "source_digest": "7e460ee5b1d29fca4930fd860fdb915303b4efb96310b6b2bd4eeebd4fb9816d",
+  "subject_id": "skills-install",
+  "title": "The projected skill claims build work in a canon repo and opens with the working loop"
+}

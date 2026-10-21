@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.119730732Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "392374d4dda4a4f6444a4085ccc0a70a9b3e421087c88c389ec2cc5c5b73a03b",
+  "scenario_id": "review.add.91",
+  "schema": 1,
+  "source_digest": "c6d5fb358d87950c0bb73ba4984bba92cc3d7fa58da61b0811a1f45c20c076ab",
+  "subject_id": "review-attestation",
+  "title": "A review that went stale and was reviewed again by another reviewer is superseded, so its files are neither checked nor vaulted"
+}

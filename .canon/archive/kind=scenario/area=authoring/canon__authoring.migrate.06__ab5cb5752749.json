@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.337914676Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "818bf31e3975822d5a0e1a42d3da14e60eeb836579475346fc68ed02b0552a19",
+  "scenario_id": "authoring.migrate.06",
+  "schema": 1,
+  "source_digest": "17f3f0d629d1cd160448779c6f8b09d47f086c2e41b1ba5272a584c2b5ceaf75",
+  "subject_id": "authoring-scaffold",
+  "title": "A change with only one sign that canon change new wrote it stays where it is and is named"
+}

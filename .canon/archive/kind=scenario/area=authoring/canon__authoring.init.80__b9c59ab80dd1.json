@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.297908589Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "152a41a052d2546418a06447a612379502f51c2a822106015c1afadedc65cd99",
+  "scenario_id": "authoring.init.80",
+  "schema": 1,
+  "source_digest": "60819d707d18efd7561d44b1b401d170950a436a714ab172e330893dc4799c06",
+  "subject_id": "authoring-scaffold",
+  "title": "Init names the command that approves its starter policy"
+}

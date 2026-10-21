@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.283107118Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "0feb534d4367bacf8229c90c054d37b7ab9d5f611ceb4c6ab898961f83231c90",
+  "scenario_id": "authoring.init.03",
+  "schema": 1,
+  "source_digest": "60819d707d18efd7561d44b1b401d170950a436a714ab172e330893dc4799c06",
+  "subject_id": "authoring-scaffold",
+  "title": "A rerun keeps canon.yaml and the policy and refreshes only the AGENTS.md block"
+}

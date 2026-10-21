@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.683394403Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "03e4ee9777492aae783378ac760a3e1813551ef3a7046679f8862bca05dae8a4",
+  "scenario_id": "context.status.09",
+  "schema": 1,
+  "source_digest": "f87925aa65ca74205807b5d1fccae5481c7dc1d82e72caf341d4b57665029d67",
+  "subject_id": "context-capability",
+  "title": "Status on subjects with no scenario records points at the inventory sync"
+}

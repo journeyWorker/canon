@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:31.921409291Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "e5a036b5266a347d274f04440c691709bc627b012b7c1382d58055b572d3ed4d",
+  "scenario_id": "divergence.lifecycle.01",
+  "schema": 1,
+  "source_digest": "b2fb7a574036d2f14866efd8257507de149bafae9dd0174182cbf478e0850b1b",
+  "subject_id": "divergence-lifecycle",
+  "title": "Promotion assigns each staged divergence a monotonic order and a refusal consumes none"
+}

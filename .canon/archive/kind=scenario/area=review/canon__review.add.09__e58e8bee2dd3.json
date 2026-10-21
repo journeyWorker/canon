@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.087202021Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "c1661f02280b5b3e514915ec3b10b3477fd207feec0e747580e2e28e5f0036f2",
+  "scenario_id": "review.add.09",
+  "schema": 1,
+  "source_digest": "c6d5fb358d87950c0bb73ba4984bba92cc3d7fa58da61b0811a1f45c20c076ab",
+  "subject_id": "review-attestation",
+  "title": "A review from a session that attested the scenario's evidence does not count under distinct_actor"
+}

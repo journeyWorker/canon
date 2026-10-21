@@ -1,0 +1,16 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.274944575Z",
+  "case": "failure",
+  "kind": "scenario",
+  "lane": "behavior",
+  "project_id": "canon",
+  "scenario_digest": "3c7db7b89d6fabef4450a05624b1e8569a362493a4ddd793ae0d5fcd68c9fe8e",
+  "scenario_id": "authoring.scaffold.11",
+  "schema": 1,
+  "source_digest": "fee1e9173653e9eb17b4e7cd845cb0db8ba657352b4e462da47f83659df7a5be",
+  "subject_id": "authoring-scaffold",
+  "title": "A lane that is not a slug is refused with nothing written"
+}

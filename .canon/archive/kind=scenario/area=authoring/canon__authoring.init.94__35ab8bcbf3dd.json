@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.322753142Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "5583bcd208c4d39dfea1c10406a87ffc6034b2b6a331892e5ce0a9ffcdb2fce0",
+  "scenario_id": "authoring.init.94",
+  "schema": 1,
+  "source_digest": "60819d707d18efd7561d44b1b401d170950a436a714ab172e330893dc4799c06",
+  "subject_id": "authoring-scaffold",
+  "title": "An unknown harness in --providers is refused before anything is written"
+}

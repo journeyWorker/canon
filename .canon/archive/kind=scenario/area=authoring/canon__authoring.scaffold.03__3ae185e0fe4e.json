@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.256959962Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "d166bb092c11a2213a3affd72add8aa97e8139c98b1448506823e70288b0e71c",
+  "scenario_id": "authoring.scaffold.03",
+  "schema": 1,
+  "source_digest": "fee1e9173653e9eb17b4e7cd845cb0db8ba657352b4e462da47f83659df7a5be",
+  "subject_id": "authoring-scaffold",
+  "title": "A scenario tag that is already present is refused rather than duplicated"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.307977932Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "c3bcd3297d8e6112ca239c5f1c7023eef49e5987c9a0711ee7c10129d407f317",
+  "scenario_id": "authoring.init.70",
+  "schema": 1,
+  "source_digest": "60819d707d18efd7561d44b1b401d170950a436a714ab172e330893dc4799c06",
+  "subject_id": "authoring-scaffold",
+  "title": "A fresh init followed by a query leaves git status clean"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.294655656Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "0a0dd5b45804a31d499ae1d3229ae54ab1113d6e1d19746ff1d15dd56cdf669d",
+  "scenario_id": "authoring.init.10",
+  "schema": 1,
+  "source_digest": "60819d707d18efd7561d44b1b401d170950a436a714ab172e330893dc4799c06",
+  "subject_id": "authoring-scaffold",
+  "title": "A duplicate or unmatched AGENTS.md marker is refused and nothing changes"
+}

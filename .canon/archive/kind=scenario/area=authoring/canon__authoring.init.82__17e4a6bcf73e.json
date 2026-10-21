@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.314566159Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "f03bab06e4b56c5626d08fc0d1723e6da831fddc8b011b787d4cc84a5f55c6e0",
+  "scenario_id": "authoring.init.82",
+  "schema": 1,
+  "source_digest": "60819d707d18efd7561d44b1b401d170950a436a714ab172e330893dc4799c06",
+  "subject_id": "authoring-scaffold",
+  "title": "The .canon/specs corpus is never ignored by git"
+}

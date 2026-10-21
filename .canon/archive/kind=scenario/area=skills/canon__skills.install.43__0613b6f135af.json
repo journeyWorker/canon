@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:51:47.834771317Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "692e6f66db31f911cfe6098f503d58e68a69c2412d0653e0aa0aec2840a0b6c8",
+  "scenario_id": "skills.install.43",
+  "schema": 1,
+  "source_digest": "7e460ee5b1d29fca4930fd860fdb915303b4efb96310b6b2bd4eeebd4fb9816d",
+  "subject_id": "skills-install",
+  "title": "Doctor warns about co-installed skills that claim build work and never edits them"
+}

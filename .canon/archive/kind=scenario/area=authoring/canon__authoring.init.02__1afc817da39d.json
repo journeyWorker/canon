@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.281520002Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "1628fcc994a01822c591d94f7a288432a6a753e6f516c37f4aa054b5aa5a7b5f",
+  "scenario_id": "authoring.init.02",
+  "schema": 1,
+  "source_digest": "60819d707d18efd7561d44b1b401d170950a436a714ab172e330893dc4799c06",
+  "subject_id": "authoring-scaffold",
+  "title": "The AGENTS.md block is appended to an existing file without touching its text"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:31.927926337Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "75984a4222368f7b0892f21342dae619cd1cbf42415fd810c28dc7d9d2ed7177",
+  "scenario_id": "divergence.lifecycle.05",
+  "schema": 1,
+  "source_digest": "b2fb7a574036d2f14866efd8257507de149bafae9dd0174182cbf478e0850b1b",
+  "subject_id": "divergence-lifecycle",
+  "title": "Run seq alone decides which record is current"
+}

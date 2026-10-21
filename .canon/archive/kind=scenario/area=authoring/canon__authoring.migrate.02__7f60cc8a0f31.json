@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.331065597Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "4117f5f874a6b140393885ab63a000870e5da006dbce2b809b7ada2d7e41ef06",
+  "scenario_id": "authoring.migrate.02",
+  "schema": 1,
+  "source_digest": "17f3f0d629d1cd160448779c6f8b09d47f086c2e41b1ba5272a584c2b5ceaf75",
+  "subject_id": "authoring-scaffold",
+  "title": "A spec root other than the repo-level specs only drops its features level"
+}

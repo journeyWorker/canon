@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:31.923065648Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "c82c0848f9d2a86c2e98d19a6f9ff33fe804c57652fead8807f49af4e25f8e8c",
+  "scenario_id": "divergence.lifecycle.02",
+  "schema": 1,
+  "source_digest": "b2fb7a574036d2f14866efd8257507de149bafae9dd0174182cbf478e0850b1b",
+  "subject_id": "divergence-lifecycle",
+  "title": "A candidate promote refuses consumes no run seq"
+}

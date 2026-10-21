@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.118142986Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "9cfbb4716d8ec20792a9d2da501ba8a26893bb5ba5ae131ffeb81c720af791ad",
+  "scenario_id": "review.add.90",
+  "schema": 1,
+  "source_digest": "c6d5fb358d87950c0bb73ba4984bba92cc3d7fa58da61b0811a1f45c20c076ab",
+  "subject_id": "review-attestation",
+  "title": "A lost review blob whose working-tree file still matches is a vault advisory, as for evidence"
+}

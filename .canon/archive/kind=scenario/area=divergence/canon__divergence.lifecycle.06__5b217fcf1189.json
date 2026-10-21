@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:31.929524323Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "76a961db15715774d74de90ce9a6debf69bf71a4c0bf269f7f34de76311e8617",
+  "scenario_id": "divergence.lifecycle.06",
+  "schema": 1,
+  "source_digest": "b2fb7a574036d2f14866efd8257507de149bafae9dd0174182cbf478e0850b1b",
+  "subject_id": "divergence-lifecycle",
+  "title": "Round breaks a tie only between records sharing a run seq"
+}

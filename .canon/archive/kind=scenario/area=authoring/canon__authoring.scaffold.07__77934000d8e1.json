@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.263305526Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "529f3092cccdfe7512b21895e81c4c6d7fe1d23fd5228e6142f0fa6ea3c55ddd",
+  "scenario_id": "authoring.scaffold.07",
+  "schema": 1,
+  "source_digest": "fee1e9173653e9eb17b4e7cd845cb0db8ba657352b4e462da47f83659df7a5be",
+  "subject_id": "authoring-scaffold",
+  "title": "Several configured roots with no selector is ambiguous and refuses rather than guessing"
+}
