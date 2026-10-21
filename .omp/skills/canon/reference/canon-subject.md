@@ -483,11 +483,15 @@ advisory, and is read as before.
   or later, a flow step no scenario points at (`brief.flow-uncovered`) or
   one with no failure scenario (`brief.flow-no-failure`): these two
   **gate shipping, never approval**.
-- **Advisories (prose, `prose.*`)**: phrase lists, sentence and
-  paragraph length, and key-sentence marking in `role=normative`
-  sections, for `language: en` and `ko`. Never an authorship verdict.
+- **Advisories (prose, `prose.*`)**: judged in the language the text is
+  written in (`language:` overrides): phrase lists, code citations,
+  asides, dates and decision notes, stock vocabulary, Korean endings and
+  length budgets, in the normative sections plus Intent and Questions;
+  sentence, paragraph and key-sentence rules in normative sections.
+  Never an authorship verdict. `reference/brief-polish.md` has each rule.
 - **Waivers**: `<!-- canon:waive <rule-id> <section-key> "<reason>" -->`,
-  one rule in one section, reason required; listed in the output.
+  one rule in one section, reason required; add `match="<text>"` to waive
+  only the findings whose matched text contains it. Listed in the output.
 - **`approve`** records the human's answer: it writes
   `Approved: <who> <when> — "<words>" (brief sha256:<digest>)` into the
   brief and records the policy approval in the same call. It refuses

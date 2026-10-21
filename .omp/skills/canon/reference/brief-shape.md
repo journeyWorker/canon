@@ -22,7 +22,7 @@ marker, never by heading text.
 - The flow is a numbered list with ids `F1`, `F2`, … each reading sees → does → becomes.
 - Intent describes what the product does today and Outcome what is true after; leftover implementation paths belong in a `Source:` line or nowhere.
 - A chore's category is exactly one of `refactor`, `dependency`, `build`, `ci`, `infra`; its invariants and checks say something.
-- A `canon:waive <rule-id> <section-key> "<reason>"` comment is well formed with a real reason.
+- A `canon:waive <rule-id> <section-key> "<reason>"` comment (optionally with `match="<text>"`) is well formed with a real reason.
 
 ## NEVER
 
