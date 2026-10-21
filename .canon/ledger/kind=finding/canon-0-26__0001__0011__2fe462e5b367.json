@@ -1,0 +1,23 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T17:16:00.605595096Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "packages/dashboard/test/briefs-render.test.ts",
+  "kind": "finding",
+  "reviewed_sha": "8eff1e88373d4c25af8f9c8a2c8a23beb90202c1",
+  "reviewer": "canon-reviewer-026",
+  "round": 1,
+  "scenario_ids": [
+    "report.dashboard.11",
+    "report.dashboard.12"
+  ],
+  "schema": 1,
+  "seq": 11,
+  "severity": "note",
+  "summary": "[spec fidelity] The When is GET /api/briefs, but the bound bun tests render hand-built Brief objects and never call the API or dashboard_briefs.rs. By hand on a live `canon dashboard`: /api/briefs returned counts, language ko detected and advisories with message=excerpt and the matched value in hint; the page showed '27 advisories in 1 of 2 briefs.', 8 rule groups with counts, and no badge on the clean brief."
+}

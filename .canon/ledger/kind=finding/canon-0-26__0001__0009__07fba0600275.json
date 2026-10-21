@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T17:15:59.931885283Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/init.rs",
+  "kind": "finding",
+  "reviewed_sha": "8eff1e88373d4c25af8f9c8a2c8a23beb90202c1",
+  "reviewer": "canon-reviewer-026",
+  "round": 1,
+  "scenario_ids": [
+    "authoring.init.98"
+  ],
+  "schema": 1,
+  "seq": 9,
+  "severity": "should_fix",
+  "summary": "[probe] Untracked derived state remains after the fix: in a fresh `canon init` git repo, editing a scenario and running a reader (`canon gate check`, documented read-only) moves the superseded scenario-index record to .canon/archive/kind=scenario/…, which no managed ignore line covers, so git status shows ?? .canon/archive/. Same in this repo: gate check at 8eff1e8 left 14 untracked .canon/archive/kind=scenario files. Not in init.98's When (report/dashboard/learn), same #105/#107 promise."
+}

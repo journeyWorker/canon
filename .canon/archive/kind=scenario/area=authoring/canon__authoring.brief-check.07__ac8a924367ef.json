@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T17:00:51.738067597Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "d0ae5b6c3417929f9652cc23d9c539740f62888445d934d878d295b871bd6b6b",
+  "scenario_id": "authoring.brief-check.07",
+  "schema": 1,
+  "source_digest": "a83a171ec2f861ce85c4c7c5505f045a89155dacfb5a08cab87267772e64fdfd",
+  "subject_id": "authoring-scaffold",
+  "title": "Parenthetical asides above the density are flagged with their count and threshold"
+}

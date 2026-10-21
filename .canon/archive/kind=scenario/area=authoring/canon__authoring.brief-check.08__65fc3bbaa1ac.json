@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T17:00:51.742344232Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "55c9977fe23b757425300d5128687cd637b8ed407fe8ce7aa0285b677f4a2b59",
+  "scenario_id": "authoring.brief-check.08",
+  "schema": 1,
+  "source_digest": "a83a171ec2f861ce85c4c7c5505f045a89155dacfb5a08cab87267772e64fdfd",
+  "subject_id": "authoring-scaffold",
+  "title": "Dates and decision notes in normative or Intent text are flagged as decision history"
+}

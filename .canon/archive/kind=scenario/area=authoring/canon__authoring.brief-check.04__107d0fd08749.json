@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T17:00:51.725984108Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "3ab45569b651a769c9fb4950343fd3c1846e74978e220979b42c342194681cfb",
+  "scenario_id": "authoring.brief-check.04",
+  "schema": 1,
+  "source_digest": "a83a171ec2f861ce85c4c7c5505f045a89155dacfb5a08cab87267772e64fdfd",
+  "subject_id": "authoring-scaffold",
+  "title": "Japanese and Chinese text is named and gets the structure rules and no prose rules"
+}

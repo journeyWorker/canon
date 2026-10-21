@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T17:00:51.718260805Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "23bd7afb76625fb68cace103f11109f17b793a50a1e335b4234b6a0b067fa33b",
+  "scenario_id": "authoring.brief-check.02",
+  "schema": 1,
+  "source_digest": "a83a171ec2f861ce85c4c7c5505f045a89155dacfb5a08cab87267772e64fdfd",
+  "subject_id": "authoring-scaffold",
+  "title": "A configured language overrides the detected one and a disagreeing text is noted in one line"
+}

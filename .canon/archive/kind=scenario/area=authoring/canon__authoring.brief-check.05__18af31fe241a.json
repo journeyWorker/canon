@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T17:00:51.729906810Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "7f4b2d9119ea24fa2ac648d9ad5c691d5abcbc0be2ccec977d4ff4d58c523638",
+  "scenario_id": "authoring.brief-check.05",
+  "schema": 1,
+  "source_digest": "a83a171ec2f861ce85c4c7c5505f045a89155dacfb5a08cab87267772e64fdfd",
+  "subject_id": "authoring-scaffold",
+  "title": "Intent and Questions are judged with the style rules, and the length and key-sentence rules stay on normative sections"
+}

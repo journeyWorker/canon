@@ -1,0 +1,23 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T17:15:58.886401485Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reviewed_sha": "8eff1e88373d4c25af8f9c8a2c8a23beb90202c1",
+  "reviewer": "canon-reviewer-026",
+  "round": 1,
+  "scenario_ids": [
+    "authoring.brief-check.06",
+    "authoring.brief-check.01"
+  ],
+  "schema": 1,
+  "seq": 6,
+  "severity": "should_fix",
+  "summary": "[probe] prose.code-citation flags product terms that are not code: 'Next.js로 만든 화면' (bare token with a .js extension), '`iPhone` 이용자' (camelCase rule in is_identifier), 'src/dst 두 지점' (SOURCE_DIRS). Scenario 01's Korean brief carries English product terms; a single-word camelCase label or a *.js product name in one is reported as a citation."
+}

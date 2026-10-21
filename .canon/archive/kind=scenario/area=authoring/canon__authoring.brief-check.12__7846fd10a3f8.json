@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T17:00:51.759432735Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "00c63f678602f2504369eaebf17fd0db0b0fc9bfde1b8bff68cdf26596944140",
+  "scenario_id": "authoring.brief-check.12",
+  "schema": 1,
+  "source_digest": "a83a171ec2f861ce85c4c7c5505f045a89155dacfb5a08cab87267772e64fdfd",
+  "subject_id": "authoring-scaffold",
+  "title": "A waiver comment clears each new rule in its section and a whole-brief finding with the key brief"
+}
