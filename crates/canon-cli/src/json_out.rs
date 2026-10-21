@@ -50,6 +50,17 @@ pub fn data_with_next_and_meta(command: &str, data: Value, after: &crate::next::
     println!("{envelope}");
 }
 
+/// The `meta` member a command's warnings travel in (0.25): `{ "warnings":
+/// [<line>, …] }`, or null when there is none. A warning is also said on
+/// stderr, in both modes, by the command that raises it.
+pub fn warnings_meta(warnings: &[String]) -> Value {
+    if warnings.is_empty() {
+        Value::Null
+    } else {
+        json!({ "warnings": warnings })
+    }
+}
+
 /// Splits a payload that carries its own page `meta` ([`crate::paging`]'s
 /// `total`, `returned`, `nextCursor`) into `(data, meta)`, so the page
 /// state lands in `meta` beside `command` instead of inside `data`.

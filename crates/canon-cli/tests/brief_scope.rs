@@ -1,0 +1,551 @@
+//! Brief approval scoped to what a change adds (0.25 D1, #96), against the
+//! built binary: a change adopted into a subject that is already building
+//! or verifying freezes only the scenarios it names with `@flow:`, never
+//! the scenarios an approved scope already covers; `canon subject unadopt`
+//! takes an unapproved adoption back.
+
+use std::path::Path;
+use std::process::{Command, Output};
+
+use serde_json::Value;
+use tempfile::TempDir;
+
+fn run(repo: &Path, args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(args)
+        .current_dir(repo)
+        .env_remove("CANON_ROLE")
+        .output()
+        .expect("spawn canon binary")
+}
+
+fn stdout(o: &Output) -> String {
+    String::from_utf8_lossy(&o.stdout).to_string()
+}
+
+fn stderr(o: &Output) -> String {
+    String::from_utf8_lossy(&o.stderr).to_string()
+}
+
+fn ok(repo: &Path, args: &[&str]) -> Output {
+    let out = run(repo, args);
+    assert!(out.status.success(), "{args:?}: {}", stderr(&out));
+    out
+}
+
+/// A complete English brief, so `canon brief approve` accepts it.
+fn brief(extra: &str) -> String {
+    format!(
+        "# Change\n\n\
+<!-- canon:section intent role=context -->\n## Intent\n\nChange\n\nVisitors lose their cart when they switch devices.\n\n\
+<!-- canon:section outcome role=normative -->\n## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
+<!-- canon:section flow role=normative -->\n## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n\n\
+<!-- canon:section detail role=normative -->\n## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n\
+<!-- canon:section acceptance role=normative -->\n## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie. ==**F1 is the happy path.**==\n\n\
+<!-- canon:section questions role=question -->\n## Questions and assumptions\n\nNone.\n\n\
+<!-- canon:section out-of-scope role=context -->\n## Out of scope\n\nSocial sign-in.\n\n{extra}"
+    )
+}
+
+fn brief_path(repo: &Path, change: &str) -> std::path::PathBuf {
+    repo.join(format!(".canon/changes/{change}/brief.md"))
+}
+
+/// A repo whose subject `s` is `status` (reached through `specced` and
+/// `building`), with no change yet.
+fn repo_with_subject(status: &str) -> TempDir {
+    let dir = TempDir::new().unwrap();
+    let repo = dir.path();
+    ok(
+        repo,
+        &[
+            "init",
+            "--providers",
+            "none",
+            "--no-agents-md",
+            "--no-policy",
+        ],
+    );
+    ok(
+        repo,
+        &["subject", "new", "s", "--domain", "dev", "--title", "S"],
+    );
+    ok(
+        repo,
+        &[
+            "feature",
+            "new",
+            "shop.cart",
+            "--title",
+            "Cart",
+            "--actor-id",
+            "u",
+        ],
+    );
+    for step in ["specced", "building", "verifying"] {
+        if status == "proposed" {
+            break;
+        }
+        ok(repo, &["subject", "status", "s", "--to", step]);
+        if step == status {
+            break;
+        }
+    }
+    dir
+}
+
+/// Writes `change` with a complete brief, approved by the human when `approve`.
+fn change(repo: &Path, change: &str, approve: bool) -> Output {
+    let out = ok(
+        repo,
+        &[
+            "change",
+            "new",
+            change,
+            "--subject-id",
+            "s",
+            "--title",
+            change,
+        ],
+    );
+    std::fs::write(brief_path(repo, change), brief("")).unwrap();
+    if approve {
+        ok(
+            repo,
+            &[
+                "brief",
+                "approve",
+                "--change-id",
+                change,
+                "--by",
+                "Ana",
+                "--note",
+                "Go",
+            ],
+        );
+    }
+    out
+}
+
+/// A scenario of `s`, tagged `@flow:<flow>` when given.
+fn scenario(repo: &Path, id: &str, flow: Option<&str>) {
+    ok(
+        repo,
+        &[
+            "scenario",
+            "new",
+            id,
+            "--title",
+            id,
+            "--subject-id",
+            "s",
+            "--case",
+            "happy",
+        ],
+    );
+    if let Some(flow) = flow {
+        let path = repo.join(".canon/specs/kind=feature/area=shop/cart.feature");
+        let text = std::fs::read_to_string(&path).unwrap();
+        std::fs::write(
+            &path,
+            text.replace(&format!("  @{id}\n"), &format!("  @flow:{flow}\n  @{id}\n")),
+        )
+        .unwrap();
+    }
+}
+
+fn attest(repo: &Path, scenario: &str, reference: &str) -> Output {
+    run(
+        repo,
+        &[
+            "evidence",
+            "add",
+            "--project-id",
+            "root",
+            "--scenario-id",
+            scenario,
+            "--kind",
+            "test-run",
+            "--ref",
+            reference,
+            "--role",
+            "implementer",
+            "--actor-id",
+            "impl",
+            "--promote",
+        ],
+    )
+}
+
+fn attest_task(repo: &Path, task: &str) -> Output {
+    run(
+        repo,
+        &[
+            "evidence",
+            "add",
+            "--task",
+            task,
+            "--kind",
+            "test-run",
+            "--ref",
+            "cargo test",
+            "--role",
+            "implementer",
+            "--actor-id",
+            "impl",
+        ],
+    )
+}
+
+/// evidence.add.100: a draft change adopted into a verifying subject
+/// freezes only the scenarios tagged with it.
+#[test]
+fn evidence_add_100_a_draft_change_freezes_only_the_scenarios_it_is_tagged_on() {
+    let dir = repo_with_subject("verifying");
+    let repo = dir.path();
+    change(repo, "a", true);
+    let tasks = repo.join(".canon/changes/a/tasks.md");
+    let mut text = std::fs::read_to_string(&tasks).unwrap_or_else(|_| "# Tasks: A\n".to_string());
+    text.push_str("\n- [ ] 1 Build it\n");
+    std::fs::write(&tasks, text).unwrap();
+    ok(repo, &["ingest", "plans"]);
+    scenario(repo, "shop.cart.01", None);
+    scenario(repo, "shop.cart.02", Some("a.F1"));
+    for id in ["shop.cart.01", "shop.cart.02"] {
+        let out = attest(repo, id, "first run");
+        assert!(out.status.success(), "{id}: {}", stderr(&out));
+    }
+
+    let adopted = change(repo, "b", false);
+    let err = stderr(&adopted);
+    assert!(
+        err.contains("warning:")
+            && err.contains("canon subject unadopt b --subject-id s")
+            && err.contains("@flow:b.*"),
+        "{err}"
+    );
+
+    // The approved scope keeps accepting evidence, and so does A's task.
+    for id in ["shop.cart.01", "shop.cart.02"] {
+        let out = attest(repo, id, "second run");
+        assert!(out.status.success(), "{id}: {}", stderr(&out));
+    }
+    let task = attest_task(repo, "a#1");
+    assert!(task.status.success(), "{}", stderr(&task));
+
+    // A scenario B adds waits for B's approval, naming B's brief.
+    scenario(repo, "shop.cart.03", Some("b.F1"));
+    let out = attest(repo, "shop.cart.03", "first run");
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert!(
+        stderr(&out).contains("BRIEF_UNAPPROVED")
+            && stderr(&out).contains(".canon/changes/b/brief.md has no `Approved:` line"),
+        "{}",
+        stderr(&out)
+    );
+    // ... and the ship guard still asks for the newest adopted change's approval.
+    let ship = run(repo, &["subject", "status", "s", "--to", "shipped"]);
+    assert_eq!(ship.status.code(), Some(1), "{}", stderr(&ship));
+    assert!(
+        stderr(&ship).contains(".canon/changes/b/brief.md"),
+        "{}",
+        stderr(&ship)
+    );
+
+    // Approving B lifts the wait.
+    ok(
+        repo,
+        &[
+            "brief",
+            "approve",
+            "--change-id",
+            "b",
+            "--by",
+            "Ana",
+            "--note",
+            "Go",
+        ],
+    );
+    let out = attest(repo, "shop.cart.03", "first run");
+    assert!(out.status.success(), "{}", stderr(&out));
+}
+
+/// evidence.add.101: a subject whose only change is unapproved refuses
+/// every scenario, and an approved brief edited since still refuses an
+/// untagged one with the changed-since-approval code.
+#[test]
+fn evidence_add_101_an_unapproved_only_change_and_an_edited_approval_still_refuse() {
+    let dir = repo_with_subject("verifying");
+    let repo = dir.path();
+    change(repo, "a", false);
+    scenario(repo, "shop.cart.01", None);
+    scenario(repo, "shop.cart.02", Some("a.F1"));
+    for id in ["shop.cart.01", "shop.cart.02"] {
+        let out = attest(repo, id, "run");
+        assert_eq!(out.status.code(), Some(1), "{id}: {}", stderr(&out));
+        assert!(
+            stderr(&out).contains("BRIEF_UNAPPROVED")
+                && stderr(&out).contains(".canon/changes/a/brief.md"),
+            "{id}: {}",
+            stderr(&out)
+        );
+    }
+
+    ok(
+        repo,
+        &[
+            "brief",
+            "approve",
+            "--change-id",
+            "a",
+            "--by",
+            "Ana",
+            "--note",
+            "Go",
+        ],
+    );
+    assert!(attest(repo, "shop.cart.01", "run").status.success());
+    std::fs::write(
+        brief_path(repo, "a"),
+        std::fs::read_to_string(brief_path(repo, "a"))
+            .unwrap()
+            .replace("Social sign-in.", "Social sign-in, later."),
+    )
+    .unwrap();
+    change(repo, "b", false);
+    let out = attest(repo, "shop.cart.01", "second run");
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert!(
+        stderr(&out).contains("BRIEF_CHANGED_SINCE_APPROVAL")
+            && stderr(&out).contains(".canon/changes/a/brief.md"),
+        "{}",
+        stderr(&out)
+    );
+}
+
+/// evidence.add.102: a subject built before briefs existed keeps
+/// re-verifying its evidenced scenarios when it adopts its first, draft
+/// change; a scenario never evidenced still waits.
+#[test]
+fn evidence_add_102_a_legacy_subject_keeps_re_verifying_its_evidenced_scenarios() {
+    let dir = repo_with_subject("verifying");
+    let repo = dir.path();
+    scenario(repo, "shop.cart.01", None);
+    scenario(repo, "shop.cart.02", None);
+    let first = attest(repo, "shop.cart.01", "before briefs");
+    assert!(first.status.success(), "{}", stderr(&first));
+
+    let adopted = change(repo, "a", false);
+    assert!(
+        stderr(&adopted).contains("warning:"),
+        "{}",
+        stderr(&adopted)
+    );
+    let again = attest(repo, "shop.cart.01", "re-verified");
+    assert!(again.status.success(), "{}", stderr(&again));
+    let never = attest(repo, "shop.cart.02", "new");
+    assert_eq!(never.status.code(), Some(1), "{}", stderr(&never));
+    assert!(
+        stderr(&never).contains("BRIEF_UNAPPROVED"),
+        "{}",
+        stderr(&never)
+    );
+}
+
+fn warnings(out: &Output) -> Vec<String> {
+    let json: Value = serde_json::from_str(&stdout(out)).unwrap();
+    json["meta"]["warnings"]
+        .as_array()
+        .map(|w| w.iter().map(|w| w.as_str().unwrap().to_string()).collect())
+        .unwrap_or_default()
+}
+
+/// subject.lifecycle.35: adopting an unapproved change into a building,
+/// verifying or shipped subject warns once; nothing else does.
+#[test]
+fn subject_lifecycle_35_adopting_an_unapproved_change_warns_only_where_it_matters() {
+    for status in ["proposed", "specced"] {
+        let dir = repo_with_subject(status);
+        let out = ok(
+            dir.path(),
+            &[
+                "change",
+                "new",
+                "a",
+                "--subject-id",
+                "s",
+                "--title",
+                "A",
+                "--json",
+            ],
+        );
+        assert!(
+            warnings(&out).is_empty() && !stderr(&out).contains("warning:"),
+            "{status}: {}",
+            stderr(&out)
+        );
+    }
+    let dir = repo_with_subject("building");
+    let repo = dir.path();
+    let out = ok(
+        repo,
+        &[
+            "change",
+            "new",
+            "a",
+            "--subject-id",
+            "s",
+            "--title",
+            "A",
+            "--json",
+        ],
+    );
+    let found = warnings(&out);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(
+        found[0].contains("canon subject unadopt a --subject-id s")
+            && found[0].contains("cannot ship"),
+        "{found:?}"
+    );
+    assert_eq!(
+        stderr(&out).matches("warning:").count(),
+        1,
+        "{}",
+        stderr(&out)
+    );
+
+    // `subject adopt` warns the same way; an approved brief does not.
+    let other = repo_with_subject("verifying");
+    let repo2 = other.path();
+    ok(
+        repo2,
+        &[
+            "subject", "new", "holding", "--domain", "dev", "--title", "Holding",
+        ],
+    );
+    ok(
+        repo2,
+        &[
+            "change",
+            "new",
+            "c",
+            "--subject-id",
+            "holding",
+            "--title",
+            "C",
+        ],
+    );
+    let out = ok(
+        repo2,
+        &["subject", "adopt", "c", "--subject-id", "s", "--json"],
+    );
+    assert_eq!(warnings(&out).len(), 1, "{}", stdout(&out));
+    ok(repo2, &["subject", "unadopt", "c", "--subject-id", "s"]);
+    std::fs::write(brief_path(repo2, "c"), brief("")).unwrap();
+    ok(
+        repo2,
+        &[
+            "brief",
+            "approve",
+            "--change-id",
+            "c",
+            "--by",
+            "Ana",
+            "--note",
+            "Go",
+        ],
+    );
+    let out = ok(
+        repo2,
+        &["subject", "adopt", "c", "--subject-id", "s", "--json"],
+    );
+    assert!(warnings(&out).is_empty(), "{}", stdout(&out));
+}
+
+/// subject.lifecycle.36: unadopt removes the link on both sides, status
+/// stops asking about the change for the subject, another subject can
+/// adopt it, and an unlinked pair is a no-op.
+#[test]
+fn subject_lifecycle_36_unadopt_removes_the_link_on_both_sides() {
+    let dir = repo_with_subject("verifying");
+    let repo = dir.path();
+    ok(
+        repo,
+        &[
+            "subject", "new", "holding", "--domain", "dev", "--title", "Holding",
+        ],
+    );
+    change(repo, "a", true);
+    change(repo, "b", false);
+    assert!(
+        stdout(&run(repo, &["status"])).contains(".canon/changes/b/brief.md"),
+        "{}",
+        stdout(&run(repo, &["status"]))
+    );
+
+    let out = ok(
+        repo,
+        &["subject", "unadopt", "b", "--subject-id", "s", "--json"],
+    );
+    let json: Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(json["meta"]["command"], "subject unadopt");
+    assert!(json["meta"]["next"].is_array(), "{json}");
+    let records = |kind: &str| -> Vec<Value> {
+        serde_json::from_str::<Value>(&stdout(&ok(repo, &["query", "--kind", kind, "--json"])))
+            .unwrap()["records"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+    };
+    let subject = records("subject")
+        .into_iter()
+        .find(|r| r["subject_id"] == "s")
+        .unwrap();
+    assert_eq!(subject["change_ids"], serde_json::json!(["a"]), "{subject}");
+    let change_b = records("change")
+        .into_iter()
+        .find(|r| r["change_id"] == "b")
+        .unwrap();
+    assert!(
+        change_b["subject_ids"]
+            .as_array()
+            .is_none_or(|ids| ids.is_empty()),
+        "{change_b}"
+    );
+    let status = stdout(&run(repo, &["status"]));
+    assert!(!status.contains("changes/b/brief.md"), "{status}");
+
+    // The change stays: a holding subject adopts it.
+    ok(repo, &["subject", "adopt", "b", "--subject-id", "holding"]);
+    // An unlinked pair is a no-op.
+    let again = ok(repo, &["subject", "unadopt", "b", "--subject-id", "s"]);
+    assert!(
+        stdout(&again).contains("not linked") && stdout(&again).contains("nothing written"),
+        "{}",
+        stdout(&again)
+    );
+}
+
+/// subject.lifecycle.37: a change whose brief carries an `Approved:` line
+/// is the subject's approved scope and is not unadopted.
+#[test]
+fn subject_lifecycle_37_unadopt_refuses_an_approved_change() {
+    let dir = repo_with_subject("building");
+    let repo = dir.path();
+    change(repo, "a", true);
+    let out = run(
+        repo,
+        &["subject", "unadopt", "a", "--subject-id", "s", "--json"],
+    );
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+    let json: Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(json["error"]["code"], "SUBJECT_UNADOPT_REFUSED", "{json}");
+    assert!(
+        json["error"]["hint"]
+            .as_str()
+            .is_some_and(|h| h.contains("approved scope")),
+        "{json}"
+    );
+    let status = stdout(&run(repo, &["subject", "status", "s", "--json"]));
+    assert!(status.contains("\"a\""), "the link stays: {status}");
+}

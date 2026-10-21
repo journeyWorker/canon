@@ -1611,6 +1611,24 @@ enum SubjectCommand {
         #[arg(long)]
         json: bool,
     },
+    /// Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved)
+    #[command(
+        after_help = "Examples:\n  canon subject unadopt add-login --subject-id demo\n\nRemoves the link on both sides (the subject's change list and the change's\nsubject list). The change and its brief stay and can be adopted elsewhere, for\nexample by a proposed holding subject. Refused (SUBJECT_UNADOPT_REFUSED) for a\nchange whose brief carries an `Approved:` line: it is the subject's approved\nscope. A pair that is not linked writes nothing and exits 0."
+    )]
+    Unadopt {
+        /// The change to take out of the subject
+        #[arg(value_parser = canon_cli::subject::parse_change_id)]
+        change_id: ChangeId,
+        /// The subject to take the change out of
+        #[arg(long, value_parser = canon_cli::subject::parse_subject_id)]
+        subject_id: SubjectId,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
+    },
     /// Show a subject, or with --to transition its lifecycle status (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason)
     Status {
         /// The subject to show, or transition with --to
@@ -2170,6 +2188,7 @@ fn main() -> ExitCode {
                 ExitCode::from(canon_cli::subject::run_new(&repo, &id, &domain, &title, &summary, &owner_role, &actor_id, json) as u8)
             }
             SubjectCommand::Adopt { change_id, subject_id, repo, json } => ExitCode::from(canon_cli::subject::run_adopt(&repo, &change_id, &subject_id, json) as u8),
+            SubjectCommand::Unadopt { change_id, subject_id, repo, json } => ExitCode::from(canon_cli::subject::run_unadopt(&repo, &change_id, &subject_id, json) as u8),
             SubjectCommand::Status { id, to, override_reason, reason, actor_id, repo, json } => {
                 canon_cli::inventory::refresh_stale_index(&repo, "canon subject status");
                 ExitCode::from(match to {

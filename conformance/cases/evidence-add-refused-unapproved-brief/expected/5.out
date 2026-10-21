@@ -8,7 +8,7 @@ warning: policy not approved: .canon/policy.yaml has no approval record (.canon/
 
 subjects (1):
   verifying (1):
-    checkout: 2 scenarios, 2 evidenced, 1 reviewed, 0 open blockers
+    checkout: 2 scenarios, 1 evidenced, 1 reviewed, 0 open blockers
       brief: not approved (.canon/changes/c-checkout/brief.md has no `Approved:` line)
 
 unowned: none

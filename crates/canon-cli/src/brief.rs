@@ -353,15 +353,51 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
     Some(status)
 }
 
+/// The change whose brief a scenario without a `@flow:` tag answers to
+/// (0.25 D1), among the subject's adopted `changes`:
+/// 1. the newest whose canon `brief.md` carries an `Approved:` line
+///    (approved now, or edited since: [`BriefStatus::changed`] still
+///    refuses), so a change adopted later does not freeze scenarios an
+///    approved scope already covers;
+/// 2. otherwise, when the scenario already has an evidence record
+///    (`evidenced`), none: it is existing behavior, attested before any
+///    approved scope, so a subject built before briefs existed keeps
+///    re-verifying;
+/// 3. otherwise the newest adopted change, so a new subject's first
+///    scenarios wait for its first brief.
+fn untagged_scope(
+    repo: &Path,
+    changes: &[ChangeId],
+    evidenced: impl FnOnce() -> bool,
+) -> Option<ChangeId> {
+    let approved = |change: &&ChangeId| {
+        canon_brief(repo, change)
+            .and_then(|path| std::fs::read_to_string(path).ok())
+            .is_some_and(|text| field(&text, "Approved:").is_some())
+    };
+    if let Some(change) = changes.iter().rev().find(approved) {
+        return Some(change.clone());
+    }
+    if evidenced() {
+        return None;
+    }
+    changes.last().cloned()
+}
+
 /// Every subject an attestation for `task` and/or `scenario` builds
-/// under, with its brief (module doc, 0.16 M7), sorted by subject id:
-/// the subject the scenario's latest index row names through its
-/// `@subject` tag, and every subject that adopted the task's change
-/// (joined from both sides, [`subject_change_ids`]: a change shared by
-/// several subjects builds under each). Read through the gate's own
-/// folds over `ctx`. A scenario the index does not hold, or one with no
-/// `@subject` tag, names no subject; a subject that needs no brief yet
-/// is left out.
+/// under, with the brief of the change it answers to (module doc, 0.16
+/// M7; scoped by 0.25 D1), sorted by subject id:
+///
+/// - a scenario, through its `@subject` owner, answers to the change of
+///   each `@flow:<change>.<F-id>` tag it carries; with no such tag, to the
+///   owner's [`untagged_scope`] (which may be none);
+/// - a task answers to its own change only, under every subject that
+///   adopted it (joined from both sides, [`subject_change_ids`]).
+///
+/// Read through the gate's own folds over `ctx`. A scenario the index does
+/// not hold, or one with no `@subject` tag, names no subject; a change
+/// with no brief to answer, or a subject that needs no brief yet, is left
+/// out.
 pub fn attested_briefs<'a>(
     repo: &Path,
     plan_roots: &[PathBuf],
@@ -372,14 +408,80 @@ pub fn attested_briefs<'a>(
     let owner = scenario.and_then(|(project, id)| {
         latest_scenarios(ctx).into_iter().find(|s| &s.project_id == project && &s.scenario_id == id).and_then(|s| s.subject_id.as_ref())
     });
-    let change = task.map(TaskId::change_id);
+    let task_change = task.map(TaskId::change_id);
+    let tagged = scenario
+        .map(|(project, id)| crate::brief_check::flow_changes_of(repo, project, id))
+        .unwrap_or_default();
     let mut subjects: Vec<(&Subject, Vec<ChangeId>)> = latest_subjects(ctx)
         .into_iter()
         .map(|s| (s, subject_change_ids(ctx, s)))
-        .filter(|(s, changes)| owner == Some(&s.subject_id) || change.as_ref().is_some_and(|change| changes.contains(change)))
         .collect();
     subjects.sort_by(|a, b| a.0.subject_id.as_str().cmp(b.0.subject_id.as_str()));
-    subjects.into_iter().filter_map(|(s, changes)| brief_of(repo, plan_roots, s, &changes).map(|brief| (s, brief))).collect()
+    let mut out: Vec<(&Subject, BriefStatus)> = Vec::new();
+    for (subject, changes) in subjects {
+        let mut answers: Vec<ChangeId> = Vec::new();
+        if owner == Some(&subject.subject_id) {
+            if tagged.is_empty() {
+                let evidenced = || {
+                    scenario.is_some_and(|(project, id)| {
+                        canon_gate::history::evidence_history(ctx)
+                            .iter()
+                            .chain(&ctx.audits)
+                            .any(|r| {
+                                r.project_id.as_ref() == Some(project)
+                                    && r.scenario_id.as_ref() == Some(id)
+                            })
+                    })
+                };
+                answers.extend(untagged_scope(repo, &changes, evidenced));
+            } else {
+                answers.extend(tagged.iter().cloned());
+            }
+        }
+        if let Some(change) = task_change
+            .as_ref()
+            .filter(|change| changes.contains(change))
+        {
+            answers.push(change.clone());
+        }
+        answers.dedup();
+        let mut seen: Vec<ChangeId> = Vec::new();
+        for change in answers {
+            if seen.contains(&change) {
+                continue;
+            }
+            if let Some(brief) = brief_of(repo, plan_roots, subject, std::slice::from_ref(&change))
+            {
+                out.push((subject, brief));
+            }
+            seen.push(change);
+        }
+    }
+    out
+}
+
+/// The warning an adoption owes (0.25 D1): `subject` is building,
+/// verifying or shipped and the adopted `change` has a brief that is not
+/// approved. The subject's existing scenarios keep accepting evidence, so
+/// the line says what does wait, and how to take the adoption back. `None`
+/// for a proposed or specced subject, an approved brief, or a change with
+/// no brief to answer.
+pub fn adoption_warning(repo: &Path, subject: &Subject, change: &ChangeId) -> Option<String> {
+    if !matches!(
+        subject.status,
+        SubjectStatus::Building | SubjectStatus::Verifying | SubjectStatus::Shipped
+    ) {
+        return None;
+    }
+    let roots = plan_roots(repo).unwrap_or_default();
+    let brief = brief_of(repo, &roots, subject, std::slice::from_ref(change))
+        .filter(|brief| brief.enforced)?;
+    let (change, subject_id) = (change.as_str(), subject.subject_id.as_str());
+    Some(format!(
+        "subject `{subject_id}` is {} and change `{change}` is not approved ({}): the subject's existing scenarios keep accepting evidence, scenarios tagged `@flow:{change}.*` wait for the approval, and `{subject_id}` cannot ship until it is approved; to take the adoption back run `canon subject unadopt {change} --subject-id {subject_id}`",
+        serde_json::to_value(subject.status).ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default(),
+        brief.unanswered()
+    ))
 }
 
 /// One line per evidence record attested under a brief override (0.16
