@@ -292,6 +292,9 @@ pub struct SkillsCheckReport {
     pub manifest_ok: bool,
     /// Files the install lock lists that the bundle no longer ships.
     pub orphans: Vec<Orphan>,
+    /// Lock keys inside a canon projection that are not plain relative
+    /// paths; ignored, never acted on.
+    pub invalid_entries: Vec<String>,
     /// Paths of a legacy `.codex/skills` canon projection still on disk.
     pub remnants: Vec<PathBuf>,
     /// Set when the install lock exists but was written by a canon other
@@ -828,6 +831,12 @@ struct CanonicalManifest {
     source_hash: String,
     providers: Vec<String>,
     files: BTreeMap<String, String>,
+    /// Files of providers an explicit `--providers` install did not select
+    /// (0.25): their projections are untouched, so the lock keeps what it
+    /// recorded for them, and a later install for that provider still
+    /// prunes what its bundle dropped. Never part of the projection.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    retained_files: BTreeMap<String, String>,
 }
 
 impl CanonicalManifest {
@@ -1063,6 +1072,7 @@ fn manifest_for(files: &[BundleFile], providers: &[Provider]) -> CanonicalManife
         source_hash,
         providers: providers.iter().map(|p| p.as_str().into()).collect(),
         files: hashes,
+        retained_files: BTreeMap::new(),
     }
 }
 
@@ -1163,7 +1173,26 @@ fn projection_key_root(provider: Provider) -> String {
 /// anything but plain path components is refused.
 fn is_projection_key(root: &str, key: &str) -> bool {
     key.strip_prefix(root).is_some_and(|rest| rest.starts_with('/'))
+        && key.split('/').all(|segment| !segment.is_empty() && segment != "." && segment != "..")
         && Path::new(key).components().all(|component| matches!(component, std::path::Component::Normal(_)))
+}
+
+/// Lock keys inside a provider's canon projection directory that are not
+/// plain relative paths (empty, `.` or `..` segments, a trailing `/`):
+/// ignored everywhere, named by `doctor`, dropped when install rewrites the lock.
+fn invalid_projection_keys(previous: Option<&CanonicalManifest>) -> Vec<String> {
+    let Some(previous) = previous else {
+        return Vec::new();
+    };
+    let roots: Vec<String> = ALL_PROVIDERS.into_iter().map(projection_key_root).collect();
+    previous
+        .files
+        .keys()
+        .chain(previous.retained_files.keys())
+        .filter(|key| roots.iter().any(|root| key.strip_prefix(root.as_str()).is_some_and(|rest| rest.starts_with('/'))))
+        .filter(|key| !roots.iter().any(|root| is_projection_key(root, key)))
+        .cloned()
+        .collect()
 }
 
 /// An [`Orphan`] with the lock key and recorded hash it came from.
@@ -1191,7 +1220,7 @@ fn find_orphans<'m>(
     let mut found = Vec::new();
     for provider in selected {
         let root = projection_key_root(*provider);
-        for (key, hash) in &previous.files {
+        for (key, hash) in previous.files.iter().chain(&previous.retained_files) {
             if !is_projection_key(&root, key) || expected.files.contains_key(key) {
                 continue;
             }
@@ -1535,6 +1564,17 @@ pub fn install_canonical(
     }
     let mut manifest = manifest_for(&files, &selected);
     let previous = load_manifest(target_dir)?;
+    if let Some(previous) = &previous {
+        let unselected_roots: Vec<String> =
+            ALL_PROVIDERS.into_iter().filter(|p| !selected.contains(p)).map(projection_key_root).collect();
+        manifest.retained_files = previous
+            .files
+            .iter()
+            .chain(&previous.retained_files)
+            .filter(|(key, _)| unselected_roots.iter().any(|root| is_projection_key(root, key)))
+            .map(|(key, hash)| (key.clone(), hash.clone()))
+            .collect();
+    }
     let mut writes: Vec<(PathBuf, Vec<u8>)> = Vec::new();
     for provider in &selected {
         for file in &files {
@@ -1551,7 +1591,7 @@ pub fn install_canonical(
     let removals = legacy_codex_removals(target_dir, previous.as_ref());
     let orphans = find_orphans(target_dir, previous.as_ref(), &manifest, &selected);
     let lock_current = match &previous {
-        Some(previous) => previous.same_projection(&manifest) && previous.canon_version == manifest.canon_version,
+        Some(previous) => previous.same_projection(&manifest) && previous.retained_files == manifest.retained_files && previous.canon_version == manifest.canon_version,
         // Nothing selected and nothing recorded: there is nothing to lock.
         None => selected.is_empty(),
     };
@@ -1648,6 +1688,7 @@ pub fn check(
         None => selected.is_empty(),
     };
     let orphans = find_orphans(target_dir, actual.as_ref(), &expected, &selected).into_iter().map(|found| found.orphan).collect();
+    let invalid_entries = invalid_projection_keys(actual.as_ref());
     let outdated = actual
         .filter(|actual| actual.canon_version != expected.canon_version)
         .map(|actual| OutdatedLock { path: manifest_path(target_dir), installed_by: actual.canon_version });
@@ -1658,6 +1699,7 @@ pub fn check(
         statuses,
         manifest_ok,
         orphans,
+        invalid_entries,
         remnants: legacy_codex_remnants(target_dir),
         outdated,
     })
@@ -1753,6 +1795,13 @@ pub fn doctor(
             orphan.fix(&report.providers)
         ));
     }
+    for key in &report.invalid_entries {
+        lines.push(format!(
+            "invalid-lock-entry: {key:?} in {} is not a plain relative path inside a canon projection, so canon ignores it; `{}` rewrites the lock without it",
+            manifest_path(target_dir).display(),
+            install_command(&report.providers)
+        ));
+    }
     if let Some(outdated) = &report.outdated {
         lines.push(format!("outdated: {} {}", outdated.path.display(), outdated.describe(&report.providers)));
     }
@@ -1827,6 +1876,7 @@ mod tests {
                 source_hash: "sha256:legacy".into(),
                 providers: vec!["codex".into()],
                 files: BTreeMap::from([(key.to_string(), content_hash(b"# topic\n"))]),
+                retained_files: BTreeMap::new(),
             };
             let removals = legacy_codex_removals(&target, Some(&manifest));
             assert_eq!(removals, vec![(key, manifest.files[key].as_str())], "{swapped}");

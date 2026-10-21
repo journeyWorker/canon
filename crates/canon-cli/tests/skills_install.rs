@@ -1337,6 +1337,21 @@ fn skills_install_62_check_and_doctor_name_each_orphan_with_the_fix() {
     let orphans = json["data"]["orphans"].as_array().unwrap();
     assert_eq!(orphans.len(), 2, "{json}");
     assert_eq!(orphans.iter().filter(|o| o["modified"] == true).count(), 1, "{json}");
+    for (entry, path, modified, how) in [
+        (&orphans[0], &old, false, format!("run `{fix}`, which removes it")),
+        (&orphans[1], &older, true, format!("rm {older}")),
+    ] {
+        assert_eq!(entry["path"], path.as_str(), "{json}");
+        assert_eq!(entry["provider"], "claude", "{json}");
+        assert_eq!(entry["modified"], modified, "{json}");
+        assert!(entry["hint"].as_str().unwrap().contains(&how), "{json}");
+    }
+    let lock_path = target.join(".canon/skills/.install-lock.json");
+    let (lock_before, files_before) = (fs::read(&lock_path).unwrap(), (fs::read(retired.join("old.md")).unwrap(), fs::read(retired.join("older.md")).unwrap()));
+    canon(&["skills", "check", "--providers", "claude", "--json"], &after, &target);
+    canon(&["skills", "check", "--providers", "claude"], &after, &target);
+    assert_eq!(fs::read(&lock_path).unwrap(), lock_before, "check never rewrites the lock");
+    assert_eq!(files_before, (fs::read(retired.join("old.md")).unwrap(), fs::read(retired.join("older.md")).unwrap()), "check never touches a file");
 
     let doctor = canon(&["skills", "doctor", "--providers", "claude"], &after, &target);
     let out = String::from_utf8_lossy(&doctor.stdout);
@@ -1371,4 +1386,69 @@ fn skills_install_62_check_ignores_unselected_providers_and_files_already_gone()
     fs::remove_file(target.join(CLAUDE_PROJECTION).join("reference/retired/old.md")).unwrap();
     let report = skills::check(&after, &target, Some("claude")).unwrap();
     assert_eq!(report.orphans.len(), 1, "a file the user already removed is not an orphan: {:?}", report.orphans);
+}
+
+/// skills.install.61: an install for a subset of providers keeps the lock
+/// entries of the providers it did not select, so a later install for one of
+/// them still prunes its dropped files and `check` still names them.
+#[test]
+fn skills_install_61_a_subset_install_keeps_the_lock_entries_of_unselected_providers() {
+    let tmp = tempfile::tempdir().unwrap();
+    let target = tmp.path().join("target");
+    let (before, after) = write_pruned_sources(tmp.path());
+    skills::install_canonical(&before, &target, Some("claude,codex")).unwrap();
+    skills::install_canonical(&after, &target, Some("claude")).unwrap();
+    let codex_retired = target.join(".agents/skills/canon/reference/retired");
+    assert!(codex_retired.join("old.md").is_file(), "the unselected projection is untouched");
+
+    let report = skills::check(&after, &target, Some("codex")).unwrap();
+    assert_eq!(report.orphans.len(), 2, "check for codex still names its dropped files: {:?}", report.orphans);
+
+    let report = skills::install_canonical(&after, &target, Some("codex")).unwrap();
+    assert_eq!(report.pruned.len(), 2, "{report:?}");
+    assert!(!codex_retired.join("old.md").exists() && !codex_retired.join("older.md").exists());
+    let lock = read_lock(&target);
+    assert!(lock["files"].as_object().unwrap().keys().all(|key| key.starts_with(".agents/")), "{lock}");
+    let retained = lock["retained_files"].as_object().unwrap();
+    assert!(!retained.is_empty() && retained.keys().all(|key| key.starts_with(".claude/") && !key.contains("retired")), "claude's shipped files stay recorded, its dropped ones are gone: {lock}");
+}
+
+/// skills.install.63: lock keys that are not plain relative paths inside a
+/// canon projection are ignored, named by doctor, and never fail an install.
+#[test]
+fn skills_install_63_a_tampered_lock_key_is_ignored_and_named_by_doctor() {
+    let tmp = tempfile::tempdir().unwrap();
+    let target = tmp.path().join("target");
+    let (before, after) = write_pruned_sources(tmp.path());
+    skills::install_canonical(&before, &target, Some("claude")).unwrap();
+    let victim = target.join("victim.txt");
+    fs::write(&victim, "keep\n").unwrap();
+    let lock_path = target.join(".canon/skills/.install-lock.json");
+    let mut lock = read_lock(&target);
+    let hash = skills::content_hash(b"keep\n");
+    let keys = [
+        ".claude/skills/canon/../../../victim.txt",
+        ".claude/skills/canon//reference/x.md",
+        ".claude/skills/canon/./reference/x.md",
+        ".claude/skills/canon/reference/",
+    ];
+    for key in keys {
+        lock["files"][key] = serde_json::Value::String(hash.clone());
+    }
+    fs::write(&lock_path, serde_json::to_string_pretty(&lock).unwrap()).unwrap();
+
+    let report = skills::check(&after, &target, Some("claude")).unwrap();
+    assert!(report.orphans.iter().all(|orphan| !orphan.path.ends_with("victim.txt")), "{:?}", report.orphans);
+    assert_eq!(report.orphans.len(), 2, "only the two real dropped files: {:?}", report.orphans);
+    assert_eq!(report.invalid_entries.len(), keys.len(), "{:?}", report.invalid_entries);
+    let doctor = String::from_utf8_lossy(&canon(&["skills", "doctor", "--providers", "claude"], &after, &target).stdout).into_owned();
+    for key in keys {
+        assert!(doctor.lines().any(|line| line.starts_with("invalid-lock-entry:") && line.contains(&format!("{key:?}"))), "{doctor}");
+    }
+
+    let out = canon(&["skills", "install", "--providers", "claude"], &after, &target);
+    assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
+    assert_eq!(fs::read_to_string(&victim).unwrap(), "keep\n");
+    let rewritten = read_lock(&target);
+    assert!(rewritten["files"].as_object().unwrap().keys().all(|key| !key.contains("victim") && !key.ends_with('/') && !key.contains("//") && !key.contains("/./")), "{rewritten}");
 }
