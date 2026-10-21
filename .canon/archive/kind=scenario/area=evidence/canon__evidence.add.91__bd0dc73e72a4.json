@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.576078634Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "05f5b9993c20662df86fb63b84e5b0dccdb9611c41243835b9dfed32fa9ed7e3",
+  "scenario_id": "evidence.add.91",
+  "schema": 1,
+  "source_digest": "ea01dc4b0d71836c4fb95d203a1ab016576179fa16297a6699394edd7838c662",
+  "subject_id": "evidence-attestation",
+  "title": "A fabrication marker is refused the way every other gate-red refusal of evidence add is"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.426489899Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "733edb38aacd38237ead1a6e0822beaf7ae9bfc2a6a5a1fa9704309ecaf55962",
+  "scenario_id": "context.capability.21",
+  "schema": 1,
+  "source_digest": "89145b060069fe1dfe1e0e3110070ac4b8a3de16b5afabf8470f80bc7bcd978e",
+  "subject_id": "context-capability",
+  "title": "A scenario batch line may still carry the deprecated key names and warns once"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.221469710Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "d14173448be12ff1a8334761e6133a130bf46b54291b89d7d539d8c99aecad93",
+  "scenario_id": "skills.install.41",
+  "schema": 1,
+  "source_digest": "1865ec27e07a5164e825a99adfb6687eefb62ddaa8d4e336e3c36bcafa256c32",
+  "subject_id": "skills-install",
+  "title": "A lock another canon version wrote is reported with the install fix"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.416886082Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "61a1abbe79baed6c5faec912dfaceeab2967186536748abf07b9f7ca439143b8",
+  "scenario_id": "context.capability.15",
+  "schema": 1,
+  "source_digest": "89145b060069fe1dfe1e0e3110070ac4b8a3de16b5afabf8470f80bc7bcd978e",
+  "subject_id": "context-capability",
+  "title": "A --kind value never carries the _record suffix"
+}

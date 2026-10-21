@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.147191122Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "45b901b961225172486c8f71e5f86309256e1243caa6ecc44c658d7cdfa18321",
+  "scenario_id": "finding.close.02",
+  "schema": 1,
+  "source_digest": "bc27d78c821b19f4efaea232e456906d588cbd596534886073c5c032b103c475",
+  "subject_id": "finding-lifecycle",
+  "title": "Closing changes the disposition and nothing else"
+}

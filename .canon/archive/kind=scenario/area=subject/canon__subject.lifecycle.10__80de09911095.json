@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.009444108Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "a58c12953880dd2faa3b042b535c757dba7d3557746a76e7dfe7cf07f223743f",
+  "scenario_id": "subject.lifecycle.10",
+  "schema": 1,
+  "source_digest": "3a4fdf955c883926fb05053f12b10f85ef5696f46c41c9e47fae5c3a7243c845",
+  "subject_id": "subject-lifecycle",
+  "title": "Shipping is refused when no scenario is tagged to the subject"
+}

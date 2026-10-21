@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.548880967Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "d48456dc94430bfd9eb9079dcf74039eb03dca76dd97e5eaa07353f3b1722514",
+  "scenario_id": "evidence.add.67",
+  "schema": 1,
+  "source_digest": "ea01dc4b0d71836c4fb95d203a1ab016576179fa16297a6699394edd7838c662",
+  "subject_id": "evidence-attestation",
+  "title": "A promoted write prints one success line that names the committed record"
+}

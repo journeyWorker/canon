@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.541274080Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "91395bb1fccb9f2c74379087cdc77286933a6819db689315feb11d49954b7694",
+  "scenario_id": "evidence.add.63",
+  "schema": 1,
+  "source_digest": "ea01dc4b0d71836c4fb95d203a1ab016576179fa16297a6699394edd7838c662",
+  "subject_id": "evidence-attestation",
+  "title": "A malformed write section or both promote flags are refused before anything is staged"
+}

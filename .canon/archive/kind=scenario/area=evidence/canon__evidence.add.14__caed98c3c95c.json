@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.480089496Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "cc1f33545caf20ff72d05a5b320cb92a546793b6e4f6ffb5c43ae576d00ea453",
+  "scenario_id": "evidence.add.14",
+  "schema": 1,
+  "source_digest": "ea01dc4b0d71836c4fb95d203a1ab016576179fa16297a6699394edd7838c662",
+  "subject_id": "evidence-attestation",
+  "title": "A bound file over the store's size limit is refused, naming the override flag"
+}

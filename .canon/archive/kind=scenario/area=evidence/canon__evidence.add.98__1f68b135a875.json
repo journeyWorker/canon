@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.597593954Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "0498d1425025028e3b6f716549dd639893ce9cde9e9ac324aa6045ef381b9605",
+  "scenario_id": "evidence.add.98",
+  "schema": 1,
+  "source_digest": "ea01dc4b0d71836c4fb95d203a1ab016576179fa16297a6699394edd7838c662",
+  "subject_id": "evidence-attestation",
+  "title": "A single scenario's report binds the attachments of the cases matched to it"
+}

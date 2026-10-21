@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.394322892Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "eb57d887c33c789363d1c6a2838f07eaecf2b8b6e0e51c45103e361506ee51dc",
+  "scenario_id": "context.capability.01",
+  "schema": 1,
+  "source_digest": "89145b060069fe1dfe1e0e3110070ac4b8a3de16b5afabf8470f80bc7bcd978e",
+  "subject_id": "context-capability",
+  "title": "The authoring surface answers in full even when the corpus it describes is broken"
+}

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T12:18:44.031028546Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test finding finding_close_87"
+  },
+  "evidence_note": {
+    "summary": "finding finding_close_87: 1 passed, 34 filtered out, 0 failed"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 18,
+  "scenario_id": "finding.close.87",
+  "schema": 1,
+  "staging_id": "07d0f45917cd",
+  "verdict": "faithful"
+}

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T12:18:53.813163807Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test dashboard_briefs report_dashboard_10"
+  },
+  "evidence_note": {
+    "summary": "dashboard_briefs report_dashboard_10: 1 passed, 10 filtered out, 0 failed"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 10,
+  "scenario_id": "report.dashboard.10",
+  "schema": 1,
+  "staging_id": "1f24dad2e35d",
+  "verdict": "faithful"
+}

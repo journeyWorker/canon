@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.162066794Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "41e4c276671ffc0b099a54cf25c3322dbac7125083c9f923907c0030af9dc328",
+  "scenario_id": "finding.close.09",
+  "schema": 1,
+  "source_digest": "bc27d78c821b19f4efaea232e456906d588cbd596534886073c5c032b103c475",
+  "subject_id": "finding-lifecycle",
+  "title": "A close records the session that authored the transition, not the raiser's"
+}

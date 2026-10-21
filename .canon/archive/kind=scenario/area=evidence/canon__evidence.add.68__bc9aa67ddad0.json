@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.550619845Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "1b3ae240665e7cfc2694ed9b29c3e34fe1257b2a6bcefba51a27340d27574b47",
+  "scenario_id": "evidence.add.68",
+  "schema": 1,
+  "source_digest": "ea01dc4b0d71836c4fb95d203a1ab016576179fa16297a6699394edd7838c662",
+  "subject_id": "evidence-attestation",
+  "title": "Evidence for a subject whose brief is not approved is refused, and nothing is staged"
+}

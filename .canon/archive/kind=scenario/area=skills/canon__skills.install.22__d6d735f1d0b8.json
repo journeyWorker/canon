@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.226400550Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "ab376f9f348ee4bc1d1cb365e8c50c34de1e632b08a001c8be7013825a3e1a5d",
+  "scenario_id": "skills.install.22",
+  "schema": 1,
+  "source_digest": "1865ec27e07a5164e825a99adfb6687eefb62ddaa8d4e336e3c36bcafa256c32",
+  "subject_id": "skills-install",
+  "title": "The skill, the AGENTS.md block and the write help name no bookkeeping step the commands already do"
+}

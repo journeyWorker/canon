@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.156956102Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "7e1bf091adc6d3abde7249207cd6974f63d6edd01a381ba1b3964a59890601be",
+  "scenario_id": "finding.close.06",
+  "schema": 1,
+  "source_digest": "bc27d78c821b19f4efaea232e456906d588cbd596534886073c5c032b103c475",
+  "subject_id": "finding-lifecycle",
+  "title": "The current disposition is the latest version never the first read"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.034141660Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "7a5a1c54683133fd8334ca352d032e45cf82b436f2086f0579c10b8239e6cd95",
+  "scenario_id": "subject.lifecycle.26",
+  "schema": 1,
+  "source_digest": "3a4fdf955c883926fb05053f12b10f85ef5696f46c41c9e47fae5c3a7243c845",
+  "subject_id": "subject-lifecycle",
+  "title": "An override ships a subject with an unapproved brief and records the waiver"
+}

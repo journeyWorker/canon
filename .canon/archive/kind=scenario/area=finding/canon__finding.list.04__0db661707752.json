@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.200010481Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "5404d60a09b80468c0b4133ec35eafb8f4ff7caacac426419e81e3182d0fdfda",
+  "scenario_id": "finding.list.04",
+  "schema": 1,
+  "source_digest": "0e71c88f9b3df45aff88aa1ccb7568acbfacdacdb2733f461b48e90ca3002698",
+  "subject_id": "finding-lifecycle",
+  "title": "A malformed change id is refused before anything is read"
+}

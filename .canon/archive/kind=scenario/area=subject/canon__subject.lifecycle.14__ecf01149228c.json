@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.016034685Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "f4abf72ef9b4cc76f7bd5f43e660619a8068686606285898b5264b7fb5fe30b5",
+  "scenario_id": "subject.lifecycle.14",
+  "schema": 1,
+  "source_digest": "3a4fdf955c883926fb05053f12b10f85ef5696f46c41c9e47fae5c3a7243c845",
+  "subject_id": "subject-lifecycle",
+  "title": "A review by a distinct actor admits the move with no waiver recorded"
+}

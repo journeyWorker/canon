@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.216326287Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "8017efe9aa99730968e38bad448046ceca2a684c6eef8208ec2b56cfbdd203b6",
+  "scenario_id": "skills.install.20",
+  "schema": 1,
+  "source_digest": "1865ec27e07a5164e825a99adfb6687eefb62ddaa8d4e336e3c36bcafa256c32",
+  "subject_id": "skills-install",
+  "title": "The skill and the AGENTS.md block carry one human approval per scope"
+}

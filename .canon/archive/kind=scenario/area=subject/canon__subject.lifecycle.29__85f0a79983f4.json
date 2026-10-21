@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.039071101Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "1a3b0c2dd8f118c0d06bca40d728a089a4e5cacf7f95bfd36f81fa9684911253",
+  "scenario_id": "subject.lifecycle.29",
+  "schema": 1,
+  "source_digest": "3a4fdf955c883926fb05053f12b10f85ef5696f46c41c9e47fae5c3a7243c845",
+  "subject_id": "subject-lifecycle",
+  "title": "A shipped subject reopens inside its approved scope and records why"
+}

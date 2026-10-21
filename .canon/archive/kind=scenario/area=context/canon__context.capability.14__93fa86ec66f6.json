@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.415287226Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "4a5db5a013e0bfddfb7089b9fdb99caafa42a291fe694fecdd42a76bc838a5a8",
+  "scenario_id": "context.capability.14",
+  "schema": 1,
+  "source_digest": "89145b060069fe1dfe1e0e3110070ac4b8a3de16b5afabf8470f80bc7bcd978e",
+  "subject_id": "context-capability",
+  "title": "One concept has one flag spelling across every command"
+}

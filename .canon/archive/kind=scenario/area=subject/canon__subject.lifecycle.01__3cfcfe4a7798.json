@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:31.994192572Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "feab35dca412e9816c86826e83f4cae7ae7ff33e50e32f02b0d1223e9b41cdd0",
+  "scenario_id": "subject.lifecycle.01",
+  "schema": 1,
+  "source_digest": "3a4fdf955c883926fb05053f12b10f85ef5696f46c41c9e47fae5c3a7243c845",
+  "subject_id": "subject-lifecycle",
+  "title": "A new subject is born proposed and reads back through the routed tier"
+}

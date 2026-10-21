@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.572393167Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "61a5ed6e5935fc91d3aaf6d4ed2de5b37a42b2724fc95aa622ef64e091002cc5",
+  "scenario_id": "evidence.add.86",
+  "schema": 1,
+  "source_digest": "ea01dc4b0d71836c4fb95d203a1ab016576179fa16297a6699394edd7838c662",
+  "subject_id": "evidence-attestation",
+  "title": "A write that makes a pinned review stale names the review and its re-pin command"
+}

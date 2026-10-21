@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.194984189Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "cb0305d531563a3b3badaf6caaa5b2602926b3de162a6274ee198c57353a63f7",
+  "scenario_id": "finding.list.01",
+  "schema": 1,
+  "source_digest": "0e71c88f9b3df45aff88aa1ccb7568acbfacdacdb2733f461b48e90ca3002698",
+  "subject_id": "finding-lifecycle",
+  "title": "A change's committed findings list one row each at their latest version"
+}

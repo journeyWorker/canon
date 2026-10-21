@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.242553124Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "2c413530ce424b177298d4618071dc38942456b6d3d4849ccdf9e8e4cb012867",
+  "scenario_id": "skills.install.58",
+  "schema": 1,
+  "source_digest": "1865ec27e07a5164e825a99adfb6687eefb62ddaa8d4e336e3c36bcafa256c32",
+  "subject_id": "skills-install",
+  "title": "A projected file whose content changed stays drift"
+}

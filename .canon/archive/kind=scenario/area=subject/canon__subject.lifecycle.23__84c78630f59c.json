@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.029268351Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "58925bbbc8154079176eeb7082b6f5c3f92e32c319fe0c1f95f5d7a1a78c3cb3",
+  "scenario_id": "subject.lifecycle.23",
+  "schema": 1,
+  "source_digest": "3a4fdf955c883926fb05053f12b10f85ef5696f46c41c9e47fae5c3a7243c845",
+  "subject_id": "subject-lifecycle",
+  "title": "An adoption that fails between its two writes names what was written and the command that completes it"
+}
