@@ -357,6 +357,13 @@ fn authoring_brief_check_08_dates_and_decision_notes_are_history_not_behavior() 
     // Any stem with 기로 했다 is a decision.
     let ko_gironeun = swap(&ko, "- 태그를 읽지 못하면 책을 되돌려 주고 대출 목록은 바꾸지 않는다.", "- 대출 목록은 그대로 두기로 했다.");
     assert_eq!(hits(&judged(None, &ko_gironeun), "prose.decision-history").len(), 1);
+    // Round 3: the reviewer's behavior sentences, with a boundary date or a decision word as modifier, are clean.
+    let ko_round3 = swap(&ko, "- 태그를 읽지 못하면 책을 되돌려 주고 대출 목록은 바꾸지 않는다.", "- 2026-12-01부터 환불 방침이 바뀐 주문은 다시 계산한다.\n- 11월 3일 이후 논의 중인 항목은 표시하지 않는다.\n- 2026-12-01부터 확정된 주문은 취소할 수 없다.\n- 10월 21일 이후 결정 버튼을 누르면 열린다.\n- 2026년 11월부터 합의된 금액만 청구한다.");
+    assert!(hits(&judged(None, &ko_round3), "prose.decision-history").is_empty());
+    let en_round3 = swap(&en, "- The organizer's pick is saved as usual.", "- Invitees who approved the slot after Oct 21 see the new picker. A decision field added on Nov 3 shows a badge.");
+    assert!(hits(&judged(None, &en_round3), "prose.decision-history").is_empty());
+    let ko_note = swap(&ko, "- 태그를 읽지 못하면 책을 되돌려 주고 대출 목록은 바꾸지 않는다.", "- 2026-10-21 운영자 결정.");
+    assert_eq!(hits(&judged(None, &ko_note), "prose.decision-history").len(), 1);
     // A note with no date is still a note: removing either phrase list fails here.
     let undated = swap(&en, "- The organizer's pick is saved as usual.", "- The pick is saved as usual, because we decided to keep it.");
     assert_eq!(hits(&judged(None, &undated), "prose.decision-history").len(), 1);
@@ -416,10 +423,10 @@ fn authoring_brief_check_10_a_korean_sentence_not_ending_in_da_is_flagged() {
     let polite = swap(&ko, "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보낸다.", "- 영수증은 한 장입니다.\n- 용지가 없습니다.\n- 반납함이 닫힙니다.");
     assert_eq!(hits(&judged(None, &polite), "prose.ko-ending").len(), 3);
     // Noun fragments that end in 자 or 라 are not hortative or imperative, in a list item or a table-free fragment.
-    let nouns = swap(&ko, "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보낸다.", "- 알림 받는 사람: 주최자, 참가자\n- 검토 대상: 후보자\n- 반납 거절 사유: 분실, 파손, 하자\n- 배경색: 보라");
+    let nouns = swap(&ko, "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보낸다.", "- 알림 받는 사람: 주최자, 참가자\n- 검토 대상: 후보자\n- 반납 거절 사유: 분실, 파손, 하자\n- 배경색: 보라\n- 알림 받는 사람: 주최자, 참가자.\n- 검토 대상: 후보자.\n- 반품 사유: 단순 변심, 상품 하자.\n- 대회 순서: 선두 주자.");
     assert!(hits(&judged(None, &nouns), "prose.ko-ending").is_empty());
     // A terminated imperative or hortative list item is a sentence, whatever the verb.
-    let imperatives = swap(&ko, "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보낸다.", "- 결제 전에 재고를 확인하라.\n- 반납이 끝나면 이용자에게 문자를 보내자.\n- 오류가 나면 사서를 부르십시오.");
+    let imperatives = swap(&ko, "- 문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보낸다.", "- 결제 전에 재고를 확인하라.\n- 고객에게 문자를 보내자.\n- 담당자를 부르십시오.");
     assert_eq!(hits(&judged(None, &imperatives), "prose.ko-ending").len(), 3);
     // English text never gets it.
     let en = swap(&fixture("good-en-cobalt.md"), "Recurring meetings.", "Recurring meetings are planned.");
