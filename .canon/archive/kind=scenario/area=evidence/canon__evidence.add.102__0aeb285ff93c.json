@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:24.547699698Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "b37239cb66a1afbb7ba6fa14f31d1cf8473b97ec74443c39bd6211d1ab9c73ca",
+  "scenario_id": "evidence.add.102",
+  "schema": 1,
+  "source_digest": "3d2b37d7da2d32a399bf6466b8dcca332a13ea6fac55f1bb62b7b5a1a7dde773",
+  "subject_id": "evidence-attestation",
+  "title": "A subject built before briefs keeps re-verifying its evidenced scenarios under a draft change"
+}

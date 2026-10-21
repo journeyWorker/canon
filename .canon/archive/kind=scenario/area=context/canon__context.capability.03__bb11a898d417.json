@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.397507004Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "9fe2f126d1ab85a31e5ff133755e2e73bc078790117d0a0f02de8453638e4555",
+  "scenario_id": "context.capability.03",
+  "schema": 1,
+  "source_digest": "89145b060069fe1dfe1e0e3110070ac4b8a3de16b5afabf8470f80bc7bcd978e",
+  "subject_id": "context-capability",
+  "title": "Two resolutions of an unchanged repo are byte-identical"
+}

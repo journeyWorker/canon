@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:24.488011585Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "da26fe7fb4cdfc3fef3a034fd18520748d04ef4a8f6e6b7b7a093ece2b98692d",
+  "scenario_id": "evidence.add.82",
+  "schema": 1,
+  "source_digest": "3d2b37d7da2d32a399bf6466b8dcca332a13ea6fac55f1bb62b7b5a1a7dde773",
+  "subject_id": "evidence-attestation",
+  "title": "A case whose scenario id is not indexed is named and skipped"
+}

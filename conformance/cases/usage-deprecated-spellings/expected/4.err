@@ -1,3 +1,0 @@
-canon brief check: --change is deprecated — use --change-id (removed in 0.25.0)
-canon brief check: BRIEF_HAS_BLOCKERS — 7 blocker(s) in .canon/changes/add-login/brief.md
-hint: fix each blocker in `findings`, then run `canon brief check` again

@@ -1,3 +1,0 @@
-canon change new: --subject is deprecated — use --subject-id (removed in 0.25.0)
-canon change new: wrote .canon/changes/add-login/brief.md
-canon change new: recorded change `add-login` adopted into subject `auth` — written directly; nothing to promote

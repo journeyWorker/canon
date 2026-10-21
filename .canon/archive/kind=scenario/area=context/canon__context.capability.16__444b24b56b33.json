@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.418473488Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "6fd7ecccaab6c36860abcfd17417aba6d1637ba6c671cb03cc55655ab4ac509e",
+  "scenario_id": "context.capability.16",
+  "schema": 1,
+  "source_digest": "89145b060069fe1dfe1e0e3110070ac4b8a3de16b5afabf8470f80bc7bcd978e",
+  "subject_id": "context-capability",
+  "title": "A deprecated flag spelling still runs, warns once on stderr and is named in meta.deprecated"
+}

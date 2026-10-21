@@ -1,0 +1,2 @@
+./.claude/skills/canon/SKILL.md — ok (claude)
+./.claude/skills/canon/reference/retired.md — orphan (claude; the install lock lists it, but this canon's bundle no longer ships it; its bytes still match the install lock; run `canon skills install --providers=claude`, which removes it)

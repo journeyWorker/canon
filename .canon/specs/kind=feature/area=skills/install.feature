@@ -298,3 +298,64 @@ Feature: skills install
     When canon skills check and canon skills doctor run
     Then the check exits 1 and calls each file stale
     And the doctor reports each stale and never as formatter-rewritten, because whitespace between tokens, backslashes and code fences are never normalized away
+
+  # canon: {"schema":1,"at":"2026-10-21T11:50:35Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:skills-install
+  @case:happy
+  @skills.install.59
+  Scenario: Install prunes a projected file the bundle no longer ships when its bytes still match the lock
+    Given a target with canon's projection installed for Claude, then a canon whose bundle no longer ships one reference file in a directory of its own
+    When the skill is installed again
+    Then the dropped file whose bytes still match the install lock is removed, and the install reports its path
+    And the directory that held only it is removed, while the canon projection directory itself and every shipped file stay
+    And the JSON lists the path under `pruned`, and the install lock lists only shipped files
+    And a rerun reports unchanged and prunes nothing
+
+  # canon: {"schema":1,"at":"2026-10-21T11:50:43Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.60
+  Scenario: Install keeps a dropped projected file whose bytes changed and says what to do
+    Given a target with canon's projection installed for Claude, then a canon whose bundle no longer ships one reference file
+    And the projected file's bytes were edited after the install
+    When the skill is installed again
+    Then the edited file is kept and the install reports its path, that its bytes differ from the install lock, and that it can be removed by hand
+    And the JSON lists it under `kept` with a hint, and nothing under `pruned`
+    And the install lock no longer lists it, and a rerun reports unchanged
+
+  # canon: {"schema":1,"at":"2026-10-21T11:50:51Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:skills-install
+  @case:edge
+  @skills.install.61
+  Scenario: Install touches only the selected providers' projections and only files the lock listed
+    Given a target with canon's projection installed for Claude and Codex, a file the user added inside the Claude projection that the lock never listed, and a canon whose bundle no longer ships one reference file
+    When the skill is installed for Claude only
+    Then the dropped file is removed from the Claude projection, and the check for Claude is clean
+    And the Codex projection is untouched, including its copy of the dropped file
+    And the user's file inside the Claude projection is untouched
+    And the install lock keeps the entries it recorded for the providers not selected, so a later install for one of them still prunes its dropped files and the check for it still names them
+
+  # canon: {"schema":1,"at":"2026-10-21T11:51:00Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.62
+  Scenario: Check and doctor name each orphan with the fix
+    Given a target with canon's projection installed for Claude, then a canon whose bundle no longer ships two reference files
+    And one dropped file whose bytes still match the lock, and another whose bytes were edited
+    When canon skills check and canon skills doctor run
+    Then the check exits 1 and names each orphan path with its provider, whether its bytes match the lock, and the fix, in the output and in the JSON `orphans` list, instead of only a generic manifest mismatch
+    And for the unmodified orphan the fix is `canon skills install`, which removes it; for the modified one it says install keeps it and to remove it by hand
+    And the doctor reports an `orphan:` line for each, names the same fix, and does not report healthy
+    And both commands are read-only: every file is where it was
+    And after the install, which removes the unmodified orphan and keeps the edited one, the check is clean and the doctor reports healthy
+
+  # canon: {"schema":1,"at":"2026-10-21T12:37:45Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.63
+  Scenario: Install ignores a lock key that is not a plain relative path inside a canon projection
+    Given a target with canon's projection installed for Claude, and an install lock edited to list keys with empty, `.` or `..` segments or a trailing `/` inside the Claude projection directory
+    When canon skills check, canon skills doctor and the install run
+    Then those keys are never treated as orphans, and nothing outside the projection is touched or removed
+    And the doctor reports an `invalid-lock-entry:` line for each
+    And the install exits 0 and rewrites the lock without them

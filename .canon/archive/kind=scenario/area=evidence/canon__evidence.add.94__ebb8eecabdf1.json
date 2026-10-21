@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.583906925Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "8ff2ea9baf5c1c83e319a9c5c97550c4065f64d2ed3e7730538b889cd676c2e3",
+  "scenario_id": "evidence.add.94",
+  "schema": 1,
+  "source_digest": "ea01dc4b0d71836c4fb95d203a1ab016576179fa16297a6699394edd7838c662",
+  "subject_id": "evidence-attestation",
+  "title": "A Cucumber embedding is stored by digest and bound to the scenario it belongs to"
+}

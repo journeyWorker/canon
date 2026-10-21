@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:23.858574088Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "820155b5f80f85d5fe65bedcb13485ad58de7e50532dd8454f653c4acb284e50",
+  "scenario_id": "subject.lifecycle.07",
+  "schema": 1,
+  "source_digest": "983f3875dadecf3e47e62ef7fd7450ce970bce3c0dc3663cfb9f4eeaaa7f806d",
+  "subject_id": "subject-lifecycle",
+  "title": "Shipping is blocked while a linked scenario's latest verdict is divergent"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:23.805921045Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "24b556ac2657c932484110be186f9d1ccde0ede04c208232ea2edce72b19cc65",
+  "scenario_id": "report.dashboard.03",
+  "schema": 1,
+  "source_digest": "d6c5aa1cf05464a7986c748a4509581f87c0f22ca0560e2b52fa23b5b6f12b51",
+  "subject_id": "report-generation",
+  "title": "A port already in use is its own refusal and names the flag that fixes it"
+}

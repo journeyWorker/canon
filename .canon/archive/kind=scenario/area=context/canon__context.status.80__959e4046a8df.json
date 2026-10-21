@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.384775375Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "b36809490e34ba517d5c9ad5c23a0d25c72803d54a3ed1d577e6d74a74a045a2",
+  "scenario_id": "context.status.80",
+  "schema": 1,
+  "source_digest": "2b5ab1fa0e2362b8a6959b31b9958dcfeb17c3cb3f299fe24596a8e3762d0557",
+  "subject_id": "context-capability",
+  "title": "Status names the policy level from its level line, else from its sections, else custom"
+}

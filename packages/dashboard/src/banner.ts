@@ -35,3 +35,19 @@ export function renderErrorBanner(banner: HTMLElement, error: unknown): void {
   banner.className = "banner banner-error";
   banner.textContent = `Failed to load snapshot: ${error instanceof Error ? error.message : String(error)}`;
 }
+
+/** The repo has no snapshot (`canon dashboard`'s /api/status says so): why,
+ * and the fix, in place of panels. */
+export function renderUnavailableBanner(banner: HTMLElement, reason: string | null, fix: string | null): void {
+  banner.className = "banner banner-error";
+  banner.replaceChildren();
+  const title = document.createElement("p");
+  title.style.margin = "0";
+  title.textContent = "No snapshot to show.";
+  const why = document.createElement("p");
+  why.textContent = reason ?? "The repo's snapshot is not available.";
+  const how = document.createElement("p");
+  how.style.margin = "0";
+  how.textContent = fix ?? "";
+  banner.append(title, why, how);
+}

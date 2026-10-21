@@ -1,0 +1,3 @@
+canon change new: wrote .canon/changes/b/brief.md
+canon change new: recorded change `b` adopted into subject `s` — written directly; nothing to promote
+canon change new: warning: subject `s` is building and change `b` is not approved (.canon/changes/b/brief.md has no `Approved:` line): the subject's existing scenarios keep accepting evidence, and while no scenario is tagged `@flow:b.*` it can still be reopened and shipped for its approved scope; once a scenario is tagged `@flow:b.*`, those scenarios wait for the approval and `s` cannot ship until the brief is approved; to take the adoption back run `canon subject unadopt b --subject-id s`

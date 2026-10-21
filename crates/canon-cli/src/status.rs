@@ -259,6 +259,13 @@ pub struct SubjectSummary {
     /// the others.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub brief: Option<BriefStatus>,
+    /// The adopted changes set aside as pending drafts
+    /// ([`crate::brief::scope_changes`]): each one's brief is not approved
+    /// and no scenario of the subject is tagged `@flow:<change>.*` for it,
+    /// so it is not part of the subject's scope yet and reopen, evidence and
+    /// ship read the newest approved or tagged change. Omitted when empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub pending_drafts: Vec<String>,
     /// For a `shipped` subject, what makes its gate red now (0.18 D3):
     /// what the `verifying → shipped` guard would refuse it on
     /// ([`crate::subject::shipped_gate_gaps`], the same checks), one
@@ -845,6 +852,19 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
     let stale_reviews = gap_count(ReviewGapKind::Stale);
     let red = if subject.status == SubjectStatus::Shipped { shipped_red(repo, ctx, subject) } else { Vec::new() };
 
+    // The flow the ship guard checks is the scope's, not a pending draft's.
+    let (scope, pending) = crate::brief::scope_changes(repo, ctx, subject, &changes);
+    // The brief status reports is the newest adopted change's, unless a pending
+    // draft sits above an unapproved tagged change: that one blocks, so it is
+    // the one the human is asked about.
+    let brief = if pending.is_empty() {
+        brief_with_findings(repo, plan_roots, subject, &changes)
+    } else {
+        match brief_with_findings(repo, plan_roots, subject, &scope) {
+            Some(scoped) if !scoped.approved => Some(scoped),
+            _ => brief_with_findings(repo, plan_roots, subject, &changes),
+        }
+    };
     SubjectSummary {
         id: subject.subject_id.as_str().to_string(),
         title: subject.title.clone(),
@@ -860,9 +880,10 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         review_due,
         open_blockers,
         missing_cases,
-        brief: brief_with_findings(repo, plan_roots, subject, &changes),
+        brief,
+        pending_drafts: pending.iter().map(|c| c.as_str().to_string()).collect(),
         red,
-        flow: changes.last().map(|change| flow_steps(ctx, joins, repo, change, distinct_actor)).unwrap_or_default(),
+        flow: scope.last().map(|change| flow_steps(ctx, joins, repo, change, distinct_actor)).unwrap_or_default(),
         reverify: if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) { crate::reverify::gaps(repo, ctx, subject) } else { Vec::new() },
         chore_reviews: if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) { crate::reverify::chore_review_gaps(repo, ctx, subject) } else { Vec::new() },
     }
@@ -1002,8 +1023,13 @@ fn flow_step(id: &str, all: &[&Scenario], roots: &[ProjectId], summary: &Subject
 
 /// Whether `subject`'s brief is enforced and not approved (module doc):
 /// the human answers before anything is built or attested for it.
+/// Whether the summary's brief is a pending draft's ([`SubjectSummary::pending_drafts`]).
+fn on_pending_draft(summary: &SubjectSummary) -> bool {
+    summary.brief.as_ref().and_then(|brief| brief.change.as_deref()).is_some_and(|change| summary.pending_drafts.iter().any(|d| d == change))
+}
+
 fn awaits_brief(summary: &SubjectSummary) -> bool {
-    summary.brief.as_ref().is_some_and(|brief| brief.enforced)
+    !on_pending_draft(summary) && summary.brief.as_ref().is_some_and(|brief| brief.enforced)
 }
 
 /// The per-subject `next:` rules (module doc), each producing at most one
@@ -1025,9 +1051,35 @@ fn subject_steps(
 ) {
     let id = subject.subject_id.as_str();
     let status = subject.status;
-    let before = next.len();
 
-    if let Some(brief) = summary.brief.as_ref().filter(|brief| brief.enforced) {
+    // A pending draft blocks nothing: its subject keeps building, attesting
+    // and shipping for its approved scope. While `canon brief check` has
+    // blockers the draft is the planner's to write; once clean, the human is
+    // told it awaits an answer.
+    if let (Some(brief), true) = (summary.brief.as_ref().filter(|brief| brief.enforced), on_pending_draft(summary)) {
+        let draft = brief.change.as_deref().unwrap_or_default();
+        match (brief.change.as_deref(), brief.findings.as_ref().filter(|counts| counts.blockers > 0)) {
+            (Some(change), Some(counts)) => next.push(NextStep {
+                actor: StepActor::Agent,
+                role: Some(Role::Planner),
+                command: format!("canon brief check --change-id {change}"),
+                why: format!("{id}: `{draft}` is a pending draft with {} blocker(s): write the brief in {} until `canon brief check` is clean; only then does the human answer it; {id} is not blocked meanwhile", counts.blockers, brief.report_in()),
+            }),
+            _ => next.push(NextStep {
+                actor: StepActor::Human,
+                role: None,
+                command: format!("report the pending draft's brief in {} to the human; {id} is not blocked meanwhile", brief.report_in()),
+                why: format!(
+                    "{id}: `{draft}` is a pending draft ({}) and not yet part of the subject's scope: reopen, evidence and ship read the newest approved change until a scenario is tagged `@flow:{draft}.*`, and then the subject cannot ship until the human answers; once they do, {}",
+                    brief.unanswered(),
+                    brief.record()
+                ),
+            }),
+        }
+    }
+    // The pending-draft step is not a gap: it must not hold back the advance.
+    let before = next.len();
+    if let Some(brief) = summary.brief.as_ref().filter(|brief| brief.enforced && !on_pending_draft(summary)) {
         // A brief `canon brief check` still has blockers for is the planner's
         // to write; the human is asked only once it is clean (0.22 D4).
         if let (Some(change), Some(counts)) = (brief.change.as_deref(), brief.findings.as_ref().filter(|counts| counts.blockers > 0)) {
@@ -1039,15 +1091,16 @@ fn subject_steps(
             });
             return;
         }
+        let change = brief.change.as_deref().unwrap_or("the change");
         next.push(NextStep {
             actor: StepActor::Human,
             role: None,
             command: format!(
-                "stop and report the brief in {}; build and attest nothing for {id} until the human answers (one answer approves brief and policy)",
+                "stop and report the brief in {}; build and attest nothing that answers to it until the human answers (one answer approves brief and policy)",
                 brief.report_in()
             ),
             why: format!(
-                "{id}: {} (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses {id}'s scenarios and tasks until it is recorded; once the human answers, {} (one call records the brief and the policy approval)",
+                "{id}: {} (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses the scenarios tagged `@flow:{change}.*` and `{change}`'s tasks (and {id}'s untagged scenarios not evidenced before {id} adopted its first change, while no adopted change is approved) until it is recorded; once the human answers, {} (one call records the brief and the policy approval)",
                 brief.unanswered(),
                 brief.record()
             ),
@@ -1058,7 +1111,7 @@ fn subject_steps(
     // A shipped subject whose gate went red (0.18 D3) is reopened first:
     // every gap below is follow-up work inside its approved change.
     if status == SubjectStatus::Shipped && !summary.red.is_empty() {
-        let tasks = match summary.brief.as_ref().and_then(|brief| brief.change.as_deref()) {
+        let tasks = match summary.brief.as_ref().and_then(|brief| brief.change.as_deref()).filter(|_| !on_pending_draft(summary)) {
             Some(change) => format!("keep the follow-up in its approved change `{change}` (never `canon change new`)"),
             None => "keep the follow-up in its change".to_string(),
         };
@@ -1244,7 +1297,12 @@ fn subject_steps(
             why: match status {
                 SubjectStatus::Proposed | SubjectStatus::Specced => format!("{id} has its scenarios and every required case; move it on"),
                 SubjectStatus::Verifying => {
-                    let brief = if summary.brief.as_ref().is_some_and(|brief| brief.approved) { "the brief is approved" } else { "no brief is written to approve" };
+                    let brief = match (!summary.pending_drafts.is_empty(), summary.brief.as_ref().is_some_and(|brief| brief.approved)) {
+                        (true, true) => "its scope's brief is approved (the newer draft is pending)",
+                        (true, false) => "no brief of its scope is approved",
+                        (false, true) => "the brief is approved",
+                        (false, false) => "no brief is written to approve",
+                    };
                     format!("{id}: every scenario is evidenced{reviewed}, with no blocker or case gap, and {brief}; ship it yourself unless the brief says the human ships")
                 }
                 _ => format!("{id}: every scenario is evidenced{reviewed}, with no blocker or case gap"),
@@ -1354,6 +1412,11 @@ pub fn render(report: &StatusReport) -> String {
                     _ => writeln!(out, "      brief: not approved (no adopted change; advisory, nothing to approve yet)"),
                 };
             }
+            if !s.pending_drafts.is_empty() {
+                let names = s.pending_drafts.iter().map(|d| format!("`{d}`")).collect::<Vec<_>>().join(", ");
+                let verb = if s.pending_drafts.len() == 1 { "is a pending draft" } else { "are pending drafts" };
+                let _ = writeln!(out, "      {names} {verb}: not yet part of the subject's scope (brief not approved and no scenario tagged `@flow:<change>.*`); reopen, evidence and ship read the newest approved or tagged change");
+            }
             if let Some(counts) = s.brief.as_ref().and_then(|b| b.findings) {
                 let _ = writeln!(out, "      brief check: {} blocker(s), {} advisory(ies); `canon brief` names the next step", counts.blockers, counts.advisories);
             }
@@ -1372,7 +1435,11 @@ pub fn render(report: &StatusReport) -> String {
                 }
             }
             if !s.red.is_empty() {
-                let _ = writeln!(out, "      gate: red — {}; reopen with `{}`", s.red.join(", "), reopen_command(&s.id));
+                if s.brief.as_ref().is_some_and(|brief| brief.enforced) && !on_pending_draft(s) {
+                    let _ = writeln!(out, "      gate: red — {}; reopening is refused until the brief above is approved (answer it, or remove its `@flow:` tags, after which `canon subject unadopt` can take the change back)", s.red.join(", "));
+                } else {
+                    let _ = writeln!(out, "      gate: red — {}; reopen with `{}`", s.red.join(", "), reopen_command(&s.id));
+                }
             }
         }
     }

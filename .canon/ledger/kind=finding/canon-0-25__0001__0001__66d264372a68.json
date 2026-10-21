@@ -1,0 +1,23 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T12:53:15.754189546Z",
+  "change_id": "canon-0-25",
+  "disposition": "fixed",
+  "kind": "finding",
+  "reason": "the brief guard now ignores a @flow tag naming a change that is not the subject's own",
+  "resolution_sha": "25501f4c79f757dfc0fad7e03b34d34eaba923e8",
+  "reviewer": "canon-reviewer-025",
+  "round": 1,
+  "scenario_ids": [
+    "evidence.add.100",
+    "evidence.add.101"
+  ],
+  "schema": 1,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "Brief guard fails open on a @flow: tag naming a change that is not the subject's: brief::attested_briefs uses every tagged change id as-is and brief_of returns enforced=false for a change with no brief, so on a verifying subject whose only change `a` is a draft, a scenario tagged @flow:zzz.F1 (no such change) or @flow:x.F1 (x approved but adopted only by another subject) gets evidence add exit 0 while @flow:a.F1 and untagged ones are refused BRIEF_UNAPPROVED (probed with target/debug/canon). Code pass. Blast radius: that evidence then makes the scenario 'already evidenced', so untagged later it needs no brief either; ship guard still reads the newest adopted change."
+}

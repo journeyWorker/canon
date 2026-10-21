@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:31.999187484Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "8d7892aa7e396dd8779a1355c1768a064c8df1266ce244ea1988384cf3c5c805",
+  "scenario_id": "subject.lifecycle.04",
+  "schema": 1,
+  "source_digest": "3a4fdf955c883926fb05053f12b10f85ef5696f46c41c9e47fae5c3a7243c845",
+  "subject_id": "subject-lifecycle",
+  "title": "A transition off the chain is refused and the subject is unchanged"
+}

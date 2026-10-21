@@ -12,15 +12,11 @@ use serde_json::{json, Value};
 /// The success envelope for `command` (its canonical path, e.g. `gate check`).
 /// A write command carries `meta.next` (0.21 D2);
 /// here it is empty, for a command with no meaningful next step.
-/// [`data_with_next`] fills it. An invocation that used a deprecated spelling
-/// carries `meta.deprecated` ([`crate::deprecation`]).
+/// [`data_with_next`] fills it.
 pub fn envelope(command: &str, data: Value) -> Value {
     let mut meta = json!({ "command": command });
     if writes(command) {
         meta["next"] = json!([]);
-    }
-    if let Some(deprecated) = crate::deprecation::meta() {
-        meta["deprecated"] = deprecated;
     }
     json!({ "data": data, "meta": meta })
 }
@@ -43,6 +39,12 @@ pub fn data_with_next(command: &str, data: Value, after: &crate::next::After) {
 
 /// [`data_with_next`] with extra `meta` keys (a page's `nextCursor`, …).
 pub fn data_with_next_and_meta(command: &str, data: Value, after: &crate::next::After, extra_meta: Value) {
+    println!("{}", envelope_with_next(command, data, after, extra_meta));
+}
+
+/// The write envelope [`data_with_next_and_meta`] prints, as a value: for a
+/// caller that answers over a socket instead of stdout.
+pub fn envelope_with_next(command: &str, data: Value, after: &crate::next::After, extra_meta: Value) -> Value {
     let mut envelope = envelope(command, data);
     if let Some(meta) = envelope["meta"].as_object_mut() {
         for extra in [&extra_meta, &after.meta()] {
@@ -51,7 +53,18 @@ pub fn data_with_next_and_meta(command: &str, data: Value, after: &crate::next::
             }
         }
     }
-    println!("{envelope}");
+    envelope
+}
+
+/// The `meta` member a command's warnings travel in (0.25): `{ "warnings":
+/// [<line>, …] }`, or null when there is none. A warning is also said on
+/// stderr, in both modes, by the command that raises it.
+pub fn warnings_meta(warnings: &[String]) -> Value {
+    if warnings.is_empty() {
+        Value::Null
+    } else {
+        json!({ "warnings": warnings })
+    }
 }
 
 /// Splits a payload that carries its own page `meta` ([`crate::paging`]'s

@@ -41,3 +41,13 @@ Feature: finding list
     Given a repo with a canon.yaml
     When canon finding list runs with a change id outside the grammar
     Then it exits 2 naming --change-id and prints nothing to stdout
+
+  # canon: {"schema":1,"at":"2026-10-21T11:47:25Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:finding-lifecycle
+  @case:happy
+  @finding.list.05
+  Scenario: finding list shows each closed finding's reason in the table and in JSON
+    Given a rejected finding closed with a reason and a fixed one closed without
+    When canon finding list runs, and again with --json
+    Then the table appends the reason to the summary of the finding that has one, leaving the columns as they were
+    And the JSON rows carry a reason field, null for the finding without one

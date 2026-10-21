@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:23.929653713Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "da2ed8562b6e8a8a9260b37bc0dc03698fdee5f950d2024781b4b54d7d2a7795",
+  "scenario_id": "subject.lifecycle.27",
+  "schema": 1,
+  "source_digest": "983f3875dadecf3e47e62ef7fd7450ce970bce3c0dc3663cfb9f4eeaaa7f806d",
+  "subject_id": "subject-lifecycle",
+  "title": "A subject with no adopted change ships with an advisory that its brief is not approved"
+}

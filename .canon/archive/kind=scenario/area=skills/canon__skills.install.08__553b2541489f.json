@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.209900842Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "0e41173d1b6a5fd3c24b62303b62c063384a90272ca0ded7317046c651c00bb5",
+  "scenario_id": "skills.install.08",
+  "schema": 1,
+  "source_digest": "1865ec27e07a5164e825a99adfb6687eefb62ddaa8d4e336e3c36bcafa256c32",
+  "subject_id": "skills-install",
+  "title": "Codex receives the skill where Codex discovers skills, frontmatter intact"
+}

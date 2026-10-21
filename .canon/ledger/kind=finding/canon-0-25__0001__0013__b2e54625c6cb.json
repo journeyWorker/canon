@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T12:53:16.876758570Z",
+  "change_id": "canon-0-25",
+  "disposition": "fixed",
+  "kind": "finding",
+  "reason": "report_dashboard_09 proves the size limit refuses before the body is read and tries a foreign Host on every route",
+  "resolution_sha": "7e138cf3093aa8d179b4e449fd360132f550ad78",
+  "reviewer": "canon-reviewer-025",
+  "round": 1,
+  "scenario_ids": [
+    "report.dashboard.09"
+  ],
+  "schema": 1,
+  "seq": 13,
+  "severity": "should_fix",
+  "summary": "report_dashboard_09's 'too large' case sends Content-Length 65537 with a ~150-byte body: with the MAX_BODY check removed the server times out reading (READ_TIMEOUT 10s) and answers the same 400 DASHBOARD_BAD_REQUEST, so the 64 KiB guard is unproven; no case shows the refusal comes before the body is read (no headers-only request), and foreign Host is tried on 2 of the /api routes. By hand a 70123-byte body is refused at once with 'the body is 70123 bytes; the limit is 65536'. Standards pass."
+}

@@ -15,6 +15,7 @@ canon subject new <subject-id> --domain <domain> --title "<title>" --actor-id <u
 canon change new <slug> --subject-id <subject-id> --title "<title>" --as planner --json
 canon change new <slug> --subject-id <subject-id> --kind chore --title "<title>" --as planner --json
 canon subject adopt <slug> --subject-id <other-subject-id> --as planner --json
+canon subject unadopt <slug> --subject-id <subject-id> --as planner --json   # a draft change off a live subject; refused once its brief is approved
 canon brief check --change-id <slug> --as planner --json
 canon brief approve --change-id <slug> --by "<the human>" --note "<their words>" --as planner --json
 ```
@@ -34,9 +35,24 @@ unapproved. A policy that no longer matches its approval fails closed
    `tasks.md` (`tasks.md` is an optional work note nothing gates on). A
    change that also serves another subject is adopted there too
    (`subject adopt`): it then belongs to both,
-   and its open blockers gate both. Inside an approved scope there is no new
+   and its open blockers gate both. Planning the next change for a
+   `building`, `verifying` or `shipped` subject warns (stderr and JSON
+   `meta.warnings`) until its brief is approved: evidence for its existing scenarios is not
+   frozen and the subject can still be reopened and shipped for its approved
+   scope while no scenario is tagged for the draft (a pending draft); once one
+   is, the subject cannot ship before the approval.
+   A scenario answers to the changes its `@flow:<change>.<F-id>`
+   tags name (`canon scenario new --flow <F-id>` tags one for this change).
+   To park a draft that should not gate a live subject, `subject unadopt`
+   it and adopt it into a `proposed` subject. Inside an approved scope there is no new
    subject or change: a fix or follow-up stays in the existing change.
-2. **Write the brief.** A PRD: intent, desired outcome, the user flow as
+2. **Write the brief.** Briefs outlive the code that exists today and are
+   read by sessions that did not write them. Intent says what the product
+   does today, in behavior words, and why that is not enough; Desired outcome
+   says what is true afterwards. Describe an interface by its behavior
+   (inputs, outputs, errors), and keep file paths, line numbers and function
+   names out of the sections that decide the work; a `Source: <path>`
+   provenance line is the one exception. A PRD: intent, desired outcome, the user flow as
    numbered steps `F1`, `F2`, … (sees → does → becomes), step detail per
    step, acceptance per step with its failure path, questions and
    assumptions, out of scope. Write it in the `language:` of `canon.yaml`;
@@ -55,7 +71,9 @@ unapproved. A policy that no longer matches its approval fails closed
    - `reference/brief-align.md`: scenarios cover the flow.
    - `reference/brief-polish.md`: prose.
 4. **Stop for the human.** Report the brief to the human, in the brief's
-   language, asking once. Build nothing for that scope (no scenarios, code
+   language, asking once, and say they can approve it in `canon dashboard`
+   (the briefs page, `/briefs.html`) or answer in chat. You never click
+   Approve or fill that form yourself. Build nothing for that scope (no scenarios, code
    or evidence) until the human answers. The approval is never assumed, even
    when the human said they cannot answer until you report: the brief is
    that report. The one answer approves the brief and the policy
@@ -85,6 +103,28 @@ shipped subject `change new` prints the reopen command for the orchestrator
 (`subject status <id> --to verifying --reason "<why>"`); the subject cannot
 ship again until the suite is evidenced after the chore's approval. Work that
 changes behavior is never a chore: it is a feature change.
+
+### A migration is cut in phases
+
+A migration (a column, a format, a dependency swap) is cut as expand,
+migrate, contract: one change per phase, each adopting only after the
+previous one shipped. A phase that alters nothing a user or a caller can
+observe (a behavior-preserving internal rename, a build step) is a chore. A
+phase that changes data, a public interface or output is never a chore: it
+is a feature change with a PRD brief, whose Acceptance names the down path
+(how it is undone), the safety condition of any backfill (idempotent,
+resumable, checked before and after), and the destructive cleanup (drop the
+old column, delete the old format) in its own later change.
+
+## Excuses that fail
+
+| The thought | The reality |
+|---|---|
+| "The human is unavailable; I will assume the approval." | Never. The brief is the report; stop, and put open questions into Questions and assumptions. |
+| "This could change policy, but I will decide it." | Anything that could change policy goes to the questions. |
+| "A small follow-up needs no new answer." | A follow-up that adds or changes a flow step is a scope change and needs a new `brief approve`. |
+| "This migration is just a chore." | Data, interface or output changes are feature changes. |
+| "Put the file and line in the brief so nobody has to look." | Paths rot; describe behavior. |
 
 ## Hand-off
 

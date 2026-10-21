@@ -1,0 +1,1 @@
+{"error":{"code":"USAGE","expected":["--subject-id"],"field":"--subject","hint":"--subject was renamed --subject-id in 0.24.0; use --subject-id","message":"--subject was removed in 0.25.0","retryable":false}}

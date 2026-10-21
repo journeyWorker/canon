@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.590613023Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "666491afdd1ba5fb860ff38bc36d4f6517786e5e273146b4a1bfac8c67b34508",
+  "scenario_id": "evidence.add.96",
+  "schema": 1,
+  "source_digest": "ea01dc4b0d71836c4fb95d203a1ab016576179fa16297a6699394edd7838c662",
+  "subject_id": "evidence-attestation",
+  "title": "An artifact scoped to a scenario binds to that scenario's record alone"
+}

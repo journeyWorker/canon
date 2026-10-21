@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:51:47.724916646Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "570bbfb804c173f91f56ae1d410ffa8466fdc273338d00b6430f47ebc57ea2c5",
+  "scenario_id": "subject.lifecycle.28",
+  "schema": 1,
+  "source_digest": "26784d60f8e418a20c07d105a5cb25139ae93b5c54503cc0fce31270bd16be1d",
+  "subject_id": "subject-lifecycle",
+  "title": "Shipping a change from an external plan needs its canon brief"
+}

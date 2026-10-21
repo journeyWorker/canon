@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-025",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-025-1"
+  },
+  "at": "2026-10-21T13:29:52.239206379Z",
+  "change_id": "canon-0-25",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewer": "canon-reviewer-025",
+  "round": 3,
+  "scenario_ids": [
+    "subject.lifecycle.30"
+  ],
+  "schema": 1,
+  "seq": 3,
+  "severity": "note",
+  "summary": "A shipped subject with an unapproved draft that a scenario is tagged for: `canon status` prints 'gate: red — 1 uncovered-cell ...; reopen with `canon subject status s --to verifying --reason \"<why it reopens>\"`', and that reopen is refused ('reopening needs the approved scope, and the brief is not approved — .canon/changes/b/brief.md'). The red-gate line predates 0.25 but the tagged-draft setup is the 0.25 rule; suggest the human step instead when the reopen guard would refuse."
+}

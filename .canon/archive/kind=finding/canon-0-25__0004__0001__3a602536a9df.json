@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-025",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-025-1"
+  },
+  "at": "2026-10-21T13:41:34.345937122Z",
+  "change_id": "canon-0-25",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewer": "canon-reviewer-025",
+  "round": 4,
+  "scenario_ids": [
+    "subject.lifecycle.39"
+  ],
+  "schema": 1,
+  "seq": 1,
+  "severity": "note",
+  "summary": "The new red-gate line for a shipped subject with a tagged unapproved draft offers three ways out: 'answer it, or `canon subject unadopt` the change, or remove its `@flow:` tags'. The middle one is refused while the tags exist (probed: `subject unadopt b --subject-id s` exits 2 SUBJECT_UNADOPT_REFUSED, hint 'remove or retag the @flow:b.* tags first'); after removing the tags the reopen works without any unadopt. Say 'remove its @flow: tags (then, if wanted, canon subject unadopt it)'."
+}

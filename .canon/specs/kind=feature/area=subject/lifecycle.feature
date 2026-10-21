@@ -298,7 +298,7 @@ Feature: subject lifecycle
   @case:failure
   @subject.lifecycle.30
   Scenario: Reopening outside an approved scope is refused naming the brief to approve
-    Given a shipped subject that adopted a newer change whose brief.md has no Approved line
+    Given a shipped subject that adopted a newer change whose brief.md has no Approved line and that one of its scenarios is tagged @flow:<change>.* for
     When it is moved to verifying with a reason
     Then the command exits 1 with an unreviewed-promotion naming that brief.md and saying a human must answer it
     And an override reason does not waive it, and the subject stays shipped
@@ -345,3 +345,54 @@ Feature: subject lifecycle
     When the changes are queried
     Then the change shows that subject as a one-element subject_ids
     And adopting it under a second subject appends that subject and writes the change as the list at the current schema generation
+
+  # canon: {"schema":1,"at":"2026-10-21T11:58:47Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:subject-lifecycle
+  @case:happy
+  @subject.lifecycle.35
+  Scenario: Adopting an unapproved change into a building subject warns and says how to undo it
+    Given a proposed, a specced and a building subject, and a change with a draft brief.md
+    When the change is created under, or adopted by, each subject
+    Then the building, verifying or shipped subject (the shipped one adopting into a shipped subject too) gets one warning on stderr and in JSON meta.warnings naming canon subject unadopt, and the proposed and specced ones none
+    And an approved brief adopted into a building subject gets none
+
+  # canon: {"schema":1,"at":"2026-10-21T11:58:51Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:subject-lifecycle
+  @case:happy
+  @subject.lifecycle.36
+  Scenario: Unadopting a change removes the link on both sides
+    Given a verifying subject adopting an approved change and a draft change, and a holding subject
+    When the draft change is unadopted from the subject
+    Then the subject's change list and the change's subject list both drop the link, canon status no longer asks about that brief for the subject, and the holding subject can adopt the change
+    And unadopting an unlinked pair writes nothing and exits 0, and the result carries meta.next
+
+  # canon: {"schema":1,"at":"2026-10-21T11:58:56Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.37
+  Scenario: A change with an approved brief is not unadopted
+    Given a building subject adopting a change whose brief.md carries an "Approved:" line
+    When the change is unadopted from that subject
+    Then the command exits 2 with SUBJECT_UNADOPT_REFUSED, its hint naming the approved scope, and the link stays
+    And a draft change a scenario of the subject is tagged @flow:<change>.* for is refused the same way, its hint naming the scenarios and saying to remove or retag them first
+
+  # canon: {"schema":1,"at":"2026-10-21T12:38:43Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:subject-lifecycle
+  @case:happy
+  @subject.lifecycle.38
+  Scenario: A pending draft change does not freeze a shipped subject's reopen, evidence, review and ship
+    Given a shipped subject adopting an approved change and a newer draft change that none of its scenarios is tagged @flow:<change>.* for
+    When the subject is reopened, a scenario is re-verified and reviewed, and the subject ships again
+    Then each step is accepted, the reopen and ship output say in one line that the draft is a pending draft not part of the transition, and canon status still lists the draft awaiting approval, marked as not yet part of the subject's scope, without saying evidence add refuses the subject's scenarios
+    And once a scenario of the subject is tagged @flow:<draft>.F1, shipping is refused on the draft's brief
+
+  # canon: {"schema":1,"at":"2026-10-21T13:15:05Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.39
+  Scenario: A tagged unapproved draft under a newer untagged draft still blocks reopen and ship
+    Given a shipped subject adopting an approved change a, a draft change b that one of its scenarios is tagged @flow:b.F1 for, and a newer draft change c no scenario is tagged for
+    When the subject is reopened and, with b's scenario attested, shipped again
+    Then both are refused naming b's brief, and the output names every change set aside, here c
+    And without c the refusal is the same, and only an unapproved change nothing is tagged for is ever set aside
+    And canon status does not advise the refused reopen: it says reopening waits for the brief's approval

@@ -45,12 +45,27 @@ After the first `status`, follow `meta.next` of each write; do not call
    root (default `.canon/specs`); `reference/canon-authoring.md` has the
    scaffold. When you fill in a scenario, keep its `# canon: {...}` provenance
    lines: dropping one aborts `inventory sync` on `missing-provenance`.
-2. **Units.** Give each unit its own actor id and session id and pass them on
-   everything it records. A delegated unit attests its own work; never attest
-   another unit's work under your id.
+2. **Units.** One unit is one flow step's complete path (sees, does,
+   becomes) that can be verified on its own, sized to one session. Name the
+   command that proves it (a test filter, a script) before you start it, and
+   run that command before you call the unit done. Give each unit its own
+   actor id and session id and pass them on everything it records. A
+   delegated unit attests its own work; never attest another unit's work
+   under your id. Units stay inside the one approved change; `tasks.md` is a
+   note, not a record.
 3. **Code and tests.** Name tests by scenario id (`game.run.01: …`) so a test
    report binds to its scenario. Record a defect you find in your own work
    with `finding add` the moment you find it, before review.
+   **A fix fails first.** For a bug fix, write or extend the scenario's test
+   and run it red on the unfixed code, then bind that failing run before you
+   change the code (`evidence add --scenario-id <id> --report <fmt>:<path> …`
+   with `--verdict divergent`; a failed case never records `faithful`, and
+   `--all-scenarios` derives `divergent` from it).
+   Fix the code, run again and bind the passing run: the green record
+   supersedes the red one, and `canon query --kind evidence --history
+   --scenario-id <id>` shows the red-then-green pair to the reviewer. A red
+   run is never an accepted gap. When no executable reproduction is
+   possible, say in `--ref` what the closest check is and why.
 4. **Evidence.** One test run that proves several scenarios is bound once with
    `--all-scenarios`: one record per indexed scenario owning a case, each with
    the verdict its own cases show; any refusal writes none. For one scenario
@@ -98,6 +113,16 @@ After the first `status`, follow `meta.next` of each write; do not call
    current while the verdicts and checks are unchanged; a scenario whose gap
    was accepted is accepted again by the reviewer once new evidence says
    something different.
+
+## Excuses that fail
+
+| The thought | The reality |
+|---|---|
+| "The suite is slow; record `faithful` to pass." | `faithful` over a failed case is refused; a limit outside this change is recorded `divergent` with the reason in `--ref`. |
+| "I fixed it, the test would pass." | Run the test red first and bind it, then green. Evidence is a claim; the history is what the reviewer reads. |
+| "The brief is as good as approved." | `evidence add` refuses an unapproved brief's scenarios. Say so and wait. |
+| "I will attest the other unit's work under my id." | Each unit records under its own actor id and session id. |
+| "I was told this twice already." | A correction repeated across runs belongs in a scenario, the policy or a gate; tell the orchestrator. |
 
 ## Retry safety
 

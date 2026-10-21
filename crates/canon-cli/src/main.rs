@@ -1133,7 +1133,7 @@ enum FindingCommand {
         json: bool,
     },
     /// Move an already-committed finding's disposition (promoted in the same run under `write: { promote: auto }` or with --promote; under `write.promote: manual`, commit it with `canon gate promote`)
-    #[command(after_help = "A finding is raised `open` and later closed. This is the ONLY way to record\nthat second state: `canon finding add` refuses an occupied natural key,\nbecause two DIFFERENT findings under one (change, round, seq) are two\nreviewers' work collapsed into one identity.\n\nWhat it changes: the disposition, and `resolution_sha` with it. NOTHING else.\nSeverity, reviewer, summary, --reviewed-sha, --introduced-by and --file-ref\nare READ from the committed record and copied byte-identically — this command\ncannot edit them, and no command can. A finding recorded wrongly stays\nwrongly recorded; that is the append-only ledger working, not a gap.\n\nThe committed record STAYS. This appends a second version at the same\nnatural key, and the pair IS the history: `open` at one instant, `fixed` at\nanother, each with its own author and timestamp. Every reader folds by\nnatural key to the latest version, so the finding is still counted once.\n\n`canon gate promote` re-derives the transition rule itself before committing\nthe second version, so a hand-written body must clear the same bar.\n\nExamples:\n  canon finding close --change-id s44-spec-derived-worklist --round 1 --seq 1 \\\n      --disposition fixed --resolution-sha $(git rev-parse HEAD)\n  canon finding close --change-id s44-spec-derived-worklist --round 1 --seq 9 \\\n      --disposition rejected")]
+    #[command(after_help = "A finding is raised `open` and later closed. This is the ONLY way to record\nthat second state: `canon finding add` refuses an occupied natural key,\nbecause two DIFFERENT findings under one (change, round, seq) are two\nreviewers' work collapsed into one identity.\n\nWhat it changes: the disposition, `resolution_sha` with it, and the closing\n--reason (required for rejected and deferred). NOTHING else.\nSeverity, reviewer, summary, --reviewed-sha, --introduced-by and --file-ref\nare READ from the committed record and copied byte-identically — this command\ncannot edit them, and no command can. A finding recorded wrongly stays\nwrongly recorded; that is the append-only ledger working, not a gap.\n\nThe committed record STAYS. This appends a second version at the same\nnatural key, and the pair IS the history: `open` at one instant, `fixed` at\nanother, each with its own author and timestamp. Every reader folds by\nnatural key to the latest version, so the finding is still counted once.\n\n`canon gate promote` re-derives the transition rule itself before committing\nthe second version, so a hand-written body must clear the same bar.\n\nExamples:\n  canon finding close --change-id s44-spec-derived-worklist --round 1 --seq 1 \\\n      --disposition fixed --resolution-sha $(git rev-parse HEAD)\n  canon finding close --change-id s44-spec-derived-worklist --round 1 --seq 9 \\\n      --disposition rejected")]
     Close {
         /// The change under review — first component of the natural key
         #[arg(long, value_parser = canon_cli::finding::parse_change_id)]
@@ -1150,6 +1150,9 @@ enum FindingCommand {
         /// The commit that closed it. Required by, and permitted only with, --disposition fixed. A full or short sha (resolved through git). Must name a COMMIT object this repo holds
         #[arg(long, value_parser = canon_cli::finding::parse_commit)]
         resolution_sha: Option<CommitArg>,
+        /// Why it was closed, one line. Required for rejected and deferred, optional for fixed and open; stored on the closing version and shown by `finding list`
+        #[arg(long)]
+        reason: Option<String>,
         /// The actor recorded as authoring the TRANSITION — not the original finding's author, which is preserved on the record this supersedes
         #[arg(long, default_value = "canon")]
         actor_id: String,
@@ -1608,6 +1611,24 @@ enum SubjectCommand {
         #[arg(long)]
         json: bool,
     },
+    /// Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved)
+    #[command(
+        after_help = "Examples:\n  canon subject unadopt add-login --subject-id demo\n\nRemoves the link on both sides (the subject's change list and the change's\nsubject list). The change and its brief stay and can be adopted elsewhere, for\nexample by a proposed holding subject. Refused (SUBJECT_UNADOPT_REFUSED) for a\nchange whose brief carries an `Approved:` line: it is the subject's approved\nscope, and for a change a scenario the subject owns is tagged\n`@flow:<change>.*` for (remove or retag it first). A pair that is not linked writes nothing and exits 0."
+    )]
+    Unadopt {
+        /// The change to take out of the subject
+        #[arg(value_parser = canon_cli::subject::parse_change_id)]
+        change_id: ChangeId,
+        /// The subject to take the change out of
+        #[arg(long, value_parser = canon_cli::subject::parse_subject_id)]
+        subject_id: SubjectId,
+        /// Repo root (default: nearest ancestor with a canon.yaml)
+        #[arg(long, default_value = ".")]
+        repo: PathBuf,
+        /// Output JSON instead of the human-readable form
+        #[arg(long)]
+        json: bool,
+    },
     /// Show a subject, or with --to transition its lifecycle status (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason)
     Status {
         /// The subject to show, or transition with --to
@@ -1759,6 +1780,14 @@ enum ArtifactsCommand {
 /// caller that asked for JSON gets JSON on stdout.
 fn usage_error(error: &clap::Error) -> ExitCode {
     let json = argv_wants_json();
+    // A spelling 0.24 deprecated and 0.25 removed: the refusal names its replacement (0.25 D6).
+    if error.use_stderr() {
+        let args: Vec<String> = std::env::args().skip(1).collect();
+        if let Some(removed) = canon_cli::removed::find(&Cli::command(), &args) {
+            let command = format!("canon {}", removed.command);
+            return ExitCode::from(CliError::refused("USAGE", removed.message()).hint(removed.hint()).field(removed.field.clone()).expected([removed.replacement.clone()]).emit(command.trim(), json) as u8);
+        }
+    }
     if !json || !error.use_stderr() {
         error.exit();
     }
@@ -1830,14 +1859,9 @@ fn run_divergence_add(args: DivergenceAddArgs) -> ExitCode {
     }
 }
 
-/// The clap tree with the deprecated spellings accepted ([`canon_cli::deprecation::apply`]).
-fn cli_command() -> clap::Command {
-    canon_cli::deprecation::apply(Cli::command())
-}
-
 fn main() -> ExitCode {
     set_sigpipe(true);
-    let command = cli_command();
+    let command = Cli::command();
     let mut matches = match command.clone().try_get_matches() {
         Ok(matches) => matches,
         Err(error) => return usage_error(&error),
@@ -1846,8 +1870,6 @@ fn main() -> ExitCode {
         Ok(cli) => cli,
         Err(error) => return usage_error(&error.format(&mut command.clone())),
     };
-    // A deprecated spelling ran: say so once on stderr, and on the JSON envelope (0.24 D2).
-    canon_cli::deprecation::warn(canon_cli::deprecation::scan(&command, &std::env::args().skip(1).collect::<Vec<_>>()));
     // The role is resolved before any command runs, so an unknown `CANON_ROLE` refuses the invocation.
     if let Err(error) = canon_cli::role::init(cli.declared_role) {
         return ExitCode::from(error.emit("canon", argv_wants_json()) as u8);
@@ -2056,10 +2078,10 @@ fn main() -> ExitCode {
                     json,
                 },
             ) as u8),
-            FindingCommand::Close { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id, promote, repo, json } => {
+            FindingCommand::Close { change_id, round, seq, disposition, resolution_sha, reason, actor_id, role, session_id, promote, repo, json } => {
                 ExitCode::from(canon_cli::finding::run_close(
                     &repo,
-                    &canon_cli::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_sha, actor_id, role, session_id, promote: promote.flag(), json },
+                    &canon_cli::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_sha, reason, actor_id, role, session_id, promote: promote.flag(), json },
                 ) as u8)
             }
             FindingCommand::List { change_id, open, json, repo, page, fields } => {
@@ -2166,6 +2188,7 @@ fn main() -> ExitCode {
                 ExitCode::from(canon_cli::subject::run_new(&repo, &id, &domain, &title, &summary, &owner_role, &actor_id, json) as u8)
             }
             SubjectCommand::Adopt { change_id, subject_id, repo, json } => ExitCode::from(canon_cli::subject::run_adopt(&repo, &change_id, &subject_id, json) as u8),
+            SubjectCommand::Unadopt { change_id, subject_id, repo, json } => ExitCode::from(canon_cli::subject::run_unadopt(&repo, &change_id, &subject_id, json) as u8),
             SubjectCommand::Status { id, to, override_reason, reason, actor_id, repo, json } => {
                 canon_cli::inventory::refresh_stale_index(&repo, "canon subject status");
                 ExitCode::from(match to {
@@ -2228,7 +2251,7 @@ fn main() -> ExitCode {
             DispatchCommand::Diff { repo, json } => canon_cli::dispatch::run_diff(&repo, json),
         },
         Command::Selftest { json } => canon_cli::selftest::run_selftest(json),
-        Command::Schema { path, json, errors, all } => ExitCode::from(canon_cli::schema::run(&cli_command(), &path, json, errors, all)),
+        Command::Schema { path, json, errors, all } => ExitCode::from(canon_cli::schema::run(&Cli::command(), &path, json, errors, all)),
     }
 }
 
@@ -2266,6 +2289,12 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
             if let Some(path) = &report.config_written {
                 canon_cli::say!(json, "canon skills install: wrote `skills: {{ providers: [{}] }}` to {}", report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "), path.display());
             }
+            for orphan in &report.pruned {
+                canon_cli::say!(json, "pruned: {} ({}) — the bundle no longer ships it; {}", orphan.path.display(), orphan.provider.as_str(), orphan.reason());
+            }
+            for orphan in &report.kept {
+                canon_cli::say!(json, "kept: {} ({}) — the bundle no longer ships it; {}; {}", orphan.path.display(), orphan.provider.as_str(), orphan.reason(), orphan.by_hand());
+            }
             let owned = canon_cli::skills::owned_paths_lines(&report.providers);
             for line in &owned {
                 canon_cli::say!(json, "{line}");
@@ -2278,6 +2307,8 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
                         "selection": selection.describe(),
                         "changed": report.changed,
                         "configWritten": report.config_written.as_ref().map(|p| p.display().to_string()),
+                        "pruned": report.pruned.iter().map(|o| serde_json::json!({ "path": o.path.display().to_string(), "provider": o.provider.as_str(), "reason": o.reason() })).collect::<Vec<_>>(),
+                        "kept": report.kept.iter().map(|o| serde_json::json!({ "path": o.path.display().to_string(), "provider": o.provider.as_str(), "reason": o.reason(), "hint": o.by_hand() })).collect::<Vec<_>>(),
                         "ownedPaths": owned,
                     }),
                 );
@@ -2299,14 +2330,16 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
             }
             for status in &report.statuses { canon_cli::say!(json, "{} — {} ({})", status.path.display(), status.state, status.provider.as_str()); }
             for remnant in &report.remnants { canon_cli::say!(json, "{} — legacy-remnant (codex reads .agents/skills; fix: `{}`)", remnant.display(), canon_cli::skills::install_command(&report.providers)); }
+            for orphan in &report.orphans { canon_cli::say!(json, "{} — orphan ({}; the install lock lists it, but this canon's bundle no longer ships it; {}; {})", orphan.path.display(), orphan.provider.as_str(), orphan.reason(), orphan.fix(&report.providers)); }
             if let Some(outdated) = &report.outdated { canon_cli::say!(json, "{} — outdated ({})", outdated.path.display(), outdated.describe(&report.providers)); }
-            let clean = report.manifest_ok && report.remnants.is_empty() && report.outdated.is_none() && report.statuses.iter().all(|status| status.state == "ok");
+            let clean = report.manifest_ok && report.orphans.is_empty() && report.remnants.is_empty() && report.outdated.is_none() && report.statuses.iter().all(|status| status.state == "ok");
             let data = serde_json::json!({
                 "clean": clean,
                 "providers": report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>(),
                 "selection": selection.describe(),
                 "manifestOk": report.manifest_ok,
                 "statuses": report.statuses.iter().map(|s| serde_json::json!({ "path": s.path.display().to_string(), "state": s.state, "provider": s.provider.as_str() })).collect::<Vec<_>>(),
+                "orphans": report.orphans.iter().map(|o| serde_json::json!({ "path": o.path.display().to_string(), "provider": o.provider.as_str(), "modified": o.modified, "reason": o.reason(), "hint": o.fix(&report.providers) })).collect::<Vec<_>>(),
                 "remnants": report.remnants.iter().map(|r| r.display().to_string()).collect::<Vec<_>>(),
                 "outdated": report.outdated.as_ref().map(|o| serde_json::json!({ "path": o.path.display().to_string(), "installedBy": o.installed_by, "message": o.describe(&report.providers) })),
             });
@@ -2317,7 +2350,10 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
                 ExitCode::SUCCESS
             } else {
                 let fix = canon_cli::skills::install_command(&report.providers);
-                ExitCode::from(CliError::failed("SKILLS_DRIFT", "an installed skill is missing, stale, a legacy remnant, or written by another canon version").hint(format!("run `{fix}`")).emit_with_data("canon skills check", json, data) as u8)
+                let by_hand: Vec<String> = report.orphans.iter().filter(|o| o.modified).map(|o| o.path.display().to_string()).collect();
+                let hint = if by_hand.is_empty() { format!("run `{fix}`") } else { format!("run `{fix}`, which prunes the orphans whose bytes still match the install lock; it keeps the modified ones ({}), so remove those by hand", by_hand.join(", ")) };
+                let orphaned = if report.orphans.is_empty() { String::new() } else { format!("; orphaned (no longer shipped by the bundle): {}", report.orphans.iter().map(|o| o.path.display().to_string()).collect::<Vec<_>>().join(", ")) };
+                ExitCode::from(CliError::failed("SKILLS_DRIFT", format!("an installed skill is missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version{orphaned}")).hint(hint).emit_with_data("canon skills check", json, data) as u8)
             }
         }
         Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).hint("check that the target directory is writable; `canon skills doctor` diagnoses the installation").emit("canon skills check", json) as u8) }
@@ -3057,26 +3093,31 @@ fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Option<&std::pa
 fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path::Path>, port: u16, json: bool) -> ExitCode {
     match canon_cli::dashboard::prepare(repo, snapshot, port) {
         Ok(bound) => {
-            canon_cli::say!(json, "canon dashboard: app       = {}", bound.dist_dir.display());
+            canon_cli::say!(json, "canon dashboard: app       = {}", bound.app.describe());
             canon_cli::say!(json, "canon dashboard: snapshot  = {}", bound.snapshot_dir.display());
+            let mut warnings = Vec::new();
+            if let canon_cli::dashboard::SnapshotState::Unavailable { reason, fix } = &bound.snapshot {
+                let warning = format!("{reason}; the panels page says so instead of showing panels; to fix it: {fix}");
+                eprintln!("canon dashboard: warning: {warning}");
+                warnings.push(warning);
+            }
+            canon_cli::say!(json, "canon dashboard: briefs    = {}", bound.briefs_url());
             canon_cli::say!(json, "canon dashboard: serving {}", bound.url());
             if json {
                 // The one document: where it serves. The server then runs until the process is stopped.
-                canon_cli::json_out::data(
-                    "dashboard",
-                    serde_json::json!({ "url": bound.url(), "app": bound.dist_dir.display().to_string(), "snapshot": bound.snapshot_dir.display().to_string() }),
-                );
+                let data = serde_json::json!({
+                    "url": bound.url(),
+                    "briefsUrl": bound.briefs_url(),
+                    "app": bound.app.describe(),
+                    "snapshot": bound.snapshot_dir.display().to_string(),
+                    "snapshotAvailable": bound.snapshot == canon_cli::dashboard::SnapshotState::Ready,
+                });
+                canon_cli::json_out::data_with_meta("dashboard", data, serde_json::json!({ "warnings": warnings }));
             }
             bound.serve_forever();
             ExitCode::SUCCESS
         }
-        Err(err) => {
-            let error = match err {
-                canon_cli::dashboard::DashboardError::Config(_) => CliError::refused("DASHBOARD_CONFIG_INVALID", err.to_string()).hint("fix the dashboard settings in canon.yaml (`canon init --check-config` reports what is wrong)"),
-                _ => CliError::failed("DASHBOARD_FAILED", err.to_string()).hint("check that the port is free and the repository is readable, then run `canon dashboard` again"),
-            };
-            ExitCode::from(error.emit("canon dashboard", json) as u8)
-        }
+        Err(err) => ExitCode::from(err.to_cli_error().emit("canon dashboard", json) as u8),
     }
 }
 
@@ -3088,14 +3129,14 @@ mod schema_drift {
     /// leaf, so `canon schema` cannot drift from the parser.
     #[test]
     fn schema_metadata_matches_the_command_tree() {
-        let problems = canon_cli::schema::check_metadata(&cli_command(), canon_cli::schema::META);
+        let problems = canon_cli::schema::check_metadata(&Cli::command(), canon_cli::schema::META);
         assert!(problems.is_empty(), "{}", problems.join("\n"));
     }
 
     /// Every clap leaf command carries one example and every example names a leaf.
     #[test]
     fn schema_examples_match_the_command_tree() {
-        let problems = canon_cli::schema::check_examples(&cli_command());
+        let problems = canon_cli::schema::check_examples(&Cli::command());
         assert!(problems.is_empty(), "{}", problems.join("\n"));
     }
 }

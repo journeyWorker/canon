@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.530877305Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "4baf65b89a73285ecbe2d5d2cb978d25630e9c223bb25c7f4532cf0aaaac5ed9",
+  "scenario_id": "subject.lifecycle.13",
+  "schema": 1,
+  "source_digest": "13c4ecfa6a59954daa11711762312b076b1cb0c06d7aaa3615a61cc313e1c3bc",
+  "subject_id": "subject-lifecycle",
+  "title": "A review authored by the evidence actor does not count under distinct_actor"
+}

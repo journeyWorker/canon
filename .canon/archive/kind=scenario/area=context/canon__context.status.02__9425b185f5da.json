@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.350830509Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "d960e457e6adb6cf1a5d1b786dac33e4f5e0479ff78b8dcc6498d7282f93864c",
+  "scenario_id": "context.status.02",
+  "schema": 1,
+  "source_digest": "2b5ab1fa0e2362b8a6959b31b9958dcfeb17c3cb3f299fe24596a8e3762d0557",
+  "subject_id": "context-capability",
+  "title": "Status ends with the next commands, one per gap, chosen by fixed rules"
+}

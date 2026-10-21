@@ -15,6 +15,8 @@ brief has none of them: harden its Invariants and Checks instead.
 - Each step reads sees → does → becomes, and names who and what state it starts from.
 - Acceptance states, per step, what must be observable and which failure path is covered (invalid input, empty state, interrupted, repeated, denied).
 - Step detail holds rules, states and edge cases of that step only; a rule that spans steps is stated once, where it first applies.
+- Intent states current behavior and Outcome the desired behavior; interfaces are described by behavior (inputs, outputs, errors); no file path, line number or function name stands in a section that decides the work (a `Source:` line may).
+- A flow step is one unit an implementer can verify with one named command; split a step that needs two.
 - Acceptance writes no scenario ids: scenarios do not exist yet and point at steps.
 
 ## NEVER

@@ -115,9 +115,6 @@ canon report --snapshot /tmp/canon-snap
 Serves the dashboard web app locally, pointed at a real snapshot:
 
 ```bash
-# build the app once
-bun install && bun run --cwd packages/dashboard build
-
 canon dashboard                       # regenerates a fresh snapshot every run, serves it
 canon dashboard --snapshot /tmp/canon-snap --port 8080
 ```
@@ -129,8 +126,32 @@ canon dashboard --snapshot /tmp/canon-snap --port 8080
   `manifest.json` (a separately generated snapshot, or a downloaded CI
   artifact) — never silently regenerated over it. If it has no
   `manifest.json`, one is generated there once.
-- Prints the URL to open, then serves until Ctrl-C. If the app is not
-  built, `canon dashboard` fails with the exact build command to run.
+- Runs in any repo: the released binary carries the app (in canon's own
+  checkout a built `packages/dashboard/dist` is used instead). It prints the
+  panels URL and a briefs URL (`/briefs.html`), then serves until Ctrl-C.
+  A taken port fails with `DASHBOARD_PORT_IN_USE`: pass `--port <n>` or
+  `--port 0`.
+- Without the `duckdb` CLI on `PATH` the server still runs; the panels page
+  says why there is no snapshot and how to get one (it never shows demo
+  data), and the briefs page works regardless.
+
+### The briefs page (where a human approves briefs)
+
+`/briefs.html` lists every live change whose brief awaits the human (no
+`Approved:` line, or edited since) with its intent, outcome, flow steps,
+acceptance, questions and assumptions, and its `canon brief check`
+blockers and advisories. The human types their name and their answer and
+clicks Approve: that records exactly what `canon brief approve --change-id
+<id> --by <name> --note <text>` records, the `Approved:` line bound to the
+brief digest and the policy approval. It is refused when the brief changed
+after the page loaded (`BRIEF_CHANGED_SINCE_PAGE_LOAD`: reload) or while it
+has blockers (`BRIEF_HAS_BLOCKERS`). The server is localhost only and
+refuses requests from other origins (`DASHBOARD_ORIGIN_REFUSED`).
+
+For an agent the human stop is unchanged: when clean briefs are waiting,
+tell the human they can approve them in `canon dashboard` (briefs page) or
+answer in chat. An agent never clicks Approve or fills the form, and runs
+`canon brief approve` only from the human's own words.
 
 The dashboard renders SEVEN panels — trust matrix, session costs, role
 memory, flywheel funnel, review burn-down, review rounds, review totals.

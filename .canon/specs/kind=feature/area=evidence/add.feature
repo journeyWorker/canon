@@ -588,3 +588,34 @@ Feature: evidence add
     Given a scenario with a current signed review that pinned its report evidence, the cases having screenshots
     When the suite runs again and evidence is added with the same cases and verdicts but new screenshot bytes
     Then the new record binds the new bytes, prints no stale-review line, and the review stays current
+
+  # canon: {"schema":1,"at":"2026-10-21T11:58:32Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.100
+  Scenario: A draft change adopted into a building subject freezes only the scenarios tagged with it
+    Given a verifying subject with an approved change A, a scenario tagged @flow:A.F1, an untagged scenario, and a task of A, then a draft change B adopted
+    When evidence is added for each of them, and for a new scenario tagged @flow:B.F1
+    Then the adoption warns, and the untagged scenario, the A-tagged scenario and A's task are accepted
+    And the B-tagged scenario is refused BRIEF_UNAPPROVED naming B's brief.md, and moving the subject to shipped still refuses on B
+    And once B is approved the B-tagged scenario is accepted
+
+  # canon: {"schema":1,"at":"2026-10-21T11:58:37Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.101
+  Scenario: A subject whose only change is unapproved, or whose approval was edited, still refuses evidence
+    Given a verifying subject whose only change has a brief.md with no "Approved:" line, or an approved one edited since
+    When evidence is added for an untagged scenario and for one tagged @flow: with that change
+    Then each add exits 1 with BRIEF_UNAPPROVED, or BRIEF_CHANGED_SINCE_APPROVAL for the edited approval, naming that brief.md
+
+  # canon: {"schema":1,"at":"2026-10-21T11:58:42Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.102
+  Scenario: A subject built before briefs keeps re-verifying its evidenced scenarios under a draft change
+    Given a verifying subject with scenarios already evidenced and no change, which then adopts its first change, a draft
+    When evidence is added again for an evidenced untagged scenario, and for one that was never evidenced
+    Then the evidenced one is accepted, being existing behavior attested before any approved scope and before the subject adopted its first change
+    And evidence recorded only after that adoption, for example while the subject was specced, does not exempt the scenario
+    And the never-evidenced one is refused BRIEF_UNAPPROVED naming the draft change's brief.md

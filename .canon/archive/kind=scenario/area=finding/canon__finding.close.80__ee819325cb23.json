@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.163704071Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "b9408de68b664436d913f8bc24fa006d5054f13593e196f6ae4d19ebcb7ab5f6",
+  "scenario_id": "finding.close.80",
+  "schema": 1,
+  "source_digest": "bc27d78c821b19f4efaea232e456906d588cbd596534886073c5c032b103c475",
+  "subject_id": "finding-lifecycle",
+  "title": "Closing with a short resolution sha records the full commit"
+}

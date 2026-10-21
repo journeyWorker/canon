@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T12:53:15.850411456Z",
+  "change_id": "canon-0-25",
+  "disposition": "fixed",
+  "kind": "finding",
+  "reason": "the already-evidenced exemption no longer counts evidence recorded under an override",
+  "resolution_sha": "25501f4c79f757dfc0fad7e03b34d34eaba923e8",
+  "reviewer": "canon-reviewer-025",
+  "round": 1,
+  "scenario_ids": [
+    "evidence.add.102"
+  ],
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "The 'already evidenced' exemption for untagged scenarios (brief::untagged_scope) counts any evidence or audit record, including one recorded after the draft change was adopted under --override-reason: probed, a never-evidenced scenario of a subject whose only change is a draft, attested once with --override-reason, is then accepted on every later evidence add with no override and no override line, so one recorded waiver becomes a permanent silent exemption. Plan D1 means behavior evidenced before any scope; consider counting only evidence recorded before the subject's first adoption, or without brief_override. Code pass."
+}

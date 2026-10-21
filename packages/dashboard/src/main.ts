@@ -1,6 +1,8 @@
 import "./style.css";
 import { loadSnapshot } from "./snapshot";
-import { renderFreshnessBanner, renderErrorBanner } from "./banner";
+import { renderNav } from "./nav";
+import { fetchSnapshotStatus } from "./status";
+import { renderFreshnessBanner, renderErrorBanner, renderUnavailableBanner as renderUnavailable } from "./banner";
 import { renderTrustMatrix } from "./panels/trust-matrix";
 import { renderSessionCosts } from "./panels/session-costs";
 import { renderRoleMemory } from "./panels/role-memory";
@@ -15,7 +17,7 @@ import { renderReviewTotals } from "./panels/review-totals";
 // dashboard --snapshot <dir>` (task 6.1) serves a real snapshot at a
 // different path alongside the built app.
 const params = new URLSearchParams(window.location.search);
-const snapshotBaseUrl = params.get("snapshot") ?? "snapshot/";
+const snapshotParam = params.get("snapshot");
 
 function panelBody(sectionId: string): HTMLElement {
   const el = document.querySelector<HTMLElement>(`#${sectionId} .panel-body`);
@@ -26,6 +28,21 @@ function panelBody(sectionId: string): HTMLElement {
 async function main(): Promise<void> {
   const banner = document.querySelector<HTMLElement>("#banner");
   if (!banner) throw new Error("missing #banner element");
+  const nav = document.querySelector<HTMLElement>("#nav");
+  if (nav) renderNav(nav, "panels");
+
+  // Under `canon dashboard` the server says whether the repo has a snapshot.
+  // When it has none the page says why instead of showing panels, and never
+  // falls back to the demo fixture; any other server has no status endpoint
+  // and the page reads its own fixture as before.
+  const status = await fetchSnapshotStatus();
+  if (status && !status.available) {
+    renderUnavailable(banner, status.reason, status.fix);
+    document.querySelector<HTMLElement>("#panels")?.remove();
+    document.body.dataset.status = "no-snapshot";
+    return;
+  }
+  const snapshotBaseUrl = snapshotParam ?? (status ? "/live-snapshot/" : "snapshot/");
 
   try {
     const { manifest, conn } = await loadSnapshot(snapshotBaseUrl);

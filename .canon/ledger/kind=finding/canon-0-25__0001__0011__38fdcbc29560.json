@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T12:53:16.681741135Z",
+  "change_id": "canon-0-25",
+  "disposition": "fixed",
+  "kind": "finding",
+  "reason": "report_dashboard_04 now checks the stderr warning and the unavailable banner",
+  "resolution_sha": "7e138cf3093aa8d179b4e449fd360132f550ad78",
+  "reviewer": "canon-reviewer-025",
+  "round": 1,
+  "scenario_ids": [
+    "report.dashboard.04"
+  ],
+  "schema": 1,
+  "seq": 11,
+  "severity": "should_fix",
+  "summary": "report.dashboard.04's Then 'warns on stderr' and 'the panels page shows that instead of panels' have no check: the test spawns the server with stderr to null and asserts only meta.warnings and /api/status; status.ts/banner.ts renderUnavailableBanner have no test. Spec-fidelity pass."
+}

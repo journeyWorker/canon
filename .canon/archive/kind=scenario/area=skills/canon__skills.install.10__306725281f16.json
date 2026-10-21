@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.213133635Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "7e2cb2da775dbae45473e1df71410f3866a69ae68e08883061ce63448fb97fa7",
+  "scenario_id": "skills.install.10",
+  "schema": 1,
+  "source_digest": "1865ec27e07a5164e825a99adfb6687eefb62ddaa8d4e336e3c36bcafa256c32",
+  "subject_id": "skills-install",
+  "title": "A leftover legacy Codex projection is reported as a remnant with its fix, never deleted"
+}

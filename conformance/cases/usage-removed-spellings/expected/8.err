@@ -1,0 +1,2 @@
+canon query: USAGE — --kind review_record was removed in 0.25.0
+hint: --kind review_record was renamed --kind review in 0.24.0; use --kind review

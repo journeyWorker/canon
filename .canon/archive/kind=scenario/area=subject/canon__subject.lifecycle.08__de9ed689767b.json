@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.509562927Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "88fd0d0ce59170ae140a90a530e4ee81eb80b88882424e9e62894cb4087d1ada",
+  "scenario_id": "subject.lifecycle.08",
+  "schema": 1,
+  "source_digest": "13c4ecfa6a59954daa11711762312b076b1cb0c06d7aaa3615a61cc313e1c3bc",
+  "subject_id": "subject-lifecycle",
+  "title": "Shipping is admitted once every linked scenario has a faithful latest verdict"
+}

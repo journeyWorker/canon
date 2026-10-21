@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.412085543Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "b0881802fdbfa03087afb211611461bf8f357a6bf29d7aa2eda6e90c8311765b",
+  "scenario_id": "context.capability.12",
+  "schema": 1,
+  "source_digest": "89145b060069fe1dfe1e0e3110070ac4b8a3de16b5afabf8470f80bc7bcd978e",
+  "subject_id": "context-capability",
+  "title": "The outline opens with a pointer to status and leaves the JSON surface unchanged"
+}

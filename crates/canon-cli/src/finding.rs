@@ -722,6 +722,9 @@ pub struct FindingCloseArgs {
     /// it would leave the ledger able to record only one direction.
     pub disposition: FindingDisposition,
     pub resolution_sha: Option<CommitArg>,
+    /// Why it was closed (0.25, #98): required for `rejected` and
+    /// `deferred`, optional otherwise, always one line.
+    pub reason: Option<String>,
     pub actor_id: String,
     pub role: RoleId,
     /// The session that authored the transition, recorded as
@@ -731,6 +734,18 @@ pub struct FindingCloseArgs {
     pub promote: crate::write_mode::PromoteFlag,
     /// `--json`: one JSON document on stdout, every human line on stderr.
     pub json: bool,
+}
+
+/// The command shape `FINDING_REASON_REQUIRED`'s hint shows: this close,
+/// with the one flag it lacks.
+fn reason_shape(args: &FindingCloseArgs) -> String {
+    format!(
+        "canon finding close --change-id {} --round {} --seq {} --disposition {} --reason \"<why, one line>\"",
+        args.change_id,
+        args.round,
+        args.seq,
+        args.disposition.as_str()
+    )
 }
 
 /// Stage the DISPOSITION TRANSITION of one already-committed finding
@@ -785,6 +800,24 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
             )).hint("drop --resolution-sha, or set --disposition fixed").field("--resolution-sha").emit("canon finding close", args.json);
         }
         _ => {}
+    }
+
+    // `--reason`, refused before any lookup or write: owed by `rejected`
+    // and `deferred`, never blank, always one line.
+    let owed = matches!(args.disposition, FindingDisposition::Rejected | FindingDisposition::Deferred);
+    match args.reason.as_deref() {
+        None if owed => {
+            return CliError::refused("FINDING_REASON_REQUIRED", format!("--disposition {0} requires --reason; a {0} finding with no recorded why leaves the next reader nothing to go on", args.disposition.as_str())).hint(format!("run `{}`", reason_shape(args))).field("--reason").emit("canon finding close", args.json);
+        }
+        Some(reason) if reason.trim().is_empty() => {
+            return CliError::refused("FINDING_REASON_REQUIRED", "--reason must be non-empty text; a blank reason records no why").hint(format!("run `{}`", reason_shape(args))).field("--reason").emit("canon finding close", args.json);
+        }
+        Some(reason) => {
+            if let Some((offset, separator)) = first_row_line_break(reason) {
+                return CliError::refused("FINDING_REASON_REQUIRED", format!("--reason carries the line separator {separator:?} at byte offset {offset}; a reason is ONE line")).hint(format!("run `{}` with the reason on one line", reason_shape(args))).field("--reason").emit("canon finding close", args.json);
+            }
+        }
+        None => {}
     }
 
     let resolution_sha = match args.resolution_sha.as_ref().map(|arg| resolve_commit(&repo, arg, true)).transpose() {
@@ -892,6 +925,9 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     }
     if let Some(file_ref) = &existing.file_ref {
         transitioned = transitioned.with_file_ref(file_ref.as_str());
+    }
+    if let Some(reason) = &args.reason {
+        transitioned = transitioned.with_reason(reason.trim());
     }
     // The scenarios it is about carry over: a close takes no list of its
     // own, and dropping them would widen the re-verification to the suite.
@@ -1028,6 +1064,7 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
                     "summary": f.summary,
                     "resolution_sha": f.resolution_sha().map(|sha| sha.as_str()),
                     "file_ref": f.file_ref,
+                    "reason": f.reason,
                 });
                 match &args.fields {
                     Some(fields) => crate::paging::project(&row, fields),
@@ -1053,10 +1090,11 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
 }
 
 /// The JSON fields of one `finding list` row, which `--fields` may name.
-const LIST_FIELDS: [&str; 8] = ["round", "seq", "severity", "disposition", "reviewer", "summary", "resolution_sha", "file_ref"];
+const LIST_FIELDS: [&str; 9] = ["round", "seq", "severity", "disposition", "reviewer", "summary", "resolution_sha", "file_ref", "reason"];
 
 /// One header row and one row per finding, columns padded to their
-/// widest cell; the summary, last, is never padded.
+/// widest cell; the summary, last, is never padded and carries the
+/// closing reason, when there is one, as a trailing `[reason: …]`.
 fn render_finding_table(findings: &[Finding]) -> String {
     const LIST_COLUMNS: usize = 6;
     let header: [&str; LIST_COLUMNS] = ["round", "seq", "severity", "disposition", "reviewer", "summary"];
@@ -1069,7 +1107,10 @@ fn render_finding_table(findings: &[Finding]) -> String {
                 severity_slug(f.severity).to_string(),
                 f.disposition().as_str().to_string(),
                 f.reviewer.clone(),
-                f.summary.clone(),
+                match &f.reason {
+                    Some(reason) => format!("{} [reason: {reason}]", f.summary),
+                    None => f.summary.clone(),
+                },
             ]
         })
         .collect();
@@ -1689,6 +1730,7 @@ mod tests {
             seq,
             disposition,
             resolution_sha: None,
+            reason: matches!(disposition, FindingDisposition::Rejected | FindingDisposition::Deferred).then(|| "by design".to_string()),
             actor_id: "canon".to_string(),
             role: RoleId::parse("reviewer").unwrap(),
             session_id: None,

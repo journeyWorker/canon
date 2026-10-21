@@ -1,2 +1,2 @@
 ./.claude/skills/canon/SKILL.md — ok (claude)
-./.canon/skills/.install-lock.json — outdated (installed by canon 0.13.1, this canon is 0.24.1 — run `canon skills install --providers=claude`)
+./.canon/skills/.install-lock.json — outdated (installed by canon 0.13.1, this canon is 0.25.0 — run `canon skills install --providers=claude`)

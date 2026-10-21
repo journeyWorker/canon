@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:23.824698882Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "8cbbdb769e9f025b3b6d9ea674f5e3da5a90a84f6aa51917c2f6f3117c869a77",
+  "scenario_id": "report.dashboard.08",
+  "schema": 1,
+  "source_digest": "d6c5aa1cf05464a7986c748a4509581f87c0f22ca0560e2b52fa23b5b6f12b51",
+  "subject_id": "report-generation",
+  "title": "A brief with blockers is not approved from the page"
+}

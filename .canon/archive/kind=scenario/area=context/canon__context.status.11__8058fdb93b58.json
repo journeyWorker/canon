@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.365192165Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "a267afc4a08fb06b765b3b8081f4d809668a5a9ae5f5e9cf2f3c2ab0ee44a295",
+  "scenario_id": "context.status.11",
+  "schema": 1,
+  "source_digest": "2b5ab1fa0e2362b8a6959b31b9958dcfeb17c3cb3f299fe24596a8e3762d0557",
+  "subject_id": "context-capability",
+  "title": "An unusable coverage policy is a blocking gap that withholds every move-on suggestion"
+}

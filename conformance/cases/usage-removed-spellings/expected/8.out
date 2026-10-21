@@ -1,0 +1,1 @@
+{"error":{"code":"USAGE","expected":["--kind review"],"field":"--kind","hint":"--kind review_record was renamed --kind review in 0.24.0; use --kind review","message":"--kind review_record was removed in 0.25.0","retryable":false}}

@@ -159,7 +159,7 @@ exits 1, and the status stays `verifying`. `retired` is not gated.
 **The brief (0.16, 0.17, 0.19):** `verifying → shipped` also refuses where a brief
 exists and is not approved, read exactly as `canon status` reads it (one
 shared check, so status says `ship` only when this passes): the subject's
-newest adopted change has a canon `.canon/changes/<change>/brief.md`
+scope (its newest adopted change, except pending drafts, see below) has a canon `.canon/changes/<change>/brief.md`
 with no `Approved:` line outside HTML comments and code fences, whose
 `Approved:` line carries a digest the brief's text no longer matches
 (`BRIEF_CHANGED_SINCE_APPROVAL`; the brief was edited after the human
@@ -203,6 +203,30 @@ answers. `canon evidence add` refuses (exit 1, nothing staged) a
 scenario whose `@subject` owner, or a task whose change
 an adopting subject, has an enforced, unapproved brief, through the same
 check; see `canon-gate`.
+
+**Approval is scoped to the scenarios a change names.** The evidence
+refusal asks the approval of each change the scenario's `@flow:<change>.<F-id>`
+tags name. An untagged scenario answers to the subject's newest adopted
+change whose brief carries an `Approved:` line; if no adopted change ever
+did, a scenario with evidence recorded before the subject first adopted a
+change (and without a brief override) needs no brief, and one without
+answers to the newest adopted change. A task answers to its own
+change. So planning the next change for a `building`, `verifying` or
+`shipped` subject does not freeze re-verification of its existing
+scenarios; scenarios written for the new change (`canon scenario new
+--flow <F-id>` tags them) wait for its approval. The ship guard above is
+unchanged, except for a pending draft: the subject cannot ship until its
+scope is approved, where the scope is found walking the adopted changes from
+the newest back: a change whose brief was never approved and that no scenario
+of the subject is tagged `@flow:<change>.*` for is a pending draft and is
+skipped; the first approved or tagged change is the scope. A tagged unapproved
+draft anywhere above the newest approved change therefore blocks. The reopen
+and ship transitions print one line naming every change set aside (stderr, and
+`meta.warnings` with `--json`): ``<change> is a pending draft (brief not
+approved, no scenario tagged `@flow:<change>.*`): not part of this transition,
+which reads the subject's newest approved or tagged change``, and `canon status`
+marks them "not yet part of the subject's scope" (`pendingDrafts` in JSON)
+while still asking the human to answer a draft's brief.
 
 ### The review guard (`spec_coverage.require_review`, opt-in)
 
@@ -279,8 +303,10 @@ canon subject status: demo-subject → verifying — written directly; nothing t
   records the change the work goes into:
   `reopen: { reason: …, change: c-demo, actor: { agent_id: impl } }`. The
   next status write clears both, as it clears a waiver.
-- Inside the approved scope it needs no human: the subject's newest
-  adopted change's brief is approved, or there is no brief to answer.
+- Inside the approved scope it needs no human: the subject's scope (its
+  newest adopted change, walking back past pending drafts no scenario is
+  tagged for) has an approved brief, or there
+  is no brief to answer.
   Otherwise it refuses, exit 1, naming the brief to approve, and
   `--override-reason` does not waive it:
   ``unreviewed-promotion demo-subject — shipped → verifying: reopening needs the approved scope, and the brief is not approved — .canon/changes/c-next/brief.md has no `Approved:` line; …``.
@@ -344,6 +370,31 @@ first: a half-done adoption still has that change's open blockers
 counted. If the change write then fails, `adopt` exits `2`, names the
 subject that now lists the change, and prints `canon subject adopt
 <change_id> --subject-id <id>` to complete it.
+
+`canon change new <slug> --subject-id <S>` and `canon subject adopt
+<change> --subject-id <S>` print a warning on stderr, and in JSON
+`meta.warnings`, when `<S>` is `building`, `verifying` or `shipped` and the
+change's brief is not approved. The warning says the subject's existing
+scenarios keep accepting evidence and the subject can still be reopened and
+shipped for its approved scope while no scenario is tagged `@flow:<change>.*`;
+once one is, the subject cannot ship until the brief is approved. The draft is
+pending until then: the reopen and ship guards read the newest adopted change
+with an `Approved:` line instead, so a shipped subject can reopen, re-verify
+and ship again while the draft waits; `canon status` still lists it.
+
+### Taking a draft change back out: `canon subject unadopt`
+
+```bash
+canon subject unadopt <change> --subject-id <S> --as planner --json
+```
+
+Removes the link on both records and keeps the change and its brief, so the
+draft can be adopted elsewhere (a `proposed` holding subject, say) while the
+live subject keeps shipping. It is refused with `SUBJECT_UNADOPT_REFUSED`
+for a change whose brief carries an `Approved:` line, and while a scenario
+the subject owns carries a `@flow:<change>.*` tag (it would fall back to an
+older approval; remove or retag those scenarios first, the hint names them);
+an unlinked pair is a no-op.
 
 ### Starting a new change: `canon change new`
 

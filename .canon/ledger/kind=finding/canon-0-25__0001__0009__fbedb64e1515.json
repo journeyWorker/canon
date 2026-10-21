@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T12:53:16.493778253Z",
+  "change_id": "canon-0-25",
+  "disposition": "fixed",
+  "kind": "finding",
+  "reason": "install keeps unselected providers' lock entries so a later prune can still reach them",
+  "resolution_sha": "f13959bbffd64c09f321ee629a0754631edcd0fb",
+  "reviewer": "canon-reviewer-025",
+  "round": 1,
+  "scenario_ids": [
+    "skills.install.61"
+  ],
+  "schema": 1,
+  "seq": 9,
+  "severity": "should_fix",
+  "summary": "skills install --providers claude after a claude+codex install rewrites the lock with the selected providers only, so the Codex entries leave the lock; a later install --providers codex then never prunes the Codex copy of a dropped file and skills check for codex does not report it: the orphan is stranded (probed by a delegated read-only probe). The scenario's 'Codex untouched' holds; D5's prune cannot reach it afterwards. Keep unselected providers' lock entries. Code pass."
+}

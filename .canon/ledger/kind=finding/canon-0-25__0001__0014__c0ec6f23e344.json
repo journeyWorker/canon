@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T12:53:16.980605549Z",
+  "change_id": "canon-0-25",
+  "disposition": "fixed",
+  "kind": "finding",
+  "reason": "the dashboard applies the Host guard to every route, not only /api",
+  "resolution_sha": "7e138cf3093aa8d179b4e449fd360132f550ad78",
+  "reviewer": "canon-reviewer-025",
+  "round": 1,
+  "scenario_ids": [
+    "report.dashboard.09"
+  ],
+  "schema": 1,
+  "seq": 14,
+  "severity": "should_fix",
+  "summary": "The dashboard checks Host only on /api/*: with a ready snapshot, `curl -H 'Host: evil.example' http://127.0.0.1:PORT/live-snapshot/mart_subjects.parquet` returns 200 and the repo's subjects (probed, release build); index.html and briefs.html also answer a foreign Host. A DNS-rebinding page can read the whole ledger snapshot. Outside 09's text (it promises /api only), so not a scenario break; apply guard_host to every route. Code pass."
+}

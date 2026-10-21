@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.046991011Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "9e5d3f63aa70031da6af3285b713bbd43b3553b514c1fc6a53ac799faa9f3c8c",
+  "scenario_id": "subject.lifecycle.34",
+  "schema": 1,
+  "source_digest": "3a4fdf955c883926fb05053f12b10f85ef5696f46c41c9e47fae5c3a7243c845",
+  "subject_id": "subject-lifecycle",
+  "title": "A change written before 0.18 with one subject reads as a one-element list"
+}

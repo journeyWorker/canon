@@ -99,7 +99,7 @@ fn gate_task_without_evidence_is_blocked_with_its_code() {
 fn finding_close_of_an_unknown_seq_is_refused() {
     let dir = TempDir::new().unwrap();
     std::fs::write(dir.path().join("canon.yaml"), "routing:\n  finding: local\n").unwrap();
-    let out = run(dir.path(), &["finding", "close", "--change-id", "some-change", "--round", "1", "--seq", "9", "--disposition", "rejected"]);
+    let out = run(dir.path(), &["finding", "close", "--change-id", "some-change", "--round", "1", "--seq", "9", "--disposition", "rejected", "--reason", "by design"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert_eq!(human_code(&out), "FINDING_NOT_FOUND");
 }

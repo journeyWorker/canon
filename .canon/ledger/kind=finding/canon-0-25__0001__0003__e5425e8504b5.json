@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T12:53:15.951723129Z",
+  "change_id": "canon-0-25",
+  "disposition": "fixed",
+  "kind": "finding",
+  "reason": "subject_lifecycle_35 now also exercises the shipped arm of the adoption warning",
+  "resolution_sha": "25501f4c79f757dfc0fad7e03b34d34eaba923e8",
+  "reviewer": "canon-reviewer-025",
+  "round": 1,
+  "scenario_ids": [
+    "subject.lifecycle.35"
+  ],
+  "schema": 1,
+  "seq": 3,
+  "severity": "note",
+  "summary": "subject.lifecycle.35's Then names building, verifying or shipped, but brief_scope.rs subject_lifecycle_35 exercises only building (change new) and verifying (subject adopt); the shipped arm of adoption_warning's matches! is never run. Spec-fidelity pass."
+}

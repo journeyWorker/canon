@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T13:24:57.526642217Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "6e66da42c1f7db73773a6062bef99adf8b2aa2b967b6132f1b13e2104dbe9e36",
+  "scenario_id": "subject.lifecycle.12",
+  "schema": 1,
+  "source_digest": "13c4ecfa6a59954daa11711762312b076b1cb0c06d7aaa3615a61cc313e1c3bc",
+  "subject_id": "subject-lifecycle",
+  "title": "With require_review, entering its scope is refused while an owned scenario has no review"
+}

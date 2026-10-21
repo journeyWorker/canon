@@ -293,7 +293,7 @@ line, was edited after its approval (`BRIEF_CHANGED_SINCE_APPROVAL`), or
 there is no canon `brief.md` yet but the change comes from an
 external openspec plan with a `proposal.md` under the plan sources (the
 check `canon status` and the ship guard use; see
-`canon-subject`). The subjects are the scenario's `@subject` owner for
+`canon-subject`; which changes a scenario answers to is scoped by its `@flow:<change>.<F-id>` tags, described there). The subjects are the scenario's `@subject` owner for
 `--scenario-id`, and every subject adopting the task's change for
 `--task`:
 
@@ -354,7 +354,8 @@ review waivers: 1 advisory(ies) — not failing the gate:
 The waiver lasts only until the subject's next status write.
 
 `canon subject status <id> --to shipped` also refuses where a brief exists and
-is not approved (the subject's newest adopted change has a canon
+is not approved (the subject's scope, its newest adopted change walking back past pending drafts
+no scenario is tagged `@flow:<change>.*` for, has a canon
 `brief.md` with no `Approved:` line or one the brief's text no longer
 matches, or an external `proposal.md` and no canon `brief.md` yet;
 see `canon-subject`), as an `unreviewed-promotion` naming

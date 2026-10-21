@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:24.312350072Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "7842734113c333a5897e3451e89991cf0e3555eee90797ab2f85a39f9b87b15d",
+  "scenario_id": "evidence.add.01",
+  "schema": 1,
+  "source_digest": "3d2b37d7da2d32a399bf6466b8dcca332a13ea6fac55f1bb62b7b5a1a7dde773",
+  "subject_id": "evidence-attestation",
+  "title": "An authored record satisfies the gate only after promotion, so the loop is add then promote then flip"
+}

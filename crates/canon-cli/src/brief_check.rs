@@ -79,7 +79,7 @@ pub enum Severity {
 }
 
 impl Severity {
-    fn as_str(self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         match self {
             Severity::Blocker => "blocker",
             Severity::Advisory => "advisory",
@@ -222,6 +222,46 @@ pub fn flow_scenarios(repo: &Path, change: &ChangeId) -> Result<FlowIndex, Strin
         }
     }
     Ok(index)
+}
+
+/// The changes the `@flow:<change>.<F-id>` tags of scenario `scenario_id`
+/// in spec root `project` name (0.25 D1), in tag order, read through the
+/// same Gherkin scan as [`flow_scenarios`]. Empty for an untagged
+/// scenario or an unreadable spec configuration.
+pub fn flow_changes_of(
+    repo: &Path,
+    project: &canon_model::ProjectId,
+    scenario_id: &canon_model::ScenarioId,
+) -> Vec<ChangeId> {
+    let Ok(roots) = crate::inventory::load_spec_roots(&repo.join("canon.yaml")) else {
+        return Vec::new();
+    };
+    let mut changes: Vec<ChangeId> = Vec::new();
+    for root in roots.iter().filter(|root| &root.id == project) {
+        for path in canon_fmt::util::feature_files(&root.root) {
+            let Some(file) = crate::inventory::feature_file_scan(&path) else {
+                continue;
+            };
+            for scenario in file
+                .scan
+                .scenarios
+                .iter()
+                .filter(|s| s.scenario_id == scenario_id.as_str())
+            {
+                for tag in &scenario.flow_tags {
+                    if let Some(change) = tag
+                        .rsplit_once('.')
+                        .and_then(|(change, _)| ChangeId::parse(change).ok())
+                    {
+                        if !changes.contains(&change) {
+                            changes.push(change);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    changes
 }
 
 /// The flow step ids `change`'s brief defines, in order; empty for a
@@ -1033,14 +1073,94 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
 pub fn check(repo: &Path, requested: Option<&ChangeId>) -> Result<Checked, CliError> {
     let (change, path) = resolve_change(repo, requested)?;
     let text = std::fs::read_to_string(&path).map_err(|e| CliError::failed("BRIEF_UNREADABLE", format!("cannot read `{}`: {e}", rel(repo, &path))).hint("check that brief.md is a readable UTF-8 file, then run the command again"))?;
+    check_text(repo, change, &path, &text)
+}
+
+/// Judges `text`, the brief of `change` read from `path`: [`check`] for a
+/// caller that has already read the file and must judge those same bytes.
+pub fn check_text(repo: &Path, change: ChangeId, path: &Path, text: &str) -> Result<Checked, CliError> {
     let language = crate::language::configured(repo).map_err(|e| CliError::failed("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again"))?;
-    let phase = phase_of(repo, &change, &text);
+    let phase = phase_of(repo, &change, text);
     let flows = match phase {
-        Phase::Building if !is_chore(&text) => Some(flow_scenarios(repo, &change).map_err(|e| CliError::failed("SPEC_ROOTS_UNREADABLE", format!("cannot read the scenarios the flow steps point at: {e}")).hint("fix `specs.roots` in canon.yaml (`canon init --check-config` reports what is wrong), then run the command again"))?),
+        Phase::Building if !is_chore(text) => Some(flow_scenarios(repo, &change).map_err(|e| CliError::failed("SPEC_ROOTS_UNREADABLE", format!("cannot read the scenarios the flow steps point at: {e}")).hint("fix `specs.roots` in canon.yaml (`canon init --check-config` reports what is wrong), then run the command again"))?),
         _ => None,
     };
-    let evaluation = evaluate(&text, &language, flows.as_ref());
-    Ok(Checked { change, brief: rel(repo, &path), language, phase, evaluation })
+    let evaluation = evaluate(text, &language, flows.as_ref());
+    Ok(Checked { change, brief: rel(repo, path), language, phase, evaluation })
+}
+
+/// One flow step of a brief: its id (`F1`), its text with the list marker
+/// dropped, and its line.
+#[derive(Debug, Clone, Serialize)]
+pub struct FlowStep {
+    pub id: String,
+    pub text: String,
+    pub line: usize,
+}
+
+/// One marked section of a brief as a reader shows it: found by marker
+/// (never by heading text, so the `ko` headings read the same), with its
+/// heading and the body lines after it. Fenced code and HTML comments are
+/// not part of a body, as in every other reading of the brief.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BriefSection {
+    pub key: String,
+    pub role: &'static str,
+    /// The heading's text, `#` marks dropped.
+    pub heading: Option<String>,
+    /// The marker's line.
+    pub line: usize,
+    /// The body lines, a blank line between paragraphs.
+    pub body: Vec<String>,
+    /// The steps of the `flow` section; empty for any other.
+    pub steps: Vec<FlowStep>,
+}
+
+/// The sections of `text`, in brief order: what [`evaluate`] reads, so the
+/// page and the checker cannot disagree about where a section starts.
+pub fn parse_sections(text: &str) -> Vec<BriefSection> {
+    let (lines, comments) = scan(text);
+    sections(&lines, &comments)
+        .iter()
+        .map(|section| {
+            let mut heading = None;
+            let mut body: Vec<String> = Vec::new();
+            for line in &section.lines {
+                let trimmed = line.text.trim();
+                if heading.is_none() && trimmed.starts_with('#') {
+                    heading = Some(trimmed.trim_start_matches('#').trim().to_string());
+                    continue;
+                }
+                if trimmed.is_empty() && body.last().is_none_or(|last| last.is_empty()) {
+                    continue;
+                }
+                body.push(line.text.trim_end().to_string());
+            }
+            while body.last().is_some_and(|last| last.is_empty()) {
+                body.pop();
+            }
+            let mut steps: Vec<FlowStep> = Vec::new();
+            if section.key == "flow" {
+                for line in section.body() {
+                    if line.text.trim_start().starts_with('<') {
+                        continue;
+                    }
+                    let text = strip_list_marker(&line.text).trim().to_string();
+                    match leading_flow_id(&line.text) {
+                        Some(id) => steps.push(FlowStep { id, text, line: line.no }),
+                        None => {
+                            if let Some(last) = steps.last_mut() {
+                                last.text.push(' ');
+                                last.text.push_str(&text);
+                            }
+                        }
+                    }
+                }
+            }
+            BriefSection { key: section.key.clone(), role: section.role.as_str(), heading, line: section.marker_line, body, steps }
+        })
+        .collect()
 }
 
 /// The blocker findings the ship guard refuses on, for `change`'s brief:
@@ -1117,7 +1237,6 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
                     eprintln!("{}", error.human("canon brief check"));
                     value["error"] = error.to_json()["error"].clone();
                 }
-                crate::deprecation::tag_document(&mut value);
                 println!("{}", serde_json::to_string_pretty(&value).expect("a JSON value always serializes"));
             }
             Err(e) => return CliError::failed("SERIALIZE_FAILED", e.to_string()).hint("this is a canon bug: report it together with the command line that produced it").emit("canon brief check", true),
@@ -1225,8 +1344,7 @@ pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
     let next = next_steps(ev);
     if json {
         let body = NextJson { change: checked.change.as_str(), brief: &checked.brief, state, counts, next };
-        let mut document = serde_json::to_value(&body).unwrap_or_default();
-        crate::deprecation::tag_document(&mut document);
+        let document = serde_json::to_value(&body).unwrap_or_default();
         println!("{}", serde_json::to_string_pretty(&document).unwrap_or_default());
     } else {
         println!("canon brief: {} — {state} ({} blocker(s), {} advisory(ies))", checked.brief, counts.blockers, counts.advisories);

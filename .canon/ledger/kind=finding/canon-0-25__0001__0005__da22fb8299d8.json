@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T12:53:16.144578311Z",
+  "change_id": "canon-0-25",
+  "disposition": "fixed",
+  "kind": "finding",
+  "reason": "finding_close_02 closes with a reason and compares the whole body minus the fields a close adds",
+  "resolution_sha": "8ba81c655f905c56ea8ed872cb3aeb1a48b8140e",
+  "reviewer": "canon-reviewer-025",
+  "round": 1,
+  "scenario_ids": [
+    "finding.close.02"
+  ],
+  "schema": 1,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "finding.close.02's evidence is the lib test close_stages_a_transition_that_preserves_every_content_field, which closes fixed without --reason and never sets or asserts reason, so the changed Then step 'the disposition, the resolution sha and the optional --reason are all a close adds' is unproven (dropping the reason copy in finding.rs close leaves it green); it compares fields one by one, not the whole body minus disposition/resolution_sha/reason/actor/at. Spec-fidelity pass."
+}

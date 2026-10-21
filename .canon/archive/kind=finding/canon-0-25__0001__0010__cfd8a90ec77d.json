@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-025",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-025-1"
+  },
+  "at": "2026-10-21T12:31:05.335263712Z",
+  "change_id": "canon-0-25",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewer": "canon-reviewer-025",
+  "round": 1,
+  "scenario_ids": [
+    "skills.install.59",
+    "skills.install.60"
+  ],
+  "schema": 1,
+  "seq": 10,
+  "severity": "note",
+  "summary": "A tampered install lock whose key ends in `/` (e.g. `.claude/skills/canon/reference/dir/`) passes is_projection_key and makes skills install fail with `io error at .../.: Invalid argument` after writing files and pruning some, lock not updated, every retry failing; no file outside the rules is deleted. Reject empty and `.` segments in is_projection_key. Code pass."
+}

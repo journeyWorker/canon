@@ -82,6 +82,128 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.25.0 release
+
+Version 0.25.0 puts the one human step in reach and makes it hold back only
+what it approves. Plan:
+`docs/superpowers/plans/2026-10-21-canon-0.25.0-approve-in-place.md`.
+
+**Why.** Adopting a draft change into a live subject made `evidence add` refuse
+every scenario of that subject until a human approved a brief still being
+written (#96). `canon dashboard` worked only inside canon's own checkout and
+answered every other repo with `DASHBOARD_FAILED` and a hint about the port
+(#102). A human with 13 pending briefs had to open each file and type each
+approval (#103).
+
+### D1: brief approval scoped to what a change adds (#96)
+
+- Evidence for a scenario needs the approval of each change its
+  `@flow:<change>.<F-id>` tags name, counting only changes its subject adopted.
+  An untagged scenario answers to the subject's newest adopted change whose
+  brief carries an `Approved:` line; when none ever did, a scenario evidenced
+  before the subject adopted its first change (without a brief override) needs
+  no brief, and any other answers to the newest adopted change. A task answers
+  to its own change.
+- A pending draft (an unapproved adopted change no scenario is tagged for) is
+  not yet part of the subject's scope: reopen, evidence and ship read the
+  newest approved change, and `canon status` lists the draft as awaiting the
+  human. Once a scenario is tagged for it, the subject cannot ship until it is
+  approved.
+- `canon change new --subject-id` and `canon subject adopt` warn (stderr and
+  `meta.warnings`) when the subject is building, verifying or shipped and the
+  brief is not approved.
+- `canon subject unadopt <change> --subject-id <id>` moves a draft off a
+  subject (both records). Refused (`SUBJECT_UNADOPT_REFUSED`) for an approved
+  brief and while a scenario of the subject is tagged for the change.
+
+### D2: the dashboard runs in any repo (#102)
+
+- The release binary embeds the built app (gzip, about 18 MB); in canon's own
+  checkout a built `packages/dashboard/dist` is used instead.
+- Without the `duckdb` CLI the server still starts; the panels page says why
+  there is no snapshot and how to get one, and never shows the demo fixture.
+- Own codes and hints: `DASHBOARD_PORT_IN_USE` (`--port <n>` or `--port 0`),
+  `DASHBOARD_NOT_BUILT`; a `--repo` that does not exist is `REPO_UNREADABLE`
+  and is not created.
+
+### D3: approve briefs from the dashboard (#103)
+
+- `/briefs.html` lists every live change whose brief awaits the human, with
+  its intent, outcome, flow steps, step detail, acceptance, questions and
+  assumptions, and its `brief check` blockers and advisories.
+- The human types a name and an answer; Approve records exactly what `canon
+  brief approve --change-id <id> --by <name> --note <text>` records (one
+  function serves both). Refused when the brief changed after the page
+  loaded (`BRIEF_CHANGED_SINCE_PAGE_LOAD`) and while it has blockers.
+- The server binds 127.0.0.1; every request must carry the dashboard's own
+  `Host`, and the write endpoint also its own `Origin`, `Content-Type:
+  application/json` and a body of at most 64 KiB
+  (`DASHBOARD_ORIGIN_REFUSED`, `DASHBOARD_BAD_REQUEST`).
+
+### D4–D7
+
+- **`finding close --reason` (#98).** Required for `rejected` and `deferred`
+  (`FINDING_REASON_REQUIRED`), optional for `fixed`; stored on the closing
+  version as an optional `reason` (absent on older records), shown in
+  `finding list` and JSON.
+- **Skills prune (#99).** `skills install` deletes projected files the bundle
+  no longer ships when their bytes match the install lock, keeps and reports
+  edited ones, and keeps unselected providers' lock entries; `skills check`
+  (`SKILLS_DRIFT`) and `skills doctor` name each orphan; malformed lock keys
+  are ignored and reported.
+- **Removed spellings.** The flags and `--kind *_record` values deprecated in
+  0.24.0 are usage errors whose hint names the new spelling; `meta.deprecated`
+  and `deprecatedAliases` are gone.
+- **Skill text (#100).** Reviewer proof standards, fail-first fixes, durable
+  briefs, one unit per flow step with a verify command, migration chores,
+  a harness capability table and spawn contract, handoffs that point to
+  artifacts, request-kind routing rows, plus the 0.25 surfaces.
+
+### Upgrading
+
+- Replace any 0.23-era spelling (`--change`, `--project`, `--subject`,
+  `--actor`, `--run`, `--kind evidence_record`) with its `-id` form.
+- `finding close --disposition rejected|deferred` now needs `--reason`.
+- Run `canon skills install` once: it prunes files 0.24 shipped that 0.25 no
+  longer does.
+
+### Conformance changes
+
+- New: `subject-adopt-warns-unapproved-brief`,
+  `subject-unadopt-refused-approved-brief`, `finding-close-refused-no-reason`,
+  `skills-check-orphan`, `dashboard-not-built`, `usage-removed-spellings`
+  (replaces `usage-deprecated-spellings`).
+- Re-blessed: `evidence-add-refused-unapproved-brief` and
+  `evidence-add-brief-override` (their fixture's evidence record dropped, D1),
+  `finding-list-open-json` and `context-json-policy-summary` (`reason`),
+  version strings.
+
+**Acceptance.**
+
+- Workspace: 2650 passed, 0 failed. Conformance re-blessed as listed above.
+- canon's own corpus: 30 new scenarios (evidence.add.100–102,
+  subject.lifecycle.35–39, finding.close.82–87, finding.list.05,
+  skills.install.59–63, report.dashboard.01–10) and 9 changed ones evidenced
+  by an implementer unit and reviewed by an independent reviewer process with
+  its own session. Four review rounds: 24 findings (2 blockers: a `@flow:` tag
+  naming a change the subject did not adopt passed the guard; a tagged draft
+  under a newer untagged draft was skipped by the scope walk), all fixed,
+  re-attested and closed with a reason. `canon gate check` clean.
+- Dogfood eval 13 (`docs/research/2026-10-21-dogfood-eval-13.md`), a consumer
+  game repo with four pending briefs, the 0.25 release build:
+  - `canon dashboard` served the embedded app from that repo; without
+    `duckdb` it served the briefs page and said why there were no panels.
+  - Three briefs approved on the page and the same three with `canon brief
+    approve` on a copy: identical `brief.md` digests, and policy approvals
+    identical except the time. The brief with a blocker could not be
+    approved; a brief edited after the page loaded was refused.
+  - `change new wall-jump --subject-id core-play` on the shipped subject:
+    0.24.1 then refused evidence for `platformer.movement.01`
+    (`BRIEF_UNAPPROVED`); 0.25 warned at adoption and recorded it. Agents
+    re-verified three changed scenarios of `core-play` with the draft adopted,
+    the last one reopening and shipping it again without unadopting.
+  - 0 wrong-shape canon calls in 70.
+
 ## 0.24.1 release
 
 Patch release for one dogfood finding (eval 12, canon 0.24.0).

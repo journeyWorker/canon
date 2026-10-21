@@ -119,7 +119,7 @@ fn spawn_dashboard(repo: &Path, snapshot: &Path) -> LiveDashboard {
 fn http_get(port: u16, path: &str) -> (u16, Vec<u8>) {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("connect to canon dashboard");
     stream.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
-    write!(stream, "GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n").unwrap();
+    write!(stream, "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n").unwrap();
     let mut raw = Vec::new();
     stream.read_to_end(&mut raw).expect("read response");
 

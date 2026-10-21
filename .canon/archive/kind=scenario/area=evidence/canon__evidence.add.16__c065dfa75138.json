@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.491672925Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "3060e775b5bc7a87d51bb074865f85e17321ed778ef93fac8eb98b68d2b4e2df",
+  "scenario_id": "evidence.add.16",
+  "schema": 1,
+  "source_digest": "ea01dc4b0d71836c4fb95d203a1ab016576179fa16297a6699394edd7838c662",
+  "subject_id": "evidence-attestation",
+  "title": "Every report case carrying the scenario id is bound, and any failed one refuses a faithful verdict"
+}

@@ -17,9 +17,18 @@ import ehWorkerUrl from "@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?ur
 
 export type BundleVariant = "mvp" | "eh";
 
+/** `url` resolved against the page. The worker fetches the wasm module and
+ * `LOAD`s the extension itself; a relative path only resolves where the
+ * worker has the page's base, and a worker started from a `blob:` URL
+ * (as some browsers and automation wrappers do) has none. */
+export function absoluteUrl(url: string): string {
+  const base = globalThis.location?.href;
+  return base ? new URL(url, base).href : url;
+}
+
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
-  mvp: { mainModule: mvpWasmUrl, mainWorker: mvpWorkerUrl },
-  eh: { mainModule: ehWasmUrl, mainWorker: ehWorkerUrl },
+  mvp: { mainModule: absoluteUrl(mvpWasmUrl), mainWorker: absoluteUrl(mvpWorkerUrl) },
+  eh: { mainModule: absoluteUrl(ehWasmUrl), mainWorker: absoluteUrl(ehWorkerUrl) },
 };
 
 export interface DuckDBHandle {
