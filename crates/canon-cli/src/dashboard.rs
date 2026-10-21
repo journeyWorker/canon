@@ -558,6 +558,27 @@ fn write_response(stream: &mut TcpStream, code: u16, content_type: &str, body: &
     header.push_str("\r\n");
     let _ = stream.write_all(header.as_bytes());
     let _ = stream.write_all(body);
+    linger_close(stream);
+}
+
+/// Closes after a response without resetting it: a refusal is answered
+/// before the request body is read, and closing a socket that still
+/// holds unread bytes sends a TCP reset, which can discard the response
+/// on the client's side. So the write half is shut first and what the
+/// client still sends is drained, bounded in bytes and time.
+fn linger_close(stream: &mut TcpStream) {
+    use std::io::Read;
+    let _ = stream.flush();
+    let _ = stream.shutdown(std::net::Shutdown::Write);
+    let _ = stream.set_read_timeout(Some(std::time::Duration::from_millis(200)));
+    let mut sink = [0u8; 8192];
+    let mut drained = 0usize;
+    while drained < 256 * 1024 {
+        match stream.read(&mut sink) {
+            Ok(0) | Err(_) => break,
+            Ok(n) => drained += n,
+        }
+    }
 }
 
 fn write_status(stream: &mut TcpStream, code: u16, body: &str) {
