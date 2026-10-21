@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T13:26:22.842051764Z",
+  "change_id": "canon-0-25",
+  "disposition": "fixed",
+  "kind": "finding",
+  "reason": "the status and next text for a pending adopted draft was corrected",
+  "resolution_sha": "8aac5e0f477d0ba2fd82cc06ba41cf6a05a51bea",
+  "reviewer": "canon-reviewer-025",
+  "round": 2,
+  "scenario_ids": [
+    "subject.lifecycle.38"
+  ],
+  "schema": 1,
+  "seq": 3,
+  "severity": "note",
+  "summary": "With a pending draft adopted (subject.lifecycle.38 setup), status and every meta.next say 'build and attest nothing for s until the human answers ... `canon evidence add` refuses s's scenarios and tasks until it is recorded', while evidence add accepts s's existing scenarios (D1) and ship succeeds: the guidance contradicts the rule it describes. Observed after reopen, evidence add and ship in the probe repo."
+}

@@ -1,0 +1,23 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-025",
+    "role": "implementer",
+    "session_id": "canon-impl-025-1"
+  },
+  "at": "2026-10-21T13:26:22.684233547Z",
+  "change_id": "canon-0-25",
+  "disposition": "fixed",
+  "kind": "finding",
+  "reason": "brief scope no longer truncates at an untagged newest draft, so an older adopted tagged draft stays in scope",
+  "resolution_sha": "8aac5e0f477d0ba2fd82cc06ba41cf6a05a51bea",
+  "reviewer": "canon-reviewer-025",
+  "round": 2,
+  "scenario_ids": [
+    "subject.lifecycle.38",
+    "subject.lifecycle.30"
+  ],
+  "schema": 1,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "brief::scope_changes truncates the subject's scope at the newest approved change whenever the NEWEST adopted change is an untagged draft, so an older adopted draft that scenarios ARE tagged for drops out of the reopen and ship guards. Probed (target/debug/canon): shipped subject, approved a, draft b adopted with shop.cart.03 tagged @flow:b.F1: reopen refused and ship refused naming b's brief (correct); then `change new c` (untagged draft): reopen goes through, and with shop.cart.03 attested under --override-reason, `subject status s --to shipped` exits 0 with an open blocker finding on change b; the control repo without c refuses ship with 'brief not approved — .canon/changes/b/brief.md'. Under the strict policy the guard reports 'open-blocker — 1 adopted change(s) checked' (b skipped). Keep every adopted change up to the newest one that is approved or tagged. Code pass; blast radius: open-blocker check and brief-structure check read the same truncated list."
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.370123835Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "df37689db095de310de2194ab8b008dba7d85bdfcdaf040f776fd1965a43a746",
+  "scenario_id": "context.status.14",
+  "schema": 1,
+  "source_digest": "2b5ab1fa0e2362b8a6959b31b9958dcfeb17c3cb3f299fe24596a8e3762d0557",
+  "subject_id": "context-capability",
+  "title": "Every status write suggestion names the unit and its session"
+}

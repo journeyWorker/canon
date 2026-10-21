@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:24.351556171Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "330b6a63b8e727907d459b1debaec0b39ce6fd2e99e5315b8d4865d4a2d00bfe",
+  "scenario_id": "evidence.add.10",
+  "schema": 1,
+  "source_digest": "3d2b37d7da2d32a399bf6466b8dcca332a13ea6fac55f1bb62b7b5a1a7dde773",
+  "subject_id": "evidence-attestation",
+  "title": "Approval metadata without authentication is refused before staging"
+}

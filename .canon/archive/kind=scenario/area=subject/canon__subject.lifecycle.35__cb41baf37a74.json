@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:51:47.754874879Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "1e2d25859326db2da6184d7938cb25cd4737acbdf31f5a419e4172ecf75ca282",
+  "scenario_id": "subject.lifecycle.35",
+  "schema": 1,
+  "source_digest": "26784d60f8e418a20c07d105a5cb25139ae93b5c54503cc0fce31270bd16be1d",
+  "subject_id": "subject-lifecycle",
+  "title": "Adopting an unapproved change into a building subject warns and says how to undo it"
+}

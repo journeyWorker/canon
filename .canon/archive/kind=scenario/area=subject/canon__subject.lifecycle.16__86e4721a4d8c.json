@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:51:47.678270056Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "0b7572c3f8b0eaaa711a053b2bc13cd818b49c38f2f851abc26306909aec3f81",
+  "scenario_id": "subject.lifecycle.16",
+  "schema": 1,
+  "source_digest": "26784d60f8e418a20c07d105a5cb25139ae93b5c54503cc0fce31270bd16be1d",
+  "subject_id": "subject-lifecycle",
+  "title": "An override reason moves the subject, records the waiver and keeps the gap visible"
+}

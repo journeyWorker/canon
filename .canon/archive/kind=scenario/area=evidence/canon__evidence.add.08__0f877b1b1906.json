@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:24.342442871Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "a43a59ec70ea2153217b7fc8e87e271f3e2f45f840cc3b106dcb06af657eadde",
+  "scenario_id": "evidence.add.08",
+  "schema": 1,
+  "source_digest": "3d2b37d7da2d32a399bf6466b8dcca332a13ea6fac55f1bb62b7b5a1a7dde773",
+  "subject_id": "evidence-attestation",
+  "title": "A line separator in a document-bound field is refused, and the plan is untouched"
+}

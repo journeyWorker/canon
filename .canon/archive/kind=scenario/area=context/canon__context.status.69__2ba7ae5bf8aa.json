@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.391131290Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "73643087876eb43422398aeb974fdc0688bd6436b580fc23c86bdb6468674aba",
+  "scenario_id": "context.status.69",
+  "schema": 1,
+  "source_digest": "2b5ab1fa0e2362b8a6959b31b9958dcfeb17c3cb3f299fe24596a8e3762d0557",
+  "subject_id": "context-capability",
+  "title": "The evidence step names gate promote only when writes stay staged"
+}

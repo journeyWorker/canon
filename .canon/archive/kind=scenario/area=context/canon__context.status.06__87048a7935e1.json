@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.357218764Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "74c277b45bbc5bb5b9e29cb10a6242a37ab76a72e29e61fe1390e1f0f5be3231",
+  "scenario_id": "context.status.06",
+  "schema": 1,
+  "source_digest": "2b5ab1fa0e2362b8a6959b31b9958dcfeb17c3cb3f299fe24596a8e3762d0557",
+  "subject_id": "context-capability",
+  "title": "Status on an unreadable manifest still answers, naming the repair command"
+}

@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:24.436089670Z",
+  "case": "edge",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "4a6a25450fc121bb33fa547fb76f80ea8c249861bdf03f6d21c285b85b5efb15",
+  "scenario_id": "evidence.add.61",
+  "schema": 1,
+  "source_digest": "3d2b37d7da2d32a399bf6466b8dcca332a13ea6fac55f1bb62b7b5a1a7dde773",
+  "subject_id": "evidence-attestation",
+  "title": "Without a write key a staged record waits for gate promote"
+}

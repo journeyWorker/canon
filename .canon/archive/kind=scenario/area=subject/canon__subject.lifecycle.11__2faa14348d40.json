@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:51:47.658547489Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "6f96b6c02c2de81aae9833d85da338271d0a33fcad528f4cddbf1578ab17de0e",
+  "scenario_id": "subject.lifecycle.11",
+  "schema": 1,
+  "source_digest": "26784d60f8e418a20c07d105a5cb25139ae93b5c54503cc0fce31270bd16be1d",
+  "subject_id": "subject-lifecycle",
+  "title": "Shipping is refused until each owned surface specifies a required case"
+}

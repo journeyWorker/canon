@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T11:40:32.355619828Z",
+  "case": "failure",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "d5b93ecc70d7b413544cd33966e86b7cbe3412e1ea5894e9455d7010f560291f",
+  "scenario_id": "context.status.05",
+  "schema": 1,
+  "source_digest": "2b5ab1fa0e2362b8a6959b31b9958dcfeb17c3cb3f299fe24596a8e3762d0557",
+  "subject_id": "context-capability",
+  "title": "Status warns when no policy makes the gate enforce coverage"
+}

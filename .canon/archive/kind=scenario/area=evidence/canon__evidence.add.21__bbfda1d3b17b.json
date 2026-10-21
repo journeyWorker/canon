@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-21T12:16:24.401435006Z",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "canon",
+  "scenario_digest": "da1602da44aea402f4ecae5d02ee356d13296bd7f9a0de539105d4338194e80a",
+  "scenario_id": "evidence.add.21",
+  "schema": 1,
+  "source_digest": "3d2b37d7da2d32a399bf6466b8dcca332a13ea6fac55f1bb62b7b5a1a7dde773",
+  "subject_id": "evidence-attestation",
+  "title": "Every write command says whether it staged or wrote directly"
+}
