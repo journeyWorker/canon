@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-025",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-025-1"
+  },
+  "at": "2026-10-21T13:02:48.366428027Z",
+  "change_id": "canon-0-25",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewer": "canon-reviewer-025",
+  "round": 2,
+  "scenario_ids": [
+    "context.capability.19",
+    "context.capability.21"
+  ],
+  "schema": 1,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "The evidence records for context.capability.19 and .21 are from 12:18 (run_seq of round 1), before b5d9bf0 (12:39) rewrote both tests; the implementer did not re-attest them, so the bound evidence attests the earlier tests that round 1 found did not prove the scenarios. The current tests pass and kill the mutation (deleting the `--` break in removed::find fails context_capability_19); re-run `evidence add` for both."
+}

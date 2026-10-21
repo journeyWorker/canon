@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-025",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-025-1"
+  },
+  "at": "2026-10-21T13:02:47.360723190Z",
+  "change_id": "canon-0-25",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewer": "canon-reviewer-025",
+  "round": 2,
+  "scenario_ids": [
+    "evidence.add.102"
+  ],
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "The untagged 'already evidenced' exemption still counts evidence recorded after the draft was adopted, while the subject was specced (no brief needed then): probed, specced subject with only draft change a, shop.cart.01 attested while specced (exit 0), subject moved to building, then evidence for shop.cart.01 is accepted with no approval and no override while never-evidenced shop.cart.02 is refused BRIEF_UNAPPROVED. The skill says nothing is attested for a scope before the human answers; count only evidence recorded before the subject's first adoption. Code pass."
+}
