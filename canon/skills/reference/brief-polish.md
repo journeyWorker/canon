@@ -20,119 +20,161 @@ brief that says the wrong thing.
 
 ## Scope and language
 
-The sections judged are all of them except flow ids and subheadings: the
-normative sections (Desired outcome, User flow, Step detail, Acceptance; for a
-chore, Invariants and Checks) and the context sections (Intent, Questions and
-assumptions). Length and key-sentence rules stay on the normative sections.
+Rules read the brief by section role. Intent and Questions and assumptions
+get the phrase rules (`evaluative`, `connective`, `contrast`, `colloquial`,
+`degree`) and the five newer ones; `decision-history` reads normative text
+and Intent, not Questions. `sentence-length`, `paragraph-length` and
+`key-sentence` read the normative sections only (Desired outcome, User flow,
+Step detail, Acceptance; for a chore, Invariants and Checks). Out of scope
+is not judged. Headings, code spans, fenced code, URLs, code-like tokens and
+the `Source:` and `Approved:` lines are not counted as prose.
 
-`canon brief check` detects the language of the brief's text from its
-letters: Hangul is `ko`, Latin is `en`. Other scripts get the structure rules
-only. The output prints one `language:` line with its source (`detected` or
-`configured`); the JSON carries `language` and `languageSource`, plus
-`languageNote` when `language:` in `canon.yaml` and the detected language
-disagree. A `language:` in `canon.yaml` overrides detection. If the note says
-the configured language is wrong for this text, tell the human; do not
-translate the brief to fit the setting.
+`canon brief check` detects the language of the text from the script of its
+prose letters: Hangul is `ko`, Latin is `en`, kana or Han text is named
+(`ja`, `zh`) and gets the structure rules only. A section in another script
+than the rest is judged in its own language, and a section with too few
+letters to tell inherits the brief's. The output prints one line,
+`language: ko (detected)`; the JSON carries `language` and `languageSource`
+(`detected` or `configured`). `language:` in `canon.yaml` is an override: when
+set it decides, and `brief check` adds `languageNote` (one line in the human
+output) if the text looks like another language. Report that note to the
+human; do not translate the brief to fit the setting.
 
 ## The rules
 
-Each finding carries the matched text or the measured value and the budget.
-Rewrite to say the concrete thing; swapping in a near synonym only moves the
-finding.
+Each finding carries the matched text or the measured value, and a hint.
+Fix the sentence by saying the concrete thing; swapping in a near synonym only
+moves the finding. The examples are invented.
 
 ### `prose.evaluative`
 
-Catches judgment words that stand for a fact: "seamless", "robust", "자연스럽게", "깔끔하게".
-Fix: name what the user observes.
+Catches a verdict standing in for a fact (en "it is important", "it is
+crucial", "it is essential"; ko "중요하", "핵심이", "필요가 있", "바람직하",
+"의미가 있"). Fix: state the fact the verdict stood for.
 
-- en: Before: "Export feels fast and reliable." After: "Export of a 10,000-row table finishes in under five seconds; a failed export keeps the previous file."
-- ko: 전: "내보내기가 빠르고 안정적으로 동작한다." 후: "행 10,000개 표의 내보내기는 5초 안에 끝나고, 실패하면 이전 파일을 그대로 둔다."
+- en. Before: "It is important that export keeps the old file." After: "A failed export keeps the previous file."
+- ko. 전: "내보내기가 실패해도 이전 파일을 유지하는 것이 중요하다." 후: "내보내기가 실패하면 이전 파일을 그대로 둔다."
 
 ### `prose.connective`
 
-Catches linking words that decorate ("moreover", "furthermore", "또한", "아울러"). Fix: delete them; keep a connective only when it carries a condition ("if", "otherwise", "unless").
+Catches a sentence that opens with a decorative connective (en "therefore",
+"in conclusion"; ko "따라서", "결론적으로", "이처럼", "사실", "참고로"). Fix:
+delete it; the order of the sentences already carries the link. Keep the
+link only as a condition ("if", "unless").
 
-- en: Before: "Moreover, the list is sorted by date." After: "The list is sorted by date, newest first."
-- ko: 전: "또한 목록은 날짜순으로 정렬된다." 후: "목록은 날짜 내림차순으로 정렬한다."
+- en. Before: "Therefore the list is sorted by date." After: "The list is sorted by date, newest first."
+- ko. 전: "따라서 목록은 날짜순으로 정렬한다." 후: "목록은 날짜 내림차순으로 정렬한다."
 
 ### `prose.contrast`
 
-Catches rhetorical contrast ("not just X but Y", "X가 아니라 Y다" used as flourish). Fix: state the Y alone.
+Catches the rhetorical "not X but Y" (ko "A가 아니라 B"). Fix: state Y alone.
 
-- en: Before: "This is not only a rename but a new way to find notes." After: "Renaming a note updates its search entry at once."
-- ko: 전: "단순한 이름 변경이 아니라 노트를 찾는 새로운 방식이다." 후: "노트 이름을 바꾸면 검색 항목이 바로 바뀐다."
+- en. Before: "This is not a rename but a new way to find notes." After: "Renaming a note updates its search entry at once."
+- ko. 전: "이것은 이름 변경이 아니라 노트를 찾는 새로운 방식이다." 후: "노트 이름을 바꾸면 검색 항목이 바로 바뀐다."
 
 ### `prose.colloquial`
 
-Catches spoken register in written text (ko): fillers and sentence-final spoken forms. Fix: the plain written form of the same statement.
+Korean only. Catches a spoken ending on a written sentence (~세요, ~어요,
+~아요, ~해요, ~에요, ~네요, ~죠, …). Fix: the plain written form (`~다`).
 
-- ko: 전: "이름이 겹치면 그냥 뒤에 숫자를 붙여 주면 돼요." 후: "이름이 겹치면 뒤에 숫자를 붙인다."
-- en: Before: "Just tack a number on if the name clashes." After: "If the name already exists, append a number."
+- ko. 전: "이름이 겹치면 뒤에 숫자를 붙여 주세요." 후: "이름이 겹치면 뒤에 숫자를 붙인다."
 
 ### `prose.degree`
 
-Catches degree words that cannot be checked ("very", "quite", "매우", "상당히"). Fix: the number or the condition.
+Catches a degree word nobody can check (en "very", "really", "extremely";
+ko "매우", "겨우", "무려", "고작"). Fix: the number or the condition.
 
-- en: Before: "The page loads very quickly." After: "The page is interactive within one second on the reference laptop."
-- ko: 전: "화면이 매우 빠르게 열린다." 후: "화면은 기준 노트북에서 1초 안에 입력을 받는다."
+- en. Before: "The page loads very quickly." After: "The page accepts input within one second on the reference laptop."
+- ko. 전: "화면이 매우 빠르게 열린다." 후: "화면은 기준 노트북에서 1초 안에 입력을 받는다."
 
 ### `prose.sentence-length`
 
-Catches a sentence over the budget. Fix: one statement per sentence; split at the condition, the action and the result. A list of three or more parallel items becomes a list.
+Normative sections. Catches a sentence over 30 words (en) or 80 characters
+(ko). Fix: one statement per sentence, split at the condition, the action
+and the result.
 
-- en: Before: "When a user who has not signed in opens a shared link that has expired, the page, which also logs the attempt, shows a notice and a sign-in button." After: "A signed-out user opens an expired shared link. The page shows the notice 'Link expired' and a sign-in button. The attempt is logged."
-- ko: 전: "로그인하지 않은 사용자가 만료된 공유 링크를 열면 시도를 기록하면서 안내 문구와 로그인 버튼을 함께 보여 준다." 후: "로그인하지 않은 사용자가 만료된 공유 링크를 연다. 화면에 '링크가 만료되었습니다' 문구와 로그인 버튼이 뜬다. 시도는 기록한다."
+- en. Before: "When a user who has not signed in opens a shared link that has already expired, the page, which also logs the attempt, shows a notice and a sign-in button and offers a way back to the list." After: "A signed-out user opens an expired shared link. The page shows the notice 'Link expired' and a sign-in button. The attempt is logged."
+- ko. 전: "로그인하지 않은 사용자가 만료된 공유 링크를 열면 시도를 기록하면서 안내 문구와 로그인 버튼을 함께 보여 주고 이후 목록 화면으로 돌아가는 경로도 제공한다." 후: "로그인하지 않은 사용자가 만료된 공유 링크를 연다. 화면에 '링크가 만료되었습니다' 문구와 로그인 버튼이 뜬다. 시도는 기록한다."
 
 ### `prose.paragraph-length`
 
-Catches a paragraph over the budget. Fix: keep the sentences that state a condition, an action, a result or a number (the compression pass in `role-planner.md`); move the rest to its own section or delete it.
+Normative sections. Catches a paragraph of more than five sentences. Fix: the
+compression pass in `role-planner.md`: keep the sentences that state a
+condition, an action, a result or a number; make three or more parallel
+items a list; delete or move the rest.
 
 ### `prose.key-sentence`
 
-A normative section carries exactly one key sentence marked `==**…**==`: the one line a reader must not miss. Fix: pick the single rule or result the section turns on, and mark only it.
+Normative sections. Each carries exactly one key sentence marked `==**…**==`:
+the line a reader must not miss. Fix: mark the single rule or result the
+section turns on, and nothing else.
 
 - en: `==**A deleted note stays recoverable for 30 days.**==`
 - ko: `==**삭제한 노트는 30일 동안 복구할 수 있다.**==`
 
 ### `prose.code-citation`
 
-Catches `path:line` citations, file paths and backticked identifiers inside sentences. Fix: say what the code does as behavior; put provenance on the one `Source:` line, which is exempt.
+Catches code references in sentences: paths with a known extension,
+`path:line`, `dir/name` under a source directory, and backticked
+code-shaped identifiers (`a::b`, `f()`, `snake_case`, `obj.member`,
+`camelCase`). It does not catch UI labels, flags, commands, dates, routes
+or URLs, or the `Source:` line. Fix: say what the code does as behavior;
+provenance goes on the one `Source:` line.
 
-- en: Before: "`NoteStore.save` in `src/store/notes.ts:212` drops the tag list." After: "Saving a note drops its tags. Source: store module, save path."
-- ko: 전: "`src/store/notes.ts:212`의 `NoteStore.save`가 태그를 버린다." 후: "노트를 저장하면 태그가 사라진다. Source: 저장소 모듈의 저장 경로."
-
-A quoted command, flag or error code the user types or reads is a term, not a citation: keep it and waive if the rule fires on it.
+- en. Before: "`NoteStore.save` in `src/store/notes.ts:212` drops the tag list." After: "Saving a note drops its tags." and, once, `Source: the note store's save path.`
+- ko. 전: "`src/store/notes.ts:212`의 `NoteStore.save`가 태그를 버린다." 후: "노트를 저장하면 태그가 사라진다." 그리고 한 번 `Source: 노트 저장소의 저장 경로.`
 
 ### `prose.parenthetical`
 
-Catches parenthetical asides above the section's density. Fix: if the aside is a condition or a result, make it its own sentence; if it is background, delete it; if it is a doubt, move it to Questions and assumptions.
+Catches a section with three or more parenthetical asides at a density over
+four per 1000 characters. Labels like `(F1)` or `(30초)` do not count. Fix:
+if the aside is a condition or a result, make it its own sentence; if it is
+background, delete it; if it is a doubt, move it to Questions and assumptions.
 
-- en: Before: "Sync runs (every hour, or on open (if online)) and retries (twice)." After: "Sync runs every hour and when the app opens while online. A failed sync retries twice."
-- ko: 전: "동기화는 (매시간, 앱을 열 때(온라인이면)) 실행되고 (두 번) 재시도한다." 후: "동기화는 매시간, 그리고 온라인 상태에서 앱을 열 때 실행한다. 실패한 동기화는 두 번 재시도한다."
+- en. Before: "Sync runs (every hour), on open (when online), and retries (at most twice)." After: "Sync runs every hour and when the app opens while online. A failed sync retries twice."
+- ko. 전: "동기화는 (한 시간마다), 앱을 열 때 (온라인이면 언제나) 실행되고 (최대 두 번) 재시도한다." 후: "동기화는 매시간, 그리고 온라인 상태에서 앱을 열 때 실행한다. 실패한 동기화는 두 번 재시도한다."
 
 ### `prose.decision-history`
 
-Catches dates and "decided / changed on …" notes in normative or Intent text. Fix: delete the history; state the decision as present behavior. A decision that is still open belongs in Questions and assumptions. The brief describes the product as it will be, not the discussion that led there.
+Catches dates (ISO dates, `10월 21일`, `Oct 21`) and decision notes ("we
+decided", "agreed on", "결정했", "하기로 했") in normative text and Intent.
+Fix: delete the history and write the decision as present behavior. A
+decision still open goes to Questions and assumptions.
 
-- en: Before: "On 3 March the team changed the default view to a grid." After: "The default view is a grid."
-- ko: 전: "3월 3일 회의에서 기본 보기를 격자로 바꾸기로 했다." 후: "기본 보기는 격자다."
+- en. Before: "On 3 March the team agreed on a grid as the default view." After: "The default view is a grid."
+- ko. 전: "3월 3일 회의에서 기본 보기를 격자로 하기로 했다." 후: "기본 보기는 격자다."
 
 ### `prose.ai-vocabulary`
 
-Catches a short closed list of metaphors and stock words ("leverage", "landscape", "journey", "unlock", "원활한", "견고한", "한 단계 끌어올리다"). Fix: the plain verb and the object.
+Catches a short closed list of stock words and metaphors (en "seamless",
+"robust", "leverage", "streamline", "empower", "north star", "game-changer",
+…; ko "원활", "견고", "시너지", "패러다임", "북극성", "토대", …). Fix: the plain
+verb and its object.
 
-- en: Before: "This unlocks a smoother note-taking journey." After: "A user can create a note in one tap from the lock screen."
-- ko: 전: "노트 작성 여정을 한층 원활하게 만든다." 후: "잠금 화면에서 한 번 눌러 노트를 만든다."
+- en. Before: "This leverages the sync engine for a seamless experience." After: "A note edited on one device appears on the others within a minute."
+- ko. 전: "동기화 엔진으로 원활한 사용 경험을 제공한다." 후: "한 기기에서 고친 노트가 1분 안에 다른 기기에 나타난다."
 
 ### `prose.ko-ending`
 
-Catches Korean sentences that do not end in the plain declarative `~다` (polite `~요`/`~니다`-style, colloquial, imperative or hortative). Flow steps and list fragments are exempt. Fix: end each statement in `~다`.
+Korean only. Catches a sentence that does not end in the plain declarative
+`~다`: polite `~니다`, `~시다`, `~요`; imperative `~라`; hortative `~자`;
+other endings. Questions, `없음.`, sentences ending in code or a quote, flow
+steps and list fragments are exempt. Fix: end the statement in `~다`.
 
-- ko: 전: "목록이 비어 있으면 안내를 보여 줘요." 후: "목록이 비어 있으면 안내를 보여 준다."
+- ko. 전: "목록이 비어 있으면 안내를 보여 줍니다." 후: "목록이 비어 있으면 안내를 보여 준다."
 
 ### `prose.length`
 
-Catches a brief or a section over its character budget; the finding states the measured value and the budget. Fix: run the compression pass in `role-planner.md`: delete sentences that restate another section, turn parallel items into a list or table, move assumptions to Questions and assumptions and a not-doing list to Out of scope. A long brief is usually a brief that says several things twice.
+Catches a section or the whole brief over its character budget; the finding
+states the measured value and the budget. Section budgets (ko / en
+characters): Intent 400 / 700, Outcome 500 / 900, Flow 800 / 1500, Detail
+2500 / 3500, Acceptance 1000 / 1800, Questions 800 / 1200, Out of scope 300 /
+600, Invariants and Checks 800 / 1500 each; whole brief 4000 / 6000. Fix: the
+compression pass in `role-planner.md`: delete sentences that restate another
+section, turn parallel items into a list or table, move assumptions to
+Questions and assumptions and a not-doing list to Out of scope. A brief this
+long usually says several things twice. A waiver for the whole-brief budget
+uses the section key `brief`.
 
 ## Inspect
 

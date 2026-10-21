@@ -1,33 +1,206 @@
 # Brief pass: polish
 
-Tighten the prose of the normative sections so a reader can act on it. Run it
-last or whenever `canon brief` reports prose advisories; it never blocks
-approval.
+Make the brief something a human reads once and understands. Run it whenever
+`canon brief check` reports `prose.*` advisories; `canon status` and
+`meta.next` name it before the human stop. It never blocks approval, and it
+is not finished by silencing rules: it is finished when the brief reads
+plainly and each advisory is gone or waived with a reason.
 
-## Scope
+## Mode first, style second
 
-Sections with `role=normative`: Desired outcome, User flow, Step detail,
-Acceptance (feature) or Invariants and Checks (chore). Context and question
-sections are not judged. Prose rules ship for `language: en` and `ko`; any
-other language gets the structure rules only.
+Fix what the document is before touching a word. Style rules cannot rescue a
+brief that says the wrong thing.
+
+- **Intent** states the current behavior: what a user sees and does today, and the gap. Not the history of how it got there.
+- **Desired outcome** states what is true afterwards, as behavior a user can observe.
+- **Interfaces** are described by behavior: inputs, outputs, errors, limits. Not by file, line or function.
+- **Acceptance** gives, per step, a check a reader can run without asking the author, and one failure path naming the condition and what the user sees.
+- **Provenance** goes on one line, `Source: <where this came from>`. That line is the only place a path or an identifier belongs.
+- **No** paths, line numbers, identifiers, dates or decision history in the prose. A fact stated in one section is not restated in another; point to the section instead.
+
+## Scope and language
+
+Rules read the brief by section role. Intent and Questions and assumptions
+get the phrase rules (`evaluative`, `connective`, `contrast`, `colloquial`,
+`degree`) and the five newer ones; `decision-history` reads normative text
+and Intent, not Questions. `sentence-length`, `paragraph-length` and
+`key-sentence` read the normative sections only (Desired outcome, User flow,
+Step detail, Acceptance; for a chore, Invariants and Checks). Out of scope
+is not judged. Headings, code spans, fenced code, URLs, code-like tokens and
+the `Source:` and `Approved:` lines are not counted as prose.
+
+`canon brief check` detects the language of the text from the script of its
+prose letters: Hangul is `ko`, Latin is `en`, kana or Han text is named
+(`ja`, `zh`) and gets the structure rules only. A section in another script
+than the rest is judged in its own language, and a section with too few
+letters to tell inherits the brief's. The output prints one line,
+`language: ko (detected)`; the JSON carries `language` and `languageSource`
+(`detected` or `configured`). `language:` in `canon.yaml` is an override: when
+set it decides, and `brief check` adds `languageNote` (one line in the human
+output) if the text looks like another language. Report that note to the
+human; do not translate the brief to fit the setting.
+
+## The rules
+
+Each finding carries the matched text or the measured value, and a hint.
+Fix the sentence by saying the concrete thing; swapping in a near synonym only
+moves the finding. The examples are invented.
+
+### `prose.evaluative`
+
+Catches a verdict standing in for a fact (en "it is important", "it is
+crucial", "it is essential"; ko "중요하", "핵심이", "필요가 있", "바람직하",
+"의미가 있"). Fix: state the fact the verdict stood for.
+
+- en. Before: "It is important that export keeps the old file." After: "A failed export keeps the previous file."
+- ko. 전: "내보내기가 실패해도 이전 파일을 유지하는 것이 중요하다." 후: "내보내기가 실패하면 이전 파일을 그대로 둔다."
+
+### `prose.connective`
+
+Catches a sentence that opens with a decorative connective (en "therefore",
+"in conclusion"; ko "따라서", "결론적으로", "이처럼", "사실", "참고로"). Fix:
+delete it; the order of the sentences already carries the link. Keep the
+link only as a condition ("if", "unless").
+
+- en. Before: "Therefore the list is sorted by date." After: "The list is sorted by date, newest first."
+- ko. 전: "따라서 목록은 날짜순으로 정렬한다." 후: "목록은 날짜 내림차순으로 정렬한다."
+
+### `prose.contrast`
+
+Catches the rhetorical "not X but Y" (ko "A가 아니라 B"). Fix: state Y alone.
+
+- en. Before: "This is not a rename but a new way to find notes." After: "Renaming a note updates its search entry at once."
+- ko. 전: "이것은 이름 변경이 아니라 노트를 찾는 새로운 방식이다." 후: "노트 이름을 바꾸면 검색 항목이 바로 바뀐다."
+
+### `prose.colloquial`
+
+Korean only. Catches a spoken ending on a written sentence (~세요, ~어요,
+~아요, ~해요, ~에요, ~네요, ~죠, …). Fix: the plain written form (`~다`).
+
+- ko. 전: "이름이 겹치면 뒤에 숫자를 붙여 주세요." 후: "이름이 겹치면 뒤에 숫자를 붙인다."
+
+### `prose.degree`
+
+Catches a degree word nobody can check (en "very", "really", "extremely";
+ko "매우", "겨우", "무려", "고작"). Fix: the number or the condition.
+
+- en. Before: "The page loads very quickly." After: "The page accepts input within one second on the reference laptop."
+- ko. 전: "화면이 매우 빠르게 열린다." 후: "화면은 기준 노트북에서 1초 안에 입력을 받는다."
+
+### `prose.sentence-length`
+
+Normative sections. Catches a sentence over 30 words (en) or 80 characters
+(ko). Fix: one statement per sentence, split at the condition, the action
+and the result.
+
+- en. Before: "When a user who has not signed in opens a shared link that has already expired, the page, which also logs the attempt, shows a notice and a sign-in button and offers a way back to the list." After: "A signed-out user opens an expired shared link. The page shows the notice 'Link expired' and a sign-in button. The attempt is logged."
+- ko. 전: "로그인하지 않은 사용자가 만료된 공유 링크를 열면 시도를 기록하면서 안내 문구와 로그인 버튼을 함께 보여 주고 이후 목록 화면으로 돌아가는 경로도 제공한다." 후: "로그인하지 않은 사용자가 만료된 공유 링크를 연다. 화면에 '링크가 만료되었습니다' 문구와 로그인 버튼이 뜬다. 시도는 기록한다."
+
+### `prose.paragraph-length`
+
+Normative sections. Catches a paragraph of more than five sentences. Fix: the
+compression pass in `role-planner.md`: keep the sentences that state a
+condition, an action, a result or a number; make three or more parallel
+items a list; delete or move the rest.
+
+### `prose.key-sentence`
+
+Normative sections. Each carries exactly one key sentence marked `==**…**==`:
+the line a reader must not miss. Fix: mark the single rule or result the
+section turns on, and nothing else.
+
+- en: `==**A deleted note stays recoverable for 30 days.**==`
+- ko: `==**삭제한 노트는 30일 동안 복구할 수 있다.**==`
+
+### `prose.code-citation`
+
+Catches code references in sentences: paths with a known extension,
+`path:line`, `dir/name` under a source directory, and backticked
+code-shaped identifiers (`a::b`, `f()`, `snake_case`, `obj.member`,
+`camelCase`). It does not catch UI labels, flags, commands, dates, routes
+or URLs, or the `Source:` line. Fix: say what the code does as behavior;
+provenance goes on the one `Source:` line.
+
+- en. Before: "`NoteStore.save` in `src/store/notes.ts:212` drops the tag list." After: "Saving a note drops its tags." and, once, `Source: the note store's save path.`
+- ko. 전: "`src/store/notes.ts:212`의 `NoteStore.save`가 태그를 버린다." 후: "노트를 저장하면 태그가 사라진다." 그리고 한 번 `Source: 노트 저장소의 저장 경로.`
+
+### `prose.parenthetical`
+
+Catches a section with three or more parenthetical asides at a density over
+four per 1000 characters. Labels like `(F1)` or `(30초)` do not count. Fix:
+if the aside is a condition or a result, make it its own sentence; if it is
+background, delete it; if it is a doubt, move it to Questions and assumptions.
+
+- en. Before: "Sync runs (every hour), on open (when online), and retries (at most twice)." After: "Sync runs every hour and when the app opens while online. A failed sync retries twice."
+- ko. 전: "동기화는 (한 시간마다), 앱을 열 때 (온라인이면 언제나) 실행되고 (최대 두 번) 재시도한다." 후: "동기화는 매시간, 그리고 온라인 상태에서 앱을 열 때 실행한다. 실패한 동기화는 두 번 재시도한다."
+
+### `prose.decision-history`
+
+Catches dates (ISO dates, `10월 21일`, `Oct 21`) and decision notes ("we
+decided", "agreed on", "결정했", "하기로 했") in normative text and Intent.
+Fix: delete the history and write the decision as present behavior. A
+decision still open goes to Questions and assumptions.
+
+- en. Before: "On 3 March the team agreed on a grid as the default view." After: "The default view is a grid."
+- ko. 전: "3월 3일 회의에서 기본 보기를 격자로 하기로 했다." 후: "기본 보기는 격자다."
+
+### `prose.ai-vocabulary`
+
+Catches a short closed list of stock words and metaphors (en "seamless",
+"robust", "leverage", "streamline", "empower", "north star", "game-changer",
+…; ko "원활", "견고", "시너지", "패러다임", "북극성", "토대", …). Fix: the plain
+verb and its object.
+
+- en. Before: "This leverages the sync engine for a seamless experience." After: "A note edited on one device appears on the others within a minute."
+- ko. 전: "동기화 엔진으로 원활한 사용 경험을 제공한다." 후: "한 기기에서 고친 노트가 1분 안에 다른 기기에 나타난다."
+
+### `prose.ko-ending`
+
+Korean only. Catches a sentence that does not end in the plain declarative
+`~다`: polite `~니다`, `~시다`, `~요`; imperative `~라`; hortative `~자`;
+other endings. Questions, `없음.`, sentences ending in code or a quote, flow
+steps and list fragments are exempt. Fix: end the statement in `~다`.
+
+- ko. 전: "목록이 비어 있으면 안내를 보여 줍니다." 후: "목록이 비어 있으면 안내를 보여 준다."
+
+### `prose.length`
+
+Catches a section or the whole brief over its character budget; the finding
+states the measured value and the budget. Section budgets (ko / en
+characters): Intent 400 / 700, Outcome 500 / 900, Flow 800 / 1500, Detail
+2500 / 3500, Acceptance 1000 / 1800, Questions 800 / 1200, Out of scope 300 /
+600, Invariants and Checks 800 / 1500 each; whole brief 4000 / 6000. Fix: the
+compression pass in `role-planner.md`: delete sentences that restate another
+section, turn parallel items into a list or table, move assumptions to
+Questions and assumptions and a not-doing list to Out of scope. A brief this
+long usually says several things twice. A waiver for the whole-brief budget
+uses the section key `brief`.
 
 ## Inspect
 
-- `canon brief check --json`, the `prose.*` findings: `evaluative`, `connective`, `contrast`, `colloquial` (ko), `degree`, `sentence-length`, `paragraph-length`, `key-sentence`. Each carries the matched phrase or the threshold and the measured value.
-- Replace an evaluative or degree word with the observable fact it stood for. Split a long sentence or paragraph. Cut connectives that only decorate.
-- Each normative section carries exactly one key sentence marked `==**…**==`: the one line a reader must not miss.
-- A finding is a prompt to reread, not a verdict: if the phrase is the precise term (a state name, a quoted label), keep it and waive that rule in that section with `<!-- canon:waive <rule-id> <section-key> "<reason>" -->`.
+- `canon brief check --json`: read the `prose.*` findings, then the sections they sit in. Fix by section, not by rule.
+- A finding is a prompt to reread, not a verdict. When the flagged text is the precise term (a state name, a quoted label, a command), keep it and waive that rule in that section:
+  `<!-- canon:waive <rule-id> <section-key> "<reason>" -->`
+  A waiver is right when the text is a quotation or a fixed term, and wrong when it excuses a sentence you could simply rewrite. One rule, one section, a reason the human can read.
+
+## The loop
+
+1. Fix the mode problems above, then the findings, section by section.
+2. Run `canon brief check --change-id <slug> --json`.
+3. Repeat until no advisory remains, or each remaining one is waived with a reason.
+4. Stop and report to the human, in the brief's language. Do not loop further: a clean run says nothing about whether the brief is good, only that these counts are within budget.
 
 ## NEVER
 
 - Never change meaning: no flow step, rule, limit or failure path added, removed or softened while rewording.
-- Never rewrite to dodge a rule (swap a listed phrase for a near synonym); say the concrete thing.
-- Never polish sections that are not normative, or touch flow ids and subheadings.
-- Never treat a clean prose run as a claim about who wrote the brief or whether it is good.
+- Never rewrite to dodge a rule (a near synonym, a list used to hide a long sentence); say the concrete thing.
+- Never touch flow ids or subheadings, and never polish the markers.
+- Never translate the brief to match a `language:` setting.
+- Never treat a clean run as a claim about who wrote the brief.
 
 ## Verify
 
-`canon brief check` no longer lists the `prose.*` findings you rewrote (or lists them as waived with a reason); no blockers appeared.
+`canon brief check` no longer lists the `prose.*` findings you rewrote, or lists them as waived with a reason; no blockers appeared.
 
 ## Next
 
@@ -39,4 +212,4 @@ Report to the human and `canon brief approve` from their answer.
 - Explaining writes nothing. Asked what a finding means or what a pass would do, answer in chat and leave the brief untouched.
 - No pass requires another as a prerequisite. Run the one the findings or the human point at, in any order.
 - A pass closes only the findings it rechecked: rerun `canon brief check` after the edit and report a finding as closed only when it is gone from that run. Never claim a rule you did not rerun.
-- Write in the brief's language (`language:` in `canon.yaml`). Edits touch `.canon/changes/<slug>/brief.md` only. A brief edited after approval is not approved: it needs a new human answer and `canon brief approve` again.
+- Write in the brief's language (detected from the text, or `language:` in `canon.yaml` when set). Edits touch `.canon/changes/<slug>/brief.md` only. A brief edited after approval is not approved: it needs a new human answer and `canon brief approve` again.
