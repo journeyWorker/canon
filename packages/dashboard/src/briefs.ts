@@ -1,6 +1,6 @@
 import "./style.css";
 import { renderNav } from "./nav";
-import { renderBriefs, approveDisabled, type Brief, type BriefHandlers } from "./briefs-render";
+import { advisoryTotal, renderBriefs, approveDisabled, type Brief, type BriefHandlers } from "./briefs-render";
 import { h, toDom } from "./vnode";
 
 // The briefs page: the changes whose brief awaits the human, and the form
@@ -45,6 +45,9 @@ function afterApproval(brief: Brief, card: HTMLElement, data: { brief: string; d
       ),
     ),
   );
+  shown = shown.filter((b) => b.changeId !== brief.changeId);
+  const total = main!.querySelector(".briefs-total");
+  if (total) total.textContent = advisoryTotal(shown);
   if (!main!.querySelector(".brief")) render([]);
 }
 
@@ -85,7 +88,10 @@ const handlers: BriefHandlers = {
   onApprove: (brief, card) => void approve(brief, card),
 };
 
+let shown: Brief[] = [];
+
 function render(briefs: Brief[]): void {
+  shown = briefs;
   main!.replaceChildren(toDom(renderBriefs(briefs, handlers)));
 }
 

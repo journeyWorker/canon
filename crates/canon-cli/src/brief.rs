@@ -202,6 +202,10 @@ pub struct BriefStatus {
     /// Omitted for a pre-0.19 brief, which is read as before.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub findings: Option<crate::brief_check::Counts>,
+    /// The advisory rule ids of that check, most findings first (the
+    /// planner step's polish hint); never serialized.
+    #[serde(skip)]
+    pub advisory_rules: Vec<String>,
 }
 
 impl BriefStatus {
@@ -300,6 +304,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
             changed: false,
             legacy_approval: false,
             findings: None,
+            advisory_rules: Vec::new(),
         });
     };
     let brief = canon_brief(repo, change);
@@ -320,6 +325,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 changed: matches!(verdict, Approval::Changed { .. }),
                 legacy_approval: matches!(verdict, Approval::Unbound { .. }),
                 findings: None,
+                advisory_rules: Vec::new(),
             }
         }
         None => match external() {
@@ -334,6 +340,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 changed: false,
                 legacy_approval: false,
                 findings: None,
+                advisory_rules: Vec::new(),
             },
             None if proposed => return None,
             None => BriefStatus {
@@ -347,6 +354,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 changed: false,
                 legacy_approval: false,
                 findings: None,
+                advisory_rules: Vec::new(),
             },
         },
     };
