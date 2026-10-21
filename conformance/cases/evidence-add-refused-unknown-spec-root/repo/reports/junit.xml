@@ -1,0 +1,7 @@
+<testsuite>
+  <testcase classname="cart" name="cart.add.01 adds"/>
+  <testcase classname="cart" name="cart.add.02 refuses"><failure message="boom"/></testcase>
+  <testcase classname="cart" name="cart.add.02 counts"/>
+  <testcase classname="cart" name="cart.add.09 is not indexed"/>
+  <testcase classname="cart" name="helper works"/>
+</testsuite>

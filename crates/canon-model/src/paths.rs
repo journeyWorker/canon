@@ -38,6 +38,9 @@ pub const HOT_DB_GITIGNORE: &str = ".canon/hot.db*";
 /// via `learn.root`.
 pub const LEARN_DIR: &str = ".canon/learn";
 
+/// The `.gitignore` line covering [`LEARN_DIR`].
+pub const LEARN_GITIGNORE: &str = ".canon/learn/";
+
 /// Promoted, git-tracked strategy tier. Overridable via
 /// `learn.demotion.strategies_root`.
 pub const STRATEGIES_DIR: &str = ".canon/strategies";
@@ -70,9 +73,16 @@ pub const REPORT_FILE: &str = ".canon/REPORT.md";
 /// `canon report --snapshot` / `canon dashboard` parquet snapshot dir.
 pub const DASHBOARD_SNAPSHOT_DIR: &str = ".canon/dashboard-snapshot";
 
+/// The `.gitignore` line covering [`DASHBOARD_SNAPSHOT_DIR`]: regenerated
+/// by every `canon dashboard` and `canon report --snapshot`.
+pub const DASHBOARD_SNAPSHOT_GITIGNORE: &str = ".canon/dashboard-snapshot/";
+
 /// Local cold-tier mirror root (CLI convention; the live cold rung is a
 /// remote bucket).
 pub const R2_LOCAL_DIR: &str = ".canon/r2";
+
+/// The `.gitignore` line covering [`R2_LOCAL_DIR`].
+pub const R2_LOCAL_GITIGNORE: &str = ".canon/r2/";
 
 /// Ingest bookkeeping root (per-source watermark cursors live below).
 pub const INGEST_DIR: &str = ".canon/ingest";
@@ -146,6 +156,9 @@ mod tests {
             ARTIFACTS_SHA256_DIR,
             ACCESS_AUDIT_FILE,
             AUDIT_GITIGNORE,
+            LEARN_GITIGNORE,
+            DASHBOARD_SNAPSHOT_GITIGNORE,
+            R2_LOCAL_GITIGNORE,
             SCENARIO_INDEX_GITIGNORE,
             SCENARIO_INDEX_LOCK_FILE,
             ARTIFACT_STORE_LOCK_FILE,

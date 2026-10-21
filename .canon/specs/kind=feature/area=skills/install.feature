@@ -359,3 +359,12 @@ Feature: skills install
     Then those keys are never treated as orphans, and nothing outside the projection is touched or removed
     And the doctor reports an `invalid-lock-entry:` line for each
     And the install exits 0 and rewrites the lock without them
+
+  # canon: {"schema":1,"at":"2026-10-21T16:36:17Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.64
+  Scenario: skills doctor reports a missing managed gitignore line with the fix
+    Given a canon repo whose gitignore lacks a line canon init manages
+    When canon skills doctor runs
+    Then it prints a gitignore line naming the missing entries and the fix, canon migrate, instead of status: healthy

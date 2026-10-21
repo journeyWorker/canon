@@ -7,12 +7,14 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, ProjectId, RecordKind, RoleId, Scenario, ScenarioId, SessionId, SpecDigest, Subject, SubjectId, SubjectStatus};
+use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, ProjectId, RecordKind, RoleId, ScenarioId, SessionId, Subject, SubjectId, SubjectStatus};
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
 use chrono::{Duration, Utc};
 use serde_json::Value;
 use tempfile::TempDir;
+
+mod support;
 
 const CANON_YAML: &str = "\
 tiers:
@@ -86,16 +88,8 @@ fn repo() -> TempDir {
         role("implementer"),
     );
     ledger(repo).write(&subject).unwrap();
-    let mut scenario = Scenario::new(
-        Envelope::new(1, RecordKind::Scenario, Utc::now(), Actor::new("canon", role("implementer"))),
-        ProjectId::parse("demo").unwrap(),
-        ScenarioId::parse(SCENARIO).unwrap(),
-        "seeded",
-        "",
-        SpecDigest::of(SCENARIO.as_bytes()),
-    );
-    scenario.subject_id = Some(SubjectId::parse("demo-subject").unwrap());
-    ledger(repo).write(&scenario).unwrap();
+    support::declare_scenario(repo, "demo", SCENARIO, Some("demo-subject"));
+    assert!(canon(repo, &["inventory", "sync"]).status.success(), "indexing the seeded scenario");
     dir
 }
 
