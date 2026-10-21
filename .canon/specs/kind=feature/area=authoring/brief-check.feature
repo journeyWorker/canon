@@ -99,6 +99,7 @@ Feature: authoring brief check
     When canon brief check runs
     Then each polite, hortative and imperative sentence is a prose.ko-ending finding naming the ending, and the ~세요 sentence is prose.colloquial's only
     And fragments, flow steps, questions and none answers report nothing, and English text never gets the rule
+    And a plain form that ends in 니다 (아니다, 지니다, 다닌다) is not polite, while 합니다, 입니다 and 없습니다 are flagged
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
@@ -137,3 +138,13 @@ Feature: authoring brief check
     Given a repo with no language set, a subject adopting a change whose brief is written in Korean with prose advisories
     When canon status runs
     Then the brief line counts the same advisories canon brief check reports, judged in the detected language
+
+  # canon: {"schema":1,"at":"2026-10-21T17:10:01Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @authoring.brief-check.15
+  Scenario: A markdown table is not measured as a sentence
+    Given a Korean detail section holding a table of six rows, one row longer than the sentence-length threshold
+    When canon brief check runs
+    Then no sentence-length, paragraph-length, parenthetical, phrase or ending finding reads the table rows
+    And prose.length still counts the table's characters
