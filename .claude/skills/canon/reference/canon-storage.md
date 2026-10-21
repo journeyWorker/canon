@@ -342,10 +342,17 @@ comment, only the missing ones):
 - `.canon/audit/` — the query/export/purge access log.
 - `.canon/ledger/kind=scenario/` — the scenario index; every reader
   rebuilds it.
+- `.canon/archive/kind=scenario/` — superseded scenario index rows;
+  derived like the index.
 - `.canon/scenario-index.lock` — the lock serializing index rebuilds.
 - `.canon/artifact-store.lock` — the lock serializing artifact store
   writes.
+- `.canon/dashboard-snapshot/` — the snapshot `canon dashboard`
+  regenerates on every run.
+- `.canon/learn/` and `.canon/r2/` — local learn scratch and the local
+  object-store stand-in `canon report` writes.
 
 A rerun on a repo that already has `canon.yaml` only refreshes
-`AGENTS.md`, so an existing repo's `.gitignore` is unchanged; add the
-lines by hand to adopt them.
+`AGENTS.md`; `canon migrate` adds the lines an existing `.gitignore`
+lacks, and `canon skills doctor` and `canon init --check-config` name a
+missing one.
