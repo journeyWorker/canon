@@ -734,8 +734,9 @@ mod tests {
         assert!(bound.briefs_url().ends_with("/briefs.html"));
     }
 
+    /// report.dashboard.01: the app embedded in the binary is served gzip-compressed to a browser that accepts it.
     #[test]
-    fn an_embedded_app_is_served_gzip_to_a_browser_that_accepts_it() {
+    fn report_dashboard_01_an_embedded_app_is_served_gzip_to_a_browser_that_accepts_it() {
         let app = AppSource::Embedded(table(&[("index.html", "<html>embedded</html>"), ("assets/app.js", "console.log(1)")]));
         let response = get(app, "/assets/app.js", "Accept-Encoding: gzip, deflate\r\n");
         assert_eq!(response.code, 200);
@@ -745,8 +746,9 @@ mod tests {
         assert_eq!(gunzip(&response.body), "console.log(1)");
     }
 
+    /// report.dashboard.01: the same app is served decompressed to a browser that does not accept gzip.
     #[test]
-    fn an_embedded_app_is_served_decompressed_to_a_browser_that_does_not_accept_gzip() {
+    fn report_dashboard_01_an_embedded_app_is_served_decompressed_to_a_browser_that_does_not_accept_gzip() {
         let app = AppSource::Embedded(table(&[("index.html", "<html>embedded</html>")]));
         for headers in ["", "Accept-Encoding: identity\r\n", "Accept-Encoding: gzip;q=0\r\n"] {
             let response = get(app.clone(), "/", headers);
@@ -762,8 +764,9 @@ mod tests {
         assert_eq!(get(app, "/nope.js", "").code, 404);
     }
 
+    /// report.dashboard.04: the demo fixture is never served, whichever source holds it.
     #[test]
-    fn the_demo_fixture_is_never_served_from_either_source() {
+    fn report_dashboard_04_the_demo_fixture_is_never_served_from_either_source() {
         // An embedded table that (wrongly) holds the fixture still does not serve it.
         let embedded = AppSource::Embedded(table(&[("index.html", "x"), ("snapshot/manifest.json", "{\"demo\":true}")]));
         for path in ["/snapshot/manifest.json", "/snapshot/", "/snapshot"] {
@@ -777,8 +780,9 @@ mod tests {
         }
     }
 
+    /// report.dashboard.01: canon's own checkout build overrides the embedded app, and nobody else's `packages/dashboard` is ever served.
     #[test]
-    fn resolve_app_serves_the_checkout_build_only_for_canons_own_dashboard_package() {
+    fn report_dashboard_01_resolve_app_serves_the_checkout_build_only_for_canons_own_dashboard_package() {
         let embedded = table(&[("index.html", "embedded")]);
         let repo = tempfile::tempdir().unwrap();
         let package = repo.path().join("packages/dashboard");

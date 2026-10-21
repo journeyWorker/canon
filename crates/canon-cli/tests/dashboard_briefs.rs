@@ -193,9 +193,9 @@ fn without_timestamp(text: &str) -> String {
     text.split(' ').map(|w| if w.len() == 20 && w.ends_with('Z') && w.as_bytes()[10] == b'T' { "<when>" } else { w }).collect::<Vec<_>>().join(" ")
 }
 
-/// dashboard.briefs.1: the list names only live, unapproved briefs.
+/// report.dashboard.05: the list names only live, unapproved briefs.
 #[test]
-fn dashboard_briefs_1_lists_only_live_unapproved_briefs_with_sections_and_findings() {
+fn report_dashboard_05_lists_only_live_unapproved_briefs_with_sections_and_findings() {
     let dir = repo_with_briefs();
     let live = serve(dir.path());
     let list = get(&live, "/api/briefs");
@@ -230,9 +230,9 @@ fn dashboard_briefs_1_lists_only_live_unapproved_briefs_with_sections_and_findin
     assert!(blocked["counts"]["blockers"].as_u64().unwrap() >= 1);
 }
 
-/// dashboard.briefs.1: sections are found by marker, so a Korean brief reads the same.
+/// report.dashboard.05: sections are found by marker, so a Korean brief reads the same.
 #[test]
-fn dashboard_briefs_1_reads_korean_headings_by_their_markers() {
+fn report_dashboard_05_reads_korean_headings_by_their_markers() {
     let dir = repo_with_briefs();
     let text = clean_brief("Ready change").replace("## User flow", "## 사용자 흐름").replace("## Acceptance", "## 인수 기준");
     std::fs::write(brief_path(dir.path(), "ready"), text).unwrap();
@@ -245,9 +245,9 @@ fn dashboard_briefs_1_reads_korean_headings_by_their_markers() {
     assert_eq!(acceptance["heading"], "인수 기준");
 }
 
-/// dashboard.briefs.2: approving from the page records what the CLI records.
+/// report.dashboard.06: approving from the page records what the CLI records.
 #[test]
-fn dashboard_briefs_2_approving_from_the_page_equals_canon_brief_approve() {
+fn report_dashboard_06_approving_from_the_page_equals_canon_brief_approve() {
     let dir = repo_with_briefs();
     let twin = TempDir::new().unwrap();
     copy_tree(dir.path(), twin.path());
@@ -280,9 +280,9 @@ fn dashboard_briefs_2_approving_from_the_page_equals_canon_brief_approve() {
     assert_eq!(ids, ["blocked"]);
 }
 
-/// dashboard.briefs.3: bytes that changed since the page loaded are refused.
+/// report.dashboard.07: bytes that changed since the page loaded are refused.
 #[test]
-fn dashboard_briefs_3_refuses_a_brief_that_changed_since_the_page_loaded() {
+fn report_dashboard_07_refuses_a_brief_that_changed_since_the_page_loaded() {
     let dir = repo_with_briefs();
     let live = serve(dir.path());
     let request = approval_request(&live, "ready");
@@ -300,9 +300,9 @@ fn dashboard_briefs_3_refuses_a_brief_that_changed_since_the_page_loaded() {
     assert_eq!(policy_approval(dir.path()), policy_before, "no policy approval was recorded");
 }
 
-/// dashboard.briefs.4: a brief with blockers is not approved from the page.
+/// report.dashboard.08: a brief with blockers is not approved from the page.
 #[test]
-fn dashboard_briefs_4_refuses_a_brief_with_blockers() {
+fn report_dashboard_08_refuses_a_brief_with_blockers() {
     let dir = repo_with_briefs();
     let live = serve(dir.path());
     let before = std::fs::read(brief_path(dir.path(), "blocked")).unwrap();
@@ -315,9 +315,9 @@ fn dashboard_briefs_4_refuses_a_brief_with_blockers() {
     assert_eq!(policy_approval(dir.path()), policy_before, "no policy approval was recorded");
 }
 
-/// dashboard.briefs.5: a request that is not the page's own is refused before the brief is read.
+/// report.dashboard.09: a request that is not the page's own is refused before the brief is read.
 #[test]
-fn dashboard_briefs_5_refuses_requests_that_are_not_the_pages_own() {
+fn report_dashboard_09_refuses_requests_that_are_not_the_pages_own() {
     let dir = repo_with_briefs();
     let live = serve(dir.path());
     let port = live.port;
@@ -350,6 +350,7 @@ fn dashboard_briefs_5_refuses_requests_that_are_not_the_pages_own() {
         assert_eq!(reply.json()["error"]["code"], error, "{name}");
         assert!(reply.json()["error"]["hint"].as_str().is_some_and(|h| !h.is_empty()), "{name}: a concrete hint");
     }
+    assert_eq!(std::fs::read(brief_path(dir.path(), "ready")).unwrap(), before, "no refused request wrote");
     let wrong_method = http(port, "GET", "/api/briefs/approve", &[("Host", format!("127.0.0.1:{port}"))], b"");
     assert_eq!(wrong_method.code, 405);
     assert!(wrong_method.head.contains("Allow: POST"));
@@ -360,9 +361,9 @@ fn dashboard_briefs_5_refuses_requests_that_are_not_the_pages_own() {
     assert_ne!(std::fs::read(brief_path(dir.path(), "ready")).unwrap(), before, "only the localhost request wrote");
 }
 
-/// dashboard.briefs.5: no refusal touched the brief.
+/// report.dashboard.10: an empty or multi-line answer, an unknown change and a malformed body are refused and write nothing.
 #[test]
-fn dashboard_briefs_5_leaves_the_brief_untouched_on_every_refusal() {
+fn report_dashboard_10_leaves_the_brief_untouched_on_every_refusal() {
     let dir = repo_with_briefs();
     let live = serve(dir.path());
     let port = live.port;
@@ -370,20 +371,6 @@ fn dashboard_briefs_5_leaves_the_brief_untouched_on_every_refusal() {
     let policy_before = policy_approval(dir.path());
     let sha = brief_of(&live, "ready")["sha256"].clone();
     let post = |headers: Vec<(&'static str, String)>, body: &str| http(port, "POST", "/api/briefs/approve", &headers, body.as_bytes());
-
-    let foreign = json!({ "changeId": "ready", "by": "Ana", "note": "Ship it.", "sha256": sha }).to_string();
-    let mut headers = page_headers(port, foreign.len());
-    headers[1].1 = "http://evil.example".to_string();
-    assert_eq!(post(headers, &foreign).code, 403);
-    let mut headers = page_headers(port, foreign.len());
-    headers.remove(1);
-    assert_eq!(post(headers, &foreign).code, 403);
-    let mut headers = page_headers(port, foreign.len());
-    headers[0].1 = "evil.example".to_string();
-    assert_eq!(post(headers, &foreign).code, 403);
-    let mut headers = page_headers(port, foreign.len());
-    headers[2].1 = "text/plain".to_string();
-    assert_eq!(post(headers, &foreign).code, 400);
 
     for (by, note, field) in [("", "Ship it.", "--by"), ("Ana", "", "--note"), ("Ana\nBob", "Ship it.", "--by"), ("Ana", "one\ntwo", "--note")] {
         let reply = post_approval(&live, &json!({ "changeId": "ready", "by": by, "note": note, "sha256": sha }));
@@ -404,9 +391,9 @@ fn dashboard_briefs_5_leaves_the_brief_untouched_on_every_refusal() {
     assert_eq!(policy_approval(dir.path()), policy_before, "no policy approval was recorded");
 }
 
-/// dashboard.status.1: no snapshot is a message, never demo data.
+/// report.dashboard.04: no snapshot is a message, never demo data.
 #[test]
-fn dashboard_status_1_a_repo_whose_snapshot_cannot_be_generated_is_still_served_and_says_why() {
+fn report_dashboard_04_a_repo_whose_snapshot_cannot_be_generated_is_still_served_and_says_why() {
     let dir = repo_with_briefs();
     let live = serve(dir.path());
     let warnings = live.startup["meta"]["warnings"].as_array().expect("meta.warnings");
@@ -427,9 +414,9 @@ fn dashboard_status_1_a_repo_whose_snapshot_cannot_be_generated_is_still_served_
     assert_eq!(demo.code, 404, "the demo fixture is never served: {}", demo.body);
 }
 
-/// dashboard.status.1: an explicit snapshot with a manifest is served and reported available.
+/// report.dashboard.04: an explicit snapshot with a manifest is served and reported available.
 #[test]
-fn dashboard_status_1_serves_an_explicit_snapshot_without_duckdb() {
+fn report_dashboard_04_serves_an_explicit_snapshot_without_duckdb() {
     let dir = repo_with_briefs();
     let snapshot = dir.path().join("my-snapshot");
     std::fs::create_dir_all(&snapshot).unwrap();
@@ -449,9 +436,9 @@ fn dashboard_status_1_serves_an_explicit_snapshot_without_duckdb() {
     assert_eq!(get(&live, "/live-snapshot/manifest.json").body, r#"{"ok":true}"#);
 }
 
-/// dashboard.port.1: a taken port is its own refusal, naming the way out.
+/// report.dashboard.03: a taken port is its own refusal, naming the way out.
 #[test]
-fn dashboard_port_1_a_port_in_use_is_refused_with_the_flag_that_fixes_it() {
+fn report_dashboard_03_a_port_in_use_is_refused_with_the_flag_that_fixes_it() {
     let dir = repo_with_briefs();
     let taken = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
     let port = taken.local_addr().unwrap().port().to_string();
@@ -464,9 +451,9 @@ fn dashboard_port_1_a_port_in_use_is_refused_with_the_flag_that_fixes_it() {
     assert!(error["error"]["message"].as_str().unwrap().contains(&port));
 }
 
-/// dashboard.app.1: with no app to serve, the refusal names how to get one.
+/// report.dashboard.02: with no app to serve, the refusal names how to get one.
 #[test]
-fn dashboard_app_1_no_app_is_refused_and_another_projects_dashboard_is_never_served() {
+fn report_dashboard_02_no_app_is_refused_and_another_projects_dashboard_is_never_served() {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
     let package = repo.join("packages/dashboard");

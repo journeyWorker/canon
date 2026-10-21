@@ -138,3 +138,175 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.95em;
 }
+
+/* Page navigation: Panels / Briefs. */
+.nav {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.95rem;
+}
+
+.nav a {
+  color: inherit;
+  text-decoration: none;
+  color: var(--muted);
+}
+
+.nav a.nav-current {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+
+/* Briefs page. */
+.brief header h2 {
+  margin: 0 0 0.15rem;
+  font-size: 1.05rem;
+}
+
+.brief-changed {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: #b9770e;
+}
+
+.brief-section h3 {
+  margin: 1rem 0 0.35rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.brief-section h4 {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.85rem;
+}
+
+.brief-section p,
+.brief-section li {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.brief-section p {
+  margin: 0.25rem 0;
+}
+
+.brief-section code,
+.brief-raw {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+}
+
+.brief-raw {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  padding: 0.6rem 0.8rem;
+}
+
+.brief-raw-details {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.findings {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.finding {
+  margin: 0.25rem 0;
+  font-size: 0.85rem;
+}
+
+.finding-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+}
+
+.finding-blocker {
+  color: #c0392b;
+}
+
+.finding-advisory {
+  color: var(--muted);
+}
+
+.finding-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.approve-form {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.approve-form label {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.approve-form input {
+  font: inherit;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: inherit;
+}
+
+.approve-form button,
+.reload-button {
+  justify-self: start;
+  font: inherit;
+  padding: 0.4rem 1rem;
+  border-radius: 0.35rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.approve-form button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.approve-blocked {
+  margin: 0;
+  color: #c0392b;
+  font-size: 0.82rem;
+}
+
+.approve-error {
+  border: 1px solid #c0392b;
+  color: #c0392b;
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.8rem;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.approve-error p {
+  margin: 0.2rem 0;
+}
+
+.notice-approved {
+  border-color: #1e8e3e;
+}
+
+.briefs-empty {
+  font-size: 1rem;
+}

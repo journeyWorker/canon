@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
 // packages/dashboard is a static, zero-network-after-load app (design.md
@@ -17,5 +18,13 @@ export default defineConfig({
     target: "es2022",
     outDir: "dist",
     assetsInlineLimit: 0,
+    // Two pages: the panels (index.html) and the briefs page (briefs.html),
+    // which loads no DuckDB.
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("index.html", import.meta.url)),
+        briefs: fileURLToPath(new URL("briefs.html", import.meta.url)),
+      },
+    },
   },
 });
