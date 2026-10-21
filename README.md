@@ -178,7 +178,31 @@ approval (#103).
   `finding-list-open-json` and `context-json-policy-summary` (`reason`),
   version strings.
 
-**Acceptance.** ACCEPTANCE_PLACEHOLDER
+**Acceptance.**
+
+- Workspace: 2650 passed, 0 failed. Conformance re-blessed as listed above.
+- canon's own corpus: 30 new scenarios (evidence.add.100–102,
+  subject.lifecycle.35–39, finding.close.82–87, finding.list.05,
+  skills.install.59–63, report.dashboard.01–10) and 9 changed ones evidenced
+  by an implementer unit and reviewed by an independent reviewer process with
+  its own session. Four review rounds: 24 findings (2 blockers: a `@flow:` tag
+  naming a change the subject did not adopt passed the guard; a tagged draft
+  under a newer untagged draft was skipped by the scope walk), all fixed,
+  re-attested and closed with a reason. `canon gate check` clean.
+- Dogfood eval 13 (`docs/research/2026-10-21-dogfood-eval-13.md`), a consumer
+  game repo with four pending briefs, the 0.25 release build:
+  - `canon dashboard` served the embedded app from that repo; without
+    `duckdb` it served the briefs page and said why there were no panels.
+  - Three briefs approved on the page and the same three with `canon brief
+    approve` on a copy: identical `brief.md` digests, and policy approvals
+    identical except the time. The brief with a blocker could not be
+    approved; a brief edited after the page loaded was refused.
+  - `change new wall-jump --subject-id core-play` on the shipped subject:
+    0.24.1 then refused evidence for `platformer.movement.01`
+    (`BRIEF_UNAPPROVED`); 0.25 warned at adoption and recorded it. Agents
+    re-verified three changed scenarios of `core-play` with the draft adopted,
+    the last one reopening and shipping it again without unadopting.
+  - 0 wrong-shape canon calls in 70.
 
 ## 0.24.1 release
 
