@@ -1,0 +1,8 @@
+canon brief check: .canon/changes/add-login/brief.md — 0 blocker(s), 3 advisory(ies)
+  language: ko (detected)
+  advisory prose.decision-history [intent] line 6: 2026-09-14 회의에서 반납 직후 영수증을 보여 주기로 결정했다.
+    hint: matched `2026-09-14`; state the behavior as it is; when it was decided and what changed belong in the commit or the plan
+  advisory prose.ko-ending [outcome] line 11: 이용자는 책을 넣고 몇 초 안에 영수증을 받습니다.
+    hint: ends in `~니다`; write the plain declarative ending ~다
+  advisory prose.code-citation [detail] line 23: 반납함은 책 태그를 읽고 `loan_list`에서 해당 책을 지운다 (`src/kiosk/return.rs:31`).
+    hint: matched `loan_list`, `src/kiosk/return.rs:31`; describe the behavior, and put provenance on one `Source:` line
