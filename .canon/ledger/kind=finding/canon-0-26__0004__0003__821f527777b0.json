@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T18:51:21.723736185Z",
+  "change_id": "canon-0-26",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reason": "fixed in the round 4 redesign commit",
+  "resolution_sha": "f29f0abab9b11df31c3cdbd1b44f1147ba6785f6",
+  "reviewed_sha": "e2194c0050ca6e130ec0e407ae3d74a007bf61be",
+  "reviewer": "canon-reviewer-026",
+  "round": 4,
+  "scenario_ids": [
+    "authoring.brief-check.08"
+  ],
+  "schema": 1,
+  "seq": 3,
+  "severity": "blocker",
+  "summary": "[probe] ko_clause_ends counts a closing quote after the decision word as the start of decided text, so a quoted status or button label with a date is a note: '10월 21일에 \\'확정\\' 상태가 된 주문은 취소할 수 없다.', '10월 21일에 \\'결정\\' 버튼을 누른 신청은 다시 열 수 없다.', '2026-12-01에 \"합의\" 표시가 붙은 계약만 보인다.' each draw prose.decision-history. Scenario 08 says a decision word used as a modifier or state (확정된, 결정 버튼) is behavior; UI labels in quotes are how briefs name these states."
+}

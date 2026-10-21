@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T18:51:22.066044193Z",
+  "change_id": "canon-0-26",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/brief_prose.rs",
+  "kind": "finding",
+  "reason": "fixed in the round 4 redesign commit",
+  "resolution_sha": "f29f0abab9b11df31c3cdbd1b44f1147ba6785f6",
+  "reviewed_sha": "e2194c0050ca6e130ec0e407ae3d74a007bf61be",
+  "reviewer": "canon-reviewer-026",
+  "round": 4,
+  "scenario_ids": [
+    "authoring.brief-check.08"
+  ],
+  "schema": 1,
+  "seq": 8,
+  "severity": "should_fix",
+  "summary": "[standards] The round-3 guards are not proven separately: removing the 부터/이후/까지 boundary check, the after/since/until boundary check, or the clause-ending check (any decision word with a date counts) each keeps both the bound brief_prose tests (15/15) and the brief_check lib tests green, because every behavior sentence in the tests trips two guards at once (a boundary date and a modifier). Each guard needs a sentence only it stops, e.g. '2026-12-01부터 운영자 결정이 적용된다.' (boundary only) and '2026-12-01에 확정된 주문은 취소할 수 없다.' (modifier only)."
+}

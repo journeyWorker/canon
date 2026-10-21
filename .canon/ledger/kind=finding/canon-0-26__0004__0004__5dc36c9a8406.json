@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T18:51:21.791020912Z",
+  "change_id": "canon-0-26",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reason": "fixed in the round 4 redesign commit",
+  "resolution_sha": "f29f0abab9b11df31c3cdbd1b44f1147ba6785f6",
+  "reviewed_sha": "e2194c0050ca6e130ec0e407ae3d74a007bf61be",
+  "reviewer": "canon-reviewer-026",
+  "round": 4,
+  "scenario_ids": [
+    "authoring.brief-check.08"
+  ],
+  "schema": 1,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "[probe] Korean dated decision acts in a connective or other verb form are missed: '2026-09-14 회의에서 결정했고 대출 목록은 바꾸지 않는다.' (했고), '2026-09-14에 결정하여 …' (하여), '2026-09-14 회의에서 정해졌다.' (정해졌다) draw nothing; ko_clause_ends lists 했다/했으며/됐다/… but not 했고/하여/되어, and 정했 does not match 정해졌다."
+}
