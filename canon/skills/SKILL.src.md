@@ -23,7 +23,8 @@ a feature, a one-line request included. A human is needed once per scope:
   the one thing you never assume, even when the human said they cannot
   answer until you report: the brief is that report. The one answer
   approves the brief and the policy, `.canon/policy.yaml`, which is what
-  the gate grades the work against. Record it only from the human's answer:
+  the gate grades the work against. The human may also approve it on the `canon dashboard` briefs page; you never use that form.
+  Record it only from the human's answer:
   `canon brief approve --change-id <slug> --by <the human> --note "<their words>"`.
   Never edit the policy to make the gate pass: a policy that differs from
   the approved one fails closed (`POLICY_CHANGED_SINCE_APPROVAL`, not

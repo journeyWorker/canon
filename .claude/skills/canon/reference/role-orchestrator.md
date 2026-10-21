@@ -89,7 +89,9 @@ not sign off.
 
 When `status` or `meta.next` shows a step with `actor: human` (the brief's
 approval), stop everything for that scope, report the brief to the human in
-its language, and wait. Do not start the implementer before the answer.
+its language, and wait. Tell the human they can approve the clean briefs in
+`canon dashboard` (the briefs page) or answer in chat; you never click
+Approve or fill the form, and you run `brief approve` only from their words. Do not start the implementer before the answer.
 Record the answer with `brief approve`. Never approve it yourself and never
 edit the policy to pass the gate. A policy that no longer matches the
 approval fails closed (`POLICY_CHANGED_SINCE_APPROVAL`, or

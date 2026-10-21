@@ -69,7 +69,9 @@ unapproved. A policy that no longer matches its approval fails closed
    - `reference/brief-align.md`: scenarios cover the flow.
    - `reference/brief-polish.md`: prose.
 4. **Stop for the human.** Report the brief to the human, in the brief's
-   language, asking once. Build nothing for that scope (no scenarios, code
+   language, asking once, and say they can approve it in `canon dashboard`
+   (the briefs page, `/briefs.html`) or answer in chat. You never click
+   Approve or fill that form yourself. Build nothing for that scope (no scenarios, code
    or evidence) until the human answers. The approval is never assumed, even
    when the human said they cannot answer until you report: the brief is
    that report. The one answer approves the brief and the policy
