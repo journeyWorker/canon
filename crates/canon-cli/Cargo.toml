@@ -35,6 +35,8 @@ serde_yaml = "0.9"
 base64 = "0.22"
 sha2 = { workspace = true }
 thiserror = { workspace = true }
+# The embedded dashboard app is stored gzip-compressed and decompressed for a browser that does not accept gzip.
+flate2 = { workspace = true }
 
 # No-follow directory handles (`openat(O_NOFOLLOW)`/`unlinkat`) for the legacy
 # `.codex/skills` cleanup in `skills.rs`. Already in the lockfile via tempfile.
@@ -43,6 +45,9 @@ rustix = { version = "1.1.4", features = ["fs"] }
 # Default SIGPIPE in `main` (0.20): `canon … | head` ends quietly instead of
 # panicking on a closed stdout. Already in the lockfile.
 libc = "0.2"
+
+[build-dependencies]
+flate2 = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"

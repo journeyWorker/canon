@@ -127,7 +127,7 @@ pub const META: &[CommandMeta] = &[
     row("context-pack new", Write, &[O, I]),
     row("context-pack show", Read, &[O, I]),
     row("context-pack verify", Read, &[O, I]),
-    row("dashboard", Read, &[O]),
+    row("dashboard", Write, &[O]),
     row_exits("demo add", Write, REFUSES, &[O]),
     row_exits("demo init", Write, REFUSES, &[O]),
     row("dispatch begin", Write, &[O]),

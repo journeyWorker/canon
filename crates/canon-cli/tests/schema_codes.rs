@@ -41,6 +41,9 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("brief_check.rs", &["brief check", "brief approve"]),
     ("change.rs", &["change new"]),
     ("context_pack.rs", &["context-pack", "prompt"]),
+    // The server's refusals (`to_cli_error`, the request guards) and the briefs page's.
+    ("dashboard.rs", &["dashboard"]),
+    ("dashboard_briefs.rs", &["dashboard"]),
     ("demo.rs", &["demo"]),
     ("dispatch.rs", &["dispatch begin", "dispatch end"]),
     ("divergence.rs", &["divergence"]),
