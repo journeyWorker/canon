@@ -659,7 +659,9 @@ fn subject_lifecycle_35_adopting_an_unapproved_change_into_a_shipped_subject_war
     let found = warnings(&out);
     assert_eq!(found.len(), 1, "{found:?}");
     assert!(
-        found[0].contains("is shipped") && found[0].contains("canon subject unadopt a --subject-id s"),
+        found[0].contains("is shipped")
+            && found[0].contains("can still be reopened and shipped for its approved scope")
+            && found[0].contains("canon subject unadopt a --subject-id s"),
         "{found:?}"
     );
 }
@@ -697,18 +699,31 @@ fn subject_lifecycle_38_a_pending_draft_does_not_freeze_a_shipped_subject() {
         &["subject", "status", "s", "--to", "verifying", "--reason", "fix the cart"],
     );
     assert!(reopen.status.success(), "{}", stderr(&reopen));
+    assert!(
+        stderr(&reopen).contains("`b` is a pending draft (brief not approved, no scenario tagged `@flow:b.*`): not part of this transition"),
+        "{}",
+        stderr(&reopen)
+    );
     let again = attest(repo, "shop.cart.01", "second run");
     assert!(again.status.success(), "{}", stderr(&again));
-    let ship = run(repo, &["subject", "status", "s", "--to", "shipped"]);
+    let ship = run(repo, &["subject", "status", "s", "--to", "shipped", "--json"]);
     assert!(ship.status.success(), "{}", stderr(&ship));
+    let shipped: Value = serde_json::from_str(&stdout(&ship)).unwrap();
+    assert!(
+        shipped["meta"]["warnings"].to_string().contains("`b` is a pending draft"),
+        "{shipped}"
+    );
 
-    // Status still shows the draft as awaiting the human.
+    // Status still shows the draft as awaiting the human, and as not yet
+    // part of the subject's scope.
     let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();
     let text = status.to_string();
     assert!(
-        text.contains("\"change\":\"b\"") && text.contains("\"approved\":false"),
+        text.contains("\"change\":\"b\"") && text.contains("\"approved\":false") && text.contains("\"pendingDraft\":\"b\""),
         "{text}"
     );
+    let human = stdout(&ok(repo, &["status"]));
+    assert!(human.contains("`b` is a pending draft: not yet part of the subject's scope"), "{human}");
 
     // Once a scenario is tagged for the draft, shipping needs its approval.
     ok(
@@ -723,4 +738,46 @@ fn subject_lifecycle_38_a_pending_draft_does_not_freeze_a_shipped_subject() {
         "{}",
         stderr(&ship)
     );
+}
+
+/// subject.lifecycle.38: a pending draft whose brief `canon brief check`
+/// still has blockers for keeps `canon brief check --change-id <c>` as the
+/// planner's next step; once the brief is clean the step asks the human.
+/// Neither blocks the subject's own steps (here, its ship step).
+#[test]
+fn subject_lifecycle_38_a_pending_drafts_next_step_follows_its_brief_check() {
+    let dir = repo_with_subject("verifying");
+    let repo = dir.path();
+    change(repo, "a", true);
+    scenario(repo, "shop.cart.01", Some("a.F1"));
+    scenario(repo, "shop.cart.02", Some("a.F1"));
+    let path = repo.join(".canon/specs/kind=feature/area=shop/cart.feature");
+    let text = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(
+        &path,
+        text.replace("@case:happy\n  @flow:a.F1\n  @shop.cart.02", "@case:failure\n  @flow:a.F1\n  @shop.cart.02"),
+    )
+    .unwrap();
+    for id in ["shop.cart.01", "shop.cart.02"] {
+        assert!(attest(repo, id, "run").status.success());
+    }
+    // An unfilled brief skeleton: blockers.
+    ok(repo, &["change", "new", "b", "--subject-id", "s", "--title", "B"]);
+
+    let steps = |repo: &Path| -> Vec<Value> {
+        let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();
+        status["next"].as_array().unwrap().clone()
+    };
+    let has = |steps: &[Value], prefix: &str| steps.iter().any(|s| s["command"].as_str().unwrap().starts_with(prefix));
+
+    let blocked = steps(repo);
+    assert!(has(&blocked, "canon brief check --change-id b"), "{blocked:?}");
+    assert!(!has(&blocked, "report the pending draft's brief"), "{blocked:?}");
+    assert!(has(&blocked, "canon subject status s --to shipped"), "{blocked:?}");
+
+    std::fs::write(brief_path(repo, "b"), brief("")).unwrap();
+    let clean = steps(repo);
+    assert!(has(&clean, "report the pending draft's brief in .canon/changes/b/brief.md to the human; s is not blocked meanwhile"), "{clean:?}");
+    assert!(!has(&clean, "canon brief check"), "{clean:?}");
+    assert!(has(&clean, "canon subject status s --to shipped"), "{clean:?}");
 }

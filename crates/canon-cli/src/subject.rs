@@ -853,10 +853,12 @@ pub fn run_status(
     let changes = gate_context.as_ref().map_or_else(|| subject.change_ids.clone(), |ctx| subject_change_ids(ctx, &subject));
     // The subject-level brief rules read its scope: a pending draft (no
     // scenario tagged for it) does not freeze the maintenance loop.
-    let changes = match &gate_context {
-        Some(ctx) => crate::brief::scope_changes(&repo, ctx, &subject, &changes),
-        None => changes,
+    let adopted = changes.len();
+    let (changes, pending_draft) = match &gate_context {
+        Some(ctx) if ships || reopens => crate::brief::scope_changes(&repo, ctx, &subject, &changes),
+        _ => (changes, None),
     };
+    let pending_note: Vec<String> = pending_draft.iter().map(crate::brief::pending_draft_line).collect();
 
     let mut blocking = match (ships, &gate_context) {
         (true, Some(ctx)) => ship_gate_violations(ctx, subject_id),
@@ -875,7 +877,7 @@ pub fn run_status(
         blocking.extend(reopen_violation(&repo, &subject, &changes));
     }
     let mut waivable = Vec::new();
-    report_review_guard(&policy, current, target, changes.len());
+    report_review_guard(&policy, current, target, adopted);
     if let (true, Some(ctx)) = (reviews, &gate_context) {
         let (rr, exclude_lanes) = active_require_review(ctx).expect("`reviews` implies an active require_review");
         let (unwaivable, gaps, readable) = review_checks(ctx, rr, exclude_lanes, &subject);
@@ -977,7 +979,7 @@ pub fn run_status(
 
     match registry.persist(&subject) {
         Ok(_) => {
-            report_subject(&repo, &subject, "status", json, &format!("canon subject status: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT));
+            report_subject_warning(&repo, &subject, "status", json, &format!("canon subject status: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT), &pending_note);
             0
         }
         Err(e) => {

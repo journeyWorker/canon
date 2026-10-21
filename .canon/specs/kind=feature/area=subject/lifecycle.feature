@@ -383,5 +383,5 @@ Feature: subject lifecycle
   Scenario: A pending draft change does not freeze a shipped subject's reopen, evidence, review and ship
     Given a shipped subject adopting an approved change and a newer draft change that none of its scenarios is tagged @flow:<change>.* for
     When the subject is reopened, a scenario is re-verified and reviewed, and the subject ships again
-    Then each step is accepted and canon status still lists the draft change awaiting approval
+    Then each step is accepted, the reopen and ship output say in one line that the draft is a pending draft not part of the transition, and canon status still lists the draft awaiting approval, marked as not yet part of the subject's scope
     And once a scenario of the subject is tagged @flow:<draft>.F1, shipping is refused on the draft's brief

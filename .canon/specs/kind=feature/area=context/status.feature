@@ -244,7 +244,7 @@ Feature: context status
     And a building subject whose older change is approved and whose newer change has no brief
     When canon status runs
     Then each brief reads as not approved and names the newest change
-    And the verifying subject gets the human step naming the newest change's brief.md, and is not suggested to ship
+    And the verifying subject gets the human step naming the newest change's brief.md, marked as a pending draft that is not yet part of its scope because no scenario is tagged for it, and is still suggested to ship for its approved scope
     And the building subject's newest change has no brief to answer, so it gets no human step and its brief line is an advisory
 
   # canon: {"schema":1,"at":"2026-10-11T14:43:36Z","actor":{"agent_id":"canon"}}

@@ -37,9 +37,11 @@ unapproved. A policy that no longer matches its approval fails closed
    (`subject adopt`): it then belongs to both,
    and its open blockers gate both. Planning the next change for a
    `building`, `verifying` or `shipped` subject warns (stderr and JSON
-   `meta.warnings`) until its brief is approved: the subject cannot ship
-   before then, but evidence for its existing scenarios is not frozen,
-   because a scenario answers to the changes its `@flow:<change>.<F-id>`
+   `meta.warnings`) until its brief is approved: evidence for its existing scenarios is not
+   frozen and the subject can still be reopened and shipped for its approved
+   scope while no scenario is tagged for the draft (a pending draft); once one
+   is, the subject cannot ship before the approval.
+   A scenario answers to the changes its `@flow:<change>.<F-id>`
    tags name (`canon scenario new --flow <F-id>` tags one for this change).
    To park a draft that should not gate a live subject, `subject unadopt`
    it and adopt it into a `proposed` subject. Inside an approved scope there is no new
