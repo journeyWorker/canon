@@ -65,9 +65,13 @@
 //! rule in one section; the reason is required. The output lists every
 //! waiver, with the severity of the rule it waives. There is no global
 //! switch. With `match="<text>"` only the rule's findings in that section whose
-//! excerpt or matched text contains `<text>` are cleared (an effective date
-//! is waived with `match="<the date>"`, not section-wide); an empty or
-//! malformed match is `brief.waiver-invalid`. A finding about the whole brief (no section: the total of
+//! matched text (`Finding::matched`, the phrase, date or value the rule matched)
+//! or excerpt contains `<text>` are cleared, never the hint (an effective date
+//! is waived with `match="<the date>"`, not section-wide). After the reason's
+//! closing quote only a whole `match="<non-empty>"` is accepted; anything else
+//! (`match =`, `MATCH=`, unquoted, empty, extra text) and a reason holding a
+//! double quote is `brief.waiver-invalid`, never a silent section-wide
+//! waiver. A finding about the whole brief (no section: the total of
 //! `prose.length`) is waived with the section key `brief`.
 //!
 //! # Flow coverage
@@ -167,6 +171,17 @@ pub struct Finding {
     pub line: usize,
     pub excerpt: String,
     pub hint: String,
+    /// The phrase, date, path or value the rule matched, as its own field so
+    /// `match=` never depends on the 80-character excerpt or the hint's wording.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub matched: Option<String>,
+}
+
+/// A prose hit of one sentence: the rule, the matched value and the hint.
+struct Hit {
+    rule: &'static str,
+    matched: String,
+    hint: String,
 }
 
 /// One waiver comment, with the severity of the rule it waives and
@@ -515,7 +530,14 @@ struct Out {
 impl Out {
     fn push(&mut self, rule: &str, section: Option<&str>, line: usize, excerpt: String, hint: String) {
         let severity = severity_of(rule).expect("every emitted rule is in RULES");
-        self.findings.push(Finding { rule: rule.to_string(), severity, section: section.map(str::to_string), line, excerpt, hint });
+        self.findings.push(Finding { rule: rule.to_string(), severity, section: section.map(str::to_string), line, excerpt, hint, matched: None });
+    }
+
+    fn push_hit(&mut self, hit: Hit, section: Option<&str>, line: usize, excerpt: String) {
+        self.push(hit.rule, section, line, excerpt, hit.hint);
+        if let Some(finding) = self.findings.last_mut() {
+            finding.matched = Some(hit.matched);
+        }
     }
 }
 
@@ -770,6 +792,22 @@ fn coverage(out: &mut Out, secs: &[Section], ids: &[(String, usize)], index: &Fl
     }
 }
 
+/// Splits `body` (the text after a waiver's opening quote) into the reason
+/// and what follows its closing quote. The closing quote is the last one
+/// that ends the body or is followed by whitespace and `match="`, so a reason
+/// may mention `match=` inside its quotes.
+fn split_reason(body: &str) -> Option<(&str, &str)> {
+    if let Some(at) = body.rfind("\" match=\"") {
+        // The reason ends here only when what follows is a whole `match="…"`.
+        let tail = &body[at + 1..];
+        if tail.trim_start().starts_with("match=\"") {
+            return Some((&body[..at], tail));
+        }
+    }
+    let inner = body.trim_end().strip_suffix('"')?;
+    Some((inner, ""))
+}
+
 fn apply_waivers(findings: Vec<Finding>, comments: &[Comment]) -> (Vec<Finding>, Vec<Waiver>) {
     let mut kept = findings;
     let mut waivers = Vec::new();
@@ -779,21 +817,24 @@ fn apply_waivers(findings: Vec<Finding>, comments: &[Comment]) -> (Vec<Finding>,
         let parsed = (|| {
             let (rule, rest) = rest.split_once(char::is_whitespace)?;
             let (section, rest) = rest.trim_start().split_once(char::is_whitespace)?;
+            // `"<reason>"`, then optionally `match="<non-empty>"`; nothing else may follow.
             let rest = rest.trim();
-            // `"<reason>"`, optionally followed by ` match="<text>"`; a malformed match is invalid.
-            let (reason_part, needle) = match rest.rfind("\" match=\"") {
-                Some(at) => (&rest[..=at], Some(rest[at + 9..].strip_suffix('"')?.to_string())),
-                None if rest.contains(" match=") => return None,
-                None => (rest, None),
+            let body = rest.strip_prefix('"')?;
+            let (reason, tail) = split_reason(body)?;
+            let needle = match tail.trim() {
+                "" => None,
+                t => {
+                    let m = t.strip_prefix("match=\"")?.strip_suffix('"')?;
+                    (!m.trim().is_empty() && !m.contains('"')).then(|| m.to_string())?.into()
+                }
             };
-            let reason = reason_part.strip_prefix('"')?.strip_suffix('"')?.trim();
-            (!reason.is_empty() && needle.as_ref().is_none_or(|n| !n.trim().is_empty())).then(|| (rule.to_string(), section.to_string(), reason.to_string(), needle))
+            (!reason.trim().is_empty() && !reason.contains('"')).then(|| (rule.to_string(), section.to_string(), reason.trim().to_string(), needle))
         })();
         match parsed {
             Some((rule, section, reason, match_text)) if severity_of(&rule).is_some() => {
                 let before = kept.len();
                 kept.retain(|f| {
-                    let hit = f.rule == rule && f.section.as_deref().unwrap_or("brief") == section && match_text.as_ref().is_none_or(|n| f.excerpt.contains(n.as_str()) || f.hint.contains(n.as_str()));
+                    let hit = f.rule == rule && f.section.as_deref().unwrap_or("brief") == section && match_text.as_ref().is_none_or(|n| f.matched.as_deref().is_some_and(|m| m.contains(n.as_str())) || f.excerpt.contains(n.as_str()));
                     !hit
                 });
                 waivers.push(Waiver { severity: severity_of(&rule), applied: kept.len() < before, rule, section, reason, line: comment.line, match_text });
@@ -804,6 +845,7 @@ fn apply_waivers(findings: Vec<Finding>, comments: &[Comment]) -> (Vec<Finding>,
                 section: None,
                 line: comment.line,
                 excerpt: excerpt(&comment.body),
+                matched: None,
                 hint: "write `<!-- canon:waive <rule-id> <section-key> \"<reason>\" -->` (optionally `match=\"<text>\"` after the reason) with a known rule id and a non-empty reason".to_string(),
             }),
         }
@@ -1487,20 +1529,20 @@ fn strip_asides(s: &str) -> String {
 }
 
 /// The 0.26 D3 hits of one sentence: `(rule, hint)`.
-fn sentence_hits(shipped: Shipped, sentence: &str, item: bool, scope: Scope) -> Vec<(&'static str, String)> {
+fn sentence_hits(shipped: Shipped, sentence: &str, item: bool, scope: Scope) -> Vec<Hit> {
     let mut hits = Vec::new();
     let cited = citations(sentence);
     if !cited.is_empty() {
-        hits.push(("prose.code-citation", format!("matched {}; describe the behavior, and put provenance on one `Source:` line", listed(&cited))));
+        hits.push(Hit { rule: "prose.code-citation", matched: cited.join(", "), hint: format!("matched {}; describe the behavior, and put provenance on one `Source:` line", listed(&cited)) });
     }
     if scope.history {
         if let Some(note) = decision_history(shipped, sentence) {
-            hits.push(("prose.decision-history", format!("matched `{note}`; a brief states behavior, not when it was decided; if the date is part of the behavior (an effective date), keep it and waive with a reason")));
+            hits.push(Hit { rule: "prose.decision-history", hint: format!("matched `{note}`; a brief states behavior, not when it was decided; if the date is part of the behavior (an effective date), keep it and waive it with `match=\"{note}\"` and a reason"), matched: note });
         }
     }
     if shipped == Shipped::Ko {
         if let Some(ending) = ko_ending(sentence, item) {
-            hits.push(("prose.ko-ending", format!("ends in `{ending}`; write the plain declarative ending ~다")));
+            hits.push(Hit { rule: "prose.ko-ending", hint: format!("ends in `{ending}`; write the plain declarative ending ~다"), matched: ending });
         }
     }
     hits
@@ -1523,6 +1565,9 @@ fn parentheticals(out: &mut Out, section: &Section, blocks: &[Block]) {
             excerpt(&format!("({})", found[0].1)),
             format!("{n} asides in {chars} characters; threshold more than {PAREN_PER_1000} per 1000 characters and at least {PAREN_MIN}; make an aside its own sentence or cut it"),
         );
+        if let Some(finding) = out.findings.last_mut() {
+            finding.matched = Some(format!("({})", found[0].1));
+        }
     }
 }
 
@@ -1568,10 +1613,11 @@ fn prose(out: &mut Out, section: &Section, shipped: Shipped, scope: Scope) {
         for (offset, sentence) in &all {
             let line = block.line_at(*offset);
             for (rule, phrase) in phrase_hits(shipped, sentence) {
-                out.push(rule, key, line, excerpt(sentence), format!("matched `{phrase}`; say what the system does or the user sees instead"));
+                let hint = format!("matched `{phrase}`; say what the system does or the user sees instead");
+                out.push_hit(Hit { rule, matched: phrase, hint }, key, line, excerpt(sentence));
             }
-            for (rule, hint) in sentence_hits(shipped, sentence, block.item, scope) {
-                out.push(rule, key, line, excerpt(sentence), hint);
+            for hit in sentence_hits(shipped, sentence, block.item, scope) {
+                out.push_hit(hit, key, line, excerpt(sentence));
             }
             if !scope.structure {
                 continue;
@@ -1600,10 +1646,10 @@ fn prose(out: &mut Out, section: &Section, shipped: Shipped, scope: Scope) {
     }
     // Table cells: the token rules read them, the sentence rules do not.
     for (line, cell) in table_cells(section) {
-        let mut hits: Vec<(&'static str, String)> = phrase_hits(shipped, &cell).into_iter().filter(|(rule, _)| *rule == "prose.ai-vocabulary").map(|(rule, phrase)| (rule, format!("matched `{phrase}`; say what the system does or the user sees instead"))).collect();
-        hits.extend(sentence_hits(shipped, &cell, true, scope).into_iter().filter(|(rule, _)| *rule != "prose.ko-ending"));
-        for (rule, hint) in hits {
-            out.push(rule, key, line, excerpt(&cell), hint);
+        let mut hits: Vec<Hit> = phrase_hits(shipped, &cell).into_iter().filter(|(rule, _)| *rule == "prose.ai-vocabulary").map(|(rule, phrase)| Hit { rule, hint: format!("matched `{phrase}`; say what the system does or the user sees instead"), matched: phrase }).collect();
+        hits.extend(sentence_hits(shipped, &cell, true, scope).into_iter().filter(|hit| hit.rule != "prose.ko-ending"));
+        for hit in hits {
+            out.push_hit(hit, key, line, excerpt(&cell));
         }
     }
     parentheticals(out, section, &blocks);

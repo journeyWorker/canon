@@ -146,7 +146,7 @@ date next to 부터 or after is a finding too. Fix: delete the history and write
 the decision as present behavior; a decision still open goes to Questions and
 assumptions. When the date is part of the behavior (an effective date, a
 deadline) or a quoted label, keep it and waive it with `match=` set to the
-date, so the waiver clears that date only and every other note in the section
+date (it compares the date or phrase the finding matched and the excerpt, nothing else), so the waiver clears that date only and every other note in the section
 still draws a finding. Never waive the rule for the whole section.
 
 - en. Before: "On 3 March the team agreed on a grid as the default view." After: "The default view is a grid."
@@ -182,10 +182,12 @@ list item the plain `~자` is not detected: it is the noun suffix in 참가자,
 questions, `없음.`, sentences ending in code or a quote, flow steps, list
 fragments without a verb, a `label:` item, and an unterminated list item.
 
-What it over-reports: an open-syllable noun ending in 라 as a terminated list
-item (보라 'purple', 카메라, 오페라); keep it and waive with `match="<the
-sentence's noun>"`. What it misses: a consonant-stem imperative written as
-`~라` (달라 as a verb) and any hortative inside a list. Fix: end the statement in `~다`.
+What it over-reports: a class of nouns, often loanwords, that end in an open
+syllable plus 라 (보라 'purple', 카메라, 오페라, 인프라) as a terminated list
+item; keep the sentence and waive with `match="<the noun>"`. What it misses: the
+prohibitive `~말라` (`지우지 말라`: 말 has a final consonant), any consonant-stem
+imperative written `~라` (달라 as a verb), and any hortative inside a list.
+Fix: end the statement in `~다`.
 
 - ko. 전: "목록이 비어 있으면 안내를 보여 줍니다." 후: "목록이 비어 있으면 안내를 보여 준다."
 - ko. 전: "- 재고를 확인해라." 후: "- 재고를 확인한다."
@@ -208,7 +210,7 @@ uses the section key `brief`.
 - `canon brief check --json`: read the `prose.*` findings, then the sections they sit in. Fix by section, not by rule.
 - A finding is a prompt to reread, not a verdict. When the flagged text is the precise term (a state name, a quoted label, a command), keep it and waive that rule in that section:
   `<!-- canon:waive <rule-id> <section-key> "<reason>" -->`
-  To waive one finding and keep the rest of the rule live in that section, add the text the finding names: `<!-- canon:waive <rule-id> <section-key> "<reason>" match="<text>" -->` (an empty or unquoted match is a blocker).
+  To waive one finding and keep the rest of the rule live in that section, add the text the finding names: `<!-- canon:waive <rule-id> <section-key> "<reason>" match="<text>" -->` (after the reason's closing quote only a whole `match="<text>"` is allowed; `match =`, `MATCH=`, an unquoted or empty match or extra text is a blocker, and a reason holds no double quote).
   A waiver is right when the text is a quotation or a fixed term, and wrong when it excuses a sentence you could simply rewrite. One rule, one section, a reason the human can read.
 
 ## The loop
