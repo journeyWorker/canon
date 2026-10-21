@@ -16,6 +16,7 @@ use std::process::{Child, Command, Output, Stdio};
 use std::time::Duration;
 
 use serde_json::{json, Value};
+use sha2::Digest;
 use tempfile::TempDir;
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
@@ -85,6 +86,8 @@ struct Live {
     child: Child,
     port: u16,
     startup: Value,
+    /// Everything the server wrote to stderr.
+    stderr: PathBuf,
 }
 
 impl Drop for Live {
@@ -99,12 +102,13 @@ impl Drop for Live {
 fn serve(repo: &Path) -> Live {
     let no_tools = repo.join("no-tools");
     std::fs::create_dir_all(&no_tools).unwrap();
+    let stderr = repo.join("dashboard.stderr");
     let mut child = Command::new(env!("CARGO_BIN_EXE_canon"))
         .args(["dashboard", "--port", "0", "--json"])
         .current_dir(repo)
         .env("PATH", &no_tools)
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(std::fs::File::create(&stderr).unwrap())
         .spawn()
         .expect("spawn canon dashboard");
     let mut line = String::new();
@@ -112,7 +116,7 @@ fn serve(repo: &Path) -> Live {
     let startup: Value = serde_json::from_str(&line).unwrap_or_else(|e| panic!("startup document {line:?}: {e}"));
     let url = startup["data"]["url"].as_str().expect("data.url").to_string();
     let port = url.trim_start_matches("http://127.0.0.1:").split('/').next().unwrap().parse().unwrap();
-    Live { child, port, startup }
+    Live { child, port, startup, stderr }
 }
 
 struct Reply {
@@ -207,7 +211,8 @@ fn report_dashboard_05_lists_only_live_unapproved_briefs_with_sections_and_findi
     let ready = brief_of(&live, "ready");
     let on_disk = std::fs::read(brief_path(dir.path(), "ready")).unwrap();
     assert_eq!(ready["text"].as_str().unwrap().as_bytes(), on_disk.as_slice());
-    assert_eq!(ready["sha256"].as_str().unwrap().len(), 64);
+    let digest: String = sha2::Sha256::digest(&on_disk).iter().map(|b| format!("{b:02x}")).collect();
+    assert_eq!(ready["sha256"], digest.as_str(), "the digest is the sha256 of the brief file's bytes");
     assert_eq!(ready["subjects"], json!(["demo"]));
     assert_eq!(ready["brief"], ".canon/changes/ready/brief.md");
     assert_eq!(ready["approvable"], true);
@@ -342,7 +347,6 @@ fn report_dashboard_09_refuses_requests_that_are_not_the_pages_own() {
         ("text content type", with("Content-Type", Some("text/plain".into())), 400, "DASHBOARD_BAD_REQUEST"),
         ("no content type", with("Content-Type", None), 400, "DASHBOARD_BAD_REQUEST"),
         ("no length", with("Content-Length", None), 400, "DASHBOARD_BAD_REQUEST"),
-        ("too large", with("Content-Length", Some((64 * 1024 + 1).to_string())), 400, "DASHBOARD_BAD_REQUEST"),
     ];
     for (name, headers, code, error) in cases {
         let reply = http(port, "POST", "/api/briefs/approve", &headers, body.as_bytes());
@@ -354,11 +358,50 @@ fn report_dashboard_09_refuses_requests_that_are_not_the_pages_own() {
     let wrong_method = http(port, "GET", "/api/briefs/approve", &[("Host", format!("127.0.0.1:{port}"))], b"");
     assert_eq!(wrong_method.code, 405);
     assert!(wrong_method.head.contains("Allow: POST"));
-    let rebound_read = http(port, "GET", "/api/briefs", &[("Host", "evil.example".to_string())], b"");
-    assert_eq!(rebound_read.code, 403, "the briefs' text is not read under a foreign Host");
+    for path in ["/api/status", "/api/briefs", "/api/briefs/approve", "/", "/index.html", "/briefs.html", "/assets/app.js", "/live-snapshot/manifest.json", "/live-snapshot/mart_subjects.parquet", "/nonexistent"] {
+        for host in ["evil.example", "evil.example:80", &format!("evil.example:{port}"), &format!("127.0.0.1:{}", port.wrapping_add(1)), ""] {
+            let rebound = http(port, "GET", path, &[("Host", host.to_string())], b"");
+            assert_eq!(rebound.code, 403, "GET {path} under Host `{host}`: {}", rebound.body);
+            assert_eq!(rebound.json()["error"]["code"], "DASHBOARD_ORIGIN_REFUSED", "GET {path} under Host `{host}`");
+        }
+        let no_host = http(port, "GET", path, &[], b"");
+        assert_eq!(no_host.code, 403, "GET {path} with no Host");
+    }
+    assert_eq!(get(&live, "/briefs.html").code, 200, "the page's own Host is served");
     let localhost = http(port, "POST", "/api/briefs/approve", &[("Host", format!("localhost:{port}")), ("Origin", format!("http://localhost:{port}")), ("Content-Type", "application/json; charset=utf-8".into()), ("Content-Length", body.len().to_string())], body.as_bytes());
     assert_eq!(localhost.code, 200, "localhost is the same dashboard: {}", localhost.body);
     assert_ne!(std::fs::read(brief_path(dir.path(), "ready")).unwrap(), before, "only the localhost request wrote");
+}
+
+/// report.dashboard.09: a body over 64 KiB is refused from its Content-Length alone, before any body byte is read.
+#[test]
+fn report_dashboard_09_refuses_an_oversize_body_without_waiting_for_it() {
+    let dir = repo_with_briefs();
+    let live = serve(dir.path());
+    let before = std::fs::read(brief_path(dir.path(), "ready")).unwrap();
+    let mut stream = TcpStream::connect(("127.0.0.1", live.port)).unwrap();
+    stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    let headers = page_headers(live.port, 70_000);
+    let mut request = String::from("POST /api/briefs/approve HTTP/1.1\r\n");
+    for (name, value) in &headers {
+        request.push_str(&format!("{name}: {value}\r\n"));
+    }
+    request.push_str("\r\n");
+    // Headers only: the connection stays open and not one body byte follows.
+    stream.write_all(request.as_bytes()).unwrap();
+    let started = std::time::Instant::now();
+    let mut raw = Vec::new();
+    let mut chunk = [0u8; 4096];
+    while !raw.windows(4).any(|w| w == b"\r\n\r\n") || !String::from_utf8_lossy(&raw).contains('}') {
+        let n = stream.read(&mut chunk).expect("an answer before the client sent any body");
+        assert!(n > 0, "the server closed without answering");
+        raw.extend_from_slice(&chunk[..n]);
+    }
+    assert!(started.elapsed() < Duration::from_secs(2), "answered after {:?}: the guard waited for the body", started.elapsed());
+    let text = String::from_utf8_lossy(&raw);
+    assert!(text.starts_with("HTTP/1.1 400"), "{text}");
+    assert!(text.contains("DASHBOARD_BAD_REQUEST") && text.contains("the body is 70000 bytes; the limit is 65536"), "{text}");
+    assert_eq!(std::fs::read(brief_path(dir.path(), "ready")).unwrap(), before);
 }
 
 /// report.dashboard.10: an empty or multi-line answer, an unknown change and a malformed body are refused and write nothing.
@@ -399,6 +442,9 @@ fn report_dashboard_04_a_repo_whose_snapshot_cannot_be_generated_is_still_served
     let warnings = live.startup["meta"]["warnings"].as_array().expect("meta.warnings");
     assert!(warnings.len() == 1 && warnings[0].as_str().unwrap().contains("duckdb"), "{}", live.startup);
     assert_eq!(live.startup["data"]["snapshotAvailable"], false);
+    let stderr = std::fs::read_to_string(&live.stderr).unwrap();
+    let warning = stderr.lines().find(|l| l.starts_with("canon dashboard: warning: ")).unwrap_or_else(|| panic!("a warning line on stderr: {stderr:?}"));
+    assert!(warning.contains("duckdb") && warning.contains("the panels page says so instead of showing panels") && warning.contains("install DuckDB"), "{warning}");
 
     let status = get(&live, "/api/status");
     assert_eq!(status.code, 200);
@@ -431,7 +477,7 @@ fn report_dashboard_04_serves_an_explicit_snapshot_without_duckdb() {
     let mut line = String::new();
     BufReader::new(child.stdout.take().unwrap()).read_line(&mut line).unwrap();
     let startup: Value = serde_json::from_str(&line).unwrap();
-    let live = Live { port: startup["data"]["url"].as_str().unwrap().trim_start_matches("http://127.0.0.1:").split('/').next().unwrap().parse().unwrap(), child, startup };
+    let live = Live { port: startup["data"]["url"].as_str().unwrap().trim_start_matches("http://127.0.0.1:").split('/').next().unwrap().parse().unwrap(), child, startup, stderr: dir.path().join("unused") };
     assert_eq!(get(&live, "/api/status").json()["data"]["snapshot"]["available"], true);
     assert_eq!(get(&live, "/live-snapshot/manifest.json").body, r#"{"ok":true}"#);
 }
@@ -466,4 +512,18 @@ fn report_dashboard_02_no_app_is_refused_and_another_projects_dashboard_is_never
     assert_eq!(error["error"]["code"], "DASHBOARD_NOT_BUILT");
     let hint = error["error"]["hint"].as_str().unwrap();
     assert!(hint.contains("bun add -g @journeykit/canon") && hint.contains("bun run --cwd packages/dashboard build"), "{hint}");
+}
+
+/// report.dashboard.02: a `--repo` that does not exist is refused and nothing is created there.
+#[test]
+fn report_dashboard_02_a_missing_repo_is_refused_and_not_created() {
+    let dir = TempDir::new().unwrap();
+    let missing = dir.path().join("no-such-repo");
+    let out = canon(dir.path(), &["dashboard", "--repo", missing.to_str().unwrap(), "--port", "0", "--json"]);
+    assert_eq!(out.status.code(), Some(2), "{}", String::from_utf8_lossy(&out.stdout));
+    let error: Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(error["error"]["code"], "REPO_UNREADABLE");
+    assert!(error["error"]["message"].as_str().unwrap().contains("does not exist"));
+    assert!(error["error"]["hint"].as_str().unwrap().contains("--repo"));
+    assert!(!missing.exists(), "the refused repo was created");
 }
