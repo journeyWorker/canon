@@ -121,7 +121,7 @@ Feature: authoring brief check
     Given a bad Korean brief and a waiver comment for each new rule and section it shows, with the key brief for the whole-brief length
     When canon brief check runs
     Then every new finding is waived, the output lists each waiver as an advisory, and a waiver for another section clears nothing
-    And a waiver with match="<text>" clears only the rule's findings in that section whose excerpt or matched text contains it (an effective date is waived and the dated decision note beside it stays), one that fits nothing waives nothing, and an empty, unquoted or trailing-text match is brief.waiver-invalid
+    And a waiver with match="<text>" clears only the rule's findings in that section whose matched text (the finding's matched field) or excerpt contains it, never the hint's words (an effective date is waived and the dated decision note beside it stays), one that fits nothing waives nothing, and an empty, unquoted, differently cased, spaced or trailing-text match is brief.waiver-invalid, while a reason that merely mentions match= is a plain waiver
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold

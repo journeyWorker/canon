@@ -346,8 +346,9 @@ fn authoring_brief_check_08_dates_and_decision_notes_are_history_not_behavior() 
     let found = hits(&report, "prose.decision-history");
     let matched: Vec<(&str, String)> = found.iter().map(|f| (f["section"].as_str().unwrap(), f["hint"].as_str().unwrap().to_string())).collect();
     assert_eq!(matched.len(), 2, "intent and detail only, not the question: {report}");
+    assert_eq!(found[0]["matched"], "2026-09-14", "the matched value is its own field: {report}");
     assert_eq!(matched[0].0, "intent");
-    assert!(matched[0].1.contains("`2026-09-14`") && matched[0].1.contains("waive with a reason"), "{matched:?}");
+    assert!(matched[0].1.contains("`2026-09-14`") && matched[0].1.contains("waive it with `match=\"2026-09-14\"`"), "{matched:?}");
     assert_eq!((matched[1].0, matched[1].1.contains("`10월 21일`")), ("detail", true), "a date that is part of the behavior is still a finding, to be waived: {matched:?}");
 
     // A sentence with a date and a phrase is one finding; a table cell is read too.
@@ -484,16 +485,30 @@ fn authoring_brief_check_12_a_waiver_clears_each_new_rule_in_its_section() {
     assert_eq!(left.len(), 1, "{report}");
     assert!(left[0]["hint"].as_str().unwrap().contains("`2026-09-14`"), "the dated decision note stays: {report}");
     assert_eq!((report["waivers"][0]["match"].as_str(), report["waivers"][0]["applied"].as_bool()), (Some("2026-12-01"), Some(true)), "{report}");
+    // The matched value is its own field: a date past the 80-character excerpt is still matched.
+    let long = swap(&ko, "- 태그를 읽지 못하면 책을 되돌려 주고 대출 목록은 바꾸지 않는다.", "- 이용자가 반납함 앞에서 책을 넣고 화면에 뜨는 안내를 읽은 뒤 영수증을 받아 가는 동안 연체 요금은 계속 계산되며 대출 목록에서 책이 빠지기 전까지 하루 단위로 쌓이고 이 요금은 2026-12-01부터 붙는다.");
+    let unwaived = judged(None, &long);
+    let cut = hits(&unwaived, "prose.decision-history")[0]["excerpt"].as_str().unwrap().to_string();
+    assert!(!cut.contains("2026-12-01"), "the date is past the cut excerpt: {cut}");
+    let report = judged(None, &format!("{long}<!-- canon:waive prose.decision-history detail \"effective date\" match=\"2026-12-01\" -->\n"));
+    assert!(hits(&report, "prose.decision-history").is_empty(), "{report}");
     // Without match the waiver clears the rule in the whole section, as before.
     let whole = format!("{detail}<!-- canon:waive prose.decision-history detail \"all\" -->\n");
     assert!(hits(&judged(None, &whole), "prose.decision-history").is_empty());
+    // A reason that only mentions `match=` inside its quotes is a plain, section-wide waiver.
     let inside_reason = format!("{detail}<!-- canon:waive prose.decision-history detail \"x match=y\" -->\n");
-    assert_eq!(rules(&judged(None, &inside_reason)).iter().filter(|r| *r == "brief.waiver-invalid").count(), 1, "a `match=` inside the reason is a malformed match");
+    let report = judged(None, &inside_reason);
+    assert!(rules(&report).iter().all(|r| r != "brief.waiver-invalid") && hits(&report, "prose.decision-history").is_empty(), "{report}");
+    // `match=` compares the matched text and the excerpt, never the hint: words from the hint clear nothing.
+    for hint_word in ["effective date", "date", "waive", "reason"] {
+        let text = format!("{detail}<!-- canon:waive prose.decision-history detail \"x\" match=\"{hint_word}\" -->\n");
+        assert_eq!(hits(&judged(None, &text), "prose.decision-history").len(), 2, "match={hint_word:?} must clear nothing");
+    }
     // A match that fits nothing waives nothing; a malformed match is a blocker.
     let nothing = format!("{detail}<!-- canon:waive prose.decision-history detail \"x\" match=\"2030-01-01\" -->\n");
     let report = judged(None, &nothing);
     assert_eq!((hits(&report, "prose.decision-history").len(), report["waivers"][0]["applied"].as_bool()), (2, Some(false)));
-    for malformed in ["match=2026-12-01", "match=\"\"", "match=\"2026-12-01", "match=\"2026-12-01\" extra"] {
+    for malformed in ["match=2026-12-01", "match=\"\"", "match=\"2026-12-01", "match=\"2026-12-01\" extra", "match =\"2026-12-01\"", "MATCH=\"2026-12-01\"", "Match=\"2026-12-01\"", "match=\"a\"match=\"b\""] {
         let text = format!("{detail}<!-- canon:waive prose.decision-history detail \"x\" {malformed} -->\n");
         let report = judged(None, &text);
         assert_eq!(rules(&report).iter().filter(|r| *r == "brief.waiver-invalid").count(), 1, "{malformed}: {report}");
