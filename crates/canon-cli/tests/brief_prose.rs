@@ -140,6 +140,14 @@ fn authoring_brief_check_02_a_configured_language_overrides_and_a_disagreeing_te
     assert!(!found.contains(&"prose.ko-ending".to_string()) && !found.contains(&"prose.colloquial".to_string()), "{found:?}");
     assert!(found.contains(&"prose.code-citation".to_string()), "{found:?}");
 
+    // Dates are language-independent; the Korean phrase list runs only on Korean-judged text.
+    let dated = swap(&fixture("good-ko-lantern.md"), "- 태그를 읽지 못하면 책을 되돌려 주고 대출 목록은 바꾸지 않는다.", "- 2026-09-14 회의에서 결정했으며 대출 목록은 바꾸지 않는다.\n- 회의 뒤에 결정했다.");
+    let under_en = judged(Some("en"), &dated);
+    let found = hits(&under_en, "prose.decision-history");
+    assert_eq!(found.len(), 1, "configured en: the date is one finding and the Korean phrase sentence draws none: {under_en}");
+    assert!(found[0]["hint"].as_str().unwrap().contains("`2026-09-14`"));
+    assert_eq!(hits(&judged(None, &dated), "prose.decision-history").len(), 2, "detected ko: the date sentence and the phrase sentence");
+
     // `ko` configured over an English brief reads as en the other way round; a matching text has no note.
     let ko = repo_with_change(Some("ko"));
     write_brief(ko.path(), &fixture("good-en-cobalt.md"));
@@ -465,6 +473,31 @@ fn authoring_brief_check_12_a_waiver_clears_each_new_rule_in_its_section() {
     // A waiver for another section clears nothing.
     let elsewhere = format!("{}<!-- canon:waive prose.ko-ending intent \"x\" -->\n", fixture("bad-ko-tidepool.md"));
     assert!(!hits(&judged(None, &elsewhere), "prose.ko-ending").is_empty());
+
+    // `match="<text>"` clears only the findings that contain it: an effective date is waived, the dated decision note stays.
+    let ko = fixture("good-ko-lantern.md");
+    let detail = swap(&ko, "- 태그를 읽지 못하면 책을 되돌려 주고 대출 목록은 바꾸지 않는다.", "- 연체 요금은 2026-12-01부터 붙는다.\n- 이 방식은 2026-09-14 회의에서 결정했다.");
+    assert_eq!(hits(&judged(None, &detail), "prose.decision-history").len(), 2);
+    let only = format!("{detail}<!-- canon:waive prose.decision-history detail \"effective date\" match=\"2026-12-01\" -->\n");
+    let report = judged(None, &only);
+    let left = hits(&report, "prose.decision-history");
+    assert_eq!(left.len(), 1, "{report}");
+    assert!(left[0]["hint"].as_str().unwrap().contains("`2026-09-14`"), "the dated decision note stays: {report}");
+    assert_eq!((report["waivers"][0]["match"].as_str(), report["waivers"][0]["applied"].as_bool()), (Some("2026-12-01"), Some(true)), "{report}");
+    // Without match the waiver clears the rule in the whole section, as before.
+    let whole = format!("{detail}<!-- canon:waive prose.decision-history detail \"all\" -->\n");
+    assert!(hits(&judged(None, &whole), "prose.decision-history").is_empty());
+    let inside_reason = format!("{detail}<!-- canon:waive prose.decision-history detail \"x match=y\" -->\n");
+    assert_eq!(rules(&judged(None, &inside_reason)).iter().filter(|r| *r == "brief.waiver-invalid").count(), 1, "a `match=` inside the reason is a malformed match");
+    // A match that fits nothing waives nothing; a malformed match is a blocker.
+    let nothing = format!("{detail}<!-- canon:waive prose.decision-history detail \"x\" match=\"2030-01-01\" -->\n");
+    let report = judged(None, &nothing);
+    assert_eq!((hits(&report, "prose.decision-history").len(), report["waivers"][0]["applied"].as_bool()), (2, Some(false)));
+    for malformed in ["match=2026-12-01", "match=\"\"", "match=\"2026-12-01", "match=\"2026-12-01\" extra"] {
+        let text = format!("{detail}<!-- canon:waive prose.decision-history detail \"x\" {malformed} -->\n");
+        let report = judged(None, &text);
+        assert_eq!(rules(&report).iter().filter(|r| *r == "brief.waiver-invalid").count(), 1, "{malformed}: {report}");
+    }
 }
 
 /// authoring.brief-check.13: the good fixtures stay free of every new

@@ -22,11 +22,14 @@
 //!   the 0.26 rules each reading one mechanism: `prose.code-citation`
 //!   (file paths, `path:line`, code identifiers in a code span),
 //!   `prose.parenthetical` (asides per section above a density),
-//!   `prose.decision-history` (every calendar date, and a closed list of
-//!   undated decision phrases; no boundary or verb gating, a date that is
-//!   behavior is waived), `prose.ko-ending` (polite `~ㅂ니다`/`~ㅂ시다`,
-//!   `~십시오`, plain imperative `~해라`/`~하라` ending in 라 after ㅏ ㅓ ㅕ ㅘ ㅝ ㅐ,
-//!   anywhere; any other terminated non-list sentence not ending in `~다`,
+//!   `prose.decision-history` (every calendar date in any language, and a
+//!   closed list of past-tense decision acts (ko list on ko text, en on en);
+//!   no boundary or verb gating, a date that is behavior is waived with
+//!   `match="<the date>"`), `prose.ko-ending` (polite `~ㅂ니다`/`~ㅂ시다`,
+//!   `~십시오`, and a plain imperative (a terminated, unlabeled sentence ending
+//!   in 라 after a syllable with no final consonant: 하라, 해라, 남겨라; 달라 is
+//!   not; open-syllable nouns 보라/카메라 are known false positives, waived
+//!   with `match=`), anywhere; any other terminated non-list sentence not ending in `~다`,
 //!   a plain hortative `~자` included, and not in a list item, where it is
 //!   the noun suffix of 참가자/하자) and `prose.length` (a
 //!   character budget per section and for the brief). The finding carries
@@ -58,10 +61,13 @@
 //! A marker key canon does not know is skipped, not reported.
 //!
 //! # Waivers
-//! `<!-- canon:waive <rule-id> <section-key> "<reason>" -->` waives one
+//! `<!-- canon:waive <rule-id> <section-key> "<reason>" [match="<text>"] -->` waives one
 //! rule in one section; the reason is required. The output lists every
 //! waiver, with the severity of the rule it waives. There is no global
-//! switch. A finding about the whole brief (no section: the total of
+//! switch. With `match="<text>"` only the rule's findings in that section whose
+//! excerpt or matched text contains `<text>` are cleared (an effective date
+//! is waived with `match="<the date>"`, not section-wide); an empty or
+//! malformed match is `brief.waiver-invalid`. A finding about the whole brief (no section: the total of
 //! `prose.length`) is waived with the section key `brief`.
 //!
 //! # Flow coverage
@@ -173,6 +179,10 @@ pub struct Waiver {
     pub line: usize,
     pub severity: Option<Severity>,
     pub applied: bool,
+    /// `match="<text>"`: the waiver clears only the findings whose excerpt or
+    /// matched text contains it; `None` clears the rule in the whole section.
+    #[serde(rename = "match", skip_serializing_if = "Option::is_none")]
+    pub match_text: Option<String>,
 }
 
 /// The finding counts `canon status` shows.
@@ -769,14 +779,24 @@ fn apply_waivers(findings: Vec<Finding>, comments: &[Comment]) -> (Vec<Finding>,
         let parsed = (|| {
             let (rule, rest) = rest.split_once(char::is_whitespace)?;
             let (section, rest) = rest.trim_start().split_once(char::is_whitespace)?;
-            let reason = rest.trim().strip_prefix('"')?.strip_suffix('"')?.trim();
-            (!reason.is_empty()).then(|| (rule.to_string(), section.to_string(), reason.to_string()))
+            let rest = rest.trim();
+            // `"<reason>"`, optionally followed by ` match="<text>"`; a malformed match is invalid.
+            let (reason_part, needle) = match rest.rfind("\" match=\"") {
+                Some(at) => (&rest[..=at], Some(rest[at + 9..].strip_suffix('"')?.to_string())),
+                None if rest.contains(" match=") => return None,
+                None => (rest, None),
+            };
+            let reason = reason_part.strip_prefix('"')?.strip_suffix('"')?.trim();
+            (!reason.is_empty() && needle.as_ref().is_none_or(|n| !n.trim().is_empty())).then(|| (rule.to_string(), section.to_string(), reason.to_string(), needle))
         })();
         match parsed {
-            Some((rule, section, reason)) if severity_of(&rule).is_some() => {
+            Some((rule, section, reason, match_text)) if severity_of(&rule).is_some() => {
                 let before = kept.len();
-                kept.retain(|f| !(f.rule == rule && f.section.as_deref().unwrap_or("brief") == section));
-                waivers.push(Waiver { severity: severity_of(&rule), applied: kept.len() < before, rule, section, reason, line: comment.line });
+                kept.retain(|f| {
+                    let hit = f.rule == rule && f.section.as_deref().unwrap_or("brief") == section && match_text.as_ref().is_none_or(|n| f.excerpt.contains(n.as_str()) || f.hint.contains(n.as_str()));
+                    !hit
+                });
+                waivers.push(Waiver { severity: severity_of(&rule), applied: kept.len() < before, rule, section, reason, line: comment.line, match_text });
             }
             _ => invalid.push(Finding {
                 rule: "brief.waiver-invalid".to_string(),
@@ -784,7 +804,7 @@ fn apply_waivers(findings: Vec<Finding>, comments: &[Comment]) -> (Vec<Finding>,
                 section: None,
                 line: comment.line,
                 excerpt: excerpt(&comment.body),
-                hint: "write `<!-- canon:waive <rule-id> <section-key> \"<reason>\" -->` with a known rule id and a non-empty reason".to_string(),
+                hint: "write `<!-- canon:waive <rule-id> <section-key> \"<reason>\" -->` (optionally `match=\"<text>\"` after the reason) with a known rule id and a non-empty reason".to_string(),
             }),
         }
     }
@@ -874,12 +894,14 @@ const EN_AI_VOCABULARY: [(&str, bool); 19] = [
 const KO_AI_VOCABULARY: [&str; 15] = ["원활", "매끄러", "매끄럽", "견고", "탄탄", "유기적", "시너지", "혁신적", "패러다임", "북극성", "나침반", "초석", "토대", "청사진", "한 단계 도약"];
 
 /// Undated decision-history phrases, matched as whole phrases
-/// (`prose.decision-history` (b)); a date (`find_date`) is (a). English
-/// `per the … decision` is the tokens `per`, `the`, then `decision` within
-/// four words. (`it was decided`, `was agreed` and `기로 결정했다` are covered by
-/// `was decided`, `as agreed` and `결정했다`.)
-const EN_DECISION_NOTES: [&str; 6] = ["we decided", "was decided", "as agreed", "approved by", "decided to", "decision on"];
-const KO_DECISION_NOTES: [&str; 12] = ["결정했다", "결정했고", "결정하여", "결정됐다", "결정되었다", "정해졌다", "합의했다", "확정했다", "기로 했다", "회의에서", "논의 결과", "운영자 결정"];
+/// (`prose.decision-history` (b)), kept to past-tense decision acts a
+/// behavior sentence does not use (round 5: 회의에서, `approved by`,
+/// `decision on`, `decided to`, `as agreed`, `decided on`, `per the …
+/// decision` all read as behavior and are not in it). The Korean list runs
+/// on Korean-judged text, the English one on English-judged text; a date
+/// (`find_date`) is (a) in every language.
+const EN_DECISION_NOTES: [&str; 4] = ["we decided", "we agreed", "was decided", "it was agreed"];
+const KO_DECISION_NOTES: [&str; 11] = ["결정했다", "결정했고", "결정하여", "결정됐다", "결정되었다", "정해졌다", "합의했다", "확정했다", "기로 했다", "논의 결과", "운영자 결정"];
 const EN_MONTHS: [&str; 23] = [
     "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December", "Jan", "Feb", "Mar", "Apr", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
@@ -1330,7 +1352,7 @@ fn find_date(s: &str, english: bool) -> Option<String> {
         let day = |t: &str| {
             let t = t.trim_matches(|c: char| !c.is_alphanumeric());
             let digits = t.chars().take_while(char::is_ascii_digit).count();
-            (1..=2).contains(&digits) && matches!(&t[digits..], "" | "st" | "nd" | "rd" | "th")
+            (1..=2).contains(&digits) && (matches!(&t[digits..], "" | "st" | "nd" | "rd" | "th") || !t[digits..].is_ascii())
         };
         let month = |t: &str| EN_MONTHS.contains(&t.trim_matches(|c: char| !c.is_alphanumeric()));
         for (i, t) in tokens.iter().enumerate() {
@@ -1360,18 +1382,15 @@ fn find_date(s: &str, english: bool) -> Option<String> {
 /// decision-note phrase.
 fn decision_history(shipped: Shipped, sentence: &str) -> Option<String> {
     let s = plain(sentence);
-    if let Some(date) = find_date(&s, shipped == Shipped::En) {
+    // A date is language-independent: found in Korean-judged and English-judged text alike.
+    if let Some(date) = find_date(&s, true) {
         return Some(date);
     }
     match shipped {
         Shipped::Ko => KO_DECISION_NOTES.iter().find(|p| s.contains(**p)).map(|p| (*p).to_string()),
         Shipped::En => {
             let lower = s.to_lowercase();
-            if let Some(note) = EN_DECISION_NOTES.iter().find(|p| lower.contains(**p)) {
-                return Some((*note).to_string());
-            }
-            let tokens: Vec<&str> = lower.split(|c: char| !c.is_alphanumeric() && c != '\'').filter(|w| !w.is_empty()).collect();
-            tokens.windows(2).position(|w| w == ["per", "the"]).filter(|&i| tokens[i + 2..].iter().take(4).any(|t| *t == "decision")).map(|_| "per the … decision".to_string())
+            EN_DECISION_NOTES.iter().find(|p| lower.contains(**p)).map(|p| (*p).to_string())
         }
     }
 }
@@ -1423,15 +1442,16 @@ fn ko_ending(sentence: &str, item: bool) -> Option<String> {
         return tilde("요");
     }
     // Plain imperative: a terminated sentence (list item or not), not a
-    // `label:` item, whose last word ends in 라 after a syllable with the
-    // vowel ㅏ ㅓ ㅕ ㅘ ㅝ ㅐ (해라, 하라, 남겨라, 줘라, 와라, 거라, 너라). Residual
-    // false positive: a noun ending that way (바라). A plain hortative ~자 is
+    // `label:` item, whose last word ends in 라 after a syllable with no final
+    // consonant (하라, 해라, 보라, 두라, 오라, 남겨라, 줘라, 넣으라); a syllable
+    // with a final consonant (달라, 갈라) never. Known false positives:
+    // open-syllable nouns (보라 'purple', 카메라, 오페라), pinned in the
+    // corpus; the remedy is a waiver with `match=`. A plain hortative ~자 is
     // not detected in list items, where it is the noun suffix of 참가자, 후보자,
     // 하자, 주자; outside list items the generic rule below reports it.
     if terminated && !end.contains(':') && end.ends_with('라') {
         if let Some(before) = end.chars().rev().nth(1) {
-            let vowel = (before as u32).wrapping_sub(0xAC00) / 28 % 21;
-            if ('\u{AC00}'..='\u{D7A3}').contains(&before) && ([0, 1, 4, 6, 9, 14].contains(&vowel) || ['하', '거', '너'].contains(&before)) {
+            if ('\u{AC00}'..='\u{D7A3}').contains(&before) && (before as u32 - 0xAC00) % 28 == 0 {
                 return tilde("라");
             }
         }
@@ -1927,7 +1947,8 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
         for w in &ev.waivers {
             let severity = w.severity.map_or("unknown", Severity::as_str);
             let state = if w.applied { "waived" } else { "waiver matches nothing" };
-            println!("  {state}: {severity} {} [{}] line {} — \"{}\"", w.rule, w.section, w.line, w.reason);
+            let only = w.match_text.as_ref().map(|m| format!(" match \"{m}\"")).unwrap_or_default();
+            println!("  {state}: {severity} {} [{}]{only} line {} — \"{}\"", w.rule, w.section, w.line, w.reason);
         }
     }
     if counts.blockers > 0 {

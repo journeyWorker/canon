@@ -56,3 +56,13 @@ clean	para	서버가 응답한다.
 clean	para	가정: 아니다.
 clean	para	저장하세요.
 clean	para	값이 다니다.
+hit	item	책을 다시 넣으라.
+hit	item	다음 화면을 보라.
+hit	item	값은 그대로 두라.
+hit	item	내일 다시 오라.
+clean	item	결과가 달라.
+clean	item	행사 이름은 갈라.
+hit	item	오늘의 색은 보라.
+hit	item	새 장비는 카메라.
+hit	item	공연 종류는 오페라.
+clean	item	재고를 확인해라
