@@ -1,0 +1,41 @@
+schema: vendor-audit
+created: 2026-10-21
+vendor_url: https://github.com/cursor/plugins/tree/main/pstack
+vendor_license: MIT (pstack/LICENSE, Lauren Tan)
+subtree_prefix: vendors/cursor-plugins/pstack
+upstream_branch: main
+upstream_sha: 190d287
+last_subtree_pull: 2026-10-21
+notes: |
+  canon keeps vendor trees local-only (gitignored), so onboard is a shallow
+  clone plus `_vendor_` isolation instead of git subtree.
+canon_surfaces:
+  - canon/skills/
+  - crates/canon-cli/
+  - evals/dogfood/
+phases:
+  - name: intake
+    status: done
+    evidence: docs/research/vendor-audits/cursor-pstack/INTAKE.md
+  - name: onboard
+    status: done
+    evidence: docs/research/vendor-audits/cursor-pstack/README.md
+  - name: survey
+    status: done
+    evidence: docs/research/vendor-audits/cursor-pstack/README.md
+  - name: audit
+    status: done
+    evidence: docs/research/vendor-audits/cursor-pstack/
+  - name: synthesize
+    status: done
+    evidence: docs/research/vendor-audits/cursor-pstack/00-synthesis.md
+  - name: revalidate
+    status: done
+    evidence: docs/research/vendor-audits/00-cross-vendor-patterns.md
+  - name: map
+    status: done
+    evidence: docs/research/vendor-audits/CANON-ADOPTION-BRIEF.md
+  - name: decide
+    status: pending
+  - name: propose
+    status: pending
