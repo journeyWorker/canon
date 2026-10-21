@@ -316,9 +316,21 @@ fn context_capability_19_a_token_after_the_separator_or_an_option_value_is_never
     let brief = std::fs::read_to_string(repo.join(".canon/changes/add-search/brief.md")).unwrap();
     assert!(brief.contains("--subject"), "the value reached the brief untouched: {brief}");
 
-    // Everything after `--` is positional.
-    let after = canon_in(repo, &["schema", "--json", "--", "--change"]);
-    assert!(!stdout(&after).contains("was removed"), "{}", stdout(&after));
+    // Lines clap refuses for another reason (`--bogus`), so the removed-spelling
+    // scan runs: a removed spelling after `--` or as an option's value is not
+    // reported.
+    for args in [
+        &["brief", "check", "--bogus", "--json", "--", "--change"][..],
+        &["brief", "check", "--bogus", "--change-id", "--change", "--json"],
+        &["brief", "check", "--bogus", "--change-id=--change", "--json"],
+    ] {
+        let refused = usage_error(&canon_in(repo, args));
+        let hint = refused["error"]["hint"].as_str().unwrap_or_default().to_string();
+        assert!(!refused.to_string().contains("was removed") && !hint.contains("--change "), "{args:?}: {refused}");
+    }
+    // The same line with the spelling as a real flag is reported.
+    let flagged = usage_error(&canon_in(repo, &["brief", "check", "--bogus", "--change", "x", "--json"]));
+    assert!(flagged["error"]["hint"].as_str().unwrap().contains("use --change-id"), "{flagged}");
 
     // As a flag it is refused, with a space or an equals sign.
     for args in [&["brief", "check", "--change=add-login", "--json"][..], &["brief", "check", "--change", "add-login", "--json"]] {
@@ -344,8 +356,8 @@ fn context_capability_21_a_scenario_batch_line_with_a_removed_key_name_refuses_t
     let dir = repo_with_change();
     let repo = dir.path();
     let file = repo.join("batch.ndjson");
-    for (key, new) in [("subject", "subject-id"), ("project", "project-id")] {
-        let lines = [r#"{"id":"demo.login.01","title":"One","subject-id":"demo"}"#.to_string(), format!(r#"{{"id":"demo.login.02","title":"Two","{key}":"{}"}}"#, if key == "subject" { "demo" } else { "root" })];
+    for (key, new) in [("subject", "subject-id"), ("project", "project-id"), ("change", "change-id")] {
+        let lines = [r#"{"id":"demo.login.01","title":"One","subject-id":"demo"}"#.to_string(), format!(r#"{{"id":"demo.login.02","title":"Two","{key}":"{}"}}"#, match key { "subject" => "demo", "project" => "root", _ => "add-login" })];
         std::fs::write(&file, lines.join("\n")).unwrap();
         let out = canon_in(repo, &["scenario", "new", "--from", "batch.ndjson", "--json"]);
         assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
@@ -360,9 +372,12 @@ fn context_capability_21_a_scenario_batch_line_with_a_removed_key_name_refuses_t
 
     let lines = [
         r#"{"id":"demo.login.01","title":"One","subject-id":"demo","project-id":"root"}"#,
-        r#"{"id":"demo.login.02","title":"Two","subject-id":"demo","case":"failure"}"#,
+        r#"{"id":"demo.login.02","title":"Two","subject-id":"demo","case":"failure","flow":"F1","change-id":"add-login"}"#,
     ];
     std::fs::write(&file, lines.join("\n")).unwrap();
+    let brief_path = repo.join(".canon/changes/add-login/brief.md");
+    let brief = std::fs::read_to_string(&brief_path).unwrap().replace("## User flow\n", "## User flow\n\n1. F1 The visitor submits credentials → lands on the catalog.\n");
+    std::fs::write(&brief_path, brief).unwrap();
     let out = canon_in(repo, &["scenario", "new", "--from", "batch.ndjson", "--json"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let feature = std::fs::read_to_string(repo.join(".canon/specs/kind=feature/area=demo/login.feature")).unwrap();
