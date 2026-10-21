@@ -1,5 +1,5 @@
 providers: claude
-outdated: ./.canon/skills/.install-lock.json installed by canon 0.13.1, this canon is 0.25.0 — run `canon skills install --providers=claude`
+outdated: ./.canon/skills/.install-lock.json installed by canon 0.13.1, this canon is 0.26.0 — run `canon skills install --providers=claude`
 owned-paths: canon writes these; exclude them from formatters and linters:
   .claude/skills/canon/**
   .canon/REPORT.md
