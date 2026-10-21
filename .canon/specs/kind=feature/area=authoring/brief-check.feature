@@ -59,7 +59,7 @@ Feature: authoring brief check
     Given a brief citing a file with a line, a code identifier in a span, a plain file path, and the same file on a Source line
     When canon brief check runs
     Then each citation in a sentence is one prose.code-citation finding whose hint names what matched and says to put provenance on one Source line
-    And the Source line, a quoted UI label, a command and a slash between words are not flagged
+    And a Source line inside a judged section, a quoted UI label, a command, a slash between words, a product name such as Next.js or iPhone and a src/dst pair are not flagged
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
@@ -76,10 +76,10 @@ Feature: authoring brief check
   @case:failure
   @authoring.brief-check.08
   Scenario: Dates and decision notes in normative or Intent text are flagged as decision history
-    Given a brief with an ISO date, a Korean date and a decision note in its normative and Intent text, and a decision note in a question
+    Given a brief with a dated decision note, an undated one ("we decided", 결정했다) and behavior sentences that only mention agreeing, a meeting or a conditional (합의하면, 변경했으면) in its normative and Intent text, and a decision note in a question
     When canon brief check runs
-    Then each is a prose.decision-history finding naming the matched date or phrase, except the question's
-    And an English sentence that only says someone agreed to terms is not flagged
+    Then each note is a prose.decision-history finding naming the matched date or phrase, except the question's
+    And a sentence that only says someone agreed to terms, sat in a meeting, changed something on the server or releases on May 3, or a Korean conditional, is not flagged
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
@@ -95,7 +95,7 @@ Feature: authoring brief check
   @case:failure
   @authoring.brief-check.10
   Scenario: A Korean sentence that does not end in the plain declarative is flagged, with fragments and flow steps exempt
-    Given a Korean brief with polite, hortative and imperative sentences, a colloquial ~세요 sentence, noun fragments in list items and flow steps in polite endings
+    Given a Korean brief with polite, hortative and imperative sentences, a colloquial ~세요 sentence, noun fragments in list items (참가자, 하자, 보라) and flow steps in polite endings
     When canon brief check runs
     Then each polite, hortative and imperative sentence is a prose.ko-ending finding naming the ending, and the ~세요 sentence is prose.colloquial's only
     And fragments, flow steps, questions and none answers report nothing, and English text never gets the rule
@@ -109,7 +109,7 @@ Feature: authoring brief check
     Given a Korean brief with an Intent over its section budget, and another with the sum of its sections over the brief budget
     When canon brief check runs
     Then prose.length names the section with the measured characters and the budget, and the whole-brief finding has no section and names its budget
-    And an English brief of the same size is within its larger budget
+    And out of scope has no budget of its own, and an English brief over the Korean budget but under the English one is flagged only when ko is configured
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold

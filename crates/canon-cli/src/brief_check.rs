@@ -814,20 +814,22 @@ const EN_DEGREE: [&str; 3] = ["very", "really", "extremely"];
 //
 // | rule                   | private (14) | bad fixtures (3) | good fixtures (4) | canon's own (17) |
 // |------------------------|--------------|------------------|-------------------|------------------|
-// | prose.code-citation    | 14 / 473     | 3 / 50           | 0                 | 0                |
+// | prose.code-citation    | 14 / 472     | 3 / 50           | 0                 | 0                |
 // | prose.parenthetical    | 14 / 38      | 3 / 11           | 0                 | 0                |
-// | prose.decision-history | 14 / 28      | 3 / 24           | 0                 | 0                |
-// | prose.ai-vocabulary    | 0 / 0        | 3 / 7            | 0                 | 0                |
-// | prose.ko-ending        | 8 / 17       | 3 / 11           | 0                 | 0                |
-// | prose.length           | 14 / 71      | 3 / 4            | 0                 | 0                |
+// | prose.decision-history | 14 / 21      | 3 / 20           | 0                 | 0                |
+// | prose.ai-vocabulary    | 0 / 0        | 3 / 8            | 0                 | 0                |
+// | prose.ko-ending        | 2 / 2        | 3 / 11           | 0                 | 0                |
+// | prose.length           | 14 / 63      | 3 / 4            | 0                 | 0                |
 //
 // Notes. `prose.ai-vocabulary`: the private briefs hold none of the
 // listed words, so the Korean list rests on the stock words themselves
 // and on the bad fixtures, not on a measured hit. `prose.ko-ending`: the
-// private briefs write plain `~다` almost everywhere (1420 sentences);
-// the 17 findings are polite `~니다` sentences in 8 briefs, and every
-// other non-`~다` sentence ending in them is a list-item fragment, which
-// is why a fragment is exempt. `prose.parenthetical`: private sections
+// private briefs write plain `~다` almost everywhere (1420 sentences); the
+// 2 findings are polite `~ㅂ니다` sentences in 2 briefs (an earlier count of
+// 17 in 8 briefs included plain `아니다`-type words), and every non-`~다`
+// sentence ending in them is a list-item fragment, which is why a fragment
+// is exempt. `prose.decision-history` needs a decision verb next to a date
+// (or an unambiguous phrase), and still hits all 14. `prose.parenthetical`: private sections
 // carry 4-10 asides per 1000 characters, a good fixture none, so the
 // line sits at more than 4 per 1000 with at least 3 asides. `prose.length`:
 // private Intent sections measure 600-1100 characters (budget 400), whole
@@ -861,12 +863,16 @@ const EN_AI_VOCABULARY: [(&str, bool); 19] = [
     ("plays a crucial role", false),
     ("testament to", false),
 ];
-const KO_AI_VOCABULARY: [&str; 14] = ["원활", "매끄럽", "견고", "탄탄", "유기적", "시너지", "혁신적", "패러다임", "북극성", "나침반", "초석", "토대", "청사진", "한 단계 도약"];
+const KO_AI_VOCABULARY: [&str; 15] = ["원활", "매끄러", "매끄럽", "견고", "탄탄", "유기적", "시너지", "혁신적", "패러다임", "북극성", "나침반", "초석", "토대", "청사진", "한 단계 도약"];
 
 /// Phrases that make a sentence a decision note (`prose.decision-history`):
 /// who decided what, and when it changed.
-const EN_DECISION_NOTES: [&str; 9] = ["we decided", "was decided", "were decided", "we agreed", "was agreed", "agreed on", "changed on", "after discussion", "in the meeting"];
-const KO_DECISION_NOTES: [&str; 11] = ["결정했", "결정하였", "결정됐", "결정되었", "합의", "논의 결과", "논의를 거", "하기로 했", "하기로 하였", "변경했", "바꾸기로"];
+const EN_DECISION_NOTES: [&str; 7] = ["we decided", "it was decided", "was decided", "were decided", "we agreed", "was agreed", "were agreed"];
+/// Verbs that make a sentence with a date a decision note ("changed on Oct 21").
+const EN_DECISION_VERBS: [&str; 10] = ["decided", "agreed", "changed", "chose", "approved", "settled", "renamed", "replaced", "added", "updated"];
+const KO_DECISION_NOTES: [&str; 12] = ["결정했다", "결정하였다", "결정됐다", "결정되었다", "합의했다", "합의하였다", "합의됐다", "합의되었다", "하기로 했다", "하기로 하였다", "하기로 정했다", "논의 결과"];
+/// Verb stems that make a sentence with a date a decision note; a stem inside a conditional (`~하면`, `~했으면`) never counts.
+const KO_DECISION_VERBS: [&str; 10] = ["결정", "합의", "확정", "변경", "추가", "바꿨", "바꾸", "정했", "반영", "수정"];
 const EN_MONTHS: [&str; 23] = [
     "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December", "Jan", "Feb", "Mar", "Apr", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
@@ -875,13 +881,13 @@ const EN_MONTHS: [&str; 23] = [
 const SOURCE_EXTENSIONS: [&str; 34] = [
     "rs", "ts", "tsx", "js", "jsx", "mjs", "py", "go", "java", "kt", "swift", "rb", "php", "c", "h", "cc", "cpp", "cs", "md", "json", "yaml", "yml", "toml", "sql", "html", "css", "scss", "sh", "feature", "lock", "txt", "xml", "proto", "vue",
 ];
-/// First path segments that make `dir/name` a file citation.
-const SOURCE_DIRS: [&str; 13] = ["src", "crates", "lib", "app", "tests", "test", "docs", "packages", "internal", "cmd", "pkg", "scripts", "config"];
 
 /// Imperative and hortative Korean endings `prose.ko-ending` reports
 /// (the polite `…요` endings in [`KO_COLLOQUIAL`] are `prose.colloquial`'s).
-const KO_IMPERATIVE: [&str; 12] = ["하라", "마라", "말라", "보라", "가라", "어라", "아라", "으라", "오라", "두라", "쓰라", "내라"];
-const KO_HORTATIVE: [&str; 4] = ["하자", "보자", "가자", "두자"];
+/// Closed lists: a verb form at the end of a terminated, non-list sentence.
+/// A noun that happens to end in 자 or 라 (참가자, 하자, 보라) is not one.
+const KO_IMPERATIVE: [&str; 12] = ["하라", "마라", "말라", "가라", "어라", "아라", "으라", "오라", "두라", "쓰라", "내라", "십시오"];
+const KO_HORTATIVE: [&str; 5] = ["하자", "보자", "가자", "주자", "두자"];
 
 /// `prose.parenthetical` fires on a section with at least
 /// [`PAREN_MIN`] asides and more than [`PAREN_PER_1000`] of them per
@@ -899,15 +905,14 @@ const PAREN_LABEL_CHARS: usize = 6;
 /// little above the longest good fixture section and well below what the
 /// private briefs measure (intent 600-1100, detail 2300-7600, total
 /// 2100-13300 characters).
-const LENGTH_BUDGETS: [(&str, usize, usize); 9] = [
+const LENGTH_BUDGETS: [(&str, usize, usize); 8] = [
     ("intent", 400, 700),
     ("outcome", 500, 900),
     ("flow", 800, 1500),
     ("detail", 2500, 3500),
     ("acceptance", 1000, 1800),
     ("questions", 800, 1200),
-    ("out-of-scope", 300, 600),
-    ("invariants", 800, 1500),
+        ("invariants", 800, 1500),
     ("checks", 800, 1500),
 ];
 /// `prose.length`'s budget for the sum of every section, `(ko, en)`.
@@ -1133,7 +1138,7 @@ fn listed(values: &[String]) -> String {
 
 /// Whether `candidate` (a token or the inside of a code span) cites a
 /// file: `path:line`, a name with a source extension, a path of two or
-/// more segments, or `dir/name` under a conventional source directory.
+/// more segments, or `./name`. A single `dir/name` is not a citation (`src/dst`).
 /// A leading `/` with no extension is a route the user sees, a `://`
 /// token a URL; neither is a file.
 fn is_path(candidate: &str) -> bool {
@@ -1162,6 +1167,10 @@ fn is_path(candidate: &str) -> bool {
     let last = core.rsplit('/').next().unwrap_or(core);
     let has_ext = last.rsplit_once('.').is_some_and(|(stem, ext)| !stem.is_empty() && SOURCE_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str()));
     let slashes = core.matches('/').count();
+    // `Next.js`, `Node.js`: a product name, not a file.
+    if slashes == 0 && !has_line && last.ends_with(".js") && last.starts_with(|c: char| c.is_ascii_uppercase()) {
+        return false;
+    }
     if core.starts_with('/') && !has_ext && !has_line {
         return false;
     }
@@ -1169,7 +1178,6 @@ fn is_path(candidate: &str) -> bool {
         || (has_line && slashes >= 1)
         || (slashes >= 2 && !core.starts_with('/'))
         || ["./", "../", "~/"].iter().any(|p| core.starts_with(p))
-        || (slashes == 1 && core.split('/').next().is_some_and(|dir| SOURCE_DIRS.contains(&dir)))
 }
 
 /// Whether the inside of a code span names a code identifier: `a::b`,
@@ -1186,7 +1194,16 @@ fn is_identifier(span: &str) -> bool {
         || (s.contains('(') && s.ends_with(')'))
         || (s.contains('_') && b.iter().any(u8::is_ascii_alphabetic))
         || b.windows(3).any(|w| w[1] == b'.' && w[0].is_ascii_alphabetic() && w[2].is_ascii_alphabetic())
-        || b.windows(2).any(|w| w[0].is_ascii_lowercase() && w[1].is_ascii_uppercase())
+        || has_hump(b)
+}
+
+/// A camelCase or PascalCase hump (lower, Upper, lower): `holdTimer`,
+/// `SeatHold`. A lowercase start needs two lowercase letters before the
+/// hump, so `iPhone` and `eBay` are names; `macOS` and `iOS` have no hump.
+fn has_hump(b: &[u8]) -> bool {
+    (1..b.len().saturating_sub(1)).any(|i| {
+        b[i - 1].is_ascii_lowercase() && b[i].is_ascii_uppercase() && b[i + 1].is_ascii_lowercase() && (b[0].is_ascii_uppercase() || i >= 2)
+    })
 }
 
 /// The code citations of one sentence, as written: file paths and
@@ -1329,14 +1346,22 @@ fn find_date(s: &str, english: bool) -> Option<String> {
 /// decision-note phrase.
 fn decision_history(shipped: Shipped, sentence: &str) -> Option<String> {
     let s = plain(sentence);
-    if let Some(date) = find_date(&s, shipped == Shipped::En) {
-        return Some(date);
-    }
+    let date = find_date(&s, shipped == Shipped::En);
     match shipped {
-        Shipped::Ko => KO_DECISION_NOTES.iter().find(|p| s.contains(**p)).map(|p| (*p).to_string()),
+        Shipped::Ko => {
+            if let Some(note) = KO_DECISION_NOTES.iter().find(|p| s.contains(**p)) {
+                return Some((*note).to_string());
+            }
+            // A date is history only next to a decision verb that is not a condition.
+            let verb = KO_DECISION_VERBS.iter().any(|v| s.match_indices(v).any(|(at, _)| !s[at + v.len()..].split_whitespace().next().is_some_and(|rest| s[at + v.len()..].starts_with(rest) && rest.contains('면'))));
+            date.filter(|_| verb)
+        }
         Shipped::En => {
             let lower = s.to_lowercase();
-            EN_DECISION_NOTES.iter().find(|p| lower.contains(**p)).map(|p| (*p).to_string())
+            if let Some(note) = EN_DECISION_NOTES.iter().find(|p| lower.contains(**p)) {
+                return Some((*note).to_string());
+            }
+            date.filter(|_| words(&lower).any(|w| EN_DECISION_VERBS.contains(&w)))
         }
     }
 }
@@ -1387,11 +1412,10 @@ fn ko_ending(sentence: &str, item: bool) -> Option<String> {
     if end.ends_with('요') {
         return tilde("요");
     }
-    if let Some(e) = KO_IMPERATIVE.iter().find(|e| end.ends_with(**e)) {
-        return tilde(&e[e.len() - 3..]);
-    }
-    if let Some(e) = KO_HORTATIVE.iter().find(|e| end.ends_with(**e)) {
-        return tilde(&e[e.len() - 3..]);
+    if terminated && !item {
+        if let Some(e) = KO_IMPERATIVE.iter().chain(KO_HORTATIVE.iter()).find(|e| end.ends_with(**e)) {
+            return tilde(&e[e.len() - 3..]);
+        }
     }
     if end.ends_with('다') || item || !terminated {
         return None;
@@ -1980,12 +2004,13 @@ mod tests {
         assert_eq!(cited("The check lives in src/booking/seat_hold.rs:88 and reads it."), ["src/booking/seat_hold.rs:88"]);
         assert_eq!(cited("It calls `SeatHold::release()` once."), ["SeatHold::release()"]);
         assert_eq!(cited("The `hold_ttl_seconds` setting and the `holdTimer` field."), ["hold_ttl_seconds", "holdTimer"]);
-        assert_eq!(cited("Read docs/plan.md, crates/tide, ./run.sh and `Reminder.due_now`."), ["Reminder.due_now", "docs/plan.md", "crates/tide", "./run.sh"]);
+        assert_eq!(cited("Read docs/plan.md, crates/tide, ./run.sh and `Reminder.due_now`."), ["Reminder.due_now", "docs/plan.md", "./run.sh"]);
         assert_eq!(cited("canon.yaml에서 `seat_hold.rs`를 읽는다."), ["seat_hold.rs", "canon.yaml"]);
         assert_eq!(cited("src/lib.rs에서 읽는다 (web/src/a.ts:3-9)."), ["src/lib.rs", "web/src/a.ts:3-9"]);
         // UI text, flags, commands, prose with a slash, dates, routes and URLs are not citations.
         for miss in [
             "The `Save` button and the `Save draft` label.",
+            "Next.js로 만든 화면과 `iPhone` 이용자, src/dst 두 지점.",
             "The `저장` button and the `No calendar shared` label.",
             "Pass `--project-id` to `canon brief check`.",
             "Read and/or write, yes/no, read/write access.",
@@ -2020,7 +2045,18 @@ mod tests {
         }
         assert_eq!(decision_history(Shipped::En, "We decided to drop it.").as_deref(), Some("we decided"));
         assert_eq!(decision_history(Shipped::En, "The user agreed to the terms.").as_deref(), None);
-        assert_eq!(decision_history(Shipped::Ko, "이 동작은 합의했다.").as_deref(), Some("합의"));
+        assert_eq!(decision_history(Shipped::En, "Changed on Oct 21 by hand.").as_deref(), Some("Oct 21"));
+        for behavior in ["An invitee who agreed on the terms sees it.", "Everyone in the meeting sees it.", "A slot changed on the server is redrawn.", "Saved on May 3 releases."] {
+            assert_eq!(decision_history(Shipped::En, behavior), None, "{behavior}");
+        }
+        assert_eq!(decision_history(Shipped::En, "It was decided to keep it.").as_deref(), Some("it was decided"));
+        assert_eq!(decision_history(Shipped::Ko, "회의에서 유지하기로 결정했다.").as_deref(), Some("결정했다"));
+        assert_eq!(decision_history(Shipped::Ko, "2026-10-21 변경").as_deref(), Some("2026-10-21"));
+        assert_eq!(decision_history(Shipped::Ko, "2026-10-21 이후에 열린다.").as_deref(), None);
+        for conditional in ["비밀번호를 변경했으면 다시 로그인한다.", "연장에 합의하면 기간이 늘어난다.", "10월 21일 전에 변경하면 적용된다."] {
+            assert_eq!(decision_history(Shipped::Ko, conditional), None, "{conditional}");
+        }
+        assert_eq!(decision_history(Shipped::Ko, "이 동작은 합의했다.").as_deref(), Some("합의했다"));
         assert_eq!(decision_history(Shipped::Ko, "정책은 결정 대상이다.").as_deref(), None);
     }
 
@@ -2044,6 +2080,12 @@ mod tests {
         assert_eq!(end("다시 확인합시다.", false).as_deref(), Some("~시다"));
         assert_eq!(end("책을 다시 넣으라.", false).as_deref(), Some("~라"));
         assert_eq!(end("함께 살펴보자.", false).as_deref(), Some("~자"));
+        // Nouns ending in 자 or 라 are fragments, not hortative or imperative forms.
+        assert_eq!(end("알림 받는 사람: 주최자, 참가자", true), None);
+        assert_eq!(end("검토 대상: 후보자", true), None);
+        assert_eq!(end("배경색: 보라", true), None);
+        assert_eq!(end("반납 거절 사유: 하자.", true), None);
+        assert_eq!(end("책을 확인하라.", false).as_deref(), Some("~라"));
         assert_eq!(end("이 규칙은 로그인 화면.", false).as_deref(), Some("…화면"));
         assert_eq!(end("그렇게 해요.", false).as_deref(), None, "~요 in the colloquial list is prose.colloquial's");
         assert_eq!(end("그렇게 하면 돼요.", false).as_deref(), Some("~요"));
