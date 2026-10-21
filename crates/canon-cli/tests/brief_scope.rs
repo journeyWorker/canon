@@ -719,11 +719,14 @@ fn subject_lifecycle_38_a_pending_draft_does_not_freeze_a_shipped_subject() {
     let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();
     let text = status.to_string();
     assert!(
-        text.contains("\"change\":\"b\"") && text.contains("\"approved\":false") && text.contains("\"pendingDraft\":\"b\""),
+        text.contains("\"change\":\"b\"") && text.contains("\"approved\":false") && text.contains("\"pendingDrafts\":[\"b\"]"),
         "{text}"
     );
     let human = stdout(&ok(repo, &["status"]));
     assert!(human.contains("`b` is a pending draft: not yet part of the subject's scope"), "{human}");
+    // The guidance says what is refused: only what answers to the draft.
+    assert!(!text.contains("refuses s's scenarios and tasks"), "{text}");
+    assert!(!text.contains("build and attest nothing for s"), "{text}");
 
     // Once a scenario is tagged for the draft, shipping needs its approval.
     ok(
@@ -780,4 +783,112 @@ fn subject_lifecycle_38_a_pending_drafts_next_step_follows_its_brief_check() {
     assert!(has(&clean, "report the pending draft's brief in .canon/changes/b/brief.md to the human; s is not blocked meanwhile"), "{clean:?}");
     assert!(!has(&clean, "canon brief check"), "{clean:?}");
     assert!(has(&clean, "canon subject status s --to shipped"), "{clean:?}");
+}
+
+/// A subject that shipped with approved `a`, then adopted a draft `b`
+/// scenario `shop.cart.03` is tagged for.
+fn shipped_with_tagged_draft() -> TempDir {
+    let dir = repo_with_subject("verifying");
+    let repo = dir.path();
+    change(repo, "a", true);
+    scenario(repo, "shop.cart.01", Some("a.F1"));
+    scenario(repo, "shop.cart.02", Some("a.F1"));
+    let path = repo.join(".canon/specs/kind=feature/area=shop/cart.feature");
+    let text = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(
+        &path,
+        text.replace("@case:happy\n  @flow:a.F1\n  @shop.cart.02", "@case:failure\n  @flow:a.F1\n  @shop.cart.02"),
+    )
+    .unwrap();
+    for id in ["shop.cart.01", "shop.cart.02"] {
+        assert!(attest(repo, id, "run").status.success());
+    }
+    ok(repo, &["subject", "status", "s", "--to", "shipped"]);
+    change(repo, "b", false);
+    scenario(repo, "shop.cart.03", Some("b.F1"));
+    ok(repo, &["inventory", "sync"]);
+    dir
+}
+
+/// subject.lifecycle.39: a tagged unapproved draft keeps blocking reopen
+/// and ship under a newer untagged draft, and the output names every
+/// change set aside.
+#[test]
+fn subject_lifecycle_39_a_tagged_draft_under_a_newer_untagged_draft_still_blocks() {
+    let dir = shipped_with_tagged_draft();
+    let repo = dir.path();
+    let reopen = |repo: &Path| {
+        run(repo, &["subject", "status", "s", "--to", "verifying", "--reason", "fix"])
+    };
+    let control = reopen(repo);
+    assert_eq!(control.status.code(), Some(1), "{}", stderr(&control));
+    assert!(stderr(&control).contains(".canon/changes/b/brief.md"), "{}", stderr(&control));
+
+    // A newer untagged draft c changes nothing: the scope still ends at b.
+    change(repo, "c", false);
+    let out = reopen(repo);
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert!(stderr(&out).contains(".canon/changes/b/brief.md"), "{}", stderr(&out));
+    assert!(!stderr(&out).contains(".canon/changes/c/brief.md"), "{}", stderr(&out));
+}
+
+/// subject.lifecycle.39: ship, from verifying, is refused naming b under
+/// the same setup; every pending draft set aside is named on a transition
+/// that goes through.
+#[test]
+fn subject_lifecycle_39_ship_names_the_tagged_draft_and_every_change_set_aside() {
+    let dir = repo_with_subject("verifying");
+    let repo = dir.path();
+    change(repo, "a", true);
+    scenario(repo, "shop.cart.01", Some("a.F1"));
+    scenario(repo, "shop.cart.02", Some("a.F1"));
+    let path = repo.join(".canon/specs/kind=feature/area=shop/cart.feature");
+    let text = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(
+        &path,
+        text.replace("@case:happy\n  @flow:a.F1\n  @shop.cart.02", "@case:failure\n  @flow:a.F1\n  @shop.cart.02"),
+    )
+    .unwrap();
+    for id in ["shop.cart.01", "shop.cart.02"] {
+        assert!(attest(repo, id, "run").status.success());
+    }
+    change(repo, "b", false);
+    scenario(repo, "shop.cart.03", Some("b.F1"));
+    ok(repo, &["inventory", "sync"]);
+    change(repo, "c", false);
+    let ship = run(repo, &["subject", "status", "s", "--to", "shipped"]);
+    assert_eq!(ship.status.code(), Some(1), "{}", stderr(&ship));
+    assert!(stderr(&ship).contains(".canon/changes/b/brief.md"), "{}", stderr(&ship));
+
+    // Retag shop.cart.03 for a: b and c are both set aside, and the line names both.
+    let text = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(&path, text.replace("@flow:b.F1", "@flow:a.F1")).unwrap();
+    ok(repo, &["inventory", "sync"]);
+    assert!(attest(repo, "shop.cart.03", "run").status.success());
+    let ship = run(repo, &["subject", "status", "s", "--to", "shipped"]);
+    assert!(ship.status.success(), "{}", stderr(&ship));
+    assert!(
+        stderr(&ship).contains("`b`, `c` are pending drafts"),
+        "{}",
+        stderr(&ship)
+    );
+}
+
+/// evidence.add.102: evidence recorded after the subject adopted its first
+/// change (here while it was specced) is not the existing behavior the
+/// exemption keeps re-verifying.
+#[test]
+fn evidence_add_102_evidence_recorded_after_adoption_does_not_exempt() {
+    let dir = repo_with_subject("proposed");
+    let repo = dir.path();
+    ok(repo, &["subject", "status", "s", "--to", "specced"]);
+    change(repo, "a", false);
+    scenario(repo, "shop.cart.01", None);
+    scenario(repo, "shop.cart.02", None);
+    let first = attest(repo, "shop.cart.01", "while specced");
+    assert!(first.status.success(), "{}", stderr(&first));
+    ok(repo, &["subject", "status", "s", "--to", "building"]);
+    let again = attest(repo, "shop.cart.01", "after building");
+    assert_eq!(again.status.code(), Some(1), "{}", stderr(&again));
+    assert!(stderr(&again).contains("BRIEF_UNAPPROVED"), "{}", stderr(&again));
 }

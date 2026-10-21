@@ -383,5 +383,15 @@ Feature: subject lifecycle
   Scenario: A pending draft change does not freeze a shipped subject's reopen, evidence, review and ship
     Given a shipped subject adopting an approved change and a newer draft change that none of its scenarios is tagged @flow:<change>.* for
     When the subject is reopened, a scenario is re-verified and reviewed, and the subject ships again
-    Then each step is accepted, the reopen and ship output say in one line that the draft is a pending draft not part of the transition, and canon status still lists the draft awaiting approval, marked as not yet part of the subject's scope
+    Then each step is accepted, the reopen and ship output say in one line that the draft is a pending draft not part of the transition, and canon status still lists the draft awaiting approval, marked as not yet part of the subject's scope, without saying evidence add refuses the subject's scenarios
     And once a scenario of the subject is tagged @flow:<draft>.F1, shipping is refused on the draft's brief
+
+  # canon: {"schema":1,"at":"2026-10-21T13:15:05Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @subject.lifecycle.39
+  Scenario: A tagged unapproved draft under a newer untagged draft still blocks reopen and ship
+    Given a shipped subject adopting an approved change a, a draft change b that one of its scenarios is tagged @flow:b.F1 for, and a newer draft change c no scenario is tagged for
+    When the subject is reopened and, with b's scenario attested, shipped again
+    Then both are refused naming b's brief, and the output names every change set aside, here c
+    And without c the refusal is the same, and only an unapproved change nothing is tagged for is ever set aside

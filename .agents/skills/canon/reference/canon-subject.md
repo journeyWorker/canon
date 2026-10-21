@@ -159,7 +159,7 @@ exits 1, and the status stays `verifying`. `retired` is not gated.
 **The brief (0.16, 0.17, 0.19):** `verifying → shipped` also refuses where a brief
 exists and is not approved, read exactly as `canon status` reads it (one
 shared check, so status says `ship` only when this passes): the subject's
-scope (its newest adopted change, except a pending draft, see below) has a canon `.canon/changes/<change>/brief.md`
+scope (its newest adopted change, except pending drafts, see below) has a canon `.canon/changes/<change>/brief.md`
 with no `Approved:` line outside HTML comments and code fences, whose
 `Approved:` line carries a digest the brief's text no longer matches
 (`BRIEF_CHANGED_SINCE_APPROVAL`; the brief was edited after the human
@@ -208,22 +208,25 @@ check; see `canon-gate`.
 refusal asks the approval of each change the scenario's `@flow:<change>.<F-id>`
 tags name. An untagged scenario answers to the subject's newest adopted
 change whose brief carries an `Approved:` line; if no adopted change ever
-did, a scenario that already has evidence needs no brief, and one without
-evidence answers to the newest adopted change. A task answers to its own
+did, a scenario with evidence recorded before the subject first adopted a
+change (and without a brief override) needs no brief, and one without
+answers to the newest adopted change. A task answers to its own
 change. So planning the next change for a `building`, `verifying` or
 `shipped` subject does not freeze re-verification of its existing
 scenarios; scenarios written for the new change (`canon scenario new
 --flow <F-id>` tags them) wait for its approval. The ship guard above is
 unchanged, except for a pending draft: the subject cannot ship until its
-scope is approved, where the scope is its newest adopted change unless that
-change's brief is not approved and no scenario of the subject is tagged
-`@flow:<change>.*` for it, in which case it is the newest adopted change with
-an `Approved:` line. The reopen and ship transitions then print one line
-(stderr, and `meta.warnings` with `--json`): ``<change> is a pending draft
-(brief not approved, no scenario tagged `@flow:<change>.*`): not part of this
-transition, which reads the subject's newest approved change``, and
-`canon status` marks the draft "not yet part of the subject's scope"
-(`pendingDraft` in JSON) while still asking the human to answer its brief.
+scope is approved, where the scope is found walking the adopted changes from
+the newest back: a change whose brief was never approved and that no scenario
+of the subject is tagged `@flow:<change>.*` for is a pending draft and is
+skipped; the first approved or tagged change is the scope. A tagged unapproved
+draft anywhere above the newest approved change therefore blocks. The reopen
+and ship transitions print one line naming every change set aside (stderr, and
+`meta.warnings` with `--json`): ``<change> is a pending draft (brief not
+approved, no scenario tagged `@flow:<change>.*`): not part of this transition,
+which reads the subject's newest approved or tagged change``, and `canon status`
+marks them "not yet part of the subject's scope" (`pendingDrafts` in JSON)
+while still asking the human to answer a draft's brief.
 
 ### The review guard (`spec_coverage.require_review`, opt-in)
 
@@ -301,8 +304,8 @@ canon subject status: demo-subject → verifying — written directly; nothing t
   `reopen: { reason: …, change: c-demo, actor: { agent_id: impl } }`. The
   next status write clears both, as it clears a waiver.
 - Inside the approved scope it needs no human: the subject's scope (its
-  newest adopted change, or the newest approved one while the newest is a
-  pending draft no scenario is tagged for) has an approved brief, or there
+  newest adopted change, walking back past pending drafts no scenario is
+  tagged for) has an approved brief, or there
   is no brief to answer.
   Otherwise it refuses, exit 1, naming the brief to approve, and
   `--override-reason` does not waive it:
