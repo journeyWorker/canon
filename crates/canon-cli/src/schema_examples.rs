@@ -79,5 +79,6 @@ pub(crate) const EXAMPLES: &[(&str, &str)] = &[
     ("subject adopt", "canon subject adopt add-login --subject-id demo"),
     ("subject new", "canon subject new payments --domain dev --title Payments"),
     ("subject status", "canon subject status demo --to specced"),
+    ("subject unadopt", "canon subject unadopt add-login --subject-id demo"),
     ("tier age", "canon tier age"),
 ];

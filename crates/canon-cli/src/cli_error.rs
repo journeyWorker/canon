@@ -296,6 +296,7 @@ const CODES: &[(&str, &str)] = &[
     ("SUBJECT_INVALID_TRANSITION", "the status change is not an allowed transition"),
     ("SUBJECT_NOT_FOUND", "no subject with that id"),
     ("SUBJECT_REASON_REQUIRED", "reopening a shipped subject needs --reason"),
+    ("SUBJECT_UNADOPT_REFUSED", "the change carries an approved brief, so it is the subject's approved scope and stays adopted"),
     ("TASK_NOT_FOUND", "the task id names no task in the plan corpus"),
     ("TASK_ROW_NOT_FOUND", "the task's row is missing from its plan document"),
     ("TIER_FAILED", "tier aging failed"),

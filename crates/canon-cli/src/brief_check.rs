@@ -224,6 +224,46 @@ pub fn flow_scenarios(repo: &Path, change: &ChangeId) -> Result<FlowIndex, Strin
     Ok(index)
 }
 
+/// The changes the `@flow:<change>.<F-id>` tags of scenario `scenario_id`
+/// in spec root `project` name (0.25 D1), in tag order, read through the
+/// same Gherkin scan as [`flow_scenarios`]. Empty for an untagged
+/// scenario or an unreadable spec configuration.
+pub fn flow_changes_of(
+    repo: &Path,
+    project: &canon_model::ProjectId,
+    scenario_id: &canon_model::ScenarioId,
+) -> Vec<ChangeId> {
+    let Ok(roots) = crate::inventory::load_spec_roots(&repo.join("canon.yaml")) else {
+        return Vec::new();
+    };
+    let mut changes: Vec<ChangeId> = Vec::new();
+    for root in roots.iter().filter(|root| &root.id == project) {
+        for path in canon_fmt::util::feature_files(&root.root) {
+            let Some(file) = crate::inventory::feature_file_scan(&path) else {
+                continue;
+            };
+            for scenario in file
+                .scan
+                .scenarios
+                .iter()
+                .filter(|s| s.scenario_id == scenario_id.as_str())
+            {
+                for tag in &scenario.flow_tags {
+                    if let Some(change) = tag
+                        .rsplit_once('.')
+                        .and_then(|(change, _)| ChangeId::parse(change).ok())
+                    {
+                        if !changes.contains(&change) {
+                            changes.push(change);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    changes
+}
+
 /// The flow step ids `change`'s brief defines, in order; empty for a
 /// legacy brief or no brief.
 pub fn flow_ids(repo: &Path, change: &ChangeId) -> Vec<String> {
