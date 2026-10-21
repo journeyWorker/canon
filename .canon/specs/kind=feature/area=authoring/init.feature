@@ -336,3 +336,13 @@ Feature: authoring init
     Then it prints a [WARN] gitignore line naming the missing entries and the fix, canon migrate
     And it exits 0, because a missing ignore line is not a config failure
     And a repo that is neither a git checkout nor has a gitignore draws no such line
+
+  # canon: {"schema":1,"at":"2026-10-21T17:24:48Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @authoring.init.100
+  Scenario: A scenario edit and a reader run leave only the edited feature in git status
+    Given a git repository freshly initialized with canon init, with a committed feature file holding one scenario
+    When canon gate check indexes the scenario, the scenario is edited, and canon gate check runs again
+    Then the init gitignore covers .canon/archive/kind=scenario/, where the superseded index version went, which no reader needs from git
+    And git status reports only the edited feature file
