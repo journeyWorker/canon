@@ -304,3 +304,12 @@ Feature: review add
     Then `canon gate check` exits 0 with no advisory for the file, and `canon evidence vault` stores nothing for it, counting only the newer review's file
     And once its working-tree file changes too, `canon gate check` still exits 0 and names neither the file nor the first review
     And when the newer review's blob is lost and its working-tree file changes, the gate exits 1 with stale-evidence naming the newer review only
+
+  # canon: {"schema":1,"at":"2026-10-21T16:35:27Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:review-attestation
+  @case:failure
+  @review.add.92
+  Scenario: A review for a project id that names no configured spec root is refused
+    Given a repo whose canon.yaml configures one spec root, game, and a scenario indexed under it
+    When review add names a --project-id that is no configured root
+    Then it exits 2 with UNKNOWN_SPEC_ROOT, writes no review record, and the hint names the configured root

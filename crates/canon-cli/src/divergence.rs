@@ -110,6 +110,9 @@ pub fn run_stage(
     json: bool,
 ) -> i32 {
     let repo = resolve_repo_root(repo);
+    if let Err(error) = crate::inventory::require_spec_root(&repo, project_id) {
+        return error.emit("canon divergence add", json);
+    }
     let promote = match crate::write_mode::should_promote(&repo, promote) {
         Ok(promote) => promote,
         Err(error) => {
@@ -225,6 +228,9 @@ fn run_commit(
     json: bool,
 ) -> i32 {
     let repo = resolve_repo_root(repo);
+    if let Err(error) = crate::inventory::require_spec_root(&repo, project_id) {
+        return error.emit(&format!("canon divergence {verb}"), json);
+    }
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
@@ -363,6 +369,9 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
     }
 
     let repo = resolve_repo_root(repo);
+    if let Err(error) = crate::inventory::require_spec_root(&repo, &args.project_id) {
+        return error.emit(CMD, args.json);
+    }
     let context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| canon_gate::GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(context) => context,
         Err(e) => return CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml (`canon init --check-config` names the problem), then run `canon divergence accept` again").emit(CMD, args.json),
@@ -579,6 +588,14 @@ mod tests {
 
     use super::*;
 
+    /// A repo whose `canon.yaml` configures the spec root `app-a`, the
+    /// project id these tests write under (`--project-id` must name one).
+    fn repo_dir() -> TempDir {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(dir.path().join("canon.yaml"), "specs:\n  roots:\n    - id: app-a\n      root: specs\n").unwrap();
+        dir
+    }
+
     fn gate_ctx_root(dir: &TempDir) -> std::path::PathBuf {
         GateCtx::from_repo(dir.path()).unwrap().ledger_root
     }
@@ -594,7 +611,7 @@ mod tests {
 
     #[test]
     fn stage_then_promote_assigns_a_monotonic_run_seq_and_a_refusal_consumes_none() {
-        let dir = TempDir::new().unwrap();
+        let dir = repo_dir();
         let (project_id, scenario_id_a, role, sha) = ids();
         let scenario_id_b = ScenarioId::parse("world.firstbuy-hotdeal.27").unwrap();
 
@@ -619,7 +636,7 @@ mod tests {
 
     #[test]
     fn a_refused_candidate_consumes_no_run_seq() {
-        let dir = TempDir::new().unwrap();
+        let dir = repo_dir();
         let (project_id, scenario_id, role, sha) = ids();
 
         // Refused: no `actor.role` at all.
@@ -671,7 +688,7 @@ mod tests {
 
     #[test]
     fn resolve_and_defer_promote_only_their_own_record_and_leave_other_staged_work() {
-        let dir = TempDir::new().unwrap();
+        let dir = repo_dir();
         let (project_id, scenario_id, role, sha) = ids();
         let deferred_id = ScenarioId::parse("world.firstbuy-hotdeal.51").unwrap();
 
@@ -705,7 +722,7 @@ mod tests {
 
     #[test]
     fn status_reflects_a_resolved_divergence() {
-        let dir = TempDir::new().unwrap();
+        let dir = repo_dir();
         let (project_id, scenario_id, role, sha) = ids();
 
         assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, false), 0);
@@ -725,7 +742,7 @@ mod tests {
     /// resolved record — the downgrade is derived at read time.
     #[test]
     fn a_moved_live_binding_reads_resolved_invalid_without_rewriting_the_resolution() {
-        let dir = TempDir::new().unwrap();
+        let dir = repo_dir();
         let (project_id, scenario_id, role, sha) = ids();
         assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, false), 0);
 

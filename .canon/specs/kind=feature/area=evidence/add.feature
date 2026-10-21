@@ -619,3 +619,33 @@ Feature: evidence add
     Then the evidenced one is accepted, being existing behavior attested before any approved scope and before the subject adopted its first change
     And evidence recorded only after that adoption, for example while the subject was specced, does not exempt the scenario
     And the never-evidenced one is refused BRIEF_UNAPPROVED naming the draft change's brief.md
+
+  # canon: {"schema":1,"at":"2026-10-21T16:35:00Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.103
+  Scenario: A project id that names no configured spec root is refused before anything is written
+    Given a repo whose canon.yaml configures one spec root, game, and a scenario indexed under it
+    When evidence add names a --project-id that is no configured root, for one scenario and with --all-scenarios
+    Then each add exits 2 with UNKNOWN_SPEC_ROOT before anything is staged, bound or written
+    And the hint names the one root to use, `--project-id game`, and the same add under game is accepted
+
+  # canon: {"schema":1,"at":"2026-10-21T16:35:10Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.104
+  Scenario: The refusal of an unknown project id lists every configured spec root
+    Given a repo whose canon.yaml configures two spec roots
+    When evidence add names a --project-id that matches neither
+    Then it exits 2 with UNKNOWN_SPEC_ROOT, and the message, the hint and the JSON expected list name both roots
+    And a root id that is configured is accepted whichever order the roots are listed in
+
+  # canon: {"schema":1,"at":"2026-10-21T16:35:18Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.105
+  Scenario: An approval payload is not issued for a project id that names no configured spec root
+    Given a repo whose canon.yaml configures one spec root, game
+    When evidence approval-payload names a --project-id that is no configured root
+    Then it exits 2 with UNKNOWN_SPEC_ROOT and prints no payload bytes
+    And the payload for the configured root is still printed

@@ -140,3 +140,12 @@ Feature: authoring scaffold
     When canon scenario new derives a path under it, or names one with --feature, or canon feature new targets it
     Then each exits 2 naming the root and saying canon migrate moves it
     And nothing is written
+
+  # canon: {"schema":1,"at":"2026-10-21T16:35:44Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.scaffold.14
+  Scenario: A scenario written into an explicit feature file still refuses a project id that names no configured spec root
+    Given a repo whose canon.yaml configures one spec root, game
+    When scenario new writes into an explicit --feature file under that root and names a --project-id that is no configured root
+    Then it exits 2 with UNKNOWN_SPEC_ROOT and writes nothing, even though the file itself lies under a configured root

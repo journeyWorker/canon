@@ -91,3 +91,13 @@ Feature: divergence lifecycle
     When the scenario's live binding still names that sha
     Then the folded state is resolved
     And the downgrade needs actual evidence of a mismatch, never merely the passage of a read
+
+  # canon: {"schema":1,"at":"2026-10-21T16:35:35Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:divergence-lifecycle
+  @case:failure
+  @divergence.lifecycle.10
+  Scenario: A divergence command whose project id names no configured spec root is refused
+    Given a repo whose canon.yaml configures one spec root, game
+    When divergence add, resolve, defer and accept each name a --project-id that is no configured root
+    Then each exits 2 with UNKNOWN_SPEC_ROOT and stages or commits no divergence record
+    And divergence status, which only reads, still lists what the ledger holds
