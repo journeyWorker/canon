@@ -1,0 +1,44 @@
+schema: vendor-audit
+created: 2026-10-21
+vendor_url: https://github.com/mattpocock/skills
+vendor_license: MIT
+subtree_prefix: vendors/mattpocock-skills
+upstream_branch: main
+upstream_sha: 5beb35b
+last_subtree_pull: 2026-10-21
+notes: |
+  canon keeps vendor trees local-only (gitignored), so onboard is a shallow
+  clone plus `_vendor_` isolation instead of git subtree.
+canon_surfaces:
+  - canon/skills/
+  - crates/canon-cli/
+  - evals/dogfood/
+phases:
+  - name: intake
+    status: done
+    evidence: docs/research/vendor-audits/mattpocock-skills/INTAKE.md
+  - name: onboard
+    status: done
+    evidence: docs/research/vendor-audits/mattpocock-skills/README.md
+  - name: survey
+    status: done
+    evidence: docs/research/vendor-audits/mattpocock-skills/README.md
+  - name: audit
+    status: done
+    evidence: docs/research/vendor-audits/mattpocock-skills/
+  - name: synthesize
+    status: done
+    evidence: docs/research/vendor-audits/mattpocock-skills/00-synthesis.md
+  - name: revalidate
+    status: done
+    evidence: docs/research/vendor-audits/00-cross-vendor-patterns.md
+  - name: map
+    status: done
+    evidence: docs/research/vendor-audits/CANON-ADOPTION-BRIEF.md
+  - name: decide
+    status: done
+    evidence: docs/research/vendor-audits/DECISIONS.md
+  - name: propose
+    status: done
+    evidence: docs/research/vendor-audits/DECISIONS.md
+    issues: [98, 99, 100]
