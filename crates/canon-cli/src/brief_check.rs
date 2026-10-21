@@ -1177,15 +1177,26 @@ pub fn guard_blockers(repo: &Path, change: &ChangeId) -> Vec<Finding> {
     findings
 }
 
-/// The finding counts `canon status` shows for `change`'s brief: `None`
-/// for a legacy brief (read as before, nothing shown) or no brief.
-pub fn status_counts(repo: &Path, change: &ChangeId, building: bool) -> Option<Counts> {
+/// The finding counts `canon status` shows for `change`'s brief, with the
+/// advisory rule ids found (the one with the most findings first, ties by
+/// rule id: what the planner's polish step names). `None` for a legacy
+/// brief (read as before, nothing shown) or no brief.
+pub fn status_report(repo: &Path, change: &ChangeId, building: bool) -> Option<(Counts, Vec<String>)> {
     let path = crate::brief::canon_brief(repo, change)?;
     let text = std::fs::read_to_string(&path).ok()?;
     let language = crate::language::configured(repo).unwrap_or_else(|_| Language::unset());
     let flows = if building && field(&text, "Approved:").is_some() { flow_scenarios(repo, change).ok() } else { None };
     let evaluation = evaluate(&text, &language, flows.as_ref());
-    (!evaluation.legacy).then(|| evaluation.counts())
+    if evaluation.legacy {
+        return None;
+    }
+    let mut per_rule: BTreeMap<&str, usize> = BTreeMap::new();
+    for f in evaluation.findings.iter().filter(|f| f.severity == Severity::Advisory) {
+        *per_rule.entry(f.rule.as_str()).or_default() += 1;
+    }
+    let mut rules: Vec<(&str, usize)> = per_rule.into_iter().collect();
+    rules.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+    Some((evaluation.counts(), rules.into_iter().map(|(rule, _)| rule.to_string()).collect()))
 }
 
 // ───────────────────────────── commands ─────────────────────────────

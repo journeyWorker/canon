@@ -100,3 +100,23 @@ Feature: report dashboard
     When the server receives it
     Then it answers 400 or 404 with the CLI error envelope
     And the brief file and the policy approval are untouched
+
+  # canon: {"schema":1,"at":"2026-10-21T16:25:09Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:report-generation
+  @case:happy
+  @report.dashboard.11
+  Scenario: The briefs page shows an advisory count badge per brief and its findings grouped by rule
+    Given an unapproved brief with advisories of two rules, one of them twice
+    When GET /api/briefs is requested and the briefs page renders the answer
+    Then the brief shows its advisory count as a badge next to its blocker count
+    And its advisories are grouped by rule id, each group naming the rule, its count, and each finding's line and matched text, rendered as text nodes
+
+  # canon: {"schema":1,"at":"2026-10-21T16:25:21Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:report-generation
+  @case:edge
+  @report.dashboard.12
+  Scenario: The briefs page totals the advisories of all listed briefs and shows none when there are none
+    Given two unapproved briefs, one with advisories and one with none
+    When GET /api/briefs is requested and the briefs page renders the answer
+    Then the page shows a total line counting the advisories of all listed briefs and the briefs holding them
+    And the brief with none shows no advisory badge, and a page with no advisories says so
