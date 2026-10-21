@@ -72,15 +72,6 @@
   ],
   "language": "en",
   "legacy": false,
-  "meta": {
-    "deprecated": [
-      {
-        "removedIn": "0.25.0",
-        "use": "--change-id",
-        "used": "--change"
-      }
-    ]
-  },
   "phase": "shaping",
   "waivers": []
 }
