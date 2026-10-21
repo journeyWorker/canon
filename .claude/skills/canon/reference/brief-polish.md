@@ -115,10 +115,10 @@ section turns on, and nothing else.
 ### `prose.code-citation`
 
 Catches code references in sentences: paths with a known extension,
-`path:line`, `dir/name` under a source directory, and backticked
+`path:line`, paths of two or more segments (`a/b/c`, `./x`), and backticked
 code-shaped identifiers (`a::b`, `f()`, `snake_case`, `obj.member`,
-`camelCase`). It does not catch UI labels, flags, commands, dates, routes
-or URLs, or the `Source:` line. Fix: say what the code does as behavior;
+`camelCase`). It does not catch UI labels, product names (`Next.js`, `iPhone`),
+flags, commands, dates, routes or URLs, or the `Source:` line. Fix: say what the code does as behavior;
 provenance goes on the one `Source:` line.
 
 - en. Before: "`NoteStore.save` in `src/store/notes.ts:212` drops the tag list." After: "Saving a note drops its tags." and, once, `Source: the note store's save path.`
@@ -136,13 +136,21 @@ background, delete it; if it is a doubt, move it to Questions and assumptions.
 
 ### `prose.decision-history`
 
-Catches dates (ISO dates, `10월 21일`, `Oct 21`) and decision notes ("we
-decided", "agreed on", "결정했", "하기로 했") in normative text and Intent.
-Fix: delete the history and write the decision as present behavior. A
-decision still open goes to Questions and assumptions.
+Normative text, Intent and table cells. One finding per sentence that holds
+a calendar date (`2026-10-21`, `2026년 10월`, `10월 21일`, `Oct 21`,
+`21 October`, `October 2026`) or a decision-history phrase (ko: `결정했다`,
+`결정했고`, `결정하여`, `결정됐다`, `정해졌다`, `합의했다`, `확정했다`, `~기로
+했다`, `회의에서`, `논의 결과`, `운영자 결정`; en: "we decided", "was decided",
+"as agreed", "approved by", "decided to", "decision on", "per the … decision").
+There is no gating: a date next to 부터 or after is a finding too. Fix: delete
+the history and write the decision as present behavior; a decision still open
+goes to Questions and assumptions. When the date is part of the behavior (an
+effective date, a deadline) or a quoted label, keep it and waive the rule in
+that section with the reason.
 
 - en. Before: "On 3 March the team agreed on a grid as the default view." After: "The default view is a grid."
 - ko. 전: "3월 3일 회의에서 기본 보기를 격자로 하기로 했다." 후: "기본 보기는 격자다."
+- waive: `<!-- canon:waive prose.decision-history detail "연체 요금은 2026-12-01부터 적용되는 동작이다" -->`
 
 ### `prose.ai-vocabulary`
 
@@ -156,20 +164,29 @@ verb and its object.
 
 ### `prose.ko-ending`
 
-Korean only. Catches a sentence that does not end in the plain declarative
-`~다`: polite `~니다`, `~시다`, `~요`; imperative `~라`; hortative `~자`;
-other endings. Questions, `없음.`, sentences ending in code or a quote, flow
-steps and list fragments are exempt. Fix: end the statement in `~다`.
+Korean only. Flagged everywhere, list items included: polite `~ㅂ니다`,
+`~ㅂ니까`, `~ㅂ시다` (합니다, 입니다, 없습니다; a plain word like 아니다 is not
+polite), `~십시오`, and a plain imperative: a terminated sentence, not a `label:`
+item, whose last word ends in 라 after a syllable with the vowel ㅏ ㅓ ㅕ ㅘ ㅝ ㅐ
+(해라, 하라, 남겨라, 줘라, 와라). The `~요` forms in `prose.colloquial`'s list
+(`~세요`, `~해요`, …) belong to that rule. Outside list items any terminated
+sentence not ending in `~다` is flagged, a plain hortative `~자` included. In a
+list item the plain `~자` is not detected: it is the same ending as the noun
+suffix in 참가자, 후보자, 하자, 주자, so keep a hortative out of lists yourself.
+Not flagged: questions, `없음.`, sentences ending in code or a quote, flow
+steps, list fragments without a verb, and a `label:` item. Known false
+positive: a noun ending in 라 after ㅏ/ㅓ (바라). Fix: end the statement in `~다`.
 
 - ko. 전: "목록이 비어 있으면 안내를 보여 줍니다." 후: "목록이 비어 있으면 안내를 보여 준다."
+- ko. 전: "- 재고를 확인해라." 후: "- 재고를 확인한다."
 
 ### `prose.length`
 
 Catches a section or the whole brief over its character budget; the finding
 states the measured value and the budget. Section budgets (ko / en
 characters): Intent 400 / 700, Outcome 500 / 900, Flow 800 / 1500, Detail
-2500 / 3500, Acceptance 1000 / 1800, Questions 800 / 1200, Out of scope 300 /
-600, Invariants and Checks 800 / 1500 each; whole brief 4000 / 6000. Fix: the
+2500 / 3500, Acceptance 1000 / 1800, Questions 800 / 1200, Invariants and
+Checks 800 / 1500 each (Out of scope has none); whole brief 4000 / 6000. Fix: the
 compression pass in `role-planner.md`: delete sentences that restate another
 section, turn parallel items into a list or table, move assumptions to
 Questions and assumptions and a not-doing list to Out of scope. A brief this
