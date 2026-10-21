@@ -293,7 +293,7 @@ line, was edited after its approval (`BRIEF_CHANGED_SINCE_APPROVAL`), or
 there is no canon `brief.md` yet but the change comes from an
 external openspec plan with a `proposal.md` under the plan sources (the
 check `canon status` and the ship guard use; see
-`canon-subject`). The subjects are the scenario's `@subject` owner for
+`canon-subject`; which changes a scenario answers to is scoped by its `@flow:<change>.<F-id>` tags, described there). The subjects are the scenario's `@subject` owner for
 `--scenario-id`, and every subject adopting the task's change for
 `--task`:
 

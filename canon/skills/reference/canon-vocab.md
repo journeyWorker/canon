@@ -101,6 +101,10 @@ NOT an attr value) and satisfies that directive's attrs:
       - "cargo test"
 ```
 
+When the body carries a continuation for another session, `summary` holds
+the next command and the claims already verified; reference artifacts and
+record ids instead of pasting them, and redact secrets.
+
 It's validated and compiled to a canon handoff body. Each
 `handoff-<domain>` directive declares its own attrs (e.g. `design` /
 `content` domains may require `acceptance-criteria` instead of
