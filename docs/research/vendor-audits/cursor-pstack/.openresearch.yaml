@@ -36,6 +36,7 @@ phases:
     status: done
     evidence: docs/research/vendor-audits/CANON-ADOPTION-BRIEF.md
   - name: decide
-    status: pending
+    status: done
+    evidence: docs/research/vendor-audits/DECISIONS.md
   - name: propose
     status: pending
