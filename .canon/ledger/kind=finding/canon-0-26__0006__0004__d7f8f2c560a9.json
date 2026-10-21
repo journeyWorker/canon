@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T19:42:14.624368320Z",
+  "change_id": "canon-0-26",
+  "disposition": "fixed",
+  "file_ref": "canon/skills/reference/brief-polish.md",
+  "kind": "finding",
+  "reason": "fixed in the round 6 fixes commit",
+  "resolution_sha": "3bcaef6426df33f8b1a5502ad1a99b2915cb0e50",
+  "reviewed_sha": "8e2e0d677a3bf269d49ebd9065baf24b0737fc40",
+  "reviewer": "canon-reviewer-026",
+  "round": 6,
+  "scenario_ids": [
+    "authoring.brief-check.10"
+  ],
+  "schema": 1,
+  "seq": 4,
+  "severity": "note",
+  "summary": "[probe] Open-syllable nouns beyond the pinned 보라/카메라/오페라 are reported as imperative ~라, notably loanwords common in tech briefs: '- 이번 변경의 대상은 인프라.' draws prose.ko-ending; 울트라, 엑스트라, 마스카라 fall in the same class. brief-polish could name the class (a noun-final 라 loanword) rather than three words."
+}
