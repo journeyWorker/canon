@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T19:27:27.022864693Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reviewed_sha": "8e2e0d677a3bf269d49ebd9065baf24b0737fc40",
+  "reviewer": "canon-reviewer-026",
+  "round": 6,
+  "scenario_ids": [
+    "authoring.brief-check.12"
+  ],
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[probe] Misspelled match= fails open: `… \"effective date\" match =\"2026-12-01\" -->` and `… \"effective date\" MATCH=\"2026-12-01\" -->` are accepted as section-wide waivers (reason recorded as 'effective date\" match =\"2026-12-01'), clearing the dated decision note beside the effective date. The reason is everything between the first and last quote, so an embedded quote is taken as reason text. The other way round, a reason that merely mentions it (\"see the match= note\") is brief.waiver-invalid. Refuse a quote inside the reason and any case-insensitive `match` token that is not exactly ` match=\"…\"`."
+}
