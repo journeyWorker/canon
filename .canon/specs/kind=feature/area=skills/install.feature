@@ -333,6 +333,7 @@ Feature: skills install
     Then the dropped file is removed from the Claude projection, and the check for Claude is clean
     And the Codex projection is untouched, including its copy of the dropped file
     And the user's file inside the Claude projection is untouched
+    And the install lock keeps the entries it recorded for the providers not selected, so a later install for one of them still prunes its dropped files and the check for it still names them
 
   # canon: {"schema":1,"at":"2026-10-21T11:51:00Z","actor":{"agent_id":"canon-impl-025"}}
   @subject:skills-install
@@ -347,3 +348,14 @@ Feature: skills install
     And the doctor reports an `orphan:` line for each, names the same fix, and does not report healthy
     And both commands are read-only: every file is where it was
     And after the install, which removes the unmodified orphan and keeps the edited one, the check is clean and the doctor reports healthy
+
+  # canon: {"schema":1,"at":"2026-10-21T12:37:45Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.63
+  Scenario: Install ignores a lock key that is not a plain relative path inside a canon projection
+    Given a target with canon's projection installed for Claude, and an install lock edited to list keys with empty, `.` or `..` segments or a trailing `/` inside the Claude projection directory
+    When canon skills check, canon skills doctor and the install run
+    Then those keys are never treated as orphans, and nothing outside the projection is touched or removed
+    And the doctor reports an `invalid-lock-entry:` line for each
+    And the install exits 0 and rewrites the lock without them
