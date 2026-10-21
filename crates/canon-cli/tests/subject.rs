@@ -12,7 +12,7 @@ use std::process::{Command, Output};
 
 use canon_model::{
     Actor, Change, ChangeId, ChangeStatus, Envelope, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, ProjectId, ProvenanceRef, RecordKind, Review,
-    RoleId, Scenario, ScenarioId, SessionId, Sha, SpecDigest, Subject, SubjectId, SubjectStatus,
+    RoleId, ScenarioId, SessionId, Sha, Subject, SubjectId, SubjectStatus,
 };
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
@@ -24,6 +24,8 @@ use tempfile::TempDir;
 /// touches to the git-backed `local` rung at `.canon/ledger` — the same
 /// root `GateCtx::from_repo` (the `verifying → shipped` evidence gate)
 /// resolves from `tiers.local.root`.
+mod support;
+
 const CANON_YAML: &str = "\
 tiers:
   local: { backend: git, root: .canon/ledger }
@@ -81,18 +83,14 @@ fn seed_subject_with_changes(repo: &Path, id: &str, status: SubjectStatus, scena
     let subject = Subject::new(envelope, SubjectId::parse(id).unwrap(), "Seeded", "s", "dev", status, RoleId::parse("implementer").unwrap())
         .with_change_ids(changes.iter().map(|c| ChangeId::parse(*c).unwrap()).collect());
     ledger(repo).write(&subject).unwrap();
+    // The scenarios live in `demo`'s configured spec root, which is what
+    // `--project-id demo` must name; a reader's stale-index refresh then
+    // indexes them instead of tombstoning records seeded into the ledger.
     for scenario_id in scenarios {
-        let envelope = Envelope::new(1, RecordKind::Scenario, Utc::now(), Actor::new("canon", RoleId::parse("implementer").unwrap()));
-        let mut scenario = Scenario::new(
-            envelope,
-            ProjectId::parse("demo").unwrap(),
-            ScenarioId::parse(*scenario_id).unwrap(),
-            "seeded",
-            "",
-            SpecDigest::of(scenario_id.as_bytes()),
-        );
-        scenario.subject_id = Some(SubjectId::parse(id).unwrap());
-        ledger(repo).write(&scenario).unwrap();
+        support::declare_scenario(repo, "demo", scenario_id, Some(id));
+    }
+    if !scenarios.is_empty() {
+        assert!(run(repo, &["inventory", "sync"]).status.success(), "indexing the seeded scenarios");
     }
 }
 
@@ -361,11 +359,8 @@ fn shipped_is_blocked_until_each_owned_surface_specifies_a_required_case() {
     assert!(err.contains("world.demo") && err.contains("@case:failure"), "must name the surface and the missing case: {err}");
     assert_eq!(query_subjects(dir.path(), &[])["records"][0]["status"], "verifying");
 
-    let envelope = Envelope::new(1, RecordKind::Scenario, Utc::now(), Actor::new("canon", RoleId::parse("implementer").unwrap()));
-    let mut failure = Scenario::new(envelope, ProjectId::parse("demo").unwrap(), ScenarioId::parse("world.demo.02").unwrap(), "refused", "", SpecDigest::of(b"02"));
-    failure.subject_id = Some(SubjectId::parse("demo-subject").unwrap());
-    failure.case = Some("failure".to_string());
-    ledger(dir.path()).write(&failure).unwrap();
+    support::declare_scenario_tagged(dir.path(), "demo", "world.demo.02", &["@subject:demo-subject".into(), "@case:failure".into()]);
+    assert!(run(dir.path(), &["inventory", "sync"]).status.success());
     seed_scenario_verdict(dir.path(), "world.demo.02", EvidenceVerdict::Faithful);
 
     let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
@@ -923,6 +918,7 @@ fn an_absent_require_review_is_byte_identical() {
 #[test]
 fn review_add_refuses_an_unsynced_scenario_and_names_inventory_sync() {
     let dir = repo();
+    support::declare_spec_root(dir.path(), "demo");
     let out = run(
         dir.path(),
         &[
@@ -1280,9 +1276,7 @@ fn evidence_add_69_no_refusal_when_the_brief_is_not_enforced() {
             _ => {
                 seed_subject_with_changes(dir.path(), "demo-subject", SubjectStatus::Building, &[], &["c-demo"]);
                 write_brief(dir.path(), "c-demo", "Status: draft, awaiting the human.\n");
-                let envelope = Envelope::new(1, RecordKind::Scenario, Utc::now(), Actor::new("canon", RoleId::parse("implementer").unwrap()));
-                let scenario = Scenario::new(envelope, ProjectId::parse("demo").unwrap(), ScenarioId::parse("world.demo.01").unwrap(), "seeded", "", SpecDigest::of(b"x"));
-                ledger(dir.path()).write(&scenario).unwrap();
+                support::declare_scenario(dir.path(), "demo", "world.demo.01", None);
             }
         }
         let out = attest_scenario(dir.path(), &[]);
@@ -1366,7 +1360,8 @@ fn evidence_add_71_the_approval_lifts_the_refusal() {
 /// `Approved:` line that is never read, under an explicit openspec plan
 /// source at the repo root.
 fn write_external_proposal(repo: &Path, change: &str) -> std::path::PathBuf {
-    std::fs::write(repo.join("canon.yaml"), format!("{CANON_YAML}plans:\n  sources:\n    - dialect: openspec\n      root: .\n")).unwrap();
+    let config = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
+    std::fs::write(repo.join("canon.yaml"), format!("{config}plans:\n  sources:\n    - dialect: openspec\n      root: .\n")).unwrap();
     let dir = repo.join("openspec/changes").join(change);
     std::fs::create_dir_all(&dir).unwrap();
     let proposal = dir.join("proposal.md");
@@ -1604,10 +1599,8 @@ fn subject_lifecycle_32_shipping_a_reopened_subject_runs_every_guard_again() {
     assert!(reopen(dir.path(), &[]).status.success());
 
     seed_blocker(dir.path(), None);
-    let envelope = Envelope::new(1, RecordKind::Scenario, Utc::now(), Actor::new("canon", RoleId::parse("implementer").unwrap()));
-    let mut follow_up = Scenario::new(envelope, ProjectId::parse("demo").unwrap(), ScenarioId::parse("world.demo.02").unwrap(), "follow-up", "", SpecDigest::of(b"02"));
-    follow_up.subject_id = Some(SubjectId::parse("demo-subject").unwrap());
-    ledger(dir.path()).write(&follow_up).unwrap();
+    support::declare_scenario(dir.path(), "demo", "world.demo.02", Some("demo-subject"));
+    assert!(run(dir.path(), &["inventory", "sync"]).status.success());
 
     let out = run(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped"]);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));

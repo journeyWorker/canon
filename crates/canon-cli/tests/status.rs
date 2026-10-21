@@ -17,6 +17,8 @@ use chrono::Utc;
 use serde_json::Value;
 use tempfile::TempDir;
 
+mod support;
+
 const CANON_YAML: &str = "\
 tiers:
   local: { backend: git, root: .canon/ledger }
@@ -322,8 +324,9 @@ fn status_counts_stale_and_unsigned_reviews() {
     let dir = repo();
     write_policy(dir.path(), FULL_POLICY);
     seed_subject(dir.path(), "demo-subject", SubjectStatus::Building, &[]);
-    seed_scenario(dir.path(), "world.demo.01", Some("demo-subject"), Some("happy"));
-    seed_scenario(dir.path(), "world.demo.02", Some("demo-subject"), Some("failure"));
+    // `review add --project-id demo` needs `demo` to be a configured root.
+    support::declare_scenario_tagged(dir.path(), "demo", "world.demo.01", &["@subject:demo-subject".into(), "@case:happy".into()]);
+    support::declare_scenario_tagged(dir.path(), "demo", "world.demo.02", &["@subject:demo-subject".into(), "@case:failure".into()]);
     seed_evidence(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
     seed_evidence(dir.path(), "world.demo.02", EvidenceVerdict::Faithful);
     let review = |scenario: &str, outcome: &str| {

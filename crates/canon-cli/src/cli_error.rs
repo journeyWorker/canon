@@ -310,6 +310,7 @@ const CODES: &[(&str, &str)] = &[
     ("UNKNOWN_COMMAND", "`canon schema` was given a command path canon does not have"),
     ("UNKNOWN_FIELD", "`--fields` names a field the records do not have"),
     ("UNKNOWN_ROLE", "`CANON_ROLE` holds a value that is not a role (planner, implementer, reviewer, orchestrator)"),
+    ("UNKNOWN_SPEC_ROOT", "`--project-id` names no spec root configured in canon.yaml, so nothing was written"),
     ("USAGE", "the command line did not parse: an unknown flag or subcommand, or a missing or malformed argument"),
     ("WRITE_FAILED", "a file or ledger record could not be written"),
 ];

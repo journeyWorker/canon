@@ -314,3 +314,33 @@ Feature: context status
     And its only step is canon subject status with verifying and a reason, which parses as printed
     And the reason says to keep the follow-up in its approved change (never canon change new), then scenario, evidence and review, and ship it again
     And once the reopen is followed the flag and the reopen step are gone
+
+  # canon: {"schema":1,"at":"2026-10-21T16:24:33Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:context-capability
+  @case:happy
+  @context.status.81
+  Scenario: A clean brief with advisories left gets the planner's polish step before the human stop
+    Given a subject whose unapproved brief has no blockers and advisories left
+    When canon status runs or a write returns meta.next
+    Then the planner's polish step comes first, naming reference/brief-polish.md, the advisory count, the top rule ids and canon brief check --change-id
+    And the human stop stays after it in the list, and while blockers remain only the canon brief check step is given
+
+  # canon: {"schema":1,"at":"2026-10-21T16:24:53Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:context-capability
+  @case:happy
+  @context.status.82
+  Scenario: A pending draft with advisories left gets the polish step before its report step
+    Given a subject with an approved change and a pending draft whose brief has no blockers and advisories left
+    When canon status runs
+    Then the first step for the draft is the planner's polish step naming the advisory count and rule ids, then canon brief check for it
+    And the human report step follows it, and the subject's own steps are not held back
+
+  # canon: {"schema":1,"at":"2026-10-21T16:25:01Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:context-capability
+  @case:edge
+  @context.status.83
+  Scenario: A brief with no advisories keeps the human stop alone, and approval ignores advisories
+    Given a brief with no blockers and no advisories, and another with advisories whose subject has a brief approval
+    When canon status runs and canon brief approve runs on the brief that has advisories
+    Then the clean brief's only step is the human stop, with no polish step
+    And the approval is recorded: advisories never refuse it

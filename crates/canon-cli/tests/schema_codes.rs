@@ -53,6 +53,8 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     // `promote_after_stage`'s command comes from its caller.
     ("gate.rs", &["gate task", "evidence add"]),
     ("init.rs", &["init"]),
+    // `require_spec_root`: the refusal of a `--project-id` no configured spec root carries, made by every write command that takes one.
+    ("inventory.rs", &["evidence add", "evidence approval-payload", "review add", "divergence add", "divergence resolve", "divergence defer", "divergence accept", "scenario new"]),
     ("learn.rs", &["learn"]),
     ("ledger.rs", &["ledger compact"]),
     // Every code is next to its emit.

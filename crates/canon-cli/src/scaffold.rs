@@ -373,6 +373,9 @@ impl Planner {
                 resolve_feature_path(root, tag.area(), tag.surface())
             }
             Some(feature) => {
+                if let Some(project) = spec.project.as_ref() {
+                    crate::inventory::check_spec_root(&self.roots, project)?;
+                }
                 let resolved: PathBuf = if feature.is_absolute() { feature.to_path_buf() } else { self.repo_root.join(feature) };
                 if !path_under_any_root(&resolved, &self.roots) {
                     return Err(CliError::refused("FEATURE_OUTSIDE_SPEC_ROOTS", format!("`{}` does not resolve under any configured `specs.roots[]` entry ({}); never a silent orphan write outside the validated corpus",

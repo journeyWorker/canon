@@ -140,6 +140,37 @@ export function renderFinding(finding: Finding): VNode {
   );
 }
 
+export interface RuleGroup {
+  rule: string;
+  findings: Finding[];
+}
+
+/** The advisories grouped by rule id: the rule with the most findings
+ * first, ties by rule id; findings keep their line order. */
+export function groupAdvisories(findings: Finding[]): RuleGroup[] {
+  const by = new Map<string, Finding[]>();
+  for (const f of findings) {
+    if (f.severity !== "advisory") continue;
+    by.set(f.rule, [...(by.get(f.rule) ?? []), f]);
+  }
+  return [...by.entries()]
+    .map(([rule, list]) => ({ rule, findings: [...list].sort((a, b) => a.line - b.line) }))
+    .sort((a, b) => b.findings.length - a.findings.length || (a.rule < b.rule ? -1 : a.rule > b.rule ? 1 : 0));
+}
+
+export function renderRuleGroup(group: RuleGroup): VNode {
+  return h(
+    "section",
+    { class: "rule-group", "data-rule-group": group.rule },
+    h("h4", {}, h("code", {}, group.rule), " ", h("span", { class: "badge badge-advisory rule-count" }, String(group.findings.length))),
+    h(
+      "ul",
+      { class: "findings" },
+      group.findings.map((f) => h("li", { class: "finding finding-advisory", "data-rule": f.rule }, `line ${f.line}: ${f.message}`, f.hint ? h("div", { class: "finding-hint" }, f.hint) : null)),
+    ),
+  );
+}
+
 /** The Approve button is off while the brief has blockers, while a request
  * is in flight, and until both the name and the note hold something. */
 export function approveDisabled(brief: Pick<Brief, "approvable">, by: string, note: string, busy: boolean): boolean {
@@ -154,6 +185,8 @@ export interface BriefHandlers {
 
 export function renderBrief(brief: Brief, handlers: BriefHandlers): VNode {
   const blockers = brief.findings.filter((f) => f.blocksApproval).length;
+  const others = brief.findings.filter((f) => f.severity !== "advisory");
+  const groups = groupAdvisories(brief.findings);
   const form = h(
     "form",
     { class: "approve-form", autocomplete: "off" },
@@ -170,6 +203,15 @@ export function renderBrief(brief: Brief, handlers: BriefHandlers): VNode {
       {},
       h("h2", {}, brief.changeId),
       h("p", { class: "panel-source" }, brief.brief, brief.subjects.length ? ` · subjects: ${brief.subjects.join(", ")}` : " · no subject adopts it"),
+      brief.counts.blockers > 0 || brief.counts.advisories > 0
+        ? h(
+            "p",
+            { class: "brief-counts" },
+            brief.counts.blockers > 0 ? h("span", { class: "badge badge-blocker" }, `${brief.counts.blockers} blocker${brief.counts.blockers === 1 ? "" : "s"}`) : null,
+            brief.counts.blockers > 0 && brief.counts.advisories > 0 ? " " : null,
+            brief.counts.advisories > 0 ? h("span", { class: "badge badge-advisory" }, advisoryText(brief.counts.advisories)) : null,
+          )
+        : null,
       brief.changedSinceApproval ? h("p", { class: "brief-changed" }, "Edited since it was approved: the approval no longer covers it.") : null,
     ),
     brief.sections.length > 0 ? brief.sections.map(renderSection) : h("pre", { class: "brief-raw" }, brief.text),
@@ -177,9 +219,9 @@ export function renderBrief(brief: Brief, handlers: BriefHandlers): VNode {
       "section",
       { class: "brief-section brief-check" },
       h("h3", {}, "Checks"),
-      brief.findings.length === 0
-        ? h("p", { class: "empty" }, "No findings.")
-        : h("ul", { class: "findings" }, [...brief.findings].sort((a, b) => Number(b.blocksApproval) - Number(a.blocksApproval)).map(renderFinding)),
+      brief.findings.length === 0 ? h("p", { class: "empty" }, "No findings.") : null,
+      others.length > 0 ? h("ul", { class: "findings" }, [...others].sort((a, b) => Number(b.blocksApproval) - Number(a.blocksApproval)).map(renderFinding)) : null,
+      groups.map(renderRuleGroup),
     ),
     brief.sections.length > 0 ? h("details", { class: "brief-raw-details" }, h("summary", {}, "Raw brief"), h("pre", { class: "brief-raw" }, brief.text)) : null,
     h("div", { class: "approve-message", role: "status" }),
@@ -196,7 +238,20 @@ export function renderBrief(brief: Brief, handlers: BriefHandlers): VNode {
   return card;
 }
 
+/** "1 advisory" / "3 advisories". */
+export function advisoryText(count: number): string {
+  return `${count} ${count === 1 ? "advisory" : "advisories"}`;
+}
+
+/** The page's total line: advisories across the listed briefs. */
+export function advisoryTotal(briefs: Pick<Brief, "counts">[]): string {
+  const total = briefs.reduce((sum, b) => sum + b.counts.advisories, 0);
+  if (total === 0) return "No advisories in the listed briefs.";
+  const holding = briefs.filter((b) => b.counts.advisories > 0).length;
+  return `${advisoryText(total)} in ${holding} of ${briefs.length} brief${briefs.length === 1 ? "" : "s"}.`;
+}
+
 export function renderBriefs(briefs: Brief[], handlers: BriefHandlers): VNode {
   if (briefs.length === 0) return h("p", { class: "empty briefs-empty" }, EMPTY_MESSAGE);
-  return h("div", { class: "briefs-list" }, briefs.map((brief) => renderBrief(brief, handlers)));
+  return h("div", { class: "briefs-list" }, h("p", { class: "briefs-total" }, advisoryTotal(briefs)), briefs.map((brief) => renderBrief(brief, handlers)));
 }

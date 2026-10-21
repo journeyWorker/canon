@@ -37,7 +37,7 @@ fn brief() -> String {
 <!-- canon:section outcome role=normative -->\n## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
 <!-- canon:section flow role=normative -->\n## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n\n\
 <!-- canon:section detail role=normative -->\n## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n\
-<!-- canon:section acceptance role=normative -->\n## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie.\n\n\
+<!-- canon:section acceptance role=normative -->\n## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie. ==**F1 is the happy path.**==\n\n\
 <!-- canon:section questions role=question -->\n## Questions and assumptions\n\nNone.\n\n\
 <!-- canon:section out-of-scope role=context -->\n## Out of scope\n\nSocial sign-in.\n"
         .to_string()
@@ -292,4 +292,62 @@ fn a_flow_step_with_only_a_happy_scenario_is_asked_for_its_failure_case_with_its
     // Once F2 has a failure scenario, no step asks for it again.
     ok(repo, &["scenario", "new", "auth.login.04", "--title", "Sign out twice", "--subject-id", "demo", "--case", "failure", "--flow", "F2", "--json"]);
     assert!(flow_step_of(repo, "F2").is_none(), "F2 is covered");
+}
+
+/// The fixture brief with its acceptance key sentence removed: no blockers,
+/// one `prose.key-sentence` advisory.
+fn brief_with_an_advisory() -> String {
+    brief().replace(" ==**F1 is the happy path.**==", "")
+}
+
+/// The steps `status --json` gives about `subject`.
+fn status_steps(repo: &Path, subject: &str) -> Vec<Value> {
+    let report = json_of(&canon(repo, &["status", "--json"], None), "status");
+    report["next"].as_array().unwrap().iter().filter(|step| step["why"].as_str().unwrap_or("").starts_with(subject)).cloned().collect()
+}
+
+/// context.status.81: a brief with no blockers and advisories left gets the
+/// planner's polish step first, naming the count and the rule ids, then the
+/// human stop; `meta.next` of a write says the same.
+#[test]
+fn context_status_81_the_polish_step_comes_before_the_human_stop() {
+    let (dir, _) = repo_with_change();
+    let repo = dir.path();
+    std::fs::write(repo.join(".canon/changes/add-login/brief.md"), brief_with_an_advisory()).unwrap();
+
+    let steps = status_steps(repo, "demo");
+    assert_eq!(steps.len(), 2, "{steps:?}");
+    assert_eq!((steps[0]["actor"].as_str(), steps[0]["role"].as_str()), (Some("agent"), Some("planner")), "{}", steps[0]);
+    let command = steps[0]["command"].as_str().unwrap();
+    assert!(command.contains("reference/brief-polish.md") && command.contains("`canon brief check --change-id add-login`"), "{command}");
+    let why = steps[0]["why"].as_str().unwrap();
+    assert!(why.contains("1 advisory finding(s)") && why.contains("prose.key-sentence"), "{why}");
+    assert_eq!((steps[1]["actor"].as_str(), steps[1]["role"].is_null()), (Some("human"), true), "{}", steps[1]);
+
+    let scenario = ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject-id", "demo", "--case", "happy", "--flow", "F1", "--json"]);
+    let next = meta_next(&scenario);
+    assert_eq!(&next[..2], &steps[..], "meta.next names the same two steps");
+
+    // Blockers still win: only the check step, no polish and no human step.
+    std::fs::write(repo.join(".canon/changes/add-login/brief.md"), brief_with_an_advisory().replace("## Out of scope\n\nSocial sign-in.", "## Out of scope\n\nTBD")).unwrap();
+    let blocked = status_steps(repo, "demo");
+    assert_eq!(blocked.len(), 1, "{blocked:?}");
+    assert_eq!(blocked[0]["command"], "canon brief check --change-id add-login");
+}
+
+/// context.status.83: with no advisories the human stop is the only step,
+/// and `canon brief approve` records an approval whatever advisories remain.
+#[test]
+fn context_status_83_no_advisories_keeps_the_human_stop_and_approve_ignores_advisories() {
+    let (dir, _) = repo_with_change();
+    let repo = dir.path();
+    let clean = status_steps(repo, "demo");
+    assert_eq!(clean.len(), 1, "{clean:?}");
+    assert_eq!(clean[0]["actor"], "human");
+
+    std::fs::write(repo.join(".canon/changes/add-login/brief.md"), brief_with_an_advisory()).unwrap();
+    assert_eq!(status_steps(repo, "demo").len(), 2);
+    let approved = ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
+    assert_eq!(meta_next(&approved)[0]["actor"], "agent");
+    assert!(status_steps(repo, "demo").iter().all(|s| !s["command"].as_str().unwrap().contains("brief-polish")), "an approved brief is not polished");
 }

@@ -909,3 +909,28 @@ fn evidence_add_102_evidence_recorded_after_adoption_does_not_exempt() {
     assert_eq!(again.status.code(), Some(1), "{}", stderr(&again));
     assert!(stderr(&again).contains("BRIEF_UNAPPROVED"), "{}", stderr(&again));
 }
+
+/// context.status.82: a pending draft whose brief has no blockers and
+/// advisories left gets the planner's polish step first, then the human
+/// report step; neither holds back the subject's own steps.
+#[test]
+fn context_status_82_a_pending_draft_with_advisories_is_polished_before_it_is_reported() {
+    let dir = repo_with_subject("verifying");
+    let repo = dir.path();
+    change(repo, "a", true);
+    scenario(repo, "shop.cart.01", Some("a.F1"));
+    ok(repo, &["change", "new", "b", "--subject-id", "s", "--title", "B"]);
+    std::fs::write(brief_path(repo, "b"), brief("").replace(" ==**F1 is the happy path.**==", "")).unwrap();
+
+    let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();
+    let steps = status["next"].as_array().unwrap();
+    let position = |needle: &str| steps.iter().position(|s| s["command"].as_str().unwrap().contains(needle));
+    let polish = position("reference/brief-polish.md").unwrap_or_else(|| panic!("{steps:?}"));
+    let report = position("report the pending draft's brief").unwrap_or_else(|| panic!("{steps:?}"));
+    assert_eq!(report, polish + 1, "{steps:?}");
+    assert_eq!(steps[polish]["role"], "planner");
+    assert!(steps[polish]["command"].as_str().unwrap().contains("`canon brief check --change-id b`"), "{}", steps[polish]);
+    let why = steps[polish]["why"].as_str().unwrap();
+    assert!(why.contains("1 advisory finding(s)") && why.contains("prose.key-sentence") && why.contains("not blocked meanwhile"), "{why}");
+    assert!(steps.len() > 2, "the subject's own steps stay: {steps:?}");
+}

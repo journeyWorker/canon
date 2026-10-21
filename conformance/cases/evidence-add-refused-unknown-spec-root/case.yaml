@@ -1,0 +1,16 @@
+description: "0.26 #104: a `--project-id` that names no spec root configured in canon.yaml (here `root`, in a repo whose only root is `game`) is refused with exit 2 and UNKNOWN_SPEC_ROOT before anything is written, by `canon evidence add` (single scenario, `--all-scenarios`, and `--json`), `canon review add` and `canon divergence add`; the hint names the one root to use, and the same commands succeed under `game`"
+steps:
+  - args: [inventory, sync]
+    exit: 0
+  - args: [evidence, add, --project-id, root, --scenario-id, cart.add.01, --kind, test-run, --ref, "npm test", --role, implementer, --actor-id, impl-agent]
+    exit: 2
+  - args: [evidence, add, --project-id, root, --all-scenarios, --report, "junit:reports/junit.xml", --kind, test-run, --ref, "npm test", --role, implementer, --actor-id, impl-agent]
+    exit: 2
+  - args: [evidence, add, --project-id, root, --scenario-id, cart.add.01, --kind, test-run, --ref, "npm test", --role, implementer, --actor-id, impl-agent, --json]
+    exit: 2
+  - args: [review, add, --project-id, root, --scenario-id, cart.add.01, --reviewer, reviewer-2, --pin, p1, --original-spec-ref, specs/cart.md, --actor-id, reviewer-2, --role, reviewer]
+    exit: 2
+  - args: [divergence, add, --project-id, root, --scenario-id, cart.add.01, --sha, "0000000000000000000000000000000000000000", --status, open, --round, "1", --reviewer, reviewer-2, --actor-id, reviewer-2, --role, reviewer]
+    exit: 2
+  - args: [evidence, add, --project-id, game, --scenario-id, cart.add.01, --kind, test-run, --ref, "npm test", --role, implementer, --actor-id, impl-agent]
+    exit: 0
