@@ -1,0 +1,2 @@
+canon change new: USAGE — --subject was removed in 0.25.0
+hint: --subject was renamed --subject-id in 0.24.0; use --subject-id

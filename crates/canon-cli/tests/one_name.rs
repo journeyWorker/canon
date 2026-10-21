@@ -2,8 +2,8 @@
 //!
 //! The contract: a concept has one flag spelling across every command
 //! (`--<noun>-id`), a `--kind` value names a record kind without the
-//! `_record` suffix, and the 0.23 spellings keep running for one release,
-//! each use warning once on stderr and, with `--json`, in `meta.deprecated`.
+//! `_record` suffix, and the 0.23 spellings 0.24 deprecated are refused (0.25 D6)
+//! as usage errors whose hint names the spelling that replaced them.
 //! The checker is a function over (command path, flags, `--kind` values), so
 //! its own test can feed it a synthetic split and prove it would catch one.
 
@@ -107,7 +107,7 @@ fn schema_json(args: &[&str]) -> Value {
 }
 
 /// Every command of the clap tree, read through `canon schema` (visible
-/// arguments only, so a hidden deprecated alias is not part of the surface).
+/// arguments only).
 fn command_tree() -> Vec<Surface> {
     let all = schema_json(&["schema", "--all", "--json"]);
     all["commands"]
@@ -168,7 +168,7 @@ fn context_capability_15_a_kind_value_never_carries_the_record_suffix() {
     assert!(std::fs::read_to_string(repo.join("canon.yaml")).unwrap().lines().any(|l| l.trim() == "evidence_record: local"), "the canon.yaml routing key keeps its stored name");
 }
 
-// ── the deprecated spellings ─────────────────────────────────────────────
+// ── the removed spellings ───────────────────────────────────────────────
 
 fn git(repo: &Path, args: &[&str]) {
     let out = Command::new("git").args(["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"]).args(args).current_dir(repo).output().expect("spawn git");
@@ -190,82 +190,98 @@ fn repo_with_change() -> tempfile::TempDir {
     dir
 }
 
-fn deprecation_lines(out: &Output) -> Vec<String> {
-    stderr(out).lines().filter(|l| l.contains("is deprecated")).map(str::to_string).collect()
+/// The usage error of a refused run: exit 2, code `USAGE`, one JSON document.
+fn usage_error(out: &Output) -> Value {
+    assert_eq!(out.status.code(), Some(2), "{}{}", stdout(out), stderr(out));
+    let body: Value = serde_json::from_slice(&out.stdout).expect("one JSON document");
+    assert_eq!(body["error"]["code"], "USAGE", "{body}");
+    assert!(!body["error"]["hint"].as_str().unwrap_or_default().is_empty(), "{body}");
+    body
 }
 
-/// context.capability.16: a deprecated flag still runs, warns once on stderr and
-/// is named in `meta.deprecated`; the canonical spelling does neither.
+/// context.capability.16: a removed flag is a usage error naming the flag that
+/// replaced it; the canonical spelling runs and the envelope has no `deprecated`.
 #[test]
-fn context_capability_16_a_deprecated_flag_spelling_still_runs_and_warns_once() {
+fn context_capability_16_a_removed_flag_spelling_is_refused_with_the_flag_that_replaced_it() {
     let dir = repo_with_change();
     let repo = dir.path();
 
     let old = canon_in(repo, &["change", "new", "add-search", "--subject", "demo", "--title", "Add search", "--json"]);
-    assert!(old.status.success(), "{}", stderr(&old));
-    assert_eq!(deprecation_lines(&old), vec!["canon change new: --subject is deprecated — use --subject-id (removed in 0.25.0)".to_string()]);
-    let body: Value = serde_json::from_slice(&old.stdout).expect("one JSON document");
-    assert_eq!(body["meta"]["deprecated"], serde_json::json!([{ "used": "--subject", "use": "--subject-id", "removedIn": "0.25.0" }]), "{body}");
-    assert!(repo.join(".canon/changes/add-search/brief.md").is_file(), "the old spelling ran the command");
+    let body = usage_error(&old);
+    assert_eq!(body["error"]["hint"], "--subject was renamed --subject-id in 0.24.0; use --subject-id", "{body}");
+    assert_eq!(body["error"]["field"], "--subject", "{body}");
+    assert!(!repo.join(".canon/changes/add-search").exists(), "a refused spelling runs nothing");
 
     let new = canon_in(repo, &["change", "new", "add-cart", "--subject-id", "demo", "--title", "Add cart", "--json"]);
-    assert!(deprecation_lines(&new).is_empty(), "{}", stderr(&new));
+    assert!(new.status.success(), "{}", stderr(&new));
     assert!(serde_json::from_slice::<Value>(&new.stdout).unwrap()["meta"].get("deprecated").is_none());
 
-    // The `=` form is the same flag; a global argument of `brief` covers its subcommands; a
-    // command whose JSON is not an envelope carries the same entry in its top-level `meta`.
-    let equals = canon_in(repo, &["brief", "check", "--change=add-login", "--json"]);
-    assert_eq!(deprecation_lines(&equals), vec!["canon brief check: --change is deprecated — use --change-id (removed in 0.25.0)".to_string()]);
-    let report: Value = serde_json::from_slice(&equals.stdout).expect("one JSON document");
-    assert_eq!(report["change"], "add-login", "the old spelling checked the named change: {report}");
-    assert_eq!(report["meta"]["deprecated"][0]["use"], "--change-id", "{report}");
-    let before_command = canon_in(repo, &["brief", "--change", "add-login", "check"]);
-    assert_eq!(deprecation_lines(&before_command).len(), 1, "{}", stderr(&before_command));
+    // The `=` form, a global argument placed before the subcommand, and a flag missing its value.
+    for args in [
+        &["brief", "check", "--change=add-login", "--json"][..],
+        &["brief", "check", "--change", "add-login", "--json"],
+        &["brief", "--change", "add-login", "check", "--json"],
+        &["brief", "check", "--change", "--json"],
+    ] {
+        let body = usage_error(&canon_in(repo, args));
+        assert_eq!(body["error"]["hint"], "--change was renamed --change-id in 0.24.0; use --change-id", "{args:?}: {body}");
+    }
+    let canonical = canon_in(repo, &["brief", "check", "--change-id", "add-login", "--json"]);
+    let report: Value = serde_json::from_slice(&canonical.stdout).expect("one JSON document");
+    assert_eq!(report["change"], "add-login", "{report}");
+    assert!(report["meta"].get("deprecated").is_none(), "{report}");
 
-    // Two deprecated spellings in one call: one line and one entry each.
-    let both = canon_in(repo, &["scenario", "new", "demo.login.01", "--title", "A sign-in", "--subject", "demo", "--actor", "alice", "--json"]);
-    assert!(both.status.success(), "{}", stderr(&both));
-    assert_eq!(deprecation_lines(&both).len(), 2, "{}", stderr(&both));
-    let body: Value = serde_json::from_slice(&both.stdout).unwrap();
-    assert_eq!(body["meta"]["deprecated"].as_array().unwrap().len(), 2, "{body}");
+    // Every removed flag, on a command that renamed it.
+    for (args, old, new) in [
+        (&["scenario", "new", "demo.login.01", "--title", "A", "--actor", "alice", "--json"][..], "--actor", "--actor-id"),
+        (&["scenario", "new", "demo.login.01", "--title", "A", "--project", "root", "--json"], "--project", "--project-id"),
+        (&["dispatch", "end", "--run", "r1", "--json"], "--run", "--run-id"),
+    ] {
+        let body = usage_error(&canon_in(repo, args));
+        assert_eq!(body["error"]["hint"], format!("{old} was renamed {new} in 0.24.0; use {new}"), "{args:?}: {body}");
+    }
+
+    // Without --json the refusal is still exit 2, on stderr, with the hint.
+    let human = canon_in(repo, &["brief", "check", "--change", "add-login"]);
+    assert_eq!(human.status.code(), Some(2));
+    assert!(stderr(&human).contains("use --change-id"), "{}", stderr(&human));
 }
 
-/// context.capability.17: a deprecated `--kind` value still runs and names the
-/// value to use.
+/// context.capability.17: a removed `--kind` value is a usage error naming the
+/// value that replaced it.
 #[test]
-fn context_capability_17_a_deprecated_kind_value_still_runs_and_warns_with_the_value_to_use() {
+fn context_capability_17_a_removed_kind_value_is_refused_with_the_value_that_replaced_it() {
     let dir = repo_with_change();
     let repo = dir.path();
 
-    for (command, old, new) in [("query", "review_record", "review"), ("export", "evidence_record", "evidence"), ("query", "finding_record", "finding")] {
-        let out = canon_in(repo, &[command, "--kind", old, "--json"]);
-        assert!(out.status.success(), "{command} {old}: {}", stderr(&out));
-        assert_eq!(deprecation_lines(&out), vec![format!("canon {command}: --kind {old} is deprecated — use --kind {new} (removed in 0.25.0)")], "{command} {old}");
-        let body: Value = serde_json::from_slice(&out.stdout).expect("one JSON document");
-        assert_eq!(body["meta"]["deprecated"], serde_json::json!([{ "used": format!("--kind {old}"), "use": format!("--kind {new}"), "removedIn": "0.25.0" }]), "{body}");
+    for (args, old, new) in [
+        (&["query", "--kind", "review_record", "--json"][..], "review_record", "review"),
+        (&["export", "--kind", "evidence_record", "--json"], "evidence_record", "evidence"),
+        (&["query", "--kind=finding_record", "--json"], "finding_record", "finding"),
+        (&["purge", "--kind=session_record", "--before", "2020-01-01T00:00:00Z", "--plan", "--json"], "session_record", "session"),
+    ] {
+        let body = usage_error(&canon_in(repo, args));
+        assert_eq!(body["error"]["hint"], format!("--kind {old} was renamed --kind {new} in 0.24.0; use --kind {new}"), "{args:?}: {body}");
     }
-    let equals = canon_in(repo, &["purge", "--kind=session_record", "--before", "2020-01-01T00:00:00Z", "--plan", "--json"]);
-    assert!(equals.status.success(), "{}", stderr(&equals));
-    assert_eq!(deprecation_lines(&equals).len(), 1, "{}", stderr(&equals));
 
     let canonical = canon_in(repo, &["query", "--kind", "evidence", "--json"]);
-    assert!(canonical.status.success() && deprecation_lines(&canonical).is_empty(), "{}", stderr(&canonical));
+    assert!(canonical.status.success(), "{}", stderr(&canonical));
     assert!(serde_json::from_slice::<Value>(&canonical.stdout).unwrap()["meta"].get("deprecated").is_none());
 
-    let unknown = canon_in(repo, &["query", "--kind", "nonsense", "--json"]);
-    assert_eq!(unknown.status.code(), Some(2));
-    assert!(deprecation_lines(&unknown).is_empty());
+    // An unknown value that was never a spelling gets no rename hint.
+    let unknown = usage_error(&canon_in(repo, &["query", "--kind", "nonsense", "--json"]));
+    assert!(!unknown.to_string().contains("renamed"), "{unknown}");
 }
 
-/// context.capability.18: help hides the old spellings; schema lists them.
+/// context.capability.18: help and schema show only the one name.
 #[test]
-fn context_capability_18_help_hides_the_deprecated_spellings_and_schema_lists_them() {
+fn context_capability_18_help_and_schema_show_only_the_one_name() {
     let dir = tempfile::tempdir().unwrap();
     for (args, canonical) in [(&["brief", "approve", "--help"][..], "--change-id"), (&["change", "new", "--help"], "--subject-id"), (&["query", "--help"], "--kind <KIND>"), (&["scenario", "new", "--help"], "--subject-id")] {
         let help = stdout(&canon_in(dir.path(), args));
         assert!(help.contains(canonical), "{args:?} help shows the canonical `{canonical}`:\n{help}");
         for old in ["--change ", "--change\n", "--subject ", "--subject\n", "--project ", "--actor ", "--run "] {
-            assert!(!help.contains(old), "{args:?} help shows the deprecated `{old:?}`:\n{help}");
+            assert!(!help.contains(old), "{args:?} help shows the removed `{old:?}`:\n{help}");
         }
         assert!(!help.contains("_record"), "{args:?} help shows a _record kind:\n{help}");
         if args[0] == "query" {
@@ -273,101 +289,82 @@ fn context_capability_18_help_hides_the_deprecated_spellings_and_schema_lists_th
         }
     }
 
-    let options = |command: &[&str]| -> Vec<Value> {
+    for command in [&["brief", "approve"][..], &["scenario", "new"], &["dispatch", "end"], &["query"], &["export"], &["purge"]] {
         let mut args = vec!["schema"];
         args.extend(command);
         args.push("--json");
-        schema_json(&args)["options"].as_array().unwrap().clone()
-    };
-    let option = |options: &[Value], name: &str| options.iter().find(|o| o["name"] == name).unwrap_or_else(|| panic!("no --{name}")).clone();
-
-    let brief_approve = options(&["brief", "approve"]);
-    assert_eq!(option(&brief_approve, "change-id")["deprecatedAliases"], serde_json::json!(["--change"]));
-    assert!(option(&brief_approve, "by").get("deprecatedAliases").is_none(), "only renamed options carry the field");
-    let scenario_new = options(&["scenario", "new"]);
-    for (new, old) in [("subject-id", "--subject"), ("change-id", "--change"), ("project-id", "--project"), ("actor-id", "--actor")] {
-        assert_eq!(option(&scenario_new, new)["deprecatedAliases"], serde_json::json!([old]), "{new}");
+        let schema = schema_json(&args);
+        for option in schema["options"].as_array().unwrap() {
+            assert!(option.get("deprecatedAliases").is_none() && option.get("deprecatedValues").is_none(), "{command:?}: {option}");
+            assert!(option["aliases"].as_array().unwrap().is_empty(), "{command:?}: no alias keeps an old spelling: {option}");
+        }
     }
-    assert_eq!(option(&options(&["dispatch", "end"]), "run-id")["deprecatedAliases"], serde_json::json!(["--run"]));
-
-    for command in ["query", "export", "purge"] {
-        let kind = option(&options(&[command]), "kind");
-        let values = kind["deprecatedValues"].as_array().unwrap();
-        assert_eq!(values.len(), 14, "{command}");
-        assert!(values.contains(&serde_json::json!({ "value": "evidence_record", "use": "evidence" })), "{command}: {values:?}");
-        assert!(values.contains(&serde_json::json!({ "value": "review_record", "use": "review" })), "{command}: {values:?}");
-        let possible: Vec<&str> = kind["possibleValues"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
-        assert!(possible.contains(&"evidence") && possible.iter().all(|v| !v.ends_with("_record")), "{command}: {possible:?}");
-    }
-    assert!(option(&options(&["change", "new"]), "kind").get("deprecatedValues").is_none(), "change new's --kind is not a record kind");
+    let kind = schema_json(&["schema", "query", "--json"])["options"].as_array().unwrap().iter().find(|o| o["name"] == "kind").unwrap().clone();
+    let possible: Vec<&str> = kind["possibleValues"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
+    assert!(possible.contains(&"evidence") && possible.iter().all(|v| !v.ends_with("_record")), "{possible:?}");
 }
 
-/// context.capability.19: only a token clap reads as a flag counts.
+/// context.capability.19: only a token clap reads as a flag is a removed spelling.
 #[test]
-fn context_capability_19_a_token_after_the_separator_or_an_option_value_is_never_a_deprecated_spelling() {
+fn context_capability_19_a_token_after_the_separator_or_an_option_value_is_never_a_removed_spelling() {
     let dir = repo_with_change();
     let repo = dir.path();
 
-    // A value that is spelled like a deprecated flag.
+    // A value that is spelled like a removed flag.
     let value = canon_in(repo, &["change", "new", "add-search", "--subject-id", "demo", "--title=--subject", "--json"]);
     assert!(value.status.success(), "{}", stderr(&value));
-    assert!(deprecation_lines(&value).is_empty(), "{}", stderr(&value));
     let brief = std::fs::read_to_string(repo.join(".canon/changes/add-search/brief.md")).unwrap();
     assert!(brief.contains("--subject"), "the value reached the brief untouched: {brief}");
 
     // Everything after `--` is positional.
     let after = canon_in(repo, &["schema", "--json", "--", "--change"]);
-    assert!(deprecation_lines(&after).is_empty(), "{}", stderr(&after));
+    assert!(!stdout(&after).contains("was removed"), "{}", stdout(&after));
 
-    // `--change=<slug>` with an equals sign is a flag, read as the deprecated spelling like `--change <slug>`.
-    let equals = canon_in(repo, &["brief", "check", "--change=add-login", "--json"]);
-    let spaced = canon_in(repo, &["brief", "check", "--change", "add-login", "--json"]);
-    let canonical = canon_in(repo, &["brief", "check", "--change-id", "add-login", "--json"]);
-    let expected = "canon brief check: --change is deprecated — use --change-id (removed in 0.25.0)".to_string();
-    assert_eq!(deprecation_lines(&equals), vec![expected.clone()], "{}", stderr(&equals));
-    assert_eq!(deprecation_lines(&spaced), vec![expected], "{}", stderr(&spaced));
-    assert!(deprecation_lines(&canonical).is_empty(), "{}", stderr(&canonical));
-    assert_eq!(equals.status.code(), canonical.status.code());
+    // As a flag it is refused, with a space or an equals sign.
+    for args in [&["brief", "check", "--change=add-login", "--json"][..], &["brief", "check", "--change", "add-login", "--json"]] {
+        usage_error(&canon_in(repo, args));
+    }
 }
 
-/// context.capability.20: a usage error names the canonical spelling.
+/// context.capability.20: a removed spelling is refused only on the commands
+/// that renamed it.
 #[test]
-fn context_capability_20_a_usage_error_names_the_canonical_spelling() {
+fn context_capability_20_a_removed_spelling_is_refused_only_on_the_commands_that_renamed_it() {
     let dir = repo_with_change();
-    let out = canon_in(dir.path(), &["brief", "check", "--change", "--json"]);
-    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
-    let body: Value = serde_json::from_slice(&out.stdout).expect("one JSON document");
-    assert_eq!(body["error"]["code"], "USAGE", "{body}");
-    let text = body.to_string();
-    assert!(text.contains("--change-id") && !text.contains("'--change'"), "{text}");
-    assert!(!body["error"]["hint"].as_str().unwrap().is_empty(), "{body}");
+    let other = usage_error(&canon_in(dir.path(), &["status", "--subject", "demo", "--json"]));
+    assert!(!other.to_string().contains("renamed"), "{other}");
+    let renamed = usage_error(&canon_in(dir.path(), &["brief", "check", "--change", "--json"]));
+    assert!(renamed["error"]["hint"].as_str().unwrap().contains("use --change-id"), "{renamed}");
 }
 
-/// context.capability.21: a `scenario new --from` line may still use the old key names.
+/// context.capability.21: a `scenario new --from` line with a removed key refuses
+/// the batch and names the key to use.
 #[test]
-fn context_capability_21_a_scenario_batch_line_may_still_carry_the_deprecated_key_names() {
+fn context_capability_21_a_scenario_batch_line_with_a_removed_key_name_refuses_the_batch() {
     let dir = repo_with_change();
     let repo = dir.path();
-    let lines = [
-        r#"{"id":"demo.login.01","title":"One","subject":"demo","project":"root"}"#,
-        r#"{"id":"demo.login.02","title":"Two","subject":"demo","case":"failure"}"#,
-        r#"{"id":"demo.login.03","title":"Three","subject-id":"demo","project-id":"root"}"#,
-    ];
     let file = repo.join("batch.ndjson");
+    for (key, new) in [("subject", "subject-id"), ("project", "project-id")] {
+        let lines = [r#"{"id":"demo.login.01","title":"One","subject-id":"demo"}"#.to_string(), format!(r#"{{"id":"demo.login.02","title":"Two","{key}":"{}"}}"#, if key == "subject" { "demo" } else { "root" })];
+        std::fs::write(&file, lines.join("\n")).unwrap();
+        let out = canon_in(repo, &["scenario", "new", "--from", "batch.ndjson", "--json"]);
+        assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+        let body: Value = serde_json::from_slice(&out.stdout).expect("one JSON document");
+        assert_eq!(body["error"]["code"], "SCAFFOLD_INVALID_ARGUMENT", "{body}");
+        let item = &body["data"]["items"][0];
+        assert_eq!(item["line"], 2, "{body}");
+        assert_eq!(item["error"]["field"], key, "{body}");
+        assert_eq!(item["error"]["hint"], format!("`{key}` was renamed `{new}` in 0.24.0; use `{new}`"), "{body}");
+        assert!(!repo.join(".canon/specs/kind=feature/area=demo/login.feature").exists(), "a refused batch writes nothing");
+    }
+
+    let lines = [
+        r#"{"id":"demo.login.01","title":"One","subject-id":"demo","project-id":"root"}"#,
+        r#"{"id":"demo.login.02","title":"Two","subject-id":"demo","case":"failure"}"#,
+    ];
     std::fs::write(&file, lines.join("\n")).unwrap();
     let out = canon_in(repo, &["scenario", "new", "--from", "batch.ndjson", "--json"]);
     assert!(out.status.success(), "{}", stderr(&out));
-    let mut seen = deprecation_lines(&out);
-    seen.sort();
-    assert_eq!(
-        seen,
-        vec![
-            "canon scenario new: --project is deprecated — use --project-id (removed in 0.25.0)".to_string(),
-            "canon scenario new: --subject is deprecated — use --subject-id (removed in 0.25.0)".to_string(),
-        ]
-    );
-    let body: Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(body["meta"]["deprecated"].as_array().unwrap().len(), 2, "{body}");
     let feature = std::fs::read_to_string(repo.join(".canon/specs/kind=feature/area=demo/login.feature")).unwrap();
-    assert_eq!(feature.matches("@subject:demo").count(), 3, "{feature}");
+    assert_eq!(feature.matches("@subject:demo").count(), 2, "{feature}");
 }

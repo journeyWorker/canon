@@ -66,10 +66,8 @@ pub struct QueryOutcome {
 /// [`kind_cli_name`] (e.g. `handoff`, `strategy_item`, `evidence`): the
 /// snake_case wire string of `canon.yaml`'s own `routing`/`aging` keys
 /// (`canon-store`'s `policy` module doc) without the `_record` suffix.
-/// A deprecated `<kind>_record` value is accepted and mapped.
 pub fn parse_kind(s: &str) -> Result<RecordKind, String> {
-    let canonical = crate::deprecation::kind_replacement(s).unwrap_or(s);
-    RecordKind::ALL.into_iter().find(|k| kind_cli_name(*k) == canonical).ok_or_else(|| {
+    RecordKind::ALL.into_iter().find(|k| kind_cli_name(*k) == s).ok_or_else(|| {
         let known = RecordKind::ALL.iter().map(|k| kind_cli_name(*k)).collect::<Vec<_>>().join(", ");
         format!("unknown record kind `{s}` (expected one of: {known})")
     })
@@ -88,12 +86,10 @@ pub fn kind_cli_name(kind: RecordKind) -> &'static str {
 }
 
 /// `--kind`'s clap parser: one of the record kinds, known to clap. The
-/// deprecated `<kind>_record` spellings parse too, hidden from help and from
-/// the possible values `canon schema` lists ([`crate::deprecation::KIND_VALUES`]).
+/// removed `<kind>_record` spellings do not parse ([`crate::removed`]).
 pub fn kind_parser() -> impl clap::builder::TypedValueParser<Value = RecordKind> {
     let visible = RecordKind::ALL.iter().map(|k| clap::builder::PossibleValue::new(kind_cli_name(*k)));
-    let deprecated = crate::deprecation::KIND_VALUES.iter().map(|(old, _)| clap::builder::PossibleValue::new(*old).hide(true));
-    crate::cli_error::closed_set(visible.chain(deprecated).collect::<Vec<_>>(), parse_kind)
+    crate::cli_error::closed_set(visible.collect::<Vec<_>>(), parse_kind)
 }
 
 /// `--since`'s `clap` value parser — an RFC3339/ISO-8601 timestamp.
@@ -638,7 +634,6 @@ fn finish_json(payload: &mut Value, outcome: &QueryOutcome) {
     if let Some(page) = &outcome.page {
         object.insert("meta".to_string(), page.to_json());
     }
-    crate::deprecation::tag_document(payload);
 }
 
 /// The human tail both formatters share: the next-cursor line when more
