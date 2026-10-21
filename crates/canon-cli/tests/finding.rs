@@ -1522,12 +1522,42 @@ fn finding_close_85_a_blank_or_multi_line_reason_is_refused() {
     }
 }
 
+/// finding.close.02: a close changes the disposition, the resolution sha, the
+/// optional reason, and the actor and time of the transition; every other
+/// field of the body is the previous version's.
+#[test]
+fn finding_close_02_a_close_adds_only_the_disposition_resolution_sha_reason_actor_and_time() {
+    let (dir, head) = git_repo();
+    let repo = dir.path();
+    let added = add(repo, &["--round", "1", "--seq", "1", "--reviewer", "r", "--summary", "needs a guard", "--file-ref", "src/a.rs:1-2", "--introduced-by", &head, "--reviewed-sha", &head, "--actor-id", "raiser"]);
+    assert!(added.status.success(), "{}", stderr(&added));
+    assert!(run_canon(&["gate", "promote"], repo).status.success());
+    let previous = body_at(&committed_findings(repo).remove(0));
+
+    let closed = close(repo, &["--disposition", "rejected", "--reason", "works as designed", "--actor-id", "closer"]);
+    assert!(closed.status.success(), "{}{}", stdout(&closed), stderr(&closed));
+    assert!(run_canon(&["gate", "promote"], repo).status.success());
+    let next = committed_findings(repo).iter().map(|p| body_at(p)).find(|b| b["disposition"] == "rejected").expect("the close");
+    assert_eq!(next["reason"], "works as designed", "{next}");
+    assert_eq!(next["actor"]["agent_id"], "closer", "{next}");
+
+    let strip = |mut body: serde_json::Value| {
+        let object = body.as_object_mut().unwrap();
+        for key in ["disposition", "resolution_sha", "reason", "actor", "at"] {
+            object.remove(key);
+        }
+        body
+    };
+    assert_eq!(strip(next), strip(previous), "a close adds nothing but those fields");
+}
+
 /// finding.close.86: under the default manual promote, a staged close
 /// carrying a reason promotes; changing only the reason is still refused.
 #[test]
 fn finding_close_86_a_staged_close_with_a_reason_promotes_and_a_bare_reason_change_does_not() {
     let dir = repo();
     let repo = dir.path();
+    std::fs::write(repo.join("canon.yaml"), "routing:\n  finding: local\nwrite:\n  promote: manual\n").unwrap();
     committed_open(repo);
     let out = close(repo, &["--disposition", "rejected", "--reason", "works as designed"]);
     assert!(out.status.success() && stdout(&out).contains("canon gate promote"), "{}{}", stdout(&out), stderr(&out));
@@ -1537,14 +1567,33 @@ fn finding_close_86_a_staged_close_with_a_reason_promotes_and_a_bare_reason_chan
     assert!(staged_findings(repo).is_empty());
     assert_eq!(committed_findings(repo).len(), 2);
 
-    let mut tampered = committed_findings(repo).iter().map(|p| body_at(p)).find(|b| b["disposition"] == "rejected").unwrap();
+    let promoted_close = committed_findings(repo).iter().map(|p| body_at(p)).find(|b| b["disposition"] == "rejected").unwrap();
+    assert_eq!(promoted_close["reason"], "works as designed", "the promoted close carries the given reason: {promoted_close}");
+
+    // The same close with only its reason changed, staged under the file
+    // name the layout requires (the digest of the original close's name).
+    let promoted_name = committed_findings(repo)
+        .iter()
+        .find(|p| body_at(p)["disposition"] == "rejected")
+        .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+        .unwrap();
+    let mut tampered = promoted_close.clone();
     tampered["reason"] = "a different story".into();
     tampered["at"] = "2030-01-01T00:00:00Z".into();
     let staging = repo.join(".canon/ledger/_staging/kind=finding");
     std::fs::create_dir_all(&staging).unwrap();
-    std::fs::write(staging.join("hand-written.json"), serde_json::to_string(&tampered).unwrap()).unwrap();
+    std::fs::write(staging.join(&promoted_name), serde_json::to_string(&tampered).unwrap()).unwrap();
+    // The layout names the file by the body's digest; the first refusal says
+    // which name the body needs, so the second one is past the layout rule.
+    let layout = run_canon(&["gate", "promote"], repo);
+    let layout_text = format!("{}{}", stdout(&layout), stderr(&layout));
+    let wanted = layout_text.split("expected `kind=finding/").nth(1).and_then(|r| r.split('`').next()).expect("the layout refusal names the file").to_string();
+    std::fs::rename(staging.join(&promoted_name), staging.join(&wanted)).unwrap();
     let refused = run_canon(&["gate", "promote"], repo);
-    assert!(!refused.status.success(), "a reason change outside a close must be refused: {}{}", stdout(&refused), stderr(&refused));
+    let text = format!("{}{}", stdout(&refused), stderr(&refused));
+    assert!(!refused.status.success(), "a reason change outside a close must be refused: {text}");
+    assert!(!text.contains("expected kind=finding"), "the refusal must not be the file-layout rule: {text}");
+    assert!(text.contains("already-committed record with a DIFFERENT body"), "the refusal is the identity check: {text}");
     assert_eq!(committed_findings(repo).len(), 2, "nothing new committed");
     assert!(!staged_findings(repo).is_empty(), "the refused body stays staged");
 }
