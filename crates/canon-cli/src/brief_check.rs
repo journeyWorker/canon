@@ -1117,7 +1117,6 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
                     eprintln!("{}", error.human("canon brief check"));
                     value["error"] = error.to_json()["error"].clone();
                 }
-                crate::deprecation::tag_document(&mut value);
                 println!("{}", serde_json::to_string_pretty(&value).expect("a JSON value always serializes"));
             }
             Err(e) => return CliError::failed("SERIALIZE_FAILED", e.to_string()).hint("this is a canon bug: report it together with the command line that produced it").emit("canon brief check", true),
@@ -1225,8 +1224,7 @@ pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
     let next = next_steps(ev);
     if json {
         let body = NextJson { change: checked.change.as_str(), brief: &checked.brief, state, counts, next };
-        let mut document = serde_json::to_value(&body).unwrap_or_default();
-        crate::deprecation::tag_document(&mut document);
+        let document = serde_json::to_value(&body).unwrap_or_default();
         println!("{}", serde_json::to_string_pretty(&document).unwrap_or_default());
     } else {
         println!("canon brief: {} — {state} ({} blocker(s), {} advisory(ies))", checked.brief, counts.blockers, counts.advisories);

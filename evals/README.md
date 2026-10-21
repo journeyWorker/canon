@@ -140,4 +140,4 @@ an unreadable path exits 2. `--json` is intended for CI aggregation. The
 checker reports only side effects explicit in the trace; it does not claim to
 audit arbitrary subprocess filesystem activity.
 
-The report also carries `wrong_shape_calls` (nonzero-exit canon calls with their error code, classed `naming` when a flag or `--kind` value was refused because of its spelling, such as `--change` for `--change-id` or `review_record` for `evidence`, else `other`) and `deprecated_spellings` (calls whose output warned `is deprecated — use` or carried `meta.deprecated`, with used and replacement). Both are informational and never fail a hard check.
+The report also carries `wrong_shape_calls` (nonzero-exit canon calls with their error code, classed `naming` when a flag or `--kind` value was refused because of its spelling, such as `--change` for `--change-id` or `review_record` for `evidence`, else `other`); a removed 0.24 spelling (`--change was renamed --change-id in 0.24.0; use --change-id`) is a naming failure. Informational; it never fails a hard check.

@@ -1759,6 +1759,14 @@ enum ArtifactsCommand {
 /// caller that asked for JSON gets JSON on stdout.
 fn usage_error(error: &clap::Error) -> ExitCode {
     let json = argv_wants_json();
+    // A spelling 0.24 deprecated and 0.25 removed: the refusal names its replacement (0.25 D6).
+    if error.use_stderr() {
+        let args: Vec<String> = std::env::args().skip(1).collect();
+        if let Some(removed) = canon_cli::removed::find(&Cli::command(), &args) {
+            let command = format!("canon {}", removed.command);
+            return ExitCode::from(CliError::refused("USAGE", removed.message()).hint(removed.hint()).field(removed.field.clone()).expected([removed.replacement.clone()]).emit(command.trim(), json) as u8);
+        }
+    }
     if !json || !error.use_stderr() {
         error.exit();
     }
@@ -1830,14 +1838,9 @@ fn run_divergence_add(args: DivergenceAddArgs) -> ExitCode {
     }
 }
 
-/// The clap tree with the deprecated spellings accepted ([`canon_cli::deprecation::apply`]).
-fn cli_command() -> clap::Command {
-    canon_cli::deprecation::apply(Cli::command())
-}
-
 fn main() -> ExitCode {
     set_sigpipe(true);
-    let command = cli_command();
+    let command = Cli::command();
     let mut matches = match command.clone().try_get_matches() {
         Ok(matches) => matches,
         Err(error) => return usage_error(&error),
@@ -1846,8 +1849,6 @@ fn main() -> ExitCode {
         Ok(cli) => cli,
         Err(error) => return usage_error(&error.format(&mut command.clone())),
     };
-    // A deprecated spelling ran: say so once on stderr, and on the JSON envelope (0.24 D2).
-    canon_cli::deprecation::warn(canon_cli::deprecation::scan(&command, &std::env::args().skip(1).collect::<Vec<_>>()));
     // The role is resolved before any command runs, so an unknown `CANON_ROLE` refuses the invocation.
     if let Err(error) = canon_cli::role::init(cli.declared_role) {
         return ExitCode::from(error.emit("canon", argv_wants_json()) as u8);
@@ -2228,7 +2229,7 @@ fn main() -> ExitCode {
             DispatchCommand::Diff { repo, json } => canon_cli::dispatch::run_diff(&repo, json),
         },
         Command::Selftest { json } => canon_cli::selftest::run_selftest(json),
-        Command::Schema { path, json, errors, all } => ExitCode::from(canon_cli::schema::run(&cli_command(), &path, json, errors, all)),
+        Command::Schema { path, json, errors, all } => ExitCode::from(canon_cli::schema::run(&Cli::command(), &path, json, errors, all)),
     }
 }
 
@@ -3088,14 +3089,14 @@ mod schema_drift {
     /// leaf, so `canon schema` cannot drift from the parser.
     #[test]
     fn schema_metadata_matches_the_command_tree() {
-        let problems = canon_cli::schema::check_metadata(&cli_command(), canon_cli::schema::META);
+        let problems = canon_cli::schema::check_metadata(&Cli::command(), canon_cli::schema::META);
         assert!(problems.is_empty(), "{}", problems.join("\n"));
     }
 
     /// Every clap leaf command carries one example and every example names a leaf.
     #[test]
     fn schema_examples_match_the_command_tree() {
-        let problems = canon_cli::schema::check_examples(&cli_command());
+        let problems = canon_cli::schema::check_examples(&Cli::command());
         assert!(problems.is_empty(), "{}", problems.join("\n"));
     }
 }

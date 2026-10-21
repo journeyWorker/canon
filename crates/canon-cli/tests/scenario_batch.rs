@@ -37,8 +37,8 @@ fn repo() -> TempDir {
 }
 
 const THREE: &str = "# the login scenarios\n\n\
-{\"id\":\"auth.login.01\",\"title\":\"Sign in\",\"subject\":\"demo\",\"case\":\"happy\"}\n\
-{\"id\":\"auth.login.02\",\"title\":\"Wrong password\",\"subject\":\"demo\",\"lane\":\"behavior\",\"case\":\"failure\"}\n\
+{\"id\":\"auth.login.01\",\"title\":\"Sign in\",\"subject-id\":\"demo\",\"case\":\"happy\"}\n\
+{\"id\":\"auth.login.02\",\"title\":\"Wrong password\",\"subject-id\":\"demo\",\"lane\":\"behavior\",\"case\":\"failure\"}\n\
 {\"id\":\"@auth.session.01\",\"title\":\"Session expires\"}\n";
 
 fn features(repo: &Path) -> Vec<(PathBuf, String)> {
@@ -104,7 +104,7 @@ fn a_file_source_works_like_stdin() {
 fn one_bad_line_writes_nothing_and_names_that_line() {
     let dir = repo();
     let batch = "{\"id\":\"auth.login.01\",\"title\":\"Sign in\"}\n\
-{\"id\":\"auth.login.02\",\"title\":\"Wrong password\",\"subject\":\"demo\",\"flow\":\"F9\"}\n\
+{\"id\":\"auth.login.02\",\"title\":\"Wrong password\",\"subject-id\":\"demo\",\"flow\":\"F9\"}\n\
 {\"id\":\"auth.login.03\",\"title\":\"Locked out\"}\n";
     let out = run(dir.path(), &["scenario", "new", "--from", "-", "--json"], Some(batch));
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));

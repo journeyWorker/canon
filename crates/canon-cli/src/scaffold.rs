@@ -492,33 +492,33 @@ pub fn run_scenario_new(repo: &Path, spec: &ScenarioSpec, actor: &Actor, at: Dat
 }
 
 /// One `--from` line: the single form's fields by their long flag names
-/// (`id` for the positional tag). The deprecated names of the renamed flags
-/// (`subject`, `change`, `project`: [`crate::deprecation::FLAGS`]) are read
-/// too and warned about ([`warn_deprecated_keys`]).
+/// (`id` for the positional tag). The removed names of the renamed flags
+/// (`subject`, `change`, `project`) are refused with the name to use
+/// ([`removed_key_refusal`]).
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct BatchLine {
     id: String,
     title: String,
-    #[serde(rename = "subject-id", alias = "subject")]
+    #[serde(rename = "subject-id")]
     subject_id: Option<String>,
     lane: Option<String>,
     case: Option<String>,
     flow: Option<String>,
-    #[serde(rename = "change-id", alias = "change")]
+    #[serde(rename = "change-id")]
     change_id: Option<String>,
     feature: Option<PathBuf>,
-    #[serde(rename = "project-id", alias = "project")]
+    #[serde(rename = "project-id")]
     project_id: Option<String>,
 }
 
-/// Warns once for each deprecated key of a `--from` line.
-fn warn_deprecated_keys(line: &serde_json::Value) {
-    for old in ["subject", "change", "project"] {
-        if line.get(old).is_some() {
-            crate::deprecation::warn_input_name("scenario new", old);
-        }
-    }
+/// The refusal for a `--from` line that still carries a removed key.
+fn removed_key_refusal(line: &serde_json::Value) -> Option<CliError> {
+    ["subject", "change", "project"].into_iter().find_map(|old| {
+        line.get(old)?;
+        let new = crate::removed::batch_key_replacement(old)?;
+        Some(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", format!("`{old}` was removed in 0.25.0")).hint(crate::removed::batch_key_hint(old, new)).field(old).expected([new]))
+    })
 }
 
 impl BatchLine {
@@ -554,6 +554,9 @@ struct BadLine {
 impl BadLine {
     fn to_json(&self) -> serde_json::Value {
         let mut error = serde_json::json!({ "code": self.error.code, "message": self.error.message });
+        if let Some(hint) = &self.error.hint {
+            error["hint"] = serde_json::json!(hint);
+        }
         if let Some(field) = &self.error.field {
             error["field"] = serde_json::json!(field);
         }
@@ -604,9 +607,10 @@ pub fn run_scenario_batch(repo: &Path, source: &str, actor: &Actor, at: DateTime
             }
         };
         let id = value.get("id").and_then(|v| v.as_str()).map(str::to_string);
-        warn_deprecated_keys(&value);
-        let planned = serde_json::from_value::<BatchLine>(value)
-            .map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e.to_string()).hint("`canon schema scenario new` lists the accepted arguments and their forms"))
+        let removed = removed_key_refusal(&value);
+        let planned = removed
+            .map_or(Ok(()), Err)
+            .and_then(|()| serde_json::from_value::<BatchLine>(value).map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e.to_string()).hint("`canon schema scenario new` lists the accepted arguments and their forms")))
             .and_then(BatchLine::into_spec)
             .and_then(|spec| {
                 let planned = planner.plan(&spec)?;
