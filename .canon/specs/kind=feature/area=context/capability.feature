@@ -157,66 +157,65 @@ Feature: context capability
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
-  @case:happy
+  @case:failure
   @context.capability.16
-  Scenario: A deprecated flag spelling still runs, warns once on stderr and is named in meta.deprecated
+  Scenario: A removed flag spelling is a usage error whose hint names the flag that replaced it
     Given a repo with a change and a brief
-    When `canon brief check --change <slug> --json` runs, the spelling 0.23 took
-    Then it runs as `--change-id <slug>` would and exits the same
-    And stderr carries exactly one line, `canon brief check: --change is deprecated — use --change-id (removed in 0.25.0)`
-    And the JSON envelope's meta.deprecated holds one entry with used `--change`, use `--change-id` and removedIn 0.25.0, and is absent when no deprecated spelling was used
+    When `canon brief check --change <slug> --json` runs, the spelling 0.23 took and 0.24 deprecated
+    Then it exits 2 with the USAGE error, field `--change`, and the hint `--change was renamed --change-id in 0.24.0; use --change-id`
+    And nothing runs, and `--change=<slug>` and `--change` placed before the subcommand are refused the same way
+    And `--change-id <slug>` runs, and the JSON envelope carries no meta.deprecated
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
-  @case:happy
+  @case:failure
   @context.capability.17
-  Scenario: A deprecated --kind value still runs and warns with the value to use instead
+  Scenario: A removed --kind value is a usage error whose hint names the value that replaced it
     Given a repo with no records
     When `canon query --kind review_record --json` runs
-    Then it reads the review records as `--kind review` does
-    And stderr carries exactly one line, `canon query: --kind review_record is deprecated — use --kind review (removed in 0.25.0)`
-    And meta.deprecated holds one entry with used `--kind review_record` and use `--kind review`
+    Then it exits 2 with the USAGE error and the hint `--kind review_record was renamed --kind review in 0.24.0; use --kind review`
+    And query, export and purge refuse every <kind>_record value the same way, and `--kind review` runs
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
   @case:edge
   @context.capability.18
-  Scenario: Help hides the deprecated spellings and schema lists them per option
+  Scenario: Help and schema show only the one name, with no deprecated field
     Given the help of a command that renamed a flag, and of query
-    When the help is printed
-    Then it shows --change-id and the kinds without the _record suffix, and none of the deprecated spellings
-    And `canon schema <command> --json` lists each renamed option's old spellings as deprecatedAliases
-    And the --kind option of query, export and purge lists its old values as deprecatedValues, each with the value to use
+    When the help and `canon schema <command> --json` are read
+    Then they show --change-id and the kinds without the _record suffix, and none of the removed spellings
+    And no option carries deprecatedAliases or deprecatedValues
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
   @case:edge
   @context.capability.19
-  Scenario: A token after -- or the value of an option is never read as a deprecated spelling
-    Given a command line that carries a deprecated spelling only after `--`, or as the value of another option
+  Scenario: A token after -- or the value of an option is never read as a removed spelling
+    Given a command line that carries a removed spelling only after `--`, or as the value of another option
     When the command runs
-    Then nothing is rewritten and no deprecation line is printed
-    And `--change=<slug>` with an equals sign is read as the deprecated spelling like `--change <slug>`
+    Then it runs, and no usage error names a removed spelling
+    And the same spelling as a flag, with a space or an equals sign, is refused
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
   @case:failure
   @context.capability.20
-  Scenario: A usage error names the canonical spelling, not the deprecated one
-    Given a command that accepts a deprecated spelling
-    When it runs without the value of that option
-    Then the usage error names the canonical option, `--change-id`, never the deprecated one
-    And it exits 2 with a hint
+  Scenario: A removed spelling is refused only on the commands that renamed it
+    Given a command that never had the old spelling as a flag
+    When it runs with that spelling
+    Then it is the ordinary unknown-argument usage error, with no rename hint
+    And on a command that renamed it, the refusal carries the rename hint even when the flag lacks its value
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
-  @case:edge
+  @case:failure
   @context.capability.21
-  Scenario: A scenario batch line may still carry the deprecated key names and warns once
-    Given an NDJSON file for `canon scenario new --from` whose lines use the keys subject, change and project
+  Scenario: A scenario batch line with a removed key name refuses the batch and names the key to use
+    Given an NDJSON file for `canon scenario new --from` whose line uses the key subject, change or project
     When the batch runs
-    Then every scenario is written as with subject-id, change-id and project-id
-    And stderr carries one deprecation line for each deprecated key used, however many lines use it
+    Then it exits 2 and writes nothing
+    And the line's error names the key that replaced it, as `subject-id`, in its hint
+    And a file using subject-id, change-id and project-id is written as before
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
