@@ -39,4 +39,6 @@ phases:
     status: done
     evidence: docs/research/vendor-audits/DECISIONS.md
   - name: propose
-    status: pending
+    status: done
+    evidence: docs/research/vendor-audits/DECISIONS.md
+    issues: [98, 99, 100]
