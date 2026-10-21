@@ -471,12 +471,7 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json
 /// approved scope. An unlinked pair writes nothing and exits `0`.
 pub fn run_unadopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json: bool) -> i32 {
     match unadopt_change(repo, change_id, subject_id) {
-        Ok(UnadoptOutcome::Refused(message)) => CliError::refused("SUBJECT_UNADOPT_REFUSED", message)
-            .hint(format!(
-                "an approved change is the subject's approved scope and stays adopted; unadopt only a change nobody approved, or keep `{}` and let its flow-tagged scenarios wait for a new approval",
-                change_id.as_str()
-            ))
-            .emit("canon subject unadopt", json),
+        Ok(UnadoptOutcome::Refused(message, hint)) => CliError::refused("SUBJECT_UNADOPT_REFUSED", message).hint(hint).emit("canon subject unadopt", json),
         Ok(UnadoptOutcome::Done(subject, wrote)) => {
             let human = if wrote {
                 format!("canon subject unadopt: unlinked change `{}` from subject `{}` — {}", change_id.as_str(), subject_id.as_str(), crate::write_mode::DIRECT)
@@ -493,7 +488,8 @@ pub fn run_unadopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, js
 enum UnadoptOutcome {
     /// The subject as it now stands, and whether anything was written.
     Done(Subject, bool),
-    Refused(String),
+    /// The refusal message and its hint.
+    Refused(String, String),
 }
 
 /// The unadopt write: the mirror of [`adopt_change`] and [`persist_adoption`].
@@ -529,13 +525,31 @@ fn unadopt_change(
         let approved = std::fs::read_to_string(&brief)
             .is_ok_and(|text| canon_ingest::markdown::field(&text, "Approved:").is_some());
         if approved {
-            return Ok(UnadoptOutcome::Refused(format!(
-                "change `{}` has an approved brief ({}), so it is subject `{}`'s approved scope and cannot be unadopted",
-                change_id.as_str(),
-                brief.strip_prefix(&resolved).unwrap_or(&brief).display(),
-                subject_id.as_str()
-            )));
+            return Ok(UnadoptOutcome::Refused(
+                format!(
+                    "change `{}` has an approved brief ({}), so it is subject `{}`'s approved scope and cannot be unadopted",
+                    change_id.as_str(),
+                    brief.strip_prefix(&resolved).unwrap_or(&brief).display(),
+                    subject_id.as_str()
+                ),
+                format!(
+                    "an approved change is the subject's approved scope and stays adopted; unadopt only a change nobody approved, or keep `{}` and let its flow-tagged scenarios wait for a new approval",
+                    change_id.as_str()
+                ),
+            ));
         }
+    }
+    let tagged = tagged_scenarios(&resolved, subject_id, change_id)?;
+    if !tagged.is_empty() {
+        return Ok(UnadoptOutcome::Refused(
+            format!(
+                "scenario(s) {} owned by subject `{}` carry a `@flow:{}.*` tag; unadopting the change would make them fall back to an older approval",
+                tagged.iter().map(|s| format!("`{s}`")).collect::<Vec<_>>().join(", "),
+                subject_id.as_str(),
+                change_id.as_str()
+            ),
+            format!("remove or retag the `@flow:{}.*` tags on those scenarios first, then run `canon subject unadopt` again", change_id.as_str()),
+        ));
     }
     let canon_yaml_path = resolve_canon_yaml(&resolved, None);
     let registry = registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject])
@@ -563,6 +577,20 @@ fn unadopt_change(
         })?;
     }
     Ok(UnadoptOutcome::Done(subject, true))
+}
+
+/// The ids of the scenarios `subject_id` owns that carry a
+/// `@flow:<change_id>.*` tag.
+fn tagged_scenarios(resolved: &Path, subject_id: &SubjectId, change_id: &ChangeId) -> Result<Vec<String>, String> {
+    let schemas = SchemaRegistry::load();
+    let ctx = GateCtx::from_repo(resolved)
+        .map_err(|e| e.to_string())
+        .and_then(|ctx| GateContext::load(ctx, &schemas, Utc::now()).map_err(|e| e.to_string()))?;
+    Ok(subject_scenarios(&ctx, subject_id)
+        .into_iter()
+        .filter(|s| crate::brief_check::flow_changes_of(resolved, &s.project_id, &s.scenario_id).contains(change_id))
+        .map(|s| s.scenario_id.as_str().to_string())
+        .collect())
 }
 
 /// `` `a` ``, `` `a` and `b` ``, `` `a`, `b` and `c` ``.
@@ -823,6 +851,12 @@ pub fn run_status(
     };
     // The subject's adopted changes, joined from both sides (0.18 D4).
     let changes = gate_context.as_ref().map_or_else(|| subject.change_ids.clone(), |ctx| subject_change_ids(ctx, &subject));
+    // The subject-level brief rules read its scope: a pending draft (no
+    // scenario tagged for it) does not freeze the maintenance loop.
+    let changes = match &gate_context {
+        Some(ctx) => crate::brief::scope_changes(&repo, ctx, &subject, &changes),
+        None => changes,
+    };
 
     let mut blocking = match (ships, &gate_context) {
         (true, Some(ctx)) => ship_gate_violations(ctx, subject_id),

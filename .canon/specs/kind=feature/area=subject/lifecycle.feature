@@ -298,7 +298,7 @@ Feature: subject lifecycle
   @case:failure
   @subject.lifecycle.30
   Scenario: Reopening outside an approved scope is refused naming the brief to approve
-    Given a shipped subject that adopted a newer change whose brief.md has no Approved line
+    Given a shipped subject that adopted a newer change whose brief.md has no Approved line and that one of its scenarios is tagged @flow:<change>.* for
     When it is moved to verifying with a reason
     Then the command exits 1 with an unreviewed-promotion naming that brief.md and saying a human must answer it
     And an override reason does not waive it, and the subject stays shipped
@@ -353,7 +353,7 @@ Feature: subject lifecycle
   Scenario: Adopting an unapproved change into a building subject warns and says how to undo it
     Given a proposed, a specced and a building subject, and a change with a draft brief.md
     When the change is created under, or adopted by, each subject
-    Then the building, verifying or shipped subject gets one warning on stderr and in JSON meta.warnings naming canon subject unadopt, and the proposed and specced ones none
+    Then the building, verifying or shipped subject (the shipped one adopting into a shipped subject too) gets one warning on stderr and in JSON meta.warnings naming canon subject unadopt, and the proposed and specced ones none
     And an approved brief adopted into a building subject gets none
 
   # canon: {"schema":1,"at":"2026-10-21T11:58:51Z","actor":{"agent_id":"canon-impl-025"}}
@@ -374,3 +374,14 @@ Feature: subject lifecycle
     Given a building subject adopting a change whose brief.md carries an "Approved:" line
     When the change is unadopted from that subject
     Then the command exits 2 with SUBJECT_UNADOPT_REFUSED, its hint naming the approved scope, and the link stays
+    And a draft change a scenario of the subject is tagged @flow:<change>.* for is refused the same way, its hint naming the scenarios and saying to remove or retag them first
+
+  # canon: {"schema":1,"at":"2026-10-21T12:38:43Z","actor":{"agent_id":"canon-impl-025"}}
+  @subject:subject-lifecycle
+  @case:happy
+  @subject.lifecycle.38
+  Scenario: A pending draft change does not freeze a shipped subject's reopen, evidence, review and ship
+    Given a shipped subject adopting an approved change and a newer draft change that none of its scenarios is tagged @flow:<change>.* for
+    When the subject is reopened, a scenario is re-verified and reviewed, and the subject ships again
+    Then each step is accepted and canon status still lists the draft change awaiting approval
+    And once a scenario of the subject is tagged @flow:<draft>.F1, shipping is refused on the draft's brief
