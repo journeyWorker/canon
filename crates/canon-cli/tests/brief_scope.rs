@@ -739,3 +739,45 @@ fn subject_lifecycle_38_a_pending_draft_does_not_freeze_a_shipped_subject() {
         stderr(&ship)
     );
 }
+
+/// subject.lifecycle.38: a pending draft whose brief `canon brief check`
+/// still has blockers for keeps `canon brief check --change-id <c>` as the
+/// planner's next step; once the brief is clean the step asks the human.
+/// Neither blocks the subject's own steps (here, its ship step).
+#[test]
+fn subject_lifecycle_38_a_pending_drafts_next_step_follows_its_brief_check() {
+    let dir = repo_with_subject("verifying");
+    let repo = dir.path();
+    change(repo, "a", true);
+    scenario(repo, "shop.cart.01", Some("a.F1"));
+    scenario(repo, "shop.cart.02", Some("a.F1"));
+    let path = repo.join(".canon/specs/kind=feature/area=shop/cart.feature");
+    let text = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(
+        &path,
+        text.replace("@case:happy\n  @flow:a.F1\n  @shop.cart.02", "@case:failure\n  @flow:a.F1\n  @shop.cart.02"),
+    )
+    .unwrap();
+    for id in ["shop.cart.01", "shop.cart.02"] {
+        assert!(attest(repo, id, "run").status.success());
+    }
+    // An unfilled brief skeleton: blockers.
+    ok(repo, &["change", "new", "b", "--subject-id", "s", "--title", "B"]);
+
+    let steps = |repo: &Path| -> Vec<Value> {
+        let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();
+        status["next"].as_array().unwrap().clone()
+    };
+    let has = |steps: &[Value], prefix: &str| steps.iter().any(|s| s["command"].as_str().unwrap().starts_with(prefix));
+
+    let blocked = steps(repo);
+    assert!(has(&blocked, "canon brief check --change-id b"), "{blocked:?}");
+    assert!(!has(&blocked, "report the pending draft's brief"), "{blocked:?}");
+    assert!(has(&blocked, "canon subject status s --to shipped"), "{blocked:?}");
+
+    std::fs::write(brief_path(repo, "b"), brief("")).unwrap();
+    let clean = steps(repo);
+    assert!(has(&clean, "report the pending draft's brief in .canon/changes/b/brief.md to the human; s is not blocked meanwhile"), "{clean:?}");
+    assert!(!has(&clean, "canon brief check"), "{clean:?}");
+    assert!(has(&clean, "canon subject status s --to shipped"), "{clean:?}");
+}

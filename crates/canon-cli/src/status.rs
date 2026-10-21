@@ -1036,19 +1036,29 @@ fn subject_steps(
     let id = subject.subject_id.as_str();
     let status = subject.status;
 
-    // A pending draft awaits the human but blocks nothing: its subject keeps
-    // building, attesting and shipping for its approved scope.
+    // A pending draft blocks nothing: its subject keeps building, attesting
+    // and shipping for its approved scope. While `canon brief check` has
+    // blockers the draft is the planner's to write; once clean, the human is
+    // told it awaits an answer.
     if let (Some(brief), Some(draft)) = (summary.brief.as_ref().filter(|brief| brief.enforced), &summary.pending_draft) {
-        next.push(NextStep {
-            actor: StepActor::Human,
-            role: None,
-            command: format!("report the pending draft's brief in {} to the human; {id} is not blocked meanwhile", brief.report_in()),
-            why: format!(
-                "{id}: `{draft}` is a pending draft ({}) and not yet part of the subject's scope: reopen, evidence and ship read the newest approved change until a scenario is tagged `@flow:{draft}.*`, and then the subject cannot ship until the human answers; once they do, {}",
-                brief.unanswered(),
-                brief.record()
-            ),
-        });
+        match (brief.change.as_deref(), brief.findings.as_ref().filter(|counts| counts.blockers > 0)) {
+            (Some(change), Some(counts)) => next.push(NextStep {
+                actor: StepActor::Agent,
+                role: Some(Role::Planner),
+                command: format!("canon brief check --change-id {change}"),
+                why: format!("{id}: `{draft}` is a pending draft with {} blocker(s): write the brief in {} until `canon brief check` is clean; only then does the human answer it; {id} is not blocked meanwhile", counts.blockers, brief.report_in()),
+            }),
+            _ => next.push(NextStep {
+                actor: StepActor::Human,
+                role: None,
+                command: format!("report the pending draft's brief in {} to the human; {id} is not blocked meanwhile", brief.report_in()),
+                why: format!(
+                    "{id}: `{draft}` is a pending draft ({}) and not yet part of the subject's scope: reopen, evidence and ship read the newest approved change until a scenario is tagged `@flow:{draft}.*`, and then the subject cannot ship until the human answers; once they do, {}",
+                    brief.unanswered(),
+                    brief.record()
+                ),
+            }),
+        }
     }
     // The pending-draft step is not a gap: it must not hold back the advance.
     let before = next.len();
