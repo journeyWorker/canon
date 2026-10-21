@@ -275,11 +275,35 @@ fn find_change(registry: &TierRegistry, id: &ChangeId) -> Result<Option<Change>,
 /// the full record body (the updated record) with `meta.next` for the
 /// subject.
 fn report_subject(repo: &Path, subject: &Subject, verb: &str, json: bool, human: &str) {
+    report_subject_warning(repo, subject, verb, json, human, &[]);
+}
+
+/// [`report_subject`] with `warnings`: said on stderr, and in `--json`
+/// carried in `meta.warnings` ([`crate::json_out::warnings_meta`]).
+fn report_subject_warning(
+    repo: &Path,
+    subject: &Subject,
+    verb: &str,
+    json: bool,
+    human: &str,
+    warnings: &[String],
+) {
     if !json {
         println!("{human}");
     }
+    for warning in warnings {
+        eprintln!("canon subject {verb}: warning: {warning}");
+    }
     let record = serde_json::to_value(subject).unwrap_or_default();
-    crate::next::finish(repo, &format!("subject {verb}"), &crate::next::Scope::Subject(subject.subject_id.as_str().to_string()), false, json, record);
+    crate::next::finish_with_meta(
+        repo,
+        &format!("subject {verb}"),
+        &crate::next::Scope::Subject(subject.subject_id.as_str().to_string()),
+        false,
+        json,
+        record,
+        crate::json_out::warnings_meta(warnings),
+    );
 }
 
 /// The `domain` enum name `canon.core` declares and a consumer repo
@@ -429,13 +453,116 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json
             } else {
                 format!("canon subject adopt: change `{}` is already linked to subject `{}`; nothing written", change_id.as_str(), subject_id.as_str())
             };
-            report_subject(repo, &subject, "adopt", json, &human);
+            let warnings: Vec<String> = crate::brief::adoption_warning(repo, &subject, change_id)
+                .into_iter()
+                .collect();
+            report_subject_warning(repo, &subject, "adopt", json, &human, &warnings);
             0
         }
         Err(e) => {
             CliError::refused("SUBJECT_ADOPT_REFUSED", e.to_string()).hint("fix what the message names, then run `canon subject adopt` again").emit("canon subject adopt", json)
         }
     }
+}
+
+/// `canon subject unadopt <change_id> --subject-id <id>` (0.25 D1): take
+/// the link [`run_adopt`] made back, on both sides. Refused for a change
+/// whose canon brief carries an `Approved:` line: it is the subject's
+/// approved scope. An unlinked pair writes nothing and exits `0`.
+pub fn run_unadopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json: bool) -> i32 {
+    match unadopt_change(repo, change_id, subject_id) {
+        Ok(UnadoptOutcome::Refused(message)) => CliError::refused("SUBJECT_UNADOPT_REFUSED", message)
+            .hint(format!(
+                "an approved change is the subject's approved scope and stays adopted; unadopt only a change nobody approved, or keep `{}` and let its flow-tagged scenarios wait for a new approval",
+                change_id.as_str()
+            ))
+            .emit("canon subject unadopt", json),
+        Ok(UnadoptOutcome::Done(subject, wrote)) => {
+            let human = if wrote {
+                format!("canon subject unadopt: unlinked change `{}` from subject `{}` — {}", change_id.as_str(), subject_id.as_str(), crate::write_mode::DIRECT)
+            } else {
+                format!("canon subject unadopt: change `{}` is not linked to subject `{}`; nothing written", change_id.as_str(), subject_id.as_str())
+            };
+            report_subject(repo, &subject, "unadopt", json, &human);
+            0
+        }
+        Err(e) => CliError::refused("SUBJECT_ADOPT_REFUSED", e).hint("fix what the message names, then run `canon subject unadopt` again").emit("canon subject unadopt", json),
+    }
+}
+
+enum UnadoptOutcome {
+    /// The subject as it now stands, and whether anything was written.
+    Done(Subject, bool),
+    Refused(String),
+}
+
+/// The unadopt write: the mirror of [`adopt_change`] and [`persist_adoption`].
+/// Removes the change from the subject's `change_ids` and the subject from
+/// the change's `subject_ids`, each re-stamped and persisted through the
+/// routed tiers, only for the side that still carries the link, so a
+/// half-written unadopt is finished by running it again.
+fn unadopt_change(
+    repo: &Path,
+    change_id: &ChangeId,
+    subject_id: &SubjectId,
+) -> Result<UnadoptOutcome, String> {
+    let (subject, change) = lookup_adoption(repo, subject_id, change_id)?;
+    let Some(mut subject) = subject else {
+        return Err(format!(
+            "subject `{}` does not exist (author it with `canon subject new` first)",
+            subject_id.as_str()
+        ));
+    };
+    let Some(mut change) = change else {
+        return Err(format!(
+            "change `{}` does not exist (import it with `canon ingest plans` first)",
+            change_id.as_str()
+        ));
+    };
+    let on_subject = subject.change_ids.contains(change_id);
+    let on_change = change.subject_ids.contains(subject_id);
+    if !on_subject && !on_change {
+        return Ok(UnadoptOutcome::Done(subject, false));
+    }
+    let resolved = resolve_repo_root(repo);
+    if let Some(brief) = crate::brief::canon_brief(&resolved, change_id) {
+        let approved = std::fs::read_to_string(&brief)
+            .is_ok_and(|text| canon_ingest::markdown::field(&text, "Approved:").is_some());
+        if approved {
+            return Ok(UnadoptOutcome::Refused(format!(
+                "change `{}` has an approved brief ({}), so it is subject `{}`'s approved scope and cannot be unadopted",
+                change_id.as_str(),
+                brief.strip_prefix(&resolved).unwrap_or(&brief).display(),
+                subject_id.as_str()
+            )));
+        }
+    }
+    let canon_yaml_path = resolve_canon_yaml(&resolved, None);
+    let registry = registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject])
+        .map_err(|e| e.to_string())?;
+    let now = Utc::now();
+    if on_subject {
+        subject.change_ids.retain(|id| id != change_id);
+        subject.envelope.at = now;
+        registry
+            .persist(&subject)
+            .map_err(|e| format!("failed to record the unadoption: {e}; nothing was written"))?;
+    }
+    if on_change {
+        change.subject_ids.retain(|id| id != subject_id);
+        change.envelope.at = now;
+        change.envelope.schema = RecordKind::Change.schema_version();
+        registry.persist(&change).map_err(|e| {
+            format!(
+                "subject `{}` no longer lists change `{}`, but the change record could not be written: {e}; complete the unlink with `canon subject unadopt {} --subject-id {}`",
+                subject_id.as_str(),
+                change_id.as_str(),
+                change_id.as_str(),
+                subject_id.as_str()
+            )
+        })?;
+    }
+    Ok(UnadoptOutcome::Done(subject, true))
 }
 
 /// `` `a` ``, `` `a` and `b` ``, `` `a`, `b` and `c` ``.

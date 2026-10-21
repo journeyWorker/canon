@@ -184,6 +184,7 @@ pub const META: &[CommandMeta] = &[
     row_exits("subject adopt", Write, REFUSES, &[P, O]),
     row_exits("subject new", Write, REFUSES, &[P, O]),
     row_exits("subject status", Write, &[exit(0, "the transition was recorded, or the subject was shown (no --to)"), exit(1, "an evidence, brief, review or policy-approval guard blocked the transition; the record is unchanged"), exit(2, "refused: an off-chain step, a missing reason, or a store failure")], &[O]).note("reads without --to: `subject status <id>` shows the subject and writes nothing"),
+    row_exits("subject unadopt", Write, REFUSES, &[P, O]),
     row("tier age", Write, &[O]),
 ];
 

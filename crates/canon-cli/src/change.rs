@@ -159,6 +159,9 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     drop(staging);
 
     let shipped = subject.status == SubjectStatus::Shipped;
+    let warnings: Vec<String> = crate::brief::adoption_warning(&repo, &subject, slug)
+        .into_iter()
+        .collect();
     if let Err(e) = crate::subject::persist_adoption(&repo, change, subject) {
         let repair = format!("canon ingest plans && {}", crate::subject::adopt_command(slug, subject_id));
         if e.subject_written {
@@ -185,6 +188,9 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         subject_id.as_str(),
         crate::write_mode::DIRECT
     );
+    for warning in &warnings {
+        eprintln!("canon change new: warning: {warning}");
+    }
     // A shipped subject stays shipped until reopened: say how, once the
     // brief is approved (the reopen refuses an unapproved one).
     let reopen = shipped.then(|| crate::status::reopen_command(subject_id.as_str()));
@@ -211,7 +217,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         false,
         json,
         serde_json::json!({ "changeId": slug.as_str(), "subjectId": subject_id.as_str(), "brief": brief }),
-        serde_json::Value::Null,
+        crate::json_out::warnings_meta(&warnings),
         extra,
     );
     0
