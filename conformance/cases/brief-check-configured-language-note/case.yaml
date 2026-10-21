@@ -1,0 +1,6 @@
+description: "`canon brief check` on a repo whose canon.yaml sets `language: en` over a Korean brief judges it as `en`, prints `language: en (configured; the text reads as ko)` and carries `languageNote` in `--json`; the Korean-only rules do not run"
+steps:
+  - args: [brief, check]
+    exit: 0
+  - args: [brief, check, --json]
+    exit: 0

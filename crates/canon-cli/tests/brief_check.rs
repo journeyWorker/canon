@@ -178,7 +178,7 @@ fn a_waiver_clears_one_rule_in_one_section_is_listed_and_needs_a_reason() {
 }
 
 #[test]
-fn prose_rules_flag_only_normative_sections_in_en_and_ko_and_never_block() {
+fn prose_rules_flag_normative_intent_and_question_sections_in_en_and_ko_and_never_block() {
     let dir = repo_with_change(None);
     let wordy = en_brief("")
         .replace("The server issues the session.", "Therefore it is important that the server very reliably issues the session, not by chance but by design.")
@@ -191,7 +191,9 @@ fn prose_rules_flag_only_normative_sections_in_en_and_ko_and_never_block() {
     for rule in ["prose.connective", "prose.evaluative", "prose.degree", "prose.contrast"] {
         assert!(in_detail.contains(&rule), "{rule} missing from {in_detail:?}");
     }
-    assert!(findings.iter().all(|f| f["section"] != "intent"), "context sections are skipped: {report}");
+    let in_intent: Vec<&str> = findings.iter().filter(|f| f["section"] == "intent").map(|f| f["rule"].as_str().unwrap()).collect();
+    assert_eq!(in_intent, ["prose.evaluative", "prose.connective", "prose.degree"], "intent gets the phrase rules and none of the length or key-sentence rules: {report}");
+    assert!(findings.iter().all(|f| f["section"] != "out-of-scope"), "out of scope is not judged: {report}");
 
     // A normative section without its key sentence.
     std::fs::write(brief_path(dir.path()), en_brief("").replace(" ==**The cart follows the account.**==", "")).unwrap();
