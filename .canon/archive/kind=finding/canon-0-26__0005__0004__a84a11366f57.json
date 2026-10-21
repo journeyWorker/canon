@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T18:58:14.879683423Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/fixtures/prose-ko-ending.tsv",
+  "kind": "finding",
+  "reviewed_sha": "bc3c050c9144025bad5de6aedf07411c15d2160d",
+  "reviewer": "canon-reviewer-026",
+  "round": 5,
+  "scenario_ids": [
+    "authoring.brief-check.10"
+  ],
+  "schema": 1,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "[standards] The vowel guard of the plain imperative is not proven: letting any 라 ending of a terminated, unlabeled sentence count keeps the corpus and every brief_prose test green (throwaway build). Every clean row ending in 라 has a `label:` colon ('배경색: 보라.', '거절 사유: 하라.'). Add a terminated, unlabeled noun row such as '- 오늘의 색은 보라.'."
+}

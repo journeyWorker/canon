@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T19:42:14.343567323Z",
+  "change_id": "canon-0-26",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reason": "fixed in the round 6 fixes commit",
+  "resolution_sha": "3bcaef6426df33f8b1a5502ad1a99b2915cb0e50",
+  "reviewed_sha": "8e2e0d677a3bf269d49ebd9065baf24b0737fc40",
+  "reviewer": "canon-reviewer-026",
+  "round": 6,
+  "scenario_ids": [
+    "authoring.brief-check.12"
+  ],
+  "schema": 1,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "[probe] match= is tested against the whole hint, not the matched text, and every prose.decision-history hint carries the same advice ('… if the date is part of the behavior (an effective date), keep it and waive with a reason'). So `<!-- canon:waive prose.decision-history detail \"effective date\" match=\"effective date\" -->` clears both '연체 요금은 2026-12-01부터 붙는다.' and '이 방식은 2026-09-14 회의에서 결정했다.'; so would match=\"behavior\", \"date\" or \"waive\". Scenario 12 says the waiver clears only findings whose excerpt or matched text contains the needle. Compare against the excerpt and the matched value (the text between the backticks after 'matched'), not the hint's advice."
+}

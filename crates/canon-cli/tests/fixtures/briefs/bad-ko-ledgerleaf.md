@@ -1,0 +1,54 @@
+# 가계부 반복 지출 자동 분류
+
+<!-- canon:section intent role=context -->
+## 의도
+
+Ledgerleaf에서 user가 recurring expense를 등록하면 categorization engine이 매달 같은 항목을 다시 분류하는데 (월 평균 120건 중 약 30%가 사용자 수정으로 되돌려진다는 2026-08-30 분석) 이 rule이 사용자의 manual override를 기억하지 않아서 같은 수정이 반복되고, 그 결과 신뢰가 떨어지는 문제가 있었다 (고객 지원 티켓 기준). 따라서 override를 rule보다 앞에 두기로 2026-09-09에 합의했고, 이는 가계부의 일관된 사용 경험을 위한 초석이다.
+
+처음에는 규칙을 더 정교하게 만들어 해결하려 했으나 (2026-08-18 첫 시도, 규칙 수 40개 → 95개) 오히려 충돌하는 규칙이 늘어 사용자가 어느 규칙이 적용됐는지 알 수 없게 되었고, 고객 지원 문의가 줄지 않았다 (월 80건 수준). 그래서 접근을 바꿔 사용자가 직접 고친 값을 단일 진실 원천으로 삼는 방식으로 정리했다 (제품팀 합의 문서 참고).
+
+<!-- canon:section outcome role=normative -->
+## 원하는 결과
+
+사용자가 한 번 고친 분류는 같은 가맹점의 다음 거래에도 그대로 적용된다 (가맹점 이름이 정규화된 값과 같을 때). ==**사용자가 고친 분류는 자동 규칙보다 항상 우선한다.**== 단순히 규칙을 늘리는 것이 아니라 수정을 기억하는 방식이다.
+
+<!-- canon:section flow role=normative -->
+## 사용자 흐름
+
+1. F1 사용자는 거래 목록에서 잘못 분류된 항목을 보고 → 분류를 "교통"으로 바꾸면 → 같은 가맹점의 이후 거래가 "교통"으로 들어온다 (`CategoryOverride` 저장).
+2. F2 사용자는 설정 화면에서 "수정 기억 끄기"를 켜고 → 저장하면 → 이후 거래는 자동 규칙만 따른다 (2026-10-11 추가).
+
+<!-- canon:section detail role=normative -->
+## 단계 상세
+
+### F1 수정 기억
+
+- 서버는 분류 수정을 받으면 `category_overrides`에 (사용자, 정규화된 가맹점, 분류) 행을 저장한다 (`src/ledger/override_store.py:64`). 같은 키가 있으면 갱신한다 (upsert).
+- 가맹점 이름 정규화는 공백 제거, 소문자 변환, 끝의 지점명 제거 순서로 이루어지며 (`src/ledger/merchant.py:20`) 이 순서는 2026-09-12 논의에서 바뀌었다 (이전에는 지점명 제거가 먼저였다).
+- 새 거래가 들어오면 override를 먼저 찾고 (일치하면 그 분류를 쓴다) 없으면 규칙 엔진을 호출합니다 (`src/ledger/classify.py:101`).
+- 이미 분류된 과거 거래는 바꾸지 않는다 (소급 적용은 하지 않기로 결정했다).
+- 매끄럽게 동작하도록 override 조회는 거래 입력 경로 안에서 캐시를 먼저 본다 (`OverrideCache`, TTL 60초).
+
+### F2 수정 기억 끄기
+
+- 설정값 `remember_overrides`가 거짓이면 override 조회를 건너뛴다 (`src/ledger/classify.py:97`).
+- 이미 저장된 override는 지우지 않고 남겨 둔다 (다시 켜면 그대로 쓴다). 지우려면 설정 화면의 "수정 기록 삭제"를 사용하세요.
+
+<!-- canon:section acceptance role=normative -->
+## 인수 조건
+
+- F1: 분류를 바꾼 뒤 같은 가맹점의 새 거래가 바뀐 분류로 저장된다 (`tests/test_override_flow.py:18`).
+- F1: 이름만 대소문자가 다른 가맹점도 같은 분류를 받는다 (`tests/test_merchant_norm.py:7`, 2026-09-12 추가).
+- F2: 수정 기억을 끄면 새 거래가 규칙 결과로 저장된다 (`tests/test_override_off.py:25`).
+- 견고한 분류를 위해 override와 규칙이 충돌하는 경우의 로그 한 줄이 남아야 한다 (로그 이름 `override_applied`).
+
+<!-- canon:section questions role=question -->
+## 질문과 가정
+
+- 같은 가맹점이지만 다른 분류가 필요한 경우(예: 마트에서 식료품과 생활용품) 어떻게 할지 정해야 합니다.
+- 소급 적용을 나중에 지원할 가능성이 있는지 (현재는 없다고 가정한다) 제품팀 의견이 필요하다.
+
+<!-- canon:section out-of-scope role=context -->
+## 범위 밖
+
+분류 규칙 편집 화면(`web/src/rules-editor.tsx`)과 공유 가계부는 다루지 않습니다.

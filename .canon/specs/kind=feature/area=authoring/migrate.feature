@@ -130,3 +130,23 @@ Feature: canon migrate
     Then the directory is named as staying with the openspec reader's diagnostic, the canon-written change still moves, and the init openspec source is kept
     When only the loose file is left and canon migrate runs
     Then the plan names the source as staying because canon has not read that file, and the file and the source stay
+
+  # canon: {"schema":1,"at":"2026-10-21T16:36:09Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @authoring.migrate.13
+  Scenario: migrate adds the missing managed gitignore lines to an existing block and a second run adds none
+    Given a repo whose gitignore already holds canon's block without the scenario archive, dashboard-snapshot, learn and r2 lines
+    When canon migrate runs, and again
+    Then the first run adds exactly the missing lines under their comments and keeps every other byte of the gitignore
+    And the second run adds none
+
+  # canon: {"schema":1,"at":"2026-10-21T17:24:55Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.migrate.14
+  Scenario: migrate adds only the missing line when its managed comment is kept
+    Given a gitignore that kept a managed comment but lost the line under it
+    When canon migrate runs, and again
+    Then the first run writes only the missing line, directly under its comment, and no comment twice
+    And the second run changes nothing

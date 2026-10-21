@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T17:15:59.211112326Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/brief_prose.rs",
+  "kind": "finding",
+  "reviewed_sha": "8eff1e88373d4c25af8f9c8a2c8a23beb90202c1",
+  "reviewer": "canon-reviewer-026",
+  "round": 1,
+  "scenario_ids": [
+    "authoring.brief-check.11"
+  ],
+  "schema": 1,
+  "seq": 7,
+  "severity": "should_fix",
+  "summary": "[standards] 'An English brief of the same size is within its larger budget' is vacuous: good-en-meadow is under the Korean budgets too (configured ko on it: no prose.length), and with pick() returning the ko budget for en test 11 stays green (throwaway build). By hand the behavior holds: an en brief with a 3095-character detail is clean detected en and flagged (budget 2500) under configured ko."
+}

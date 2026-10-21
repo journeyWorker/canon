@@ -1826,6 +1826,11 @@ pub fn doctor(
             }
         }
     }
+    if target_dir.join("canon.yaml").is_file() {
+        if let Some(gap) = crate::init::gitignore_gap(target_dir) {
+            lines.push(format!("gitignore: {gap}"));
+        }
+    }
     if lines.len() == lines_before_report && !lines.iter().any(|line| line.starts_with("no-providers:")) {
         lines.push("status: healthy".into());
     }

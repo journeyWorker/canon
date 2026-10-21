@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T19:27:27.420196927Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reviewed_sha": "8e2e0d677a3bf269d49ebd9065baf24b0737fc40",
+  "reviewer": "canon-reviewer-026",
+  "round": 6,
+  "scenario_ids": [
+    "authoring.brief-check.10"
+  ],
+  "schema": 1,
+  "seq": 3,
+  "severity": "note",
+  "summary": "[probe] The final-consonant rule drops the negative imperative 말라 (말 has ㄹ): '- 절대 지우지 말라.' was flagged in round 5 and draws nothing now, while '- 하지 마라.' is flagged. Scenario 10 defines the rule as no final consonant before 라, so this is a documented gap, not listed in brief-polish."
+}

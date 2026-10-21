@@ -221,7 +221,7 @@ enum Command {
         action: ChangeCommand,
     },
     /// Check a change's brief (PRD format) and see the next steps; never edits
-    #[command(after_help = "Examples:\n  canon brief                          State and the next one to three steps\n  canon brief check                    Findings; exit 0 clean, 2 blockers, 1 error\n  canon brief check --change-id add-login --json\n\nThe brief is the PRD `canon change new` writes: sections are found by their\n`<!-- canon:section <key> role=… -->` marker, never by heading text. Blockers\n(structure) are a missing or out-of-order section, a duplicate flow id, step\ndetail that does not match the flow ids, leftover placeholders, and, once the\nsubject is building, a flow step with no scenario or no failure scenario.\nAdvisories (prose, `language:` en or ko only) apply to normative sections.\nWaive one rule in one section with\n  <!-- canon:waive <rule-id> <section-key> \"<reason>\" -->\nA brief without markers (written before 0.19) checks as `brief.legacy`, an\nadvisory. Without --change-id, the repo's only live change is checked.")]
+    #[command(after_help = "Examples:\n  canon brief                          State and the next one to three steps\n  canon brief check                    Findings; exit 0 clean, 2 blockers, 1 error\n  canon brief check --change-id add-login --json\n\nThe brief is the PRD `canon change new` writes: sections are found by their\n`<!-- canon:section <key> role=… -->` marker, never by heading text. Blockers\n(structure) are a missing or out-of-order section, a duplicate flow id, step\ndetail that does not match the flow ids, leftover placeholders, and, once the\nsubject is building, a flow step with no scenario or no failure scenario.\nAdvisories (prose) apply to normative sections, Intent and Questions, in the\nlanguage each is written in (`language:` in canon.yaml overrides); only en and\nko have rule lists.\nWaive one rule in one section with\n  <!-- canon:waive <rule-id> <section-key> \"<reason>\" -->\nA brief without markers (written before 0.19) checks as `brief.legacy`, an\nadvisory. Without --change-id, the repo's only live change is checked.")]
     Brief {
         #[command(subcommand)]
         action: Option<BriefCommand>,
@@ -968,7 +968,7 @@ enum EvidenceCommand {
         /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given
         #[arg(long, value_parser = canon_cli::dispatch::parse_task_id)]
         task: Option<TaskId>,
-        /// Spec corpus id for --scenario-id (canon keys a scenario by the composite (project_id, scenario_id))
+        /// Spec corpus id for --scenario-id (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (UNKNOWN_SPEC_ROOT) before anything is written
         #[arg(long, value_parser = canon_cli::review::parse_project_id)]
         project_id: Option<ProjectId>,
         /// What CLASS of evidence is attested to (test-run, review, ...) — the `evidence.kind` companion. `audit` records an external evaluator's re-audit (needs --evaluator-id/--evaluator-version/--evaluator-digest/--audit-result)

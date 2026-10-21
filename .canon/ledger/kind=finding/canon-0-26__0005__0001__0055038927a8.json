@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T19:23:06.999229174Z",
+  "change_id": "canon-0-26",
+  "disposition": "fixed",
+  "file_ref": ".canon/specs/kind=feature/area=authoring/brief-check.feature",
+  "kind": "finding",
+  "reason": "fixed in the round 5 fixes commit",
+  "resolution_sha": "2a2fbae090569d57b59a71d0438b37821ba5b53c",
+  "reviewed_sha": "bc3c050c9144025bad5de6aedf07411c15d2160d",
+  "reviewer": "canon-reviewer-026",
+  "round": 5,
+  "scenario_ids": [
+    "authoring.brief-check.02"
+  ],
+  "schema": 1,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "[spec fidelity] Scenario 02 still says 'a Korean dated decision note draws no prose.decision-history when en is configured', but with every date now flagged in any language it does: `language: en` on '2026-09-14 회의에서 결정했으며 …' draws prose.decision-history (matched `2026-09-14`), and the conformance case brief-check-configured-language-note was re-blessed to that (1 → 2 advisories). No test asserts the line (test 02 never checks decision-history), so the evidence verdict and checks stayed the same and my round-3 review of 02 still counts in the gate. Either the scenario line goes or the behavior returns; a test must assert whichever is kept."
+}

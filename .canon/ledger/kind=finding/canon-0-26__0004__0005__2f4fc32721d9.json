@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T18:51:21.861291535Z",
+  "change_id": "canon-0-26",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reason": "fixed in the round 4 redesign commit",
+  "resolution_sha": "f29f0abab9b11df31c3cdbd1b44f1147ba6785f6",
+  "reviewed_sha": "e2194c0050ca6e130ec0e407ae3d74a007bf61be",
+  "reviewer": "canon-reviewer-026",
+  "round": 4,
+  "scenario_ids": [
+    "authoring.brief-check.08"
+  ],
+  "schema": 1,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "[probe] English relative clauses with a pronoun subject count as decision acts: 'Invoices that we approved on Oct 21 stay paid.' and 'Slots they chose on Oct 21 stay booked.' draw prose.decision-history, because the subject check only looks at the word before the verb. The scenario's own example of this class ('who approved the slot') is behavior."
+}

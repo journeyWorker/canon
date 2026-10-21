@@ -185,6 +185,43 @@ fn load_spec_roots_with_former(canon_yaml: &Path) -> Result<Vec<(SpecRoot, Vec<P
     Ok(roots)
 }
 
+/// The refusal every write command makes when its `--project-id` names
+/// no spec root configured in `<repo>/canon.yaml` (0.26, #104). A record
+/// written under such an id attests nothing the gate counts (a scenario
+/// is keyed `(project_id, scenario_id)`), and no command removes one
+/// record, so the id is checked before anything is written. The hint
+/// names the configured roots, and with one root the exact flag to use.
+/// An unreadable `canon.yaml` is `CONFIG_UNREADABLE`, as everywhere else.
+/// Read-only queries are not checked: a filter on an id no root carries
+/// matches nothing and writes nothing.
+pub fn require_spec_root(repo: &Path, project_id: &ProjectId) -> Result<(), crate::cli_error::CliError> {
+    use crate::cli_error::CliError;
+    let roots = load_spec_roots(&repo.join("canon.yaml")).map_err(|e| {
+        CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again")
+    })?;
+    check_spec_root(&roots, project_id)
+}
+
+/// [`require_spec_root`] over roots already loaded.
+pub fn check_spec_root(roots: &[SpecRoot], project_id: &ProjectId) -> Result<(), crate::cli_error::CliError> {
+    use crate::cli_error::CliError;
+    if roots.iter().any(|root| &root.id == project_id) {
+        return Ok(());
+    }
+    let ids: Vec<&str> = roots.iter().map(|root| root.id.as_str()).collect();
+    let hint = match ids.as_slice() {
+        [one] => format!("the only spec root canon.yaml configures is `{one}`; pass `--project-id {one}`"),
+        many => format!("canon.yaml configures the spec roots {}; pass `--project-id <one of them>`", many.iter().map(|id| format!("`{id}`")).collect::<Vec<_>>().join(", ")),
+    };
+    Err(CliError::refused(
+        "UNKNOWN_SPEC_ROOT",
+        format!("`--project-id {}` names no spec root configured in canon.yaml (`specs.roots[]`: {}); nothing was written", project_id.as_str(), ids.join(", ")),
+    )
+    .hint(hint)
+    .field("--project-id")
+    .expected(ids))
+}
+
 /// Rebindable roots inventory-sync reads through (design D3,
 /// spec-ledger-selftest Req 2) — composes over [`GateCtx`]'s own
 /// two-constructor pattern (`from_repo`/`from_fixture`) rather than a

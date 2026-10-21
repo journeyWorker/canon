@@ -1452,3 +1452,33 @@ fn skills_install_63_a_tampered_lock_key_is_ignored_and_named_by_doctor() {
     let rewritten = read_lock(&target);
     assert!(rewritten["files"].as_object().unwrap().keys().all(|key| !key.contains("victim") && !key.ends_with('/') && !key.contains("//") && !key.contains("/./")), "{rewritten}");
 }
+
+/// skills.install.64 (#105, #107): `canon skills doctor` in a canon repo
+/// whose `.gitignore` lacks a line `canon init` manages names the missing
+/// entries and the fix (`canon migrate`) in place of `status: healthy`;
+/// with the line present it is healthy again.
+#[test]
+fn skills_install_64_doctor_reports_a_missing_gitignore_line_with_the_fix() {
+    let tmp = tempfile::tempdir().unwrap();
+    let source = tmp.path().join("source");
+    let target = tmp.path().join("target");
+    write_canonical_source(&source);
+    fs::create_dir_all(&target).unwrap();
+    fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
+    let install = canon(&["skills", "install", "--providers", "claude"], &source, &target);
+    assert_eq!(install.status.code(), Some(0), "{}", String::from_utf8_lossy(&install.stdout));
+    let managed = ".canon/hot.db*\n.canon/audit/\n.canon/ledger/kind=scenario/\n.canon/archive/kind=scenario/\n.canon/scenario-index.lock\n.canon/artifact-store.lock\n.canon/dashboard-snapshot/\n.canon/learn/\n.canon/r2/\n";
+
+    fs::write(target.join(".gitignore"), managed.replace(".canon/learn/\n", "").replace(".canon/r2/\n", "")).unwrap();
+    let doctor = canon(&["skills", "doctor"], &source, &target);
+    let out = String::from_utf8_lossy(&doctor.stdout);
+    assert_eq!(doctor.status.code(), Some(0), "{out}");
+    let line = out.lines().find(|line| line.starts_with("gitignore: ")).unwrap_or_else(|| panic!("{out}"));
+    assert!(line.contains(".canon/learn/, .canon/r2/") && line.contains("fix: `canon migrate`"), "{line}");
+    assert!(!out.contains("status: healthy"), "{out}");
+
+    fs::write(target.join(".gitignore"), managed).unwrap();
+    let doctor = canon(&["skills", "doctor"], &source, &target);
+    let out = String::from_utf8_lossy(&doctor.stdout);
+    assert!(out.contains("status: healthy") && !out.contains("gitignore:"), "{out}");
+}

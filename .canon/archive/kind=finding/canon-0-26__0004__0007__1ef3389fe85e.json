@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T18:28:55.830422153Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reviewed_sha": "e2194c0050ca6e130ec0e407ae3d74a007bf61be",
+  "reviewer": "canon-reviewer-026",
+  "round": 4,
+  "scenario_ids": [
+    "authoring.brief-check.08"
+  ],
+  "schema": 1,
+  "seq": 7,
+  "severity": "should_fix",
+  "summary": "[plan fidelity] Plan D3 names 'dates and \"decided / changed on …\" notes', but scenario 08 and the code now treat change verbs as behavior, so a dated past-tense change act is missed: pause-menu.before.md Intent '처음에는 Restart만 확인을 받으려 했으나 … 10월 14일에 Quit도 같은 확인을 받도록 바꿨다.' draws nothing. The three eval-14 turn2 before briefs draw 0 decision-history findings now (3, 1 and 1 at round 3), and the calibration comment drops to 12 of 14 private briefs. A clause-ending past change (바꿨다, 변경했다, 'changed X on <date>') differs from a modifier (바뀐, 변경된) the same way 확정됐다 differs from 확정된."
+}

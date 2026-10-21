@@ -1,0 +1,71 @@
+# expect	kind	sentence ; a Korean row runs in good-ko-lantern, an English row in good-en-cobalt
+hit	item	문자 수신에 동의한 이용자에게는 같은 내용을 문자로도 보냅니다.
+hit	item	영수증은 한 장입니다.
+hit	item	용지가 없습니다.
+hit	item	다음 화면으로 넘어갑시다.
+hit	item	오류가 나면 사서를 부르십시오.
+hit	item	담당자를 부르십시오
+hit	item	결제 전에 재고를 확인하라.
+hit	item	재고를 확인해라.
+hit	item	요청은 로그로 남겨라.
+hit	item	결과를 화면에 보여 줘라.
+hit	item	사용자는 다시 시도하라.
+hit	item	일찍 와라.
+hit	item	어서 가거라.
+hit	item	뭐든 해라.
+hit	item	영수증이 열립니다
+hit	item	이 값은 바라.
+hit	para	서버가 응답합니다.
+hit	para	이 규칙은 로그인 화면.
+hit	para	함께 살펴보자.
+hit	para	고객에게 문자를 보내자.
+hit	para	책을 확인하라.
+hit	para	그렇게 하면 돼요.
+hit	para	이 값은 좋지요.
+clean	item	알림 받는 사람: 주최자, 참가자.
+clean	item	검토 대상: 후보자.
+clean	item	반품 사유: 단순 변심, 상품 하자.
+clean	item	대회 순서: 선두 주자.
+clean	item	상품 하자.
+clean	item	선두 주자.
+clean	item	주최자와 참가자.
+clean	item	서울에서 온 참가자.
+clean	item	결제 화면에 남은 하자.
+clean	item	배경색: 보라
+clean	item	배경색: 보라.
+clean	item	거절 사유: 하라.
+clean	item	영수증 화면.
+clean	item	영수증 화면
+clean	item	영수증을 보여 줌
+clean	item	고객에게 문자를 보내자.
+clean	item	주최자, 참가자
+clean	item	무엇이 필요한가?
+clean	item	없음.
+clean	item	값은 `ok`.
+clean	item	서버가 응답한다.
+clean	item	가정: 아니다.
+clean	item	서버는 열쇠를 지니다.
+clean	item	매일 학교에 다닌다.
+clean	item	값이 다니다.
+clean	item	저장하세요.
+clean	item	그렇게 해요.
+clean	item	보고 → 누르면 → 열립니다.
+clean	item	응답한다 (확인합니다).
+clean	item	이 값은 API.
+clean	para	서버가 응답한다.
+clean	para	가정: 아니다.
+clean	para	저장하세요.
+clean	para	값이 다니다.
+hit	item	책을 다시 넣으라.
+hit	item	다음 화면을 보라.
+hit	item	값은 그대로 두라.
+hit	item	내일 다시 오라.
+clean	item	결과가 달라.
+clean	item	행사 이름은 갈라.
+hit	item	오늘의 색은 보라.
+hit	item	새 장비는 카메라.
+hit	item	공연 종류는 오페라.
+clean	item	재고를 확인해라
+hit	item	이번 변경의 대상은 인프라.
+clean	item	절대 지우지 말라.
+hit	item	로그를 남기지 마라.

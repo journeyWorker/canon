@@ -147,7 +147,8 @@ fn init_rerun_with_no_agents_md_refuses_to_overwrite_an_existing_canon_yaml() {
 }
 
 /// Every canon `.gitignore` line, as a repo set up by `canon init` 0.17 has them.
-const CANON_GITIGNORE: &str = ".canon/hot.db*\n.canon/audit/\n.canon/ledger/kind=scenario/\n.canon/scenario-index.lock\n.canon/artifact-store.lock\n";
+const CANON_GITIGNORE: &str =
+    ".canon/hot.db*\n.canon/audit/\n.canon/ledger/kind=scenario/\n.canon/archive/kind=scenario/\n.canon/scenario-index.lock\n.canon/artifact-store.lock\n.canon/dashboard-snapshot/\n.canon/learn/\n.canon/r2/\n";
 
 /// authoring.init.97 (#35): `canon init` re-run on a repo an older canon
 /// set up adds the canon `.gitignore` lines it lacks, each once, and keeps
@@ -165,7 +166,7 @@ fn authoring_init_97_a_rerun_adds_the_missing_canon_gitignore_lines() {
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(stdout(&out).contains("canon.yaml already exists — left unchanged; the AGENTS.md block and the canon .gitignore lines are refreshed\n"), "{}", stdout(&out));
     assert!(
-        stdout(&out).contains("canon init: added to .gitignore: .canon/audit/, .canon/ledger/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock\n"),
+        stdout(&out).contains("canon init: added to .gitignore: .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/\n"),
         "{}",
         stdout(&out)
     );
@@ -720,4 +721,112 @@ fn authoring_init_95_a_missing_skill_source_is_reported_with_the_retry() {
     let retry = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "install", "--source"]).arg(&source).current_dir(&repo).output().unwrap();
     assert_eq!(stdout(&retry), format!("canon v1 — installed (pi; from canon.yaml skills.providers)\n{}\n", canon_cli::skills::owned_paths_lines(&[canon_cli::skills::Provider::Pi]).join("\n")), "{}", stderr(&retry));
     assert_eq!(projected(&repo), vec![".pi/skills/canon"]);
+}
+
+fn git(repo: &Path, args: &[&str]) -> String {
+    let out = Command::new("git").args(["-c", "user.email=a@b.c", "-c", "user.name=n"]).args(args).current_dir(repo).output().expect("spawn git");
+    assert!(out.status.success(), "git {args:?}: {}", stderr(&out));
+    stdout(&out)
+}
+
+const DERIVED_DIRS: [&str; 3] = [".canon/dashboard-snapshot/", ".canon/learn/", ".canon/r2/"];
+
+/// authoring.init.98 (#105, #107): after `canon init` and a commit,
+/// `canon report --snapshot` at the default directory (what `canon
+/// dashboard` regenerates) leaves the snapshot, learn and r2 directories on
+/// disk and `git status` empty; without the managed lines they are untracked.
+#[test]
+fn authoring_init_98_the_derived_directories_dashboard_and_report_write_stay_out_of_git() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    git(repo, &["init", "-q"]);
+    assert!(run_canon(&["init", "--repo", ".", "--no-policy"], repo).status.success());
+    let gitignore = std::fs::read_to_string(repo.join(".gitignore")).unwrap();
+    for dir in DERIVED_DIRS {
+        assert_eq!(gitignore.lines().filter(|line| line.trim() == dir).count(), 1, "{dir} once in:\n{gitignore}");
+    }
+    git(repo, &["add", "-A"]);
+    git(repo, &["commit", "-qm", "init"]);
+
+    let out = run_canon(&["report", "--snapshot", ".canon/dashboard-snapshot", "--repo", "."], repo);
+    assert!(out.status.success(), "{}{}", stdout(&out), stderr(&out));
+    for written in [".canon/dashboard-snapshot/manifest.json", ".canon/learn", ".canon/r2"] {
+        assert!(repo.join(written).exists(), "{written} is written by the run, or this test proves nothing");
+    }
+    assert_eq!(git(repo, &["status", "--porcelain", "-uall"]), "", "nothing untracked after the snapshot run");
+
+    let without: String = gitignore.lines().filter(|line| !DERIVED_DIRS.contains(&line.trim()) && !line.starts_with("# the snapshot `canon dashboard`") && !line.starts_with("# canon's learn scratch") && !line.starts_with("# canon's local object-store")).map(|line| format!("{line}\n")).collect();
+    std::fs::write(repo.join(".gitignore"), without).unwrap();
+    let status = git(repo, &["status", "--porcelain", "-uall"]);
+    for dir in DERIVED_DIRS {
+        assert!(status.contains(dir), "{dir} is untracked without its line: {status}");
+    }
+}
+
+/// authoring.init.99 (#105, #107): `canon init --check-config` names a
+/// missing managed gitignore line and the fix as a `[WARN]`, never as a
+/// failure (exit 0); a directory that is no git checkout and has no
+/// `.gitignore` draws none.
+#[test]
+fn authoring_init_99_check_config_warns_about_a_missing_gitignore_line_and_names_the_fix() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    git(repo, &["init", "-q"]);
+    assert!(run_canon(&["init", "--repo", ".", "--no-policy"], repo).status.success());
+    let clean = run_canon(&["init", "--check-config", "--repo", "."], repo);
+    assert!(clean.status.success() && !stdout(&clean).contains("[WARN]"), "{}", stdout(&clean));
+
+    let gitignore = std::fs::read_to_string(repo.join(".gitignore")).unwrap();
+    std::fs::write(repo.join(".gitignore"), gitignore.replace(".canon/r2/\n", "")).unwrap();
+    let out = run_canon(&["init", "--check-config", "--repo", "."], repo);
+    assert_eq!(out.status.code(), Some(0), "a missing ignore line is advice, not a config failure: {}{}", stdout(&out), stderr(&out));
+    let warn = stdout(&out).lines().find(|line| line.starts_with("[WARN] gitignore")).unwrap_or_else(|| panic!("{}", stdout(&out))).to_string();
+    assert!(warn.contains(".canon/r2/") && warn.contains("`canon migrate`"), "{warn}");
+    assert!(!warn.contains(".canon/learn/"), "only the missing line is named: {warn}");
+
+    let json = run_canon(&["init", "--check-config", "--repo", ".", "--json"], repo);
+    let body: serde_json::Value = serde_json::from_str(&stdout(&json)).unwrap();
+    assert!(body["data"]["sections"].as_array().unwrap().iter().any(|s| s["section"] == "gitignore" && s["status"] == "warn"), "{body}");
+
+    let migrated = run_canon(&["migrate", "--repo", "."], repo);
+    assert!(migrated.status.success(), "{}{}", stdout(&migrated), stderr(&migrated));
+    assert!(!stdout(&run_canon(&["init", "--check-config", "--repo", "."], repo)).contains("[WARN]"));
+
+    let plain = tempfile::tempdir().unwrap();
+    write(plain.path(), "canon.yaml", "tiers:\n  git:\n    root: .canon/ledger\n");
+    let out = run_canon(&["init", "--check-config", "--repo", "."], plain.path());
+    assert!(!stdout(&out).contains("[WARN]"), "no git checkout and no .gitignore: {}", stdout(&out));
+}
+
+/// authoring.init.100 (review finding 9): the archive of superseded scenario
+/// index versions is derived like the index, so a scenario edit followed by
+/// a reader run leaves only the edited `.feature` in `git status`.
+#[test]
+fn authoring_init_100_a_scenario_edit_and_a_reader_run_leave_only_the_feature_modified() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    git(repo, &["init", "-q"]);
+    assert!(run_canon(&["init", "--repo", ".", "--no-policy"], repo).status.success());
+    let gitignore = std::fs::read_to_string(repo.join(".gitignore")).unwrap();
+    assert!(gitignore.lines().any(|line| line.trim() == ".canon/archive/kind=scenario/"), "{gitignore}");
+
+    let feature = |step: &str| {
+        format!(
+            "Feature: cart add\n  # canon: {{\"schema\":1,\"at\":\"2026-10-12T00:00:00Z\",\"actor\":{{\"agent_id\":\"canon\"}}}}\n\n  # canon: {{\"schema\":1,\"at\":\"2026-10-12T00:00:00Z\",\"actor\":{{\"agent_id\":\"canon\"}}}}\n  @cart.add.01\n  Scenario: Adding an item\n    When the shopper adds an item\n    Then {step}\n"
+        )
+    };
+    let path = ".canon/specs/kind=feature/area=cart/add.feature";
+    write(repo, path, &feature("the cart holds it"));
+    git(repo, &["add", "-A"]);
+    git(repo, &["commit", "-qm", "seed"]);
+
+    let first = run_canon(&["gate", "check", "--repo", "."], repo);
+    assert!(first.status.success(), "{}{}", stdout(&first), stderr(&first));
+    assert_eq!(git(repo, &["status", "--porcelain", "-uall"]), "", "the first reader run indexes the scenario and leaves git clean");
+
+    write(repo, path, &feature("the cart holds one of it"));
+    let second = run_canon(&["gate", "check", "--repo", "."], repo);
+    assert!(second.status.success(), "{}{}", stdout(&second), stderr(&second));
+    assert!(repo.join(".canon/archive/kind=scenario").exists(), "the rewrite archived the superseded version, or this test proves nothing");
+    assert_eq!(git(repo, &["status", "--porcelain", "-uall"]), format!(" M {path}\n"));
 }

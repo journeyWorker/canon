@@ -9,13 +9,15 @@ use std::path::Path;
 use std::process::{Command, Output};
 
 use canon_model::{
-    Actor, Change, ChangeId, ChangeStatus, Envelope, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, ProjectId, RecordKind, RoleId, Scenario, ScenarioId, Sha, SpecDigest, Subject, SubjectId, SubjectStatus,
+    Actor, Change, ChangeId, ChangeStatus, Envelope, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, ProjectId, RecordKind, RoleId, ScenarioId, Sha, Subject, SubjectId, SubjectStatus,
 };
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
 use chrono::{DateTime, Duration, Utc};
 use serde_json::Value;
 use tempfile::TempDir;
+
+mod support;
 
 const CANON_YAML: &str = "\
 tiers:
@@ -73,11 +75,10 @@ fn seed_scenario(repo: &Path, id: &str) {
     seed_scenario_in(repo, "demo", id);
 }
 
+/// The scenario lives in `project`'s configured spec root, so the stale-index
+/// refresh a reader runs indexes it (and `--project-id` names a root).
 fn seed_scenario_in(repo: &Path, project: &str, id: &str) {
-    let envelope = Envelope::new(1, RecordKind::Scenario, ago(600), actor("canon", "implementer"));
-    let mut scenario = Scenario::new(envelope, ProjectId::parse(project).unwrap(), ScenarioId::parse(id).unwrap(), "seeded", "", SpecDigest::of(id.as_bytes()));
-    scenario.subject_id = Some(SubjectId::parse("demo-subject").unwrap());
-    ledger(repo).write(&scenario).unwrap();
+    support::declare_scenario(repo, project, id, Some("demo-subject"));
 }
 
 fn seed_change(repo: &Path, id: &str) {

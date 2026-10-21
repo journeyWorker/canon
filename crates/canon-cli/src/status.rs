@@ -50,8 +50,12 @@
 //! enforced) gets the one `human` step status ever emits once `canon brief
 //! check` has no blocker left for it (0.22 D4); while it has some, the
 //! subject's step is the planner's `canon brief check --change-id <slug>`,
-//! `N blocker(s): write the brief`. Either is the
-//! subject's only step, whatever its status: the agent stops and reports
+//! `N blocker(s): write the brief`. With no blocker but advisories left
+//! (0.26 D4), a planner step to polish the brief
+//! (`reference/brief-polish.md`) and re-run `canon brief check` comes
+//! first, naming the count and the top rule ids; the human step stays after
+//! it (advisories never refuse an approval). Those steps are the
+//! subject's only ones, whatever its status: the agent stops and reports
 //! the brief, and nothing is built or attested for the subject (no
 //! `feature new`, `scenario new`, `evidence add`, review or status
 //! advance) before the human answers. The step names the canon file to
@@ -942,7 +946,10 @@ fn brief_with_findings(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, c
     let mut brief = crate::brief::brief_of(repo, plan_roots, subject, changes)?;
     if let (true, Some(change)) = (brief.brief_exists, changes.last()) {
         let building = matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying | SubjectStatus::Shipped);
-        brief.findings = crate::brief_check::status_counts(repo, change, building);
+        if let Some((counts, rules)) = crate::brief_check::status_report(repo, change, building) {
+            brief.findings = Some(counts);
+            brief.advisory_rules = rules;
+        }
     }
     Some(brief)
 }
@@ -1028,6 +1035,21 @@ fn on_pending_draft(summary: &SubjectSummary) -> bool {
     summary.brief.as_ref().and_then(|brief| brief.change.as_deref()).is_some_and(|change| summary.pending_drafts.iter().any(|d| d == change))
 }
 
+/// The planner's polish step for a brief with no blockers and advisories
+/// left (0.26 D4): polish it, then run `canon brief check` again. It never
+/// blocks: the human step stays in the list after it.
+fn polish_step(id: &str, brief: &BriefStatus, draft: bool) -> Option<NextStep> {
+    let (change, counts) = (brief.change.as_deref()?, brief.findings.filter(|counts| counts.blockers == 0 && counts.advisories > 0)?);
+    let top = brief.advisory_rules.iter().take(3).map(String::as_str).collect::<Vec<_>>().join(", ");
+    let draft = if draft { format!("; it is a pending draft, so {id} is not blocked meanwhile") } else { String::new() };
+    Some(NextStep {
+        actor: StepActor::Agent,
+        role: Some(Role::Planner),
+        command: format!("polish the brief in {} (reference/brief-polish.md), then run `canon brief check --change-id {change}`", brief.report_in()),
+        why: format!("{id}: {} advisory finding(s) remain in `{change}` ({top}); the check is clean of blockers, so the human can answer now, but a polished brief is easier to read; advisories never refuse an approval{draft}", counts.advisories),
+    })
+}
+
 fn awaits_brief(summary: &SubjectSummary) -> bool {
     !on_pending_draft(summary) && summary.brief.as_ref().is_some_and(|brief| brief.enforced)
 }
@@ -1065,16 +1087,21 @@ fn subject_steps(
                 command: format!("canon brief check --change-id {change}"),
                 why: format!("{id}: `{draft}` is a pending draft with {} blocker(s): write the brief in {} until `canon brief check` is clean; only then does the human answer it; {id} is not blocked meanwhile", counts.blockers, brief.report_in()),
             }),
-            _ => next.push(NextStep {
-                actor: StepActor::Human,
-                role: None,
-                command: format!("report the pending draft's brief in {} to the human; {id} is not blocked meanwhile", brief.report_in()),
-                why: format!(
-                    "{id}: `{draft}` is a pending draft ({}) and not yet part of the subject's scope: reopen, evidence and ship read the newest approved change until a scenario is tagged `@flow:{draft}.*`, and then the subject cannot ship until the human answers; once they do, {}",
-                    brief.unanswered(),
-                    brief.record()
-                ),
-            }),
+            _ => {
+                // Advisories never block the human's answer: the planner's
+                // polish step comes first, the human step stays after it.
+                next.extend(polish_step(id, brief, true));
+                next.push(NextStep {
+                    actor: StepActor::Human,
+                    role: None,
+                    command: format!("report the pending draft's brief in {} to the human; {id} is not blocked meanwhile", brief.report_in()),
+                    why: format!(
+                        "{id}: `{draft}` is a pending draft ({}) and not yet part of the subject's scope: reopen, evidence and ship read the newest approved change until a scenario is tagged `@flow:{draft}.*`, and then the subject cannot ship until the human answers; once they do, {}",
+                        brief.unanswered(),
+                        brief.record()
+                    ),
+                });
+            }
         }
     }
     // The pending-draft step is not a gap: it must not hold back the advance.
@@ -1091,6 +1118,7 @@ fn subject_steps(
             });
             return;
         }
+        next.extend(polish_step(id, brief, false));
         let change = brief.change.as_deref().unwrap_or("the change");
         next.push(NextStep {
             actor: StepActor::Human,

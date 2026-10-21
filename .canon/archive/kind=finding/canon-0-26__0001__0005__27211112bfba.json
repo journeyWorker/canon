@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T17:15:58.550440073Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/brief_prose.rs",
+  "kind": "finding",
+  "reviewed_sha": "8eff1e88373d4c25af8f9c8a2c8a23beb90202c1",
+  "reviewer": "canon-reviewer-026",
+  "round": 1,
+  "scenario_ids": [
+    "authoring.brief-check.06"
+  ],
+  "schema": 1,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "[standards] The Source-line exemption is not exercised: the test appends 'Source: …' after the out-of-scope section, which no prose rule reads. Deleting the meta-line skip in blocks() keeps test 06 green, while a Source line in detail is then flagged (checked on a throwaway build). The Then's command and slash-between-words cases are not asserted at all (by hand: `canon brief check`, 문자/메일, read/write are not flagged)."
+}

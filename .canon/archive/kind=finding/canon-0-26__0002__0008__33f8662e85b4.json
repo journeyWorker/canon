@@ -1,0 +1,23 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T17:53:25.521610613Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "conformance/cases/brief-check-configured-language-note/expected/1.out",
+  "kind": "finding",
+  "reviewed_sha": "ec056dfc826c47ff0171bb62ae6c7e57ccdf72d5",
+  "reviewer": "canon-reviewer-026",
+  "round": 2,
+  "scenario_ids": [
+    "authoring.brief-check.02",
+    "authoring.brief-check.08"
+  ],
+  "schema": 1,
+  "seq": 8,
+  "severity": "note",
+  "summary": "[re-bless] With `language: en` configured on a Korean brief, '2026-09-14 회의에서 반납 직후 영수증을 보여 주기로 결정했다.' no longer draws prose.decision-history (the re-blessed case drops it): a date now needs an English decision verb. Consistent with the override, but a configured language that disagrees with the text now misses a dated decision it caught before."
+}

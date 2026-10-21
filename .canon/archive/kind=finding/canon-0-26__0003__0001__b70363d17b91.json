@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T18:11:22.506861944Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reviewed_sha": "0a6886ff4ad20e5f70536578d7a0630d9b07cc42",
+  "reviewer": "canon-reviewer-026",
+  "round": 3,
+  "scenario_ids": [
+    "authoring.brief-check.08"
+  ],
+  "schema": 1,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "[probe] The decision-noun gate flags dates with 부터/이후/after, which scenario 08 now says are behavior and never a note: '2026-12-01부터 환불 방침이 바뀐 주문은 다시 계산한다.' (방침), '11월 3일 이후 논의 중인 항목은 표시하지 않는다.' (논의), '2026-12-01부터 확정된 주문은 취소할 수 없다.' (확정), '10월 21일 이후 결정 버튼을 누른 신청은 다시 열 수 없다.' (결정), '2026년 11월부터 합의된 금액만 청구한다.' (합의), and en 'Invitees who approved the slot after Oct 21 see a badge.', 'A decision field added on Nov 3 shows the pick.' each draw prose.decision-history. The code has no 부터/이후/after guard; KO_DECISION_VERBS and EN_DECISION_VERBS match ordinary nouns and participles (확정된 주문, 결정 버튼, 합의된 금액, approved). Blast radius: commerce and booking briefs use 확정/합의 for order state."
+}

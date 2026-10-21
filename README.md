@@ -82,6 +82,134 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.26.0 release
+
+Version 0.26.0 makes `brief check` read a brief the way a human does, in
+the language it is written in. It also sends the agent through the polish
+pass before the agent asks the human to approve. Plan:
+`docs/superpowers/plans/2026-10-22-canon-0.26.0-briefs-a-human-reads.md`.
+
+**Why (#108).** A human opened the briefs page on 14 pending Korean briefs
+and found them unreadable. Each brief ran 2k–13k characters, with 3–48
+`file:line` citations, 5–77 parenthetical asides and 1–9 dated decision
+notes. `brief check` reported 0 advisories on every one of them, for four
+reasons:
+
+- `language:` was unset, so the Korean text was judged as English.
+- Intent and Questions were not judged at all.
+- No rule covered citations, asides, dates, endings or length.
+- Nothing routed the agent to the polish pass.
+
+### D1–D3: `brief check`
+
+- **Language by detection.** A brief is judged in the language of its
+  prose letters:
+  - Hangul gives `ko` and Latin gives `en`.
+  - Kana or Han gives `ja` or `zh`, which get the structure rules only.
+  - A section written in another script is judged in its own language.
+
+  `language:` in `canon.yaml` is now an override. The output prints
+  `language: ko (detected)`, and JSON carries `languageSource` and
+  `languageNote`; the note appears when a configured language disagrees
+  with the text.
+- **Context sections are judged.** Intent and Questions get the phrase rules
+  and the new rules.
+- **Six new advisory rules.** Each is waivable with
+  `<!-- canon:waive <rule> <section> "<reason>" -->`; the whole-brief length
+  finding uses the section key `brief`.
+
+  | Rule | What it reports |
+  |---|---|
+  | `prose.code-citation` | Paths, `path:line` and code identifiers in prose. Provenance belongs on one `Source:` line, which the rule skips. |
+  | `prose.parenthetical` | Asides above a per-section density. |
+  | `prose.decision-history` | Dated decision notes and decision-history phrases. |
+  | `prose.ai-vocabulary` | A short closed list of stock words and metaphors. |
+  | `prose.ko-ending` | Korean sentences that do not end in the plain `~다`. |
+  | `prose.length` | Character budgets per section and for the whole brief, stating the measured size. |
+
+  The thresholds are calibrated on Korean fixtures written in the reported
+  style, which hit every mechanism. Canon's own briefs and the good fixtures
+  stay free of the new rules.
+
+### D4: polish before the human stop
+
+- When a brief has no blockers and advisories remain, `canon status` and
+  `meta.next` give the planner a polish step first: `reference/brief-polish.md`,
+  then `canon brief check`. The human step comes after it. Advisories never
+  block, so `brief approve` still works.
+- The briefs page shows the total, a badge with each brief's advisory count,
+  its language, and its findings grouped by rule.
+
+### D5: skill text
+
+- `brief-polish.md` is rewritten:
+  - First, the document mode: Intent states the current behavior and Outcome
+    the desired one. Interfaces are described by their behavior, and a reader
+    can verify the acceptance on their own. Provenance goes on one `Source:`
+    line.
+  - Then one section per rule id, with a before and after example in Korean
+    and in English.
+- `role-planner.md` gains a compression pass: each paragraph keeps only its
+  condition, action, result and number sentences, and three or more parallel
+  items become a list or a table.
+
+### D6: reported issues
+
+- **#104.** A `--project-id` that names no spec root in `canon.yaml` is
+  refused (`UNKNOWN_SPEC_ROOT`) before anything is written. The hint lists the
+  configured roots. This covers `evidence add` (including `--all-scenarios`),
+  `evidence approval-payload`, `review add`, `divergence add`, `resolve`,
+  `defer` and `accept`, and `scenario new --feature`.
+- **#105 and #107.** The ignore lines that `canon init` and `canon migrate`
+  manage now also cover `.canon/dashboard-snapshot/`, `.canon/learn/`,
+  `.canon/r2/` and `.canon/archive/kind=scenario/`. `migrate` adds a missing
+  line without duplicating its comment. `canon skills doctor` and
+  `canon init --check-config` name a missing line.
+- The dashboard drains the request and shuts the write side before it
+  closes, so a client always receives an early refusal.
+
+### Upgrading
+
+- In an existing repo, run `canon migrate` once to add the new ignore lines.
+  Canon's own repo stops tracking `.canon/archive/kind=scenario/`.
+- Briefs may now report advisories they did not report before. Polish them,
+  or waive a finding with a reason. Approval is unaffected.
+- Scripts that pass a `--project-id` naming no configured spec root now get
+  exit 2 (`UNKNOWN_SPEC_ROOT`).
+
+**Acceptance.**
+
+- Workspace: 2693 passed, 0 failed.
+- canon's own corpus: 32 new scenarios (authoring.brief-check.01–15,
+  evidence.add.103–105, review.add.92, divergence.lifecycle.10,
+  authoring.scaffold.14, authoring.init.98–100, authoring.migrate.13–14,
+  skills.install.64, context.status.81–83, report.dashboard.11–12) were
+  evidenced by an implementer unit and reviewed by an independent reviewer
+  process with its own session. The review ran seven rounds and recorded 41
+  findings, 11 of them blockers, mostly false positives and misses in the
+  Korean rules. All were fixed, attested again and closed with a reason.
+  `prose.decision-history` and the imperative check of `prose.ko-ending` were
+  redefined to stop a run of word-list trade-offs, and both now have a
+  sentence corpus that is checked in both directions. `canon gate check` is
+  clean.
+- Dogfood eval 14 (`docs/research/2026-10-22-dogfood-eval-14.md`) ran on a
+  consumer game repo with no `language:` set:
+  - The 14 briefs that prompted the release are detected as `ko`. They now
+    report 13–96 advisories each; canon 0.25 reported 0.
+  - A planner agent wrote three Korean briefs. `brief check` reported
+    `language: ko (detected)` and the remaining advisories. The agent
+    polished the briefs until 0 advisories were left, then stopped for the
+    human. The briefs are 2.2k–2.4k characters, against 2.7k–3.1k from the
+    same prompt on 0.25, with no `path:line` citations.
+  - Three pending briefs were written in the reported style (5.5k
+    characters, 20–25 `path:line` citations, 31–40 asides, 5–6 dated notes
+    and 48–57 advisories each). The agent polished them to 3.3k–3.6k
+    characters, with 0 citations, 3–5 asides, 0 dates and 0 advisories,
+    without changing what they say.
+  - The briefs page shows the advisory total, a badge on each brief, its
+    language and its findings grouped by rule.
+  - Wrong-shape canon calls: 0 of 12.
+
 ## 0.25.0 release
 
 Version 0.25.0 puts the one human step in reach and makes it hold back only
@@ -161,8 +289,9 @@ approval (#103).
 
 ### Upgrading
 
-- Replace any 0.23-era spelling (`--change`, `--project`, `--subject`,
-  `--actor`, `--run`, `--kind evidence_record`) with its `-id` form.
+- The spellings 0.24.0 deprecated are removed in 0.25.0, as announced: replace
+  `--change`, `--project`, `--subject`, `--actor`, `--run` and
+  `--kind evidence_record` with their `-id` and suffix-free forms.
 - `finding close --disposition rejected|deferred` now needs `--reason`.
 - Run `canon skills install` once: it prunes files 0.24 shipped that 0.25 no
   longer does.

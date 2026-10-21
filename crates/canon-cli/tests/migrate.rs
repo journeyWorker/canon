@@ -214,7 +214,7 @@ fn authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout() {
         "  canon.yaml: remove the plans source `{ dialect: openspec, root: . }` canon init wrote; no change is left under it\n",
         "  remove openspec/changes/.gitkeep (canon init's placeholder for that source)\n",
         "  canon.yaml: skills.providers: [claude, codex] (from the install lock)\n",
-        "  .gitignore: add .canon/audit/, .canon/ledger/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock\n",
+        "  .gitignore: add .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/\n",
         "  rebuild the scenario index (full sync)\n",
         "canon migrate: --dry-run, nothing written\n",
     ] {
@@ -246,7 +246,7 @@ fn authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout() {
         "every other byte of canon.yaml is kept"
     );
     let gitignore = read(repo, ".gitignore");
-    for line in [".canon/hot.db*", ".canon/audit/", ".canon/ledger/kind=scenario/", ".canon/scenario-index.lock", ".canon/artifact-store.lock"] {
+    for line in [".canon/hot.db*", ".canon/audit/", ".canon/ledger/kind=scenario/", ".canon/archive/kind=scenario/", ".canon/scenario-index.lock", ".canon/artifact-store.lock", ".canon/dashboard-snapshot/", ".canon/learn/", ".canon/r2/"] {
         assert_eq!(gitignore.lines().filter(|l| l.trim() == line).count(), 1, "{line} once in:\n{gitignore}");
     }
 
@@ -615,4 +615,61 @@ fn authoring_migrate_12_unread_openspec_material_keeps_the_source() {
     assert!(read(repo, "canon.yaml").contains("    - dialect: openspec\n      root: .\n"), "the source stays");
     assert_eq!(read(repo, "openspec/changes/notes.txt"), "loose notes\n");
     assert!(repo.join(".canon/changes/add-cart/brief.md").is_file());
+}
+
+/// authoring.migrate.13 (#105, #107): a repo whose `.gitignore` holds the
+/// block canon 0.25 wrote gets `.canon/dashboard-snapshot/`, `.canon/learn/`
+/// and `.canon/r2/` from `canon migrate`, each under its comment once, every
+/// other byte kept; a second run adds none.
+#[test]
+fn authoring_migrate_13_adds_the_derived_directory_lines_to_an_existing_block_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    git(repo, &["init", "-q"]);
+    ok(repo, &["init", "--repo", ".", "--no-policy"]);
+    let old = "target/\n# canon's read-access audit log\n.canon/hot.db*\n.canon/audit/\n.canon/ledger/kind=scenario/\n.canon/scenario-index.lock\n.canon/artifact-store.lock\nnode_modules/\n";
+    write(repo, ".gitignore", old);
+    commit_all(repo, "a 0.25 gitignore");
+
+    let dry = ok(repo, &["migrate", "--dry-run"]);
+    assert!(dry.contains("  .gitignore: add .canon/archive/kind=scenario/, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/\n"), "{dry}");
+    assert_eq!(read(repo, ".gitignore"), old, "--dry-run writes nothing");
+
+    let out = ok(repo, &["migrate"]);
+    assert!(out.contains("canon migrate: added to .gitignore: .canon/archive/kind=scenario/, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/\n"), "{out}");
+    let gitignore = read(repo, ".gitignore");
+    assert!(gitignore.starts_with(old), "every existing byte is kept: {gitignore}");
+    for line in [".canon/archive/kind=scenario/", ".canon/dashboard-snapshot/", ".canon/learn/", ".canon/r2/"] {
+        assert_eq!(gitignore.lines().filter(|l| l.trim() == line).count(), 1, "{line} once in:\n{gitignore}");
+    }
+
+    let again = ok(repo, &["migrate"]);
+    assert!(!again.contains("added to .gitignore"), "{again}");
+    assert_eq!(read(repo, ".gitignore"), gitignore, "a second run adds none");
+}
+
+/// authoring.migrate.14 (review finding 12): a `.gitignore` that kept a
+/// managed comment but lost its line gets only the line, directly under the
+/// comment; no comment is written twice, and a second run changes nothing.
+#[test]
+fn authoring_migrate_14_a_kept_comment_gets_its_missing_line_and_no_second_comment() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    git(repo, &["init", "-q"]);
+    ok(repo, &["init", "--repo", ".", "--no-policy"]);
+    let full = read(repo, ".gitignore");
+    let lost = full.replace(".canon/learn/\n", "").replace(".canon/archive/kind=scenario/\n", "");
+    assert_ne!(lost, full);
+    write(repo, ".gitignore", &lost);
+    commit_all(repo, "a gitignore that lost two lines and kept their comments");
+
+    let out = ok(repo, &["migrate"]);
+    assert!(out.contains("canon migrate: added to .gitignore: .canon/archive/kind=scenario/, .canon/learn/\n"), "{out}");
+    assert_eq!(read(repo, ".gitignore"), full, "the lines return under their own comments, byte for byte");
+    for comment in full.lines().filter(|line| line.starts_with('#')) {
+        assert_eq!(read(repo, ".gitignore").lines().filter(|l| *l == comment).count(), 1, "{comment} once");
+    }
+
+    ok(repo, &["migrate"]);
+    assert_eq!(read(repo, ".gitignore"), full, "a second run changes nothing");
 }

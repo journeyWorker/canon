@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T17:53:25.170206921Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reviewed_sha": "ec056dfc826c47ff0171bb62ae6c7e57ccdf72d5",
+  "reviewer": "canon-reviewer-026",
+  "round": 2,
+  "scenario_ids": [
+    "authoring.brief-check.06"
+  ],
+  "schema": 1,
+  "seq": 7,
+  "severity": "note",
+  "summary": "[probe] The Next.js exemption (no slash, uppercase start, .js) also exempts file names: 'The pick is saved by App.js as usual.' draws no citation; in backticks `App.js` still counts as an identifier."
+}

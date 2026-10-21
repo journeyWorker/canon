@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T18:51:21.656516207Z",
+  "change_id": "canon-0-26",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reason": "fixed in the round 4 redesign commit",
+  "resolution_sha": "f29f0abab9b11df31c3cdbd1b44f1147ba6785f6",
+  "reviewed_sha": "e2194c0050ca6e130ec0e407ae3d74a007bf61be",
+  "reviewer": "canon-reviewer-026",
+  "round": 4,
+  "scenario_ids": [
+    "authoring.brief-check.10"
+  ],
+  "schema": 1,
+  "seq": 2,
+  "severity": "blocker",
+  "summary": "[probe] Imperatives with an argument are missed in list items when the ending is not in the closed list or the argument is a topic: '- 재고를 확인해라.' (해라, the plain imperative of every 하다 verb), '- 요청은 로그로 남겨라.' (겨라), '- 결과를 화면에 보여 줘라.' (줘라), '- 사용자는 다시 시도하라.' (only a topic 는 before it) draw nothing; the same '재고를 확인해라.' in a paragraph is flagged (…확인해라). Scenario 10 says each imperative sentence that has an argument is a finding."
+}

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T17:01:56.654212243Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec_root divergence_lifecycle_10"
+  },
+  "evidence_note": {
+    "summary": "spec_root: 1 passed, 5 filtered out, 0 failed @ 5df188d"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 14,
+  "scenario_id": "divergence.lifecycle.10",
+  "schema": 1,
+  "staging_id": "cef3b143f0d0",
+  "verdict": "faithful"
+}

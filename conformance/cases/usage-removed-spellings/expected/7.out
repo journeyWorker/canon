@@ -71,6 +71,7 @@
     }
   ],
   "language": "en",
+  "languageSource": "detected",
   "legacy": false,
   "phase": "shaping",
   "waivers": []

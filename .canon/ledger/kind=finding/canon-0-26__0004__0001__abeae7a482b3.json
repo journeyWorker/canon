@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T18:51:21.585712739Z",
+  "change_id": "canon-0-26",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reason": "fixed in the round 4 redesign commit",
+  "resolution_sha": "f29f0abab9b11df31c3cdbd1b44f1147ba6785f6",
+  "reviewed_sha": "e2194c0050ca6e130ec0e407ae3d74a007bf61be",
+  "reviewer": "canon-reviewer-026",
+  "round": 4,
+  "scenario_ids": [
+    "authoring.brief-check.10"
+  ],
+  "schema": 1,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "[probe] has_argument treats any earlier word ending in 와/과/에서/에 as a verb argument, so a terminated noun-phrase fragment with a modifier is flagged as hortative ~자: '- 주최자와 참가자.', '- 서울에서 온 참가자.', '- 결제 화면에 남은 하자.' each draw prose.ko-ending. Scenario 10 says noun fragments in list items, with or without a terminator, report nothing. 와/과 join nouns and 에/에서 mark noun modifiers as often as verb arguments; the bare fragments ('상품 하자.', '선두 주자.', a ':' label) are exempt."
+}

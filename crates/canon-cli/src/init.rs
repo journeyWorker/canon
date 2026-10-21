@@ -78,13 +78,22 @@ const HOT_KINDS: [RecordKind; 5] = [RecordKind::Task, RecordKind::Handoff, Recor
 /// query; the derived scenario index, which every reader rebuilds
 /// from the `.feature` files when stale (0.16 D2), so committing it
 /// would only commit churn; and the lock files that serialize those
-/// rebuilds and artifact-store writes, which are local process state.
-const GITIGNORE_LINES: [(&str, &str); 5] = [
+/// rebuilds and artifact-store writes, which are local process state;
+/// and the three derived directories `canon dashboard`/`canon report`
+/// write (the regenerated snapshot, the learn scratch area, the local
+/// object-store stand-in), which would otherwise be untracked after the
+/// first run (#105, #107); and the archive of superseded scenario index
+/// versions, which every rewrite of the derived index fills.
+const GITIGNORE_LINES: [(&str, &str); 9] = [
     ("# canon's sqlite hot tier (s32 sqlite-hot-backend) -- db file + WAL/SHM sidecars.", paths::HOT_DB_GITIGNORE),
     ("# canon's read-access audit log (canon query/export/purge) -- local, never committed.", paths::AUDIT_GITIGNORE),
     ("# canon's scenario index -- derived from the .feature files, rebuilt by every reader.", paths::SCENARIO_INDEX_GITIGNORE),
+    ("# the archive of superseded scenario index versions -- derived like the index, never committed.", paths::SCENARIO_ARCHIVE_GITIGNORE),
     ("# the lock that serializes scenario index rebuilds -- local process state.", paths::SCENARIO_INDEX_LOCK_FILE),
     ("# the lock that serializes artifact store writes -- local process state.", paths::ARTIFACT_STORE_LOCK_FILE),
+    ("# the snapshot `canon dashboard` and `canon report --snapshot` regenerate -- derived, never committed.", paths::DASHBOARD_SNAPSHOT_GITIGNORE),
+    ("# canon's learn scratch area -- rebuildable, never committed.", paths::LEARN_GITIGNORE),
+    ("# canon's local object-store stand-in -- local state, never committed.", paths::R2_LOCAL_GITIGNORE),
 ];
 
 /// D8/D9's skeleton `canon.yaml` body: every one of `RecordKind::ALL`'s
@@ -173,9 +182,26 @@ pub(crate) fn missing_gitignore_lines(repo: &Path) -> Vec<(&'static str, &'stati
     GITIGNORE_LINES.iter().copied().filter(|(_, line)| !existing.lines().any(|have| have.trim() == *line)).collect()
 }
 
+/// What `canon skills doctor` and `canon init --check-config` say when
+/// `<repo>/.gitignore` lacks managed lines (#105, #107): the lines, and
+/// the command that adds them. `None` when none is missing, and when
+/// the directory is neither a git checkout nor carries a `.gitignore`
+/// (nothing there for git to show as untracked).
+pub(crate) fn gitignore_gap(repo: &Path) -> Option<String> {
+    if !repo.join(".git").exists() && !repo.join(".gitignore").exists() {
+        return None;
+    }
+    let missing: Vec<&str> = missing_gitignore_lines(repo).into_iter().map(|(_, line)| line).collect();
+    if missing.is_empty() {
+        return None;
+    }
+    Some(format!("`.gitignore` lacks {}, which canon writes and git would show as untracked; fix: `canon migrate`", missing.join(", ")))
+}
+
 /// Ensures every [`GITIGNORE_LINES`] entry is present in
-/// `<repo>/.gitignore` -- appends each missing one under its comment
-/// (creating the file if absent), so a `.gitignore` a prior `canon init`
+/// `<repo>/.gitignore` -- appends each missing one under its comment (or
+/// under the comment the file kept without it; never a second copy of a
+/// comment), creating the file if absent, so a `.gitignore` a prior `canon init`
 /// (or the repo's own `git init`) already wrote is never duplicated.
 /// `.gitignore` commonly PRE-EXISTS a `canon init` invocation (e.g. a
 /// `git init`-then-`canon init` sequence), and a repo initialized by an
@@ -190,13 +216,28 @@ pub(crate) fn scaffold_gitignore(repo: &Path) -> std::io::Result<Vec<&'static st
     if missing.is_empty() {
         return Ok(Vec::new());
     }
-    let mut file = fs::OpenOptions::new().create(true).append(true).open(&path)?;
-    if !existing.is_empty() && !existing.ends_with('\n') {
-        file.write_all(b"\n")?;
-    }
+    // A managed comment the file kept without its line gets the line
+    // directly under it; a comment is never written twice. Every other
+    // byte of the file is kept as it was.
+    let mut segments: Vec<String> = existing.split_inclusive('\n').map(str::to_string).collect();
+    let mut appended = String::new();
     for (comment, line) in &missing {
-        file.write_all(format!("{comment}\n{line}\n").as_bytes())?;
+        match segments.iter().position(|have| have.trim() == *comment) {
+            Some(at) => {
+                if !segments[at].ends_with('\n') {
+                    segments[at].push('\n');
+                }
+                segments.insert(at + 1, format!("{line}\n"));
+            }
+            None => appended.push_str(&format!("{comment}\n{line}\n")),
+        }
     }
+    let mut text: String = segments.concat();
+    if !appended.is_empty() && !text.is_empty() && !text.ends_with('\n') {
+        text.push('\n');
+    }
+    text.push_str(&appended);
+    fs::write(&path, text)?;
     Ok(missing.into_iter().map(|(_, line)| line).collect())
 }
 
@@ -755,6 +796,12 @@ pub fn run_check_config(repo: &Path, json: bool) -> i32 {
             all_ok = false;
             report.push_str(&format!("[FAIL] language: {e}\n"));
         }
+    }
+
+    // The managed `.gitignore` lines (#105, #107): a gap is advice, not a
+    // config failure, so it never changes the exit code.
+    if let Some(gap) = gitignore_gap(repo) {
+        report.push_str(&format!("[WARN] gitignore: {gap}\n"));
     }
 
     // `artifact_store:` (0.23 D3): absent is the local default and prints

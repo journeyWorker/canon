@@ -617,7 +617,13 @@ fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<(Vec<u8>,
 /// Emit only the exact signable bytes to stdout; never stage or sign.
 pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> i32 {
     use std::io::Write;
-    match approval_binding(&resolve_repo_root(repo), args) {
+    let repo = resolve_repo_root(repo);
+    if let Some(project_id) = &args.project_id {
+        if let Err(error) = crate::inventory::require_spec_root(&repo, project_id) {
+            return error.emit("canon evidence approval-payload", args.json);
+        }
+    }
+    match approval_binding(&repo, args) {
         Ok((payload, surface, effects)) if args.json => {
             let hex: String = payload.iter().map(|byte| format!("{byte:02x}")).collect();
             crate::json_out::data(
@@ -673,6 +679,13 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     }
     if let Err(error) = check_artifact_scopes(args) {
         return error.emit("canon evidence add", args.json);
+    }
+    // #104: an id no configured spec root carries is refused before
+    // anything is staged, bound or written (`--all-scenarios` included).
+    if let Some(project_id) = &args.project_id {
+        if let Err(error) = crate::inventory::require_spec_root(&repo, project_id) {
+            return error.emit("canon evidence add", args.json);
+        }
     }
     let audit = match audit_of(args) {
         Ok(audit) => audit,

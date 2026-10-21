@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T18:06:57.268489346Z",
+  "change_id": "canon-0-26",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reason": "fixed in the round 2 fixes commit",
+  "resolution_sha": "dbb4b80236b089471ab70951f1e7de361d8c8d5e",
+  "reviewed_sha": "ec056dfc826c47ff0171bb62ae6c7e57ccdf72d5",
+  "reviewer": "canon-reviewer-026",
+  "round": 2,
+  "scenario_ids": [
+    "authoring.brief-check.10"
+  ],
+  "schema": 1,
+  "seq": 1,
+  "severity": "blocker",
+  "summary": "[spec fidelity] The fix for round-1 #1 exempts every imperative and hortative sentence in a list item: '- 결제 전에 재고를 확인하라.', '- 반납이 끝나면 이용자에게 문자를 보내자.', '- 오류가 나면 사서를 부르십시오.' draw nothing (the same sentences in a paragraph are flagged). ko_ending now checks KO_IMPERATIVE/KO_HORTATIVE only when `terminated && !item`, and test 10 was re-pinned from 3 endings to 2 ('the list-item imperative is a fragment form and exempt') for '- 책을 다시 넣으라.', while scenario 10 still says each imperative sentence is a finding. Flagging terminated list items again (`if terminated`) fails test 10 (throwaway build). Blast radius: Detail and Acceptance are mostly list items, so this is where Korean briefs write instructions."
+}

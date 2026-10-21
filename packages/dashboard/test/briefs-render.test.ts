@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { approveDisabled, EMPTY_MESSAGE, inline, renderBody, renderBrief, renderBriefs, type Brief, type BriefHandlers } from "../src/briefs-render";
+import { advisoryTotal, approveDisabled, EMPTY_MESSAGE, groupAdvisories, inline, renderBody, renderBrief, renderBriefs, type Brief, type BriefHandlers } from "../src/briefs-render";
 import { elements, escapeHtml, toHtml } from "../src/vnode";
 
 const handlers: BriefHandlers = { onInput: () => {}, onApprove: () => {} };
@@ -155,4 +155,57 @@ test("markdown subset: paragraphs join, lists group, sub-headings, key-sentence 
   expect(toHtml(nodes[0])).toBe("<p>First line second line</p>");
   expect(toHtml(nodes[4])).toBe("<p><strong>Key.</strong></p>");
   expect(inline("a `b` **c** ==d==").map((c) => (typeof c === "string" ? c : toHtml(c)))).toEqual(["a ", "<code>b</code>", " ", "<strong>c</strong>", " ", "d"]);
+});
+
+const advisory = (rule: string, line: number, message: string) => ({ severity: "advisory" as const, rule, line, message, hint: "", section: null, blocksApproval: false });
+
+test("report.dashboard.11: advisories are grouped by rule, with the count, line and matched text", () => {
+  const findings = [
+    advisory("prose.evaluative", 9, "obviously"),
+    advisory("prose.key-sentence", 30, "no key sentence"),
+    advisory("prose.evaluative", 4, "very"),
+  ];
+  const groups = groupAdvisories(findings);
+  expect(groups.map((g) => [g.rule, g.findings.map((f) => f.line)])).toEqual([
+    ["prose.evaluative", [4, 9]],
+    ["prose.key-sentence", [30]],
+  ]);
+  const card = renderBrief(brief({ findings, counts: { blockers: 0, advisories: 3 }, approvable: true }), handlers);
+  const html = toHtml(card);
+  expect(html).toContain("3 advisories");
+  const groupNodes = elements(card).filter((e) => e.tag === "section" && e.attrs["data-rule-group"]);
+  expect(groupNodes.map((g) => g.attrs["data-rule-group"])).toEqual(["prose.evaluative", "prose.key-sentence"]);
+  expect(toHtml(groupNodes[0])).toContain("line 4: very");
+  expect(toHtml(groupNodes[0])).toContain("line 9: obviously");
+  const counts = elements(groupNodes[0]).find((e) => e.attrs.class?.toString().includes("rule-count"))!;
+  expect(toHtml(counts)).toContain(">2<");
+});
+
+test("report.dashboard.11: the badge sits next to the blocker count and is absent with none", () => {
+  const both = toHtml(renderBrief(brief(), handlers));
+  expect(both).toContain("1 blocker</span> <span class=\"badge badge-advisory\">1 advisory</span>");
+  const clean = brief({ findings: [], counts: { blockers: 0, advisories: 0 }, approvable: true });
+  expect(toHtml(renderBrief(clean, handlers))).not.toContain("badge");
+});
+
+test("report.dashboard.11: advisory text is a text node, never markup", () => {
+  const hostile = brief({ findings: [advisory("prose.evaluative", 1, HOSTILE)], counts: { blockers: 0, advisories: 1 } });
+  const card = renderBrief(hostile, handlers);
+  expect(elements(card).some((e) => e.tag === "script" || e.tag === "img")).toBe(false);
+  expect(toHtml(card)).toContain(escapeHtml(HOSTILE));
+});
+
+test("report.dashboard.12: the page total counts advisories across briefs and says when there are none", () => {
+  const two = [brief({ counts: { blockers: 0, advisories: 3 } }), brief({ changeId: "b", counts: { blockers: 0, advisories: 0 } })];
+  expect(advisoryTotal(two)).toBe("3 advisories in 1 of 2 briefs.");
+  expect(toHtml(renderBriefs(two, handlers))).toContain("3 advisories in 1 of 2 briefs.");
+  expect(advisoryTotal([brief({ counts: { blockers: 1, advisories: 1 } })])).toBe("1 advisory in 1 of 1 brief.");
+  expect(advisoryTotal([brief({ counts: { blockers: 0, advisories: 0 } })])).toBe("No advisories in the listed briefs.");
+});
+
+test("each brief card names the language it was judged in and where that came from", () => {
+  const detected = toHtml(renderBrief(brief({ language: "ko", languageSource: "detected" }), handlers));
+  expect(detected).toContain("language: ko (detected)");
+  const configured = toHtml(renderBrief(brief({ language: "en", languageSource: "configured", languageNote: "the text reads as ko" }), handlers));
+  expect(configured).toContain("language: en (configured; the text reads as ko)");
 });

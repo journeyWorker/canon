@@ -315,3 +315,34 @@ Feature: authoring init
     When canon init runs again
     Then it adds each missing canon gitignore line once under its comment, names them, and keeps the rest of the gitignore and canon.yaml byte-identical
     And with --no-agents-md it only adds the lines, and with none missing that run is the overwrite refusal
+
+  # canon: {"schema":1,"at":"2026-10-21T16:35:52Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @authoring.init.98
+  Scenario: The derived directories dashboard and report write stay out of git in a freshly initialized repo
+    Given a git repository freshly initialized with canon init and committed
+    When canon dashboard writes its snapshot, and report and learn write their default directories
+    Then the init gitignore covers .canon/dashboard-snapshot/, .canon/learn/ and .canon/r2/
+    And git status reports nothing untracked
+
+  # canon: {"schema":1,"at":"2026-10-21T16:36:00Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.init.99
+  Scenario: init --check-config warns about a missing managed gitignore line and names the fix
+    Given a repo whose gitignore lacks one of the lines canon init manages
+    When init --check-config runs
+    Then it prints a [WARN] gitignore line naming the missing entries and the fix, canon migrate
+    And it exits 0, because a missing ignore line is not a config failure
+    And a repo that is neither a git checkout nor has a gitignore draws no such line
+
+  # canon: {"schema":1,"at":"2026-10-21T17:24:48Z","actor":{"agent_id":"canon-impl-026"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @authoring.init.100
+  Scenario: A scenario edit and a reader run leave only the edited feature in git status
+    Given a git repository freshly initialized with canon init, with a committed feature file holding one scenario
+    When canon gate check indexes the scenario, the scenario is edited, and canon gate check runs again
+    Then the init gitignore covers .canon/archive/kind=scenario/, where the superseded index version went, which no reader needs from git
+    And git status reports only the edited feature file

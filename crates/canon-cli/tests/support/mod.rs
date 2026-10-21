@@ -222,3 +222,49 @@ pub fn stdout(output: &Output) -> String {
 pub fn stderr(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).into_owned()
 }
+
+/// Declares `project` as a spec root in `<repo>/canon.yaml` (its corpus
+/// under `specs-<project>/`), once. `--project-id` must name a configured
+/// root, so a fixture that writes under `project` declares it first. The
+/// block goes at the end of the file, so declare roots after the rest of
+/// the config is written.
+pub fn declare_spec_root(repo: &Path, project: &str) {
+    let path = repo.join("canon.yaml");
+    let mut text = std::fs::read_to_string(&path).unwrap_or_default();
+    if text.lines().any(|line| line.trim() == format!("- id: {project}")) {
+        return;
+    }
+    if !text.is_empty() && !text.ends_with('\n') {
+        text.push('\n');
+    }
+    if !text.lines().any(|line| line == "specs:") {
+        text.push_str("specs:\n  roots:\n");
+    }
+    text.push_str(&format!("    - id: {project}\n      root: specs-{project}\n"));
+    std::fs::write(path, text).unwrap();
+}
+
+const PROVENANCE: &str = r#"# canon: {"schema":1,"at":"2026-10-01T00:00:00Z","actor":{"agent_id":"canon"}}"#;
+
+/// Declares `project` ([`declare_spec_root`]) and adds `scenario_id`
+/// (`<area>.<surface>.<nn>`) to its corpus, owned by `subject` when given,
+/// so the stale-index refresh a reader runs indexes it rather than
+/// tombstoning a record seeded straight into the ledger.
+pub fn declare_scenario(repo: &Path, project: &str, scenario_id: &str, subject: Option<&str>) {
+    let tags: Vec<String> = subject.map(|s| format!("@subject:{s}")).into_iter().collect();
+    declare_scenario_tagged(repo, project, scenario_id, &tags);
+}
+
+/// [`declare_scenario`] with any tags (`@subject:<id>`, `@case:happy`).
+pub fn declare_scenario_tagged(repo: &Path, project: &str, scenario_id: &str, tags: &[String]) {
+    declare_spec_root(repo, project);
+    let mut parts = scenario_id.split('.');
+    let (area, surface) = (parts.next().unwrap(), parts.next().unwrap());
+    let dir = repo.join(format!("specs-{project}/kind=feature/area={area}"));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join(format!("{surface}.feature"));
+    let mut text = std::fs::read_to_string(&file).unwrap_or_else(|_| format!("Feature: {area} {surface}\n  {PROVENANCE}\n"));
+    let owner: String = tags.iter().map(|t| format!("  {t}\n")).collect();
+    text.push_str(&format!("\n  {PROVENANCE}\n{owner}  @{scenario_id}\n  Scenario: {scenario_id} seeded\n    Given a step\n"));
+    std::fs::write(file, text).unwrap();
+}

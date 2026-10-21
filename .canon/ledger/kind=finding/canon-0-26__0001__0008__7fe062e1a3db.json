@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T17:41:47.203917044Z",
+  "change_id": "canon-0-26",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/brief_prose.rs",
+  "kind": "finding",
+  "reason": "fixed by the prose rules change",
+  "resolution_sha": "8c50a008dbda2d2a556f9dff83157dfa5f489347",
+  "reviewed_sha": "8eff1e88373d4c25af8f9c8a2c8a23beb90202c1",
+  "reviewer": "canon-reviewer-026",
+  "round": 1,
+  "scenario_ids": [
+    "authoring.brief-check.03"
+  ],
+  "schema": 1,
+  "seq": 8,
+  "severity": "should_fix",
+  "summary": "[standards] The configured-language half asserts questions is empty OR [prose.ko-ending], which holds either way; removing the Configured early return in section_language keeps test 03 green (test 02 catches it). The Then 'when the repo sets a language, every section is judged in it' needs an assertion that differs between the two resolutions."
+}

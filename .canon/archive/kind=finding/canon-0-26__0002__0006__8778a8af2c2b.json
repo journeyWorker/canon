@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T17:53:24.832739093Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reviewed_sha": "ec056dfc826c47ff0171bb62ae6c7e57ccdf72d5",
+  "reviewer": "canon-reviewer-026",
+  "round": 2,
+  "scenario_ids": [
+    "authoring.brief-check.08"
+  ],
+  "schema": 1,
+  "seq": 6,
+  "severity": "note",
+  "summary": "[probe] KO_DECISION_NOTES holds '하기로 했다' only, so a decision with another verb is missed: '대출 목록은 그대로 두기로 했다.' and '영수증을 보여 주기로 했다.' draw nothing; '…하지 않기로 결정했다' is caught."
+}

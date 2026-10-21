@@ -202,6 +202,9 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     };
 
     let repo = resolve_repo_root(repo);
+    if let Err(error) = crate::inventory::require_spec_root(&repo, &args.project_id) {
+        return error.emit("canon review add", args.json);
+    }
     let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(ctx) => ctx,
         Err(e) => {
@@ -429,6 +432,14 @@ mod tests {
 
     use super::*;
 
+    /// A repo whose `canon.yaml` configures the spec root `app-a`, the
+    /// project id these tests write under (`--project-id` must name one).
+    fn repo_dir() -> TempDir {
+        let dir = TempDir::new().unwrap();
+        std::fs::write(dir.path().join("canon.yaml"), "specs:\n  roots:\n    - id: app-a\n      root: specs\n").unwrap();
+        dir
+    }
+
     fn args() -> ReviewAddArgs {
         ReviewAddArgs {
             project_id: ProjectId::parse("app-a").unwrap(),
@@ -458,7 +469,7 @@ mod tests {
 
     /// A repo whose ledger holds `args()`'s scenario record.
     fn repo_with_scenario() -> TempDir {
-        let dir = TempDir::new().unwrap();
+        let dir = repo_dir();
         let envelope = Envelope::new(1, RecordKind::Scenario, Utc::now(), Actor::new("canon", RoleId::parse("implementer").unwrap()));
         let a = args();
         ledger(&dir).write(&Scenario::new(envelope, a.project_id, a.scenario_ids[0].clone(), "t", "", SpecDigest::of(b"feature bytes"))).unwrap();
@@ -537,7 +548,7 @@ mod tests {
     /// review.add.21: no scenario record, nothing to pin — refused.
     #[test]
     fn refuses_a_scenario_without_a_record_and_writes_nothing() {
-        let dir = TempDir::new().unwrap();
+        let dir = repo_dir();
         assert_eq!(run_add(dir.path(), &args()), 2);
         assert!(reviews(&dir).is_empty(), "a refused review add must write nothing");
     }

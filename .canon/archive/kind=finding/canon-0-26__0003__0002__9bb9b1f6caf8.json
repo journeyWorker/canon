@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T18:11:22.883474377Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reviewed_sha": "0a6886ff4ad20e5f70536578d7a0630d9b07cc42",
+  "reviewer": "canon-reviewer-026",
+  "round": 3,
+  "scenario_ids": [
+    "authoring.brief-check.10"
+  ],
+  "schema": 1,
+  "seq": 2,
+  "severity": "blocker",
+  "summary": "[probe] With the list-item exemption gone, a terminated noun fragment in a list item is flagged as hortative again: '- 알림 받는 사람: 주최자, 참가자.', '- 검토 대상: 후보자.', '- 반품 사유: 단순 변심, 상품 하자.', '- 대회 순서: 선두 주자.' each draw prose.ko-ending ~자 (가자, 보자, 하자, 주자 in KO_HORTATIVE). Scenario 10 says noun fragments in list items (참가자, 하자, 보라) report nothing; the unit test dropped the period from '하자.' to keep passing, and the fixture's own '- 영수증 화면.' shows terminated fragments are meant to be exempt. Without the period they are exempt; '보라.' is no longer listed."
+}

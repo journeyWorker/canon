@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T17:15:57.774708289Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reviewed_sha": "8eff1e88373d4c25af8f9c8a2c8a23beb90202c1",
+  "reviewer": "canon-reviewer-026",
+  "round": 1,
+  "scenario_ids": [
+    "authoring.brief-check.08"
+  ],
+  "schema": 1,
+  "seq": 3,
+  "severity": "blocker",
+  "summary": "[probe] prose.decision-history flags behavior sentences: en 'An invitee who agreed on the terms appears with busy blocks.' (agreed on), 'Every invitee in the meeting sees the pick.' (in the meeting), 'A slot changed on the server is redrawn.' (changed on), 'The pick is saved on May 3 releases.'; ko '이용자가 비밀번호를 변경했으면 …' (변경했), '이용자와 사서가 연장에 합의하면 …' (합의). The scenario promises a sentence that only says someone agreed to terms is not flagged; the phrase lists are substring matches with no decision context. Blast radius: calendar and account briefs (the fixture domain) hit this on plain behavior."
+}

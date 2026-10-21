@@ -147,6 +147,8 @@ pub fn list(repo: &Path) -> Reply {
             "text": text,
             "sha256": sha256_hex(&bytes),
             "language": checked.language.tag,
+            "languageSource": checked.language_source.as_str(),
+            "languageNote": checked.language_note,
             "changedSinceApproval": matches!(approval, crate::brief::Approval::Changed { .. }),
             "legacy": checked.evaluation.legacy,
             "sections": parse_sections(&text),

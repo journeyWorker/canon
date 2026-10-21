@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T17:53:26.228702773Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/brief_prose.rs",
+  "kind": "finding",
+  "reviewed_sha": "ec056dfc826c47ff0171bb62ae6c7e57ccdf72d5",
+  "reviewer": "canon-reviewer-026",
+  "round": 2,
+  "scenario_ids": [
+    "authoring.brief-check.05"
+  ],
+  "schema": 1,
+  "seq": 10,
+  "severity": "note",
+  "summary": "[standards] Test 05 still puts one short sentence in Out of scope; the 'out of scope is not judged' Then is guarded by test 11's long_scope check, which is bound to authoring.brief-check.11, not 05. The whole-brief total still counts Out of scope characters."
+}

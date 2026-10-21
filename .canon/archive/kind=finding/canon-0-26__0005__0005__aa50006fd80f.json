@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T18:58:15.265932913Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reviewed_sha": "bc3c050c9144025bad5de6aedf07411c15d2160d",
+  "reviewer": "canon-reviewer-026",
+  "round": 5,
+  "scenario_ids": [
+    "authoring.brief-check.10"
+  ],
+  "schema": 1,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "[probe] 하라체 imperatives of consonant stems and ㅗ/ㅜ/ㅡ vowel stems are missed in list items: '- 책을 다시 넣으라.' (round 1's own test sentence), '- 다음 화면을 보라.', '- 값은 그대로 두라.', '- 내일 다시 오라.' draw nothing. With no final-consonant check, '- 결과가 달라.' and '- 행사 이름은 갈라.' are named imperative ~라. brief-polish names the vowel set but lists neither gap among what is not flagged."
+}

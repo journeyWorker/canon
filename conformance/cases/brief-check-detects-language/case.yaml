@@ -1,0 +1,6 @@
+description: "`canon brief check` on a repo whose canon.yaml sets no `language:` judges a Korean brief with the Korean rules, prints one `language: ko (detected)` line, and carries `language`, `languageSource: detected` and findings for a dated decision note, a polite ending and a code citation in `--json`; advisories never fail the check"
+steps:
+  - args: [brief, check]
+    exit: 0
+  - args: [brief, check, --json]
+    exit: 0

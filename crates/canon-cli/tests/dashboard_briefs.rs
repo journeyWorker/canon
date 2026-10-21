@@ -235,6 +235,36 @@ fn report_dashboard_05_lists_only_live_unapproved_briefs_with_sections_and_findi
     assert!(blocked["counts"]["blockers"].as_u64().unwrap() >= 1);
 }
 
+/// report.dashboard.11: the list carries each brief's advisory findings (rule
+/// id, line, matched text) and the language source, and a brief that has only
+/// advisories stays approvable. The grouping by rule and the badge are the
+/// page's own (`packages/dashboard`).
+#[test]
+fn report_dashboard_11_lists_the_advisory_findings_of_a_brief_without_blockers() {
+    let dir = repo_with_briefs();
+    let text = clean_brief("Ready change").replace(" ==**F2 covers the failure path.**==", "");
+    let lines: Vec<&str> = text.lines().collect();
+    // The key-sentence finding sits on the first body line of the acceptance section.
+    let heading = lines.iter().position(|l| l.starts_with("## Acceptance")).unwrap();
+    let acceptance_line = (heading + 1..lines.len()).find(|&i| !lines[i].trim().is_empty()).unwrap() + 1;
+    std::fs::write(brief_path(dir.path(), "ready"), &text).unwrap();
+    let live = serve(dir.path());
+
+    let ready = brief_of(&live, "ready");
+    assert_eq!(ready["approvable"], true, "{ready}");
+    assert_eq!(ready["languageSource"], "detected", "{ready}");
+    let findings = ready["findings"].as_array().unwrap();
+    let key: Vec<&Value> = findings.iter().filter(|f| f["rule"] == "prose.key-sentence").collect();
+    assert_eq!(key.len(), 1, "{ready}");
+    assert_eq!((key[0]["severity"].as_str(), key[0]["section"].as_str()), (Some("advisory"), Some("acceptance")));
+    assert_eq!(key[0]["line"].as_u64(), Some(acceptance_line as u64), "{}", key[0]);
+    assert_eq!(key[0]["message"], "no key sentence", "the matched text is the finding's excerpt");
+    assert!(key[0]["hint"].as_str().is_some_and(|h| h.contains("==**")), "{}", key[0]);
+    let advisories = findings.iter().filter(|f| f["severity"] == "advisory").count() as u64;
+    assert!(advisories >= 1);
+    assert_eq!(ready["counts"], json!({ "blockers": 0, "advisories": advisories }), "{ready}");
+}
+
 /// report.dashboard.05: sections are found by marker, so a Korean brief reads the same.
 #[test]
 fn report_dashboard_05_reads_korean_headings_by_their_markers() {
