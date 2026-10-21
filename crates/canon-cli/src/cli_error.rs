@@ -285,7 +285,7 @@ const CODES: &[(&str, &str)] = &[
     ("SCENARIO_TAG_EXISTS", "the scenario tag already exists"),
     ("SELFTEST_FAILED", "a selftest suite or fixture did not match its expected result"),
     ("SERIALIZE_FAILED", "the result could not be serialized"),
-    ("SKILLS_DRIFT", "`skills check` found an installed skill missing, stale, a legacy remnant, or written by another canon version"),
+    ("SKILLS_DRIFT", "`skills check` found an installed skill missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version"),
     ("SKILLS_FAILED", "a skills command failed"),
     ("SPEC_ROOTS_UNREADABLE", "the scenario files a brief's flow steps point at could not be read"),
     ("SPEC_ROOT_UNRESOLVED", "no single spec root could be chosen; pass --project-id"),

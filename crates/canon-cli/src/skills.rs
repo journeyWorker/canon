@@ -216,6 +216,44 @@ pub fn provider_names(providers: &[Provider]) -> String {
     providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(",")
 }
 
+/// A projected file the install lock lists and the bundle no longer ships
+/// (0.25, #99).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Orphan {
+    pub provider: Provider,
+    /// Where the file sits, under the target.
+    pub path: PathBuf,
+    /// `false` when its bytes still match the hash the lock recorded: install
+    /// removes it. `true` when they differ (or it is not a regular file):
+    /// install keeps it.
+    pub modified: bool,
+}
+
+impl Orphan {
+    /// What the install lock says about its bytes.
+    pub fn reason(&self) -> &'static str {
+        if self.modified {
+            "its bytes differ from the install lock (or it is not a regular file)"
+        } else {
+            "its bytes still match the install lock"
+        }
+    }
+
+    /// What to do about it by hand.
+    pub fn by_hand(&self) -> String {
+        format!("remove it by hand with `rm {}` if you do not need it", self.path.display())
+    }
+
+    /// What to do about it, as `check` and `doctor` say it.
+    pub fn fix(&self, providers: &[Provider]) -> String {
+        if self.modified {
+            format!("`canon skills install` keeps it; {}", self.by_hand())
+        } else {
+            format!("run `{}`, which removes it", install_command(providers))
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CanonicalInstallReport {
     pub providers: Vec<Provider>,
@@ -225,6 +263,11 @@ pub struct CanonicalInstallReport {
     /// The `canon.yaml` whose `skills.providers` an explicit `--providers`
     /// rewrote; `None` when it already held that list or does not exist.
     pub config_written: Option<PathBuf>,
+    /// Files the previous lock listed and the new bundle no longer ships,
+    /// whose bytes still matched the lock: removed.
+    pub pruned: Vec<Orphan>,
+    /// The same, whose bytes differed: kept.
+    pub kept: Vec<Orphan>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -247,6 +290,8 @@ pub struct SkillsCheckReport {
     pub source_hash: String,
     pub statuses: Vec<SkillStatus>,
     pub manifest_ok: bool,
+    /// Files the install lock lists that the bundle no longer ships.
+    pub orphans: Vec<Orphan>,
     /// Paths of a legacy `.codex/skills` canon projection still on disk.
     pub remnants: Vec<PathBuf>,
     /// Set when the install lock exists but was written by a canon other
@@ -1069,18 +1114,23 @@ fn legacy_codex_removals<'m>(
         .collect()
 }
 
-/// Removes the proven legacy Codex files, then each directory they left
-/// empty, up to and including `.codex/skills`. `.codex` itself, any
-/// non-empty directory, and every file canon cannot prove it wrote stay.
-/// Each file's hash is checked again at removal time; one that changed since
-/// [`legacy_codex_removals`] is kept.
-fn remove_legacy_codex(target_dir: &Path, removals: &[(&str, &str)]) -> Result<(), SkillsError> {
+/// Removes the lock-proven files `removals` (`(key, recorded hash)`), then
+/// each directory they left empty below `stop_below`, which is never removed
+/// (the legacy migration stops at `.codex`, so `.codex/skills` goes when
+/// empty; a pruned projection stops at `<root>/skills/canon`). Any non-empty
+/// directory and every file canon cannot prove it wrote stay. Each file's
+/// hash is checked again at removal time; one that changed since it was
+/// selected is kept. Returns the keys actually removed.
+fn remove_proven<'k>(target_dir: &Path, removals: &[(&'k str, &str)], stop_below: &str) -> Result<Vec<&'k str>, SkillsError> {
     let mut dirs: Vec<&str> = Vec::new();
+    let mut removed = Vec::new();
     for (key, hash) in removals {
-        legacy_fs::remove_file_if_hash(target_dir, key, hash)?;
+        if legacy_fs::remove_file_if_hash(target_dir, key, hash)? {
+            removed.push(*key);
+        }
         let mut current = *key;
         while let Some((parent, _)) = current.rsplit_once('/') {
-            if parent.len() < LEGACY_CODEX_SKILLS.len() {
+            if parent == stop_below || !parent.starts_with(stop_below) {
                 break;
             }
             dirs.push(parent);
@@ -1099,7 +1149,82 @@ fn remove_legacy_codex(target_dir: &Path, removals: &[(&str, &str)]) -> Result<(
     for dir in dirs {
         legacy_fs::remove_dir_if_empty(target_dir, dir)?;
     }
-    Ok(())
+    Ok(removed)
+}
+
+/// `<root>/skills/canon`, the directory `provider`'s projection lives in, as
+/// a lock key prefix.
+fn projection_key_root(provider: Provider) -> String {
+    format!("{}/skills/canon", provider.descriptor().root)
+}
+
+/// Whether `key`, from the install lock, names a file inside the canon
+/// projection `root`. Keys come from a file in the target repository, so
+/// anything but plain path components is refused.
+fn is_projection_key(root: &str, key: &str) -> bool {
+    key.strip_prefix(root).is_some_and(|rest| rest.starts_with('/'))
+        && Path::new(key).components().all(|component| matches!(component, std::path::Component::Normal(_)))
+}
+
+/// An [`Orphan`] with the lock key and recorded hash it came from.
+struct FoundOrphan<'m> {
+    orphan: Orphan,
+    key: &'m str,
+    hash: &'m str,
+}
+
+/// The files of `selected` providers' canon projections that `previous`
+/// lists, `expected` (the lock a fresh install would write) does not, and
+/// that exist on disk. An unselected provider's projection and a file the
+/// lock never listed are never named. A file whose bytes still match the
+/// lock's hash is unmodified; a changed, replaced or symlinked one is
+/// `modified`.
+fn find_orphans<'m>(
+    target_dir: &Path,
+    previous: Option<&'m CanonicalManifest>,
+    expected: &CanonicalManifest,
+    selected: &[Provider],
+) -> Vec<FoundOrphan<'m>> {
+    let Some(previous) = previous else {
+        return Vec::new();
+    };
+    let mut found = Vec::new();
+    for provider in selected {
+        let root = projection_key_root(*provider);
+        for (key, hash) in &previous.files {
+            if !is_projection_key(&root, key) || expected.files.contains_key(key) {
+                continue;
+            }
+            let path = target_dir.join(key);
+            if fs::symlink_metadata(&path).is_err() {
+                continue;
+            }
+            let modified = legacy_fs::read(target_dir, key).is_none_or(|bytes| content_hash(&bytes) != *hash);
+            found.push(FoundOrphan { orphan: Orphan { provider: *provider, path, modified }, key, hash });
+        }
+    }
+    found
+}
+
+/// Removes the unmodified orphans, then the directories that leaves empty
+/// inside each canon projection. Returns `(pruned, kept)`; a file that
+/// changed between detection and removal moves to `kept`.
+fn prune_orphans(target_dir: &Path, found: Vec<FoundOrphan<'_>>, selected: &[Provider]) -> Result<(Vec<Orphan>, Vec<Orphan>), SkillsError> {
+    let mut pruned = Vec::new();
+    let mut kept = Vec::new();
+    for provider in selected {
+        let (mine, _): (Vec<_>, Vec<_>) = found.iter().partition(|f| f.orphan.provider == *provider);
+        let removals: Vec<(&str, &str)> = mine.iter().filter(|f| !f.orphan.modified).map(|f| (f.key, f.hash)).collect();
+        let removed = remove_proven(target_dir, &removals, &projection_key_root(*provider))?;
+        for found in mine {
+            if removed.contains(&found.key) {
+                pruned.push(found.orphan.clone());
+            } else {
+                kept.push(Orphan { modified: true, ..found.orphan.clone() });
+            }
+        }
+    }
+    Ok((pruned, kept))
 }
 
 /// Filesystem access for the legacy Codex migration. Keys are
@@ -1159,16 +1284,18 @@ mod legacy_fs {
         read_in(&dir, name)
     }
 
-    pub(super) fn remove_file_if_hash(target_dir: &Path, key: &str, hash: &str) -> Result<(), SkillsError> {
+    /// Whether it unlinked the file: `false` when the file is gone, is not a
+    /// regular file, or no longer holds the bytes `hash` names.
+    pub(super) fn remove_file_if_hash(target_dir: &Path, key: &str, hash: &str) -> Result<bool, SkillsError> {
         let Some((dir, name)) = open_parent(target_dir, key) else {
-            return Ok(());
+            return Ok(false);
         };
         if read_in(&dir, name).is_none_or(|bytes| content_hash(&bytes) != hash) {
-            return Ok(());
+            return Ok(false);
         }
         match unlinkat(&dir, name, AtFlags::empty()) {
-            Ok(()) => Ok(()),
-            Err(errno) if errno == Errno::NOENT => Ok(()),
+            Ok(()) => Ok(true),
+            Err(errno) if errno == Errno::NOENT => Ok(false),
             Err(errno) => Err(io_error(target_dir, key, errno)),
         }
     }
@@ -1210,12 +1337,12 @@ mod legacy_fs {
         fs::read(&path).ok()
     }
 
-    pub(super) fn remove_file_if_hash(target_dir: &Path, key: &str, hash: &str) -> Result<(), SkillsError> {
+    pub(super) fn remove_file_if_hash(target_dir: &Path, key: &str, hash: &str) -> Result<bool, SkillsError> {
         if read(target_dir, key).is_none_or(|bytes| content_hash(&bytes) != hash) {
-            return Ok(());
+            return Ok(false);
         }
         let path = target_dir.join(key);
-        fs::remove_file(&path).map_err(|source| SkillsError::Io { path, source })
+        fs::remove_file(&path).map(|()| true).map_err(|source| SkillsError::Io { path, source })
     }
 
     pub(super) fn remove_dir_if_empty(target_dir: &Path, key: &str) -> Result<(), SkillsError> {
@@ -1384,7 +1511,10 @@ pub fn competing_skills(target_dir: &Path) -> Vec<CompetingSkill> {
 }
 
 /// Projects the canonical bundle for the [`select_providers`] selection
-/// and records it in the install lock. An explicit `providers` also
+/// and records it in the install lock. Files the previous lock lists for a
+/// selected provider that the bundle no longer ships are pruned when their
+/// bytes still match the lock's hash and kept (and reported) otherwise
+/// (0.25, #99); see [`find_orphans`]. An explicit `providers` also
 /// rewrites `skills.providers` in `<target_dir>/canon.yaml` when that file
 /// exists, after the projection is written. With nothing selected and no
 /// install lock, nothing at all is written.
@@ -1419,6 +1549,7 @@ pub fn install_canonical(
     }
     reject_symlink_path_under(target_dir, &manifest_path(target_dir))?;
     let removals = legacy_codex_removals(target_dir, previous.as_ref());
+    let orphans = find_orphans(target_dir, previous.as_ref(), &manifest, &selected);
     let lock_current = match &previous {
         Some(previous) => previous.same_projection(&manifest) && previous.canon_version == manifest.canon_version,
         // Nothing selected and nothing recorded: there is nothing to lock.
@@ -1429,11 +1560,13 @@ pub fn install_canonical(
         || writes
             .iter()
             .any(|(path, bytes)| fs::read(path).ok().as_deref() != Some(bytes.as_slice()));
+    let (mut pruned, mut kept) = (Vec::new(), Vec::new());
     if changed {
         for (path, bytes) in writes {
             write_bytes_under(target_dir, &path, &bytes)?;
         }
-        remove_legacy_codex(target_dir, &removals)?;
+        remove_proven(target_dir, &removals, ".codex")?;
+        (pruned, kept) = prune_orphans(target_dir, orphans, &selected)?;
         manifest.source_commit = source_commit(source_dir);
         let mut json =
             serde_json::to_string_pretty(&manifest).expect("manifest serialization is infallible");
@@ -1453,6 +1586,8 @@ pub fn install_canonical(
         source_hash: manifest.source_hash,
         changed,
         config_written,
+        pruned,
+        kept,
     })
 }
 
@@ -1512,6 +1647,7 @@ pub fn check(
         // Nothing selected needs no lock.
         None => selected.is_empty(),
     };
+    let orphans = find_orphans(target_dir, actual.as_ref(), &expected, &selected).into_iter().map(|found| found.orphan).collect();
     let outdated = actual
         .filter(|actual| actual.canon_version != expected.canon_version)
         .map(|actual| OutdatedLock { path: manifest_path(target_dir), installed_by: actual.canon_version });
@@ -1521,6 +1657,7 @@ pub fn check(
         source_hash: expected.source_hash,
         statuses,
         manifest_ok,
+        orphans,
         remnants: legacy_codex_remnants(target_dir),
         outdated,
     })
@@ -1607,6 +1744,15 @@ pub fn doctor(
     if !report.manifest_ok {
         lines.push(format!("stale: {}", manifest_path(target_dir).display()));
     }
+    for orphan in &report.orphans {
+        lines.push(format!(
+            "orphan: {} ({}) — the install lock lists it, but this canon's bundle no longer ships it; {}; {}",
+            orphan.path.display(),
+            orphan.provider.as_str(),
+            orphan.reason(),
+            orphan.fix(&report.providers)
+        ));
+    }
     if let Some(outdated) = &report.outdated {
         lines.push(format!("outdated: {} {}", outdated.path.display(), outdated.describe(&report.providers)));
     }
@@ -1689,7 +1835,7 @@ mod tests {
             let moved = outside.join("moved");
             fs::rename(target.join(swapped), &moved).unwrap();
             std::os::unix::fs::symlink(&moved, target.join(swapped)).unwrap();
-            remove_legacy_codex(&target, &removals).unwrap();
+            remove_proven(&target, &removals, ".codex").unwrap();
 
             let outside_file = moved.join(key.strip_prefix(swapped).unwrap().trim_start_matches('/'));
             assert!(outside_file.is_file(), "swapping {swapped} let the unlink follow it");

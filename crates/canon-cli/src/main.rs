@@ -2266,6 +2266,12 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
             if let Some(path) = &report.config_written {
                 canon_cli::say!(json, "canon skills install: wrote `skills: {{ providers: [{}] }}` to {}", report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "), path.display());
             }
+            for orphan in &report.pruned {
+                canon_cli::say!(json, "pruned: {} ({}) — the bundle no longer ships it; {}", orphan.path.display(), orphan.provider.as_str(), orphan.reason());
+            }
+            for orphan in &report.kept {
+                canon_cli::say!(json, "kept: {} ({}) — the bundle no longer ships it; {}; {}", orphan.path.display(), orphan.provider.as_str(), orphan.reason(), orphan.by_hand());
+            }
             let owned = canon_cli::skills::owned_paths_lines(&report.providers);
             for line in &owned {
                 canon_cli::say!(json, "{line}");
@@ -2278,6 +2284,8 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
                         "selection": selection.describe(),
                         "changed": report.changed,
                         "configWritten": report.config_written.as_ref().map(|p| p.display().to_string()),
+                        "pruned": report.pruned.iter().map(|o| serde_json::json!({ "path": o.path.display().to_string(), "provider": o.provider.as_str(), "reason": o.reason() })).collect::<Vec<_>>(),
+                        "kept": report.kept.iter().map(|o| serde_json::json!({ "path": o.path.display().to_string(), "provider": o.provider.as_str(), "reason": o.reason(), "hint": o.by_hand() })).collect::<Vec<_>>(),
                         "ownedPaths": owned,
                     }),
                 );
@@ -2299,14 +2307,16 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
             }
             for status in &report.statuses { canon_cli::say!(json, "{} — {} ({})", status.path.display(), status.state, status.provider.as_str()); }
             for remnant in &report.remnants { canon_cli::say!(json, "{} — legacy-remnant (codex reads .agents/skills; fix: `{}`)", remnant.display(), canon_cli::skills::install_command(&report.providers)); }
+            for orphan in &report.orphans { canon_cli::say!(json, "{} — orphan ({}; the install lock lists it, but this canon's bundle no longer ships it; {}; {})", orphan.path.display(), orphan.provider.as_str(), orphan.reason(), orphan.fix(&report.providers)); }
             if let Some(outdated) = &report.outdated { canon_cli::say!(json, "{} — outdated ({})", outdated.path.display(), outdated.describe(&report.providers)); }
-            let clean = report.manifest_ok && report.remnants.is_empty() && report.outdated.is_none() && report.statuses.iter().all(|status| status.state == "ok");
+            let clean = report.manifest_ok && report.orphans.is_empty() && report.remnants.is_empty() && report.outdated.is_none() && report.statuses.iter().all(|status| status.state == "ok");
             let data = serde_json::json!({
                 "clean": clean,
                 "providers": report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>(),
                 "selection": selection.describe(),
                 "manifestOk": report.manifest_ok,
                 "statuses": report.statuses.iter().map(|s| serde_json::json!({ "path": s.path.display().to_string(), "state": s.state, "provider": s.provider.as_str() })).collect::<Vec<_>>(),
+                "orphans": report.orphans.iter().map(|o| serde_json::json!({ "path": o.path.display().to_string(), "provider": o.provider.as_str(), "modified": o.modified, "reason": o.reason(), "hint": o.fix(&report.providers) })).collect::<Vec<_>>(),
                 "remnants": report.remnants.iter().map(|r| r.display().to_string()).collect::<Vec<_>>(),
                 "outdated": report.outdated.as_ref().map(|o| serde_json::json!({ "path": o.path.display().to_string(), "installedBy": o.installed_by, "message": o.describe(&report.providers) })),
             });
@@ -2317,7 +2327,10 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
                 ExitCode::SUCCESS
             } else {
                 let fix = canon_cli::skills::install_command(&report.providers);
-                ExitCode::from(CliError::failed("SKILLS_DRIFT", "an installed skill is missing, stale, a legacy remnant, or written by another canon version").hint(format!("run `{fix}`")).emit_with_data("canon skills check", json, data) as u8)
+                let by_hand: Vec<String> = report.orphans.iter().filter(|o| o.modified).map(|o| o.path.display().to_string()).collect();
+                let hint = if by_hand.is_empty() { format!("run `{fix}`") } else { format!("run `{fix}`, which prunes the orphans whose bytes still match the install lock; it keeps the modified ones ({}), so remove those by hand", by_hand.join(", ")) };
+                let orphaned = if report.orphans.is_empty() { String::new() } else { format!("; orphaned (no longer shipped by the bundle): {}", report.orphans.iter().map(|o| o.path.display().to_string()).collect::<Vec<_>>().join(", ")) };
+                ExitCode::from(CliError::failed("SKILLS_DRIFT", format!("an installed skill is missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version{orphaned}")).hint(hint).emit_with_data("canon skills check", json, data) as u8)
             }
         }
         Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).hint("check that the target directory is writable; `canon skills doctor` diagnoses the installation").emit("canon skills check", json) as u8) }
