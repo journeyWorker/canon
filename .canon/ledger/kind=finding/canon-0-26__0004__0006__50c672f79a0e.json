@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-026",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-026-1"
+  },
+  "at": "2026-10-21T18:28:55.453138577Z",
+  "change_id": "canon-0-26",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reviewed_sha": "e2194c0050ca6e130ec0e407ae3d74a007bf61be",
+  "reviewer": "canon-reviewer-026",
+  "round": 4,
+  "scenario_ids": [
+    "authoring.brief-check.08"
+  ],
+  "schema": 1,
+  "seq": 6,
+  "severity": "should_fix",
+  "summary": "[probe] Common English dated decision notes are missed: 'The cap was approved on 2026-10-01.' (passive with a non-'it' subject), 'Per the Oct 21 decision, the cap is 3.' ('decision' followed by ','), 'As agreed with legal on 2026-10-01, the cap is 3.', 'Approved by the PM on Oct 21.' draw nothing; only 'decided on', 'decision on/of' and we/team/operator/they/owner/it-was subjects count."
+}
