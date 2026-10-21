@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T17:41:47.284014220Z",
+  "change_id": "canon-0-26",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reason": "fixed by the prose rules change",
+  "resolution_sha": "8c50a008dbda2d2a556f9dff83157dfa5f489347",
+  "reviewed_sha": "8eff1e88373d4c25af8f9c8a2c8a23beb90202c1",
+  "reviewer": "canon-reviewer-026",
+  "round": 1,
+  "scenario_ids": [
+    "authoring.brief-check.09"
+  ],
+  "schema": 1,
+  "seq": 10,
+  "severity": "note",
+  "summary": "[probe] KO_AI_VOCABULARY stem 매끄럽 misses the ㅂ-irregular adnominal 매끄러운 ('매끄러운 화면' draws nothing; '매끄럽게' is flagged). The bad-ko-marigold sentence with 매끄러운 is flagged only through 토대."
+}

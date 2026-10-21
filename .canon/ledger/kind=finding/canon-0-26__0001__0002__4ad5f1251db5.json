@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T17:41:46.743653655Z",
+  "change_id": "canon-0-26",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/brief_check.rs",
+  "kind": "finding",
+  "reason": "fixed by the prose rules change",
+  "resolution_sha": "8c50a008dbda2d2a556f9dff83157dfa5f489347",
+  "reviewed_sha": "8eff1e88373d4c25af8f9c8a2c8a23beb90202c1",
+  "reviewer": "canon-reviewer-026",
+  "round": 1,
+  "scenario_ids": [
+    "authoring.brief-check.05"
+  ],
+  "schema": 1,
+  "seq": 2,
+  "severity": "blocker",
+  "summary": "[spec fidelity] Out of scope is judged: lengths() runs over every judged section and LENGTH_BUDGETS has out-of-scope (300 ko / 600 en), so a 352-character Korean out-of-scope section draws prose.length (en: 699 > 600). Scenario 05 says out of scope is not judged and plan D2 keeps length rules off context sections. The test puts one short sentence in out-of-scope, so it cannot see this."
+}
