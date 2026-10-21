@@ -362,7 +362,12 @@ subject that now lists the change, and prints `canon subject adopt
 <change> --subject-id <S>` print a warning on stderr, and in JSON
 `meta.warnings`, when `<S>` is `building`, `verifying` or `shipped` and the
 change's brief is not approved: the new change gates the subject's ship until
-its brief is answered.
+its brief is answered, except that a draft no scenario of the subject is
+tagged `@flow:<change>.*` for is pending: the reopen and ship guards read the
+newest adopted change with an `Approved:` line instead, so a shipped subject
+can reopen, re-verify and ship again while the draft waits; `canon status`
+still lists it. Once a scenario is tagged for the draft, its approval is
+required as before.
 
 ### Taking a draft change back out: `canon subject unadopt`
 
@@ -373,8 +378,10 @@ canon subject unadopt <change> --subject-id <S> --as planner --json
 Removes the link on both records and keeps the change and its brief, so the
 draft can be adopted elsewhere (a `proposed` holding subject, say) while the
 live subject keeps shipping. It is refused with `SUBJECT_UNADOPT_REFUSED`
-for a change whose brief carries an `Approved:` line; an unlinked pair is a
-no-op.
+for a change whose brief carries an `Approved:` line, and while a scenario
+the subject owns carries a `@flow:<change>.*` tag (it would fall back to an
+older approval; remove or retag those scenarios first, the hint names them);
+an unlinked pair is a no-op.
 
 ### Starting a new change: `canon change new`
 

@@ -1512,8 +1512,8 @@ fn subject_lifecycle_29_a_shipped_subject_reopens_inside_its_approved_scope_and_
     assert!(subject.get("reopen").is_none(), "the note belongs to the reopen that wrote it: {subject}");
 }
 
-/// subject.lifecycle.30: a newer adopted change is a new scope. While
-/// its brief has no `Approved:` line the reopen is refused naming that
+/// subject.lifecycle.30: a newer adopted change a scenario of the subject
+/// is tagged `@flow:<change>.*` for is a new scope. While its brief has no `Approved:` line the reopen is refused naming that
 /// brief, `--override-reason` does not waive it, and the subject stays
 /// shipped; once the human answers, the same reopen goes through.
 #[test]
@@ -1523,6 +1523,15 @@ fn subject_lifecycle_30_reopening_outside_an_approved_scope_is_refused_naming_th
     seed_change(dir.path(), "c-next");
     assert!(run(dir.path(), &["subject", "adopt", "c-next", "--subject-id", "demo-subject"]).status.success());
     write_brief(dir.path(), "c-next", "Status: draft, awaiting the human.\n");
+    // A scenario the subject owns is tagged for the draft, so it is the
+    // subject's scope rather than a pending draft (subject.lifecycle.38).
+    std::fs::write(dir.path().join("canon.yaml"), format!("{CANON_YAML}specs:\n  roots:\n    - id: demo\n      root: specs\n")).unwrap();
+    std::fs::create_dir_all(dir.path().join("specs/kind=feature/area=world")).unwrap();
+    std::fs::write(
+        dir.path().join("specs/kind=feature/area=world/demo.feature"),
+        "Feature: demo\n  # canon: {\"schema\":1,\"at\":\"2026-10-12T18:00:00Z\",\"actor\":{\"agent_id\":\"canon\"}}\n\n  # canon: {\"schema\":1,\"at\":\"2026-10-12T18:00:00Z\",\"actor\":{\"agent_id\":\"canon\"}}\n  @subject:demo-subject\n  @flow:c-next.F1\n  @world.demo.01\n  Scenario: tagged for the draft\n    Given a step\n",
+    )
+    .unwrap();
 
     let refusal = "canon subject status: SUBJECT_GATE_VIOLATION — unreviewed-promotion demo-subject — shipped → verifying: reopening needs the approved scope, and the brief is not approved — .canon/changes/c-next/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words with `canon brief approve --change-id c-next --by <the human> --note \"<their words>\"`\n";
     let out = reopen(dir.path(), &[]);

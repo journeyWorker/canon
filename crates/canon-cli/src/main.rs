@@ -1613,7 +1613,7 @@ enum SubjectCommand {
     },
     /// Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved)
     #[command(
-        after_help = "Examples:\n  canon subject unadopt add-login --subject-id demo\n\nRemoves the link on both sides (the subject's change list and the change's\nsubject list). The change and its brief stay and can be adopted elsewhere, for\nexample by a proposed holding subject. Refused (SUBJECT_UNADOPT_REFUSED) for a\nchange whose brief carries an `Approved:` line: it is the subject's approved\nscope. A pair that is not linked writes nothing and exits 0."
+        after_help = "Examples:\n  canon subject unadopt add-login --subject-id demo\n\nRemoves the link on both sides (the subject's change list and the change's\nsubject list). The change and its brief stay and can be adopted elsewhere, for\nexample by a proposed holding subject. Refused (SUBJECT_UNADOPT_REFUSED) for a\nchange whose brief carries an `Approved:` line: it is the subject's approved\nscope, and for a change a scenario the subject owns is tagged\n`@flow:<change>.*` for (remove or retag it first). A pair that is not linked writes nothing and exits 0."
     )]
     Unadopt {
         /// The change to take out of the subject

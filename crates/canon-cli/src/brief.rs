@@ -353,16 +353,50 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
     Some(status)
 }
 
+/// Whether `change`'s canon `brief.md` carries an `Approved:` line (approved
+/// now, or edited since).
+fn has_approved_line(repo: &Path, change: &ChangeId) -> bool {
+    canon_brief(repo, change)
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .is_some_and(|text| field(&text, "Approved:").is_some())
+}
+
+/// The adopted changes the subject-level brief rules (reopen guard, ship
+/// guard, the brief-structure check) read, whose last is the subject's
+/// scope: the newest adopted change, except that a newest change never
+/// approved (no `Approved:` line) that no scenario owned by the subject is
+/// tagged `@flow:<change>.*` for is a pending draft, and the scope is then
+/// the newest adopted change carrying an `Approved:` line (none: `changes`
+/// unchanged). `canon status` keeps reading the full list, so the draft
+/// still shows as awaiting the human.
+pub fn scope_changes(repo: &Path, ctx: &GateContext, subject: &Subject, changes: &[ChangeId]) -> Vec<ChangeId> {
+    let Some(newest) = changes.last() else { return Vec::new() };
+    if has_approved_line(repo, newest) {
+        return changes.to_vec();
+    }
+    let tagged = canon_gate::spec_coverage::subject_scenarios(ctx, &subject.subject_id)
+        .into_iter()
+        .any(|s| crate::brief_check::flow_changes_of(repo, &s.project_id, &s.scenario_id).contains(newest));
+    if tagged {
+        return changes.to_vec();
+    }
+    match changes.iter().rposition(|c| has_approved_line(repo, c)) {
+        Some(at) => changes[..=at].to_vec(),
+        None => changes.to_vec(),
+    }
+}
+
 /// The change whose brief a scenario without a `@flow:` tag answers to
 /// (0.25 D1), among the subject's adopted `changes`:
 /// 1. the newest whose canon `brief.md` carries an `Approved:` line
 ///    (approved now, or edited since: [`BriefStatus::changed`] still
 ///    refuses), so a change adopted later does not freeze scenarios an
 ///    approved scope already covers;
-/// 2. otherwise, when the scenario already has an evidence record
-///    (`evidenced`), none: it is existing behavior, attested before any
-///    approved scope, so a subject built before briefs existed keeps
-///    re-verifying;
+/// 2. otherwise, when the scenario already has an evidence record that
+///    carries no brief override (`evidenced`), none: it is existing
+///    behavior, attested before any approved scope, so a subject built
+///    before briefs existed keeps re-verifying (a waiver never becomes a
+///    standing exemption);
 /// 3. otherwise the newest adopted change, so a new subject's first
 ///    scenarios wait for its first brief.
 fn untagged_scope(
@@ -370,11 +404,7 @@ fn untagged_scope(
     changes: &[ChangeId],
     evidenced: impl FnOnce() -> bool,
 ) -> Option<ChangeId> {
-    let approved = |change: &&ChangeId| {
-        canon_brief(repo, change)
-            .and_then(|path| std::fs::read_to_string(path).ok())
-            .is_some_and(|text| field(&text, "Approved:").is_some())
-    };
+    let approved = |change: &&ChangeId| has_approved_line(repo, change);
     if let Some(change) = changes.iter().rev().find(approved) {
         return Some(change.clone());
     }
@@ -421,21 +451,24 @@ pub fn attested_briefs<'a>(
     for (subject, changes) in subjects {
         let mut answers: Vec<ChangeId> = Vec::new();
         if owner == Some(&subject.subject_id) {
-            if tagged.is_empty() {
+            // A tag counts only for a change this subject adopted.
+            let counted: Vec<ChangeId> = tagged.iter().filter(|c| changes.contains(c)).cloned().collect();
+            if counted.is_empty() {
                 let evidenced = || {
                     scenario.is_some_and(|(project, id)| {
                         canon_gate::history::evidence_history(ctx)
                             .iter()
                             .chain(&ctx.audits)
                             .any(|r| {
-                                r.project_id.as_ref() == Some(project)
+                                r.brief_override.is_none()
+                                    && r.project_id.as_ref() == Some(project)
                                     && r.scenario_id.as_ref() == Some(id)
                             })
                     })
                 };
                 answers.extend(untagged_scope(repo, &changes, evidenced));
             } else {
-                answers.extend(tagged.iter().cloned());
+                answers.extend(counted);
             }
         }
         if let Some(change) = task_change

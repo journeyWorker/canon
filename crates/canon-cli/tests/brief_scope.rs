@@ -549,3 +549,178 @@ fn subject_lifecycle_37_unadopt_refuses_an_approved_change() {
     let status = stdout(&run(repo, &["subject", "status", "s", "--json"]));
     assert!(status.contains("\"a\""), "the link stays: {status}");
 }
+
+/// evidence.add.100: a `@flow:` tag counts only for a change the
+/// scenario's owning subject adopted. A tag naming a change that does not
+/// exist, or one adopted only by another subject, is ignored, so the
+/// scenario follows the untagged rule and is refused on a draft-only subject.
+#[test]
+fn evidence_add_100_a_tag_naming_a_change_the_subject_did_not_adopt_is_ignored() {
+    let dir = repo_with_subject("verifying");
+    let repo = dir.path();
+    change(repo, "a", false);
+    ok(
+        repo,
+        &["subject", "new", "other", "--domain", "dev", "--title", "Other"],
+    );
+    ok(
+        repo,
+        &["change", "new", "x", "--subject-id", "other", "--title", "X"],
+    );
+    std::fs::write(brief_path(repo, "x"), brief("")).unwrap();
+    ok(
+        repo,
+        &["brief", "approve", "--change-id", "x", "--by", "Ana", "--note", "Go"],
+    );
+    scenario(repo, "shop.cart.01", Some("zzz.F1"));
+    scenario(repo, "shop.cart.02", Some("x.F1"));
+    scenario(repo, "shop.cart.03", Some("a.F1"));
+    for id in ["shop.cart.01", "shop.cart.02", "shop.cart.03"] {
+        let out = attest(repo, id, "run");
+        assert_eq!(out.status.code(), Some(1), "{id}: {}", stderr(&out));
+        assert!(
+            stderr(&out).contains("BRIEF_UNAPPROVED")
+                && stderr(&out).contains(".canon/changes/a/brief.md"),
+            "{id}: {}",
+            stderr(&out)
+        );
+    }
+}
+
+/// evidence.add.101: an evidence record attested under `--override-reason`
+/// never becomes the standing 'already evidenced' exemption: the next add
+/// of that scenario is refused again without the override.
+#[test]
+fn evidence_add_101_an_override_attestation_does_not_exempt_the_scenario_later() {
+    let dir = repo_with_subject("verifying");
+    let repo = dir.path();
+    change(repo, "a", false);
+    scenario(repo, "shop.cart.01", None);
+    let refused = attest(repo, "shop.cart.01", "run");
+    assert_eq!(refused.status.code(), Some(1), "{}", stderr(&refused));
+    let waived = run(
+        repo,
+        &[
+            "evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01",
+            "--kind", "test-run", "--ref", "waived run", "--role", "implementer",
+            "--actor-id", "impl", "--promote", "--override-reason", "urgent fix",
+        ],
+    );
+    assert!(waived.status.success(), "{}", stderr(&waived));
+    let again = attest(repo, "shop.cart.01", "run again");
+    assert_eq!(again.status.code(), Some(1), "{}", stderr(&again));
+    assert!(stderr(&again).contains("BRIEF_UNAPPROVED"), "{}", stderr(&again));
+}
+
+/// subject.lifecycle.37: a change a scenario of the subject is tagged
+/// `@flow:<change>.*` for is not unadopted either: the scenario would fall
+/// back to an older approval. The hint names the scenarios.
+#[test]
+fn subject_lifecycle_37_unadopt_refuses_a_change_a_scenario_is_tagged_for() {
+    let dir = repo_with_subject("verifying");
+    let repo = dir.path();
+    change(repo, "b", false);
+    scenario(repo, "shop.cart.01", Some("b.F1"));
+    ok(repo, &["inventory", "sync"]);
+    let out = run(
+        repo,
+        &["subject", "unadopt", "b", "--subject-id", "s", "--json"],
+    );
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+    let json: Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(json["error"]["code"], "SUBJECT_UNADOPT_REFUSED", "{json}");
+    let text = json.to_string();
+    assert!(
+        text.contains("shop.cart.01") && text.contains("remove or retag"),
+        "{json}"
+    );
+    assert!(stdout(&run(repo, &["subject", "status", "s", "--json"])).contains("\"b\""));
+
+    // Retagged away, the unadopt goes through.
+    let path = repo.join(".canon/specs/kind=feature/area=shop/cart.feature");
+    let text = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(&path, text.replace("  @flow:b.F1\n", "")).unwrap();
+    ok(repo, &["inventory", "sync"]);
+    ok(repo, &["subject", "unadopt", "b", "--subject-id", "s"]);
+}
+
+/// subject.lifecycle.35: the shipped arm of the adoption warning.
+#[test]
+fn subject_lifecycle_35_adopting_an_unapproved_change_into_a_shipped_subject_warns() {
+    let dir = repo_with_subject("verifying");
+    let repo = dir.path();
+    scenario(repo, "shop.cart.01", None);
+    assert!(attest(repo, "shop.cart.01", "run").status.success());
+    ok(repo, &["subject", "status", "s", "--to", "shipped"]);
+    let out = ok(
+        repo,
+        &["change", "new", "a", "--subject-id", "s", "--title", "A", "--json"],
+    );
+    let found = warnings(&out);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(
+        found[0].contains("is shipped") && found[0].contains("canon subject unadopt a --subject-id s"),
+        "{found:?}"
+    );
+}
+
+/// subject.lifecycle.38: on a shipped subject a newest adopted draft change
+/// no scenario is tagged for is pending: reopen, re-verification and ship
+/// read the approved scope, and status still lists the draft. Tagging a
+/// scenario for the draft brings its approval back into every rule.
+#[test]
+fn subject_lifecycle_38_a_pending_draft_does_not_freeze_a_shipped_subject() {
+    let dir = repo_with_subject("verifying");
+    let repo = dir.path();
+    change(repo, "a", true);
+    scenario(repo, "shop.cart.01", Some("a.F1"));
+    scenario(repo, "shop.cart.03", Some("a.F1"));
+    let path = repo.join(".canon/specs/kind=feature/area=shop/cart.feature");
+    let text = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(
+        &path,
+        text.replace("@case:happy\n  @flow:a.F1\n  @shop.cart.03", "@case:failure\n  @flow:a.F1\n  @shop.cart.03"),
+    )
+    .unwrap();
+    for id in ["shop.cart.01", "shop.cart.03"] {
+        let first = attest(repo, id, "first run");
+        assert!(first.status.success(), "{id}: {}", stderr(&first));
+    }
+    let shipped = run(repo, &["subject", "status", "s", "--to", "shipped"]);
+    assert!(shipped.status.success(), "{}", stderr(&shipped));
+
+    let adopted = change(repo, "b", false);
+    assert!(stderr(&adopted).contains("warning:"), "{}", stderr(&adopted));
+
+    let reopen = run(
+        repo,
+        &["subject", "status", "s", "--to", "verifying", "--reason", "fix the cart"],
+    );
+    assert!(reopen.status.success(), "{}", stderr(&reopen));
+    let again = attest(repo, "shop.cart.01", "second run");
+    assert!(again.status.success(), "{}", stderr(&again));
+    let ship = run(repo, &["subject", "status", "s", "--to", "shipped"]);
+    assert!(ship.status.success(), "{}", stderr(&ship));
+
+    // Status still shows the draft as awaiting the human.
+    let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();
+    let text = status.to_string();
+    assert!(
+        text.contains("\"change\":\"b\"") && text.contains("\"approved\":false"),
+        "{text}"
+    );
+
+    // Once a scenario is tagged for the draft, shipping needs its approval.
+    ok(
+        repo,
+        &["subject", "status", "s", "--to", "verifying", "--reason", "more"],
+    );
+    scenario(repo, "shop.cart.02", Some("b.F1"));
+    let ship = run(repo, &["subject", "status", "s", "--to", "shipped"]);
+    assert_eq!(ship.status.code(), Some(1), "{}", stderr(&ship));
+    assert!(
+        stderr(&ship).contains(".canon/changes/b/brief.md"),
+        "{}",
+        stderr(&ship)
+    );
+}
