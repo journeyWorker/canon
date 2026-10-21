@@ -275,7 +275,7 @@ fn report_dashboard_06_approving_from_the_page_equals_canon_brief_approve() {
     assert!(page_brief.contains("Approved: Ana "), "{page_brief}");
     let record = |repo: &Path| -> Value {
         let mut approval: Value = serde_json::from_str(&std::fs::read_to_string(repo.join(".canon/policy.approval.json")).expect("the policy approval is recorded")).unwrap();
-        approval.as_object_mut().unwrap().remove("approvedAt");
+        assert!(approval.as_object_mut().unwrap().remove("approved_at").is_some(), "the policy approval carries its time: {approval}");
         approval
     };
     assert_eq!(record(dir.path()), record(twin.path()));
