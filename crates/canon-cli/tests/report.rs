@@ -41,6 +41,7 @@ fn report_writes_canon_report_md_under_the_resolved_repo_root() {
         return;
     }
     let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap(); // `canon report` refuses a directory canon was never set up in
 
     let output = run_canon(&["report", "--repo", "."], dir.path());
 
@@ -59,6 +60,7 @@ fn check_exit_codes_track_missing_no_drift_and_drift_across_the_full_lifecycle()
         return;
     }
     let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap(); // `canon report` refuses a directory canon was never set up in
 
     // MISSING — no report has been written yet.
     let missing = run_canon(&["report", "--repo", ".", "--check"], dir.path());
@@ -92,6 +94,7 @@ fn snapshot_writes_ten_parquet_files_and_a_manifest_under_the_given_dir() {
         return;
     }
     let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap(); // `canon report` refuses a directory canon was never set up in
     let snapshot_dir = dir.path().join("snap-out");
 
     let output = run_canon(&["report", "--repo", ".", "--snapshot", snapshot_dir.to_str().unwrap()], dir.path());

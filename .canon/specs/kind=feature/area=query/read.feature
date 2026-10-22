@@ -102,3 +102,13 @@ Feature: query read
     When canon query reads the repository through --repo or --canon-yaml
     Then the access event is appended to that repository's .canon/audit/access.jsonl
     And the current directory is left unchanged
+
+  # canon: {"schema":1,"at":"2026-10-22T04:50:07Z","actor":{"agent_id":"canon-impl-027"}}
+  @subject:query-reads
+  @case:edge
+  @query.read.82
+  Scenario: A read that finds no hot tier answers from an empty one and creates no file
+    Given a repository whose hot tier file has never been written
+    When canon dispatch diff or canon query reads a kind routed to the hot tier
+    Then it answers as if the tier held no records and creates neither the database file nor its write-ahead sidecar
+    And the one file a canon query run does write is the read-access audit line, which its effectNote names

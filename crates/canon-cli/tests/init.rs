@@ -733,8 +733,10 @@ const DERIVED_DIRS: [&str; 3] = [".canon/dashboard-snapshot/", ".canon/learn/", 
 
 /// authoring.init.98 (#105, #107): after `canon init` and a commit,
 /// `canon report --snapshot` at the default directory (what `canon
-/// dashboard` regenerates) leaves the snapshot, learn and r2 directories on
-/// disk and `git status` empty; without the managed lines they are untracked.
+/// dashboard` regenerates) leaves the snapshot directory on disk and `git
+/// status` empty; without the managed line it is untracked. The report seeds
+/// its empty learn and r2 sources in a scratch directory (0.27), so it
+/// creates neither of those.
 #[test]
 fn authoring_init_98_the_derived_directories_dashboard_and_report_write_stay_out_of_git() {
     let dir = tempfile::tempdir().unwrap();
@@ -750,17 +752,16 @@ fn authoring_init_98_the_derived_directories_dashboard_and_report_write_stay_out
 
     let out = run_canon(&["report", "--snapshot", ".canon/dashboard-snapshot", "--repo", "."], repo);
     assert!(out.status.success(), "{}{}", stdout(&out), stderr(&out));
-    for written in [".canon/dashboard-snapshot/manifest.json", ".canon/learn", ".canon/r2"] {
-        assert!(repo.join(written).exists(), "{written} is written by the run, or this test proves nothing");
+    assert!(repo.join(".canon/dashboard-snapshot/manifest.json").exists(), "the snapshot is written by the run, or this test proves nothing");
+    for derived in [".canon/learn", ".canon/r2"] {
+        assert!(!repo.join(derived).exists(), "a report only reads: {derived} is not created");
     }
     assert_eq!(git(repo, &["status", "--porcelain", "-uall"]), "", "nothing untracked after the snapshot run");
 
     let without: String = gitignore.lines().filter(|line| !DERIVED_DIRS.contains(&line.trim()) && !line.starts_with("# the snapshot `canon dashboard`") && !line.starts_with("# canon's learn scratch") && !line.starts_with("# canon's local object-store")).map(|line| format!("{line}\n")).collect();
     std::fs::write(repo.join(".gitignore"), without).unwrap();
     let status = git(repo, &["status", "--porcelain", "-uall"]);
-    for dir in DERIVED_DIRS {
-        assert!(status.contains(dir), "{dir} is untracked without its line: {status}");
-    }
+    assert!(status.contains(".canon/dashboard-snapshot/"), "the snapshot directory is untracked without its line: {status}");
 }
 
 /// authoring.init.99 (#105, #107): `canon init --check-config` names a
@@ -800,7 +801,7 @@ fn authoring_init_99_check_config_warns_about_a_missing_gitignore_line_and_names
 
 /// authoring.init.100 (review finding 9): the archive of superseded scenario
 /// index versions is derived like the index, so a scenario edit followed by
-/// a reader run leaves only the edited `.feature` in `git status`.
+/// an index refresh leaves only the edited `.feature` in `git status`.
 #[test]
 fn authoring_init_100_a_scenario_edit_and_a_reader_run_leave_only_the_feature_modified() {
     let dir = tempfile::tempdir().unwrap();
@@ -820,12 +821,12 @@ fn authoring_init_100_a_scenario_edit_and_a_reader_run_leave_only_the_feature_mo
     git(repo, &["add", "-A"]);
     git(repo, &["commit", "-qm", "seed"]);
 
-    let first = run_canon(&["gate", "check", "--repo", "."], repo);
+    let first = run_canon(&["inventory", "sync", "--repo", "."], repo);
     assert!(first.status.success(), "{}{}", stdout(&first), stderr(&first));
-    assert_eq!(git(repo, &["status", "--porcelain", "-uall"]), "", "the first reader run indexes the scenario and leaves git clean");
+    assert_eq!(git(repo, &["status", "--porcelain", "-uall"]), "", "the first refresh indexes the scenario and leaves git clean");
 
     write(repo, path, &feature("the cart holds one of it"));
-    let second = run_canon(&["gate", "check", "--repo", "."], repo);
+    let second = run_canon(&["inventory", "sync", "--repo", "."], repo);
     assert!(second.status.success(), "{}{}", stdout(&second), stderr(&second));
     assert!(repo.join(".canon/archive/kind=scenario").exists(), "the rewrite archived the superseded version, or this test proves nothing");
     assert_eq!(git(repo, &["status", "--porcelain", "-uall"]), format!(" M {path}\n"));

@@ -36,11 +36,17 @@ fn write_evidence(ledger_root: &Path, task_id: &str, role: &str, verdict: Eviden
     GitTier::new(ledger_root).write(&record).expect("write evidence record");
 }
 
+/// The smallest `canon.yaml` a repo needs for `canon gate check` to run in it: without one the gate refuses (`CONFIG_MISSING`).
+fn write_canon_yaml(dir: &Path) {
+    std::fs::write(dir.join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap();
+}
+
 // ── canon gate check ──
 
 #[test]
 fn gate_check_exits_clean_on_an_empty_repo() {
     let dir = tempfile::tempdir().unwrap();
+    write_canon_yaml(dir.path());
     let output = run_canon(&["gate", "check", "--repo", "."], dir.path());
     assert!(output.status.success(), "empty repo must gate green; stderr: {}", stderr(&output));
     assert!(stdout(&output).contains("clean"), "{}", stdout(&output));
@@ -73,6 +79,7 @@ fn gate_check_refuses_an_unparseable_canon_yaml() {
 #[test]
 fn gate_check_names_the_file_of_a_schema_invalid_evidence_record() {
     let dir = tempfile::tempdir().unwrap();
+    write_canon_yaml(dir.path());
     let ledger_root = dir.path().join(".canon/ledger");
     let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("it-agent", RoleId::parse("implementer").unwrap()));
     let record = EvidenceRecord::new(envelope, Some(TaskId::parse("seed-change#1").unwrap()), None, None, EvidenceVerdict::Faithful);
@@ -92,6 +99,7 @@ fn gate_check_names_the_file_of_a_schema_invalid_evidence_record() {
 #[test]
 fn gate_check_exits_gate_red_on_a_seeded_uncovered_cell_violation() {
     let dir = tempfile::tempdir().unwrap();
+    write_canon_yaml(dir.path());
     std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
     std::fs::write(dir.path().join(".canon/policy.yaml"), "risk_routing:\n  reviewer: true\n").unwrap();
     write_evidence(&dir.path().join(".canon/ledger"), "seed-change#1", "implementer", EvidenceVerdict::Faithful);
@@ -109,6 +117,7 @@ fn gate_check_exits_gate_red_on_a_seeded_uncovered_cell_violation() {
 #[test]
 fn gate_check_fails_on_an_unknown_top_level_policy_key() {
     let dir = tempfile::tempdir().unwrap();
+    write_canon_yaml(dir.path());
     std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
     std::fs::write(dir.path().join(".canon/policy.yaml"), "trust_required:\n  test-run: agent\nspec_coverag:\n  require_evidence: true\n").unwrap();
 
@@ -131,6 +140,7 @@ fn gate_check_fails_on_an_unknown_top_level_policy_key() {
 #[test]
 fn gate_check_release_flag_engages_release_trust_check_but_ordinary_run_stays_silent_on_it() {
     let dir = tempfile::tempdir().unwrap();
+    write_canon_yaml(dir.path());
     std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
     std::fs::write(dir.path().join(".canon/policy.yaml"), "trust_required:\n  p1: human\n").unwrap();
 
@@ -221,6 +231,7 @@ impl RiskRepo {
         git(root.path(), &["config", "user.email", "risk-integration@example.test"]);
         git(root.path(), &["config", "user.name", "Risk Integration"]);
 
+        write_canon_yaml(root.path());
         std::fs::create_dir_all(root.path().join(".canon")).unwrap();
         std::fs::create_dir_all(root.path().join("src/auth")).unwrap();
         std::fs::create_dir_all(root.path().join("docs")).unwrap();

@@ -57,7 +57,7 @@ fn exits_follow_each_commands_own_contract() {
         json(&args)["exits"].as_array().unwrap().iter().map(|e| e["code"].as_u64().unwrap()).collect::<Vec<_>>()
     };
     assert_eq!(exits(&["context"]), [0]);
-    assert_eq!(exits(&["dispatch", "diff"]), [0]);
+    assert_eq!(exits(&["dispatch", "diff"]), [0, 2]);
     assert_eq!(exits(&["finding", "list"]), [0, 2]);
     assert_eq!(exits(&["evidence", "vault"]), [0, 2]);
     assert_eq!(exits(&["gate", "check"]), [0, 1, 2]);
@@ -83,7 +83,7 @@ fn enum_options_list_their_values_and_defaults() {
     let policy = v["options"].as_array().unwrap().iter().find(|o| o["name"] == "policy").unwrap().clone();
     assert!(policy["possibleValues"].as_array().unwrap().iter().any(|p| p == "strict"));
     let repo = v["options"].as_array().unwrap().iter().find(|o| o["name"] == "repo").unwrap().clone();
-    assert_eq!(repo["default"][0], ".");
+    assert_eq!(repo["default"][0], "nearest ancestor directory with a canon.yaml", "`.` is resolved to the nearest canon.yaml, so the schema must not report it as the default");
 }
 
 #[test]

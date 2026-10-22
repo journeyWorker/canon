@@ -109,3 +109,13 @@ Feature: format corpus
     Then it exits 1 with one layout-grammar violation at features
     And the violation names the root and the first file, the layout canon reads, and canon migrate
     And none of the root's feature files is read
+
+  # canon: {"schema":1,"at":"2026-10-22T04:50:15Z","actor":{"agent_id":"canon-impl-027"}}
+  @subject:format-corpus
+  @case:failure
+  @format.corpus.11
+  Scenario: A corpus root that is missing, or a repo with no canon.yaml, never reads as clean
+    Given a corpus root that does not exist, and a --repo that holds no canon.yaml
+    When canon format runs over each
+    Then it exits 2, with REPO_UNREADABLE for the missing root and CONFIG_MISSING for the repo
+    And a corpus root that exists is still checked without a canon.yaml when no --repo is given

@@ -428,3 +428,23 @@ Feature: gate check
     When the subject is moved to shipped
     Then the refusal names, per root, canon evidence add with that root's own --project-id and --scenario-id, for each of that root's scenarios
     And evidence recorded for one root's scenarios leaves only the other root's scenarios named, and recording the last clears the move
+
+  # canon: {"schema":1,"at":"2026-10-22T04:47:50Z","actor":{"agent_id":"canon-impl-027"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @gate.check.100
+  Scenario: A gate check where no canon.yaml is found refuses instead of reporting clean
+    Given a directory with no canon.yaml in it or above it, and a canon repository with a subdirectory that has none
+    When canon gate check runs in the first, and again with --repo naming the subdirectory
+    Then each exits 2 with CONFIG_MISSING, names --repo, and a hint naming canon init and the directory searched
+    And neither prints a clean result
+
+  # canon: {"schema":1,"at":"2026-10-22T04:48:22Z","actor":{"agent_id":"canon-impl-027"}}
+  @subject:gate-trust-spine
+  @case:edge
+  @gate.check.101
+  Scenario: A nested directory of a canon repo finds the repo root, and an explicit --repo is taken as given
+    Given a canon repository with a nested directory below its root
+    When canon status runs there with no --repo, and again with --repo .
+    Then both read the root's canon.yaml and ledger, the nearest ancestor that holds one
+    And an explicit --repo other than . names that directory as given, with no walk up

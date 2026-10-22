@@ -271,7 +271,6 @@ fn ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_re
          silently skip past the one proof this capstone test exists to give"
     );
     let roots = canon_report::roots::Roots::new(repo.join(".canon/ledger"), repo.join(".canon/r2"), &learn_root);
-    roots.ensure_seeded().expect("seed empty-glob placeholders for r2 (unused by these two marts)");
 
     let role_memory = canon_report::marts::fetch_role_memory(&roots).expect("mart_role_memory query must succeed");
     assert!(!role_memory.rows.is_empty(), "mart_role_memory must render non-empty after this ingest");

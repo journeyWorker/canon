@@ -136,6 +136,7 @@ fn fresh_snapshot_matches_the_committed_dashboard_fixture_contract() {
     );
 
     let fresh_repo = tempfile::tempdir().unwrap();
+    std::fs::write(fresh_repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap(); // `canon report` refuses a directory canon was never set up in
     let snapshot_dir = fresh_repo.path().join("snap-out");
     let output = run_canon(&["report", "--repo", ".", "--snapshot", snapshot_dir.to_str().unwrap()], fresh_repo.path());
     assert!(output.status.success(), "canon report --snapshot must succeed over a fresh empty repo; stderr: {}", stderr(&output));
@@ -182,6 +183,7 @@ fn report_and_snapshot_share_a_stable_digest_across_independent_runs() {
         return;
     }
     let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap(); // `canon report` refuses a directory canon was never set up in
     std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
     std::fs::write(dir.path().join(".canon/policy.yaml"), "risk_routing:\n  reviewer: true\n").unwrap();
     write_evidence(&dir.path().join(".canon/ledger"), "selftest-change#1");

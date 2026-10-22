@@ -125,3 +125,13 @@ Feature: report generation
     And a byte-identical copy of that record written to the sqlite hot tier
     When the report is generated
     Then the task's evidence count is 1, not 2
+
+  # canon: {"schema":1,"at":"2026-10-22T04:50:24Z","actor":{"agent_id":"canon-impl-027"}}
+  @subject:report-generation
+  @case:edge
+  @report.generation.13
+  Scenario: A report check reads its empty sources from scratch and writes nothing into the repo
+    Given a committed report and a repository whose r2 and learn sources are empty
+    When canon report --check runs
+    Then it compares and reports no drift, and creates no seed file, directory or parquet under .canon
+    And the empty sources are seeded in a scratch directory that is gone when the run ends

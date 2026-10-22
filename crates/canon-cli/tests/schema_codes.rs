@@ -24,8 +24,11 @@ use canon_cli::schema::{error_codes, META};
 /// How many lines after a code literal its `emit("canon …")` may sit.
 const EMIT_WINDOW: usize = 6;
 
-/// Files that are not error sites: the registry and the generated table.
-const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs"];
+/// Files that are not error sites: the registry and the generated table, and
+/// `context.rs`, whose one code (`CONFIG_MISSING`, built by `require_config`)
+/// is emitted by `main.rs` for every command that needs canon state (see
+/// [`needs_config_leaves`]).
+const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs", "context.rs"];
 
 /// For each source file, the command prefixes that get a code the file builds
 /// without an `emit("canon …")` next to it: helpers, `to_cli_error`
@@ -124,6 +127,25 @@ fn leaves_under(prefix: &str) -> Vec<&'static str> {
     found
 }
 
+/// The leaves `main.rs` refuses with `CONFIG_MISSING` when no `canon.yaml` is
+/// found: those with a `--repo` option that are not in
+/// `canon_cli::context::CONFIG_EXEMPT`. A leaf's options come from its own
+/// `canon schema` output, so a new `--repo` option is picked up by itself.
+fn needs_config_leaves() -> Vec<&'static str> {
+    META.iter()
+        .map(|m| m.path)
+        .filter(|path| canon_cli::context::needs_config(path))
+        .filter(|path| {
+            let mut args: Vec<&str> = vec!["schema"];
+            args.extend(path.split(' '));
+            args.push("--json");
+            let out = std::process::Command::new(env!("CARGO_BIN_EXE_canon")).args(&args).output().expect("spawn canon");
+            let body: serde_json::Value = serde_json::from_slice(&out.stdout).expect("schema is JSON");
+            body["data"]["options"].as_array().expect("options").iter().any(|o| o["name"] == "repo")
+        })
+        .collect()
+}
+
 fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
     let mut table: BTreeMap<&'static str, BTreeSet<&'static str>> = META.iter().map(|m| (m.path, GLOBAL.iter().copied().collect())).collect();
     let codes: Vec<&'static str> = all_codes().iter().map(|(c, _)| *c).filter(|c| !GLOBAL.contains(c)).collect();
@@ -182,6 +204,9 @@ fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
         if file_has_codes && !defaults.contains_key(name.as_str()) {
             problems.push(format!("{name} builds error codes but has no FILE_DEFAULTS entry (use an empty list when every code sits next to its emit)"));
         }
+    }
+    for leaf in needs_config_leaves() {
+        table.get_mut(leaf).expect("leaf has a row").insert("CONFIG_MISSING");
     }
     for command in promoters {
         for leaf in leaves_under(&command) {
