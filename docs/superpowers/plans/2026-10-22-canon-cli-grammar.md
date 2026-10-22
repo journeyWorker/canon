@@ -172,6 +172,18 @@ Skill text, the AGENTS block, website en/ko, dashboard, `trace_check.py` (its re
 - **The generated guide ends each workflow with its done criterion** (which `gate check` / `subject show` result means finished) and where to read the result; every command line in it is parsed by T14.
 - Not adopted: `--change-id current`-style context selectors (conflicts with "context is never an operand"; `meta.next[].argv` carries the explicit id), typed selector prefixes, `--yes`/`--force`, retry tokens, aliases, a 0/1 exit table.
 
+### D11 Re-verification follows the code (#116, #117)
+
+Found in a consumer repo: three approved chores (one docs-only, one tests-only) made the ship guard ask for new evidence on all 104 evidenced scenarios of the subject; the agent recorded them one by one, and the first report-bound evidence staled 104 reviews.
+
+- **A chore approval asks only where the code changed:** a scenario whose latest evidence was recorded on the current `codeTree` (D7b) needs no new evidence after the approval. A docs-only chore then needs its change-level review alone. What counts as code is `code.exclude` in `canon.yaml` (globs, default `docs/**`, `*.md`), applied to `codeTree` everywhere. Per-scenario code dependencies stay out of scope (#17).
+- **When code changed, one command:** `status`, `meta.next` and the refusal hint lead with the batch over every report (`evidence add --all-scenarios --report junit:a.xml --report junit:b.xml`), never a per-scenario loop.
+- **A bound report decides the verdict** in single-scenario mode too, as the batch already does: any failed case `divergent`, a skipped case and none failed `not-applicable`, else `faithful`; an explicit `--verdict faithful` over a failed or skipped case stays refused.
+
+### D12 Per-leaf table decisions
+
+`docs/design/cli-commands-0.28.md` "Open for the owner": O1–O12, O14 and O15 are taken as recommended there. O13 differs: `--override-reason` stays available to agents (an implementer attesting while a brief waits on the human is the documented use); every waived refusal is recorded, echoed in `data.overrides[]`, and listed by `status` for the human. The approvals themselves (`brief approve`, `policy approve`, `divergence accept`) refuse the agent roles (D10).
+
 ## Renames (decided 2026-10-22: all of the table)
 
 | Kind | Now | 0.28 |
@@ -233,6 +245,7 @@ Open, recommended against: `learn`/`dispatch` as noun groups (`strategy` above c
 | T15 mutation | Seeded violations (drop a META row, an option's help, add a `json!` print, a runnable group, a duplicate name) each fail the right test. |
 | T16 input | For every writing leaf, the spec's example `--input` document (inline, file and stdin) and the equivalent flags produce byte-identical records; an unknown key, `null`, a conflicting flag, a stdin conflict and an oversize document are refused; a batch with one invalid element writes nothing; a batch whose third write fails reports written/failed/skipped and a re-run reports the first two `unchanged`; a value starting with `-` survives. |
 | T17 commits | Every `--rev` default resolves HEAD; an explicit short sha, branch and `HEAD~1` resolve to full shas; `codeTree` is identical for a dirty working tree and for the commit made from it, differs after any code change, and ignores `.canon/` and gitignored files; a dirty tree records `worktreeDirty: true` and refuses nothing; no git refuses `NO_COMMIT`. |
+| T18 re-verification | A docs-only chore (code tree unchanged) needs no new evidence, only its change review; a chore after a code change asks for every evidenced scenario and names the batch form; a single-scenario report with a skipped case gives `not-applicable` without `--verdict` and is refused with `--verdict faithful`. |
 
 ## Slices
 
@@ -248,7 +261,8 @@ Open, recommended against: `learn`/`dispatch` as noun groups (`strategy` above c
 | S6b | `--input` inline/file/stdin JSON and NDJSON for every writing leaf (D7): document → lossless argv, input schemas in the spec, batch report with written/failed/skipped/unchanged; remove `--from`/`--scenario-ids-from`. `--rev` defaults to HEAD with the uncommitted-code rule (D7b) | S1, S5 |
 | S7 | `canon context` commands/families; kind name `evidence` (Q6); capability version 6 | S1 |
 | S8 | Derived docs: website reference, skill/AGENTS blocks between markers, doc lint T14, "Removed in 0.28" table; skill text and README | S1, S6 |
-| S9 | Tests T1–T17, witness fixtures, conformance re-bless with review | all |
+| S9 | Tests T1–T18, witness fixtures, conformance re-bless with review | all |
+| S10 | Re-verification by code tree and derived single-scenario verdicts (D11; #116, #117) | S4 (D7b `codeTree`) |
 | R | README 0.28.0 with the Upgrading list, version, dogfood eval, release | all |
 
 Effort from coverage B7: ~24–27 engineer-days serial, ~8–9 calendar days fanned out. S3 is the bulk.
@@ -256,7 +270,7 @@ Effort from coverage B7: ~24–27 engineer-days serial, ~8–9 calendar days fan
 **Acceptance:**
 - the workspace passes;
 - canon's own gate is clean with new scenarios evidenced and independently reviewed;
-- T1–T17 green with empty allowlists except the documented witness list;
+- T1–T18 green with empty allowlists except the documented witness list;
 - a dogfood eval (omp, roles, `language: ko`) on a 0.26 baseline shows 0 wrong-shape calls and no more `--help`/`schema` probes per scenario than eval 12, and a canon 0.25-era hook and script set migrated by `canon migrate`.
 
 ## Owner decisions
