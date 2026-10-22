@@ -85,12 +85,14 @@ CREATE OR REPLACE VIEW stg_trajectories  AS SELECT * FROM _canon_pinned_trajecto
 struct Scratch {
     _init_file: tempfile::NamedTempFile,
     _hot_root: tempfile::TempDir,
+    _seed_root: tempfile::TempDir,
 }
 
 /// Builds the base `duckdb -init <views.sql> [-json]` `Command` every
 /// caller needs — env vars set, `roots` seeded first
-/// ([`Roots::ensure_seeded`]) so an empty r2/learn source never aborts
-/// an unrelated query (module doc of [`crate::roots`]), and the sqlite
+/// ([`Roots::seeded_in`], into a scratch directory, never the repo) so an
+/// empty r2/learn source never aborts an unrelated query (module doc of
+/// [`crate::roots`]), and the sqlite
 /// hot tier materialized under `CANON_HOT_ROOT`. Returns the backing
 /// [`Scratch`] alongside the `Command` — it must outlive the `duckdb`
 /// invocation, since `-init` takes a filename, never inline SQL.
@@ -104,7 +106,8 @@ fn base_command(roots: &Roots, json: bool, pin_corpus: bool) -> Result<(Command,
     if !duckdb_available() {
         return Err(ReportError::DuckDbMissing);
     }
-    roots.ensure_seeded()?;
+    let seed_root = tempfile::Builder::new().prefix("canon-report-seed-").tempdir()?;
+    let roots = &roots.seeded_in(seed_root.path())?;
 
     let mut init_file = tempfile::Builder::new().prefix("canon-report-views-").suffix(".sql").tempfile()?;
     init_file.write_all(canon_store::VIEWS_SQL.as_bytes())?;
@@ -125,7 +128,7 @@ fn base_command(roots: &Roots, json: bool, pin_corpus: bool) -> Result<(Command,
         cmd.env(key, value);
     }
     cmd.env(canon_store::CANON_HOT_ROOT_ENV, hot_root.path());
-    Ok((cmd, Scratch { _init_file: init_file, _hot_root: hot_root }))
+    Ok((cmd, Scratch { _init_file: init_file, _hot_root: hot_root, _seed_root: seed_root }))
 }
 
 fn parse_rows(stdout: &str) -> Result<Vec<Row>, ReportError> {
@@ -138,7 +141,7 @@ fn parse_rows(stdout: &str) -> Result<Vec<Row>, ReportError> {
 
 /// Runs ONE `sql` statement against `canon_store::VIEWS_SQL` opened
 /// over `roots`, returning every row `-json` mode printed. `roots` is
-/// seeded first ([`Roots::ensure_seeded`]) so an empty r2/learn source
+/// seeded first ([`Roots::seeded_in`]) so an empty r2/learn source
 /// never aborts an unrelated query (module doc of [`crate::roots`]).
 ///
 /// Deliberately UNPINNED: a single statement has nothing to be

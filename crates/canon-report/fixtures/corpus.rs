@@ -351,7 +351,7 @@ pub mod review_rounds {
 pub fn build(dir: &Path) -> Roots {
     let git_root = dir.join("ledger");
     let learn_root = dir.join("learn");
-    let r2_root = dir.join("r2"); // deliberately left empty — proves `Roots::ensure_seeded` handles it.
+    let r2_root = dir.join("r2"); // deliberately left empty — proves `Roots::seeded_in` handles it.
 
     build_git_tier(&git_root);
     build_learn_store(&learn_root);

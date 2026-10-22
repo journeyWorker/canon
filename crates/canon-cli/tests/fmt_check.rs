@@ -64,17 +64,14 @@ fn format_without_check_flag_exits_nonzero_and_lists_the_same_failure_classes() 
 #[test]
 fn fmt_check_with_repo_flag_resolves_identically_to_the_bare_positional_form() {
     let fixture = fixture_root();
-    let repo = fixture.parent().expect("fixture root has a parent");
     let relative_root = fixture.file_name().expect("fixture root has a final component");
+    // `--repo` names a canon repo (it must hold a canon.yaml): the fixture corpus, linked in beside one.
+    let repo = tempfile::tempdir().unwrap();
+    std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap();
+    std::os::unix::fs::symlink(&fixture, repo.path().join(relative_root)).unwrap();
 
-    let bare = run_canon(&["fmt", "--check", &fixture.to_string_lossy()]);
-    let with_repo = run_canon(&[
-        "fmt",
-        "--check",
-        &relative_root.to_string_lossy(),
-        "--repo",
-        &repo.to_string_lossy(),
-    ]);
+    let bare = run_canon(&["fmt", "--check", &repo.path().join(relative_root).to_string_lossy()]);
+    let with_repo = run_canon(&["fmt", "--check", &relative_root.to_string_lossy(), "--repo", &repo.path().to_string_lossy()]);
 
     assert_eq!(with_repo.status.code(), bare.status.code(), "exit code must match the bare positional form");
     assert_eq!(stdout(&with_repo), stdout(&bare), "stdout must be byte-identical to the bare positional form");

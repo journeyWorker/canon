@@ -280,10 +280,12 @@ fn evidence_add_67_a_promoted_write_names_only_its_committed_record() {
 
 // ── stale index refresh ──
 
-/// inventory.sync.40: a reader refreshes the scenario index from a new
-/// `.feature` file, says so in one line, and is silent once it is fresh.
+/// inventory.sync.40: a command that writes refreshes the scenario index from
+/// a new `.feature` file, says so in one line, and is silent once it is fresh;
+/// the read commands (`status`, `gate check`) answer from the specs as they
+/// are and write nothing.
 #[test]
-fn a_reader_refreshes_a_stale_index_once_and_names_the_files() {
+fn a_writer_refreshes_a_stale_index_once_and_a_reader_never_does() {
     let dir = init_repo();
     let repo = dir.path();
     ok(repo, &["subject", "new", "runs", "--domain", "dev", "--title", "Runs", "--actor-id", "lead"]);
@@ -291,24 +293,31 @@ fn a_reader_refreshes_a_stale_index_once_and_names_the_files() {
     assert!(scenario_records(repo).is_empty(), "scenario new writes no index record");
 
     let out = ok(repo, &["status", "--json"]);
-    let lines: Vec<String> = stderr(&out).lines().map(str::to_string).collect();
-    assert_eq!(lines.len(), 1, "one line says what was refreshed: {lines:?}");
-    assert!(lines[0].starts_with("canon status: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/"), "{lines:?}");
-    assert!(lines[0].ends_with(": 1 record(s) written"), "{lines:?}");
+    assert!(!stderr(&out).contains("scenario index"), "a read command prints no refresh line: {}", stderr(&out));
+    assert!(scenario_records(repo).is_empty(), "status writes no index record");
     let report: serde_json::Value = serde_json::from_slice(&out.stdout).expect("stdout stays JSON");
     let runs = report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "runs").unwrap();
-    assert_eq!(runs["scenarios"], 1, "status counts the scenario it just indexed: {report}");
+    assert_eq!(runs["scenarios"], 1, "status counts the scenario the index does not hold yet: {report}");
+    let gate = ok(repo, &["gate", "check"]);
+    assert!(scenario_records(repo).is_empty(), "the gate writes no index record: {}", stderr(&gate));
 
-    let quiet = ok(repo, &["gate", "check"]);
+    let out = ok(repo, &["evidence", "vault"]);
+    let lines: Vec<String> = stderr(&out).lines().map(str::to_string).collect();
+    assert_eq!(lines.len(), 1, "one line says what was refreshed: {lines:?}");
+    assert!(lines[0].starts_with("canon evidence vault: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/"), "{lines:?}");
+    assert!(lines[0].ends_with(": 1 record(s) written"), "{lines:?}");
+    assert_eq!(scenario_records(repo).len(), 1);
+
+    let quiet = ok(repo, &["evidence", "vault"]);
     assert!(!stderr(&quiet).contains("scenario index"), "a fresh index is not refreshed again: {}", stderr(&quiet));
     assert_eq!(scenario_records(repo).len(), 1);
 }
 
 /// gate.check.80: an edited `.feature` file is re-indexed by the
-/// next reader — only that file — with the record `canon inventory sync`
-/// would write.
+/// next writer — only that file — with the record `canon inventory sync`
+/// would write; the gate grades the edit meanwhile without writing it.
 #[test]
-fn an_edited_feature_file_is_reindexed_by_the_next_reader_and_only_that_file() {
+fn an_edited_feature_file_is_reindexed_by_the_next_writer_and_only_that_file() {
     let dir = init_repo();
     let repo = dir.path();
     ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure"]);
@@ -320,9 +329,12 @@ fn an_edited_feature_file_is_reindexed_by_the_next_reader_and_only_that_file() {
     let text = std::fs::read_to_string(&feature).unwrap();
     std::fs::write(&feature, text.replace("A run ends", "A run ends at zero health")).unwrap();
 
-    let out = ok(repo, &["gate", "check"]);
+    let gate = canon(repo, &["gate", "check"]);
+    assert_eq!(scenario_records(repo).len(), 2, "the gate writes nothing: {}", stderr(&gate));
+
+    let out = ok(repo, &["evidence", "vault"]);
     let err = stderr(&out);
-    assert!(err.contains("canon gate check: refreshed the scenario index from 1 changed feature file(s)") && err.contains(": 1 record(s) written"), "{err}");
+    assert!(err.contains("canon evidence vault: refreshed the scenario index from 1 changed feature file(s)") && err.contains(": 1 record(s) written"), "{err}");
     let records = scenario_records(repo);
     assert_eq!(records.len(), 3, "one new record for the edited scenario, none for the untouched one");
     assert!(records.iter().any(|r| r["title"] == "A run ends at zero health"), "{records:?}");
@@ -354,7 +366,7 @@ fn review_add_and_subject_status_need_no_sync_step() {
 
 /// inventory.sync.42 (@case:failure): a root with format violations is
 /// named, not refreshed, and the command still runs; a directory without
-/// `canon.yaml` is never written to.
+/// `canon.yaml` is never written to (a command that needs one refuses).
 #[test]
 fn a_root_that_cannot_sync_is_named_and_a_dir_without_canon_yaml_is_never_written() {
     let dir = init_repo();
@@ -367,17 +379,19 @@ fn a_root_that_cannot_sync_is_named_and_a_dir_without_canon_yaml_is_never_writte
     assert_ne!(broken, text, "the fixture must actually lose its provenance comments");
     std::fs::write(&feature, broken).unwrap();
 
-    let out = canon(repo, &["status"]);
+    let out = canon(repo, &["evidence", "vault"]);
     let err = stderr(&out);
-    assert!(err.contains("canon status: found the scenario index stale for 1 changed feature file(s)"), "{err}");
+    assert!(err.contains("canon evidence vault: found the scenario index stale for 1 changed feature file(s)"), "{err}");
     assert!(err.contains("NOT refreshed: root `root`") && err.contains("`canon inventory sync` lists them"), "{err}");
     assert!(scenario_records(repo).is_empty(), "an aborted root writes nothing");
 
     let bare = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(bare.path().join(".canon/specs/kind=feature")).unwrap();
     std::fs::copy(&feature, bare.path().join(".canon/specs/kind=feature/run.feature")).unwrap();
-    let _ = canon(bare.path(), &["gate", "check", "--repo", "."]);
-    let _ = canon(bare.path(), &["status", "--repo", "."]);
+    for args in [&["gate", "check", "--repo", "."][..], &["status", "--repo", "."][..], &["evidence", "vault", "--repo", "."][..]] {
+        let refused = canon(bare.path(), args);
+        assert_eq!(refused.status.code(), Some(2), "{args:?}: {}", stderr(&refused));
+    }
     assert!(!bare.path().join(".canon/ledger").exists(), "no canon.yaml, no refresh");
 }
 
@@ -413,7 +427,7 @@ fn repo_with_a_deleted_scenario() -> tempfile::TempDir {
 }
 
 /// inventory.sync.43: a scenario whose `.feature` file is deleted is a
-/// change to the index like any other. A reader's refresh and a full
+/// change to the index like any other. A writer's refresh and a full
 /// `canon inventory sync` both mark it removed with the same record; the
 /// gate stops grading it and `canon query` stops listing it; adding it
 /// back brings it back.
@@ -427,9 +441,9 @@ fn a_deleted_scenario_is_removed_the_same_way_by_a_refresh_and_by_a_full_sync() 
     let copied = Command::new("cp").arg("-R").arg(refreshed.path().join(".")).arg(synced.path()).status().unwrap();
     assert!(copied.success());
 
-    let err = stderr(&canon(refreshed.path(), &["gate", "check"]));
+    let err = stderr(&canon(refreshed.path(), &["evidence", "vault"]));
     assert!(
-        err.contains("canon gate check: refreshed the scenario index from 1 scenario(s) no longer in any feature file (game.shop.01): 1 record(s) written"),
+        err.contains("canon evidence vault: refreshed the scenario index from 1 scenario(s) no longer in any feature file (game.shop.01): 1 record(s) written"),
         "{err}"
     );
     let sync = ok(synced.path(), &["inventory", "sync"]);
@@ -451,7 +465,7 @@ fn a_deleted_scenario_is_removed_the_same_way_by_a_refresh_and_by_a_full_sync() 
 }
 
 /// inventory.sync.44 (@case:failure): a root that refuses to sync marks
-/// nothing removed either. Neither a reader's refresh nor a full sync
+/// nothing removed either. Neither a writer's refresh nor a full sync
 /// writes a tombstone for a root with format violations, so a half-edited
 /// corpus never empties the index.
 #[test]
@@ -462,8 +476,8 @@ fn a_root_that_cannot_sync_marks_no_scenario_removed() {
     let text = std::fs::read_to_string(&run).unwrap();
     std::fs::write(&run, text.lines().filter(|l| !l.trim_start().starts_with("# canon:")).map(|l| format!("{l}\n")).collect::<String>()).unwrap();
 
-    let err = stderr(&canon(repo, &["status"]));
-    assert!(err.contains("canon status: found the scenario index stale for 1 changed feature file(s)"), "{err}");
+    let err = stderr(&canon(repo, &["evidence", "vault"]));
+    assert!(err.contains("canon evidence vault: found the scenario index stale for 1 changed feature file(s)"), "{err}");
     assert!(err.contains("and 1 scenario(s) no longer in any feature file (game.shop.01): 0 record(s) written; NOT refreshed: root `root`"), "{err}");
     let sync = canon(repo, &["inventory", "sync"]);
     assert_eq!(sync.status.code(), Some(1), "{}", stdout(&sync));
@@ -518,10 +532,10 @@ fn inventory_sync_47_an_unrefreshable_root_fails_the_gate_the_ship_guard_and_sta
     ok(repo, &["subject", "status", "demo", "--to", "shipped", "--actor-id", "lead"]);
 }
 
-/// inventory.sync.45: `canon inventory sync` and every reader's refresh
+/// inventory.sync.45: `canon inventory sync` and every writer's refresh
 /// take the repo's scenario-index lock, and a writer that waited checks
 /// staleness again before writing. Deterministic: the test holds the
-/// lock itself, starts two syncs and two refreshing readers against one
+/// lock itself, starts two syncs and two refreshing writers against one
 /// stale index, sees that none of them writes while it holds the lock,
 /// releases it — and the index ends with one record per scenario,
 /// written by exactly one of the four.
@@ -538,7 +552,7 @@ fn concurrent_syncs_and_refreshes_write_each_index_record_once() {
     let spawn = |args: &[&str]| {
         Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").current_dir(repo).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().expect("spawn canon")
     };
-    let children = [spawn(&["inventory", "sync"]), spawn(&["inventory", "sync"]), spawn(&["status"]), spawn(&["gate", "check"])];
+    let children = [spawn(&["inventory", "sync"]), spawn(&["inventory", "sync"]), spawn(&["evidence", "vault"]), spawn(&["evidence", "vault"])];
     std::thread::sleep(std::time::Duration::from_millis(500));
     assert!(scenario_records(repo).is_empty(), "nothing writes the index while another process holds the lock");
     lock.unlock().unwrap();
@@ -572,10 +586,10 @@ fn a_fresh_init_then_a_query_leaves_git_status_clean() {
 }
 
 /// authoring.init.71: `canon init` also ignores the derived scenario
-/// index, so a reader's refresh after a committed `.feature` edit leaves
+/// index, so a writer's refresh after a committed `.feature` edit leaves
 /// `git status` clean too.
 #[test]
-fn the_scenario_index_a_reader_rebuilds_stays_out_of_git() {
+fn the_scenario_index_a_writer_rebuilds_stays_out_of_git() {
     let dir = init_repo();
     let repo = dir.path();
     let gitignore = std::fs::read_to_string(repo.join(".gitignore")).unwrap();
@@ -584,7 +598,7 @@ fn the_scenario_index_a_reader_rebuilds_stays_out_of_git() {
     git(repo, &["add", "-A"]);
     git(repo, &["commit", "-q", "-m", "spec"]);
 
-    let out = ok(repo, &["status"]);
+    let out = ok(repo, &["evidence", "vault"]);
     assert!(stderr(&out).contains("refreshed the scenario index"), "{}", stderr(&out));
     assert_eq!(scenario_records(repo).len(), 1);
     ok(repo, &["query", "--kind", "subject"]);
@@ -592,7 +606,7 @@ fn the_scenario_index_a_reader_rebuilds_stays_out_of_git() {
 }
 
 /// authoring.init.72: `canon init` ignores the scenario-index lock file,
-/// so the lock a reader's refresh leaves behind never shows up in `git
+/// so the lock a writer's refresh leaves behind never shows up in `git
 /// status`.
 #[test]
 fn the_scenario_index_lock_stays_out_of_git() {
@@ -604,7 +618,7 @@ fn the_scenario_index_lock_stays_out_of_git() {
     git(repo, &["add", "-A"]);
     git(repo, &["commit", "-q", "-m", "spec"]);
 
-    ok(repo, &["status"]);
+    ok(repo, &["evidence", "vault"]);
     assert!(repo.join(".canon/scenario-index.lock").is_file(), "the refresh took the lock");
     assert_eq!(git(repo, &["status", "--porcelain"]), "", "the lock file must not show up as untracked");
 }

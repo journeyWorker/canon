@@ -272,21 +272,27 @@ fails those commands (exit `1`), and `canon init --check-config` reports
 
 `canon inventory sync` materializes one `Scenario` record per
 `(project_id, scenario_id)` under `.canon/ledger/kind=scenario/`. The
-index is derived — a pure function of the `.feature` files — so the
-commands that read it rebuild it first: `canon gate check`, `canon
-status`, `canon subject status`, `canon review add` and `canon evidence
-add`. The index is stale when a `.feature` file holds a scenario with no
-live index record, or one whose recorded source digest differs from the
-file's current bytes, or when the index holds a scenario of a spec root
-that no `.feature` file of it declares any more. The reader then runs
-`canon inventory sync`'s code on the changed files (validation still
-covers the whole root) and prints one stderr line:
+index is derived — a pure function of the `.feature` files. The index is
+stale when a `.feature` file holds a scenario with no live index record,
+or one whose recorded source digest differs from the file's current bytes,
+or when the index holds a scenario of a spec root that no `.feature` file
+of it declares any more.
+
+The commands that write records (`canon subject status`, `canon review
+add` and `canon evidence add`) rebuild a stale index on disk first: they
+run `canon inventory sync`'s code on the changed files (validation still
+covers the whole root) and print one stderr line:
 
 ```
-canon status: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
+canon evidence add: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
 ```
 
-A deleted scenario is not erased: `canon inventory sync` — and a reader's
+The commands that only read (`canon gate check`, `canon status`) write
+nothing: they grade a stale index as the refresh would leave it, built in
+memory, and print no refresh line. `canon query --kind scenario` and the
+report panels read the index on disk as it is.
+
+A deleted scenario is not erased: `canon inventory sync` — and a writer's
 refresh, identically — appends a tombstone, a new generation of its
 record with `removed: true`. The gate, `canon status`, `canon query` and
 the report panels then treat it as absent; re-adding the scenario writes
@@ -294,7 +300,7 @@ a live generation that supersedes the tombstone. A root that fails to
 sync writes no tombstone either.
 
 ```
-canon status: refreshed the scenario index from 1 scenario(s) no longer in any feature file (cart.pay.01): 1 record(s) written
+canon evidence add: refreshed the scenario index from 1 scenario(s) no longer in any feature file (cart.pay.01): 1 record(s) written
 ```
 
 `canon inventory sync` and every refresh hold an OS file lock on
@@ -303,17 +309,16 @@ index one change twice; a refresh that waited checks staleness again and
 is silent if another run already did the work. The lock is released when
 its holder exits, however it exits, so it never goes stale; a writer
 gives up after 30 s with a message naming the file (`canon inventory
-sync` exits `2`; a reader skips the refresh and still runs).
+sync` exits `2`; a writer's refresh is skipped and the command still runs).
 
 A fresh index prints nothing. A root that fails to sync (format
 violations, a duplicate id) is named and left as it was, and the command
 still runs; `canon gate check` then fails with `uncovered-cell <root>`,
 the `verifying → shipped` guard refuses, and `canon status` lists only
-`canon inventory sync`, while the reporting readers (`query`, `context`)
-keep only this line:
+`canon inventory sync`:
 
 ```
-canon gate check: found the scenario index stale for 1 changed feature file(s) (…): 0 record(s) written; NOT refreshed: root `root` (2 format violation(s), 0 sync error(s)) — `canon inventory sync` lists them
+canon evidence add: found the scenario index stale for 1 changed feature file(s) (…): 0 record(s) written; NOT refreshed: root `root` (2 format violation(s), 0 sync error(s)) — `canon inventory sync` lists them
 ```
 
 Nothing is written in a directory without `canon.yaml`. `canon inventory

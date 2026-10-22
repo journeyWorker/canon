@@ -188,21 +188,43 @@ impl SqliteTier {
     /// existing table) is a genuine query failure, not an
     /// availability degrade.
     pub fn connect(path: &Path) -> Result<Self, StoreError> {
+        Self::open(path, true)
+    }
+
+    /// [`SqliteTier::connect`] for a command that only reads: an absent db
+    /// file (and only an absent one) is NOT created (no file, no parent directory, no WAL sidecar).
+    /// The tier is backed by an empty in-memory table instead, so a query
+    /// answers "no records" exactly as it would on a freshly created file,
+    /// and the repo tree is left as the command found it.
+    pub fn connect_for_read(path: &Path) -> Result<Self, StoreError> {
+        // Only a path that does not exist reads as empty. Anything else there (a directory, an
+        // unreadable or non-sqlite file) is opened for real and fails as an unavailable backend.
+        let absent = matches!(std::fs::symlink_metadata(path), Err(e) if e.kind() == std::io::ErrorKind::NotFound);
+        Self::open(path, !absent)
+    }
+
+    fn open(path: &Path, on_disk: bool) -> Result<Self, StoreError> {
         let rt = tokio::runtime::Runtime::new().map_err(StoreError::Io)?;
         let path_owned = path.to_path_buf();
         let unavailable = |e: String| StoreError::tier_unavailable(Rung::Hot, Some(Backend::Sqlite), format!("{}: {e}", path.display()));
         let pool = rt.block_on(async {
-            if let Some(parent) = path.parent() {
-                if !parent.as_os_str().is_empty() {
-                    std::fs::create_dir_all(parent).map_err(|e| unavailable(e.to_string()))?;
+            let pool = if on_disk {
+                if let Some(parent) = path.parent() {
+                    if !parent.as_os_str().is_empty() {
+                        std::fs::create_dir_all(parent).map_err(|e| unavailable(e.to_string()))?;
+                    }
                 }
-            }
-            let opts = sqlx::sqlite::SqliteConnectOptions::new()
-                .filename(path)
-                .create_if_missing(true)
-                .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
-                .busy_timeout(BUSY_TIMEOUT);
-            let pool = sqlx::sqlite::SqlitePoolOptions::new().max_connections(5).connect_with(opts).await.map_err(|e| unavailable(e.to_string()))?;
+                let opts = sqlx::sqlite::SqliteConnectOptions::new()
+                    .filename(path)
+                    .create_if_missing(true)
+                    .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+                    .busy_timeout(BUSY_TIMEOUT);
+                sqlx::sqlite::SqlitePoolOptions::new().max_connections(5).connect_with(opts).await.map_err(|e| unavailable(e.to_string()))?
+            } else {
+                // One connection: every `:memory:` connection is its own database.
+                let opts = sqlx::sqlite::SqliteConnectOptions::new().in_memory(true);
+                sqlx::sqlite::SqlitePoolOptions::new().max_connections(1).connect_with(opts).await.map_err(|e| unavailable(e.to_string()))?
+            };
             sqlx::query(create_table_sql()).execute(&pool).await.map_err(|e| StoreError::Sql(e.to_string()))?;
             sqlx::query(create_index_sql()).execute(&pool).await.map_err(|e| StoreError::Sql(e.to_string()))?;
             Ok::<_, StoreError>(pool)

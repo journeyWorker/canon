@@ -89,8 +89,8 @@ const MIGRATE: &str = "spec root `root` (`specs`) is on the pre-0.17 layout (`fe
 
 /// authoring.init.81: a fresh `canon init` repo's spec root is
 /// `.canon/specs`; `canon scenario new` writes under
-/// `.canon/specs/kind=feature/area=<area>/<surface>.feature`, the next
-/// reader indexes it, and the gate grades it.
+/// `.canon/specs/kind=feature/area=<area>/<surface>.feature`, the gate
+/// grades it from the specs, and the next write indexes it.
 #[test]
 fn authoring_init_81_a_fresh_repo_authors_indexes_and_gates_under_canon_specs() {
     let dir = init_repo();
@@ -105,18 +105,17 @@ fn authoring_init_81_a_fresh_repo_authors_indexes_and_gates_under_canon_specs() 
 
     std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_evidence: true\n").unwrap();
     let gate = canon(repo, &["gate", "check"]);
-    assert!(
-        stderr(&gate).contains(&format!("canon gate check: refreshed the scenario index from 1 changed feature file(s) ({FEATURE}): 1 record(s) written")),
-        "{}",
-        stderr(&gate)
-    );
-    let records = scenario_records(repo);
-    assert_eq!(records.len(), 1, "{records:?}");
-    assert_eq!(records[0]["scenario_id"], "world.hotdeal.01");
+    // The gate is a read command: it grades the new scenario from the specs, in memory, and writes no index record.
+    assert!(!stderr(&gate).contains("refreshed the scenario index"), "{}", stderr(&gate));
+    assert!(scenario_records(repo).is_empty(), "a read leaves the index as it found it: {:?}", scenario_records(repo));
     assert_eq!(gate.status.code(), Some(1), "{}", stdout(&gate));
     assert!(stdout(&gate).contains("world.hotdeal.01"), "the unevidenced scenario is graded: {}", stdout(&gate));
 
-    ok(repo, &["evidence", "add", "--scenario-id", "world.hotdeal.01", "--project-id", "root", "--kind", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor-id", "impl"]);
+    let evidence = ok(repo, &["evidence", "add", "--scenario-id", "world.hotdeal.01", "--project-id", "root", "--kind", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor-id", "impl"]);
+    assert!(stderr(&evidence).contains(&format!("canon evidence add: refreshed the scenario index from 1 changed feature file(s) ({FEATURE}): 1 record(s) written")), "a writer indexes the scenario: {}", stderr(&evidence));
+    let records = scenario_records(repo);
+    assert_eq!(records.len(), 1, "{records:?}");
+    assert_eq!(records[0]["scenario_id"], "world.hotdeal.01");
     let gate = ok(repo, &["gate", "check"]);
     assert!(stdout(&gate).contains("canon gate check: clean (0 violations)"), "{}", stdout(&gate));
 }
@@ -191,7 +190,6 @@ fn inventory_sync_49_the_pre_0_17_layout_fails_the_gate_closed_and_status_names_
         let gate = canon(repo, &["gate", "check"]);
         assert_eq!(gate.status.code(), Some(1), "indexed={indexed}: {}{}", stdout(&gate), stderr(&gate));
         assert!(stdout(&gate).contains(&format!("uncovered-cell root — {MIGRATE}; until then its scenarios are not graded")), "{}", stdout(&gate));
-        assert!(stderr(&gate).contains(&format!("canon gate check: {MIGRATE}; its scenario index is NOT refreshed")), "{}", stderr(&gate));
         let records = scenario_records(repo);
         assert_eq!(records.len(), usize::from(indexed), "{records:?}");
         assert!(records.iter().all(|r| r.get("removed").is_none()), "a refused root writes no tombstone: {records:?}");

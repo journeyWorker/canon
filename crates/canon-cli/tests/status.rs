@@ -953,7 +953,7 @@ fn context_status_09_status_on_an_unindexable_corpus_points_at_inventory_sync() 
     std::fs::write(&feature, "Feature: demo\n\n  @subject:demo-subject\n  @world.demo.01\n  Scenario: A demo\n    Given a step\n").unwrap();
 
     let out = run(dir.path(), &["status", "--json"]);
-    assert!(stderr(&out).contains("NOT refreshed"), "status's own refresh refused the corpus: {}", stderr(&out));
+    assert!(!stderr(&out).contains("refreshed the scenario index"), "status writes no index: {}", stderr(&out));
     let report = status_json(dir.path());
     assert_eq!(commands(&report), ["canon inventory sync"]);
     let why = report["next"][0]["why"].as_str().unwrap();

@@ -1,7 +1,7 @@
 //! Acceptance: "report generation on a completely fresh repo (no
 //! strategies/trajectories, no r2 export, no git-tier records at all)
 //! succeeds and renders empty panels" — the P1 regression guard for
-//! `Roots::ensure_seeded` seeding `strategies/`/`trajectories/` at the
+//! `Roots::seeded_in` seeding `strategies/`/`trajectories/` at the
 //! WRONG glob depth (`crates/canon-store/sql/views.sql`'s
 //! `stg_strategy_items`/`stg_trajectories` read `read_parquet` with a
 //! FOUR-directory-level glob; a seed at three levels leaves that glob
@@ -31,7 +31,7 @@ fn report_generation_on_a_completely_fresh_repo_succeeds_with_empty_panels() {
 
     let content = report(&inputs).expect(
         "report generation over a completely fresh repo must not crash on an empty read_parquet glob — \
-         Roots::ensure_seeded must seed strategies/trajectories at the exact 4-level depth sql/views.sql globs",
+         Roots::seeded_in must seed strategies/trajectories at the exact 4-level depth sql/views.sql globs",
     );
 
     assert!(content.starts_with("# canon report\n"));

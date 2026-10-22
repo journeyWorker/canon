@@ -14,8 +14,9 @@
 //! that has never routed a record to r2, or never distilled a
 //! strategy/trajectory yet — both entirely normal early states, not
 //! error conditions) would otherwise abort EVERY query, including ones
-//! that never touch those views. [`Roots::ensure_seeded`] writes one
-//! zero-row placeholder parquet file per glob root, at the EXACT
+//! that never touch those views. [`Roots::seeded_in`] writes one
+//! zero-row placeholder parquet file per glob root into a per-invocation
+//! scratch directory (a report never writes into the repo it reads), at the EXACT
 //! directory depth each source's own `read_parquet` glob expects
 //! (`sql/views.sql`'s `stg_r2_records` — `kind=*/**/*.parquet`, any
 //! depth under one `kind=` level; `stg_strategy_items`/
@@ -155,6 +156,28 @@ fn has_any_parquet(dir: &Path) -> bool {
     false
 }
 
+/// `link` as a directory symlink to `target` (a copy where the platform has none).
+fn link_dir(target: &Path, link: &Path) -> Result<(), ReportError> {
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(target, link)?;
+    }
+    #[cfg(not(unix))]
+    {
+        fn copy(from: &Path, to: &Path) -> std::io::Result<()> {
+            fs::create_dir_all(to)?;
+            for entry in fs::read_dir(from)? {
+                let entry = entry?;
+                let dest = to.join(entry.file_name());
+                if entry.path().is_dir() { copy(&entry.path(), &dest)? } else { fs::copy(entry.path(), dest)?; }
+            }
+            Ok(())
+        }
+        copy(target, link)?;
+    }
+    Ok(())
+}
+
 fn write_seed_parquet(path: &Path, schema: Arc<Schema>, columns: Vec<ArrayRef>) -> Result<(), ReportError> {
     fs::create_dir_all(path.parent().expect("seed path always has a parent"))?;
     let batch = RecordBatch::try_new(schema.clone(), columns).map_err(|e| ReportError::Seed(e.to_string()))?;
@@ -204,47 +227,55 @@ impl Roots {
         Ok(())
     }
 
-    /// Creates every root directory (idempotent — a real, already-
-    /// populated repo checkout is left untouched beyond `mkdir -p`)
-    /// and seeds a zero-row placeholder parquet file into any
-    /// `read_parquet`-backed source (`r2_root`, `learn_root/
-    /// strategies`, `learn_root/trajectories`) that currently has NONE
-    /// — module doc's "empty-glob seeding" rationale. Zero-row means
-    /// the seed contributes NOTHING to any mart's aggregate output; it
-    /// exists purely so `read_parquet`'s glob resolves at all.
-    pub fn ensure_seeded(&self) -> Result<(), ReportError> {
-        fs::create_dir_all(&self.git_root)?;
+    /// These roots with every source a `read_parquet`/`read_json` glob
+    /// needs but the repo does not have yet replaced by a seeded copy under
+    /// `scratch` — module doc's "empty-glob seeding" rationale, without
+    /// touching the repo: a report only reads, so an empty r2/learn source
+    /// (or a missing ledger directory) is answered from `scratch`, which
+    /// the caller removes after the query.
+    ///
+    /// A source that already holds a `*.parquet` file (or a ledger
+    /// directory that exists) is used as it is. Where only one of the
+    /// learn stores is empty, the other is linked into the scratch learn
+    /// root rather than copied. A zero-row seed contributes NOTHING to any
+    /// mart's aggregate output; it exists purely so the glob resolves.
+    pub fn seeded_in(&self, scratch: &Path) -> Result<Roots, ReportError> {
+        let mut roots = self.clone();
+        if !self.git_root.is_dir() {
+            roots.git_root = scratch.join("ledger");
+            fs::create_dir_all(&roots.git_root)?;
+        }
 
         if !has_any_parquet(&self.r2_root) {
+            roots.r2_root = scratch.join("r2");
             let empty: ArrayRef = Arc::new(StringArray::from(Vec::<&str>::new()));
             write_seed_parquet(
-                &self.r2_root.join(format!("kind={SEED_MARKER}")).join(format!("{SEED_MARKER}.parquet")),
+                &roots.r2_root.join(format!("kind={SEED_MARKER}")).join(format!("{SEED_MARKER}.parquet")),
                 r2_schema(),
                 vec![empty.clone(), empty.clone(), empty.clone(), empty.clone(), empty],
             )?;
         }
 
-        let strategies_root = self.learn_root.join("strategies");
-        if !has_any_parquet(&strategies_root) {
-            let empty: ArrayRef = Arc::new(StringArray::from(Vec::<&str>::new()));
-            write_seed_parquet(
-                &strategies_root.join(SEED_MARKER).join(SEED_MARKER).join(SEED_MARKER).join(SEED_MARKER).join(format!("{SEED_MARKER}.parquet")),
-                learn_store_schema(),
-                vec![empty.clone(), empty.clone(), empty.clone(), empty.clone(), empty],
-            )?;
+        let stores = ["strategies", "trajectories"];
+        if stores.iter().any(|store| !has_any_parquet(&self.learn_root.join(store))) {
+            roots.learn_root = scratch.join("learn");
+            for store in stores {
+                let real = self.learn_root.join(store);
+                let seeded = roots.learn_root.join(store);
+                if has_any_parquet(&real) {
+                    fs::create_dir_all(&roots.learn_root)?;
+                    link_dir(&real, &seeded)?;
+                } else {
+                    let empty: ArrayRef = Arc::new(StringArray::from(Vec::<&str>::new()));
+                    write_seed_parquet(
+                        &seeded.join(SEED_MARKER).join(SEED_MARKER).join(SEED_MARKER).join(SEED_MARKER).join(format!("{SEED_MARKER}.parquet")),
+                        learn_store_schema(),
+                        vec![empty.clone(), empty.clone(), empty.clone(), empty.clone(), empty],
+                    )?;
+                }
+            }
         }
-
-        let trajectories_root = self.learn_root.join("trajectories");
-        if !has_any_parquet(&trajectories_root) {
-            let empty: ArrayRef = Arc::new(StringArray::from(Vec::<&str>::new()));
-            write_seed_parquet(
-                &trajectories_root.join(SEED_MARKER).join(SEED_MARKER).join(SEED_MARKER).join(SEED_MARKER).join(format!("{SEED_MARKER}.parquet")),
-                learn_store_schema(),
-                vec![empty.clone(), empty.clone(), empty.clone(), empty.clone(), empty],
-            )?;
-        }
-
-        Ok(())
+        Ok(roots)
     }
 
     /// The `(env var, value)` pairs [`crate::query::run_query`] sets
@@ -270,19 +301,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ensure_seeded_creates_matching_glob_files_for_every_empty_parquet_source() {
+    fn seeded_in_replaces_every_empty_parquet_source_with_a_seeded_scratch_copy_and_leaves_the_repo_alone() {
         let dir = tempfile::tempdir().unwrap();
+        let scratch = tempfile::tempdir().unwrap();
         let roots = Roots::new(dir.path().join("git"), dir.path().join("r2"), dir.path().join("learn"));
-        roots.ensure_seeded().unwrap();
+        let seeded = roots.seeded_in(scratch.path()).unwrap();
 
-        assert!(has_any_parquet(&roots.r2_root), "r2 root must be seeded when empty");
-        assert!(has_any_parquet(&roots.learn_root.join("strategies")), "strategies store must be seeded when empty");
-        assert!(has_any_parquet(&roots.learn_root.join("trajectories")), "trajectories store must be seeded when empty");
+        assert!(has_any_parquet(&seeded.r2_root), "r2 root must be seeded when empty");
+        assert!(has_any_parquet(&seeded.learn_root.join("strategies")), "strategies store must be seeded when empty");
+        assert!(has_any_parquet(&seeded.learn_root.join("trajectories")), "trajectories store must be seeded when empty");
+        assert!(seeded.git_root.is_dir(), "a missing ledger directory is answered by an empty one");
+        assert!(fs::read_dir(dir.path()).unwrap().next().is_none(), "nothing is written under the repo roots");
     }
 
     #[test]
-    fn ensure_seeded_never_touches_an_already_populated_source() {
+    fn seeded_in_uses_an_already_populated_source_as_it_is() {
         let dir = tempfile::tempdir().unwrap();
+        let scratch = tempfile::tempdir().unwrap();
         let roots = Roots::new(dir.path().join("git"), dir.path().join("r2"), dir.path().join("learn"));
         let real = roots.r2_root.join("kind=change").join("real.parquet");
         fs::create_dir_all(real.parent().unwrap()).unwrap();
@@ -292,9 +327,9 @@ mod tests {
         })
         .unwrap();
 
-        roots.ensure_seeded().unwrap();
+        let seeded = roots.seeded_in(scratch.path()).unwrap();
 
-        // Only the one real file — no seed marker written alongside it.
+        assert_eq!(seeded.r2_root, roots.r2_root, "a populated source is not replaced");
         let mut names = Vec::new();
         for entry in walk(&roots.r2_root) {
             names.push(entry.file_name().unwrap().to_string_lossy().to_string());

@@ -1001,11 +1001,14 @@ fn first_three(items: &[String]) -> String {
     }
 }
 
-/// A reader's stale-index refresh (0.16 D2): `canon gate check`,
-/// `canon status`, `canon subject status`, `canon review add` and
-/// `canon evidence add` call this before they read the scenario index,
-/// so an edited, added or deleted scenario never needs a separate
-/// `canon inventory sync` step.
+/// A writer's stale-index refresh (0.16 D2): `canon subject status`,
+/// `canon review add`, `canon evidence add` and the other commands that
+/// record something call this before they read the scenario index, so an
+/// edited, added or deleted scenario never needs a separate `canon
+/// inventory sync` step. The read commands (`canon gate check`, `canon
+/// status`) do not call it: a `read` command writes nothing (0.27), so
+/// they grade the index as this refresh would leave it, in memory
+/// ([`overlay_stale_index`]).
 ///
 /// It runs the same materialization `canon inventory sync` runs
 /// ([`sync_one_root`]), scoped to the changed files, plus the same
@@ -1015,7 +1018,7 @@ fn first_three(items: &[String]) -> String {
 /// writes into a directory without `canon.yaml`, and never fails the
 /// caller: a config error is the caller's own to report, and a root
 /// that refuses to sync (format violations, a duplicate id) is named
-/// with the command that shows why. The readers that grade or advance
+/// with the command that shows why. The commands that grade or advance
 /// (`gate check`, the ship guard, `status`) then fail closed on
 /// [`unrefreshable_roots`].
 ///

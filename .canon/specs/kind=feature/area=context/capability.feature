@@ -236,3 +236,33 @@ Feature: context capability
     When `canon gate promote` runs
     Then its tally reads `evidence=1, finding=1`, the names `canon query --kind` takes
     And with nothing staged, the line that lists the promotable kinds uses the same names
+
+  # canon: {"schema":1,"at":"2026-10-22T04:48:34Z","actor":{"agent_id":"canon-impl-027"}}
+  @subject:context-capability
+  @case:edge
+  @context.capability.24
+  Scenario: A command that needs canon state refuses without a canon.yaml, and the ones that run without it still do
+    Given a directory with no canon.yaml in it or above it
+    When a command that reads or records repository state runs there, such as status, query, finding list, report or subject new
+    Then it exits 2 with CONFIG_MISSING and writes nothing
+    And init, schema, context, regime-key and retrieve still run there, and init creates the canon.yaml the others look for
+
+  # canon: {"schema":1,"at":"2026-10-22T04:48:48Z","actor":{"agent_id":"canon-impl-027"}}
+  @subject:context-capability
+  @case:edge
+  @context.capability.25
+  Scenario: The schema reports a --repo default of the nearest canon.yaml, not the literal dot
+    Given a command whose --repo defaults to the dot
+    When canon schema <command> --json lists its options
+    Then the default of --repo reads as the nearest ancestor directory with a canon.yaml
+    And it is no longer reported as the literal dot, which is not what the command does
+
+  # canon: {"schema":1,"at":"2026-10-22T04:49:11Z","actor":{"agent_id":"canon-impl-027"}}
+  @subject:context-capability
+  @case:edge
+  @context.capability.26
+  Scenario: A command declared read leaves the repo tree as it found it, or names the cache it writes
+    Given a scratch repository holding a subject, a change, a scenario, evidence, a review and a finding, with a scenario index that is out of date
+    When every command the schema declares effect read runs in it, with its example and the other reads that used to write
+    Then the file tree, ignored files included, and git status are the same afterwards
+    And the only exception is a path the command's effectNote names, which is gitignored and never committed

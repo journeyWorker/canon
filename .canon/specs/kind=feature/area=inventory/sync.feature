@@ -244,3 +244,13 @@ Feature: inventory sync
     And it exits 1 with an uncovered-cell violation naming the root and canon migrate
     And canon status's only next step is canon migrate
     And once the files move to kind=feature/ directly under the root the gate has no such violation
+
+  # canon: {"schema":1,"at":"2026-10-22T04:49:45Z","actor":{"agent_id":"canon-impl-027"}}
+  @subject:inventory-sync
+  @case:edge
+  @inventory.sync.50
+  Scenario: Status and gate check grade a stale scenario index as a sync would leave it without writing it
+    Given a .feature file that holds a scenario the scenario index does not
+    When canon status and canon gate check run
+    Then each answers as it would after canon inventory sync and writes no index record, no archive file and no refresh line
+    And a command that records something, such as canon evidence vault, still refreshes the index and says so in one line

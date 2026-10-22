@@ -1859,6 +1859,32 @@ fn run_divergence_add(args: DivergenceAddArgs) -> ExitCode {
     }
 }
 
+/// A command that needs canon state refuses, `CONFIG_MISSING`, when `--repo`
+/// (absent or `.`: the nearest ancestor of cwd with a `canon.yaml`; anything
+/// else: that directory as given) holds no `canon.yaml`. The exceptions are
+/// [`canon_cli::context::CONFIG_EXEMPT`]; `--canon-yaml`, where a command takes
+/// one, names the file itself and the command reports a missing one; and
+/// `canon format` without `--repo`, which validates the corpus it is handed.
+fn refuse_without_config(parsed: &clap::ArgMatches) -> Option<ExitCode> {
+    let mut names = Vec::new();
+    let mut leaf = parsed;
+    while let Some((name, sub)) = leaf.subcommand() {
+        names.push(name);
+        leaf = sub;
+    }
+    let command = names.join(" ");
+    if !canon_cli::context::needs_config(&command) {
+        return None;
+    }
+    let repo = leaf.try_get_one::<PathBuf>("repo").ok().flatten()?;
+    if leaf.try_get_one::<PathBuf>("canon_yaml").ok().flatten().is_some() {
+        return None;
+    }
+    let json = leaf.try_get_one::<bool>("json").ok().flatten().copied().unwrap_or(false);
+    let error = canon_cli::context::require_config(repo).err()?;
+    Some(ExitCode::from(error.emit(&format!("canon {command}"), json) as u8))
+}
+
 fn main() -> ExitCode {
     set_sigpipe(true);
     let command = Cli::command();
@@ -1866,6 +1892,7 @@ fn main() -> ExitCode {
         Ok(matches) => matches,
         Err(error) => return usage_error(&error),
     };
+    let parsed = matches.clone();
     let cli = match Cli::from_arg_matches_mut(&mut matches) {
         Ok(cli) => cli,
         Err(error) => return usage_error(&error.format(&mut command.clone())),
@@ -1873,6 +1900,9 @@ fn main() -> ExitCode {
     // The role is resolved before any command runs, so an unknown `CANON_ROLE` refuses the invocation.
     if let Err(error) = canon_cli::role::init(cli.declared_role) {
         return ExitCode::from(error.emit("canon", argv_wants_json()) as u8);
+    }
+    if let Some(code) = refuse_without_config(&parsed) {
+        return code;
     }
     if matches!(cli.command, Command::Dashboard { .. }) {
         set_sigpipe(false);
@@ -1890,10 +1920,7 @@ fn main() -> ExitCode {
             TierCommand::Age { dry_run, repo, canon_yaml, json } => run_tier_age(&repo, canon_yaml.as_deref(), dry_run, json),
         },
         Command::Artifacts { action } => match action {
-            ArtifactsCommand::Verify { full, repo, json } => {
-                canon_cli::inventory::refresh_stale_index(&repo, "canon artifacts verify");
-                ExitCode::from(canon_cli::artifacts::run_verify(&repo, full, json) as u8)
-            }
+            ArtifactsCommand::Verify { full, repo, json } => ExitCode::from(canon_cli::artifacts::run_verify(&repo, full, json) as u8),
             ArtifactsCommand::Migrate { to, dry_run, repo, json } => ExitCode::from(canon_cli::artifacts::run_migrate(&repo, &to, dry_run, json) as u8),
         },
         Command::Query { kind, since, repo, canon_yaml, json, plugin, history, change_id, status, domain, include_sensitive, page, fields } => {
@@ -1910,10 +1937,7 @@ fn main() -> ExitCode {
         }
         Command::Format { check: _, root, repo, json } => run_fmt(&root, repo.as_deref(), json),
         Command::Context { repo, json, fields } => run_context(&repo, json, fields),
-        Command::Status { repo, json, fields } => {
-            canon_cli::inventory::refresh_stale_index(&repo, "canon status");
-            ExitCode::from(canon_cli::status::run(&repo, json, fields.as_deref()) as u8)
-        }
+        Command::Status { repo, json, fields } => ExitCode::from(canon_cli::status::run(&repo, json, fields.as_deref()) as u8),
         Command::ContextPack { action } => match action {
             ContextPackCommand::New(args) => run_context_pack_new(args),
             ContextPackCommand::Show { id, repo, json } => run_context_pack_show(&repo, &id, json),
@@ -1933,10 +1957,7 @@ fn main() -> ExitCode {
             IngestCommand::Plans { dialect, source, repo, json } => run_ingest_plans(&repo, dialect.as_deref(), source.as_deref(), json),
         },
         Command::Gate { action } => match action {
-            GateCommand::Check { repo, release, json } => {
-                canon_cli::inventory::refresh_stale_index(&repo, "canon gate check");
-                ExitCode::from(canon_cli::gate::run_check(&repo, release, json) as u8)
-            }
+            GateCommand::Check { repo, release, json } => ExitCode::from(canon_cli::gate::run_check(&repo, release, json) as u8),
             GateCommand::Task { task_id, repo, json } => ExitCode::from(canon_cli::gate::run_task(&repo, &task_id, json) as u8),
             GateCommand::Promote { repo, dry_run, json } => ExitCode::from(canon_cli::gate::run_promote(&repo, dry_run, json) as u8),
             GateCommand::InstallHooks { repo, event, matcher, command, timeout, json } => {
@@ -2506,6 +2527,13 @@ fn run_fmt(root: &std::path::Path, repo: Option<&std::path::Path>, json: bool) -
         Some(r) => canon_cli::context::resolve_repo_root(r).join(root),
         None => root.to_path_buf(),
     };
+    // A corpus root that is not a directory holds no files to find wrong: it must not read as clean.
+    if !resolved_root.is_dir() {
+        let error = CliError::refused("REPO_UNREADABLE", format!("`{}` is not a directory, so there is no corpus to check", resolved_root.display()))
+            .field("root")
+            .hint("pass the corpus root, e.g. `canon format .canon/specs`, relative to the current directory or to --repo");
+        return ExitCode::from(error.emit("canon format", json) as u8);
+    }
     let report = canon_cli::fmt::run(&resolved_root);
     canon_cli::say_raw!(json, "{}", canon_cli::fmt::format_human(&report));
     let data = canon_cli::fmt::format_json(&report);

@@ -65,6 +65,7 @@ fn git_only_repo_emits_no_warn_line() {
         return;
     }
     let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap(); // `canon report` refuses a directory canon was never set up in
     // No canon.yaml at all — the existing fixture-corpus default every
     // other test in this crate already uses.
 

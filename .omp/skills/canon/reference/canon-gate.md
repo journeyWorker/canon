@@ -58,21 +58,19 @@ bytes no longer match the approved digest, or the approval cannot be read,
 the gate fails closed: the violation is reported and the exit is `1` (see
 `canon-policy`).
 
-Before it reads the scenario index, the gate rebuilds any stale part of
-it from the changed `.feature` files (the same code `canon inventory
-sync` runs) and says so in one stderr line, silent when the index is
-fresh:
+The gate is a read command: it writes nothing. A scenario index that is
+stale (a `.feature` file added, edited or deleted since the last sync) is
+graded as the refresh would leave it, built in memory from the changed
+files with the code `canon inventory sync` runs; the index on disk is
+brought up to date by the next command that writes (`canon evidence add`,
+`canon review add`, `canon subject status`) or by `canon inventory sync`.
+It prints no refresh line.
 
-```
-canon gate check: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
-```
-
-A root that fails to sync (format violations, a duplicate id) is named
-instead, ending ``NOT refreshed: root `x` (N format violation(s), 0 sync
-error(s)) — `canon inventory sync` lists them``, and the gate fails
-closed: it adds `uncovered-cell <root> — the scenario index for spec root
-`<root>` is stale and could not be refreshed (…); `canon inventory sync`
-lists the problems to fix` and exits 1, since the index it would grade
+A root that fails to sync (format violations, a duplicate id) cannot be
+graded in memory either, and the gate fails closed: it adds
+`uncovered-cell <root> — the scenario index for spec root `<root>` is
+stale and could not be refreshed (…); `canon inventory sync` lists the
+problems to fix` and exits 1, since the index it would grade
 does not hold the edits. The `verifying → shipped` guard refuses with
 the same violation, and `canon status` lists the sync as its only step.
 Fix what the sync lists and run the gate again. See `canon-storage`
