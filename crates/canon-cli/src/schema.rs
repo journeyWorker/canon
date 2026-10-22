@@ -121,7 +121,7 @@ pub const META: &[CommandMeta] = &[
     row_exits("artifacts migrate", Write, &[exit(0, "migrated, already migrated, or a dry run: nothing to do is success"), exit(2, "refused: the target is not an s3 tier, a blob does not match its name, the store is unreachable, or a write failed; nothing is removed until every blob verified")], &[O]),
     row_exits("artifacts verify", Read, &[exit(0, "every bound file is stored (or, local store only, still proven by the working tree)"), exit(1, "a bound file is missing from the store or altered: data.problems names each"), exit(2, "refused: canon.yaml cannot be read or the store cannot be used or reached; an unreachable store is never a pass")], &[O]),
     row("brief approve", Write, HUMAN),
-    row_exits("brief check", Read, &[exit(0, "clean (advisories allowed)"), exit(1, "operational error, with a stable error code"), exit(2, "blocker findings")], &[P, R]),
+    row_exits("brief check", Read, &[exit(0, "clean (advisories allowed)"), exit(1, "operational error, with a stable error code"), exit(2, "blocker findings, or no canon.yaml at --repo (CONFIG_MISSING)")], &[P, R]),
     row_exits("change new", Write, REFUSES, &[P]),
     row_exits("context", Read, &[exit(0, "always: it describes what can be authored and never gates; an unreadable canon.yaml or policy degrades to the built-in surface, with the reason in policy.diagnostics")], EVERYONE),
     row("context-pack new", Write, &[O, I]),
@@ -131,14 +131,14 @@ pub const META: &[CommandMeta] = &[
     row_exits("demo add", Write, REFUSES, &[O]),
     row_exits("demo init", Write, REFUSES, &[O]),
     row("dispatch begin", Write, &[O]),
-    row_exits("dispatch diff", Read, &[exit(0, "always, including when the observed graph differs from the declared plan or a side cannot be read (a note on stderr and in `notes`): it reports, it never gates")], &[O]),
+    row_exits("dispatch diff", Read, &[exit(0, "always, including when the observed graph differs from the declared plan or a side cannot be read (a note on stderr and in `notes`): it reports, it never gates"), exit(2, "refused: no canon.yaml at --repo (CONFIG_MISSING)")], &[O]),
     row("dispatch end", Write, &[O]),
     row_exits("divergence accept", Write, REFUSES, &[R]),
     row("divergence add", Write, &[I, R]),
     row("divergence defer", Write, &[I, R]),
     row("divergence promote", Write, &[I, O]),
     row("divergence resolve", Write, &[I, R]),
-    row_exits("divergence status", Read, &[exit(0, "always on a successful read: a capability query, never a gate"), exit(2, "refused: canon.yaml or the ledger cannot be read")], EVERYONE),
+    row_exits("divergence status", Read, &[exit(0, "always on a successful read: a capability query, never a gate"), exit(2, "refused: canon.yaml is missing or unreadable, or the ledger cannot be read")], EVERYONE),
     row_exits("evidence add", Write, &[exit(0, "staged"), exit(1, "gate-red: a fabrication marker, an invalid typed atom, a contradicting report, or an unapproved brief refuses the record; nothing is staged"), exit(2, "usage or infrastructure: a malformed flag combination, an unknown task, no plan corpus, a write failure; nothing is staged")], &[I]),
     row("evidence approval-payload", Read, &[I, O]),
     row_exits("evidence vault", Write, &[exit(0, "the pass ran, whatever it could store: files it could not store are listed in `notStored`, not an error; their bytes are gone, so no retry could clear a failing exit (`canon gate check` reports the stale evidence)"), exit(2, "refused: the ledger cannot be read or a write failed")], &[O]),
@@ -146,8 +146,8 @@ pub const META: &[CommandMeta] = &[
     row_exits("feature new", Write, REFUSES, &[P, I]),
     row_exits("finding add", Write, REFUSES, &[R]),
     row_exits("finding close", Write, REFUSES, &[R]),
-    row_exits("finding list", Read, &[exit(0, "whether or not any finding matched"), exit(2, "refused: the ledger cannot be read")], EVERYONE),
-    row_exits("format", Read, &[exit(0, "clean"), exit(1, "the corpus has violations")], EVERYONE),
+    row_exits("finding list", Read, &[exit(0, "whether or not any finding matched"), exit(2, "refused: canon.yaml is missing or unreadable, or the ledger cannot be read")], EVERYONE),
+    row_exits("format", Read, &[exit(0, "clean"), exit(1, "the corpus has violations"), exit(2, "refused: the corpus root is not a directory, or --repo holds no canon.yaml")], EVERYONE),
     row_exits("gate check", Read, &[exit(0, "clean"), exit(1, "the gate found violations, including a policy that changed since its approval"), exit(2, "the gate could not run: bad --repo or an unreadable ledger or config")], EVERYONE),
     row("gate install-hooks", Write, &[O]),
     row("gate promote", Write, &[I]),
@@ -169,9 +169,9 @@ pub const META: &[CommandMeta] = &[
     row("prompt add", Write, &[O]),
     row("prompt show", Read, &[O]),
     row("purge", Destructive, &[O]),
-    row("query", Read, EVERYONE),
+    row("query", Read, EVERYONE).note("appends one line per run to the read-access audit log .canon/audit/access.jsonl, which `canon init` gitignores and which is never committed; changes nothing else"),
     row("regime-key", Read, &[O]),
-    row("report", Write, &[O]),
+    row("report", Write, &[O]).note("with --check it only compares the report on disk with a fresh render and writes nothing"),
     row("retrieve", Read, EVERYONE),
     row_exits("review add", Write, REFUSES, &[R]),
     row_exits("scenario new", Write, REFUSES, &[P, I]),
@@ -180,7 +180,7 @@ pub const META: &[CommandMeta] = &[
     row("skills check", Read, &[O]),
     row("skills doctor", Read, &[O]),
     row("skills install", Write, &[O]),
-    row_exits("status", Read, &[exit(0, "always: a problem reading the repo is a warning"), exit(1, "the report could not be serialized (--json)")], EVERYONE),
+    row_exits("status", Read, &[exit(0, "always once canon.yaml is found: a problem reading the repo is a warning"), exit(2, "refused: no canon.yaml at --repo (CONFIG_MISSING)"), exit(1, "the report could not be serialized (--json)")], EVERYONE),
     row_exits("subject adopt", Write, REFUSES, &[P, O]),
     row_exits("subject new", Write, REFUSES, &[P, O]),
     row_exits("subject status", Write, &[exit(0, "the transition was recorded, or the subject was shown (no --to)"), exit(1, "an evidence, brief, review or policy-approval guard blocked the transition; the record is unchanged"), exit(2, "refused: an off-chain step, a missing reason, or a store failure")], &[O]).note("reads without --to: `subject status <id>` shows the subject and writes nothing"),
@@ -434,10 +434,25 @@ fn arg_schema(arg: &clap::Arg) -> ArgSchema {
         required: arg.is_required_set(),
         repeatable,
         possible_values: arg.get_possible_values().iter().filter(|v| !v.is_hide_set()).map(|v| v.get_name().to_string()).collect(),
-        default: arg.get_default_values().iter().map(|v| v.to_string_lossy().into_owned()).collect(),
+        default: default_values(arg),
         help: arg.get_help().map(|h| h.to_string()),
     }
 }
+
+/// What an option holds when it is not given. A `--repo` whose default is `.`
+/// does not mean the current directory: `.` (given or not) is resolved to the
+/// nearest ancestor of it that has a `canon.yaml`
+/// ([`crate::context::resolve_repo_root`]), so the schema says that.
+fn default_values(arg: &clap::Arg) -> Vec<String> {
+    let values: Vec<String> = arg.get_default_values().iter().map(|v| v.to_string_lossy().into_owned()).collect();
+    if arg.get_id() == "repo" && values == ["."] {
+        return vec![NEAREST_CONFIG_DIR.to_string()];
+    }
+    values
+}
+
+/// The reported default of a `--repo` that is `.` (see [`default_values`]).
+const NEAREST_CONFIG_DIR: &str = "nearest ancestor directory with a canon.yaml";
 
 fn command_schema(canonical: &[String], cmd: &Command) -> CommandSchema {
     let key = canonical.join(" ");

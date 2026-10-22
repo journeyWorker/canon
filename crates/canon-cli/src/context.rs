@@ -58,6 +58,8 @@ use canon_policy::SchemaRegistry;
 use canon_vocab::CapabilitySnapshot;
 use serde::Serialize;
 
+use crate::cli_error::CliError;
+
 /// The authoring-surface CAPABILITY version — `canon context`'s own
 /// outline/JSON contract version, deliberately NOT any record kind's
 /// `Envelope.schema`. Those became genuinely per-kind in
@@ -355,6 +357,8 @@ pub struct AuthoringSurface {
 /// the exact prior "repo used as-is" behavior for a directory with no
 /// canon state at all
 /// (`resolve_surface_never_fails_on_a_repo_with_no_canon_state_at_all`).
+/// A command that needs canon state does not run on that fallback: `main`
+/// refuses it first ([`require_config`]).
 ///
 /// Called by `main.rs`'s `run_context` BEFORE [`resolve_surface`] —
 /// `resolve_surface` itself stays a pure "(already-resolved repo, opts) ->
@@ -366,6 +370,58 @@ pub fn resolve_repo_root(repo: &Path) -> PathBuf {
     }
     let cwd = std::env::current_dir().unwrap_or_else(|_| repo.to_path_buf());
     cwd.ancestors().find(|dir| dir.join("canon.yaml").is_file()).map(Path::to_path_buf).unwrap_or(cwd)
+}
+
+/// The commands with a `--repo` option that run without a `canon.yaml`
+/// there, and why. Every other command that takes `--repo` needs canon
+/// state and is refused by [`require_config`] when it finds none, instead of
+/// grading an empty repo (`gate check` used to print `clean` for a
+/// directory canon was never set up in).
+pub const CONFIG_EXEMPT: &[(&str, &str)] = &[
+    ("init", "creates canon.yaml"),
+    ("migrate", "carries its own CONFIG_MISSING refusal, worded for the layout it moves"),
+    ("demo init", "scaffolds a new repo, canon.yaml included"),
+    ("demo add", "refuses with DEMO_NOT_INITIALIZED when `demo init` has not run"),
+    ("context", "a capability query that never fails: without a canon.yaml it describes the built-in surface"),
+    ("regime-key", "its --repo names a repository in the regime key, not a directory"),
+    ("adapter validate", "reads one response file; --repo only verifies a context-pack join"),
+    ("adapter authorize", "reads .canon/policy.yaml only, and requires --repo"),
+    ("context-pack new", "a context pack is made from the git tree and never reads canon.yaml"),
+    ("context-pack show", "a context pack is made from the git tree and never reads canon.yaml"),
+    ("context-pack verify", "a context pack is made from the git tree and never reads canon.yaml"),
+    ("prompt add", "a prompt bundle is stored beside the git tree and never reads canon.yaml"),
+    ("prompt show", "a prompt bundle is stored beside the git tree and never reads canon.yaml"),
+    ("retrieve", "run by agent hooks in any directory: with no repo state it finds no guidance and prints none"),
+    ("dispatch begin", "run by agent hooks in any directory: the run manifest and the learn store default to `.canon/`"),
+    ("dispatch end", "closes a run `dispatch begin` opened, found by id under `.canon/`"),
+    ("learn approve", "the strategy store defaults to `.canon/learn`; canon.yaml only tunes it"),
+    ("learn promote", "the strategy store defaults to `.canon/learn`; canon.yaml only tunes it"),
+    ("learn rollback", "the strategy store defaults to `.canon/learn`; canon.yaml only tunes it"),
+    ("gate task", "run by agent hooks and pre-commit scripts: it flips a plan row on evidence it finds and refuses otherwise"),
+    ("gate promote", "run by agent hooks and pre-commit scripts: with nothing staged it reports so"),
+    ("gate install-hooks", "installs hook seams into a repo that may not be set up yet"),
+    ("dashboard", "serves a built app and a snapshot; its canon.yaml section is optional and a missing repo or app is refused with its own code"),
+];
+
+/// Whether `command` (a canonical leaf path such as `gate check`) needs a
+/// `canon.yaml` at its `--repo`.
+pub fn needs_config(command: &str) -> bool {
+    !CONFIG_EXEMPT.iter().any(|(exempt, _)| *exempt == command)
+}
+
+/// The repo root a command that needs canon state runs against
+/// ([`resolve_repo_root`]), or the `CONFIG_MISSING` refusal when no
+/// `canon.yaml` is there: `--repo` absent or `.` searched cwd and its
+/// ancestors, any other `--repo` named that directory as given.
+pub fn require_config(repo: &Path) -> Result<PathBuf, CliError> {
+    let root = resolve_repo_root(repo);
+    if root.join("canon.yaml").is_file() {
+        return Ok(root);
+    }
+    let searched = if repo == Path::new(".") { format!("`{}` and its parent directories", root.display()) } else { format!("`{}`", root.display()) };
+    Err(CliError::refused("CONFIG_MISSING", format!("no canon.yaml in {searched}"))
+        .field("--repo")
+        .hint(format!("run `canon init` in the repository root to set canon up, or pass --repo <dir> naming a directory that holds canon.yaml (searched {searched})")))
 }
 
 /// Resolve the `canon.yaml` path a `--repo`/`--canon-yaml`-accepting verb

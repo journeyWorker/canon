@@ -1,0 +1,2 @@
+canon status: CONFIG_MISSING — no canon.yaml in `<repo>` and its parent directories
+hint: run `canon init` in the repository root to set canon up, or pass --repo <dir> naming a directory that holds canon.yaml (searched `<repo>` and its parent directories)

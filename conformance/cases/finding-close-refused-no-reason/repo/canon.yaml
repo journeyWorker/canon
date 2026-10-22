@@ -1,0 +1,6 @@
+tiers:
+  local:
+    backend: git
+    root: .canon/ledger
+routing:
+  finding: local

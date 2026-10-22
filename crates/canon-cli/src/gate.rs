@@ -123,13 +123,15 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     // every check this run engages reads `gate_context.now`, never its
     // own wall-clock read.
     let now = Utc::now();
-    let gate_context = match GateContext::load(ctx, &registry, now) {
+    let mut gate_context = match GateContext::load(ctx, &registry, now) {
         Ok(gc) => gc,
         Err(e) => {
             return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon gate check", json);
         }
     };
 
+    // A stale scenario index is graded as the refresh would leave it, in memory: a read command writes nothing.
+    crate::inventory::overlay_stale_index(&mut gate_context);
     let checks = canon_gate::check_set(release);
     // An index the `.feature` edits are not in grades specs that no longer
     // exist (0.16 M6): fail closed, one violation per unrefreshable root.

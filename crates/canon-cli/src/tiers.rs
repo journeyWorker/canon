@@ -239,8 +239,9 @@ fn attach_s3(cfg: &R2TierConfig) -> Result<(Option<R2Tier>, Option<String>), Tie
 /// [`build_lenient_tiers`]/[`build_lenient_tiers_for_kinds`] -- the
 /// ONE degrade-or-propagate decision for the sqlite backend in this
 /// module.
-fn attach_sqlite(cfg: &SqliteTierConfig) -> Result<(Option<SqliteTier>, Option<String>), TierCliError> {
-    match SqliteTier::connect(&cfg.path) {
+fn attach_sqlite(cfg: &SqliteTierConfig, read_only: bool) -> Result<(Option<SqliteTier>, Option<String>), TierCliError> {
+    let connected = if read_only { SqliteTier::connect_for_read(&cfg.path) } else { SqliteTier::connect(&cfg.path) };
+    match connected {
         Ok(tier) => Ok((Some(tier), None)),
         Err(StoreError::TierUnavailable { reason, .. }) => Ok((None, Some(reason))),
         Err(err) => Err(TierCliError::Store(err)),
@@ -281,7 +282,7 @@ pub(crate) fn build_lenient_tiers(policy: &TierPolicy, project_dir: &Path) -> Re
             BackendConfig::Git(cfg) => git = Some(GitTier::new(project_dir.join(&cfg.root))),
             BackendConfig::Postgres(cfg) => pg = attach_postgres(cfg)?.0,
             BackendConfig::S3(cfg) => r2 = attach_s3(cfg)?.0,
-            BackendConfig::Sqlite(cfg) => sqlite = attach_sqlite(cfg)?.0,
+            BackendConfig::Sqlite(cfg) => sqlite = attach_sqlite(cfg, false)?.0,
         }
     }
     Ok((git, pg, r2, sqlite))
@@ -342,6 +343,17 @@ pub(crate) fn tiers_needed_for(policy: &TierPolicy, kind: RecordKind) -> Result<
 /// ingest artifacts`) can print WHY a needed rung is unwritten instead
 /// of a bare "tiers unreachable" guess.
 pub(crate) fn build_lenient_tiers_for_kinds(canon_yaml_path: &Path, kinds: &[RecordKind]) -> Result<LoadedTiers, TierCliError> {
+    build_lenient_tiers_for_kinds_with(canon_yaml_path, kinds, false)
+}
+
+/// [`build_lenient_tiers_for_kinds`] for a command that only reads: a
+/// sqlite rung whose db file does not exist yet is answered from an empty
+/// in-memory table instead of creating the file ([`SqliteTier::connect_for_read`]).
+pub(crate) fn build_lenient_tiers_for_kinds_read(canon_yaml_path: &Path, kinds: &[RecordKind]) -> Result<LoadedTiers, TierCliError> {
+    build_lenient_tiers_for_kinds_with(canon_yaml_path, kinds, true)
+}
+
+fn build_lenient_tiers_for_kinds_with(canon_yaml_path: &Path, kinds: &[RecordKind], read_only: bool) -> Result<LoadedTiers, TierCliError> {
     let display_path = canon_yaml_path.display().to_string();
     let yaml = std::fs::read_to_string(canon_yaml_path)
         .map_err(|source| TierCliError::ReadCanonYaml { path: display_path.clone(), source })?;
@@ -373,7 +385,7 @@ pub(crate) fn build_lenient_tiers_for_kinds(canon_yaml_path: &Path, kinds: &[Rec
             }
         }
         Some(BackendConfig::Sqlite(cfg)) => {
-            let (tier, reason) = attach_sqlite(cfg)?;
+            let (tier, reason) = attach_sqlite(cfg, read_only)?;
             sqlite = tier;
             if let Some(reason) = reason {
                 unavailable_reasons.insert(Rung::Local, reason);
@@ -419,7 +431,7 @@ pub(crate) fn build_lenient_tiers_for_kinds(canon_yaml_path: &Path, kinds: &[Rec
                 }
             }
             Some(BackendConfig::Sqlite(cfg)) if sqlite.is_none() => {
-                let (tier, reason) = attach_sqlite(cfg)?;
+                let (tier, reason) = attach_sqlite(cfg, read_only)?;
                 sqlite = tier;
                 if let Some(reason) = reason {
                     unavailable_reasons.insert(rung, reason);
@@ -430,6 +442,12 @@ pub(crate) fn build_lenient_tiers_for_kinds(canon_yaml_path: &Path, kinds: &[Rec
     }
 
     Ok(LoadedTiers { policy, git, pg, r2, sqlite, unavailable_reasons })
+}
+
+/// [`build_lenient_tiers_for_kind`] for a command that only reads
+/// ([`build_lenient_tiers_for_kinds_read`]).
+pub(crate) fn build_lenient_tiers_for_kind_read(canon_yaml_path: &Path, kind: RecordKind) -> Result<LoadedTiers, TierCliError> {
+    build_lenient_tiers_for_kinds_read(canon_yaml_path, &[kind])
 }
 
 /// The RUNG-SCOPED, single-kind sibling of

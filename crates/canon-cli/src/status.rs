@@ -81,10 +81,10 @@
 //! its blockers against both.
 //!
 //! # No bookkeeping steps (0.16 M6)
-//! Readers refresh a stale scenario index themselves
-//! ([`crate::inventory::refresh_stale_index`]), so no step says "then
-//! `canon inventory sync`": the sync step appears only when the refresh
-//! refused (a format violation or a duplicate id), and
+//! A stale scenario index is read as a refresh would leave it, in memory
+//! ([`crate::inventory::overlay_stale_index`]; `status` is a read command and
+//! writes nothing), so no step says "then `canon inventory sync`": the sync
+//! step appears only when the refresh would be refused (a format violation or a duplicate id), and
 //! `canon inventory sync` names why (see Failing closed). The evidence step names
 //! `canon gate promote` only when `canon.yaml` keeps writes staged
 //! (`write.promote: manual`, the default without a `write:` key).
@@ -382,7 +382,7 @@ pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> i32 {
         }
     }
     let repo = resolve_repo_root(repo);
-    let mut report = resolve(&repo);
+    let mut report = resolve_with_pending_index(&repo);
     report.apply_role(Role::current(None));
     if json {
         let shown = match fields {
@@ -438,7 +438,8 @@ pub fn split_by_role(steps: Vec<NextStep>, role: Role) -> (Vec<NextStep>, BTreeM
 const REPORT_FIELDS: [&str; 10] = ["statusVersion", "canonVersion", "policy", "warnings", "subjects", "unowned", "audits", "next", "nextOmitted", "waitingOn"];
 
 /// Build the report for an already-resolved repo root. The caller has
-/// refreshed a stale scenario index (`canon status` does, first).
+/// refreshed a stale scenario index (a writer that reports does, first);
+/// `canon status` itself reads it with [`resolve_with_pending_index`].
 pub fn resolve(repo: &Path) -> StatusReport {
     resolve_with(repo, false)
 }

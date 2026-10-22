@@ -403,7 +403,7 @@ pub fn run(
     history: bool,
 ) -> Result<QueryOutcome, QueryError> {
     let canon_yaml_path = resolve_canon_yaml(repo, canon_yaml);
-    let loaded = tiers::build_lenient_tiers_for_kind(&canon_yaml_path, kind)?;
+    let loaded = tiers::build_lenient_tiers_for_kind_read(&canon_yaml_path, kind)?;
     let archive = if history && canon_store::archive::is_archived_kind(kind) { loaded.git.as_ref().and_then(GitTier::archive_tier) } else { None };
     let registry = TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite);
 
@@ -794,7 +794,7 @@ pub fn run_with_plugin(
     domain: Option<&str>,
 ) -> Result<(QueryOutcome, PluginQueryOutcome), QueryError> {
     let canon_yaml_path = resolve_canon_yaml(repo, canon_yaml);
-    let loaded = tiers::build_lenient_tiers_for_kind(&canon_yaml_path, kind)?;
+    let loaded = tiers::build_lenient_tiers_for_kind_read(&canon_yaml_path, kind)?;
     let project_dir = tiers::project_dir(&canon_yaml_path).to_path_buf();
     let git_root = loaded.git.as_ref().map(|g| g.root().to_path_buf());
 
