@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-027",
+    "role": "implementer",
+    "session_id": "canon-impl-027-1"
+  },
+  "at": "2026-10-22T05:10:01.759882Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-report --lib seeded_in"
+  },
+  "evidence_note": {
+    "summary": "canon-report lib seeded_in: 2 passed, 0 failed, 50 filtered out @ a4f9cdc1"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 14,
+  "scenario_id": "report.generation.13",
+  "schema": 1,
+  "staging_id": "f6fffde39f2f",
+  "verdict": "faithful"
+}

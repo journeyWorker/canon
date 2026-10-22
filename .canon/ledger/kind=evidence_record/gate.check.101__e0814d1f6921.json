@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-027",
+    "role": "implementer",
+    "session_id": "canon-impl-027-1"
+  },
+  "at": "2026-10-22T05:09:57.548656Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test repo_discovery a_nested_directory"
+  },
+  "evidence_note": {
+    "summary": "repo_discovery a_nested_directory: 1 passed, 0 failed, 5 filtered out @ a4f9cdc1"
+  },
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 58,
+  "scenario_id": "gate.check.101",
+  "schema": 1,
+  "staging_id": "3793de0dfd9b",
+  "verdict": "faithful"
+}
