@@ -40,7 +40,7 @@ Already right: kebab-case everywhere; `--json` on every leaf; `--as` declared on
 
 ### D1 Grammar doc
 
-`docs/design/cli-grammar.md` is one normative page. It holds the concept table, verbs, placeholders, envelope, exit table, safety rule, and owner decisions with their sources. Its tables are machine-readable: `docs/design/cli-vocabulary.tsv` maps option → value name → concept.
+`docs/design/cli-grammar.md` is one normative page. It holds the concept table, verbs, placeholders, envelope, exit table, safety rule, and owner decisions with their sources. Its tables are machine-readable: `docs/design/cli-vocabulary.tsv` maps option → value name → concept, and `docs/design/cli-commands-0.28.md` is the **final per-leaf table** (both reviews' first blocker): every leaf with its operand (kind, arity), required options, mutually exclusive and dependent options, effect, output form (report / artifact / stream, media type), and one runnable example. The skill, the website reference and the spec examples are generated from it; it is written before S0 starts and reviewed with this plan.
 
 - **Verbs:**
   - `new` creates an authored unit (feature, scenario, subject, change).
@@ -51,10 +51,11 @@ Already right: kebab-case everywhere; `--json` on every leaf; `--as` declared on
   - `validate` checks the shape of one input file.
   - `approve` records a human approval.
   - `accept` records a reviewer taking a known gap.
-  - `update`, `move`, `get`, `delete` are not used; the original report's CRUD set is rejected (coverage A2).
+  - `move` moves a thing between places or states: `artifacts move --tier`, `subject move --to` (the review round's fix: a noun such as `status` stays read-only).
+  - `update`, `get`, `delete` are not used; the original report's CRUD set is rejected (coverage A2).
 - **Placeholders:** `<DIR> <FILE> <PATH> <ID> <SHA> <N> <TIMESTAMP> <NAME> <TEXT> <URL> <KIND>` plus the concept ids (`<CHANGE_ID>`, …).
 - **Booleans** name a mode (`--all`, `--check`, `--no-promote`).
-- **Operands (Q8, decided 2026-10-22):** a command's primary object is its operand, repeatable when the command acts on several of one kind (`review scenario <SCENARIO_ID>...`, `evidence audit <SCENARIO_ID>`, `brief approve <CHANGE_ID>`, `finding close <FINDING_KEY>`, `subject adopt <CHANGE_ID>`). Every other identifier is `--<noun>-id`. At most one operand kind per command; context is never an operand.
+- **Operands (Q8, decided 2026-10-22; rule from review round 1):** a command's primary object is its operand, decided by three rules applied in order. (1) In a noun group, a command that acts on one instance of that noun takes it: `subject show|move|adopt|unadopt <SUBJECT_ID>` (so `subject adopt <SUBJECT_ID> --change-id <CHANGE_ID>`), `change new <CHANGE_ID>`, `feature new <SURFACE>`, `task done <TASK_ID>`, `plugin sync <PLUGIN_ID>`, `strategy promote|approval-payload|rollback <STRATEGY_ID>`, `context-pack show|verify <PACK_ID>`, `dispatch end <RUN_ID>`, `prompt add|show <NAME@VERSION>`. (2) A command named for its target kind takes that target: `brief show|check|approve <CHANGE_ID>`, `review scenario <SCENARIO_ID>...`, `review change <CHANGE_ID>`, `divergence add|defer|resolve <SCENARIO_ID>`, `divergence accept <SCENARIO_ID>...`, `evidence audit <SCENARIO_ID>`, `finding close <CHANGE_ID> --round --seq`. (3) A command that can target several kinds, or filters a collection, takes no operand: `evidence add` (`--scenario-id`, `--task-id` or `--all-scenarios`), `finding add`, `finding list`, `query`, `export`, `purge`. Every other identifier is `--<noun>-id` (`--task-id`, `--plugin-id`, `--parent-run-id` included). At most one operand kind per command; context is never an operand. The per-leaf table records the result for every leaf.
 - **`--project-id` is required only when the repo configures more than one spec root**, on every command that takes it (today `evidence add` requires it even with one root, `scenario new` does not).
 - **A mode that changes a command's options is its own command**, even when most options are shared (owner decision 2026-10-22). Shared options are declared once and flattened into each.
 
@@ -90,15 +91,18 @@ It plays the role OpenAPI plays for an HTTP API (coverage B3).
 
 - **Success:** `{ok: true, data, meta}`.
 - **Failure:** `{ok: false, error, meta}`, plus `data` when the command has a partial report (e.g. `gate check` violations).
-- **`meta`:** `command` (the schema id; flags never change it); `schemaVersion` (`major.minor` per report: a consumer accepts unknown fields within a major and rejects an unknown major, terraform's rule, bigcli §4.3); `canonVersion`; `context` (resolved repo root, role, actor); `next` (each with `command` text and `argv` array); paging; `warnings`; `deprecated`.
-- **`error`:** `code` first, then `message`, `field`, `expected` (always the valid set), `received`, `hint` (a working invocation, never clap's usage blob), `retryable` (true only where a retry can succeed).
+- **`meta`:** `command` (the schema id; flags never change it); `schemaVersion` = `"<major>.<minor>"` per report, starting at `"1.0"` in 0.28 (a consumer accepts unknown fields within a major and rejects an unknown major, terraform's rule, bigcli §4.3; the report is named by `meta.command`, the release by `canonVersion`, so neither goes into the version string); `canonVersion`; `context` (role, actor, and the repo root as a path relative to the current directory, so conformance stays byte-stable and no host path leaks); `next` (each with `command` text and `argv` array); paging; `warnings`; `coverage` (below).
+- **`error`:** `code` first, then `message`, `field` (an argv name such as `--scenario-id`, or a JSON pointer into `--input` such as `/items/2/scenarioId`), `expected` (always the valid set), `received` (redacted for secrets), `suggestions[]` (edit distance over the spec's commands, options and values; a `destructive` command is suggested only when the typo is within distance 1 of it, Orca `command-suggestion.ts`), `hint` (a working invocation built from the spec, never clap's usage blob; when a value has the shape of another kind, e.g. a scenario id where a change id belongs, the hint is the corrected command, Orca `worktree-selector-recovery.ts`), `retryable` (true only where a retry can succeed, declared per code in the registry).
+- **Keys are camelCase everywhere** in reports, errors and `--input` (0.25 mixes `planDigest` with `dry_run`); ledger records embedded verbatim keep their own schema and say so in the spec.
+- **Streams:** `--json` puts the success or failure document on stdout and nothing on stderr; human text and logs go to stderr; without `--json`, errors go to stderr (Orca verified, research §3). T7 asserts empty stderr in JSON mode.
 - **Format:** compact JSON. JSON mode is decided from argv before parsing, so pre-parse errors are JSON too.
-- **Not wrapped:** artifacts and streams.
-- **Unchanged by environment:** no environment variable or TTY changes the format (oxlint #27569, bigcli §0).
+- **Not wrapped:** artifacts and streams, each declared as such per leaf in the per-leaf table (`export` bytes, `report snapshot` files, `strategy approval-payload` and `evidence approval-payload` bytes, `skills get` markdown in text mode). Every one of them still has an enveloped `--json` form or an envelope on failure.
+- **Unchanged by environment:** no environment variable or TTY changes the format (oxlint #27569, bigcli §0). `CANON_ROLE` never filters or fails `canon schema`, `schema --errors`, `context` or `skills get`: an invalid value there is a warning, and role filtering needs `--as` on the command line (review round 1: `CANON_ROLE=bogus` blocks `schema --errors` today, and `CANON_ROLE=implementer` hides 47 of 70 commands).
+- **Coverage:** a check reports what it examined (`meta.coverage`: spec roots, scenarios, subjects examined; roots skipped and why). A check that examined nothing reports `unverifiable` with exit 1, never `clean` (Orca `hostScope`; the class of #109).
 
 ### D4 Exit table
 
-0 ok; 1 the command's finding or failed check; 2 refused (usage, `CONFIG_MISSING`, unreadable input, invalid argument). Each leaf declares its own rows. `brief check` flips to 1 = blockers.
+0 ok; 1 the command's finding, failed check or `unverifiable` result; 2 refused (usage, `CONFIG_MISSING`, an id or file that does not exist, unreadable input, invalid argument). Each leaf declares its own rows; each registered error code declares its exit, and T5 checks that every `*_NOT_FOUND`, `*_UNREADABLE` and `*_INVALID_ARGUMENT` maps to 2 (six map to 1 in 0.25). `brief check` flips to 1 = blockers. Check commands that fail with exit 1 keep their report in `data` (`task done` when blocked included).
 
 ### D5 Context
 
@@ -154,7 +158,19 @@ An agent should not copy a sha it can ask git for (decided 2026-10-22).
 
 ### D9 Callers move in the same release
 
-Skill text, the AGENTS block, website en/ko, dashboard, `trace_check.py`, conformance (reviewed re-bless; every JSON body validated against its schema), hook scripts and examples.
+Skill text, the AGENTS block, website en/ko, dashboard, `trace_check.py` (its read/write split comes from the spec's `effect`, not a verb list), conformance (reviewed re-bless; every JSON body validated against its schema), hook scripts and examples.
+
+- **Installed callers recover in one step.** The retrieve hook reads `(.data // .)`, so it works before and after. `status`, `gate check` and `context` detect a 0.27-era skill lock, hook command or `canon gate task` hook entry and put `canon migrate --commit --plan-digest …` first in `meta.next` with a warning. `canon migrate` backs up every file it rewrites under `.canon/migrate-backup/<timestamp>/`, is idempotent, and is tested on a fixture repo holding 0.27 hooks, skill and scripts.
+
+### D10 From the Orca CLI (research `docs/research/2026-10-23-orca-cli-research.md`)
+
+- **The guide comes from the binary** (Q9): `canon skills get <NAME> [--full]` prints the version-matched guide embedded at build time (text: markdown artifact; `--json`: enveloped). The installed `SKILL.md` becomes a short stub: what canon is, the loop in five lines, and "run `canon skills get canon` for the full guide; never guess a flag, ask `canon schema <command>`". The skill can no longer drift from the binary; `skills check` checks the stub's version; `canon migrate` replaces an old full skill with the stub.
+- **Declared idempotency:** every writing leaf declares `idempotency` in the spec (`replay-safe`, `content-keyed`, `appends`); a duplicate `add` with identical content and a `close` of an already closed finding are no-ops reported `unchanged`. T12 runs every writing leaf twice.
+- **Conflicts and requirements in the spec:** `conflictsWith` and `requires` per option, from clap; T3 checks each is enforced at parse time.
+- **Human-only acts:** `brief approve`, `policy approve`, `divergence accept` and the overrides refuse the agent roles with `retryable: false` and a hint addressed to the human ("ask the user to run …"); no flag grants them. A refusal that was waived (`--override-reason`) is echoed in `data.overrides[]`.
+- **`--input -` refuses a terminal** (`INPUT_STDIN_TTY`) instead of waiting; each input declares `maxBytes` in the spec.
+- **The generated guide ends each workflow with its done criterion** (which `gate check` / `subject show` result means finished) and where to read the result; every command line in it is parsed by T14.
+- Not adopted: `--change-id current`-style context selectors (conflicts with "context is never an operand"; `meta.next[].argv` carries the explicit id), typed selector prefixes, `--yes`/`--force`, retry tokens, aliases, a 0/1 exit table.
 
 ## Renames (decided 2026-10-22: all of the table)
 
@@ -165,13 +181,16 @@ Skill text, the AGENTS block, website en/ko, dashboard, `trace_check.py`, confor
 | command | `selftest`, `gate selftest` | `selftest [--suite <NAME>]` |
 | command | `gate promote`, `divergence promote` | `gate promote [--kind …]` only |
 | command | `learn promote/approve/rollback` | `strategy promote`, `strategy approval-payload`, `strategy rollback` |
-| command | `artifacts migrate --to <BACKEND>` | `artifacts move --tier <TIER>` |
+| command | `artifacts migrate --to <BACKEND>` | `artifacts move --tier <TIER>` (D6 preview + `--commit`) |
 | command | `evidence vault` | `artifacts store` |
 | command | `ingest artifacts` | `ingest records` |
 | command | `context-pack new` | `context-pack add` |
 | command | `demo add` | `demo review` |
 | command | bare `brief` | `brief show` |
-| command | `subject status <ID> [--to <STATE>]` | `subject show <ID>` and `subject status <ID> --to <STATE>` (write only) |
+| command | `subject status <ID> [--to <STATE>]` | `subject show <SUBJECT_ID>` (read) and `subject move <SUBJECT_ID> --to <STATE>` (write) |
+| command | `report`, `report --check`, `report --snapshot <DIR>` | `report build`, `report check`, `report snapshot <DIR>` |
+| command | `canon schema` filtered by `CANON_ROLE` | unfiltered; `--as` filters |
+| command | — | `skills get <NAME> [--full]` (D10) |
 | command | `divergence status` | `divergence list` |
 | command | `gate task <TASK_ID>` | `task done <TASK_ID>` |
 | command | `regime-key` | `regime show` |
@@ -186,7 +205,8 @@ Skill text, the AGENTS block, website en/ko, dashboard, `trace_check.py`, confor
 | option | `dispatch end --status`, `divergence add --status` | `--outcome`, `--state` |
 | option | `--role` (attribution) | stays, defaulting to `--as`; `regime-key --role` → `--role-segment` |
 | option | `--fields` (repeatable + comma list) | one form: `--fields <A,B>` |
-| option | `ingest plans --source`, `report --snapshot` | `--plan-source`, `--snapshot-dir` |
+| option | `--task`, `--plugin`, `--parent-run` | `--task-id`, `--plugin-id`, `--parent-run-id` |
+| option | `ingest plans --source` | `--plan-source` |
 | option | `init --check-config` | `init --check` |
 | kind | `evidence_record` in `canon context` | `evidence` (Q6) |
 
@@ -241,10 +261,11 @@ Effort from coverage B7: ~24–27 engineer-days serial, ~8–9 calendar days fan
 
 ## Owner decisions
 
-- **Q1 Preview + `--commit`:** decided 2026-10-22: destructive commands and migrations (`purge`, `artifacts move`, `migrate`, `ledger compact`, `tier age`). See D6.
-- **Q2 Renames:** decided 2026-10-22: the whole table.
-- **Q3 Mode splits:** decided 2026-10-22: split even when options overlap (`evidence audit`; `review scenario` / `review change`).
-- **Q4 Envelope:** decided 2026-10-22: `{ok, data, meta, error}`; `command`, `schemaVersion`, `canonVersion` in `meta`.
+- **Q1 Preview + `--commit`:** decided 2026-10-22: destructive commands and migrations (`purge`, `artifacts move`, `migrate`, `ledger compact`, `tier age`). See D6. All five are `effect: destructive` in the spec, and `purge --kind` lists only the kinds purge accepts.
+- **Q2 Renames:** decided 2026-10-22: the whole table, plus the round-1 review fixes (`subject move`, `report build|check|snapshot`, `-id` on `--task`/`--plugin`/`--parent-run`).
+- **Q3 Mode splits:** decided 2026-10-22: split even when options overlap (`evidence audit`; `review scenario` / `review change`; `report`).
+- **Q4 Envelope:** decided 2026-10-22: `{ok, data, meta, error}`; `command`, `schemaVersion` (`"1.0"` form), `canonVersion` in `meta`.
 - **Q6 Kind name:** decided 2026-10-22: `evidence` everywhere a kind is named to a user (context, `--kind` values, JSON). Storage paths and the record's own `kind` field stay `evidence_record`.
 - **Q7 Telemetry, NDJSON output:** not in 0.28. JSON/NDJSON *input* is in (D7).
-- **Q8 Identifier flags and operands:** decided 2026-10-22: (c), the primary object is an operand. See D1.
+- **Q8 Identifier flags and operands:** decided 2026-10-22: (c), the primary object is an operand, by the three rules in D1.
+- **Q9 Guide from the binary:** proposed (D10, Orca `skills get`). Replaces the installed full skill with a stub that sends the agent to `canon skills get`; the full text lives in the binary.
