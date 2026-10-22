@@ -26,7 +26,7 @@ The command surface is described once, in a generated spec that the parser, `can
 | Coverage | `canon brief` is a runnable group and is missing from `schema --all`, because `leaf_paths` only walks leaves. `canon context` lists no commands and no artifact families. Context says `evidence_record` while `--kind` says `evidence`. | coverage B2, B6 |
 | JSON | 57 leaves print `{data, meta}`. 13 print a bare report, and `retrieve` prints a bare array. There is no `ok` and no `schemaVersion`, errors carry no command id, and there are 6 failure shapes. About 49 of 70 payloads are built with `serde_json::json!` and have no schema. | output §1–3; coverage B4 |
 | Exit codes | `brief check` is reversed: 2 = blockers, 1 = error. 37 leaves share a boilerplate exit table. | X5 |
-| format vs lint | `format` never rewrites: it validates corpus shape, has a no-op `--check`, and an alias `fmt`. | C8; bigcli §1 |
+| format vs lint | `format` never rewrites: it validates corpus shape, has a no-op `--check`, and an alias `fmt`. Out of scope for 0.28 (owner decision 2026-10-22); `format` keeps its name and behavior. | C8; bigcli §1 |
 | Option names | One name with several shapes: `--to`, `--change-id`, `--scenario-id`, `--providers`. One name with several meanings: `--repo`, `--kind`, `--status`, `--role`/`--as`, and `--version` on `prompt`. One concept with many names: actor ×3, approver ×3, sha ×5, signature ×4, manifest ×2. | O2–O16, O22 |
 | Command names | Same action at two scopes: `selftest`/`gate selftest`, `gate promote`/`divergence promote`. One verb with two actions: `migrate`/`artifacts migrate`. `artifacts` has 3 meanings. `context` vs `context-pack`. Nouns that act: `gate task`, `evidence vault`, `subject status --to`, `regime-key`. | C1–C16, X3 |
 | Safety | Only `purge` is `destructive`, and it uses `--plan` / `--confirm <digest>`. `artifacts migrate` deletes local blobs by default. 7 of 46 writing leaves have `--dry-run`. There is no `--no-input`. | X4, O6, O18–O20 |
@@ -40,7 +40,7 @@ Already right: kebab-case everywhere; `--json` on every leaf; `--as` declared on
 
 ### D1 Grammar doc
 
-`docs/design/cli-grammar.md` is one normative page. It holds the concept table, verbs, placeholders, envelope, exit table, safety rule, the format/lint/check roles, and owner decisions with their sources. Its tables are machine-readable: `docs/design/cli-vocabulary.tsv` maps option → value name → concept.
+`docs/design/cli-grammar.md` is one normative page. It holds the concept table, verbs, placeholders, envelope, exit table, safety rule, and owner decisions with their sources. Its tables are machine-readable: `docs/design/cli-vocabulary.tsv` maps option → value name → concept.
 
 - **Verbs:**
   - `new` creates an authored unit (feature, scenario, subject, change).
@@ -51,12 +51,11 @@ Already right: kebab-case everywhere; `--json` on every leaf; `--as` declared on
   - `validate` checks the shape of one input file.
   - `approve` records a human approval.
   - `accept` records a reviewer taking a known gap.
-  - `format` rewrites to canonical form.
-  - `lint` reports rule findings.
   - `update`, `move`, `get`, `delete` are not used; the original report's CRUD set is rejected (coverage A2).
 - **Placeholders:** `<DIR> <FILE> <PATH> <ID> <SHA> <N> <TIMESTAMP> <NAME> <TEXT> <URL> <KIND>` plus the concept ids (`<CHANGE_ID>`, …).
 - **Booleans** name a mode (`--all`, `--check`, `--no-promote`).
-- **Operands:** a command takes at most one operand kind: the group's own noun, or paths for `format`/`lint`. Context is never an operand.
+- **Operands:** a command takes at most one operand kind: the group's own noun, or paths. Context is never an operand.
+- **A mode that changes a command's options is its own command**, even when most options are shared (owner decision 2026-10-22). Shared options are declared once and flattened into each.
 
 ### D2 One generated command spec
 
@@ -118,23 +117,11 @@ It plays the role OpenAPI plays for an HTTP API (coverage B3).
 - **`--override-reason <TEXT>`** stays the only "proceed although refused" flag; there is no `--force`.
 - **`--no-input`:** `--json` implies it.
 
-### D7 format, lint, check
-
-| Command | Role | Effect | Modes | Exit |
-| --- | --- | --- | --- | --- |
-| `canon lint [<PATH>]...` | today's `format`: corpus rules, each finding with `code`, `severity`, `path`, `line`, `message`, `fix?` | read; `--fix` writes safe fixes only (today the provenance-line class) | `--fix`, `--deny-warnings`, `--rules` | 0 clean / 1 errors / 2 refused |
-| `canon format [<PATH>]...` | canonical rewrite of the files canon owns as text: `.feature` (Gherkin layout, `# canon:` line placement) and `brief.md` (section markers, table layout). Never ledger, archive, policy or anything digest-pinned; the rewritable set is declared per family. | write | exactly one of `--check` (exit 1, lists files, optional `--diff`) or `--write`; bare `format` is a usage error, so an old `canon format <root>` call cannot silently start rewriting | 0 canonical / 1 would change / 2 refused |
-| `canon explain <CODE>` | one rule or error code: what raises it, the fix, the reference | read | | 0 / 2 |
-
-- `gate check` stays the verdict over repo state; no second top-level `check`.
-- `brief check` stays: it checks one input.
-- A rewritten brief that was approved is no longer approved, as with any edit. `format --write` says so per file.
-
 ### D8 Renames in one release
 
 - Every rename in 0.28 keeps the old spelling working as a hidden alias. The alias prints the stderr line, adds `meta.deprecated {used, use, since, removedIn}`, and appears in the spec as `deprecated`.
 - The next minor removes the alias; the usage error then names the replacement (`removed.rs`, extended with a command table).
-- **Hard cuts in 0.28 that cannot warn:** the 13 bare reports move into `data`; `retrieve` becomes an envelope; `brief check` exits flip; `format` gets its new meaning; and the kind name is unified (Q8).
+- **Hard cuts in 0.28 that cannot warn:** the 13 bare reports move into `data`; `retrieve` becomes an envelope; `brief check` exits flip; and the kind name is unified (Q6).
   - Each one bumps the affected `schemaVersion` major and has an old → new key list in the README Upgrading section.
   - The retrieve hook reads both shapes.
   - `gate install-hooks` rewrites installed hook commands.
@@ -149,7 +136,8 @@ Skill text, the AGENTS block, website en/ko, dashboard, `trace_check.py`, confor
 
 | Kind | Now | 0.28 |
 | --- | --- | --- |
-| command | `format` (+`fmt`) | `lint` (old `format` semantics), new `format` per D7 |
+| command | `evidence add --kind audit …` | `evidence audit` (own options: `--evaluator-id/-version/-digest`, `--audit-result`; no `--verdict`/`--task`/`--surface-ref`/`--approval-*`) |
+| command | `review add --scenario-id …` / `review add --change-id …` | `review scenario` (pins scenario digest + evidence checks) and `review change` (pins the chore brief) |
 | command | `selftest`, `gate selftest` | `selftest [--suite <NAME>]` |
 | command | `gate promote`, `divergence promote` | `gate promote [--kind …]` only |
 | command | `learn promote/approve/rollback` | `strategy promote`, `strategy approval-payload`, `strategy rollback` |
@@ -176,7 +164,7 @@ Skill text, the AGENTS block, website en/ko, dashboard, `trace_check.py`, confor
 | option | `--fields` (repeatable + comma list) | one form: `--fields <A,B>` |
 | option | `ingest plans --source`, `report --snapshot` | `--plan-source`, `--snapshot-dir` |
 | option | `init --check-config` | `init --check` |
-| kind | `evidence_record` in `canon context` | `evidence` (Q8) |
+| kind | `evidence_record` in `canon context` | `evidence` (Q6) |
 
 Open, recommended against: `learn`/`dispatch` as noun groups (`strategy` above covers `learn`; `dispatch` stays the toolchain verb for a run), `context` → `authoring`, `query/export/purge` under `records`.
 
@@ -209,7 +197,7 @@ Open, recommended against: `learn`/`dispatch` as noun groups (`strategy` above c
 | S2 | `Report` trait, envelope D3, error D3; type the ~20 typed reports | S0 |
 | S3a–e | Type the ~49 `json!` payloads by module (evidence/review/finding; gate/divergence/subject; dispatch/ingest/learn; retention/export/purge/query; init/migrate/skills/context/misc) | S2 |
 | S4 | `--repo` D5 (#109), effect honesty (#110), safety D6, `--dry-run`/`--no-input`, exit table D4 | S0 |
-| S5 | `lint`/`format`/`explain` (D7) | S0 |
+| S5 | Mode splits: `evidence audit`, `review scenario`, `review change` (old forms alias with deprecation) | S0 |
 | S6 | Renames table with aliases and deprecation (D8), `removed.rs` command table | S0, S5 |
 | S7 | `canon context` commands/families/kind name; capability version 6 | S1 |
 | S8 | Derived docs: website reference, skill/AGENTS blocks between markers, doc lint T14, Deprecations table; skill text and README | S1, S6 |
@@ -228,8 +216,8 @@ Effort from coverage B7: ~24–27 engineer-days serial, ~8–9 calendar days fan
 
 - **Q1 Preview by default + `--commit`:** which of `artifacts move` (deletes local blobs), `migrate` (git mv + rewrites canon.yaml), `ledger compact`, `tier age`, `gate promote`, `strategy rollback`, `subject status --to retired|shipped`.
 - **Q2 Renames:** confirm the table above.
-- **Q3 Mode splits:** `evidence add --class audit` → `evidence audit`? `review add` scenario vs change review as two commands?
+- **Q3 Mode splits:** decided 2026-10-22: split even when options overlap (`evidence audit`; `review scenario` / `review change`).
 - **Q4 Envelope:** `{ok, data, meta}` with `command`/`schemaVersion` in `meta` (recommended; 57 leaves and their callers already read `.data`) vs the flat form.
-- **Q5 `format` rewrite scope:** `.feature` and `brief.md` only (recommended), and whether `format` runs on an approved brief at all or refuses with a hint.
 - **Q6 Kind name:** `evidence` everywhere (recommended; it follows the 0.24 no-`_record` rule).
 - **Q7 Issues only:** telemetry and NDJSON outputs (recommended).
+- **Q8 Identifier flags and operands:** every leaf is at most two words deep (14 top-level, 56 `group verb`), and 16 leaves take an operand. Options: (a) keep `--<noun>-id` everywhere (0.24 rule); (b) drop the suffix; (c) the command's primary object is an operand (`review scenario <SCENARIO_ID>...`, `evidence audit <SCENARIO_ID>`, `finding close <FINDING_KEY>`), every other identifier stays `--<noun>-id`. Recommended (c).
