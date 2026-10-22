@@ -64,8 +64,11 @@ fn ok(dir: &Path, home: &Path, args: &[&str]) {
     assert!(out.status.success(), "{args:?}: {}", String::from_utf8_lossy(&out.stderr));
 }
 
+/// Background maintenance is off: `git commit` may start `git gc --auto`
+/// detached, which deletes files under `.git` while `copy_dir` walks it.
 fn git(dir: &Path, args: &[&str]) -> String {
     let out = Command::new("git")
+        .args(["-c", "gc.auto=0", "-c", "maintenance.auto=false"])
         .args(args)
         .current_dir(dir)
         .env("GIT_AUTHOR_NAME", "t")
