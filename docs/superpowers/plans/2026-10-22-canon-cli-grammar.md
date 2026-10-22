@@ -54,7 +54,8 @@ Already right: kebab-case everywhere; `--json` on every leaf; `--as` declared on
   - `update`, `move`, `get`, `delete` are not used; the original report's CRUD set is rejected (coverage A2).
 - **Placeholders:** `<DIR> <FILE> <PATH> <ID> <SHA> <N> <TIMESTAMP> <NAME> <TEXT> <URL> <KIND>` plus the concept ids (`<CHANGE_ID>`, …).
 - **Booleans** name a mode (`--all`, `--check`, `--no-promote`).
-- **Operands:** a command takes at most one operand kind: the group's own noun, or paths. Context is never an operand.
+- **Operands (Q8, decided 2026-10-22):** a command's primary object is its operand, repeatable when the command acts on several of one kind (`review scenario <SCENARIO_ID>...`, `evidence audit <SCENARIO_ID>`, `brief approve <CHANGE_ID>`, `finding close <FINDING_KEY>`, `subject adopt <CHANGE_ID>`). Every other identifier is `--<noun>-id`. At most one operand kind per command; context is never an operand. The old `--<noun>-id` spelling of a primary object keeps working as a deprecated alias in 0.28.
+- **`--project-id` is required only when the repo configures more than one spec root**, on every command that takes it (today `evidence add` requires it even with one root, `scenario new` does not).
 - **A mode that changes a command's options is its own command**, even when most options are shared (owner decision 2026-10-22). Shared options are declared once and flattened into each.
 
 ### D2 One generated command spec
@@ -110,18 +111,29 @@ It plays the role OpenAPI plays for an HTTP API (coverage B3).
 
 ### D6 Safety
 
-- **Preview by default, act with `--commit`** for commands that delete or rewrite data others depend on. The set is decided in Q1.
-- **`purge`:** a bare run previews, prints `planDigest`, `risk` and `effects[]`, and exits 0. It acts with `--commit --plan-digest <DIGEST>`, like terraform's saved plan; destructive acts also need the target named.
+- **Preview by default, act with `--commit`** (decided 2026-10-22) for commands that delete or rewrite existing data and for migrations: `purge`, `artifacts move` (deletes local blobs), `migrate` (git mv, rewrites canon.yaml), `ledger compact`, `tier age`. A bare run prints the plan (`planDigest`, `effects[]`) and exits 0; `--commit --plan-digest <DIGEST>` acts and refuses if the plan changed since. Their `--dry-run` is removed (the bare run is the dry run). Appends and state transitions (`gate promote`, `strategy rollback`, subject transitions) run directly.
+- **`purge`** keeps its digest binding under the shared form: `--plan` / `--confirm <DIGEST>` become the bare run / `--commit --plan-digest <DIGEST>`; destructive acts also need the target named.
 - **`--dry-run`** with one help string on every other writing leaf where a preview helps: init, skills install, gate install-hooks, inventory sync, plugin sync, artifacts store, ingest *, export, subject adopt/unadopt.
 - **Refusal leaves the tree unchanged.** This is tested over every writing leaf; a repeated write is a no-op where declared idempotent.
 - **`--override-reason <TEXT>`** stays the only "proceed although refused" flag; there is no `--force`.
-- **`--no-input`:** `--json` implies it.
+- **No `--no-input` flag.** canon prompts in one place (`init` asking which harnesses, only when stdin and stderr are terminals; `--providers` answers it). A flag named `--no-input` beside `--input` (D7) would be one name with two meanings, so the rule is stated instead: canon never prompts without a terminal, and every prompted value has a flag (tested).
+
+### D7 JSON input
+
+Agents assemble arguments as data, so every writing leaf also accepts its arguments as one JSON document (decided 2026-10-22; gws takes request bodies as JSON, bigcli §2). `--json` stays output-only.
+
+- **`--input <FILE|->`**: a JSON object whose keys are the command's option names in camelCase (`scenarioId`, `projectId`, `reportFormat`…) and whose `operands` key holds the operands. Repeatable options are arrays, flags are booleans. A key canon does not know is refused (`INPUT_UNKNOWN_FIELD`, `field` names the key, `expected` lists the valid keys), so a typo never drops silently.
+- **Batch:** a JSON array, or NDJSON when the file has one object per line, runs the command once per element, all or nothing (validated before the first write), with one combined report (`data.items[]`, each with its own result). This replaces the per-command batch forms: `scenario new --from`, `review add --scenario-ids-from`; they stay as deprecated aliases in 0.28.
+- **Precedence:** a flag given on the command line and the same key in `--input` with a different value is refused (`INPUT_CONFLICT`); equal values are fine. Global options (`--repo`, `--as`, `--json`) are flags only.
+- **Schema:** each writing leaf's input document has a JSON Schema in the generated spec (`inputs[].schemaRef`), derived from the same clap definition as the flags, so the two cannot drift. `canon schema <command> --json` shows it and an example document.
+- **Validation is the same code path** as flags: the document is turned into an argv and parsed by clap, so every rule (required, `requiredOneOf`, value sets) and every error code applies unchanged.
+- Read-only leaves do not take `--input` (their arguments are filters, short enough as flags).
 
 ### D8 Renames in one release
 
 - Every rename in 0.28 keeps the old spelling working as a hidden alias. The alias prints the stderr line, adds `meta.deprecated {used, use, since, removedIn}`, and appears in the spec as `deprecated`.
 - The next minor removes the alias; the usage error then names the replacement (`removed.rs`, extended with a command table).
-- **Hard cuts in 0.28 that cannot warn:** the 13 bare reports move into `data`; `retrieve` becomes an envelope; `brief check` exits flip; and the kind name is unified (Q6).
+- **Hard cuts in 0.28 that cannot warn:** the 13 bare reports move into `data`; `retrieve` becomes an envelope; `brief check` exits flip.
   - Each one bumps the affected `schemaVersion` major and has an old → new key list in the README Upgrading section.
   - The retrieve hook reads both shapes.
   - `gate install-hooks` rewrites installed hook commands.
@@ -132,7 +144,7 @@ It plays the role OpenAPI plays for an HTTP API (coverage B3).
 
 Skill text, the AGENTS block, website en/ko, dashboard, `trace_check.py`, conformance (reviewed re-bless; every JSON body validated against its schema), hook scripts and examples.
 
-## Renames (proposal; owner confirms in Q2)
+## Renames (decided 2026-10-22: all of the table)
 
 | Kind | Now | 0.28 |
 | --- | --- | --- |
@@ -187,6 +199,7 @@ Open, recommended against: `learn`/`dispatch` as noun groups (`strategy` above c
 | T13 context | `kinds` = `RecordKind::ALL`; `families` = `FamilyKind::ALL`; every `--kind` value set ⊆ `kinds`; every spec command in `context.commands` per role. |
 | T14 docs | Every command line in skill text, website docs, the AGENTS block, hints and `meta.next` parses against the spec. |
 | T15 mutation | Seeded violations (drop a META row, an option's help, add a `json!` print, a runnable group, a duplicate name) each fail the right test. |
+| T16 input | For every writing leaf, the spec's example `--input` document and the equivalent flags produce byte-identical records; an unknown key and a conflicting flag are refused; a batch with one invalid element writes nothing. |
 
 ## Slices
 
@@ -196,9 +209,10 @@ Open, recommended against: `learn`/`dispatch` as noun groups (`strategy` above c
 | S1 | Spec generator, drift test, `canon completion`, man pages | S0 |
 | S2 | `Report` trait, envelope D3, error D3; type the ~20 typed reports | S0 |
 | S3a–e | Type the ~49 `json!` payloads by module (evidence/review/finding; gate/divergence/subject; dispatch/ingest/learn; retention/export/purge/query; init/migrate/skills/context/misc) | S2 |
-| S4 | `--repo` D5 (#109), effect honesty (#110), safety D6, `--dry-run`/`--no-input`, exit table D4 | S0 |
-| S5 | Mode splits: `evidence audit`, `review scenario`, `review change` (old forms alias with deprecation) | S0 |
-| S6 | Renames table with aliases and deprecation (D8), `removed.rs` command table | S0, S5 |
+| S4 | `--repo` D5 (#109), effect honesty (#110), safety D6, `--dry-run`, exit table D4 | S0 |
+| S5 | Mode splits: `evidence audit`, `review scenario`, `review change`; primary-object operands (Q8) (old forms alias with deprecation) | S0 |
+| S6 | Renames table with aliases and deprecation (D8), `removed.rs` command table; preview + `--commit` set (D6) | S0, S5 |
+| S6b | `--input` JSON/NDJSON for every writing leaf (D7): document → argv, input schemas in the spec, batch report, retire `--from`/`--scenario-ids-from` | S1, S5 |
 | S7 | `canon context` commands/families/kind name; capability version 6 | S1 |
 | S8 | Derived docs: website reference, skill/AGENTS blocks between markers, doc lint T14, Deprecations table; skill text and README | S1, S6 |
 | S9 | Tests T1–T15, witness fixtures, conformance re-bless with review | all |
@@ -209,15 +223,15 @@ Effort from coverage B7: ~24–27 engineer-days serial, ~8–9 calendar days fan
 **Acceptance:**
 - the workspace passes;
 - canon's own gate is clean with new scenarios evidenced and independently reviewed;
-- T1–T15 green with empty allowlists except the documented witness list;
+- T1–T16 green with empty allowlists except the documented witness list;
 - a dogfood eval (omp, roles, `language: ko`) on a 0.26 baseline shows 0 wrong-shape calls and no more `--help`/`schema` probes per scenario than eval 12, and a canon 0.25-era hook and script set migrated by `canon migrate`.
 
 ## Owner decisions
 
-- **Q1 Preview by default + `--commit`:** which of `artifacts move` (deletes local blobs), `migrate` (git mv + rewrites canon.yaml), `ledger compact`, `tier age`, `gate promote`, `strategy rollback`, `subject status --to retired|shipped`.
-- **Q2 Renames:** confirm the table above.
+- **Q1 Preview + `--commit`:** decided 2026-10-22: destructive commands and migrations (`purge`, `artifacts move`, `migrate`, `ledger compact`, `tier age`). See D6.
+- **Q2 Renames:** decided 2026-10-22: the whole table.
 - **Q3 Mode splits:** decided 2026-10-22: split even when options overlap (`evidence audit`; `review scenario` / `review change`).
-- **Q4 Envelope:** `{ok, data, meta}` with `command`/`schemaVersion` in `meta` (recommended; 57 leaves and their callers already read `.data`) vs the flat form.
-- **Q6 Kind name:** `evidence` everywhere (recommended; it follows the 0.24 no-`_record` rule).
-- **Q7 Issues only:** telemetry and NDJSON outputs (recommended).
-- **Q8 Identifier flags and operands:** every leaf is at most two words deep (14 top-level, 56 `group verb`), and 16 leaves take an operand. Options: (a) keep `--<noun>-id` everywhere (0.24 rule); (b) drop the suffix; (c) the command's primary object is an operand (`review scenario <SCENARIO_ID>...`, `evidence audit <SCENARIO_ID>`, `finding close <FINDING_KEY>`), every other identifier stays `--<noun>-id`. Recommended (c).
+- **Q4 Envelope:** decided 2026-10-22: `{ok, data, meta, error}`; `command`, `schemaVersion`, `canonVersion` in `meta`.
+- **Q6 Kind name:** open. `canon context` says `evidence_record` while `--kind` says `evidence`; unify on one (recommended `evidence`) or keep both.
+- **Q7 Telemetry, NDJSON output:** open; not in 0.28 unless decided. JSON/NDJSON *input* is in (D7).
+- **Q8 Identifier flags and operands:** decided 2026-10-22: (c), the primary object is an operand. See D1.
