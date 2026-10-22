@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-027",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-027-1"
+  },
+  "at": "2026-10-22T05:50:34.645892Z",
+  "change_id": "canon-0-27",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewer": "canon-reviewer-027",
+  "round": 1,
+  "scenario_ids": [
+    "query.read.82"
+  ],
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Treat an existing SQLite directory as an unavailable backend instead of an empty in-memory tier"
+}
