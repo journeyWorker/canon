@@ -1,8 +1,8 @@
 # Canon 0.28.0: one CLI grammar, generated from one spec
 
-- **Status:** PLANNED. Starts after 0.26.0 (brief prose) ships; 0.27 is not reserved for this.
-- **Base:** `main` after 0.26.0.
-- **Version:** 0.28.0 (minor). One release carries the whole grammar change set; a later minor only removes the deprecated spellings.
+- **Status:** PLANNED. 0.26.0 and 0.27.0 (#109, #110) have shipped; starts on owner go.
+- **Base:** `main` at 0.27.0.
+- **Version:** 0.28.0 (minor). One release carries the whole grammar change set as a clean cutover: no deprecated aliases (owner decision 2026-10-22).
 - **Evidence:**
   - `docs/research/2026-10-22-cli-audit-surface.md`: canon 0.25.0, rule by rule; ids C*, O*, P*, D*, X*.
   - `docs/research/2026-10-22-cli-audit-output.md`: every leaf × JSON/text/error shape and exit code.
@@ -54,7 +54,7 @@ Already right: kebab-case everywhere; `--json` on every leaf; `--as` declared on
   - `update`, `move`, `get`, `delete` are not used; the original report's CRUD set is rejected (coverage A2).
 - **Placeholders:** `<DIR> <FILE> <PATH> <ID> <SHA> <N> <TIMESTAMP> <NAME> <TEXT> <URL> <KIND>` plus the concept ids (`<CHANGE_ID>`, …).
 - **Booleans** name a mode (`--all`, `--check`, `--no-promote`).
-- **Operands (Q8, decided 2026-10-22):** a command's primary object is its operand, repeatable when the command acts on several of one kind (`review scenario <SCENARIO_ID>...`, `evidence audit <SCENARIO_ID>`, `brief approve <CHANGE_ID>`, `finding close <FINDING_KEY>`, `subject adopt <CHANGE_ID>`). Every other identifier is `--<noun>-id`. At most one operand kind per command; context is never an operand. The old `--<noun>-id` spelling of a primary object keeps working as a deprecated alias in 0.28.
+- **Operands (Q8, decided 2026-10-22):** a command's primary object is its operand, repeatable when the command acts on several of one kind (`review scenario <SCENARIO_ID>...`, `evidence audit <SCENARIO_ID>`, `brief approve <CHANGE_ID>`, `finding close <FINDING_KEY>`, `subject adopt <CHANGE_ID>`). Every other identifier is `--<noun>-id`. At most one operand kind per command; context is never an operand.
 - **`--project-id` is required only when the repo configures more than one spec root**, on every command that takes it (today `evidence add` requires it even with one root, `scenario new` does not).
 - **A mode that changes a command's options is its own command**, even when most options are shared (owner decision 2026-10-22). Shared options are declared once and flattened into each.
 
@@ -67,7 +67,7 @@ Already right: kebab-case everywhere; `--json` on every leaf; `--as` declared on
 - the exit table;
 - envelope JSON Schemas;
 - all error codes with meaning, exit and retryability;
-- every node: leaves, pure groups and runnable groups (`nodeKind`). Each node carries `about`, `effect`, `effectNote`, `idempotency`, `roles`, operands, options (help, value name, default, `possibleValues`, `deprecated`), `requiredOneOf`, `exits`, `errorCodes`, `outputs` (`kind: report|artifact|stream`, `schemaRef`, `schemaVersion`), `inputs` (e.g. NDJSON batch lines with `schemaRef`) and `examples`;
+- every node: leaves, pure groups and runnable groups (`nodeKind`). Each node carries `about`, `effect`, `effectNote`, `idempotency`, `roles`, operands, options (help, value name, default, `possibleValues`), `requiredOneOf`, `exits`, `errorCodes`, `outputs` (`kind: report|artifact|stream`, `schemaRef`, `schemaVersion`), `inputs` (e.g. NDJSON batch lines with `schemaRef`) and `examples`;
 - `schemas`: a JSON Schema 2020-12 for every report and input document;
 - `records`: kinds and families with links to `crates/canon-model/schemas`.
 
@@ -82,7 +82,7 @@ It plays the role OpenAPI plays for an HTTP API (coverage B3).
   - a `commands` index in `canon context`, always present, filtered by `--as`;
   - the website CLI reference (en/ko tables; prose stays hand-written);
   - the skill/AGENTS command blocks, regenerated between markers, plus a lint that every command line in skill text, website docs, hints and `meta.next` parses against the spec;
-  - a dated Deprecations table;
+  - a "Removed in 0.28" table (old spelling → new) for the README Upgrading section and the usage errors;
   - `canon completion <bash|zsh|fish>`, which reads the embedded spec at runtime;
   - man pages via `clap_mangen` at packaging.
 
@@ -123,22 +123,19 @@ It plays the role OpenAPI plays for an HTTP API (coverage B3).
 Agents assemble arguments as data, so every writing leaf also accepts its arguments as one JSON document (decided 2026-10-22; gws takes request bodies as JSON, bigcli §2). `--json` stays output-only.
 
 - **`--input <FILE|->`**: a JSON object whose keys are the command's option names in camelCase (`scenarioId`, `projectId`, `reportFormat`…) and whose `operands` key holds the operands. Repeatable options are arrays, flags are booleans. A key canon does not know is refused (`INPUT_UNKNOWN_FIELD`, `field` names the key, `expected` lists the valid keys), so a typo never drops silently.
-- **Batch:** a JSON array, or NDJSON when the file has one object per line, runs the command once per element, all or nothing (validated before the first write), with one combined report (`data.items[]`, each with its own result). This replaces the per-command batch forms: `scenario new --from`, `review add --scenario-ids-from`; they stay as deprecated aliases in 0.28.
+- **Batch:** a JSON array, or NDJSON when the file has one object per line, runs the command once per element, all or nothing (validated before the first write), with one combined report (`data.items[]`, each with its own result). This replaces the per-command batch forms `scenario new --from` and `review add --scenario-ids-from`, which are removed.
 - **Precedence:** a flag given on the command line and the same key in `--input` with a different value is refused (`INPUT_CONFLICT`); equal values are fine. Global options (`--repo`, `--as`, `--json`) are flags only.
 - **Schema:** each writing leaf's input document has a JSON Schema in the generated spec (`inputs[].schemaRef`), derived from the same clap definition as the flags, so the two cannot drift. `canon schema <command> --json` shows it and an example document.
 - **Validation is the same code path** as flags: the document is turned into an argv and parsed by clap, so every rule (required, `requiredOneOf`, value sets) and every error code applies unchanged.
 - Read-only leaves do not take `--input` (their arguments are filters, short enough as flags).
 
-### D8 Renames in one release
+### D8 Clean cutover
 
-- Every rename in 0.28 keeps the old spelling working as a hidden alias. The alias prints the stderr line, adds `meta.deprecated {used, use, since, removedIn}`, and appears in the spec as `deprecated`.
-- The next minor removes the alias; the usage error then names the replacement (`removed.rs`, extended with a command table).
-- **Hard cuts in 0.28 that cannot warn:** the 13 bare reports move into `data`; `retrieve` becomes an envelope; `brief check` exits flip.
-  - Each one bumps the affected `schemaVersion` major and has an old → new key list in the README Upgrading section.
-  - The retrieve hook reads both shapes.
-  - `gate install-hooks` rewrites installed hook commands.
-  - `canon migrate` gains a step that rewrites canon's own scripts and hooks in a consumer repo.
-- A renamed command also changes shape in this one release. This is accepted because its old name keeps working.
+- Every rename, split and shape change lands in 0.28 with no deprecated alias (owner decision 2026-10-22: agents work from the skill, and the skill, AGENTS block, docs and hooks are regenerated in the same release).
+- An old command or option spelling fails as a usage error (exit 2) whose `error.hint` names the replacement and `error.expected` lists the valid spellings (`removed.rs`, extended with a command and option table generated from the spec's "Removed in 0.28" table).
+- Every changed JSON report bumps its `schemaVersion` major; the README Upgrading section lists old → new command lines and report keys.
+- `canon migrate` rewrites canon's own hook commands and scripts in a consumer repo (`gate install-hooks` output, the retrieve hook), and `canon skills install` refreshes the skill; `skills check` reports a skill older than the binary.
+- The `deprecation.rs` machinery (`meta.deprecated`, `deprecatedAliases` in schema, stderr warnings) is removed with the 0.24 aliases it served, if none remain.
 
 ### D9 Callers move in the same release
 
@@ -209,13 +206,13 @@ Open, recommended against: `learn`/`dispatch` as noun groups (`strategy` above c
 | S1 | Spec generator, drift test, `canon completion`, man pages | S0 |
 | S2 | `Report` trait, envelope D3, error D3; type the ~20 typed reports | S0 |
 | S3a–e | Type the ~49 `json!` payloads by module (evidence/review/finding; gate/divergence/subject; dispatch/ingest/learn; retention/export/purge/query; init/migrate/skills/context/misc) | S2 |
-| S4 | `--repo` D5 (#109), effect honesty (#110), safety D6, `--dry-run`, exit table D4 | S0 |
-| S5 | Mode splits: `evidence audit`, `review scenario`, `review change`; primary-object operands (Q8) (old forms alias with deprecation) | S0 |
-| S6 | Renames table with aliases and deprecation (D8), `removed.rs` command table; preview + `--commit` set (D6) | S0, S5 |
-| S6b | `--input` JSON/NDJSON for every writing leaf (D7): document → argv, input schemas in the spec, batch report, retire `--from`/`--scenario-ids-from` | S1, S5 |
-| S7 | `canon context` commands/families/kind name; capability version 6 | S1 |
-| S8 | Derived docs: website reference, skill/AGENTS blocks between markers, doc lint T14, Deprecations table; skill text and README | S1, S6 |
-| S9 | Tests T1–T15, witness fixtures, conformance re-bless with review | all |
+| S4 | `--repo` declared once (D5; discovery and CONFIG_MISSING shipped in 0.27), `effectNote` in the spec (truthful reads shipped in 0.27), safety D6, `--dry-run`, exit table D4 | S0 |
+| S5 | Mode splits: `evidence audit`, `review scenario`, `review change`; primary-object operands (Q8) | S0 |
+| S6 | Renames table (D8), `removed.rs` command/option table with hints; preview + `--commit` set (D6); remove `deprecation.rs` | S0, S5 |
+| S6b | `--input` JSON/NDJSON for every writing leaf (D7): document → argv, input schemas in the spec, batch report; remove `--from`/`--scenario-ids-from` | S1, S5 |
+| S7 | `canon context` commands/families; kind name `evidence` (Q6); capability version 6 | S1 |
+| S8 | Derived docs: website reference, skill/AGENTS blocks between markers, doc lint T14, "Removed in 0.28" table; skill text and README | S1, S6 |
+| S9 | Tests T1–T16, witness fixtures, conformance re-bless with review | all |
 | R | README 0.28.0 with the Upgrading list, version, dogfood eval, release | all |
 
 Effort from coverage B7: ~24–27 engineer-days serial, ~8–9 calendar days fanned out. S3 is the bulk.
@@ -232,6 +229,6 @@ Effort from coverage B7: ~24–27 engineer-days serial, ~8–9 calendar days fan
 - **Q2 Renames:** decided 2026-10-22: the whole table.
 - **Q3 Mode splits:** decided 2026-10-22: split even when options overlap (`evidence audit`; `review scenario` / `review change`).
 - **Q4 Envelope:** decided 2026-10-22: `{ok, data, meta, error}`; `command`, `schemaVersion`, `canonVersion` in `meta`.
-- **Q6 Kind name:** open. `canon context` says `evidence_record` while `--kind` says `evidence`; unify on one (recommended `evidence`) or keep both.
-- **Q7 Telemetry, NDJSON output:** open; not in 0.28 unless decided. JSON/NDJSON *input* is in (D7).
+- **Q6 Kind name:** decided 2026-10-22: `evidence` everywhere a kind is named to a user (context, `--kind` values, JSON). Storage paths and the record's own `kind` field stay `evidence_record`.
+- **Q7 Telemetry, NDJSON output:** not in 0.28. JSON/NDJSON *input* is in (D7).
 - **Q8 Identifier flags and operands:** decided 2026-10-22: (c), the primary object is an operand. See D1.
