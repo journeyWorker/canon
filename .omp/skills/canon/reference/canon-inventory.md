@@ -6,21 +6,25 @@ records every downstream stage joins against.
 
 ## You rarely run it yourself
 
-Since 0.16 the commands that read the index refresh it first:
-`canon status`, `canon gate check`, `canon evidence add`,
-`canon review add` and `canon subject status` index added, edited and
-deleted `.feature` files themselves, with the same code this command runs,
-scoped to the changed files, and say so in one stderr line:
+Since 0.16 the commands that read the index see added, edited and deleted
+`.feature` files without a sync step. `canon evidence add`, `canon review
+add` and `canon subject status` refresh the index on disk first, with the
+same code this command runs, scoped to the changed files, and say so in one
+stderr line:
 
 ```
-canon status: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
+canon evidence add: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
 ```
+
+`canon status` and `canon gate check` are read commands and write nothing:
+they grade the index as that refresh would leave it, built in memory, and
+print no line.
 
 So the working loop has no sync step and no `canon format` step: write the
 scenario (`canon scenario new` writes it format-clean) and run the next
 command. Run `canon inventory sync` when:
 
-- a reader prints `NOT refreshed` — a root has a format violation (a
+- a command prints `NOT refreshed` — a root has a format violation (a
   hand-written `Feature:`/`Scenario:` header with no `# canon:` provenance
   comment, an emptied file, …) or a duplicate id, so its files were not
   indexed. `canon gate check` then fails (`uncovered-cell <root>`),
@@ -57,7 +61,7 @@ and the openspec source `canon init` wrote is removed only after every
 pointer brief is written and nothing unread is left under
 `openspec/changes/` (each unread directory is named).
 
-The reader's refresh treats a file as stale when its latest index
+The refresh treats a file as stale when its latest index
 generation has another `source_digest` or `scenario_digest`. A
 generation written before 0.15 has no `scenario_digest`, so a repo that
 kept an old index gets it rewritten on the first read.
@@ -68,7 +72,7 @@ kept an old index gets it rewritten on the first read.
 author .feature corpus (canon scenario new)
         │
         ▼
-scenario index                  # refreshed by every reader; `canon inventory sync` rebuilds it
+scenario index                  # refreshed by the writers; `canon inventory sync` rebuilds it
         │
         ▼
 canon review add                # attests a review — see canon-inventory downstream / canon-gate

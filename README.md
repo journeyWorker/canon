@@ -82,6 +82,35 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.27.0 release
+
+Two safety fixes found by the 0.25 CLI audit; no command, option or JSON shape changes.
+
+- **A gate cannot pass without canon state (#109).** `--repo` absent or `.`
+  finds the nearest ancestor holding `canon.yaml`; any other value is used as
+  given. A command that needs canon state and finds none refuses
+  `CONFIG_MISSING` (exit 2, field `--repo`, a hint naming `canon init` and the
+  directory searched). Before, `canon gate check` in a directory without
+  `canon.yaml`, or with `--repo <subdir>`, printed `clean` and exited 0.
+  Commands that work without config (init, migrate, schema, context, prompt,
+  retrieve and the others listed in `context::CONFIG_EXEMPT`, each with a
+  reason) still run. `format` refuses a corpus root that is not a directory.
+- **Read commands write nothing (#110).** Every command `canon schema` marks
+  `effect: read` leaves the tree unchanged: `status` and `gate check` grade a
+  stale scenario index in memory instead of rewriting it; a read of a hot tier
+  that was never written creates no `hot.db`; `report --check` seeds its
+  sources in a scratch directory. `query` keeps its gitignored audit line and
+  says so in its `effectNote`. A test runs every read command in a populated
+  repo and checks the tree is unchanged.
+- **A broken hot tier is never an empty answer.** Only a hot path that does
+  not exist reads as empty; a directory or a file that is not SQLite at that
+  path makes `query` fail with the unavailable tier (found in review).
+  `report` still filters such a path (#114).
+
+Conformance re-blessed for the reader-refresh lines that are gone, the
+`--repo` default in schema output, `CONFIG_MISSING` for `status` without
+`canon.yaml`, and version strings.
+
 ## 0.26.0 release
 
 Version 0.26.0 makes `brief check` read a brief the way a human does, in

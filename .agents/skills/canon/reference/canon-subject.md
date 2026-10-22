@@ -21,11 +21,13 @@ authored in one place:
   adopt`.
 - **Scenarios**: the `@subject:<id>` tag on each Gherkin scenario,
   indexed onto `Scenario.subject_id` by the scenario index (rebuilt by
-  `canon inventory sync`, and refreshed by every command that reads it).
+  `canon inventory sync`, and refreshed on disk by the commands that write
+  records; `canon status` and `canon gate check` read it as the refresh
+  would leave it, without writing).
   The Subject record carries no scenario list — the spec corpus is the
   only source, and the Subjects report panel, `spec_coverage.scope`, and
   the shipped gate all read it from there. To link a scenario, tag it;
-  the next `canon status` or `canon gate check` indexes the tag. There is
+  the next `canon status` or `canon gate check` reads the tag. There is
   no subject-side command for it.
 
 ## The 4-step loop
@@ -609,9 +611,9 @@ uses, so status and the gate cannot disagree about a gap:
   unreadable one → `canon init --check-config`; a scenario tagged with a
   subject that has no record → `canon subject new <that id>`; no subject
   at all → `canon subject new`; subjects and `.feature` scenarios but no
-  scenario records → `canon inventory sync` (status refreshes the index
-  itself first, so this means the refresh refused on a format violation
-  or a duplicate id, which the sync names). Then per subject, verifying
+  scenario records → `canon inventory sync` (status reads the index as a
+  refresh would leave it, so this means the refresh would be refused on a
+  format violation or a duplicate id, which the sync names). Then per subject, verifying
   first, then building, specced, proposed, shipped: an unapproved brief
   (building and later, and proposed once its change has a brief)
   → the human step below, which is then the subject's
