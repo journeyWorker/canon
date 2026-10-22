@@ -279,6 +279,8 @@ fn status_and_gate_check_grade_a_stale_index_as_a_sync_would_leave_it_without_wr
     for args in [&["gate", "check", "--json"][..], &["gate", "check"][..], &["status", "--json"][..], &["status"][..]] {
         let stale = stdout_on_copy(base.path(), home.path(), false, args);
         let synced = stdout_on_copy(base.path(), home.path(), true, args);
+        let (changed, _, _, _) = run_on_copy(base.path(), home.path(), &args.iter().map(|a| a.to_string()).collect::<Vec<_>>());
+        assert!(changed.is_empty(), "{args:?} must not write the index or its archive: {changed:?}");
         assert_eq!(stale, synced, "{args:?}: a reader that does not write still answers from the specs as they are");
     }
     let gate = stdout_on_copy(base.path(), home.path(), false, &["gate", "check"]);
