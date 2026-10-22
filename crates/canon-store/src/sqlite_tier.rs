@@ -192,12 +192,15 @@ impl SqliteTier {
     }
 
     /// [`SqliteTier::connect`] for a command that only reads: an absent db
-    /// file is NOT created (no file, no parent directory, no WAL sidecar).
+    /// file (and only an absent one) is NOT created (no file, no parent directory, no WAL sidecar).
     /// The tier is backed by an empty in-memory table instead, so a query
     /// answers "no records" exactly as it would on a freshly created file,
     /// and the repo tree is left as the command found it.
     pub fn connect_for_read(path: &Path) -> Result<Self, StoreError> {
-        Self::open(path, path.is_file())
+        // Only a path that does not exist reads as empty. Anything else there (a directory, an
+        // unreadable or non-sqlite file) is opened for real and fails as an unavailable backend.
+        let absent = matches!(std::fs::symlink_metadata(path), Err(e) if e.kind() == std::io::ErrorKind::NotFound);
+        Self::open(path, !absent)
     }
 
     fn open(path: &Path, on_disk: bool) -> Result<Self, StoreError> {

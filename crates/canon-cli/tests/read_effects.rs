@@ -300,3 +300,30 @@ fn dispatch_diff_answers_from_an_empty_hot_tier_without_creating_the_file() {
     assert_eq!(body["declared"], 0, "{body}");
     assert_eq!(body["notes"].as_array().map(Vec::len), Some(0), "an absent hot tier is an empty one, not a note: {body}");
 }
+
+#[test]
+fn a_hot_path_that_exists_but_is_not_a_database_is_an_error_never_an_empty_read() {
+    let home = TempDir::new().unwrap();
+    let base = fixture(home.path());
+    for (what, make) in [("a directory", true), ("a file that is not sqlite", false)] {
+        let scratch = TempDir::new().unwrap();
+        let repo = scratch.path().join("repo");
+        copy_dir(base.path(), &repo);
+        let hot = repo.join(".canon/hot.db");
+        if make {
+            std::fs::create_dir_all(&hot).unwrap();
+        } else {
+            std::fs::write(&hot, b"this is not a sqlite database, just bytes").unwrap();
+        }
+        for args in [&["query", "--kind", "task", "--json"][..], &["dispatch", "diff", "--json"][..]] {
+            let out = canon(&repo, home.path(), &args.iter().map(|a| a.to_string()).collect::<Vec<_>>());
+            let text = String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr);
+            if args[0] == "query" {
+                assert!(!out.status.success(), "{what}: {args:?} must not succeed with an empty result: {text}");
+                assert!(text.contains("hot"), "{what}: the failure names the hot rung: {text}");
+            } else {
+                assert!(text.contains("unavailable"), "{what}: dispatch diff names the unreadable side in its notes: {text}");
+            }
+        }
+    }
+}
