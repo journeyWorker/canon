@@ -122,12 +122,26 @@ It plays the role OpenAPI plays for an HTTP API (coverage B3).
 
 Agents assemble arguments as data, so every writing leaf also accepts its arguments as one JSON document (decided 2026-10-22; gws takes request bodies as JSON, bigcli §2). `--json` stays output-only.
 
-- **`--input <FILE|->`**: a JSON object whose keys are the command's option names in camelCase (`scenarioId`, `projectId`, `reportFormat`…) and whose `operands` key holds the operands. Repeatable options are arrays, flags are booleans. A key canon does not know is refused (`INPUT_UNKNOWN_FIELD`, `field` names the key, `expected` lists the valid keys), so a typo never drops silently.
-- **Batch:** a JSON array, or NDJSON when the file has one object per line, runs the command once per element, all or nothing (validated before the first write), with one combined report (`data.items[]`, each with its own result). This replaces the per-command batch forms `scenario new --from` and `review add --scenario-ids-from`, which are removed.
-- **Precedence:** a flag given on the command line and the same key in `--input` with a different value is refused (`INPUT_CONFLICT`); equal values are fine. Global options (`--repo`, `--as`, `--json`) are flags only.
+- **`--input <JSON|FILE|->`** (decided 2026-10-22): the value is inline JSON when it starts with `{` or `[` after whitespace (gws passes `--params '<JSON>'` / `--json '<JSON>'` inline, bigcli §2), `-` reads stdin, anything else is a file path. Inline is what agents use most: no temp file.
+- **Document shape:** a JSON object whose keys are the command's option names in camelCase (`scenarioId`, `projectId`, `reportFormat`…) and whose `operands` key holds the operands as an array. Repeatable options are arrays; flags are booleans (`true` emits the flag, `false` emits its `--no-` form when it has one, else nothing); `null` is refused (`INPUT_INVALID_TYPE`) because canon has no clear-to-default semantics. A key canon does not know is refused (`INPUT_UNKNOWN_FIELD`, `field` names the key, `expected` lists the valid keys), so a typo never drops silently. Option names, not record field names: the document is a command invocation, not a record.
+- **Lossless argv:** every value becomes one `--<kebab>=<value>` element (never two tokens, never shell-parsed), so a value starting with `-` (`"summary": "- item"`) cannot read as a flag. Relative paths in the document resolve against the current directory, exactly as on the command line.
+- **Batch:** a JSON array, or NDJSON when a file or stdin has one object per line, runs the command once per element in order. Every element is validated (parse, clap, refusals that need no write) before the first write; a validation failure writes nothing and reports `error.field = "items[<i>].<key>"`. A write failure after that stops at the failing element; `data.items[]` reports each element as `written`, `failed` (with its error) or `skipped`, and the exit is 1. Re-running the same batch is safe: elements whose record already exists with identical content are reported `unchanged` (the record writers are already content-addressed). Limits: 8 MiB per document, 10 000 elements; over the limit is refused before reading further (`INPUT_TOO_LARGE`). This replaces `scenario new --from` and `review add --scenario-ids-from`, which are removed.
+- **stdin:** `--input -` claims stdin; a command that also reads stdin for another option (`--report junit:-`) refuses the combination (`INPUT_STDIN_CONFLICT`).
+- **Precedence:** a flag given on the command line and the same key in `--input` with a different value is refused (`INPUT_CONFLICT`); equal values are fine. Global options (`--repo`, `--as`, `--json`) and the safety pair (`--commit`, `--plan-digest`) are flags only: a document cannot commit a destructive plan.
 - **Schema:** each writing leaf's input document has a JSON Schema in the generated spec (`inputs[].schemaRef`), derived from the same clap definition as the flags, so the two cannot drift. `canon schema <command> --json` shows it and an example document.
 - **Validation is the same code path** as flags: the document is turned into an argv and parsed by clap, so every rule (required, `requiredOneOf`, value sets) and every error code applies unchanged.
 - Read-only leaves do not take `--input` (their arguments are filters, short enough as flags).
+
+### D7b Commits default to HEAD
+
+An agent should not copy a sha it can ask git for (decided 2026-10-22).
+
+- Every option that names "the commit this record is about" becomes optional and defaults to `HEAD`: `review scenario|change`, `divergence add|defer|resolve`, `evidence add`, `evidence approval-payload`, `finding add` (the commit the round reviewed), and `finding close --disposition fixed` (the resolution commit). canon resolves it with `git rev-parse --verify <rev>^{commit}` and records the full sha.
+- Given explicitly, the value is any git revision (`HEAD~1`, a branch, a tag, a short sha), resolved the same way; today only `finding` resolves short shas.
+- **Uncommitted code:** when the default is used and tracked files outside `.canon/` differ from `HEAD`, `HEAD` is not what was reviewed or observed. `review`, `divergence` and `finding close --disposition fixed` refuse (`WORKTREE_DIRTY`, hint: commit first or pass `--rev`). `evidence add` and `finding add` record and mark the record `worktreeDirty: true`, since evidence is commonly recorded before the commit.
+- **No default** for the commit that introduced a finding: it must be sourced, never guessed.
+- **Names:** `--rev <REV>` for the commit a record is about (one name on every command above); `--resolution-rev <REV>` and `--introduced-rev <REV>` on `finding`. `--commit` is only the destructive-command switch (D6), which resolves the collision both reviews raised.
+- Outside a git work tree, or in a repo with no commits, a command that needs a commit and got none refuses (`NO_COMMIT`) with a hint.
 
 ### D8 Clean cutover
 
@@ -162,7 +176,7 @@ Skill text, the AGENTS block, website en/ko, dashboard, `trace_check.py`, confor
 | command | `regime-key` | `regime show` |
 | option | `--agent-id` / `--reviewer` (id) | `--actor-id` (`--reviewer` dropped where `--actor-id --role reviewer` says it) |
 | option | `--by`, `--principal`, `--approval-by` | `--approver` |
-| option | `--sha`, `--artifact-sha`, `--reviewed-sha`, `--resolution-sha`, `--introduced-by` | `--commit`, `--reviewed-commit`, `--resolution-commit`, `--introduced-in` |
+| option | `--pin`, `--sha`, `--artifact-sha`, `--reviewed-sha` / `--resolution-sha` / `--introduced-by` | `--rev` (default HEAD) / `--resolution-rev` (default HEAD when fixed) / `--introduced-rev` (no default); see D7b |
 | option | `--approved-at`, `--signature`, `--approval-signature-file`, `--context-manifest` | `--approval-at`, `--signature-file`, `--manifest` |
 | option | `prompt --version` | `--bundle-version` |
 | option | `export --out` | `-o/--output` |
@@ -196,7 +210,8 @@ Open, recommended against: `learn`/`dispatch` as noun groups (`strategy` above c
 | T13 context | `kinds` = `RecordKind::ALL`; `families` = `FamilyKind::ALL`; every `--kind` value set ⊆ `kinds`; every spec command in `context.commands` per role. |
 | T14 docs | Every command line in skill text, website docs, the AGENTS block, hints and `meta.next` parses against the spec. |
 | T15 mutation | Seeded violations (drop a META row, an option's help, add a `json!` print, a runnable group, a duplicate name) each fail the right test. |
-| T16 input | For every writing leaf, the spec's example `--input` document and the equivalent flags produce byte-identical records; an unknown key and a conflicting flag are refused; a batch with one invalid element writes nothing. |
+| T16 input | For every writing leaf, the spec's example `--input` document (inline, file and stdin) and the equivalent flags produce byte-identical records; an unknown key, `null`, a conflicting flag, a stdin conflict and an oversize document are refused; a batch with one invalid element writes nothing; a batch whose third write fails reports written/failed/skipped and a re-run reports the first two `unchanged`; a value starting with `-` survives. |
+| T17 commits | Every `--rev` default resolves HEAD; an explicit short sha, branch and `HEAD~1` resolve to full shas; uncommitted code outside `.canon/` refuses review/divergence/fixed-close and marks evidence/finding records; no git or no commits refuses `NO_COMMIT`. |
 
 ## Slices
 
@@ -209,10 +224,10 @@ Open, recommended against: `learn`/`dispatch` as noun groups (`strategy` above c
 | S4 | `--repo` declared once (D5; discovery and CONFIG_MISSING shipped in 0.27), `effectNote` in the spec (truthful reads shipped in 0.27), safety D6, `--dry-run`, exit table D4 | S0 |
 | S5 | Mode splits: `evidence audit`, `review scenario`, `review change`; primary-object operands (Q8) | S0 |
 | S6 | Renames table (D8), `removed.rs` command/option table with hints; preview + `--commit` set (D6); remove `deprecation.rs` | S0, S5 |
-| S6b | `--input` JSON/NDJSON for every writing leaf (D7): document → argv, input schemas in the spec, batch report; remove `--from`/`--scenario-ids-from` | S1, S5 |
+| S6b | `--input` inline/file/stdin JSON and NDJSON for every writing leaf (D7): document → lossless argv, input schemas in the spec, batch report with written/failed/skipped/unchanged; remove `--from`/`--scenario-ids-from`. `--rev` defaults to HEAD with the uncommitted-code rule (D7b) | S1, S5 |
 | S7 | `canon context` commands/families; kind name `evidence` (Q6); capability version 6 | S1 |
 | S8 | Derived docs: website reference, skill/AGENTS blocks between markers, doc lint T14, "Removed in 0.28" table; skill text and README | S1, S6 |
-| S9 | Tests T1–T16, witness fixtures, conformance re-bless with review | all |
+| S9 | Tests T1–T17, witness fixtures, conformance re-bless with review | all |
 | R | README 0.28.0 with the Upgrading list, version, dogfood eval, release | all |
 
 Effort from coverage B7: ~24–27 engineer-days serial, ~8–9 calendar days fanned out. S3 is the bulk.
@@ -220,7 +235,7 @@ Effort from coverage B7: ~24–27 engineer-days serial, ~8–9 calendar days fan
 **Acceptance:**
 - the workspace passes;
 - canon's own gate is clean with new scenarios evidenced and independently reviewed;
-- T1–T16 green with empty allowlists except the documented witness list;
+- T1–T17 green with empty allowlists except the documented witness list;
 - a dogfood eval (omp, roles, `language: ko`) on a 0.26 baseline shows 0 wrong-shape calls and no more `--help`/`schema` probes per scenario than eval 12, and a canon 0.25-era hook and script set migrated by `canon migrate`.
 
 ## Owner decisions
