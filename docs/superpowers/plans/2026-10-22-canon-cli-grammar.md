@@ -138,10 +138,11 @@ An agent should not copy a sha it can ask git for (decided 2026-10-22).
 
 - Every option that names "the commit this record is about" becomes optional and defaults to `HEAD`: `review scenario|change`, `divergence add|defer|resolve`, `evidence add`, `evidence approval-payload`, `finding add` (the commit the round reviewed), and `finding close --disposition fixed` (the resolution commit). canon resolves it with `git rev-parse --verify <rev>^{commit}` and records the full sha.
 - Given explicitly, the value is any git revision (`HEAD~1`, a branch, a tag, a short sha), resolved the same way; today only `finding` resolves short shas.
-- **Uncommitted code:** when the default is used and tracked files outside `.canon/` differ from `HEAD`, `HEAD` is not what was reviewed or observed. `review`, `divergence` and `finding close --disposition fixed` refuse (`WORKTREE_DIRTY`, hint: commit first or pass `--rev`). `evidence add` and `finding add` record and mark the record `worktreeDirty: true`, since evidence is commonly recorded before the commit.
+- **Uncommitted code is recorded, never refused** (owner decision 2026-10-23: reviewing a working tree before the commit is normal). Every record that takes `--rev` also stores `codeTree`: the git tree id of the code the command saw, computed from the working tree with a temporary index (tracked and untracked files, gitignored files and `.canon/` excluded; `git write-tree`). It also stores `worktreeDirty: true|false`. When the default is used, `rev` is HEAD and `codeTree` is the working tree, so a record made before a commit names exactly the code it was about.
+- **A review survives its commit:** the commit made afterwards has the same code tree (computed the same way from the commit), so canon can tell that a review of an uncommitted working tree covers that commit, and that it does not once the code changed. Anything that compares a record to "current code" compares `codeTree`, not `rev`.
 - **No default** for the commit that introduced a finding: it must be sourced, never guessed.
 - **Names:** `--rev <REV>` for the commit a record is about (one name on every command above); `--resolution-rev <REV>` and `--introduced-rev <REV>` on `finding`. `--commit` is only the destructive-command switch (D6), which resolves the collision both reviews raised.
-- Outside a git work tree, or in a repo with no commits, a command that needs a commit and got none refuses (`NO_COMMIT`) with a hint.
+- Outside a git work tree, or in a repo with no commits, a command that needs a commit and got none refuses (`NO_COMMIT`) with a hint. A working tree with no commits yet still gets a `codeTree`.
 
 ### D8 Clean cutover
 
@@ -211,7 +212,7 @@ Open, recommended against: `learn`/`dispatch` as noun groups (`strategy` above c
 | T14 docs | Every command line in skill text, website docs, the AGENTS block, hints and `meta.next` parses against the spec. |
 | T15 mutation | Seeded violations (drop a META row, an option's help, add a `json!` print, a runnable group, a duplicate name) each fail the right test. |
 | T16 input | For every writing leaf, the spec's example `--input` document (inline, file and stdin) and the equivalent flags produce byte-identical records; an unknown key, `null`, a conflicting flag, a stdin conflict and an oversize document are refused; a batch with one invalid element writes nothing; a batch whose third write fails reports written/failed/skipped and a re-run reports the first two `unchanged`; a value starting with `-` survives. |
-| T17 commits | Every `--rev` default resolves HEAD; an explicit short sha, branch and `HEAD~1` resolve to full shas; uncommitted code outside `.canon/` refuses review/divergence/fixed-close and marks evidence/finding records; no git or no commits refuses `NO_COMMIT`. |
+| T17 commits | Every `--rev` default resolves HEAD; an explicit short sha, branch and `HEAD~1` resolve to full shas; `codeTree` is identical for a dirty working tree and for the commit made from it, differs after any code change, and ignores `.canon/` and gitignored files; a dirty tree records `worktreeDirty: true` and refuses nothing; no git refuses `NO_COMMIT`. |
 
 ## Slices
 
