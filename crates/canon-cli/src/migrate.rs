@@ -222,7 +222,7 @@ pub fn run(repo: &Path, dry_run: bool, json: bool) -> i32 {
         }
         log.line("canon migrate: --dry-run, nothing written");
         if json {
-            crate::json_out::data("migrate", serde_json::json!({ "dryRun": true, "steps": log.into_lines() }));
+            crate::json_out::data("migrate", &crate::json_out::untyped(serde_json::json!({ "dryRun": true, "steps": log.into_lines() })));
         }
         return 0;
     }
@@ -1095,14 +1095,14 @@ fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, json: bool) -> i32 
                 }
             }
             if json {
-                crate::json_out::data("migrate", serde_json::json!({ "dryRun": false, "steps": log.into_lines(), "indexRecordsWritten": outcome.total_written() }));
+                crate::json_out::data("migrate", &crate::json_out::untyped(serde_json::json!({ "dryRun": false, "steps": log.into_lines(), "indexRecordsWritten": outcome.total_written() })));
             }
             0
         }
         Ok(outcome) => {
             crate::say_raw!(json, "{}", crate::inventory::format_human(&outcome));
             CliError::failed("MIGRATE_INDEX_FAILED", "the files moved, but the scenario index rebuild found the problems; fix them, then run `canon inventory sync`").hint("run `canon inventory sync` and fix what it reports")
-                .emit_with_data("canon migrate", json, serde_json::json!({ "steps": log.into_lines(), "index": crate::inventory::format_json(&outcome) }))
+                .emit_with_data("canon migrate", json, &crate::json_out::untyped(serde_json::json!({ "steps": log.into_lines(), "index": crate::inventory::format_json(&outcome) })))
         }
         Err(e) => {
             CliError::refused("MIGRATE_INDEX_FAILED", format!("the files moved, but the scenario index was not rebuilt: {e}; run `canon inventory sync`")).hint("run `canon inventory sync` and fix what it reports").emit("canon migrate", json)

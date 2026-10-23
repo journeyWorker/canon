@@ -15,6 +15,7 @@
 use std::sync::OnceLock;
 
 use clap::ValueEnum;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::cli_error::CliError;
@@ -22,7 +23,7 @@ use crate::cli_error::CliError;
 /// The environment variable that declares the role.
 pub const ENV: &str = "CANON_ROLE";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, ValueEnum, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 #[value(rename_all = "lowercase")]
 pub enum Role {

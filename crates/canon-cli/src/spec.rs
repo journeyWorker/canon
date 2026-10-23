@@ -126,6 +126,7 @@ pub struct OptionSpec {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub short: Option<char>,
     pub aliases: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub value_name: Option<String>,
     pub required: bool,
     pub repeatable: bool,
@@ -307,7 +308,8 @@ fn option_spec(cmd: &Command, arg: &Arg, conflicts: &[(String, String)]) -> Opti
         required: arg.is_required_set(),
         repeatable: is_repeatable(arg),
         possible_values: arg.get_possible_values().iter().filter(|v| !v.is_hide_set()).map(|v| v.get_name().to_string()).collect(),
-        default: default_values(arg),
+        // A flag is off unless given; clap's `false` is not a default worth listing.
+        default: if kind == "value" { default_values(arg) } else { Vec::new() },
         help: arg.get_help().map(|h| h.to_string()),
         env: arg.get_env().map(|e| e.to_string_lossy().into_owned()),
         conflicts_with,
@@ -461,7 +463,7 @@ pub struct ErrorRow {
 
 /// Every registered error code, sorted by code.
 pub fn error_rows() -> Vec<ErrorRow> {
-    crate::cli_error::all_codes().iter().map(|(code, meaning)| ErrorRow { code, meaning, exit: 2, retryable: false }).collect()
+    crate::cli_error::all_codes().iter().map(|info| ErrorRow { code: info.code, meaning: info.meaning, exit: info.exit, retryable: info.retryable }).collect()
 }
 
 /// The record kinds and artifact families, linked to their JSON Schemas under
@@ -478,13 +480,31 @@ fn records() -> Value {
     json!({ "kinds": kinds, "families": families })
 }
 
+/// Gives an embedded JSON Schema its own base URI, so that its `#/$defs/…`
+/// references resolve inside it and not against the spec document.
+fn with_id(mut schema: Value, id: String) -> Value {
+    if let Some(object) = schema.as_object_mut() {
+        object.insert("$id".to_string(), Value::String(id));
+    }
+    schema
+}
+
 /// The JSON Schema of every report, keyed by report name.
 fn schemas() -> Value {
     let mut map = serde_json::Map::new();
     for report in crate::reports::report_schemas() {
-        map.insert(report.name, report.schema);
+        let id = format!("urn:canon:report:{}", report.name);
+        map.insert(report.name, with_id(report.schema, id));
     }
     Value::Object(map)
+}
+
+/// The success and failure envelope schemas, each with its own base URI.
+fn envelopes() -> Value {
+    match crate::reports::envelope_schemas() {
+        Value::Object(map) => Value::Object(map.into_iter().map(|(name, schema)| (name.clone(), with_id(schema, format!("urn:canon:envelope:{name}")))).collect()),
+        other => other,
+    }
 }
 
 /// The whole spec.
@@ -502,7 +522,7 @@ pub fn generate() -> Value {
         "globalOptions": global_options(&root),
         "envVars": ENV_VARS.iter().map(|v| json!({ "name": v.name, "about": v.about })).collect::<Vec<_>>(),
         "exitTable": EXIT_TABLE.iter().map(|(code, meaning)| json!({ "code": code, "meaning": meaning })).collect::<Vec<_>>(),
-        "envelopes": crate::reports::envelope_schemas(),
+        "envelopes": envelopes(),
         "errors": error_rows(),
         "commands": nodes(&root),
         "schemas": schemas(),

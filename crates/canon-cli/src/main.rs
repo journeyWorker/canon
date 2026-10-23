@@ -15,6 +15,7 @@ fn main() -> ExitCode {
         Err(error) => return usage_error(&error),
     };
     let parsed = matches.clone();
+    canon_cli::run::entry::record_context(&parsed);
     let cli = match Cli::from_arg_matches_mut(&mut matches) {
         Ok(cli) => cli,
         Err(error) => return usage_error(&error.format(&mut command.clone())),

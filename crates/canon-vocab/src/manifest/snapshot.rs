@@ -43,12 +43,13 @@
 
 use std::collections::BTreeMap;
 
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::manifest::schema::DirectiveDecl;
 use crate::manifest::types::Literal;
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CapabilitySnapshot {
     /// SHA-256 hex content hash over the vocabulary this snapshot resolved
@@ -69,7 +70,7 @@ pub struct CapabilitySnapshot {
     pub inactive: BTreeMap<String, String>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ResolvedPlugin {
     pub version: String,

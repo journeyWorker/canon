@@ -73,6 +73,7 @@ use canon_gate::GateContext;
 use canon_ingest::markdown::{field, without_field};
 use canon_model::{paths, ChangeId, ProjectId, ScenarioId, Subject, SubjectStatus, TaskId};
 use chrono::{DateTime, NaiveDate, Utc};
+use schemars::JsonSchema;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
@@ -156,7 +157,7 @@ pub fn approved_at(line: &str) -> Option<DateTime<Utc>> {
 /// `brief.md` (module doc). A fix stays inside the approved
 /// change, so a newer adopted change is a new scope, and an older
 /// change's approval does not cover it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BriefStatus {
     pub approved: bool,

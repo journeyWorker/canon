@@ -366,7 +366,7 @@ impl InitLog {
 
     fn finish(self, repo: &Path) -> i32 {
         if self.emit_data {
-            crate::next::finish(repo, "init", &crate::next::Scope::Repo, false, self.json, serde_json::json!({ "steps": self.steps }));
+            crate::next::finish(repo, "init", &crate::next::Scope::Repo, false, self.json, &crate::json_out::untyped(serde_json::json!({ "steps": self.steps })));
         }
         0
     }
@@ -833,11 +833,11 @@ pub fn run_check_config(repo: &Path, json: bool) -> i32 {
     let data = serde_json::json!({ "ok": all_ok, "sections": sections });
     if all_ok {
         if json {
-            crate::json_out::data("init", data);
+            crate::json_out::data("init", &crate::json_out::untyped(data));
         }
         0
     } else {
-        CliError::failed("CONFIG_UNREADABLE", "a present canon.yaml section fails its loader").hint("data.sections names each failing section").emit_with_data("canon init --check-config", json, data)
+        CliError::failed("CONFIG_UNREADABLE", "a present canon.yaml section fails its loader").hint("data.sections names each failing section").emit_with_data("canon init --check-config", json, &crate::json_out::untyped(data))
     }
 }
 

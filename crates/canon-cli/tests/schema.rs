@@ -69,7 +69,7 @@ fn exits_follow_each_commands_own_contract() {
 fn errors_lists_the_whole_registry() {
     let v = json(&["schema", "--errors", "--json"]);
     let listed: Vec<&str> = v["errors"].as_array().unwrap().iter().map(|e| e["code"].as_str().unwrap()).collect();
-    let registry: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|(c, _)| *c).collect();
+    let registry: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
     assert_eq!(listed, registry);
     assert!(v["errors"].as_array().unwrap().iter().all(|e| !e["meaning"].as_str().unwrap().is_empty()));
     let human = canon(&["schema", "--errors"]);

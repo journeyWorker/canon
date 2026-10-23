@@ -216,9 +216,8 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         &crate::next::Scope::Change(slug.as_str().to_string()),
         false,
         json,
-        serde_json::json!({ "changeId": slug.as_str(), "subjectId": subject_id.as_str(), "brief": brief }),
+        &crate::json_out::untyped(serde_json::json!({ "changeId": slug.as_str(), "subjectId": subject_id.as_str(), "brief": brief })),
         crate::json_out::warnings_meta(&warnings),
-        extra,
-    );
+        extra);
     0
 }

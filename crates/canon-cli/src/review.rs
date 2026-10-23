@@ -323,7 +323,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     if reviews.is_empty() {
         if args.json {
             let wrote: Vec<serde_json::Value> = unchanged.iter().map(|(scenario, existing)| serde_json::json!({ "location": existing.committed, "scenarioId": scenario, "unchanged": true })).collect();
-            crate::json_out::data_with_meta("review add", serde_json::json!({ "outcome": args.outcome.as_str(), "reviews": wrote, "blobsStored": 0 }), serde_json::json!({ "unchanged": true }));
+            crate::json_out::data_with_meta("review add", &crate::json_out::untyped(serde_json::json!({ "outcome": args.outcome.as_str(), "reviews": wrote, "blobsStored": 0 })), serde_json::json!({ "unchanged": true }));
         }
         return 0;
     }
@@ -361,7 +361,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         Some(change) => crate::next::Scope::Change(change.as_str().to_string()),
         None => crate::next::Scope::Scenarios(scenario_ids.iter().map(|id| id.as_str().to_string()).collect()),
     };
-    crate::next::finish(&repo, "review add", &scope, false, args.json, serde_json::json!({ "outcome": args.outcome.as_str(), "reviews": wrote, "blobsStored": stored }));
+    crate::next::finish(&repo, "review add", &scope, false, args.json, &crate::json_out::untyped(serde_json::json!({ "outcome": args.outcome.as_str(), "reviews": wrote, "blobsStored": stored })));
     0
 }
 

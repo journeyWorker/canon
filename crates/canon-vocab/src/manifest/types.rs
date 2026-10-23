@@ -34,6 +34,7 @@
 //! doc comment: "serde_yaml 0.9 serializes externally-tagged enums as YAML
 //! `!tags`, not the single-key maps the spec mandates").
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -49,7 +50,7 @@ pub enum Type {
     Evidence,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct AttrDecl {
     pub name: String,
     #[serde(default)]
@@ -64,7 +65,7 @@ pub struct AttrDecl {
 /// layer's types): the runtime shape [`type_accepts`] judges an authored
 /// YAML value against a declared [`Type`]. `Map` carries `evidence`'s
 /// `{kind, ref}` structure (and any other future record-shaped attr).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub enum Literal {
     Bool(bool),
@@ -127,7 +128,7 @@ pub fn type_accepts(ty: &Type, lit: &Literal) -> bool {
 
 // --- serde representation (verbatim technique from the donor manifest layer's types) ---
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 enum TypeDef {
     Bool,
@@ -165,6 +166,16 @@ impl From<&Type> for TypeDef {
             Type::Domain(s) => TypeDef::Domain(s.clone()),
             Type::Evidence => TypeDef::Evidence,
         }
+    }
+}
+
+impl schemars::JsonSchema for Type {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Type".into()
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        TypeDef::json_schema(generator)
     }
 }
 

@@ -16,7 +16,7 @@ fn run_prompt_add(args: PromptAddArgs) -> ExitCode {
     match crate::context_pack::register_prompt_bundle_from_manifest(&repo, &name, &version, &manifest) {
         Ok(bundle) => {
             if json {
-                crate::json_out::data("prompt add", serde_json::to_value(&bundle).expect("prompt bundle is serializable"));
+                crate::json_out::data("prompt add", &crate::json_out::untyped(serde_json::to_value(&bundle).expect("prompt bundle is serializable")));
             } else {
                 println!("prompt bundle {}@{} registered ({})", bundle.name, bundle.version, bundle.digest);
             }

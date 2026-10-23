@@ -125,6 +125,41 @@ fn an_option_says_what_it_conflicts_with_and_requires() {
     assert_eq!(option("feature new", "actor-id")["env"], "CANON_ACTOR");
 }
 
+/// An embedded schema is a document of its own: it names its base URI and its
+/// internal references resolve against it, so a consumer can validate with it.
+#[test]
+fn every_embedded_schema_is_a_self_contained_json_schema() {
+    let doc = spec::generate();
+    let mut checked = 0;
+    for group in ["schemas", "envelopes"] {
+        for (name, schema) in doc[group].as_object().unwrap_or_else(|| panic!("`{group}` is an object")) {
+            let id = schema["$id"].as_str().unwrap_or_else(|| panic!("{group}.{name} has no $id"));
+            assert!(id.starts_with("urn:canon:"), "{group}.{name}: {id}");
+            jsonschema::validator_for(schema).unwrap_or_else(|e| panic!("{group}.{name} is not a usable JSON Schema: {e}"));
+            checked += 1;
+        }
+    }
+    assert!(checked >= 2, "{checked} schemas");
+}
+
+#[test]
+fn an_output_that_names_a_schema_points_at_one() {
+    let doc = spec::generate();
+    for node in doc["commands"].as_array().expect("commands") {
+        for output in node["outputs"].as_array().into_iter().flatten() {
+            let report = output["report"].as_str().expect("report name");
+            match output["schemaRef"].as_str() {
+                Some(reference) => {
+                    assert_eq!(reference, format!("#/schemas/{report}"));
+                    assert!(doc["schemas"].get(report).is_some(), "`{}`: {reference} names no schema", node["command"]);
+                    assert!(output["schemaVersion"].is_string(), "`{}`: a schema without a version", node["command"]);
+                }
+                None => assert!(doc["schemas"].get(report).is_none(), "`{}`: the schema of {report} exists but the output does not point at it", node["command"]),
+            }
+        }
+    }
+}
+
 #[test]
 fn the_spec_carries_what_d2_promises() {
     let doc = spec::generate();
@@ -139,7 +174,7 @@ fn the_spec_carries_what_d2_promises() {
     assert!(doc["globalOptions"].as_array().expect("globalOptions").iter().any(|o| o["name"] == "as"));
     let codes: Vec<u64> = doc["exitTable"].as_array().expect("exitTable").iter().map(|e| e["code"].as_u64().expect("a code")).collect();
     assert_eq!(codes, [0, 1, 2]);
-    let registry: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|(code, _)| *code).collect();
+    let registry: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
     let listed: Vec<&str> = doc["errors"].as_array().expect("errors").iter().map(|e| e["code"].as_str().expect("code")).collect();
     assert_eq!(listed, registry);
     for error in doc["errors"].as_array().expect("errors") {

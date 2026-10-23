@@ -77,24 +77,21 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output authorization result as JSON",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
         {
           "kind": "report",
           "report": "AdapterAuthorizeReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/AdapterAuthorizeReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -164,24 +161,21 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output the normalized core summary as JSON",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
         {
           "kind": "report",
           "report": "AdapterValidateReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/AdapterValidateReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -255,16 +249,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Preview what would be uploaded and removed, without writing anything",
           "kind": "flag",
           "name": "dry-run",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -281,16 +272,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -348,16 +336,13 @@
       "options": [
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Download every blob and re-hash it, instead of trusting the store's size and digest metadata",
           "kind": "flag",
           "name": "full",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -374,16 +359,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -511,16 +493,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -605,24 +584,21 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
         {
           "kind": "report",
           "report": "BriefCheckReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/BriefCheckReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -702,24 +678,21 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
         {
           "kind": "report",
           "report": "BriefShowReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/BriefShowReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -848,16 +821,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -924,16 +894,13 @@
       "options": [
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -941,8 +908,8 @@
           "kind": "artifact",
           "mediaType": "text/x-shellscript",
           "report": "CompletionReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/CompletionReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -995,16 +962,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -1022,8 +986,8 @@
         {
           "kind": "report",
           "report": "ContextReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/ContextReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -1122,16 +1086,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output the complete pack manifest as JSON",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -1223,16 +1184,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output the complete pack manifest as JSON",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -1324,16 +1282,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output a JSON verification result",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -1438,16 +1393,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Print one JSON document naming the address it serves (`data.url`), then serve until stopped; the human lines go to stderr",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -1526,16 +1478,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -1600,16 +1549,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -1828,16 +1774,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -1901,16 +1844,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -2016,16 +1956,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -2214,16 +2151,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -2417,32 +2351,26 @@
           "conflictsWith": [
             "--no-promote"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Promote the record this run staged, in the same run; records others staged stay staged (the default under canon.yaml `write: { promote: auto }`)",
           "kind": "flag",
           "name": "promote",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
           "conflictsWith": [
             "--promote"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Keep this write staged even under canon.yaml `write: { promote: auto }`",
           "kind": "flag",
           "name": "no-promote",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -2459,16 +2387,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -2647,16 +2572,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -2731,29 +2653,23 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Preview without writing anything",
           "kind": "flag",
           "name": "dry-run",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -2923,16 +2839,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -3014,16 +2927,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Print `{data, meta}` as JSON",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -3055,16 +2965,13 @@
           "conflictsWith": [
             "--limit"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Return every record from the cursor on, not one page",
           "kind": "flag",
           "name": "all",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -3405,16 +3312,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "One record per indexed scenario of --project-id that owns a case in the --report(s), all or nothing (see below)",
           "kind": "flag",
           "name": "all-scenarios",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -3489,32 +3393,26 @@
           "conflictsWith": [
             "--no-promote"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Promote the record this run staged, in the same run; records others staged stay staged (the default under canon.yaml `write: { promote: auto }`)",
           "kind": "flag",
           "name": "promote",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
           "conflictsWith": [
             "--promote"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Keep this write staged even under canon.yaml `write: { promote: auto }`",
           "kind": "flag",
           "name": "no-promote",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -3531,16 +3429,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -3700,16 +3595,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -3792,16 +3684,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -3933,29 +3822,23 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": null,
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": null,
           "kind": "flag",
           "name": "include-sensitive",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -3987,16 +3870,13 @@
           "conflictsWith": [
             "--limit"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Return every record from the cursor on, not one page",
           "kind": "flag",
           "name": "all",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -4139,16 +4019,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -4409,32 +4286,26 @@
           "conflictsWith": [
             "--no-promote"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Promote the record this run staged, in the same run; records others staged stay staged (the default under canon.yaml `write: { promote: auto }`)",
           "kind": "flag",
           "name": "promote",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
           "conflictsWith": [
             "--promote"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Keep this write staged even under canon.yaml `write: { promote: auto }`",
           "kind": "flag",
           "name": "no-promote",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -4451,16 +4322,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -4634,32 +4502,26 @@
           "conflictsWith": [
             "--no-promote"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Promote the record this run staged, in the same run; records others staged stay staged (the default under canon.yaml `write: { promote: auto }`)",
           "kind": "flag",
           "name": "promote",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
           "conflictsWith": [
             "--promote"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Keep this write staged even under canon.yaml `write: { promote: auto }`",
           "kind": "flag",
           "name": "no-promote",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -4676,16 +4538,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -4751,29 +4610,23 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Only findings whose current disposition is open",
           "kind": "flag",
           "name": "open",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Print `{change_id, findings: [...], meta}` as JSON",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -4818,16 +4671,13 @@
           "conflictsWith": [
             "--limit"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Return every record from the cursor on, not one page",
           "kind": "flag",
           "name": "all",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -4913,16 +4763,13 @@
       "options": [
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Validate and report violations (the default; kept for compatibility)",
           "kind": "flag",
           "name": "check",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -4937,16 +4784,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -5036,29 +4880,23 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Additionally engage the release-scoped trust check",
           "kind": "flag",
           "name": "release",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -5181,16 +5019,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -5261,29 +5096,23 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Preview without writing anything",
           "kind": "flag",
           "name": "dry-run",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -5334,24 +5163,21 @@
       "options": [
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
         {
           "kind": "report",
           "report": "SelftestReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/SelftestReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -5436,16 +5262,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -5517,16 +5340,13 @@
       "options": [
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Keep polling instead of exiting after one pass",
           "kind": "flag",
           "name": "watch",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -5556,16 +5376,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -5669,16 +5486,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -5734,16 +5548,13 @@
       "options": [
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Keep polling instead of exiting after one pass",
           "kind": "flag",
           "name": "watch",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -5784,42 +5595,33 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Ignore watermark cursors and re-parse every in-scope file",
           "kind": "flag",
           "name": "full",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Scan every workspace on this machine, not just this project",
           "kind": "flag",
           "name": "all-workspaces",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -5898,32 +5700,26 @@
             "--policy",
             "--providers"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Validate an existing canon.yaml instead of writing one",
           "kind": "flag",
           "name": "check-config",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
           "conflictsWith": [
             "--check-config"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Do not write or refresh the canon block in AGENTS.md",
           "kind": "flag",
           "name": "no-agents-md",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -5950,16 +5746,13 @@
             "--check-config",
             "--policy"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Do not write the starter .canon/policy.yaml",
           "kind": "flag",
           "name": "no-policy",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -5991,16 +5784,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -6094,16 +5884,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -6228,16 +6015,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": null,
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -6359,29 +6143,23 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Preview without writing anything",
           "kind": "flag",
           "name": "dry-run",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -6524,16 +6302,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -6605,16 +6380,13 @@
       "options": [
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Report what would move and write nothing",
           "kind": "flag",
           "name": "dry-run",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -6631,16 +6403,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -6715,29 +6484,23 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Print the plan and write nothing",
           "kind": "flag",
           "name": "dry-run",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -6844,16 +6607,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -6955,16 +6715,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -7030,16 +6787,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -7165,16 +6919,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output the complete bundle manifest as JSON",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -7274,16 +7025,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output the complete bundle manifest as JSON",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -7395,16 +7143,13 @@
           "conflictsWith": [
             "--confirm"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Print the removal set and its `planDigest`; delete nothing",
           "kind": "flag",
           "name": "plan",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -7422,16 +7167,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": null,
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -7551,16 +7293,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -7581,16 +7320,13 @@
           "conflictsWith": [
             "--plugin"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Every version of the kind, the ledger's and the archive's, oldest first, instead of the current records",
           "kind": "flag",
           "name": "history",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -7627,16 +7363,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Permit sensitive query output only when policy explicitly allows it",
           "kind": "flag",
           "name": "include-sensitive",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -7668,16 +7401,13 @@
           "conflictsWith": [
             "--limit"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Return every record from the cursor on, not one page",
           "kind": "flag",
           "name": "all",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -7789,16 +7519,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -7870,16 +7597,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Byte-diff against .canon/REPORT.md (0 clean, 1 drift); --snapshot wins if both given",
           "kind": "flag",
           "name": "check",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -7894,16 +7618,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -8026,16 +7747,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -8330,16 +8048,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -8595,16 +8310,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -8673,45 +8385,36 @@
       "options": [
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
           "conflictsWith": [
             "path"
           ],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Print every error code any command can emit, with its meaning, instead of a command",
           "kind": "flag",
           "name": "errors",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "List every command instead of only the declared role's",
           "kind": "flag",
           "name": "all",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -8764,24 +8467,21 @@
       "options": [
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
         {
           "kind": "report",
           "report": "SelftestReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/SelftestReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -8878,16 +8578,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -8977,16 +8674,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -9077,16 +8771,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -9155,16 +8846,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -9182,8 +8870,8 @@
         {
           "kind": "report",
           "report": "StatusReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/StatusReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -9284,16 +8972,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -9438,16 +9123,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -9593,16 +9275,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -9694,16 +9373,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -9774,16 +9450,13 @@
       "options": [
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Preview without writing anything",
           "kind": "flag",
           "name": "dry-run",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         },
         {
           "aliases": [],
@@ -9811,16 +9484,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "false"
-          ],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
-          "valueName": null
+          "required": false
         }
       ],
       "outputs": [
@@ -9884,17 +9554,445 @@
       "name": "CANON_SKILLS_SOURCE"
     }
   ],
-  "envelopes": {},
+  "envelopes": {
+    "failure": {
+      "$defs": {
+        "Context": {
+          "description": "`meta.context`: what canon resolved about where and as whom it ran.",
+          "properties": {
+            "actor": {
+              "description": "The declared actor (`CANON_ACTOR`); `null` when none.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "repo": {
+              "description": "The repo root canon worked in, as a path relative to the current directory (`.` for it).",
+              "type": "string"
+            },
+            "role": {
+              "description": "The declared role (`--as` or `CANON_ROLE`); `null` when none.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "role",
+            "actor",
+            "repo"
+          ],
+          "type": "object"
+        },
+        "ErrorBody": {
+          "description": "The `error` member of a failure envelope. Field order is the document\norder: `code` first.",
+          "properties": {
+            "code": {
+              "description": "Stable SCREAMING_SNAKE code, listed by `canon schema --errors`.",
+              "type": "string"
+            },
+            "expected": {
+              "description": "The valid values of `field`, when it takes a closed set.",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "field": {
+              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "description": "A working invocation or the next step; `null` when there is none.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "received": {
+              "description": "The value that was refused, with secrets redacted.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "retryable": {
+              "description": "True only where running the same command again can succeed.",
+              "type": "boolean"
+            },
+            "suggestions": {
+              "description": "The nearest valid commands, options or values (a destructive command only within edit distance 1).",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "code",
+            "message",
+            "suggestions",
+            "hint",
+            "retryable"
+          ],
+          "type": "object"
+        },
+        "Meta": {
+          "additionalProperties": true,
+          "description": "The `meta` member of every envelope.",
+          "properties": {
+            "canonVersion": {
+              "type": "string"
+            },
+            "command": {
+              "description": "The command's schema id (`gate check`); flags never change it.",
+              "type": "string"
+            },
+            "context": {
+              "$ref": "#/$defs/Context"
+            },
+            "next": {
+              "description": "The steps that follow, most useful first; present on a command that writes.",
+              "items": {
+                "$ref": "#/$defs/NextEntry"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "nextOmitted": {
+              "description": "How many further steps were left out past the limit.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "schemaVersion": {
+              "description": "`\"<major>.<minor>\"` of the report in `data` (`\"1.0\"` in 0.28).",
+              "type": "string"
+            },
+            "waitingOn": {
+              "additionalProperties": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "With a declared role: how many steps each other owner holds.",
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "warnings": {
+              "description": "Conditions that make the result weaker than it looks.",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "command",
+            "schemaVersion",
+            "canonVersion",
+            "context"
+          ],
+          "type": "object"
+        },
+        "NextEntry": {
+          "description": "One `meta.next` entry: a step with its command split for a caller that\nruns it without a shell.",
+          "properties": {
+            "actor": {
+              "$ref": "#/$defs/StepActor"
+            },
+            "argv": {
+              "description": "`command` split into its words (`[\"canon\", \"gate\", \"check\"]`); empty when `command` is not a canon command line.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "command": {
+              "description": "A canon command line when `actor` is `agent`; what to get from the human when it is `human`.",
+              "type": "string"
+            },
+            "role": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Role"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Who in the role set carries the step out; `null` for a step only the human takes."
+            },
+            "why": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "command",
+            "argv",
+            "why",
+            "actor",
+            "role"
+          ],
+          "type": "object"
+        },
+        "Role": {
+          "enum": [
+            "planner",
+            "implementer",
+            "reviewer",
+            "orchestrator"
+          ],
+          "type": "string"
+        },
+        "StepActor": {
+          "description": "Who carries out a `next` step (0.16 D1). The only `human` step is\ngetting a brief approved.",
+          "enum": [
+            "agent",
+            "human"
+          ],
+          "type": "string"
+        }
+      },
+      "$id": "urn:canon:envelope:failure",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`{ok: false, error, meta}` plus `data` when the command keeps a partial report on exit 1.",
+      "properties": {
+        "data": {
+          "description": "The partial report (gate violations, a blocked task, a refused promotion)."
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorBody"
+        },
+        "meta": {
+          "$ref": "#/$defs/Meta"
+        },
+        "ok": {
+          "const": false,
+          "description": "false: the command failed; see `error`"
+        }
+      },
+      "required": [
+        "ok",
+        "error",
+        "meta"
+      ],
+      "title": "FailureEnvelope",
+      "type": "object"
+    },
+    "success": {
+      "$defs": {
+        "Context": {
+          "description": "`meta.context`: what canon resolved about where and as whom it ran.",
+          "properties": {
+            "actor": {
+              "description": "The declared actor (`CANON_ACTOR`); `null` when none.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "repo": {
+              "description": "The repo root canon worked in, as a path relative to the current directory (`.` for it).",
+              "type": "string"
+            },
+            "role": {
+              "description": "The declared role (`--as` or `CANON_ROLE`); `null` when none.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "role",
+            "actor",
+            "repo"
+          ],
+          "type": "object"
+        },
+        "Meta": {
+          "additionalProperties": true,
+          "description": "The `meta` member of every envelope.",
+          "properties": {
+            "canonVersion": {
+              "type": "string"
+            },
+            "command": {
+              "description": "The command's schema id (`gate check`); flags never change it.",
+              "type": "string"
+            },
+            "context": {
+              "$ref": "#/$defs/Context"
+            },
+            "next": {
+              "description": "The steps that follow, most useful first; present on a command that writes.",
+              "items": {
+                "$ref": "#/$defs/NextEntry"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "nextOmitted": {
+              "description": "How many further steps were left out past the limit.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "schemaVersion": {
+              "description": "`\"<major>.<minor>\"` of the report in `data` (`\"1.0\"` in 0.28).",
+              "type": "string"
+            },
+            "waitingOn": {
+              "additionalProperties": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "With a declared role: how many steps each other owner holds.",
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "warnings": {
+              "description": "Conditions that make the result weaker than it looks.",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "command",
+            "schemaVersion",
+            "canonVersion",
+            "context"
+          ],
+          "type": "object"
+        },
+        "NextEntry": {
+          "description": "One `meta.next` entry: a step with its command split for a caller that\nruns it without a shell.",
+          "properties": {
+            "actor": {
+              "$ref": "#/$defs/StepActor"
+            },
+            "argv": {
+              "description": "`command` split into its words (`[\"canon\", \"gate\", \"check\"]`); empty when `command` is not a canon command line.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "command": {
+              "description": "A canon command line when `actor` is `agent`; what to get from the human when it is `human`.",
+              "type": "string"
+            },
+            "role": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Role"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Who in the role set carries the step out; `null` for a step only the human takes."
+            },
+            "why": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "command",
+            "argv",
+            "why",
+            "actor",
+            "role"
+          ],
+          "type": "object"
+        },
+        "Role": {
+          "enum": [
+            "planner",
+            "implementer",
+            "reviewer",
+            "orchestrator"
+          ],
+          "type": "string"
+        },
+        "StepActor": {
+          "description": "Who carries out a `next` step (0.16 D1). The only `human` step is\ngetting a brief approved.",
+          "enum": [
+            "agent",
+            "human"
+          ],
+          "type": "string"
+        }
+      },
+      "$id": "urn:canon:envelope:success",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`{ok: true, data, meta}`.",
+      "properties": {
+        "data": {
+          "description": "The command's report, named by `meta.command` in the spec's `outputs`. A ledger record inside it keeps the record's own schema (camelCase is the report's, not the record's)."
+        },
+        "meta": {
+          "$ref": "#/$defs/Meta"
+        },
+        "ok": {
+          "const": true,
+          "description": "true: the command succeeded"
+        }
+      },
+      "required": [
+        "ok",
+        "data",
+        "meta"
+      ],
+      "title": "SuccessEnvelope",
+      "type": "object"
+    }
+  },
   "errors": [
     {
       "code": "ADAPTER_EXECUTION_NOT_AUTHORIZED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the adapter response did not authorize execution",
       "retryable": false
     },
     {
       "code": "ADAPTER_REFUSED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "an adapter response was malformed or refused",
       "retryable": false
     },
@@ -9914,17 +10012,17 @@
       "code": "ARTIFACTS_STORE_UNREACHABLE",
       "exit": 2,
       "meaning": "the artifact store tier cannot be attached or reached, so no blob can be verified or uploaded",
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "ARTIFACTS_VERIFY_FAILED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "a bound file is missing from the artifact store or altered; data.problems names each",
       "retryable": false
     },
     {
       "code": "BRIEF_CHANGED_SINCE_APPROVAL",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the brief was edited after the human approved it, so it reads as not approved until approved again",
       "retryable": false
     },
@@ -9936,7 +10034,7 @@
     },
     {
       "code": "BRIEF_HAS_BLOCKERS",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the brief has blocker findings, so it cannot be approved yet",
       "retryable": false
     },
@@ -9954,7 +10052,7 @@
     },
     {
       "code": "BRIEF_UNAPPROVED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "an attestation was refused because the subject's brief has no human approval",
       "retryable": false
     },
@@ -9966,7 +10064,7 @@
     },
     {
       "code": "BRIEF_WRITE_FAILED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the brief file could not be written",
       "retryable": false
     },
@@ -10008,7 +10106,7 @@
     },
     {
       "code": "CONTEXT_GIT_UNAVAILABLE",
-      "exit": 2,
+      "exit": 1,
       "meaning": "a context pack needs a git identity that is not available",
       "retryable": false
     },
@@ -10026,7 +10124,7 @@
     },
     {
       "code": "CONTEXT_OBJECT_CONFLICT",
-      "exit": 2,
+      "exit": 1,
       "meaning": "an immutable context object already holds different bytes",
       "retryable": false
     },
@@ -10038,7 +10136,7 @@
     },
     {
       "code": "CONTEXT_PACK_TAMPERED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "a context pack is stale or was changed after it was created",
       "retryable": false
     },
@@ -10068,13 +10166,13 @@
     },
     {
       "code": "DASHBOARD_FAILED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the dashboard could not start for a reason that is not one of the other DASHBOARD_ codes (an I/O failure)",
       "retryable": false
     },
     {
       "code": "DASHBOARD_NOT_BUILT",
-      "exit": 2,
+      "exit": 1,
       "meaning": "this canon binary embeds no dashboard app and the repo holds no build of canon's own",
       "retryable": false
     },
@@ -10086,9 +10184,9 @@
     },
     {
       "code": "DASHBOARD_PORT_IN_USE",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the dashboard's port is already bound by another process",
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "DEMO_NOT_INITIALIZED",
@@ -10104,9 +10202,9 @@
     },
     {
       "code": "DISPATCH_END_IN_PROGRESS",
-      "exit": 2,
+      "exit": 1,
       "meaning": "another process is closing the run; retry",
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "DISPATCH_INVALID_ARGUMENT",
@@ -10158,7 +10256,7 @@
     },
     {
       "code": "DIVERGENCE_REFUSED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "a divergence candidate was refused by a gate rule",
       "retryable": false
     },
@@ -10182,13 +10280,13 @@
     },
     {
       "code": "EVIDENCE_CONTRACT_MISMATCH",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the record's kind and ref differ from the task's typed evidence contract",
       "retryable": false
     },
     {
       "code": "EVIDENCE_FABRICATED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the note carries a fabrication marker or an unsupported verified claim",
       "retryable": false
     },
@@ -10206,7 +10304,7 @@
     },
     {
       "code": "EVIDENCE_REPORT_CONTRADICTION",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the bound report contradicts the verdict",
       "retryable": false
     },
@@ -10214,7 +10312,7 @@
       "code": "EVIDENCE_STORE_FAILED",
       "exit": 2,
       "meaning": "a bound file could not be stored in the artifact store",
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "EVIDENCE_VAULT_FAILED",
@@ -10290,19 +10388,19 @@
     },
     {
       "code": "FORMAT_VIOLATIONS",
-      "exit": 2,
+      "exit": 1,
       "meaning": "`format` found spec-corpus violations; data.violations names each",
       "retryable": false
     },
     {
       "code": "GATE_TASK_BLOCKED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "`gate task` refused to flip the task: its evidence does not support it",
       "retryable": false
     },
     {
       "code": "GATE_TASK_EVIDENCE_INVALID",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the evidence or typed atom for the task is invalid",
       "retryable": false
     },
@@ -10320,7 +10418,7 @@
     },
     {
       "code": "GATE_VIOLATIONS",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the evidence gate found violations; data.violations names each",
       "retryable": false
     },
@@ -10332,13 +10430,13 @@
     },
     {
       "code": "INGEST_FAILED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "an ingest command failed",
       "retryable": false
     },
     {
       "code": "INGEST_SOURCE_UNUSABLE",
-      "exit": 2,
+      "exit": 1,
       "meaning": "an `ingest plans` source was malformed and persisted nothing; check its root",
       "retryable": false
     },
@@ -10374,7 +10472,7 @@
     },
     {
       "code": "INVENTORY_ABORTED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "`inventory sync` aborted a spec root on violations or duplicate scenarios; data.roots names each",
       "retryable": false
     },
@@ -10392,13 +10490,13 @@
     },
     {
       "code": "LEARN_DEMOTION_FAILED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "promotion is blocked and the demotion a contradicting trajectory triggered also failed; the strategy is still active",
       "retryable": false
     },
     {
       "code": "LEARN_EVALUATION_REJECTED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the promotion evaluation does not fit the candidate strategy",
       "retryable": false
     },
@@ -10416,19 +10514,19 @@
     },
     {
       "code": "LEARN_PROMOTION_BLOCKED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the promotion gate blocks this strategy",
       "retryable": false
     },
     {
       "code": "LEARN_PROMOTION_FAILED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the strategy could not be promoted",
       "retryable": false
     },
     {
       "code": "LEARN_ROLLBACK_FAILED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the strategy could not be rolled back",
       "retryable": false
     },
@@ -10458,13 +10556,13 @@
     },
     {
       "code": "LEDGER_COMPACT_FAILED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "a superseded version could not be moved to the archive; what moved stays moved",
       "retryable": false
     },
     {
       "code": "MIGRATE_INDEX_FAILED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "files moved but the scenario index was not rebuilt; run `canon inventory sync`",
       "retryable": false
     },
@@ -10518,7 +10616,7 @@
     },
     {
       "code": "PLUGIN_SYNC_ERRORS",
-      "exit": 2,
+      "exit": 1,
       "meaning": "`plugin sync` could not write some candidates; data.roots names each error",
       "retryable": false
     },
@@ -10542,19 +10640,19 @@
     },
     {
       "code": "POLICY_CHANGED_SINCE_APPROVAL",
-      "exit": 2,
+      "exit": 1,
       "meaning": "`.canon/policy.yaml` differs from the bytes a human approved; shipping or reopening a subject refuses until it is re-approved or restored, and `--override-reason` does not waive it",
       "retryable": false
     },
     {
       "code": "PROMOTE_FAILED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "a staged record was written but promoting it to the ledger failed",
       "retryable": false
     },
     {
       "code": "PROMOTE_REFUSED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "`gate promote` refused one or more staged records; data.refused names each",
       "retryable": false
     },
@@ -10572,7 +10670,7 @@
     },
     {
       "code": "QUERY_FAILED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the query could not read the ledger",
       "retryable": false
     },
@@ -10590,13 +10688,13 @@
     },
     {
       "code": "REPORT_FAILED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the report could not be built or checked",
       "retryable": false
     },
     {
       "code": "REPORT_STALE",
-      "exit": 2,
+      "exit": 1,
       "meaning": "`report --check` found the report missing or out of date",
       "retryable": false
     },
@@ -10656,25 +10754,25 @@
     },
     {
       "code": "SELFTEST_FAILED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "a selftest suite or fixture did not match its expected result",
       "retryable": false
     },
     {
       "code": "SERIALIZE_FAILED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the result could not be serialized",
       "retryable": false
     },
     {
       "code": "SKILLS_DRIFT",
-      "exit": 2,
+      "exit": 1,
       "meaning": "`skills check` found an installed skill missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version",
       "retryable": false
     },
     {
       "code": "SKILLS_FAILED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "a skills command failed",
       "retryable": false
     },
@@ -10704,7 +10802,7 @@
     },
     {
       "code": "SUBJECT_GATE_VIOLATION",
-      "exit": 2,
+      "exit": 1,
       "meaning": "the status transition is blocked by gate violations",
       "retryable": false
     },
@@ -10752,7 +10850,7 @@
     },
     {
       "code": "TIER_FAILED",
-      "exit": 2,
+      "exit": 1,
       "meaning": "tier aging failed",
       "retryable": false
     },
@@ -10965,6 +11063,2017 @@
       }
     ]
   },
-  "schemas": {},
+  "schemas": {
+    "AdapterAuthorizeReport": {
+      "$defs": {
+        "AdapterCapabilities": {
+          "additionalProperties": false,
+          "description": "Declared provider capabilities. These are records, not enforcement.",
+          "properties": {
+            "filesystem": {
+              "$ref": "#/$defs/FilesystemCapability"
+            },
+            "network": {
+              "$ref": "#/$defs/NetworkCapability"
+            },
+            "secrets": {
+              "$ref": "#/$defs/SecretsCapability"
+            }
+          },
+          "required": [
+            "filesystem",
+            "network",
+            "secrets"
+          ],
+          "type": "object"
+        },
+        "FilesystemCapability": {
+          "enum": [
+            "read-only",
+            "workspace-write",
+            "none"
+          ],
+          "type": "string"
+        },
+        "NetworkCapability": {
+          "enum": [
+            "none",
+            "allowlisted",
+            "full"
+          ],
+          "type": "string"
+        },
+        "SecretsCapability": {
+          "enum": [
+            "none",
+            "brokered",
+            "direct"
+          ],
+          "type": "string"
+        }
+      },
+      "$id": "urn:canon:report:AdapterAuthorizeReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "capabilities": {
+          "$ref": "#/$defs/AdapterCapabilities"
+        },
+        "executionAuthorized": {
+          "type": "boolean"
+        },
+        "executionPerformed": {
+          "type": "boolean"
+        },
+        "reasons": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sandboxEnforced": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "executionAuthorized",
+        "executionPerformed",
+        "sandboxEnforced",
+        "reasons",
+        "capabilities"
+      ],
+      "title": "AuthorizationResult",
+      "type": "object"
+    },
+    "AdapterValidateReport": {
+      "$defs": {
+        "AdapterCapabilities": {
+          "additionalProperties": false,
+          "description": "Declared provider capabilities. These are records, not enforcement.",
+          "properties": {
+            "filesystem": {
+              "$ref": "#/$defs/FilesystemCapability"
+            },
+            "network": {
+              "$ref": "#/$defs/NetworkCapability"
+            },
+            "secrets": {
+              "$ref": "#/$defs/SecretsCapability"
+            }
+          },
+          "required": [
+            "filesystem",
+            "network",
+            "secrets"
+          ],
+          "type": "object"
+        },
+        "AdapterStatus": {
+          "description": "A response's terminal state.",
+          "enum": [
+            "succeeded",
+            "failed",
+            "aborted"
+          ],
+          "type": "string"
+        },
+        "FilesystemCapability": {
+          "enum": [
+            "read-only",
+            "workspace-write",
+            "none"
+          ],
+          "type": "string"
+        },
+        "NetworkCapability": {
+          "enum": [
+            "none",
+            "allowlisted",
+            "full"
+          ],
+          "type": "string"
+        },
+        "SecretsCapability": {
+          "enum": [
+            "none",
+            "brokered",
+            "direct"
+          ],
+          "type": "string"
+        },
+        "TelemetrySummary": {
+          "description": "[`AdapterTelemetry`] as the report states it (camelCase keys; the response itself is snake_case).",
+          "properties": {
+            "costUsd": {
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "endedAt": {
+              "type": "string"
+            },
+            "retries": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "startedAt": {
+              "type": "string"
+            },
+            "tokens": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "toolCalls": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "startedAt",
+            "endedAt",
+            "toolCalls",
+            "retries",
+            "tokens",
+            "costUsd"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:AdapterValidateReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "A redacted, normalized summary safe for CLI output. Extension payloads are\nintentionally absent; only their sorted key names are exposed.",
+      "properties": {
+        "capabilities": {
+          "$ref": "#/$defs/AdapterCapabilities"
+        },
+        "contextJoinVerified": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "contextPackId": {
+          "type": "string"
+        },
+        "evidenceCount": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "extensionKeys": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "model": {
+          "type": "string"
+        },
+        "protocolVersion": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/AdapterStatus"
+        },
+        "telemetry": {
+          "$ref": "#/$defs/TelemetrySummary"
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "runId",
+        "provider",
+        "model",
+        "contextPackId",
+        "status",
+        "capabilities",
+        "evidenceCount",
+        "telemetry",
+        "extensionKeys",
+        "contextJoinVerified"
+      ],
+      "title": "ValidationSummary",
+      "type": "object"
+    },
+    "BriefCheckReport": {
+      "$defs": {
+        "Counts": {
+          "description": "The finding counts `canon status` shows.",
+          "properties": {
+            "advisories": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "blockers": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "blockers",
+            "advisories"
+          ],
+          "type": "object"
+        },
+        "Finding": {
+          "description": "One finding.",
+          "properties": {
+            "excerpt": {
+              "type": "string"
+            },
+            "hint": {
+              "type": "string"
+            },
+            "line": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "matched": {
+              "description": "The phrase, date, path or value the rule matched, as its own field so\n`match=` never depends on the 80-character excerpt or the hint's wording.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "rule": {
+              "type": "string"
+            },
+            "section": {
+              "description": "The section key the finding is in; `None` for a whole-brief finding.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "severity": {
+              "$ref": "#/$defs/Severity"
+            }
+          },
+          "required": [
+            "rule",
+            "severity",
+            "section",
+            "line",
+            "excerpt",
+            "hint"
+          ],
+          "type": "object"
+        },
+        "Phase": {
+          "description": "The phase the flow-coverage rules need.",
+          "oneOf": [
+            {
+              "const": "shaping",
+              "description": "The brief is not approved yet, or no adopting subject is\n`building` yet: its scenarios are not due.",
+              "type": "string"
+            },
+            {
+              "const": "building",
+              "description": "The brief carries an approval and an adopting subject is\n`building`, `verifying` or `shipped`.",
+              "type": "string"
+            },
+            {
+              "const": "unknown",
+              "description": "The ledger could not be read, so the phase is not known and the\ncoverage rules are skipped.",
+              "type": "string"
+            }
+          ]
+        },
+        "Severity": {
+          "description": "A finding's severity.",
+          "enum": [
+            "blocker",
+            "advisory"
+          ],
+          "type": "string"
+        },
+        "Waiver": {
+          "description": "One waiver comment, with the severity of the rule it waives and\nwhether it matched a finding.",
+          "properties": {
+            "applied": {
+              "type": "boolean"
+            },
+            "line": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "match": {
+              "description": "`match=\"<text>\"`: the waiver clears only the findings whose excerpt or\nmatched text contains it; `None` clears the rule in the whole section.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            },
+            "rule": {
+              "type": "string"
+            },
+            "section": {
+              "type": "string"
+            },
+            "severity": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Severity"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "rule",
+            "section",
+            "reason",
+            "line",
+            "severity",
+            "applied"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:BriefCheckReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "The `brief check` report: the verdict over one change brief.",
+      "properties": {
+        "approved": {
+          "type": "boolean"
+        },
+        "brief": {
+          "type": "string"
+        },
+        "change": {
+          "type": "string"
+        },
+        "counts": {
+          "$ref": "#/$defs/Counts"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "type": "array"
+        },
+        "language": {
+          "type": "string"
+        },
+        "languageNote": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "languageSource": {
+          "type": "string"
+        },
+        "legacy": {
+          "type": "boolean"
+        },
+        "phase": {
+          "$ref": "#/$defs/Phase"
+        },
+        "waivers": {
+          "items": {
+            "$ref": "#/$defs/Waiver"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "change",
+        "brief",
+        "language",
+        "languageSource",
+        "phase",
+        "legacy",
+        "approved",
+        "counts",
+        "findings",
+        "waivers"
+      ],
+      "title": "BriefCheckReport",
+      "type": "object"
+    },
+    "BriefShowReport": {
+      "$defs": {
+        "Counts": {
+          "description": "The finding counts `canon status` shows.",
+          "properties": {
+            "advisories": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "blockers": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "blockers",
+            "advisories"
+          ],
+          "type": "object"
+        },
+        "Step": {
+          "description": "One next step of `canon brief show`.",
+          "properties": {
+            "step": {
+              "type": "string"
+            },
+            "why": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "step",
+            "why"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:BriefShowReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "The `brief show` report: the brief's state and the next steps.",
+      "properties": {
+        "brief": {
+          "type": "string"
+        },
+        "change": {
+          "type": "string"
+        },
+        "counts": {
+          "$ref": "#/$defs/Counts"
+        },
+        "next": {
+          "items": {
+            "$ref": "#/$defs/Step"
+          },
+          "type": "array"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "change",
+        "brief",
+        "state",
+        "counts",
+        "next"
+      ],
+      "title": "BriefShowReport",
+      "type": "object"
+    },
+    "CompletionReport": {
+      "$id": "urn:canon:report:CompletionReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`--json` of `canon completion`: the script in an envelope.",
+      "properties": {
+        "script": {
+          "description": "The script, as `canon completion <shell>` prints it.",
+          "type": "string"
+        },
+        "shell": {
+          "description": "`bash`, `zsh` or `fish`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "shell",
+        "script"
+      ],
+      "title": "CompletionReport",
+      "type": "object"
+    },
+    "ContextReport": {
+      "$defs": {
+        "AttrDecl": {
+          "properties": {
+            "default": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Literal"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "required": {
+              "default": false,
+              "type": "boolean"
+            },
+            "type": {
+              "$ref": "#/$defs/Type"
+            }
+          },
+          "required": [
+            "name",
+            "required",
+            "type"
+          ],
+          "type": "object"
+        },
+        "CapabilitySnapshot": {
+          "properties": {
+            "capabilityVersion": {
+              "description": "SHA-256 hex content hash over the vocabulary this snapshot resolved\n(module doc) — set by [`crate::resolve_snapshot::resolve_snapshot`],\nempty on a hand-built [`CapabilitySnapshot::default`].",
+              "type": "string"
+            },
+            "directives": {
+              "additionalProperties": {
+                "$ref": "#/$defs/DirectiveDecl"
+              },
+              "type": "object"
+            },
+            "enums": {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "description": "`enums.yaml`'s shared vocabulary, folded from every active plugin,\nresolved by `Type::Domain(name)`.",
+              "type": "object"
+            },
+            "evidenceKinds": {
+              "description": "`Type::Evidence`'s policy-resolved kind domain (D4) — see module doc.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "inactive": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Installed-but-inactive directive tag -> owning plugin id (plugin\n§11.2 fix-it parity; `crate::checker` surfaces this the same way\n`check_directive` does, minus the LSP fix-it object itself since no\nLSP consumes it yet).",
+              "type": "object"
+            },
+            "plugins": {
+              "additionalProperties": {
+                "$ref": "#/$defs/ResolvedPlugin"
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "capabilityVersion",
+            "plugins",
+            "enums",
+            "directives",
+            "evidenceKinds",
+            "inactive"
+          ],
+          "type": "object"
+        },
+        "CelSurface": {
+          "description": "One record kind's CEL binding surface (S13 5.1/5.2/5.3, design D6):\nevery field a `policy.yaml` CEL expression bound to this kind may\nreference off the `record` variable, plus the fixed pure-function\nallowlist — folded in verbatim from the SAME `canon_policy::bindings_for`\ncall `canon-policy`'s own write-time validator uses (`canon-policy`\nlib.rs's own forward reference: \"S12's `resolve_surface`/\n`AuthoringSurface` gain a `policy` section populated by\n`bindings::bindings_for`\"), so this can never disagree with what a\n`policy.yaml` CEL expression is actually checked against — invariant 2,\nextended to the CEL surface.",
+          "properties": {
+            "fields": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "`record.<field>` → that field's statically-resolved `CelType`,\nrendered via `CelType`'s own `Display` (`BindingSet::field_names()`\nover `BindingSet::record_fields`, never a hand-typed field list).",
+              "type": "object"
+            },
+            "functions": {
+              "description": "The allowlisted, non-macro callable functions\n(`BindingSet::callable_function_names()`), each rendered via\n`Display for FunctionSig` (`name(args) -> returns`) — excludes\nCEL-native macros like `has` (`callable_function_names()`'s own\ndoc: the parser rewrites a well-formed `has(...)` call away before\nit ever reaches the validator as a `Call`).",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "fields",
+            "functions"
+          ],
+          "type": "object"
+        },
+        "DirectiveDecl": {
+          "properties": {
+            "attrs": {
+              "items": {
+                "$ref": "#/$defs/AttrDecl"
+              },
+              "type": "array"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "attrs"
+          ],
+          "type": "object"
+        },
+        "EvidenceBindingSurface": {
+          "anyOf": [
+            {
+              "properties": {
+                "case": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "lane": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "mode": {
+                  "type": "string"
+                },
+                "scope": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "strength": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "mode",
+                "strength",
+                "case",
+                "lane",
+                "scope"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "invalid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "invalid"
+              ],
+              "type": "object"
+            }
+          ],
+          "description": "`experimental.evidence_binding`, keyed like `policy.yaml` (`case`,\n`lane`, `scope`; each empty means unfiltered). Untagged like\n[`SpecCoverageSurface`]."
+        },
+        "KindSurface": {
+          "description": "One record kind's authoring shape: the fields an agent must supply, the\npartition it lands in, and its current schema version.",
+          "properties": {
+            "envelope_fields": {
+              "additionalProperties": {
+                "type": "boolean"
+              },
+              "description": "Every top-level field name this kind's record carries (envelope\nfields `schema`/`kind`/`at`/`actor` flattened alongside the kind's\nown business fields — `#[serde(flatten)]` puts them all in the same\nJSON object, so \"envelope fields\" for authoring purposes means the\nwhole top-level shape) mapped to whether it is required.",
+              "type": "object"
+            },
+            "partition": {
+              "$ref": "#/$defs/PartitionLayout"
+            },
+            "schema_version": {
+              "description": "This kind's CURRENT format generation, read straight from\n[`canon_model::RecordKind::schema_version`] — never a\nhand-maintained copy, so `canon context` can never advertise a\ngeneration no writer stamps (`s38-evidence-bearing-memory`).",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "schema_version",
+            "envelope_fields",
+            "partition"
+          ],
+          "type": "object"
+        },
+        "Literal": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "format": "double",
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "$ref": "#/$defs/Literal"
+              },
+              "type": "array"
+            },
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/Literal"
+              },
+              "type": "object"
+            }
+          ],
+          "description": "A record field's literal value (plugin §7 lineage, from the donor manifest\nlayer's types): the runtime shape [`type_accepts`] judges an authored\nYAML value against a declared [`Type`]. `Map` carries `evidence`'s\n`{kind, ref}` structure (and any other future record-shaped attr)."
+        },
+        "PartitionLayout": {
+          "description": "The Hive-style partition layout one record kind's git-tier files follow —\ndesign D3's `partition: LayoutDescriptor`, built from\n[`RecordKind::partition_template`]/[`RecordKind::is_area_scoped`] (S1's\nown registry — never a second, hand-written layout table).",
+          "properties": {
+            "area_scoped": {
+              "description": "Whether `template` requires the `area={area}/` segment.",
+              "type": "boolean"
+            },
+            "template": {
+              "description": "The path template, e.g. `kind={kind}/{id}.json` or\n`kind={kind}/area={area}/{id}.json`.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "template",
+            "area_scoped"
+          ],
+          "type": "object"
+        },
+        "PolicyFieldSurface": {
+          "description": "One `policy.yaml` field's authoring-time shape: either a fixed value or\na CEL predicate's source (never its evaluated result — [`resolve_surface`]\nhas no specific artifact to evaluate against, only the repo's resolved\npolicy shape, matching invariant 1's \"describes what CAN be authored\").",
+          "oneOf": [
+            {
+              "properties": {
+                "kind": {
+                  "const": "flat",
+                  "type": "string"
+                },
+                "value": true
+              },
+              "required": [
+                "kind",
+                "value"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "expression": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "cel",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "expression"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "PolicySurface": {
+          "description": "`canon_gate::PolicyResolution`'s own fields, summarized field-by-field\nvia [`PolicyFieldSurface`] — one Rust field per `PolicyResolution` field,\nso the mapping between \"what the gate resolved\" and \"what context shows\"\nstays traceable by name, never a re-derived shape.",
+          "properties": {
+            "clean": {
+              "description": "`PolicyResolution::is_clean()` — whether `policy.yaml` loaded with\nzero problems for this repo.",
+              "type": "boolean"
+            },
+            "diagnostics": {
+              "description": "`PolicyDiagnostic::to_string()` per problem `resolve()` recorded,\nin the order `resolve()` encountered them (deterministic per repo\nstate, matching invariant 3 — this is never sorted, since it is\nalready reproducible byte-for-byte on an unchanged repo).",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "evidence_binding": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/EvidenceBindingSurface"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`experimental.evidence_binding`. Skipped when absent (off by\ndefault)."
+            },
+            "risk_routing": {
+              "additionalProperties": {
+                "$ref": "#/$defs/PolicyFieldSurface"
+              },
+              "type": "object"
+            },
+            "risk_tiers": {
+              "additionalProperties": {
+                "$ref": "#/$defs/RiskTierSurface"
+              },
+              "type": "object"
+            },
+            "spec_coverage": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SpecCoverageSurface"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "s44's opt-in spec-corpus requirement. `None` (JSON `null`) = the\nsection is absent, which is a DIFFERENT fact from\n`require_evidence: false` and stays distinguishable here: an\nauthor needs to see whether the repo opted in at all."
+            },
+            "staleness": {
+              "$ref": "#/$defs/StalenessSurface"
+            },
+            "trust_required": {
+              "additionalProperties": {
+                "$ref": "#/$defs/PolicyFieldSurface"
+              },
+              "type": "object"
+            },
+            "trust_sample": {
+              "additionalProperties": {
+                "$ref": "#/$defs/PolicyFieldSurface"
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "trust_required",
+            "trust_sample",
+            "staleness",
+            "risk_routing",
+            "risk_tiers",
+            "spec_coverage",
+            "clean",
+            "diagnostics"
+          ],
+          "type": "object"
+        },
+        "RequireAuditSurface": {
+          "description": "`spec_coverage.require_audit` in the `policy` section, keyed like\n`policy.yaml` (0.15 D3). `scope` is the resolved status list (the\ndefault `[verifying, shipped]` when the key is omitted); empty means\nevery scenario.",
+          "properties": {
+            "rate": {
+              "type": "number"
+            },
+            "scope": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "seed": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "rate",
+            "seed",
+            "scope"
+          ],
+          "type": "object"
+        },
+        "RequireReviewSurface": {
+          "description": "`spec_coverage.require_review` in the `policy` section, keyed like\n`policy.yaml`. `scope` is the resolved status list (the default\n`[verifying, shipped]` when the key is omitted); empty means every\nscenario.",
+          "properties": {
+            "block_on_findings": {
+              "type": "boolean"
+            },
+            "distinct_actor": {
+              "type": "boolean"
+            },
+            "scope": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "scope",
+            "distinct_actor",
+            "block_on_findings"
+          ],
+          "type": "object"
+        },
+        "ResolvedPlugin": {
+          "properties": {
+            "options": {
+              "additionalProperties": {
+                "$ref": "#/$defs/Literal"
+              },
+              "type": "object"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "version",
+            "options"
+          ],
+          "type": "object"
+        },
+        "ReviewRequirementSurface": {
+          "description": "The same requirement in the camelCase `review` section.",
+          "properties": {
+            "blockOnFindings": {
+              "type": "boolean"
+            },
+            "distinctActor": {
+              "type": "boolean"
+            },
+            "scope": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "scope",
+            "distinctActor",
+            "blockOnFindings"
+          ],
+          "type": "object"
+        },
+        "ReviewSurface": {
+          "description": "The review vocabulary (issue #2): what `canon finding` and `canon\nreview` accept, and whether this repo requires review before a\nsubject is claimed done. Static vocabulary plus the resolved policy;\nnever a corpus read (invariant 1).",
+          "properties": {
+            "findingDispositions": {
+              "description": "`canon finding add/close --disposition` values.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "findingSeverities": {
+              "description": "`canon finding add --severity` values, in blocking order.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "requireReview": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ReviewRequirementSurface"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`spec_coverage.require_review`. `None` = not required here\n(absent, or `spec_coverage` itself is absent or invalid)."
+            },
+            "reviewFields": {
+              "additionalProperties": {
+                "type": "boolean"
+              },
+              "description": "The `review` kind's fields → required, the SAME map\n`kinds.review.envelopeFields` carries.",
+              "type": "object"
+            }
+          },
+          "required": [
+            "findingSeverities",
+            "findingDispositions",
+            "reviewFields",
+            "requireReview"
+          ],
+          "type": "object"
+        },
+        "RiskTierSurface": {
+          "properties": {
+            "effects": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "min_human_approvals": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "paths": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "rank": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "rank",
+            "paths",
+            "effects",
+            "min_human_approvals"
+          ],
+          "type": "object"
+        },
+        "SpecCoverageSurface": {
+          "anyOf": [
+            {
+              "properties": {
+                "exclude_lanes": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "require_audit": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/RequireAuditSurface"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Omitted when the sub-section is absent."
+                },
+                "require_cases": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "require_evidence": {
+                  "type": "boolean"
+                },
+                "require_review": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/RequireReviewSurface"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "`null` when the sub-section is absent."
+                },
+                "scope": {
+                  "description": "Empty means every scenario.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "require_evidence",
+                "scope",
+                "exclude_lanes",
+                "require_cases",
+                "require_review"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "invalid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "invalid"
+              ],
+              "type": "object"
+            }
+          ],
+          "description": "`spec_coverage`, keyed like `policy.yaml`. Serialized untagged: an\nactive section is its fields; a present-but-unusable one is\n`{\"invalid\": \"<detail>\"}`."
+        },
+        "StalenessSurface": {
+          "properties": {
+            "max_commits_behind": {
+              "$ref": "#/$defs/PolicyFieldSurface"
+            },
+            "surface_scoped": {
+              "$ref": "#/$defs/PolicyFieldSurface"
+            }
+          },
+          "required": [
+            "max_commits_behind",
+            "surface_scoped"
+          ],
+          "type": "object"
+        },
+        "Type": {
+          "oneOf": [
+            {
+              "enum": [
+                "bool",
+                "number",
+                "string",
+                "evidence"
+              ],
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "enum": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "enum"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "list": {
+                  "$ref": "#/$defs/TypeDef"
+                }
+              },
+              "required": [
+                "list"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "domain": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "domain"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "TypeDef": {
+          "oneOf": [
+            {
+              "enum": [
+                "bool",
+                "number",
+                "string",
+                "evidence"
+              ],
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "enum": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "enum"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "list": {
+                  "$ref": "#/$defs/TypeDef"
+                }
+              },
+              "required": [
+                "list"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "domain": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "domain"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "VocabularySurface": {
+          "description": "canon-vocab's own resolved capability snapshot (design.md D3, S10 part2\ntask 6.1): folded in verbatim from the SAME `canon_vocab::resolve_snapshot`\ncall the checker itself resolves against — no second, independently\nre-derived projection of the typed authoring vocabulary (invariant 2).\n`profile` is always `None` (the project's own `defaultProfile`, or\n`\"default\"` with no `canon.project.yaml` at all) — `canon context` has\nno `--profile` flag of its own yet; a future one would thread straight\nthrough `resolve_surface`'s existing `(repo, opts)` shape without\ntouching this struct.",
+          "properties": {
+            "diagnostics": {
+              "description": "`canon_vocab::checker::Diagnostic` (plugin load/activation\nproblems the resolution itself hit — a malformed\n`canon.project.yaml`, an unresolvable `depends` range),\nstringified one-per-entry in resolution order — mirrors\n`PolicySurface::diagnostics`'s own \"already reproducible\nbyte-for-byte on an unchanged repo\" reasoning, never sorted.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "snapshot": {
+              "$ref": "#/$defs/CapabilitySnapshot",
+              "description": "The resolved directive/enum/evidence-kind index a typed task-atom\nor handoff-body file is checked against right now — the exact\nvalue `crate::gate`'s typed evidence path (task 4.4) re-resolves\nfresh at gate time for the identical reason (Risks section: policy\nis the live source of truth, never an authoring-time snapshot)."
+            }
+          },
+          "required": [
+            "snapshot",
+            "diagnostics"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:ContextReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "The full authoring surface (design D3): everything an agent needs to\nknow BEFORE writing a canon artifact against this repo. Every map is a\n`BTreeMap`; every array is sorted or built from an already-sorted\nsource (invariant 3).",
+      "properties": {
+        "capabilityVersion": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cel": {
+          "additionalProperties": {
+            "$ref": "#/$defs/CelSurface"
+          },
+          "description": "S13 5.1/5.2/5.3 (design D6): by `RecordKind::as_str()`, the SAME\nkey set `kinds` uses — the CEL binding surface (`record.<field>`\ntypes + allowlisted functions) `policy.yaml`'s own write-time\nvalidator checks a CEL expression against, never a second\nindependently-derived projection (invariant 2).",
+          "type": "object"
+        },
+        "enums": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": "By enum type name (the schema registry's own `$defs` — never a\nhand-maintained second list); each value is that enum's sorted\nmember set.",
+          "type": "object"
+        },
+        "joinKeys": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "By join-spine key name (S1's `join_spine_doc::rows()`) → that key's\ngrammar string.",
+          "type": "object"
+        },
+        "kinds": {
+          "additionalProperties": {
+            "$ref": "#/$defs/KindSurface"
+          },
+          "description": "By `RecordKind::as_str()` (S1's twelve closed kinds — S11's\nregistry, D1 of the S11 design).",
+          "type": "object"
+        },
+        "policy": {
+          "$ref": "#/$defs/PolicySurface"
+        },
+        "review": {
+          "$ref": "#/$defs/ReviewSurface",
+          "description": "Issue #2's review vocabulary and requirement ([`ReviewSurface`])."
+        },
+        "vocab": {
+          "$ref": "#/$defs/VocabularySurface",
+          "description": "S10 part2's typed authoring vocabulary (design.md D3, task 6.1) —\ncanon-vocab's own resolved directive/enum/evidence-kind index,\nnever a second hand-projected view of it (invariant 2)."
+        }
+      },
+      "required": [
+        "capabilityVersion",
+        "kinds",
+        "enums",
+        "joinKeys",
+        "policy",
+        "vocab",
+        "review",
+        "cel"
+      ],
+      "title": "AuthoringSurface",
+      "type": "object"
+    },
+    "SelftestReport": {
+      "$defs": {
+        "SuiteSummary": {
+          "description": "One suite's outcome in [`SelftestSummary`].",
+          "properties": {
+            "clean": {
+              "type": "boolean"
+            },
+            "failures": {
+              "description": "One line per failing check; empty when the suite is clean.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "name": {
+              "type": "string"
+            },
+            "passed": {
+              "description": "Fixture checks that cleared.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "name",
+            "clean",
+            "passed",
+            "failures"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:SelftestReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon selftest --json`: one entry per suite.",
+      "properties": {
+        "clean": {
+          "description": "Every suite is clean.",
+          "type": "boolean"
+        },
+        "suites": {
+          "items": {
+            "$ref": "#/$defs/SuiteSummary"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "clean",
+        "suites"
+      ],
+      "title": "SelftestSummary",
+      "type": "object"
+    },
+    "StatusReport": {
+      "$defs": {
+        "AuditEntry": {
+          "properties": {
+            "evaluator": {
+              "description": "The latest audit's evaluator, when there is one.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "projectId": {
+              "type": "string"
+            },
+            "scenario": {
+              "type": "string"
+            },
+            "state": {
+              "description": "`missing`, `indeterminate`, or `refuted`.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "scenario",
+            "projectId",
+            "state"
+          ],
+          "type": "object"
+        },
+        "AuditSummary": {
+          "description": "Where audits stand (0.15 D3).",
+          "properties": {
+            "confirmed": {
+              "description": "Sampled scenarios whose latest audit is `confirmed`.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "owed": {
+              "description": "Sampled scenarios still owing an audit: none recorded, or the\nlatest is `indeterminate`.",
+              "items": {
+                "$ref": "#/$defs/AuditEntry"
+              },
+              "type": "array"
+            },
+            "refuted": {
+              "description": "Every scenario whose latest audit is `refuted` (`false-success`),\nsampled or not.",
+              "items": {
+                "$ref": "#/$defs/AuditEntry"
+              },
+              "type": "array"
+            },
+            "sampled": {
+              "description": "In-scope scenarios `spec_coverage.require_audit` sampled (0 when\nit is off).",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "sampled",
+            "confirmed",
+            "owed",
+            "refuted"
+          ],
+          "type": "object"
+        },
+        "BriefStatus": {
+          "description": "Whether a subject's newest adopted change records the human's\napproval of its brief: an `Approved:` line in that change's canon\n`brief.md` (module doc). A fix stays inside the approved\nchange, so a newer adopted change is a new scope, and an older\nchange's approval does not cover it.",
+          "properties": {
+            "approval": {
+              "description": "The approval line's text after `Approved:`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "approved": {
+              "type": "boolean"
+            },
+            "brief": {
+              "description": "That change's canon `brief.md`, relative to the repo root: the one\nfile the approval is read from. Omitted when the change has no\nbrief to answer (neither a canon `brief.md` nor an external\n`proposal.md`).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "briefExists": {
+              "description": "Whether [`Self::brief`] exists. `false` for an external change\nwhose canon brief is still to be created, with a `Source:` line\nnaming [`Self::source`].",
+              "type": "boolean"
+            },
+            "change": {
+              "description": "The newest adopted change (the last of the subject's adopted\nchanges, adoption order), whose canon `brief.md` must carry the\napproval. Omitted when the subject adopts no change.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "changed": {
+              "description": "The brief changed after its approval (0.19 D3): the line's digest\nno longer matches, so it is not approved and `canon brief approve`\nmust run again.",
+              "type": "boolean"
+            },
+            "enforced": {
+              "description": "Whether the missing approval blocks (module doc): not approved,\nand the newest adopted change has a brief to answer. Then status\nasks the human and the ship guard refuses; otherwise both only\nreport it.",
+              "type": "boolean"
+            },
+            "findings": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Counts"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What `canon brief check` found in the brief's text (0.19 D2):\nfilled by `canon status` only, for a brief in the PRD format.\nOmitted for a pre-0.19 brief, which is read as before."
+            },
+            "legacyApproval": {
+              "description": "The approval line has no digest (pre-0.19): approved, but status\nadvises re-approving it so it binds to the brief's text.",
+              "type": "boolean"
+            },
+            "source": {
+              "description": "The external plan document the change comes from: the `Source:`\nline of the canon `brief.md`, or, before that file exists, the\nexternal openspec `proposal.md` found under the plan sources.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "approved",
+            "enforced",
+            "briefExists"
+          ],
+          "type": "object"
+        },
+        "ChangeId": {
+          "description": "openspec change slug: kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), the directory name under `openspec/changes/` — joins: change ↔ tasks ↔ specs",
+          "type": "string"
+        },
+        "Counts": {
+          "description": "The finding counts `canon status` shows.",
+          "properties": {
+            "advisories": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "blockers": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "blockers",
+            "advisories"
+          ],
+          "type": "object"
+        },
+        "FlowScenarioState": {
+          "description": "One scenario covering a flow step, with the evidence and review state\nthe gate reads for it.",
+          "properties": {
+            "evidenced": {
+              "description": "Has a ledger verdict ([`Joins::verdict_state`]).",
+              "type": "boolean"
+            },
+            "failure": {
+              "description": "Tagged `@case:failure`.",
+              "type": "boolean"
+            },
+            "id": {
+              "type": "string"
+            },
+            "review": {
+              "description": "`reviewed`, or the review gap's kind: `missing`, `stale`,\n`unsigned`, `not-distinct`; `not-indexed` when the scenario index\nhas no record for the id yet (`canon inventory sync`).",
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "failure",
+            "evidenced",
+            "review"
+          ],
+          "type": "object"
+        },
+        "FlowStep": {
+          "description": "One flow step of the brief and what covers it.",
+          "properties": {
+            "change": {
+              "description": "The change whose brief defines it.",
+              "type": "string"
+            },
+            "gaps": {
+              "description": "`no scenario` and/or `no failure case`; empty when covered.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "id": {
+              "description": "`F1`.",
+              "type": "string"
+            },
+            "scenarios": {
+              "items": {
+                "$ref": "#/$defs/FlowScenarioState"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "id",
+            "change",
+            "scenarios",
+            "gaps"
+          ],
+          "type": "object"
+        },
+        "MissingCase": {
+          "properties": {
+            "case": {
+              "type": "string"
+            },
+            "projectId": {
+              "description": "The `specs.roots[]` id the surface lives under.",
+              "type": "string"
+            },
+            "surface": {
+              "description": "`<area>.<surface>`.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "projectId",
+            "surface",
+            "case"
+          ],
+          "type": "object"
+        },
+        "PolicyStatus": {
+          "properties": {
+            "level": {
+              "description": "The policy's level (0.16 D3, [`crate::policy_level::detect`]):\n`light`, `standard`, `strict`, or `custom`; `null` when the\npolicy is absent.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "present": {
+              "description": "Whether `.canon/policy.yaml` exists.",
+              "type": "boolean"
+            },
+            "spec_coverage": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SpecCoverageSurface"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The effective `spec_coverage` section, keyed like `policy.yaml`\n(the same shape `canon context --json` prints); `null` when absent."
+            }
+          },
+          "required": [
+            "present",
+            "spec_coverage",
+            "level"
+          ],
+          "type": "object"
+        },
+        "RequireAuditSurface": {
+          "description": "`spec_coverage.require_audit` in the `policy` section, keyed like\n`policy.yaml` (0.15 D3). `scope` is the resolved status list (the\ndefault `[verifying, shipped]` when the key is omitted); empty means\nevery scenario.",
+          "properties": {
+            "rate": {
+              "type": "number"
+            },
+            "scope": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "seed": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "rate",
+            "seed",
+            "scope"
+          ],
+          "type": "object"
+        },
+        "RequireReviewSurface": {
+          "description": "`spec_coverage.require_review` in the `policy` section, keyed like\n`policy.yaml`. `scope` is the resolved status list (the default\n`[verifying, shipped]` when the key is omitted); empty means every\nscenario.",
+          "properties": {
+            "block_on_findings": {
+              "type": "boolean"
+            },
+            "distinct_actor": {
+              "type": "boolean"
+            },
+            "scope": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "scope",
+            "distinct_actor",
+            "block_on_findings"
+          ],
+          "type": "object"
+        },
+        "SpecCoverageSurface": {
+          "anyOf": [
+            {
+              "properties": {
+                "exclude_lanes": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "require_audit": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/RequireAuditSurface"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Omitted when the sub-section is absent."
+                },
+                "require_cases": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "require_evidence": {
+                  "type": "boolean"
+                },
+                "require_review": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/RequireReviewSurface"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "`null` when the sub-section is absent."
+                },
+                "scope": {
+                  "description": "Empty means every scenario.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "require_evidence",
+                "scope",
+                "exclude_lanes",
+                "require_cases",
+                "require_review"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "invalid": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "invalid"
+              ],
+              "type": "object"
+            }
+          ],
+          "description": "`spec_coverage`, keyed like `policy.yaml`. Serialized untagged: an\nactive section is its fields; a present-but-unusable one is\n`{\"invalid\": \"<detail>\"}`."
+        },
+        "SubjectSummary": {
+          "properties": {
+            "acceptedDivergences": {
+              "description": "Counted divergent scenarios a reviewer accepted as known gaps\n(`canon divergence accept`) whose acceptance still holds, each as\n`accepted-divergence <id> — <tracking> (expires <date>)`. They are\nnot in `divergent`; omitted when empty.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "brief": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/BriefStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Whether the brief is approved (0.16 D1): present for `building`,\n`verifying` and `shipped` subjects, and for a `proposed` subject\nwhose newest adopted change has a brief to answer; omitted for\nthe others."
+            },
+            "choreReviews": {
+              "description": "Approved chore changes with no qualifying change-level review (0.23 D5).",
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "$ref": "#/$defs/ChangeId"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "divergent": {
+              "description": "Counted scenarios whose latest verdict (for some role) is divergent.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "evidenced": {
+              "description": "Counted scenarios with a ledger verdict.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "excluded": {
+              "description": "Owned scenarios `exclude_lanes` removes from every count.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "flow": {
+              "description": "The flow steps of the subject's current (newest adopted) change's\nbrief with the scenarios tagged `@flow:<change>.<F-id>` (0.19 D4).\nOmitted for a brief with no flow steps (a legacy brief) or no brief.",
+              "items": {
+                "$ref": "#/$defs/FlowStep"
+              },
+              "type": "array"
+            },
+            "id": {
+              "type": "string"
+            },
+            "missingCases": {
+              "items": {
+                "$ref": "#/$defs/MissingCase"
+              },
+              "type": "array"
+            },
+            "openBlockers": {
+              "description": "Open blocker findings on the subject's adopted changes.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "pendingDrafts": {
+              "description": "The adopted changes set aside as pending drafts\n([`crate::brief::scope_changes`]): each one's brief is not approved\nand no scenario of the subject is tagged `@flow:<change>.*` for it,\nso it is not part of the subject's scope yet and reopen, evidence and\nship read the newest approved or tagged change. Omitted when empty.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "red": {
+              "description": "For a `shipped` subject, what makes its gate red now (0.18 D3):\nwhat the `verifying → shipped` guard would refuse it on\n([`crate::subject::shipped_gate_gaps`], the same checks), one\nphrase per failure class: `<n> <class> (first: <subject>)`.\nStatus then names the reopen command. Omitted when empty.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "reviewDue": {
+              "description": "Whether `require_review` covers this subject's status or the next\none on the chain, i.e. whether its reviews are due now.",
+              "type": "boolean"
+            },
+            "reviewed": {
+              "description": "Counted scenarios with a qualifying review under the\n`require_review` rule (any current signed review when it is off).",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "scenarios": {
+              "description": "Owned scenarios the gate counts (after `exclude_lanes`).",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "staleReviews": {
+              "description": "Counted scenarios whose only signed reviews are stale: pinned to a\nspec or evidence that has since changed (0.15 D1).",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "status": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "unsignedReviews": {
+              "description": "Counted scenarios whose latest reviews are all `indeterminate` or\n`unavailable` (0.15 D4).",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "status",
+            "scenarios",
+            "excluded",
+            "evidenced",
+            "divergent",
+            "reviewed",
+            "staleReviews",
+            "unsignedReviews",
+            "reviewDue",
+            "openBlockers",
+            "missingCases",
+            "choreReviews"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:StatusReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "The whole report, in the order it prints.",
+      "properties": {
+        "audits": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AuditSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Audit obligations and refutations (0.15 D3). Omitted when\n`require_audit` is off and no latest audit is refuted."
+        },
+        "canonVersion": {
+          "type": "string"
+        },
+        "policy": {
+          "$ref": "#/$defs/PolicyStatus"
+        },
+        "statusVersion": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "subjects": {
+          "description": "Lifecycle order (proposed → retired), then subject id.",
+          "items": {
+            "$ref": "#/$defs/SubjectSummary"
+          },
+          "type": "array"
+        },
+        "unowned": {
+          "description": "Scenario ids (latest generation) whose `@subject:` tag is absent.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "warnings": {
+          "description": "One line per condition that makes the counts below incomplete or\nthe gate weaker than it looks.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "statusVersion",
+        "canonVersion",
+        "policy",
+        "warnings",
+        "subjects",
+        "unowned"
+      ],
+      "title": "StatusReport",
+      "type": "object"
+    }
+  },
   "specVersion": "1"
 }

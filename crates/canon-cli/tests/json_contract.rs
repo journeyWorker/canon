@@ -119,7 +119,7 @@ fn every_leaf_command_answers_json_with_one_document_and_a_coded_error() {
     assert!(leaves.len() > 60, "{leaves:?}");
 
     let regime = String::from_utf8(run(repo.path(), &["regime-key", "--role", "reviewer", "--repo", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
-    let registry: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|(code, _)| *code).collect();
+    let registry: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
     let skipped: Vec<&str> = SKIPPED.iter().map(|(command, _)| *command).collect();
     let mut problems = Vec::new();
     let mut usage = Vec::new();

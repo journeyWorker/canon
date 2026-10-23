@@ -17,7 +17,7 @@ fn run_context_pack_new(args: ContextPackNewArgs) -> ExitCode {
     match crate::context_pack::create_from_manifest(&repo, &manifest) {
         Ok(pack) => {
             if json {
-                crate::json_out::data("context-pack new", serde_json::to_value(&pack).expect("context pack is serializable"));
+                crate::json_out::data("context-pack new", &crate::json_out::untyped(serde_json::to_value(&pack).expect("context pack is serializable")));
             } else {
                 println!("{}", pack.id);
             }

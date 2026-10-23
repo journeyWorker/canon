@@ -203,13 +203,13 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     let data = serde_json::json!({ "clean": report.is_clean(), "violations": violations, "advisories": advisories });
     if report.is_clean() {
         if json {
-            crate::json_out::data("gate check", data);
+            crate::json_out::data("gate check", &crate::json_out::untyped(data));
         }
         return 0;
     }
     CliError::failed("GATE_VIOLATIONS", format!("{} violation(s)", report.violations.len()))
         .hint("fix each violation named in data.violations, then run `canon gate check` again")
-        .emit_with_data("canon gate check", json, data)
+        .emit_with_data("canon gate check", json, &crate::json_out::untyped(data))
 }
 
 /// The one-line advisory (0.14 D3) printed when the spec corpus has
@@ -531,7 +531,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
         // row, never a fresh flip).
         crate::say!(json, "canon gate task: {task_id} already done (idempotent no-op)");
         if json {
-            crate::json_out::data("gate task", serde_json::json!({ "taskId": task_id.as_str(), "flipped": false }));
+            crate::json_out::data("gate task", &crate::json_out::untyped(serde_json::json!({ "taskId": task_id.as_str(), "flipped": false })));
         }
         return 0;
     }
@@ -547,7 +547,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
             }
             refresh_task_status(&repo, &task_id.change_id());
             let change = crate::next::Scope::Change(task_id.change_id().as_str().to_string());
-            crate::next::finish(&repo, "gate task", &change, false, json, serde_json::json!({ "taskId": task_id.as_str(), "flipped": true, "document": document_path.display().to_string() }));
+            crate::next::finish(&repo, "gate task", &change, false, json, &crate::json_out::untyped(serde_json::json!({ "taskId": task_id.as_str(), "flipped": true, "document": document_path.display().to_string() })));
             0
         }
         TaskFlipDecision::Blocked { violations } => {
@@ -857,16 +857,16 @@ pub fn run_promote(repo: &Path, dry_run: bool, json: bool) -> i32 {
             if report.is_clean() {
                 if dry_run {
                     if json {
-                        crate::json_out::data("gate promote", data);
+                        crate::json_out::data("gate promote", &crate::json_out::untyped(data));
                     }
                 } else {
-                    crate::next::finish(&repo, "gate promote", &crate::next::Scope::Repo, false, json, data);
+                    crate::next::finish(&repo, "gate promote", &crate::next::Scope::Repo, false, json, &crate::json_out::untyped(data));
                 }
                 0
             } else {
                 CliError::failed("PROMOTE_REFUSED", format!("{} staged record(s) refused", report.refused.len()))
                     .hint("each refusal is named in data.refused; fix the staged record or re-add it, then run `canon gate promote` again")
-                    .emit_with_data("canon gate promote", json, data)
+                    .emit_with_data("canon gate promote", json, &crate::json_out::untyped(data))
             }
         }
         Err(e) => {
@@ -959,7 +959,7 @@ pub(crate) fn promote_after_stage(command: &str, ledger_root: &Path, location: &
         Err(refusal) => {
             crate::say_raw!(json, "{}", refusal.lines);
             match refusal.data {
-                Some(data) => refusal.error.emit_with_data(command, json, data),
+                Some(data) => refusal.error.emit_with_data(command, json, &crate::json_out::untyped(data)),
                 None => refusal.error.emit(command, json),
             };
             StagedOutcome::Refused
@@ -1123,7 +1123,7 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
         crate::say!(json, "canon gate install-hooks: no diff, nothing written");
     }
     if json {
-        crate::json_out::data("gate install-hooks", serde_json::json!({ "installed": changed, "preCommitScriptWritten": script_written }));
+        crate::json_out::data("gate install-hooks", &crate::json_out::untyped(serde_json::json!({ "installed": changed, "preCommitScriptWritten": script_written })));
     }
     0
 }
@@ -1176,7 +1176,7 @@ pub fn run_selftest(json: bool) -> i32 {
     crate::say_raw!(json, "{}", report.format_human());
     if report.is_clean() {
         if json {
-            crate::json_out::data("gate selftest", serde_json::json!({ "clean": true, "fixtures": report.outcomes.len() }));
+            crate::json_out::data("gate selftest", &crate::json_out::untyped(serde_json::json!({ "clean": true, "fixtures": report.outcomes.len() })));
         }
         return 0;
     }
@@ -1194,7 +1194,7 @@ pub fn run_selftest(json: bool) -> i32 {
         })
         .collect();
     CliError::failed("SELFTEST_FAILED", format!("{} fixture(s) did not match their expected violations", failures.len())).hint("the fixtures that differ are listed above; this is a canon defect, so report it with the output")
-        .emit_with_data("canon gate selftest", json, serde_json::json!({ "clean": false, "failures": failures }))
+        .emit_with_data("canon gate selftest", json, &crate::json_out::untyped(serde_json::json!({ "clean": false, "failures": failures })))
 }
 
 #[cfg(test)]
