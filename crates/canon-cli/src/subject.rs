@@ -986,7 +986,7 @@ pub fn run_move(
 
     match registry.persist(&subject) {
         Ok(_) => {
-            report_subject_warning(&repo, &subject, "status", json, &format!("canon subject move: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT), &pending_note);
+            report_subject_warning(&repo, &subject, "move", json, &format!("canon subject move: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT), &pending_note);
             0
         }
         Err(e) => {

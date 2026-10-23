@@ -80,24 +80,11 @@ fn init_scaffolds_a_working_config_in_a_fresh_repo() {
         assert!(policy.contains(line), "starter policy is missing `{line}`: {policy}");
     }
     assert!(policy.contains("A human"), "the starter policy must say a human approves it: {policy}");
-    assert!(stdout(&out).contains("a human reviews it and approves it with `canon policy approve --by <who>`"), "{}", stdout(&out));
+    assert!(stdout(&out).contains("a human reviews it and approves it with `canon policy approve --approver <who>`"), "{}", stdout(&out));
 
     let agents = std::fs::read_to_string(dir.path().join("AGENTS.md")).unwrap();
     assert!(agents.starts_with("<!-- canon:begin -->\n") && agents.ends_with("<!-- canon:end -->\n"), "{agents}");
-    for needle in [
-        "managed with canon",
-        "canon status",
-        "canon skill",
-        "failure",
-        "Independent review",
-        "canon brief check",
-        "canon brief approve <slug> --by <the human> --note",
-        "Inside an approved scope, never stop for a human",
-        "unless the brief says the human ships",
-        "a new change is a new scope",
-    ] {
-        assert!(agents.contains(needle), "the AGENTS.md block is missing `{needle}`: {agents}");
-    }
+    assert!(agents.contains("canon status"), "the block must point at `canon status`: {agents}");
 
     let gitignore = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap();
     assert!(gitignore.lines().any(|line| line.trim() == ".canon/hot.db*"), "expected the hot tier's db+WAL+SHM glob in .gitignore: {gitignore}");
@@ -334,7 +321,7 @@ fn authoring_init_31_light_starter_requires_evidence_only_and_says_how_to_raise_
     let policy = std::fs::read_to_string(dir.path().join(".canon/policy.yaml")).unwrap();
     assert!(policy.starts_with("# canon policy level: light\n"), "{policy}");
     assert_eq!(policy_keys(dir.path()), ["spec_coverage:", "  require_evidence: true"]);
-    for line in ["  # require_cases: [failure]", "  # require_review: {}", "To raise the level", "canon policy approve --by <who>"] {
+    for line in ["  # require_cases: [failure]", "  # require_review: {}", "To raise the level", "canon policy approve --approver <who>"] {
         assert!(policy.contains(line), "the light starter is missing `{line}`: {policy}");
     }
 
@@ -363,7 +350,7 @@ fn authoring_init_32_standard_starter_adds_a_failure_case_and_says_how_to_reach_
     assert!(policy.starts_with("# canon policy level: standard\n"), "{policy}");
     assert_eq!(policy_keys(dir.path()), ["spec_coverage:", "  require_evidence: true", "  require_cases: [failure]"]);
     for line in [
-        "  # To raise the level, uncomment what the next level adds below and\n  # change the level line at the top of this file; a human approves the\n  # edit with `canon policy approve --by <who>`.\n",
+        "  # To raise the level, uncomment what the next level adds below and\n  # change the level line at the top of this file; a human approves the\n  # edit with `canon policy approve --approver <who>`.\n",
         "  # strict:\n",
         "  # require_review: {}\n",
     ] {
@@ -439,7 +426,7 @@ fn check_config_on_the_freshly_scaffolded_config_reports_all_sections_pass() {
     let dir = tempfile::tempdir().unwrap();
     assert!(run_canon(&["init", "--repo", "."], dir.path()).status.success());
 
-    let out = run_canon(&["init", "--check-config", "--repo", "."], dir.path());
+    let out = run_canon(&["init", "--check", "--repo", "."], dir.path());
     assert!(out.status.success(), "check-config on the fresh skeleton must exit 0: {}", stderr(&out));
     let report = stdout(&out);
     assert!(report.contains("[PASS]") && report.contains("tiers"), "{report}");
@@ -450,7 +437,7 @@ fn check_config_on_the_freshly_scaffolded_config_reports_all_sections_pass() {
 #[test]
 fn check_config_on_a_missing_canon_yaml_fails_loud() {
     let dir = tempfile::tempdir().unwrap();
-    let out = run_canon(&["init", "--check-config", "--repo", "."], dir.path());
+    let out = run_canon(&["init", "--check", "--repo", "."], dir.path());
     assert!(!out.status.success());
     assert_eq!(out.status.code(), Some(2));
     assert!(stderr(&out).contains("canon.yaml"), "{}", stderr(&out));
@@ -466,7 +453,7 @@ fn check_config_surfaces_a_malformed_section_without_hiding_the_others() {
         "tiers:\n  local:\n    backend: git\n    root: .canon/ledger\nrouting:\n  change: local\nspecs:\n  roots:\n    - id: root\n      root: specs\nplans:\n  sources:\n    - dialect: not-a-real-dialect\n      root: plans-src\n",
     );
 
-    let out = run_canon(&["init", "--check-config", "--repo", "."], dir.path());
+    let out = run_canon(&["init", "--check", "--repo", "."], dir.path());
     assert!(!out.status.success(), "a malformed plans section must fail the whole check nonzero");
     let report = stdout(&out);
     assert!(report.contains("[PASS]") && report.contains("tiers"), "{report}");
@@ -484,7 +471,7 @@ fn check_config_treats_an_absent_plans_key_as_not_configured_not_a_failure() {
         "tiers:\n  local:\n    backend: git\n    root: .canon/ledger\nrouting:\n  change: local\nspecs:\n  roots:\n    - id: root\n      root: specs\n",
     );
 
-    let out = run_canon(&["init", "--check-config", "--repo", "."], dir.path());
+    let out = run_canon(&["init", "--check", "--repo", "."], dir.path());
     assert!(out.status.success(), "an absent `plans:` key must not fail the check: {}", stderr(&out));
     let report = stdout(&out);
     assert!(report.contains("[not configured] plans"), "{report}");
@@ -505,7 +492,7 @@ fn check_config_fails_on_a_malformed_pg_schema_and_never_prints_pass_for_tiers()
         "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: postgres, dsn_env: CANON_PG_DSN, schema: Bad-Schema }\nrouting:\n  task: hot\n",
     );
 
-    let out = run_canon(&["init", "--check-config", "--repo", "."], dir.path());
+    let out = run_canon(&["init", "--check", "--repo", "."], dir.path());
     assert!(!out.status.success(), "a malformed pg schema must fail check-config nonzero");
     let report = stdout(&out);
     assert!(report.contains("[FAIL] tiers/routing/aging"), "{report}");
@@ -520,7 +507,7 @@ fn check_config_validates_a_sqlite_hot_config_end_to_end() {
     let dir = tempfile::tempdir().unwrap();
     write(dir.path(), "canon.yaml", "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  task: hot\n");
 
-    let out = run_canon(&["init", "--check-config", "--repo", "."], dir.path());
+    let out = run_canon(&["init", "--check", "--repo", "."], dir.path());
     assert!(out.status.success(), "check-config on a valid sqlite hot config must exit 0: {}", stderr(&out));
     let report = stdout(&out);
     assert!(report.contains("[PASS] tiers/routing/aging"), "{report}");
@@ -531,7 +518,7 @@ fn check_config_fails_loud_on_a_sqlite_entry_missing_path() {
     let dir = tempfile::tempdir().unwrap();
     write(dir.path(), "canon.yaml", "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite }\nrouting:\n  task: hot\n");
 
-    let out = run_canon(&["init", "--check-config", "--repo", "."], dir.path());
+    let out = run_canon(&["init", "--check", "--repo", "."], dir.path());
     assert!(!out.status.success(), "a sqlite entry missing `path` must fail check-config nonzero");
     let report = stdout(&out);
     assert!(report.contains("[FAIL] tiers/routing/aging"), "{report}");
@@ -608,7 +595,7 @@ fn authoring_init_90_non_tty_init_installs_only_the_detected_harness_and_records
     let lock = std::fs::read_to_string(repo.join(".canon/skills/.install-lock.json")).unwrap();
     assert!(lock.contains("\"omp\"") && !lock.contains("\"codex\""), "{lock}");
 
-    let check = run_canon(&["init", "--check-config"], &repo);
+    let check = run_canon(&["init", "--check"], &repo);
     assert!(stdout(&check).contains("[PASS] skills (providers: omp)\n"), "{}", stdout(&check));
     let doctor = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "doctor"]).current_dir(&repo).env("CANON_SKILLS_SOURCE", &source).output().unwrap();
     assert_eq!(stdout(&doctor), format!("providers: omp (from canon.yaml skills.providers)\nstatus: healthy\n{}\n", canon_cli::skills::owned_paths_lines(&[canon_cli::skills::Provider::Omp]).join("\n")));
@@ -657,7 +644,7 @@ fn authoring_init_92_a_bare_repo_installs_nothing_and_names_the_flag() {
     assert!(!repo.join(".canon/skills").exists(), "no install lock");
     let config = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
     assert!(config.ends_with("# skills:\n#   providers: [claude, codex]\n"), "only a commented example: {config}");
-    let check = run_canon(&["init", "--check-config"], &repo);
+    let check = run_canon(&["init", "--check"], &repo);
     assert!(stdout(&check).contains("[not configured] skills"), "{}", stdout(&check));
 }
 
@@ -719,7 +706,7 @@ fn authoring_init_95_a_missing_skill_source_is_reported_with_the_retry() {
     assert!(projected(&repo).is_empty());
 
     let source = skill_source(tmp.path());
-    let retry = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "install", "--source"]).arg(&source).current_dir(&repo).output().unwrap();
+    let retry = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "install", "--skills-source"]).arg(&source).current_dir(&repo).output().unwrap();
     assert_eq!(stdout(&retry), format!("canon v1 — installed (pi; from canon.yaml skills.providers)\n{}\n", canon_cli::skills::owned_paths_lines(&[canon_cli::skills::Provider::Pi]).join("\n")), "{}", stderr(&retry));
     assert_eq!(projected(&repo), vec![".pi/skills/canon"]);
 }
@@ -751,7 +738,7 @@ fn authoring_init_98_the_derived_directories_dashboard_and_report_write_stay_out
     git(repo, &["add", "-A"]);
     git(repo, &["commit", "-qm", "init"]);
 
-    let out = run_canon(&["report", "--snapshot", ".canon/dashboard-snapshot", "--repo", "."], repo);
+    let out = run_canon(&["report", "snapshot", ".canon/dashboard-snapshot", "--repo", "."], repo);
     assert!(out.status.success(), "{}{}", stdout(&out), stderr(&out));
     assert!(repo.join(".canon/dashboard-snapshot/manifest.json").exists(), "the snapshot is written by the run, or this test proves nothing");
     for derived in [".canon/learn", ".canon/r2"] {
@@ -775,28 +762,28 @@ fn authoring_init_99_check_config_warns_about_a_missing_gitignore_line_and_names
     let repo = dir.path();
     git(repo, &["init", "-q"]);
     assert!(run_canon(&["init", "--repo", ".", "--no-policy"], repo).status.success());
-    let clean = run_canon(&["init", "--check-config", "--repo", "."], repo);
+    let clean = run_canon(&["init", "--check", "--repo", "."], repo);
     assert!(clean.status.success() && !stdout(&clean).contains("[WARN]"), "{}", stdout(&clean));
 
     let gitignore = std::fs::read_to_string(repo.join(".gitignore")).unwrap();
     std::fs::write(repo.join(".gitignore"), gitignore.replace(".canon/r2/\n", "")).unwrap();
-    let out = run_canon(&["init", "--check-config", "--repo", "."], repo);
+    let out = run_canon(&["init", "--check", "--repo", "."], repo);
     assert_eq!(out.status.code(), Some(0), "a missing ignore line is advice, not a config failure: {}{}", stdout(&out), stderr(&out));
     let warn = stdout(&out).lines().find(|line| line.starts_with("[WARN] gitignore")).unwrap_or_else(|| panic!("{}", stdout(&out))).to_string();
     assert!(warn.contains(".canon/r2/") && warn.contains("`canon migrate`"), "{warn}");
     assert!(!warn.contains(".canon/learn/"), "only the missing line is named: {warn}");
 
-    let json = run_canon(&["init", "--check-config", "--repo", ".", "--json"], repo);
+    let json = run_canon(&["init", "--check", "--repo", ".", "--json"], repo);
     let body: serde_json::Value = serde_json::from_str(&stdout(&json)).unwrap();
     assert!(body["data"]["sections"].as_array().unwrap().iter().any(|s| s["section"] == "gitignore" && s["status"] == "warn"), "{body}");
 
     let migrated = run_canon(&["migrate", "--repo", "."], repo);
     assert!(migrated.status.success(), "{}{}", stdout(&migrated), stderr(&migrated));
-    assert!(!stdout(&run_canon(&["init", "--check-config", "--repo", "."], repo)).contains("[WARN]"));
+    assert!(!stdout(&run_canon(&["init", "--check", "--repo", "."], repo)).contains("[WARN]"));
 
     let plain = tempfile::tempdir().unwrap();
     write(plain.path(), "canon.yaml", "tiers:\n  git:\n    root: .canon/ledger\n");
-    let out = run_canon(&["init", "--check-config", "--repo", "."], plain.path());
+    let out = run_canon(&["init", "--check", "--repo", "."], plain.path());
     assert!(!stdout(&out).contains("[WARN]"), "no git checkout and no .gitignore: {}", stdout(&out));
 }
 

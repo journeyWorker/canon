@@ -1,6 +1,6 @@
 description: "0.18 D5: `canon evidence add` refuses a summary where a fabrication marker stands on its own with `canon evidence add: refused —` and exit 1, writing nothing, and accepts a summary where the same letters sit inside a path (`pack.json/atlas`), a file name or a URL (exit 0)"
 steps:
-  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --promote, --summary, "atlas check: n/a"]
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --class, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --promote, --summary, "atlas check: n/a"]
     exit: 1
-  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --promote, --summary, "error screen names pack.json/atlas JSON as unreadable; notes in tbd_notes.md and https://example.com/tbd"]
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --class, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --promote, --summary, "error screen names pack.json/atlas JSON as unreadable; notes in tbd_notes.md and https://example.com/tbd"]
     exit: 0

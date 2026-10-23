@@ -1,2 +1,2 @@
-canon subject status: SUBJECT_REASON_REQUIRED — reopening checkout (shipped → verifying) needs --reason <text>: why it reopens, recorded on the subject with the actor
-hint: canon subject status checkout --to verifying --reason "<why it reopens>" --as <role>
+canon subject move: SUBJECT_REASON_REQUIRED — reopening checkout (shipped → verifying) needs --reason <text>: why it reopens, recorded on the subject with the actor
+hint: canon subject move checkout --to verifying --reason "<why it reopens>" --as <role>

@@ -307,7 +307,7 @@ fn plugin_git_attachment_is_unconditional_even_when_the_queried_kinds_own_routin
     plant_overlay(&dir.path().join(".canon/ledger"), "root", "world.hotdeal.01", true, &["world.hotdeal.01"]);
 
     let output = run_canon(
-        &["query", "--kind", "scenario", "--plugin", "porting", "--json"],
+        &["query", "--kind", "scenario", "--plugin-id", "porting", "--json"],
         dir.path(),
         &[("CANON_R2_LOCAL_ROOT", r2_root.to_str().unwrap())],
     );

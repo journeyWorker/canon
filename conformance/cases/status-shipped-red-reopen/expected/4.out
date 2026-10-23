@@ -1,2 +1,2 @@
-canon subject status: checkout → verifying — written directly; nothing to promote
-next: canon evidence add --scenario-id checkout.pay.03 --project-id root --kind test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref "<test command>" — checkout: 1 of 3 scenario(s) have no evidence; attest each, then `canon gate promote` (`write.promote: manual`)
+canon subject move: checkout → verifying — written directly; nothing to promote
+next: canon evidence add --scenario-id checkout.pay.03 --project-id root --class test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref "<test command>" — checkout: 1 of 3 scenario(s) have no evidence; attest each, then `canon gate promote` (`write.promote: manual`)

@@ -18,11 +18,16 @@ use tempfile::TempDir;
 
 /// What a `read` leaf may write, which its `effectNote` must name. A path here
 /// is gitignored by `canon init`; the test checks that too.
+/// Read leaves whose effectNote declares they refresh stale scenario-index
+/// records first: committed ledger/archive records, so they are not in
+/// `ALLOWED_WRITES` (whose paths are gitignored) but may change those trees.
+const INDEX_REFRESH_LEAVES: &[&str] = &["subject show"];
+
 const ALLOWED_WRITES: &[(&str, &[&str])] = &[
     ("query", &[".canon/audit/access.jsonl"]),
     // Scratch directories in the system temp dir, removed on exit: nothing under the repo.
     ("selftest", &[]),
-    ("gate selftest", &[]),
+    ("report check", &[]),
 ];
 
 /// Invocations beyond each leaf's schema example that reach a different read
@@ -42,16 +47,15 @@ const EXTRA_INVOCATIONS: &[&str] = &[
     "query --kind run",
     "query --kind change --history",
     "finding list --change-id add-login --json",
-    "divergence status --json",
+    "divergence list --json",
     "format .canon/specs --json",
     "brief check --json",
     "policy show --json",
     "context --json",
-    "retrieve --role reviewer --domain dev --json",
+    "report check --json",
+    "retrieve --for-role reviewer --domain dev --json",
 ];
 
-/// Commands that are not `read` leaves but promise a read-only mode.
-const READ_ONLY_MODES: &[&str] = &["report --check", "report --check --json"];
 
 fn canon(dir: &Path, home: &Path, args: &[String]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_canon"))
@@ -103,14 +107,14 @@ fn fixture(home: &Path) -> TempDir {
     ok(
         repo,
         home,
-        &["evidence", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--kind", "test-run", "--ref", "npm test", "--verdict", "faithful", "--summary", "1 passed", "--actor-id", "impl", "--session-id", "s1", "--role", "implementer"],
+        &["evidence", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--verdict", "faithful", "--summary", "1 passed", "--actor-id", "impl", "--session-id", "s1", "--role", "implementer"],
     );
     ok(
         repo,
         home,
         &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "alice", "--pin", "abc123", "--role", "reviewer", "--session-id", "s2", "--original-spec-ref", "docs/prd.md"],
     );
-    ok(repo, home, &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "bob", "--summary", "Naming nit"]);
+    ok(repo, home, &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "bob", "--summary", "Naming nit"]);
     ok(repo, home, &["gate", "promote"]);
     // Specs ahead of the index: no `inventory sync` after this.
     ok(repo, home, &["scenario", "new", "auth.login.02", "--title", "Sign out", "--feature", feature]);
@@ -226,9 +230,9 @@ fn every_read_leaf_leaves_the_repo_tree_unchanged_or_declares_its_write() {
         argv.remove(0);
         invocations.push((leaf.clone(), argv));
     }
-    for line in EXTRA_INVOCATIONS.iter().chain(READ_ONLY_MODES) {
+    for line in EXTRA_INVOCATIONS.iter() {
         let argv = words(line);
-        let leaf = leaves.iter().chain(std::iter::once(&"report".to_string())).filter(|l| line.starts_with(l.as_str())).max_by_key(|l| l.len()).unwrap_or_else(|| panic!("`{line}` belongs to no read leaf")).clone();
+        let leaf = leaves.iter().filter(|l| line.starts_with(l.as_str())).max_by_key(|l| l.len()).unwrap_or_else(|| panic!("`{line}` belongs to no read leaf")).clone();
         invocations.push((leaf, argv));
     }
 
@@ -246,19 +250,23 @@ fn every_read_leaf_leaves_the_repo_tree_unchanged_or_declares_its_write() {
     for leaf in &leaves {
         let detail = schema(base.path(), home.path(), &leaf.split(' ').collect::<Vec<_>>());
         if detail["effectNote"].is_string() {
-            assert!(ALLOWED_WRITES.iter().any(|(l, _)| l == leaf), "`{leaf}` declares a read-effect note the test does not know: add it to ALLOWED_WRITES");
+            assert!(ALLOWED_WRITES.iter().any(|(l, _)| l == leaf) || INDEX_REFRESH_LEAVES.contains(&leaf.as_str()), "`{leaf}` declares a read-effect note the test does not know: add it to ALLOWED_WRITES");
         }
     }
 
     let mut problems = Vec::new();
     for (leaf, argv) in &invocations {
-        let allowed: Vec<PathBuf> = ALLOWED_WRITES.iter().filter(|(l, _)| l == leaf).flat_map(|(_, paths)| paths.iter().map(PathBuf::from)).collect();
+        let mut allowed: Vec<PathBuf> = ALLOWED_WRITES.iter().filter(|(l, _)| l == leaf).flat_map(|(_, paths)| paths.iter().map(PathBuf::from)).collect();
+        let refreshes = INDEX_REFRESH_LEAVES.contains(&leaf.as_str());
+        if refreshes {
+            allowed.extend([PathBuf::from(".canon/ledger"), PathBuf::from(".canon/archive")]);
+        }
         let (changed, status_before, status_after, out) = run_on_copy(base.path(), home.path(), argv);
-        let unexpected: Vec<&PathBuf> = changed.iter().filter(|p| !allowed.iter().any(|a| a == *p || a.starts_with(p))).collect();
+        let unexpected: Vec<&PathBuf> = changed.iter().filter(|p| !allowed.iter().any(|a| a == *p || a.starts_with(p) || (refreshes && p.starts_with(a)))).collect();
         if !unexpected.is_empty() {
             problems.push(format!("`canon {}` (leaf `{leaf}`) changed {unexpected:?}; stderr: {}", argv.join(" "), String::from_utf8_lossy(&out.stderr).lines().next().unwrap_or("")));
         }
-        if status_before != status_after && allowed.is_empty() {
+        if status_before != status_after && allowed.is_empty() && !refreshes {
             problems.push(format!("`canon {}` changed `git status --porcelain`:\n{status_before}\n->\n{status_after}", argv.join(" ")));
         }
         if status_before != status_after && !allowed.is_empty() {

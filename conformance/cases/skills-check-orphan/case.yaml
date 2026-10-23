@@ -1,6 +1,6 @@
 description: "0.25 D5: after a bundle drops a reference file, `canon skills check` names the projected file as an orphan with the install command that removes it (exit 1), `canon skills doctor` names it on an `orphan:` line (exit 0), `canon skills install` prunes it and reports `pruned:` (exit 0), and both are clean afterwards"
 steps:
-  - args: [skills, install, --providers, claude, --source, canon/skills-before]
+  - args: [skills, install, --providers, claude, --skills-source, canon/skills-before]
     exit: 0
   - args: [skills, check, --providers, claude]
     exit: 1

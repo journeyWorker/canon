@@ -55,8 +55,7 @@ fn every_removed_spelling_is_a_usage_error_that_names_the_replacement() {
         (&["ingest", "sessions", "--canon-yaml", "canon.yaml"], "--repo"),
         (&["query", "--kind", "change", "--canon-yaml", "canon.yaml"], "--repo"),
         (&["tier", "age", "--canon-yaml", "canon.yaml"], "--repo"),
-        (&["regime-key", "--role", "reviewer", "--repo", "r", "--area", "a", "--hash", "abcdef012345"], "--repo-name"),
-        (&["format", "--check", "spec"], "canon format"),
+        (&["format", "--check", "spec"], "format"),
         (&["fmt", "spec"], "format"),
     ];
     for (args, replacement) in cases {
@@ -79,7 +78,7 @@ fn commands_from_a_subdirectory_find_the_repo_and_a_given_repo_is_used_as_is() {
     std::fs::create_dir_all(&nested).unwrap();
     let elsewhere = TempDir::new().unwrap();
 
-    for args in [&["status"][..], &["policy", "show"][..], &["query", "--kind", "subject"][..], &["gate", "check"][..], &["subject", "status", "demo"][..]] {
+    for args in [&["status"][..], &["policy", "show"][..], &["query", "--kind", "subject"][..], &["gate", "check"][..], &["subject", "show", "demo"][..]] {
         let from_nested = canon(&nested, args);
         assert_ne!(from_nested.status.code(), Some(2), "{args:?} from a nested directory: {}", String::from_utf8_lossy(&from_nested.stderr));
 

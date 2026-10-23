@@ -86,7 +86,7 @@ fn repo_with_subject(status: &str) -> TempDir {
         if status == "proposed" {
             break;
         }
-        ok(repo, &["subject", "status", "s", "--to", step]);
+        ok(repo, &["subject", "move", "s", "--to", step]);
         if step == status {
             break;
         }
@@ -116,7 +116,7 @@ fn change(repo: &Path, change: &str, approve: bool) -> Output {
                 "brief",
                 "approve",
                 change,
-                "--by",
+                "--approver",
                 "Ana",
                 "--note",
                 "Go",
@@ -163,7 +163,7 @@ fn attest(repo: &Path, scenario: &str, reference: &str) -> Output {
             "root",
             "--scenario-id",
             scenario,
-            "--kind",
+            "--class",
             "test-run",
             "--ref",
             reference,
@@ -182,9 +182,9 @@ fn attest_task(repo: &Path, task: &str) -> Output {
         &[
             "evidence",
             "add",
-            "--task",
+            "--task-id",
             task,
-            "--kind",
+            "--class",
             "test-run",
             "--ref",
             "cargo test",
@@ -243,7 +243,7 @@ fn evidence_add_100_a_draft_change_freezes_only_the_scenarios_it_is_tagged_on() 
         stderr(&out)
     );
     // ... and the ship guard still asks for the newest adopted change's approval.
-    let ship = run(repo, &["subject", "status", "s", "--to", "shipped"]);
+    let ship = run(repo, &["subject", "move", "s", "--to", "shipped"]);
     assert_eq!(ship.status.code(), Some(1), "{}", stderr(&ship));
     assert!(
         stderr(&ship).contains(".canon/changes/b/brief.md"),
@@ -258,7 +258,7 @@ fn evidence_add_100_a_draft_change_freezes_only_the_scenarios_it_is_tagged_on() 
             "brief",
             "approve",
                 "b",
-            "--by",
+            "--approver",
             "Ana",
             "--note",
             "Go",
@@ -295,7 +295,7 @@ fn evidence_add_101_an_unapproved_only_change_and_an_edited_approval_still_refus
             "brief",
             "approve",
                 "a",
-            "--by",
+            "--approver",
             "Ana",
             "--note",
             "Go",
@@ -440,7 +440,7 @@ fn subject_lifecycle_35_adopting_an_unapproved_change_warns_only_where_it_matter
             "brief",
             "approve",
                 "c",
-            "--by",
+            "--approver",
             "Ana",
             "--note",
             "Go",
@@ -537,7 +537,7 @@ fn subject_lifecycle_37_unadopt_refuses_an_approved_change() {
             .is_some_and(|h| h.contains("approved scope")),
         "{json}"
     );
-    let status = stdout(&run(repo, &["subject", "status", "s", "--json"]));
+    let status = stdout(&run(repo, &["subject", "show", "s", "--json"]));
     assert!(status.contains("\"a\""), "the link stays: {status}");
 }
 
@@ -562,7 +562,7 @@ fn evidence_add_100_a_tag_naming_a_change_the_subject_did_not_adopt_is_ignored()
     ok(
         repo,
         &["brief", "approve",
-                "x", "--by", "Ana", "--note", "Go"],
+                "x", "--approver", "Ana", "--note", "Go"],
     );
     scenario(repo, "shop.cart.01", Some("zzz.F1"));
     scenario(repo, "shop.cart.02", Some("x.F1"));
@@ -594,7 +594,7 @@ fn evidence_add_101_an_override_attestation_does_not_exempt_the_scenario_later()
         repo,
         &[
             "evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01",
-            "--kind", "test-run", "--ref", "waived run", "--role", "implementer",
+            "--class", "test-run", "--ref", "waived run", "--role", "implementer",
             "--actor-id", "impl", "--promote", "--override-reason", "urgent fix",
         ],
     );
@@ -626,7 +626,7 @@ fn subject_lifecycle_37_unadopt_refuses_a_change_a_scenario_is_tagged_for() {
         text.contains("shop.cart.01") && text.contains("remove or retag"),
         "{json}"
     );
-    assert!(stdout(&run(repo, &["subject", "status", "s", "--json"])).contains("\"b\""));
+    assert!(stdout(&run(repo, &["subject", "show", "s", "--json"])).contains("\"b\""));
 
     // Retagged away, the unadopt goes through.
     let path = repo.join(".canon/specs/kind=feature/area=shop/cart.feature");
@@ -643,7 +643,7 @@ fn subject_lifecycle_35_adopting_an_unapproved_change_into_a_shipped_subject_war
     let repo = dir.path();
     scenario(repo, "shop.cart.01", None);
     assert!(attest(repo, "shop.cart.01", "run").status.success());
-    ok(repo, &["subject", "status", "s", "--to", "shipped"]);
+    ok(repo, &["subject", "move", "s", "--to", "shipped"]);
     let out = ok(
         repo,
         &["change", "new", "a", "--subject-id", "s", "--title", "A", "--json"],
@@ -680,7 +680,7 @@ fn subject_lifecycle_38_a_pending_draft_does_not_freeze_a_shipped_subject() {
         let first = attest(repo, id, "first run");
         assert!(first.status.success(), "{id}: {}", stderr(&first));
     }
-    let shipped = run(repo, &["subject", "status", "s", "--to", "shipped"]);
+    let shipped = run(repo, &["subject", "move", "s", "--to", "shipped"]);
     assert!(shipped.status.success(), "{}", stderr(&shipped));
 
     let adopted = change(repo, "b", false);
@@ -688,7 +688,7 @@ fn subject_lifecycle_38_a_pending_draft_does_not_freeze_a_shipped_subject() {
 
     let reopen = run(
         repo,
-        &["subject", "status", "s", "--to", "verifying", "--reason", "fix the cart"],
+        &["subject", "move", "s", "--to", "verifying", "--reason", "fix the cart"],
     );
     assert!(reopen.status.success(), "{}", stderr(&reopen));
     assert!(
@@ -698,7 +698,7 @@ fn subject_lifecycle_38_a_pending_draft_does_not_freeze_a_shipped_subject() {
     );
     let again = attest(repo, "shop.cart.01", "second run");
     assert!(again.status.success(), "{}", stderr(&again));
-    let ship = run(repo, &["subject", "status", "s", "--to", "shipped", "--json"]);
+    let ship = run(repo, &["subject", "move", "s", "--to", "shipped", "--json"]);
     assert!(ship.status.success(), "{}", stderr(&ship));
     let shipped: Value = serde_json::from_str(&stdout(&ship)).unwrap();
     assert!(
@@ -723,10 +723,10 @@ fn subject_lifecycle_38_a_pending_draft_does_not_freeze_a_shipped_subject() {
     // Once a scenario is tagged for the draft, shipping needs its approval.
     ok(
         repo,
-        &["subject", "status", "s", "--to", "verifying", "--reason", "more"],
+        &["subject", "move", "s", "--to", "verifying", "--reason", "more"],
     );
     scenario(repo, "shop.cart.02", Some("b.F1"));
-    let ship = run(repo, &["subject", "status", "s", "--to", "shipped"]);
+    let ship = run(repo, &["subject", "move", "s", "--to", "shipped"]);
     assert_eq!(ship.status.code(), Some(1), "{}", stderr(&ship));
     assert!(
         stderr(&ship).contains(".canon/changes/b/brief.md"),
@@ -768,13 +768,13 @@ fn subject_lifecycle_38_a_pending_drafts_next_step_follows_its_brief_check() {
     let blocked = steps(repo);
     assert!(has(&blocked, "canon brief check b"), "{blocked:?}");
     assert!(!has(&blocked, "report the pending draft's brief"), "{blocked:?}");
-    assert!(has(&blocked, "canon subject status s --to shipped"), "{blocked:?}");
+    assert!(has(&blocked, "canon subject move s --to shipped"), "{blocked:?}");
 
     std::fs::write(brief_path(repo, "b"), brief("")).unwrap();
     let clean = steps(repo);
     assert!(has(&clean, "report the pending draft's brief in .canon/changes/b/brief.md to the human; s is not blocked meanwhile"), "{clean:?}");
     assert!(!has(&clean, "canon brief check"), "{clean:?}");
-    assert!(has(&clean, "canon subject status s --to shipped"), "{clean:?}");
+    assert!(has(&clean, "canon subject move s --to shipped"), "{clean:?}");
 }
 
 /// A subject that shipped with approved `a`, then adopted a draft `b`
@@ -795,7 +795,7 @@ fn shipped_with_tagged_draft() -> TempDir {
     for id in ["shop.cart.01", "shop.cart.02"] {
         assert!(attest(repo, id, "run").status.success());
     }
-    ok(repo, &["subject", "status", "s", "--to", "shipped"]);
+    ok(repo, &["subject", "move", "s", "--to", "shipped"]);
     change(repo, "b", false);
     scenario(repo, "shop.cart.03", Some("b.F1"));
     ok(repo, &["inventory", "sync"]);
@@ -810,7 +810,7 @@ fn subject_lifecycle_39_a_tagged_draft_under_a_newer_untagged_draft_still_blocks
     let dir = shipped_with_tagged_draft();
     let repo = dir.path();
     let reopen = |repo: &Path| {
-        run(repo, &["subject", "status", "s", "--to", "verifying", "--reason", "fix"])
+        run(repo, &["subject", "move", "s", "--to", "verifying", "--reason", "fix"])
     };
     let control = reopen(repo);
     assert_eq!(control.status.code(), Some(1), "{}", stderr(&control));
@@ -827,14 +827,14 @@ fn subject_lifecycle_39_a_tagged_draft_under_a_newer_untagged_draft_still_blocks
         "a refused reopen names what it set aside: {}",
         stderr(&out)
     );
-    let json = run(repo, &["subject", "status", "s", "--to", "verifying", "--reason", "fix", "--json"]);
+    let json = run(repo, &["subject", "move", "s", "--to", "verifying", "--reason", "fix", "--json"]);
     assert_eq!(json.status.code(), Some(1));
     assert!(stdout(&json).contains("`c` is a pending draft"), "{}", stdout(&json));
 
     // Status does not advise the reopen the guard refuses.
     let text = stdout(&ok(repo, &["status"]));
     assert!(text.contains("reopening is refused until the brief above is approved"), "{text}");
-    assert!(!text.contains("reopen with `canon subject status s"), "{text}");
+    assert!(!text.contains("reopen with `canon subject move s"), "{text}");
 }
 
 /// subject.lifecycle.39: ship, from verifying, is refused naming b under
@@ -861,11 +861,11 @@ fn subject_lifecycle_39_ship_names_the_tagged_draft_and_every_change_set_aside()
     scenario(repo, "shop.cart.03", Some("b.F1"));
     ok(repo, &["inventory", "sync"]);
     change(repo, "c", false);
-    let ship = run(repo, &["subject", "status", "s", "--to", "shipped"]);
+    let ship = run(repo, &["subject", "move", "s", "--to", "shipped"]);
     assert_eq!(ship.status.code(), Some(1), "{}", stderr(&ship));
     assert!(stderr(&ship).contains(".canon/changes/b/brief.md"), "{}", stderr(&ship));
     assert!(stderr(&ship).contains("`c` is a pending draft"), "a refused ship names what it set aside: {}", stderr(&ship));
-    let json = run(repo, &["subject", "status", "s", "--to", "shipped", "--json"]);
+    let json = run(repo, &["subject", "move", "s", "--to", "shipped", "--json"]);
     assert_eq!(json.status.code(), Some(1));
     assert!(stdout(&json).contains("`c` is a pending draft"), "{}", stdout(&json));
 
@@ -874,7 +874,7 @@ fn subject_lifecycle_39_ship_names_the_tagged_draft_and_every_change_set_aside()
     std::fs::write(&path, text.replace("@flow:b.F1", "@flow:a.F1")).unwrap();
     ok(repo, &["inventory", "sync"]);
     assert!(attest(repo, "shop.cart.03", "run").status.success());
-    let ship = run(repo, &["subject", "status", "s", "--to", "shipped"]);
+    let ship = run(repo, &["subject", "move", "s", "--to", "shipped"]);
     assert!(ship.status.success(), "{}", stderr(&ship));
     assert!(
         stderr(&ship).contains("`b`, `c` are pending drafts"),
@@ -890,13 +890,13 @@ fn subject_lifecycle_39_ship_names_the_tagged_draft_and_every_change_set_aside()
 fn evidence_add_102_evidence_recorded_after_adoption_does_not_exempt() {
     let dir = repo_with_subject("proposed");
     let repo = dir.path();
-    ok(repo, &["subject", "status", "s", "--to", "specced"]);
+    ok(repo, &["subject", "move", "s", "--to", "specced"]);
     change(repo, "a", false);
     scenario(repo, "shop.cart.01", None);
     scenario(repo, "shop.cart.02", None);
     let first = attest(repo, "shop.cart.01", "while specced");
     assert!(first.status.success(), "{}", stderr(&first));
-    ok(repo, &["subject", "status", "s", "--to", "building"]);
+    ok(repo, &["subject", "move", "s", "--to", "building"]);
     let again = attest(repo, "shop.cart.01", "after building");
     assert_eq!(again.status.code(), Some(1), "{}", stderr(&again));
     assert!(stderr(&again).contains("BRIEF_UNAPPROVED"), "{}", stderr(&again));

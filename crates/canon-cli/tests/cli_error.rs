@@ -81,7 +81,7 @@ fn evidence_add_on_an_unapproved_brief_is_refused_with_its_code_and_the_next_ste
     let dir = repo_with_unapproved_brief();
     let out = run(
         dir.path(),
-        &["evidence", "add", "--task", "add-login#1", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl"],
+        &["evidence", "add", "--task-id", "add-login#1", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl"],
     );
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
     assert_eq!(human_code(&out), "BRIEF_UNAPPROVED");
@@ -91,7 +91,7 @@ fn evidence_add_on_an_unapproved_brief_is_refused_with_its_code_and_the_next_ste
 #[test]
 fn gate_task_without_evidence_is_blocked_with_its_code() {
     let dir = repo_with_unapproved_brief();
-    let out = run(dir.path(), &["gate", "task", "add-login#1"]);
+    let out = run(dir.path(), &["task", "done", "add-login#1"]);
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
     assert_eq!(human_code(&out), "GATE_TASK_BLOCKED");
 }
@@ -155,12 +155,12 @@ fn json_failures_from_a_command_with_its_own_flag_carry_code_message_hint_and_re
     let dir = repo_with_unapproved_brief();
     let repo = dir.path();
 
-    let out = run(repo, &["brief", "approve", "--by", "Ana", "--note", " ", "--json"]);
+    let out = run(repo, &["brief", "approve", "--approver", "Ana", "--note", " ", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     let error = json_error(&out);
     assert_eq!((error["code"].as_str(), error["retryable"].as_bool()), (Some("APPROVAL_INCOMPLETE"), Some(false)), "{error}");
     assert!(stderr(&out).is_empty(), "JSON mode writes nothing to stderr: {}", stderr(&out));
-    let human = run(repo, &["brief", "approve", "--by", "Ana", "--note", " "]);
+    let human = run(repo, &["brief", "approve", "--approver", "Ana", "--note", " "]);
     assert_eq!(human_code(&human), "APPROVAL_INCOMPLETE", "human mode says the same thing on stderr: {}", stderr(&human));
 
     // Exits come from the registry: a missing brief is exit 2.
@@ -168,7 +168,7 @@ fn json_failures_from_a_command_with_its_own_flag_carry_code_message_hint_and_re
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     assert_eq!(json_error(&out)["code"], "BRIEF_NOT_FOUND");
 
-    let out = run(repo, &["subject", "status", "no-such-subject", "--to", "specced", "--json"]);
+    let out = run(repo, &["subject", "move", "no-such-subject", "--to", "specced", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert_eq!(json_error(&out)["code"], "SUBJECT_NOT_FOUND");
 }

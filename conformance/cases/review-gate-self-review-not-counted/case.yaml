@@ -1,4 +1,4 @@
 description: "Under `require_review.distinct_actor: true`, a review authored by the scenario's own evidence actor does not count: `canon subject status <id> --to verifying` exits 1 with `unreviewed-promotion` naming that actor and the rule"
 steps:
-  - args: [subject, status, cart, --to, verifying]
+  - args: [subject, move, cart, --to, verifying]
     exit: 1

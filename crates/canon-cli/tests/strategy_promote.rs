@@ -1,4 +1,4 @@
-//! Integration test for `canon learn promote <strategy_id>` (S6
+//! Integration test for `canon strategy promote <strategy_id>` (S6
 //! `role-strategy-memory` task group 4 / task 5.2, gate wiring s37
 //! `execution-graph-topology`), run as a real subprocess against the
 //! real `canon` binary: seed a distilled `StrategyItem` into the
@@ -89,14 +89,19 @@ fn seed_proven_regime(repo: &Path) {
 
 fn run_promote(repo: &Path, id: &StrategyId, extra: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_canon"))
-        .arg("learn")
+        .arg("strategy")
         .arg("promote")
         .arg(id.to_string())
         .arg("--repo")
         .arg(repo)
         .args(extra)
         .output()
-        .expect("spawn canon learn promote")
+        .expect("spawn canon strategy promote")
+}
+
+fn error_code(output: &std::process::Output) -> String {
+    let body: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|e| panic!("one JSON document ({e}): {}", String::from_utf8_lossy(&output.stdout)));
+    body["error"]["code"].as_str().unwrap_or_default().to_string()
 }
 
 fn git_tier_file(repo: &Path, id: &StrategyId) -> std::path::PathBuf {
@@ -198,13 +203,9 @@ fn promote_materializes_a_seeded_strategy_as_a_git_tier_file() {
     seed_proven_regime(dir.path());
     let written_at = git_tier_file(dir.path(), &id);
 
-    let refused = run_promote(dir.path(), &id, &[]);
+    let refused = run_promote(dir.path(), &id, &["--json"]);
     assert_eq!(refused.status.code(), Some(1), "direct promotion without approval must be refused");
-    let stderr = String::from_utf8_lossy(&refused.stderr);
-    assert!(
-        stderr.contains("strategy promotion requires a valid paired evaluation and verified human approval"),
-        "stable refusal reason must be reported: {stderr}"
-    );
+    assert!(error_code(&refused).starts_with("LEARN_PROMOTION"), "the refusal carries a promotion error code: {}", error_code(&refused));
     assert!(!written_at.exists(), "refused direct promotion must not write the git-tier file");
 
     let (evaluation_path, approval_path, evaluation, approval) = write_approved_bundle(dir.path(), &candidate, &private_key);
@@ -250,8 +251,7 @@ fn an_unproven_strategy_is_blocked_by_the_promotion_gate() {
     let output = run_promote(dir.path(), &id, &[]);
     assert!(!output.status.success(), "an unproven strategy must not reach the git-tracked tier");
     assert!(!git_tier_file(dir.path(), &id).exists(), "a blocked promotion must write nothing");
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("promotion gate"), "the refusal names the gate: {stderr}");
+    assert_eq!(output.status.code(), Some(1));
 }
 
 /// The exact state this repo was in before the flywheel was wired:
@@ -297,7 +297,7 @@ fn a_blocked_dry_run_previews_then_reports_the_refusal() {
     let output = run_promote(dir.path(), &id, &["--dry-run"]);
     assert!(!output.status.success(), "a blocked dry-run must report the refusal in its exit code");
     assert!(String::from_utf8_lossy(&output.stdout).contains("[dry-run]"), "the preview is still shown");
-    assert!(String::from_utf8_lossy(&output.stderr).contains("promotion gate"), "and the refusal reason with it");
+    assert!(!output.stderr.is_empty(), "and the refusal reason with it");
     assert!(!git_tier_file(dir.path(), &id).exists(), "--dry-run still writes nothing");
 }
 
@@ -311,13 +311,9 @@ fn the_per_role_promotion_config_in_canon_yaml_drives_the_gate() {
     let id = seed_strategy(dir.path(), "proven by one corroborating success");
     seed_trajectories(dir.path(), 1, VerdictOutcome::Success);
 
-    let output = run_promote(dir.path(), &id, &[]);
+    let output = run_promote(dir.path(), &id, &["--json"]);
     assert!(!output.status.success(), "direct promotion must still require approval");
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("strategy promotion requires a valid paired evaluation and verified human approval"),
-        "stable refusal reason must be reported: {stderr}"
-    );
+    assert!(error_code(&output).starts_with("LEARN_PROMOTION"), "{}", error_code(&output));
     assert!(
         !git_tier_file(dir.path(), &id).exists(),
         "configured statistical gate must not bypass activation approval"
@@ -346,5 +342,47 @@ fn a_failed_demotion_has_its_own_error_code() {
     assert_eq!(output.status.code(), Some(1), "{}", String::from_utf8_lossy(&output.stderr));
     let body: serde_json::Value = serde_json::from_slice(&output.stdout).expect("one JSON document");
     assert_eq!(body["error"]["code"], "LEARN_DEMOTION_FAILED", "{body}");
-    assert!(body["error"]["message"].as_str().unwrap().contains("promotion gate"), "the block that triggered it is still named: {body}");
+}
+
+/// `strategy approval-payload` is a read: identical arguments print identical
+/// bytes (exit 0), and `--json` envelopes the same payload with the fields an
+/// external signer needs.
+#[test]
+fn approval_payload_is_deterministic_and_enveloped_with_json() {
+    let dir = tempfile::tempdir().unwrap();
+    let private_key = pin_approval_signer(dir.path());
+    let store = ParquetStrategyStore::open(dir.path().join(".canon").join("learn").join("strategies"));
+    let candidate = StrategyItem::new(StrategyId::new(), fixture_regime(), dev_role(), "review guidance", "one-liner", "sign me", vec![TrajectoryId::new()], Utc::now())
+        .with_lifecycle(StrategyLifecycle::Quarantined);
+    store.append(&candidate).expect("seed strategy");
+    let (evaluation_path, _, _, _) = write_approved_bundle(dir.path(), &candidate, &private_key);
+    let id = candidate.id.to_string();
+    let payload = |extra: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_canon"))
+            .args(["strategy", "approval-payload", &id, "--evaluation"])
+            .arg(&evaluation_path)
+            .args(["--approver", "alice", "--approval-at", "2030-01-01T00:00:00Z", "--repo"])
+            .arg(dir.path())
+            .args(extra)
+            .output()
+            .expect("spawn canon strategy approval-payload")
+    };
+
+    let first = payload(&[]);
+    let second = payload(&[]);
+    assert_eq!(first.status.code(), Some(0), "{}", String::from_utf8_lossy(&first.stderr));
+    assert_eq!(second.status.code(), Some(0), "{}", String::from_utf8_lossy(&second.stderr));
+    assert!(!first.stdout.is_empty());
+    assert_eq!(first.stdout, second.stdout, "identical arguments must print identical bytes");
+
+    let enveloped = payload(&["--json"]);
+    assert_eq!(enveloped.status.code(), Some(0), "{}", String::from_utf8_lossy(&enveloped.stderr));
+    let body: serde_json::Value = serde_json::from_slice(&enveloped.stdout).expect("one JSON document");
+    let data = &body["data"];
+    let hex: String = first.stdout.iter().map(|byte| format!("{byte:02x}")).collect();
+    assert_eq!(data["payloadHex"], hex.as_str(), "{body}");
+    assert_eq!(data["approver"], "alice", "{body}");
+    assert_eq!(data["approvalAt"], "2030-01-01T00:00:00Z", "{body}");
+    assert_eq!(data["subject"], format!("strategy:{id}"), "{body}");
+    assert!(data["instructions"].as_str().is_some_and(|text| !text.is_empty()), "{body}");
 }

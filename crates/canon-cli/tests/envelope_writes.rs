@@ -47,7 +47,7 @@ fn export_json_is_the_manifest_as_data_with_its_page_in_meta_and_a_next_step() {
 
     // With --out the manifest is the file; stdout names it.
     let file = repo.join("manifest.json");
-    let written = body(&canon(repo, &["export", "--kind", "evidence", "--out", file.to_str().unwrap(), "--json"]));
+    let written = body(&canon(repo, &["export", "--kind", "evidence", "--output", file.to_str().unwrap(), "--json"]));
     assert_eq!(written["data"]["out"], file.display().to_string(), "{written}");
     let manifest: Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
     assert_eq!(manifest["schema"], "canon.retention.export", "the file is the manifest itself");
@@ -122,30 +122,31 @@ fn candidate_and_evaluation(repo: &Path) -> (StrategyItem, PromotionEvaluation) 
 }
 
 #[test]
-fn learn_approve_json_is_the_payload_as_data_and_the_signing_is_a_human_step() {
+fn strategy_approval_payload_json_is_the_payload_as_data_and_the_signing_is_a_human_step() {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
     let (candidate, evaluation) = candidate_and_evaluation(repo);
     fs::write(repo.join("evaluation.json"), serde_json::to_vec(&evaluation).unwrap()).unwrap();
 
-    let out = canon(repo, &["learn", "approve", &candidate.id.to_string(), "--evaluation", "evaluation.json", "--principal", "alice", "--repo", ".", "--json"]);
+    let out = canon(repo, &["strategy", "approval-payload", &candidate.id.to_string(), "--evaluation", "evaluation.json", "--approver", "alice", "--approval-at", "2026-01-01T00:00:00Z", "--repo", ".", "--json"]);
     let shown = body(&out);
-    assert_eq!(shown["meta"]["command"], "learn approve", "{shown}");
-    assert_eq!(shown["data"]["candidate_strategy_id"], candidate.id.to_string(), "{shown}");
-    assert!(shown["data"]["payload_hex"].as_str().is_some_and(|hex| !hex.is_empty()), "{shown}");
+    assert_eq!(shown["meta"]["command"], "strategy approval-payload", "{shown}");
+    assert_eq!(shown["data"]["subject"], format!("strategy:{}", candidate.id), "{shown}");
+    assert!(shown["data"]["payloadHex"].as_str().is_some_and(|hex| !hex.is_empty()), "{shown}");
     let step = &shown["meta"]["next"][0];
     assert_eq!(step["actor"], "human", "signing is the human's: {shown}");
-    assert!(step["command"].as_str().unwrap().contains("canon learn promote"), "{shown}");
-    assert!(shown.get("payload_hex").is_none(), "the old top-level keys are gone: {shown}");
+    assert!(step["command"].as_str().unwrap().contains("canon strategy promote"), "{shown}");
+    assert!(shown.get("payloadHex").is_none(), "the old top-level keys are gone: {shown}");
 
     // The human form stays the bare payload a signer reads.
-    let human = canon(repo, &["learn", "approve", &candidate.id.to_string(), "--evaluation", "evaluation.json", "--principal", "alice", "--repo", "."]);
-    let payload: Value = serde_json::from_slice(&human.stdout).expect("the payload");
-    assert!(payload["payload_hex"].is_string(), "{payload}");
+    let human = canon(repo, &["strategy", "approval-payload", &candidate.id.to_string(), "--evaluation", "evaluation.json", "--approver", "alice", "--approval-at", "2026-01-01T00:00:00Z", "--repo", "."]);
+    assert!(human.status.success());
+    let hex: String = human.stdout.iter().map(|byte| format!("{byte:02x}")).collect();
+    assert_eq!(shown["data"]["payloadHex"], hex.as_str(), "the bare stdout is the payload bytes themselves");
 }
 
 #[test]
-fn learn_rollback_json_is_the_record_as_data_with_a_next_step() {
+fn strategy_rollback_json_is_the_record_as_data_with_a_next_step() {
     let signing = Signing::new();
     let repo = signing.repo.path();
     let (candidate, evaluation) = candidate_and_evaluation(repo);
@@ -166,10 +167,10 @@ fn learn_rollback_json_is_the_record_as_data_with_a_next_step() {
 
     let out = canon(
         repo,
-        &["learn", "rollback", &candidate.id.to_string(), "--reason", reason, "--actor-id", "alice", "--signature-file", "rollback.sig", "--approved-at", &at.to_rfc3339_opts(SecondsFormat::Nanos, true), "--repo", ".", "--json"],
+        &["strategy", "rollback", &candidate.id.to_string(), "--reason", reason, "--actor-id", "alice", "--signature-file", "rollback.sig", "--approval-at", &at.to_rfc3339_opts(SecondsFormat::Nanos, true), "--repo", ".", "--json"],
     );
     let shown = body(&out);
-    assert_eq!(shown["meta"]["command"], "learn rollback", "{shown}");
+    assert_eq!(shown["meta"]["command"], "strategy rollback", "{shown}");
     assert!(shown["meta"]["next"].is_array(), "a write carries meta.next: {shown}");
     assert!(shown["data"].is_object() && shown["data"].get("meta").is_none(), "the rollback record is data: {shown}");
     assert!(shown.get("strategy_id").is_none() && shown.get("reason").is_none(), "the old top-level keys are gone: {shown}");

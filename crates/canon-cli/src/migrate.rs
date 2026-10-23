@@ -89,7 +89,7 @@ fn scaffold_proposal(title: &str) -> String {
 /// `tasks.md` as `canon change new` wrote it from 0.14 through 0.16.
 fn scaffold_tasks(title: &str) -> String {
     format!(
-        "# Tasks: {title}\n\n<!-- One checkbox row per task, numbered: `- [ ] 1 Write the failure-path scenarios`. Each row imports as task `<slug>#<n>`; flip it with `canon task done` once evidence exists, never by hand. -->\n"
+        "# Tasks: {title}\n\n<!-- One checkbox row per task, numbered: `- [ ] 1 Write the failure-path scenarios`. Each row imports as task `<slug>#<n>`; flip it with `canon gate task` once evidence exists, never by hand. -->\n"
     )
 }
 

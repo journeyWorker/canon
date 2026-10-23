@@ -2,11 +2,11 @@ description: "0.18 D1: `--all-scenarios --verdict faithful` over a report in whi
 steps:
   - args: [inventory, sync]
     exit: 0
-  - args: [evidence, add, --project-id, root, --all-scenarios, --verdict, faithful, --report, junit:reports/junit.xml, --kind, test-run, --ref, "npm test", --role, implementer, --actor-id, impl-agent]
+  - args: [evidence, add, --project-id, root, --all-scenarios, --verdict, faithful, --report, junit:reports/junit.xml, --class, test-run, --ref, "npm test", --role, implementer, --actor-id, impl-agent]
     exit: 1
-  - args: [evidence, add, --project-id, root, --all-scenarios, --scenario-id, cart.add.01, --report, junit:reports/junit.xml, --kind, test-run, --ref, "npm test", --role, implementer]
+  - args: [evidence, add, --project-id, root, --all-scenarios, --scenario-id, cart.add.01, --report, junit:reports/junit.xml, --class, test-run, --ref, "npm test", --role, implementer]
     exit: 2
-  - args: [evidence, add, --all-scenarios, --report, junit:reports/junit.xml, --kind, test-run, --ref, "npm test", --role, implementer]
+  - args: [evidence, add, --all-scenarios, --report, junit:reports/junit.xml, --class, test-run, --ref, "npm test", --role, implementer]
     exit: 0
   - args: [gate, promote]
     exit: 0

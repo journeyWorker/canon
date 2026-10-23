@@ -418,7 +418,7 @@ fn authoring_migrate_07_legacy_reviews_pinned_before_the_move_are_pinned_current
         write(repo, ".canon/policy.yaml", "spec_coverage:\n  require_review:\n    scope: []\n");
         write(repo, "specs/kind=feature/area=cart/add.feature", CART);
         let pin = commit_all(repo, "cart add");
-        ok(repo, &["evidence", "add", "--scenario-id", "cart.add.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
+        ok(repo, &["evidence", "add", "--scenario-id", "cart.add.01", "--project-id", "root", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
         plant(
             repo,
             RecordKind::Review,

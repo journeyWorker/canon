@@ -95,5 +95,5 @@ fn bare_brief_is_a_usage_error_naming_brief_show() {
     assert_eq!(out.status.code(), Some(2));
     let body: serde_json::Value = serde_json::from_slice(&out.stdout).expect("a JSON error");
     assert_eq!(body["error"]["code"], "USAGE");
-    assert_eq!(body["error"]["expected"], serde_json::json!(["canon brief show"]));
+    assert_eq!(body["error"]["expected"], serde_json::json!(["brief show"]));
 }

@@ -138,7 +138,7 @@ fn fresh_snapshot_matches_the_committed_dashboard_fixture_contract() {
     let fresh_repo = tempfile::tempdir().unwrap();
     std::fs::write(fresh_repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap(); // `canon report` refuses a directory canon was never set up in
     let snapshot_dir = fresh_repo.path().join("snap-out");
-    let output = run_canon(&["report", "--repo", ".", "--snapshot", snapshot_dir.to_str().unwrap()], fresh_repo.path());
+    let output = run_canon(&["report", "snapshot", "--repo", ".", snapshot_dir.to_str().unwrap()], fresh_repo.path());
     assert!(output.status.success(), "canon report --snapshot must succeed over a fresh empty repo; stderr: {}", stderr(&output));
 
     let fresh_manifest = read_manifest(&snapshot_dir);
@@ -193,19 +193,19 @@ fn report_and_snapshot_share_a_stable_digest_across_independent_runs() {
     // `tests/report.rs`, re-asserted here over the SAME seeded repo the
     // digest cross-check below also uses, so both halves of task 7.2's
     // acceptance text run over one shared fixture.
-    let write = run_canon(&["report", "--repo", "."], dir.path());
+    let write = run_canon(&["report", "build", "--repo", "."], dir.path());
     assert!(write.status.success(), "stderr: {}", stderr(&write));
-    let check = run_canon(&["report", "--repo", ".", "--check"], dir.path());
+    let check = run_canon(&["report", "check", "--repo", "."], dir.path());
     assert_eq!(check.status.code(), Some(0), "no-drift must exit 0 immediately after a write; stderr: {}", stderr(&check));
 
     // Two independent --snapshot runs against the SAME unchanged input.
     let snap_a = dir.path().join("snap-a");
-    let out_a = run_canon(&["report", "--repo", ".", "--snapshot", snap_a.to_str().unwrap()], dir.path());
+    let out_a = run_canon(&["report", "snapshot", "--repo", ".", snap_a.to_str().unwrap()], dir.path());
     assert!(out_a.status.success(), "{}", stdout(&out_a));
     let manifest_a = read_manifest(&snap_a);
 
     let snap_b = dir.path().join("snap-b");
-    let out_b = run_canon(&["report", "--repo", ".", "--snapshot", snap_b.to_str().unwrap()], dir.path());
+    let out_b = run_canon(&["report", "snapshot", "--repo", ".", snap_b.to_str().unwrap()], dir.path());
     assert!(out_b.status.success(), "{}", stdout(&out_b));
     let manifest_b = read_manifest(&snap_b);
 

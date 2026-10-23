@@ -1,6 +1,6 @@
-canon subject status: refreshed the scenario index from 1 changed feature file(s) (specs/kind=feature/area=cart/add.feature): 1 record(s) written
-canon subject status: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
-canon subject status:   ran unreviewed-promotion — every owned scenario needs a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's
-canon subject status:   ran open-blocker — 1 adopted change(s) checked for open blocker findings
-canon subject status: waived unreviewed-promotion cart.add.01 — building → verifying: no review record for this scenario; spec_coverage.require_review wants an independent review (`canon review scenario`, or `canon review change` for a chore) once its subject is claimed done
-canon subject status: override recorded by `lead` for the 1 violation(s) above: reviewer out until Monday; a gap that appears later is not covered
+canon subject move: refreshed the scenario index from 1 changed feature file(s) (specs/kind=feature/area=cart/add.feature): 1 record(s) written
+canon subject move: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
+canon subject move:   ran unreviewed-promotion — every owned scenario needs a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's
+canon subject move:   ran open-blocker — 1 adopted change(s) checked for open blocker findings
+canon subject move: waived unreviewed-promotion cart.add.01 — building → verifying: no review record for this scenario; spec_coverage.require_review wants an independent review (`canon review scenario`, or `canon review change` for a chore) once its subject is claimed done
+canon subject move: override recorded by `lead` for the 1 violation(s) above: reviewer out until Monday; a gap that appears later is not covered

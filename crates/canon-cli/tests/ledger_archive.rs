@@ -217,11 +217,11 @@ fn migrate_compacts_the_ledger() {
     assert_eq!((ledger_count(repo, "evidence_record"), archive_count(repo, "evidence_record")), (1, 2));
 }
 
-fn accept(repo: &Path, reviewer: &str, actor: &str, session: &str) -> Output {
+fn accept(repo: &Path, actor: &str, session: &str) -> Output {
     canon(
         repo,
         &[
-            "divergence", "accept", SCENARIO, "--project-id", "demo", "--reason", "the engine drops the event", "--tracking", "https://example.com/issues/1", "--reviewer", reviewer,
+            "divergence", "accept", SCENARIO, "--project-id", "demo", "--reason", "the engine drops the event", "--tracking", "https://example.com/issues/1",
             "--role", "reviewer", "--actor-id", actor, "--session-id", session,
         ],
     )
@@ -235,14 +235,14 @@ fn accepting_a_divergence_still_checks_independence_against_superseded_attestati
     attest(repo, "impl-two", "implementer", 10, EvidenceVerdict::Divergent);
     assert_eq!(archive_count(repo, "evidence_record"), 1, "impl-agent's attestation is archived: impl-two's replaced it");
 
-    let refused = accept(repo, "impl-agent", "impl-agent", "review-session");
+    let refused = accept(repo, "impl-agent", "review-session");
     assert_eq!(refused.status.code(), Some(2), "{}", out(&refused));
     assert!(out(&refused).contains("`impl-agent` attested"), "an archived attestation still binds the reviewer: {}", out(&refused));
-    let same_session = accept(repo, "reviewer-2", "reviewer-2", "impl-agent-session");
+    let same_session = accept(repo, "reviewer-2", "impl-agent-session");
     assert_eq!(same_session.status.code(), Some(2), "{}", out(&same_session));
     assert!(out(&same_session).contains("session `impl-agent-session` attested"), "{}", out(&same_session));
 
-    let accepted = accept(repo, "reviewer-2", "reviewer-2", "review-session");
+    let accepted = accept(repo, "reviewer-2", "review-session");
     assert_eq!(accepted.status.code(), Some(0), "{}", out(&accepted));
 }
 

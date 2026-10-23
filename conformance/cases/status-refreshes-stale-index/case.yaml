@@ -11,7 +11,7 @@ steps:
     exit: 0
   - args: [status]
     exit: 0
-  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent]
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --class, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent]
     exit: 0
   - args: [gate, check]
     exit: 0

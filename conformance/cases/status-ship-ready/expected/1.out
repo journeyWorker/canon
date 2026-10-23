@@ -4,16 +4,16 @@ policy: .canon/policy.yaml
   require_cases: failure
   require_review: <absent>
   level: custom
-warning: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+warning: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --approver <who>`
 
 subjects (1):
   verifying (1):
     checkout: 2 scenarios, 2 evidenced, 0 reviewed, 0 open blockers
       brief: approved in .canon/changes/c-checkout/brief.md — Journey 2026-10-11 — "승인. 네 가정대로 진행"
-      advisory: that approval has no digest, so it does not follow the brief's text; re-approve with `canon brief approve c-checkout --by <the human> --note "<their words>"` to bind it
+      advisory: that approval has no digest, so it does not follow the brief's text; re-approve with `canon brief approve c-checkout --approver <the human> --note "<their words>"` to bind it
 
 unowned: none
 
 next:
   # checkout: every scenario is evidenced, with no blocker or case gap, and the brief is approved; ship it yourself unless the brief says the human ships
-  canon subject status checkout --to shipped --actor-id <unit>
+  canon subject move checkout --to shipped --actor-id <unit>

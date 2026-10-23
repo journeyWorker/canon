@@ -3,4 +3,4 @@ canon gate check: 1 violation(s)
 unreviewed-promotion (1):
   unreviewed-promotion cart.add.01 — no signed review: the latest review recorded no sign-off (`reviewer-2` indeterminate); an indeterminate or unavailable review is a gap, never an approval — run the review again and record `--outcome signed`
 
-advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --approver <who>`

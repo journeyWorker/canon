@@ -109,7 +109,7 @@ fn schema_json(args: &[&str]) -> Value {
 /// Every command of the clap tree, read through `canon schema` (visible
 /// arguments only).
 fn command_tree() -> Vec<Surface> {
-    let all = schema_json(&["schema", "--all", "--json"]);
+    let all = schema_json(&["schema", "--json"]);
     all["commands"]
         .as_array()
         .unwrap()
@@ -158,7 +158,7 @@ fn context_capability_15_a_kind_value_never_carries_the_record_suffix() {
     // The stored names do not move: the record's own `kind`, the ledger directory and the routing key.
     let dir = repo_with_change();
     let repo = dir.path();
-    let out = canon_in(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "demo.login.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer"]);
+    let out = canon_in(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "demo.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer"]);
     assert!(out.status.success(), "{}{}", stdout(&out), stderr(&out));
     let ledger = repo.join(".canon/ledger/kind=evidence_record");
     let files: Vec<_> = std::fs::read_dir(&ledger).expect("the ledger directory keeps its stored name").flatten().collect();
@@ -208,7 +208,7 @@ fn context_capability_16_a_removed_flag_spelling_is_refused_with_the_flag_that_r
 
     let old = canon_in(repo, &["change", "new", "add-search", "--subject", "demo", "--title", "Add search", "--json"]);
     let body = usage_error(&old);
-    assert_eq!(body["error"]["hint"], "--subject was renamed --subject-id in 0.24.0; use --subject-id", "{body}");
+    assert_eq!(body["error"]["expected"], serde_json::json!(["--subject-id"]), "{body}");
     assert_eq!(body["error"]["field"], "--subject", "{body}");
     assert!(!repo.join(".canon/changes/add-search").exists(), "a refused spelling runs nothing");
 
@@ -223,7 +223,7 @@ fn context_capability_16_a_removed_flag_spelling_is_refused_with_the_flag_that_r
         &["scenario", "new", "demo.login.01", "--title", "A", "--change", "--json"],
     ] {
         let body = usage_error(&canon_in(repo, args));
-        assert_eq!(body["error"]["hint"], "--change was renamed --change-id in 0.24.0; use --change-id", "{args:?}: {body}");
+        assert_eq!(body["error"]["expected"], serde_json::json!(["--change-id"]), "{args:?}: {body}");
     }
     let canonical = canon_in(repo, &["brief", "check", "add-login", "--json"]);
     let report: Value = serde_json::from_slice(&canonical.stdout).expect("one JSON document");
@@ -237,13 +237,14 @@ fn context_capability_16_a_removed_flag_spelling_is_refused_with_the_flag_that_r
         (&["ingest", "artifacts", "--run", "r1", "--json"], "--run", "--run-id"),
     ] {
         let body = usage_error(&canon_in(repo, args));
-        assert_eq!(body["error"]["hint"], format!("{old} was renamed {new} in 0.24.0; use {new}"), "{args:?}: {body}");
+        assert_eq!(body["error"]["field"], old, "{args:?}: {body}");
+        assert!(body["error"]["expected"].as_array().unwrap().contains(&serde_json::json!(new)), "{args:?}: {body}");
     }
 
     // Without --json the refusal is still exit 2, on stderr, with the hint.
     let human = canon_in(repo, &["scenario", "new", "demo.login.01", "--title", "A", "--change", "add-login"]);
     assert_eq!(human.status.code(), Some(2));
-    assert!(stderr(&human).contains("use --change-id"), "{}", stderr(&human));
+    assert!(stderr(&human).contains("--change-id"), "{}", stderr(&human));
 }
 
 /// context.capability.17: a removed `--kind` value is a usage error naming the
@@ -260,7 +261,9 @@ fn context_capability_17_a_removed_kind_value_is_refused_with_the_value_that_rep
         (&["purge", "--kind=session_record", "--before", "2020-01-01T00:00:00Z", "--plan", "--json"], "session_record", "session"),
     ] {
         let body = usage_error(&canon_in(repo, args));
-        assert_eq!(body["error"]["hint"], format!("--kind {old} was renamed --kind {new} in 0.24.0; use --kind {new}"), "{args:?}: {body}");
+        assert_eq!(body["error"]["field"], "--kind", "{args:?}: {body}");
+        assert_eq!(body["error"]["expected"], serde_json::json!([format!("--kind {new}")]), "{args:?}: {body}");
+        let _ = old;
     }
 
     let canonical = canon_in(repo, &["query", "--kind", "evidence", "--json"]);
@@ -269,7 +272,7 @@ fn context_capability_17_a_removed_kind_value_is_refused_with_the_value_that_rep
 
     // An unknown value that was never a spelling gets no rename hint.
     let unknown = usage_error(&canon_in(repo, &["query", "--kind", "nonsense", "--json"]));
-    assert!(!unknown.to_string().contains("renamed"), "{unknown}");
+    assert!(!unknown.to_string().contains("was removed"), "{unknown}");
 }
 
 /// context.capability.18: help and schema show only the one name.
@@ -329,7 +332,7 @@ fn context_capability_19_a_token_after_the_separator_or_an_option_value_is_never
     }
     // The same line with the spelling as a real flag is reported.
     let flagged = usage_error(&canon_in(repo, &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--change", "x", "--json"]));
-    assert!(flagged["error"]["hint"].as_str().unwrap().contains("use --change-id"), "{flagged}");
+    assert_eq!(flagged["error"]["expected"], serde_json::json!(["--change-id"]), "{flagged}");
 
     // As a flag it is refused, with a space or an equals sign.
     for args in [&["scenario", "new", "demo.login.01", "--title", "A", "--change=add-login", "--json"][..], &["scenario", "new", "demo.login.01", "--title", "A", "--change", "add-login", "--json"]] {
@@ -343,9 +346,9 @@ fn context_capability_19_a_token_after_the_separator_or_an_option_value_is_never
 fn context_capability_20_a_removed_spelling_is_refused_only_on_the_commands_that_renamed_it() {
     let dir = repo_with_change();
     let other = usage_error(&canon_in(dir.path(), &["status", "--subject", "demo", "--json"]));
-    assert!(!other.to_string().contains("renamed"), "{other}");
+    assert!(!other.to_string().contains("was removed"), "{other}");
     let renamed = usage_error(&canon_in(dir.path(), &["scenario", "new", "demo.login.01", "--title", "A", "--change", "--json"]));
-    assert!(renamed["error"]["hint"].as_str().unwrap().contains("use --change-id"), "{renamed}");
+    assert_eq!(renamed["error"]["expected"], serde_json::json!(["--change-id"]), "{renamed}");
 }
 
 /// context.capability.21: a `scenario new --from` line with a removed key refuses

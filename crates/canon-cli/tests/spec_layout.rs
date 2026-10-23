@@ -111,7 +111,7 @@ fn authoring_init_81_a_fresh_repo_authors_indexes_and_gates_under_canon_specs() 
     assert_eq!(gate.status.code(), Some(1), "{}", stdout(&gate));
     assert!(stdout(&gate).contains("world.hotdeal.01"), "the unevidenced scenario is graded: {}", stdout(&gate));
 
-    let evidence = ok(repo, &["evidence", "add", "--scenario-id", "world.hotdeal.01", "--project-id", "root", "--kind", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor-id", "impl"]);
+    let evidence = ok(repo, &["evidence", "add", "--scenario-id", "world.hotdeal.01", "--project-id", "root", "--class", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor-id", "impl"]);
     assert!(stderr(&evidence).contains(&format!("canon evidence add: refreshed the scenario index from 1 changed feature file(s) ({FEATURE}): 1 record(s) written")), "a writer indexes the scenario: {}", stderr(&evidence));
     let records = scenario_records(repo);
     assert_eq!(records.len(), 1, "{records:?}");

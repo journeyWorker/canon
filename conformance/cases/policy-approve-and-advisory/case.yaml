@@ -6,7 +6,7 @@ steps:
     exit: 1
   - args: [status]
     exit: 0
-  - args: [policy, approve, --by, alice, --note, reviewed the starter policy]
+  - args: [policy, approve, --approver, alice, --note, reviewed the starter policy]
     exit: 0
   - args: [gate, check]
     exit: 1

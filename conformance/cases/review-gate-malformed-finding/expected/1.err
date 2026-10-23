@@ -1,6 +1,6 @@
-canon subject status: refreshed the scenario index from 1 changed feature file(s) (specs/kind=feature/area=cart/add.feature): 1 record(s) written
-canon subject status: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
-canon subject status:   ran unreviewed-promotion — every owned scenario needs a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's
-canon subject status:   ran open-blocker — 1 adopted change(s) checked for open blocker findings
-canon subject status: SUBJECT_GATE_VIOLATION — malformed-evidence kind=finding/c-cart__0001__0001__<digest12>.json — unreadable finding record: resolution_sha: disposition is `fixed` but no `resolution_sha` names the commit that closed it (malformed); require_review.block_on_findings cannot tell whether it is an open blocker, so the gate fails closed — fix or remove the record
+canon subject move: refreshed the scenario index from 1 changed feature file(s) (specs/kind=feature/area=cart/add.feature): 1 record(s) written
+canon subject move: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
+canon subject move:   ran unreviewed-promotion — every owned scenario needs a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's
+canon subject move:   ran open-blocker — 1 adopted change(s) checked for open blocker findings
+canon subject move: SUBJECT_GATE_VIOLATION — malformed-evidence kind=finding/c-cart__0001__0001__<digest12>.json — unreadable finding record: resolution_sha: disposition is `fixed` but no `resolution_sha` names the commit that closed it (malformed); require_review.block_on_findings cannot tell whether it is an open blocker, so the gate fails closed — fix or remove the record
 hint: fix each violation above (`canon gate check` lists them with their causes), then run this transition again

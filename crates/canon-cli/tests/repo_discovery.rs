@@ -119,14 +119,14 @@ fn every_command_that_needs_canon_state_refuses_without_a_canon_yaml() {
         &["status"],
         &["query", "--kind", "subject"],
         &["finding", "list", "--change-id", "add-login"],
-        &["divergence", "status"],
+        &["divergence", "list"],
         &["brief", "check"],
         &["policy", "show"],
         &["dispatch", "diff"],
         &["artifacts", "verify"],
         &["subject", "new", "x", "--domain", "dev", "--title", "X"],
         &["inventory", "sync"],
-        &["report"],
+        &["report", "build"],
         &["ingest", "sessions"],
         &["tier", "age"],
         &["ledger", "compact"],
@@ -147,7 +147,7 @@ fn every_command_that_needs_canon_state_refuses_without_a_canon_yaml() {
 fn commands_that_run_without_a_canon_yaml_still_do() {
     let home = TempDir::new().unwrap();
     let empty = TempDir::new().unwrap();
-    for args in [&["schema", "gate", "check"][..], &["context", "--json"][..], &["retrieve", "--role", "reviewer", "--domain", "dev"][..], &["regime-key", "--role", "reviewer", "--repo-name", "r", "--area", "a", "--hash", "abcdef012345"][..], &["--help"][..]] {
+    for args in [&["schema", "gate", "check"][..], &["context", "--json"][..], &["retrieve", "--for-role", "reviewer", "--domain", "dev"][..], &["regime", "show", "--role-segment", "reviewer", "--repo-name", "r", "--area", "a", "--hash", "abcdef012345"][..], &["--help"][..]] {
         let out = canon(empty.path(), home.path(), args);
         assert_eq!(out.status.code(), Some(0), "{args:?}: {}", stderr(&out));
     }

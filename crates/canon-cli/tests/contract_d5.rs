@@ -83,21 +83,21 @@ fn context_keeps_only_the_named_sections() {
 #[test]
 fn divergence_status_projects_each_scenario_row() {
     let dir = repo();
-    ok(dir.path(), &["divergence", "add", "auth.login.01", "--project-id", "root", "--sha", SHA, "--reviewer", "alice", "--role", "reviewer"]);
-    let all = body(&run(dir.path(), &["divergence", "status", "--json"]));
+    ok(dir.path(), &["divergence", "add", "auth.login.01", "--project-id", "root", "--sha", SHA, "--actor-id", "alice", "--role", "reviewer"]);
+    let all = body(&run(dir.path(), &["divergence", "list", "--json"]));
     assert!(all["data"]["scenarios"][0].as_object().unwrap().len() >= 3, "{all}");
-    let out = run(dir.path(), &["divergence", "status", "--json", "--fields", "scenario_id,state"]);
+    let out = run(dir.path(), &["divergence", "list", "--json", "--fields", "scenario_id,state"]);
     let shown = body(&out);
     assert_eq!(shown["data"]["scenarios"], serde_json::json!([{ "scenario_id": "auth.login.01", "state": "open" }]));
     assert_eq!(shown["data"]["summary"], all["data"]["summary"], "the summary is not a row and is kept");
-    let out = run(dir.path(), &["divergence", "status", "--json", "--fields", "nope"]);
+    let out = run(dir.path(), &["divergence", "list", "--json", "--fields", "nope"]);
     assert_eq!(body(&out)["error"]["code"], "UNKNOWN_FIELD");
 }
 
 #[test]
 fn export_projects_each_record_but_keeps_the_manifest_digests() {
     let dir = repo();
-    ok(dir.path(), &["evidence", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer"]);
+    ok(dir.path(), &["evidence", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer"]);
     let all = body(&run(dir.path(), &["export", "--kind", "evidence"]));
     assert_eq!(all["records"].as_array().unwrap().len(), 1);
     let out = run(dir.path(), &["export", "--kind", "evidence", "--fields", "id,digest"]);
@@ -132,7 +132,7 @@ fn usage_errors_name_the_argument_and_its_possible_values() {
     assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("USAGE"), Some("--kind")));
     assert!(strings(&e["expected"]).contains(&"evidence"));
 
-    let e = error_of(dir.path(), &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "nope", "--reviewer", "a", "--summary", "s"]);
+    let e = error_of(dir.path(), &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "nope", "--actor-id", "a", "--summary", "s"]);
     assert_eq!(e["field"], "--severity");
     assert_eq!(strings(&e["expected"]), ["blocker", "should-fix", "note"]);
 
@@ -140,11 +140,11 @@ fn usage_errors_name_the_argument_and_its_possible_values() {
     assert_eq!(e["field"], "--disposition");
     assert_eq!(strings(&e["expected"]), ["open", "fixed", "rejected", "deferred"]);
 
-    let e = error_of(dir.path(), &["change", "new", "x", "--subject-id", "demo", "--title", "t", "--kind", "nope"]);
-    assert_eq!(e["field"], "--kind");
+    let e = error_of(dir.path(), &["change", "new", "x", "--subject-id", "demo", "--title", "t", "--change-kind", "nope"]);
+    assert_eq!(e["field"], "--change-kind");
     assert_eq!(strings(&e["expected"]), ["feature", "chore"]);
 
-    let e = error_of(dir.path(), &["evidence", "add", "--kind", "k", "--ref", "r", "--role", "implementer", "--verdict", "nope"]);
+    let e = error_of(dir.path(), &["evidence", "add", "--class", "k", "--ref", "r", "--role", "implementer", "--verdict", "nope"]);
     assert_eq!(e["field"], "--verdict");
     assert_eq!(strings(&e["expected"]), ["faithful", "not-applicable", "divergent"]);
 
@@ -158,10 +158,10 @@ fn usage_errors_name_the_argument_and_its_possible_values() {
 fn a_subject_status_off_the_chain_lists_the_states_it_may_move_to() {
     let dir = repo();
     // The state argument is a closed set clap knows.
-    let e = error_of(dir.path(), &["subject", "status", "demo", "--to", "nope"]);
+    let e = error_of(dir.path(), &["subject", "move", "demo", "--to", "nope"]);
     assert_eq!(strings(&e["expected"]), ["proposed", "specced", "building", "verifying", "shipped", "retired"]);
     // A known state that is not the next step names the next steps.
-    let e = error_of(dir.path(), &["subject", "status", "demo", "--to", "shipped"]);
+    let e = error_of(dir.path(), &["subject", "move", "demo", "--to", "shipped"]);
     assert_eq!(e["code"], "SUBJECT_INVALID_TRANSITION");
     assert_eq!(strings(&e["expected"]), ["specced", "retired"]);
 }
@@ -179,7 +179,7 @@ fn input_validation_refusals_name_the_field_and_the_accepted_values() {
     let e = error_of(dir.path(), &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "fixed"]);
     assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("FINDING_RESOLUTION_SHA_REQUIRED"), Some("--resolution-sha")));
 
-    let regime = String::from_utf8(run(dir.path(), &["regime-key", "--role", "implementer", "--repo-name", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
+    let regime = String::from_utf8(run(dir.path(), &["regime", "show", "--role-segment", "implementer", "--repo-name", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
     let e = error_of(dir.path(), &["dispatch", "begin", "--role", "reviewer", "--regime", &regime]);
     assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("DISPATCH_ROLE_REGIME_MISMATCH"), Some("--role")));
     assert_eq!(strings(&e["expected"]), ["implementer"]);
@@ -188,7 +188,7 @@ fn input_validation_refusals_name_the_field_and_the_accepted_values() {
 #[test]
 fn a_refusal_about_no_particular_argument_carries_neither_key() {
     let dir = repo();
-    let e = error_of(dir.path(), &["subject", "status", "ghost", "--to", "specced"]);
+    let e = error_of(dir.path(), &["subject", "move", "ghost", "--to", "specced"]);
     assert_eq!(e["code"], "SUBJECT_NOT_FOUND");
     assert!(e.get("field").is_none() && e.get("expected").is_none(), "{e}");
 }
@@ -196,7 +196,7 @@ fn a_refusal_about_no_particular_argument_carries_neither_key() {
 // ---- 4. retry safety -------------------------------------------------------
 
 fn evidence(dir: &Path, extra: &[&str]) -> Output {
-    let mut args = vec!["evidence", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--json"];
+    let mut args = vec!["evidence", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--json"];
     args.extend_from_slice(extra);
     run(dir, &args)
 }

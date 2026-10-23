@@ -500,7 +500,7 @@ fn canonical_check_and_doctor_report_legacy_codex_remnant_with_fix() {
     assert!(!doctor.iter().any(|line| line == "status: healthy"));
 
     let output = Command::new(env!("CARGO_BIN_EXE_canon"))
-        .args(["skills", "check", "--providers", "claude,codex", "--source"])
+        .args(["skills", "check", "--providers", "claude,codex", "--skills-source"])
         .arg(&source)
         .arg("--repo")
         .arg(&target)
@@ -588,7 +588,7 @@ fn set_lock_version(target: &Path, version: Option<&str>) {
 }
 
 fn canon(args: &[&str], source: &Path, target: &Path) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).arg("--source").arg(source).arg("--repo").arg(target).output().unwrap()
+    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).arg("--skills-source").arg(source).arg("--repo").arg(target).output().unwrap()
 }
 
 /// skills.install.40
@@ -1019,7 +1019,7 @@ fn skills_install_55_a_malformed_skills_section_fails_loud() {
         assert!(!target.join(".claude/skills").exists() && !target.join(".canon").exists(), "{section:?}: nothing is written");
         assert_eq!(fs::read_to_string(target.join("canon.yaml")).unwrap(), config);
 
-        let check = Command::new(env!("CARGO_BIN_EXE_canon")).args(["init", "--check-config", "--repo"]).arg(&target).output().unwrap();
+        let check = Command::new(env!("CARGO_BIN_EXE_canon")).args(["init", "--check", "--repo"]).arg(&target).output().unwrap();
         let out = String::from_utf8_lossy(&check.stdout);
         assert_eq!(check.status.code(), Some(2), "{out}");
         assert!(out.lines().any(|line| line.starts_with("[FAIL] skills: ") && line.contains(needle)), "{out}");

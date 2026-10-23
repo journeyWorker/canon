@@ -3,4 +3,4 @@ canon gate check: 1 violation(s)
 unreviewed-promotion (1):
   unreviewed-promotion cart.add.01 — no review record for this scenario; spec_coverage.require_review wants an independent review (`canon review scenario`, or `canon review change` for a chore) once its subject is claimed done
 
-advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --approver <who>`

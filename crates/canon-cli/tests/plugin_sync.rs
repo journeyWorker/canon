@@ -83,7 +83,7 @@ fn sync_porting(dir: &Path) -> Output {
 }
 
 fn query_scenarios_with_plugin(dir: &Path) -> Vec<Value> {
-    let out = run_canon(&["query", "--kind", "scenario", "--repo", ".", "--plugin", "porting", "--json"], dir);
+    let out = run_canon(&["query", "--kind", "scenario", "--repo", ".", "--plugin-id", "porting", "--json"], dir);
     assert!(out.status.success(), "canon query --plugin porting failed: {}", stderr(&out));
     let json: Value = serde_json::from_str(&stdout(&out)).unwrap_or_else(|e| panic!("query --json didn't parse: {e}\n{}", stdout(&out)));
     json["data"]["records"].as_array().cloned().unwrap_or_default()

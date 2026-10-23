@@ -64,21 +64,21 @@ fn report_generation_10_task_columns_fill_from_the_sqlite_hot_tier() {
     assert!(canon_yaml.contains("backend: sqlite") && canon_yaml.contains("task: hot"), "init's default routing: {canon_yaml}");
 
     ok(
-        run_canon(&["evidence", "add", "--task", "add-login#1", "--kind", "test-run", "--ref", "cargo test login", "--role", "implementer", "--summary", "login scenarios written"], repo),
+        run_canon(&["evidence", "add", "--task-id", "add-login#1", "--class", "test-run", "--ref", "cargo test login", "--role", "implementer", "--summary", "login scenarios written"], repo),
         "evidence add",
     );
-    ok(run_canon(&["gate", "task", "add-login#1"], repo), "gate task");
+    ok(run_canon(&["task", "done", "add-login#1"], repo), "task done");
     assert!(repo.join(".canon/hot.db").is_file(), "tasks live in the sqlite hot tier");
     assert!(!repo.join(".canon/ledger/kind=task").exists(), "no task reached the git ledger, so the report can only have read sqlite");
 
-    let report = ok(run_canon(&["report"], repo), "report");
+    let report = ok(run_canon(&["report", "build"], repo), "report");
     assert!(!stderr(&report).contains("WARN"), "{}", stderr(&report));
     let content = fs::read_to_string(repo.join(".canon/REPORT.md")).unwrap();
     assert!(content.contains("| add-login | add-login#1 | Write the login scenarios | done | ✓ | ✓ | canon | 1 |"), "{content}");
     assert!(content.contains("| add-login | add-login#2 | Implement login | open | · | · | — | 0 |"), "{content}");
     assert!(!content.contains("## Kinds not read directly"), "{content}");
 
-    let check = run_canon(&["report", "--check"], repo);
+    let check = run_canon(&["report", "check"], repo);
     assert_eq!(check.status.code(), Some(0), "the hot tier reads the same twice: {}", stderr(&check));
 }
 
@@ -100,12 +100,12 @@ fn report_generation_11_a_missing_hot_db_is_no_rows_and_an_unreadable_one_fails_
     )
     .unwrap();
 
-    let report = ok(run_canon(&["report"], repo), "report over a missing hot db");
+    let report = ok(run_canon(&["report", "build"], repo), "report over a missing hot db");
     assert!(!stderr(&report).contains("WARN"), "{}", stderr(&report));
     assert!(!repo.join(".canon/hot.db").exists(), "reading never creates the hot db");
 
     fs::write(repo.join(".canon/hot.db"), "not a sqlite database, just text\n".repeat(64)).unwrap();
-    let report = run_canon(&["report"], repo);
+    let report = run_canon(&["report", "build"], repo);
     assert_eq!(report.status.code(), Some(1), "stdout: {} stderr: {}", stdout(&report), stderr(&report));
     let err = stderr(&report);
     assert!(err.contains("reading the sqlite hot tier at") && err.contains(".canon/hot.db"), "{err}");
@@ -123,10 +123,10 @@ fn report_generation_12_a_record_in_both_tiers_counts_once() {
     let dir = fresh_repo_with_tasks();
     let repo = dir.path();
     ok(
-        run_canon(&["evidence", "add", "--task", "add-login#1", "--kind", "test-run", "--ref", "cargo test login", "--role", "implementer", "--summary", "login scenarios written"], repo),
+        run_canon(&["evidence", "add", "--task-id", "add-login#1", "--class", "test-run", "--ref", "cargo test login", "--role", "implementer", "--summary", "login scenarios written"], repo),
         "evidence add",
     );
-    ok(run_canon(&["gate", "task", "add-login#1"], repo), "gate task");
+    ok(run_canon(&["task", "done", "add-login#1"], repo), "task done");
     let evidence_dir = repo.join(".canon/ledger/kind=evidence_record");
     let files: Vec<_> = fs::read_dir(&evidence_dir).unwrap().map(|e| e.unwrap().path()).collect();
     assert_eq!(files.len(), 1, "{files:?}");
@@ -136,7 +136,7 @@ fn report_generation_12_a_record_in_both_tiers_counts_once() {
     assert!(!receipt.deduped, "the copy landed in sqlite");
     drop(hot);
 
-    ok(run_canon(&["report"], repo), "report");
+    ok(run_canon(&["report", "build"], repo), "report");
     let content = fs::read_to_string(repo.join(".canon/REPORT.md")).unwrap();
     assert!(content.contains("| add-login | add-login#1 | Write the login scenarios | done | ✓ | ✓ | canon | 1 |"), "{content}");
 }

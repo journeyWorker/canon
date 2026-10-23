@@ -4,5 +4,5 @@ steps:
     exit: 0
   - args: [skills, doctor]
     exit: 0
-  - args: [init, --check-config]
+  - args: [init, --check]
     exit: 0
