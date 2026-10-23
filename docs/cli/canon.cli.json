@@ -111,7 +111,6 @@
       "effect": "read",
       "errorCodes": [
         "ADAPTER_REFUSED",
-        "SERIALIZE_FAILED",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
@@ -531,7 +530,6 @@
         "CONFIG_MISSING",
         "CONFIG_UNREADABLE",
         "NO_BRIEF",
-        "SERIALIZE_FAILED",
         "SPEC_ROOTS_UNREADABLE",
         "UNKNOWN_ROLE",
         "USAGE"
