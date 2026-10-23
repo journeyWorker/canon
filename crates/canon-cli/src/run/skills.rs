@@ -18,6 +18,9 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
     if let Some(dir) = source.as_deref().filter(|dir| !dir.join("SKILL.src.md").is_file()) {
         return match crate::skills::install(dir, target, dry_run) {
             Ok(report) => {
+                if !dry_run && report.installed.iter().all(|skill| !skill.changed) {
+                    crate::json_out::mark_unchanged();
+                }
                 for skill in &report.installed {
                     let status = match (skill.changed, dry_run) {
                         (true, false) => "installed",
@@ -37,6 +40,9 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
     }
     match crate::skills::install_canonical(source.as_deref(), target, providers, dry_run) {
         Ok(report) => {
+            if !dry_run && !report.changed && report.config_written.is_none() {
+                crate::json_out::mark_unchanged();
+            }
             let selection = crate::skills::ProviderSelection { providers: report.providers.clone(), origin: report.origin };
             let status = match (report.changed, dry_run) {
                 (true, false) => "installed",

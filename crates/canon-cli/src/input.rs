@@ -52,7 +52,7 @@ const BATCH_EXAMPLES: &[(&str, &str)] = &[
     ("scenario new", r#"[{"operands":["auth.login.01"],"title":"Logs in","case":"happy"},{"operands":["auth.login.02"],"title":"Signs out","case":"happy"}]"#),
     ("evidence add", r#"[{"scenarioId":"auth.login.01","class":"test-run","ref":"npm test","role":"implementer"},{"scenarioId":"auth.login.02","class":"test-run","ref":"npm test","role":"implementer"}]"#),
     ("finding add", r#"[{"changeId":"add-login","round":1,"seq":1,"severity":"note","actorId":"reviewer-1","summary":"Token is logged"},{"changeId":"add-login","round":1,"seq":2,"severity":"blocker","actorId":"reviewer-1","summary":"No rate limit"}]"#),
-    ("divergence add", r#"[{"operands":["auth.login.01"],"sha":"0123456789abcdef0123456789abcdef01234567","actorId":"reviewer-1","role":"reviewer"},{"operands":["auth.login.02"],"sha":"0123456789abcdef0123456789abcdef01234567","actorId":"reviewer-1","role":"reviewer"}]"#),
+    ("divergence add", r#"[{"operands":["auth.login.01"],"actorId":"reviewer-1","role":"reviewer"},{"operands":["auth.login.02"],"actorId":"reviewer-1","role":"reviewer"}]"#),
     ("subject new", r#"[{"operands":["payments"],"domain":"dev","title":"Payments"},{"operands":["billing"],"domain":"dev","title":"Billing"}]"#),
 ];
 
