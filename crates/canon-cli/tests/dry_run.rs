@@ -167,7 +167,7 @@ fn skills_install_dry_run_previews_without_writing() {
     let target = tmp.path().join("target");
     std::fs::create_dir_all(&target).unwrap();
     let data = valid_preview(
-        &["skills", "install", "--source", source.to_str().unwrap(), "--repo", target.to_str().unwrap(), "--providers", "claude"],
+        &["skills", "install", "--skills-source", source.to_str().unwrap(), "--repo", target.to_str().unwrap(), "--providers", "claude"],
         tmp.path(),
         &[tmp.path()],
     );
@@ -181,7 +181,7 @@ fn skills_install_dry_run_refuses_like_the_real_run() {
     let target = tmp.path().join("target");
     std::fs::create_dir_all(&target).unwrap();
     assert_eq!(
-        bad_preview(&["skills", "install", "--source", source.to_str().unwrap(), "--repo", target.to_str().unwrap(), "--providers", "bogus"], tmp.path(), &[tmp.path()]),
+        bad_preview(&["skills", "install", "--skills-source", source.to_str().unwrap(), "--repo", target.to_str().unwrap(), "--providers", "bogus"], tmp.path(), &[tmp.path()]),
         "SKILLS_FAILED"
     );
 }
@@ -366,7 +366,7 @@ fn export_repo() -> tempfile::TempDir {
 #[test]
 fn export_dry_run_writes_neither_the_output_file_nor_the_audit_line() {
     let dir = export_repo();
-    let data = valid_preview(&["export", "--kind", "change", "--out", "out.json"], dir.path(), &[dir.path()]);
+    let data = valid_preview(&["export", "--kind", "change", "--output", "out.json"], dir.path(), &[dir.path()]);
     assert_eq!(data["recordCount"], 1, "{data}");
     assert!(dir.path().join("out.json").is_file(), "the real run wrote the file");
 }
@@ -374,7 +374,7 @@ fn export_dry_run_writes_neither_the_output_file_nor_the_audit_line() {
 #[test]
 fn export_dry_run_leaves_no_output_file() {
     let dir = export_repo();
-    let preview = run(&["export", "--kind", "change", "--out", "out.json", "--dry-run"], dir.path());
+    let preview = run(&["export", "--kind", "change", "--output", "out.json", "--dry-run"], dir.path());
     assert!(preview.status.success());
     assert!(!dir.path().join("out.json").exists());
 }
@@ -383,7 +383,7 @@ fn export_dry_run_leaves_no_output_file() {
 fn export_dry_run_refuses_like_the_real_run() {
     let dir = export_repo();
     assert_eq!(bad_preview(&["export", "--kind", "change", "--include-sensitive"], dir.path(), &[dir.path()]), "RETENTION_EXPORT_FAILED");
-    assert_eq!(bad_preview(&["export", "--kind", "change", "--out", "missing-dir/out.json"], dir.path(), &[dir.path()]), "RETENTION_EXPORT_FAILED");
+    assert_eq!(bad_preview(&["export", "--kind", "change", "--output", "missing-dir/out.json"], dir.path(), &[dir.path()]), "RETENTION_EXPORT_FAILED");
 }
 
 // ── subject adopt / unadopt ──
@@ -445,7 +445,7 @@ fn subject_unadopt_dry_run_refuses_like_the_real_run() {
 #[test]
 fn gate_and_learn_promote_take_the_shared_flag() {
     let dir = repo_with(LOCAL_TIER);
-    for args in [&["gate", "promote", "--dry-run"][..], &["learn", "promote", "--help"]] {
+    for args in [&["gate", "promote", "--dry-run"][..], &["strategy", "promote", "--help"]] {
         let output = run(args, dir.path());
         assert_ne!(output.status.code(), Some(2), "{args:?}: {}", String::from_utf8_lossy(&output.stderr));
     }

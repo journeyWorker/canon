@@ -64,7 +64,7 @@ const SCENARIO_OPERAND: &[&str] = &["divergence add", "divergence defer", "diver
 const REVIEWER: &[&str] = &["divergence add", "divergence defer", "divergence resolve", "divergence accept", "finding add", "review scenario", "review change"];
 const SKILLS: &[&str] = &["skills install", "skills check", "skills doctor"];
 const TASK: &[&str] = &["dispatch begin", "evidence add", "evidence approval-payload"];
-const DESTRUCTIVE: &[&str] = &["artifacts move", "ledger compact", "migrate", "tier age"];
+const DESTRUCTIVE: &[&str] = &["artifacts move", "ledger compact", "migrate", "purge", "tier age"];
 
 /// Every removed spelling, in the order of the table's 0.27 → 0.28 sections.
 /// `new` is a spelling (a command path with its option names), never a command
@@ -151,7 +151,7 @@ pub const ROWS: &[Row] = &[
     option("--canon-yaml", &["ingest sessions", "query", "tier age"], "--repo", "the repo's canon.yaml is found from `--repo`, or from the nearest directory holding one when it is omitted", "D5"),
     // ── Destructive leaves preview by default ──
     option("--dry-run", DESTRUCTIVE, "--commit --plan-digest", "the bare run previews; `--commit --plan-digest` acts", "D6"),
-    option("--plan", &["purge"], "purge", "the bare run previews", "D6"),
+    option("--plan", &["purge"], "purge", "the bare run previews; `--commit --plan-digest` acts", "D6"),
     option("--confirm", &["purge"], "--commit --plan-digest", "the bare run previews; `--commit --plan-digest` acts", "D6"),
     // ── Evidence re-audit moved to `evidence audit` ──
     option("--evaluator-id", &["evidence add"], "evidence audit", "an external evaluator's re-audit is its own command", "Q3"),

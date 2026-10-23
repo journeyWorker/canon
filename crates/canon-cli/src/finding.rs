@@ -539,12 +539,12 @@ pub struct FindingCloseReport<'a> {
     pub change_id: &'a str,
     pub round: u32,
     pub seq: u32,
-    /// The disposition it moved from; absent on a no-op.
+    /// The disposition it moved from; absent when unchanged.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub from: Option<&'static str>,
     pub disposition: &'static str,
     /// `true` when the finding already had this disposition and nothing was staged.
-    pub noop: bool,
+    pub unchanged: bool,
 }
 
 impl crate::reports::Report for FindingCloseReport<'_> {}
@@ -963,7 +963,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
             args.seq,
             args.disposition.as_str()
         );
-        let noop = FindingCloseReport { landing: None, change_id: args.change_id.as_str(), round: args.round, seq: args.seq, from: None, disposition: args.disposition.as_str(), noop: true };
+        let noop = FindingCloseReport { landing: None, change_id: args.change_id.as_str(), round: args.round, seq: args.seq, from: None, disposition: args.disposition.as_str(), unchanged: true };
         crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), false, args.json, &noop);
         return 0;
     }
@@ -1041,7 +1041,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
                     seq: args.seq,
                     from: Some(existing.disposition().as_str()),
                     disposition: args.disposition.as_str(),
-                    noop: false,
+                    unchanged: false,
                 };
                 crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, &record);
             }

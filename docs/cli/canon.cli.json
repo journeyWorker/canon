@@ -12609,6 +12609,7 @@
         "artifacts move",
         "ledger compact",
         "migrate",
+        "purge",
         "tier age"
       ],
       "since": "0.28.0"
@@ -12616,7 +12617,7 @@
     {
       "kind": "option",
       "new": "purge",
-      "note": "the bare run previews",
+      "note": "the bare run previews; `--commit --plan-digest` acts",
       "old": "--plan",
       "rule": "D6",
       "scope": [
@@ -16714,15 +16715,11 @@
           "type": "string"
         },
         "from": {
-          "description": "The disposition it moved from; absent on a no-op.",
+          "description": "The disposition it moved from; absent when unchanged.",
           "type": [
             "string",
             "null"
           ]
-        },
-        "noop": {
-          "description": "`true` when the finding already had this disposition and nothing was staged.",
-          "type": "boolean"
         },
         "round": {
           "format": "uint32",
@@ -16739,6 +16736,10 @@
             "string",
             "null"
           ]
+        },
+        "unchanged": {
+          "description": "`true` when the finding already had this disposition and nothing was staged.",
+          "type": "boolean"
         }
       },
       "required": [
@@ -16746,7 +16747,7 @@
         "round",
         "seq",
         "disposition",
-        "noop"
+        "unchanged"
       ],
       "title": "FindingCloseReport",
       "type": "object"
