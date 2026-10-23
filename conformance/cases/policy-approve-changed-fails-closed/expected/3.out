@@ -1,2 +1,2 @@
 canon policy approve: .canon/policy.yaml (sha256:7afcb13ce4a4ffbcf8d8a63e50afd579206e9aaaa79ff005389af75eb6a7b0ab) approved by `bob` — wrote .canon/policy.approval.json — written directly; nothing to promote
-next: canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> — no subject exists yet; a subject is the unit status, review and shipping track
+next: canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> --session-id <session> — no subject exists yet; a subject is the unit status, review and shipping track

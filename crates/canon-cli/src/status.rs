@@ -660,7 +660,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Planner),
-            command: format!("canon subject new {id} --domain <domain> --title \"<title>\" --actor-id <unit>"),
+            command: format!("canon subject new {id} --domain <domain> --title \"<title>\" --actor-id <unit> --session-id <session>"),
             why: format!("{} scenario(s) are tagged @subject:{id}, which no subject record carries", tagged.len()),
         });
     }
@@ -668,7 +668,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Planner),
-            command: "canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit>".into(),
+            command: "canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit> --session-id <session>".into(),
             why: "no subject exists yet; a subject is the unit status, review and shipping track".into(),
         });
     }
@@ -700,7 +700,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
             next.push(NextStep {
                 actor: StepActor::Agent,
                 role: Some(Role::Implementer),
-                command: format!("canon feature new <area>.<surface> --title \"<feature>\" --actor-id <unit>{}", project_flag(&roots, None)),
+                command: format!("canon feature new <area>.<surface> --title \"<feature>\" --actor-id <unit> --session-id <session>{}", project_flag(&roots, None)),
                 why: "no .feature file holds a scenario yet; write the features, then each subject's scenarios with `canon scenario new … --subject-id <id>`".into(),
             });
         }
@@ -1033,7 +1033,7 @@ fn shipped_red(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<String>
 /// `canon subject move <id> --to verifying --reason …`: the reopen command
 /// status names for a red shipped subject (0.18 D3).
 pub(crate) fn reopen_command(id: &str) -> String {
-    format!("canon subject move {id} --to verifying --reason \"<why it reopens>\" --actor-id <unit>")
+    format!("canon subject move {id} --to verifying --reason \"<why it reopens>\" --actor-id <unit> --session-id <session>")
 }
 
 /// The next scenario number free on `surface` within spec root `project`.
@@ -1085,7 +1085,7 @@ fn flow_step(id: &str, all: &[&Scenario], roots: &[ProjectId], summary: &Subject
     Some(NextStep {
         actor: StepActor::Agent,
         role: Some(role),
-        command: format!("canon scenario new {suggested} --subject-id {id} --case {case} --flow {} --title \"{title}\" --actor-id <unit>{}", step.id, project_flag(roots, project.as_deref())),
+        command: format!("canon scenario new {suggested} --subject-id {id} --case {case} --flow {} --title \"{title}\" --actor-id <unit> --session-id <session>{}", step.id, project_flag(roots, project.as_deref())),
         why: format!("{id}: brief flow step {} has {gap}, and the ship guard refuses until it has one; tag it with --flow so it covers the step", step.id),
     })
 }
@@ -1226,7 +1226,7 @@ fn subject_steps(
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Implementer),
-            command: format!("canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id {id} --case happy --actor-id <unit>{}", project_flag(roots, None)),
+            command: format!("canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id {id} --case happy --actor-id <unit> --session-id <session>{}", project_flag(roots, None)),
             why: format!("{id} owns no scenario; specify its behavior, one scenario per behavior{roots_note}"),
         });
         return;
@@ -1248,7 +1248,7 @@ fn subject_steps(
             actor: StepActor::Agent,
             role: Some(Role::Implementer),
             command: format!(
-                "canon scenario new {} --title \"<what happens on this path>\" --subject-id {id} --case {} --actor-id <unit>{}",
+                "canon scenario new {} --title \"<what happens on this path>\" --subject-id {id} --case {} --actor-id <unit> --session-id <session>{}",
                 next_number(all, &gap.project_id, &gap.surface),
                 gap.case,
                 project_flag(roots, Some(&gap.project_id))
@@ -1380,7 +1380,7 @@ fn subject_steps(
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Orchestrator),
-            command: format!("canon subject move {id} --to {to} --actor-id <unit>"),
+            command: format!("canon subject move {id} --to {to} --actor-id <unit> --session-id <session>"),
             why: match status {
                 SubjectStatus::Proposed | SubjectStatus::Specced => format!("{id} has its scenarios and every required case; move it on"),
                 SubjectStatus::Verifying => {

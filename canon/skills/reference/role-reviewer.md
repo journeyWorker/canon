@@ -51,14 +51,14 @@ canon context
 ```
 ```text
 # Add a divergence candidate, staged with no run_seq yet
-canon divergence add <SCENARIO_ID> --actor-id <ACTOR_ID> [--project-id <PROJECT_ID>] [--rev <REV>] [--state <open|still-divergent|resolved|deferred>] [--reason <TEXT>] [--expiry <TIMESTAMP>] [--round <N>] [--detail <TEXT>] [--role <ROLE>] [--promote | --no-promote] [--input]
+canon divergence add <SCENARIO_ID> --actor-id <ACTOR_ID> [--project-id <PROJECT_ID>] [--rev <REV>] [--state <open|still-divergent|resolved|deferred>] [--reason <TEXT>] [--expiry <TIMESTAMP>] [--round <N>] [--session-id <SESSION_ID>] [--detail <TEXT>] [--role <ROLE>] [--promote | --no-promote] [--input]
 ```
 ```bash
 canon divergence add auth.login.01 --actor-id alice --role reviewer
 ```
 ```text
 # Directly record a deferred divergence (requires --reason/--expiry)
-canon divergence defer <SCENARIO_ID> --actor-id <ACTOR_ID> --reason <TEXT> --expiry <TIMESTAMP> [--project-id <PROJECT_ID>] [--rev <REV>] [--round <N>] [--role <ROLE>] [--input]
+canon divergence defer <SCENARIO_ID> --actor-id <ACTOR_ID> --reason <TEXT> --expiry <TIMESTAMP> [--project-id <PROJECT_ID>] [--rev <REV>] [--round <N>] [--session-id <SESSION_ID>] [--role <ROLE>] [--input]
 ```
 ```bash
 canon divergence defer auth.login.01 --actor-id alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer
@@ -72,7 +72,7 @@ canon divergence list --as-of 2030-01-01
 ```
 ```text
 # Directly record a resolved divergence
-canon divergence resolve <SCENARIO_ID> --actor-id <ACTOR_ID> [--project-id <PROJECT_ID>] [--rev <REV>] [--round <N>] [--detail <TEXT>] [--role <ROLE>] [--input]
+canon divergence resolve <SCENARIO_ID> --actor-id <ACTOR_ID> [--project-id <PROJECT_ID>] [--rev <REV>] [--round <N>] [--session-id <SESSION_ID>] [--detail <TEXT>] [--role <ROLE>] [--input]
 ```
 ```bash
 canon divergence resolve auth.login.01 --actor-id alice --role reviewer

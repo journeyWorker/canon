@@ -41,6 +41,8 @@ pub struct SubjectNewArgs {
     #[arg(long, default_value = "canon", value_name = "ACTOR_ID")]
     pub actor_id: String,
     #[command(flatten)]
+    pub session: crate::cli::SessionArgs,
+    #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
@@ -116,6 +118,8 @@ pub struct SubjectMoveArgs {
     /// The invoking actor's id, recorded with an --override-reason waiver or a --reason
     #[arg(long, default_value = "canon", value_name = "ACTOR_ID")]
     pub actor_id: String,
+    #[command(flatten)]
+    pub session: crate::cli::SessionArgs,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form

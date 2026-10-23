@@ -711,6 +711,18 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
     if inputs.is_empty() {
         return Expanded::Argv(args);
     }
+    // An option the leaf does not have is clap's to refuse (`USAGE` naming it), as it is without `--input`:
+    // reading its value as an operand here would turn the refusal into a conflict with the document.
+    let known_elsewhere = |token: &str| match token.strip_prefix("--") {
+        Some(rest) => {
+            let name = rest.split('=').next().unwrap_or_default();
+            matches!(name, "help" | "version") || find_long(root, name).is_some()
+        }
+        None => matches!(token, "-h" | "-V") || token.chars().nth(1).is_some_and(|c| find_short(root, c).is_some()),
+    };
+    if lexed.opts.iter().any(|o| o.long.is_none() && !known_elsewhere(&tokens[o.span.start])) {
+        return Expanded::Argv(args);
+    }
     let leaf = Leaf::of(cmd, &path);
     let command_name = leaf.command();
     let fail = |error: CliError| Expanded::Exit(ExitCode::from(error.emit(&command_name, json) as u8));

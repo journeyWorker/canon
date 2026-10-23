@@ -18,7 +18,7 @@ fn project_for(repo: &Path, given: Option<ProjectId>, command: &str, json: bool)
 pub fn run(cmd: DivergenceCliCommand) -> ExitCode {
     match cmd {
         DivergenceCliCommand::Add(args) => run_divergence_add(args),
-        DivergenceCliCommand::Resolve(DivergenceResolveArgs { project_id, scenario_id, rev, round, detail, actor_id, role, repo, json, .. }) => {
+        DivergenceCliCommand::Resolve(DivergenceResolveArgs { project_id, scenario_id, rev, round, detail, actor_id, session, role, repo, json, .. }) => {
             let role = match record_role(role, &repo, "canon divergence resolve", json) {
                 Ok(role) => role,
                 Err(code) => return code,
@@ -31,9 +31,9 @@ pub fn run(cmd: DivergenceCliCommand) -> ExitCode {
                 Ok(commit) => commit,
                 Err(error) => return ExitCode::from(error.emit("canon divergence resolve", json) as u8),
             };
-            ExitCode::from(crate::divergence::run_resolve(&repo, &project_id, &scenario_id, &commit, round, &actor_id, detail.as_deref().unwrap_or_default(), &actor_id, &role, json) as u8)
+            ExitCode::from(crate::divergence::run_resolve(&repo, &project_id, &scenario_id, &commit, round, &actor_id, detail.as_deref().unwrap_or_default(), &actor_id, &role, session.session_id.as_ref(), json) as u8)
         }
-        DivergenceCliCommand::Defer(DivergenceDeferArgs { project_id, scenario_id, rev, round, reason, expiry, actor_id, role, repo, json, .. }) => {
+        DivergenceCliCommand::Defer(DivergenceDeferArgs { project_id, scenario_id, rev, round, reason, expiry, actor_id, session, role, repo, json, .. }) => {
             let role = match record_role(role, &repo, "canon divergence defer", json) {
                 Ok(role) => role,
                 Err(code) => return code,
@@ -46,11 +46,11 @@ pub fn run(cmd: DivergenceCliCommand) -> ExitCode {
                 Ok(commit) => commit,
                 Err(error) => return ExitCode::from(error.emit("canon divergence defer", json) as u8),
             };
-            ExitCode::from(crate::divergence::run_defer(&repo, &project_id, &scenario_id, &commit, round, &actor_id, &reason, expiry, &actor_id, &role, json) as u8)
+            ExitCode::from(crate::divergence::run_defer(&repo, &project_id, &scenario_id, &commit, round, &actor_id, &reason, expiry, &actor_id, &role, session.session_id.as_ref(), json) as u8)
         }
         DivergenceCliCommand::Accept(DivergenceAcceptArgs { project_id, scenario_ids, reason, tracking, expiry, actor_id, role, session_id, repo, json, .. }) => {
             let ids: Vec<String> = scenario_ids.iter().map(ToString::to_string).collect();
-            let call = format!("canon divergence accept {} --actor-id <their name> --reason \"<why>\" --tracking <ISSUE_URL>", ids.join(" "));
+            let call = format!("canon divergence accept {} --actor-id <their name> --session-id <their session> --reason \"<why>\" --tracking <ISSUE_URL>", ids.join(" "));
             if let Err(code) = human_only("canon divergence accept", &call, json) {
                 return code;
             }
@@ -69,7 +69,7 @@ pub fn run(cmd: DivergenceCliCommand) -> ExitCode {
 
 /// `canon divergence add`.
 fn run_divergence_add(args: DivergenceAddArgs) -> ExitCode {
-    let DivergenceAddArgs { project_id, scenario_id, rev, state, reason, expiry, round, detail, actor_id, role, promote, repo, json, .. } = args;
+    let DivergenceAddArgs { project_id, scenario_id, rev, state, reason, expiry, round, detail, actor_id, session, role, promote, repo, json, .. } = args;
     let role = match record_role(role, &repo, "canon divergence add", json) {
         Ok(role) => role,
         Err(code) => return code,
@@ -83,7 +83,7 @@ fn run_divergence_add(args: DivergenceAddArgs) -> ExitCode {
         Err(error) => return ExitCode::from(error.emit("canon divergence add", json) as u8),
     };
     match crate::divergence::parse_status(&state, reason.as_deref(), expiry) {
-        Ok(status) => ExitCode::from(crate::divergence::run_stage(&repo, &project_id, &scenario_id, &commit, status, round, &actor_id, detail.as_deref().unwrap_or_default(), &actor_id, &role, promote.flag(), json) as u8),
+        Ok(status) => ExitCode::from(crate::divergence::run_stage(&repo, &project_id, &scenario_id, &commit, status, round, &actor_id, detail.as_deref().unwrap_or_default(), &actor_id, &role, session.session_id.as_ref(), promote.flag(), json) as u8),
         Err(e) => ExitCode::from(CliError::refused("DIVERGENCE_INVALID_ARGUMENT", e.to_string()).hint("`canon schema divergence add` lists the accepted arguments and their forms").emit("canon divergence add", json) as u8),
     }
 }

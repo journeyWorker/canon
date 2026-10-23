@@ -5,4 +5,4 @@ canon review scenario: artifact store holds 1 bound file(s) under .canon/artifac
 canon review scenario: wrote kind=review/area=cart/root__cart.add.01__d3cbd9f29d5fa092854912a2d36c8327b572e078__<digest12>.json (new) — written directly; nothing to promote
 canon review scenario: wrote kind=review/area=cart/root__cart.add.02__d3cbd9f29d5fa092854912a2d36c8327b572e078__<digest12>.json (new) — written directly; nothing to promote
 canon review scenario: wrote kind=review/area=cart/root__cart.add.03__d3cbd9f29d5fa092854912a2d36c8327b572e078__<digest12>.json (new) — written directly; nothing to promote
-next: canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> — no subject exists yet; a subject is the unit status, review and shipping track (+1 more)
+next: canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> --session-id <session> — no subject exists yet; a subject is the unit status, review and shipping track (+1 more)

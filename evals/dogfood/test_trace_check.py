@@ -251,6 +251,81 @@ class SyntheticTranscriptTests(unittest.TestCase):
         report = self.run_calls(("canon brief approve --help", ""), ("canon brief approve x --approver me --note n --json", ""))
         self.assertTrue(report["hard_checks_passed"])
 
+    def run_named(self, name, *pairs):
+        """`run_calls` for a subagent transcript file named `<name>.jsonl`."""
+        rows = [{"type": "session", "version": 3, "id": name, "timestamp": "2026-01-01T00:00:00Z", "cwd": "/workspace"},
+                {"type": "message", "message": {"role": "user", "content": [{"type": "text", "text": "go"}]}, "timestamp": "2026-01-01T00:00:01Z"}]
+        for n, (command, output) in enumerate(pairs, 1):
+            rows.append({"type": "message", "message": {"role": "assistant", "content": [
+                {"type": "toolCall", "id": f"c{n}", "name": "bash", "arguments": {"command": command, "cwd": "/workspace"}}]},
+                "timestamp": f"2026-01-01T00:00:{n + 1:02d}Z"})
+            rows.append({"type": "message", "message": {"role": "toolResult", "toolCallId": f"c{n}", "isError": False,
+                                                        "content": [{"type": "text", "text": output}]},
+                         "timestamp": f"2026-01-01T00:00:{n + 1:02d}Z"})
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / f"{name}.jsonl"
+            path.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+            return trace_check.analyze([str(path)])
+
+    def test_a_subagent_named_for_the_reviewer_is_a_reviewer_session(self):
+        # No review call at all: the transcript name alone says what it was spawned as.
+        report = self.run_named("PauseReReviewer", ("canon status --json", ""))
+        self.assertEqual(report["reviewer_sessions"], ["PauseReReviewer"])
+        self.assertEqual(self.run_named("PauseImplementer", ("canon status --json", ""))["reviewer_sessions"], [])
+
+    def test_a_declared_reviewer_role_makes_a_reviewer_session(self):
+        for command in ("canon gate check --as reviewer --json", "CANON_ROLE=reviewer canon gate check --json",
+                        "env CANON_ROLE=reviewer canon gate check --json"):
+            self.assertEqual(self.run_calls((command, ""))["reviewer_sessions"], ["syn"], command)
+        self.assertEqual(self.run_calls(("canon review scenario a.b.01 --actor-id r --original-spec-ref x --json", ""))["reviewer_sessions"], ["syn"])
+        self.assertEqual(self.run_calls(("canon gate check --as implementer --json", ""))["reviewer_sessions"], [])
+
+    def test_canon_owned_projection_writes_are_not_agent_writes_before_the_brief_stop(self):
+        # A write before the stop is a violation; `skills install` rewriting the provider files is not one.
+        rows = [("canon skills install", ""), ("canon migrate --commit --plan-digest abc --json", ""),
+                ("canon change new c1 --subject-id s --title T --json", ""), ("printf x > notes.txt", "")]
+        with tempfile.TemporaryDirectory() as tmp:
+            trace = trace_check.analyze([self._brief_stop_session(tmp, rows)])
+        paths = [f["path"] for f in trace["failures"] if f["check"] == "write_before_brief_stop"]
+        self.assertEqual(paths, ["notes.txt"], "only the agent's own write counts")
+
+    def _brief_stop_session(self, tmp, pairs):
+        rows = [{"type": "session", "version": 3, "id": "stop", "timestamp": "2026-01-01T00:00:00Z", "cwd": "/workspace"},
+                {"type": "message", "message": {"role": "user", "content": [{"type": "text", "text": "go"}]}, "timestamp": "2026-01-01T00:00:01Z"}]
+        for n, (command, output) in enumerate(pairs, 1):
+            rows.append({"type": "message", "message": {"role": "assistant", "content": [
+                {"type": "toolCall", "id": f"c{n}", "name": "bash", "arguments": {"command": command, "cwd": "/workspace"}}]},
+                "timestamp": f"2026-01-01T00:00:{n + 1:02d}Z"})
+            rows.append({"type": "message", "message": {"role": "toolResult", "toolCallId": f"c{n}", "isError": False,
+                                                        "content": [{"type": "text", "text": output}]},
+                         "timestamp": f"2026-01-01T00:00:{n + 1:02d}Z"})
+        n = len(pairs) + 1
+        rows.append({"type": "message", "message": {"role": "assistant", "content": [
+            {"type": "toolCall", "id": "w", "name": "write", "arguments": {"path": ".canon/changes/c1/brief.md", "content": "b"}}]},
+            "timestamp": f"2026-01-01T00:00:{n + 1:02d}Z"})
+        rows.append({"type": "message", "message": {"role": "toolResult", "toolCallId": "w", "isError": False, "content": [{"type": "text", "text": "ok"}]},
+                     "timestamp": f"2026-01-01T00:00:{n + 1:02d}Z"})
+        rows.append({"type": "message", "message": {"role": "assistant", "content": [], "stopReason": "stop"}, "timestamp": f"2026-01-01T00:00:{n + 2:02d}Z"})
+        path = Path(tmp) / "stop.jsonl"
+        path.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+        return str(path)
+
+    def test_a_subagent_is_linked_to_its_root_by_file_name_when_the_recorded_path_is_elsewhere(self):
+        def rows(sid, parent=None):
+            header = {"type": "session", "version": 3, "id": sid, "timestamp": "2026-01-01T00:00:00Z", "cwd": "/workspace"}
+            if parent:
+                header["parentSession"] = parent
+            return [header, {"type": "message", "message": {"role": "user", "content": [{"type": "text", "text": "go"}]}, "timestamp": "2026-01-01T00:00:01Z"}]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "2026-01-01T00-00-00-000Z_root.jsonl"
+            root.write_text("\n".join(json.dumps(r) for r in rows("root")) + "\n")
+            (Path(tmp) / root.stem).mkdir()
+            child = Path(tmp) / root.stem / "PauseReviewer.jsonl"
+            child.write_text("\n".join(json.dumps(r) for r in rows("child", "/other/machine/sessions/" + root.name)) + "\n")
+            report = trace_check.analyze([str(root)])
+        self.assertEqual({s["id"]: s["parent"] for s in report["sessions"]}, {"root": None, "child": "root"})
+        self.assertEqual(report["reviewer_sessions"], ["child"])
+
 
 if __name__ == "__main__":
     unittest.main()

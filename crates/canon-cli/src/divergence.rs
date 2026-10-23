@@ -180,6 +180,7 @@ pub fn run_stage(
     detail: &str,
     actor_id: &str,
     role: &RoleId,
+    session: Option<&SessionId>,
     promote: crate::write_mode::PromoteFlag,
     json: bool,
 ) -> i32 {
@@ -199,7 +200,7 @@ pub fn run_stage(
             return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence add", json);
         }
     };
-    let candidate = candidate(project_id, scenario_id, &commit.sha, Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, Actor::new(actor_id, role.clone()), Utc::now());
+    let candidate = candidate(project_id, scenario_id, &commit.sha, Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, actor_in(actor_id, role, session), Utc::now());
 
     // The scenario's newest divergence already says exactly this: a repeat
     // writes nothing and reports the record that is there.
@@ -283,6 +284,7 @@ fn run_commit(
     detail: &str,
     actor_id: &str,
     role: &RoleId,
+    session: Option<&SessionId>,
     json: bool,
 ) -> i32 {
     let repo = resolve_repo_root(repo);
@@ -295,7 +297,7 @@ fn run_commit(
             return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&format!("canon divergence {verb}"), json);
         }
     };
-    let candidate = candidate(project_id, scenario_id, &commit.sha, Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, Actor::new(actor_id, role.clone()), Utc::now());
+    let candidate = candidate(project_id, scenario_id, &commit.sha, Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, actor_in(actor_id, role, session), Utc::now());
 
     match stage_and_promote(&gate_ctx.ledger_root, &candidate) {
         Ok(target) => {
@@ -308,6 +310,15 @@ fn run_commit(
         Err(message) => {
             CliError::failed("DIVERGENCE_REFUSED", message).hint("`canon divergence list` lists the scenario's divergences and their state; fix what the message names, then run the command again").emit(&format!("canon divergence {verb}"), json)
         }
+    }
+}
+
+/// The actor of a divergence record: `actor_id` in `role`, in `session` when `--session-id` named one.
+fn actor_in(actor_id: &str, role: &RoleId, session: Option<&SessionId>) -> Actor {
+    let actor = Actor::new(actor_id, role.clone());
+    match session {
+        Some(session) => actor.with_session(session.clone()),
+        None => actor,
     }
 }
 
@@ -324,9 +335,10 @@ pub fn run_resolve(
     detail: &str,
     actor_id: &str,
     role: &RoleId,
+    session: Option<&SessionId>,
     json: bool,
 ) -> i32 {
-    run_commit("resolve", repo, project_id, scenario_id, commit, DivergenceStatus::Resolved, round, reviewer, detail, actor_id, role, json)
+    run_commit("resolve", repo, project_id, scenario_id, commit, DivergenceStatus::Resolved, round, reviewer, detail, actor_id, role, session, json)
 }
 
 /// `canon divergence defer --reason <..> --expiry <..>` (module doc):
@@ -343,6 +355,7 @@ pub fn run_defer(
     expiry: DateTime<Utc>,
     actor_id: &str,
     role: &RoleId,
+    session: Option<&SessionId>,
     json: bool,
 ) -> i32 {
     run_commit(
@@ -357,6 +370,7 @@ pub fn run_defer(
         "",
         actor_id,
         role,
+        session,
         json,
     )
 }
@@ -657,8 +671,8 @@ mod tests {
         let (project_id, scenario_id_a, role, sha) = ids();
         let scenario_id_b = ScenarioId::parse("world.firstbuy-hotdeal.27").unwrap();
 
-        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id_a, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default(), false), 0);
-        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id_b, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default(), false), 0);
+        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id_a, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, None, Default::default(), false), 0);
+        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id_b, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, None, Default::default(), false), 0);
 
         let code = crate::gate::run_promote(dir.path(), Some(RecordKind::Divergence), false, false);
         assert_eq!(code, 0);
@@ -696,7 +710,7 @@ mod tests {
         );
         stage(&gate_ctx_root(&dir), &malformed).unwrap();
 
-        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default(), false), 0);
+        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, None, Default::default(), false), 0);
 
         let code = crate::gate::run_promote(dir.path(), Some(RecordKind::Divergence), false, false);
         assert_eq!(code, 1, "a refusal reports a non-zero (but not usage-error) exit code");
@@ -736,16 +750,16 @@ mod tests {
         let deferred_id = ScenarioId::parse("world.firstbuy-hotdeal.51").unwrap();
 
         // Something else is mid-`stage`.
-        assert_eq!(run_stage(dir.path(), &project_id, &ScenarioId::parse("world.firstbuy-hotdeal.50").unwrap(), &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default(), false), 0);
+        assert_eq!(run_stage(dir.path(), &project_id, &ScenarioId::parse("world.firstbuy-hotdeal.50").unwrap(), &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, None, Default::default(), false), 0);
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let staging_dir = crate::gate::evidence_staging_dir(&gate_ctx.ledger_root);
         let staged_before = files_with_bytes(&staging_dir);
         assert_eq!(staged_before.len(), 1, "exactly the one unrelated candidate is staged");
 
-        assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, false), 0);
+        assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, None, false), 0);
         // Whole seconds so the persisted expiry compares exactly.
         let expiry = chrono::DateTime::from_timestamp((Utc::now() + chrono::Duration::days(7)).timestamp(), 0).unwrap();
-        assert_eq!(run_defer(dir.path(), &project_id, &deferred_id, &sha, 1, "reviewer-1", "needs another look", expiry, "agent-x", &role, false), 0);
+        assert_eq!(run_defer(dir.path(), &project_id, &deferred_id, &sha, 1, "reviewer-1", "needs another look", expiry, "agent-x", &role, None, false), 0);
 
         let committed = GitTier::new(&gate_ctx.ledger_root);
         let landed = committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap();
@@ -768,7 +782,7 @@ mod tests {
         let dir = repo_dir();
         let (project_id, scenario_id, role, sha) = ids();
 
-        assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, false), 0);
+        assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, None, false), 0);
 
         // Read-only capability query — always exits 0.
         assert_eq!(run_list(dir.path(), None, false, &crate::paging::Page::first_page(), None), 0);
@@ -787,7 +801,7 @@ mod tests {
     fn a_moved_live_binding_reads_resolved_invalid_without_rewriting_the_resolution() {
         let dir = repo_dir();
         let (project_id, scenario_id, role, sha) = ids();
-        assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, false), 0);
+        assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, None, false), 0);
 
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let moved = Sha::parse("b".repeat(40)).unwrap();

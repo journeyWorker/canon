@@ -25,6 +25,8 @@ pub struct DispatchBeginArgs {
     /// The dispatching agent's id (recorded as the run's actor)
     #[arg(long, default_value = "canon", value_name = "ACTOR_ID")]
     pub actor_id: String,
+    #[command(flatten)]
+    pub session: crate::cli::SessionArgs,
     /// Declared provider metadata (copied verbatim; never inferred from --actor-id)
     #[arg(long, value_name = "NAME")]
     pub provider: Option<String>,

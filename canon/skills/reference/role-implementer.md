@@ -63,14 +63,14 @@ canon context-pack verify sha256:00000000000000000000000000000000000000000000000
 ```
 ```text
 # Add a divergence candidate, staged with no run_seq yet
-canon divergence add <SCENARIO_ID> --actor-id <ACTOR_ID> [--project-id <PROJECT_ID>] [--rev <REV>] [--state <open|still-divergent|resolved|deferred>] [--reason <TEXT>] [--expiry <TIMESTAMP>] [--round <N>] [--detail <TEXT>] [--role <ROLE>] [--promote | --no-promote] [--input]
+canon divergence add <SCENARIO_ID> --actor-id <ACTOR_ID> [--project-id <PROJECT_ID>] [--rev <REV>] [--state <open|still-divergent|resolved|deferred>] [--reason <TEXT>] [--expiry <TIMESTAMP>] [--round <N>] [--session-id <SESSION_ID>] [--detail <TEXT>] [--role <ROLE>] [--promote | --no-promote] [--input]
 ```
 ```bash
 canon divergence add auth.login.01 --actor-id alice --role reviewer
 ```
 ```text
 # Directly record a deferred divergence (requires --reason/--expiry)
-canon divergence defer <SCENARIO_ID> --actor-id <ACTOR_ID> --reason <TEXT> --expiry <TIMESTAMP> [--project-id <PROJECT_ID>] [--rev <REV>] [--round <N>] [--role <ROLE>] [--input]
+canon divergence defer <SCENARIO_ID> --actor-id <ACTOR_ID> --reason <TEXT> --expiry <TIMESTAMP> [--project-id <PROJECT_ID>] [--rev <REV>] [--round <N>] [--session-id <SESSION_ID>] [--role <ROLE>] [--input]
 ```
 ```bash
 canon divergence defer auth.login.01 --actor-id alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer
@@ -84,7 +84,7 @@ canon divergence list --as-of 2030-01-01
 ```
 ```text
 # Directly record a resolved divergence
-canon divergence resolve <SCENARIO_ID> --actor-id <ACTOR_ID> [--project-id <PROJECT_ID>] [--rev <REV>] [--round <N>] [--detail <TEXT>] [--role <ROLE>] [--input]
+canon divergence resolve <SCENARIO_ID> --actor-id <ACTOR_ID> [--project-id <PROJECT_ID>] [--rev <REV>] [--round <N>] [--session-id <SESSION_ID>] [--detail <TEXT>] [--role <ROLE>] [--input]
 ```
 ```bash
 canon divergence resolve auth.login.01 --actor-id alice --role reviewer
@@ -112,7 +112,7 @@ canon evidence audit auth.login.01 --ref audit-report.json --evaluator-id eval-1
 ```
 ```text
 # Create a fresh .feature file for a new area.surface
-canon feature new <SURFACE> --title <TEXT> [--actor-id <ACTOR_ID>] [--project-id <PROJECT_ID>] [--input]
+canon feature new <SURFACE> --title <TEXT> [--actor-id <ACTOR_ID>] [--session-id <SESSION_ID>] [--project-id <PROJECT_ID>] [--input]
 ```
 ```bash
 canon feature new billing.invoice --title Invoices
@@ -168,7 +168,7 @@ canon retrieve --for-role reviewer --domain dev --limit 20
 ```
 ```text
 # Append a tagged scenario stub to its .feature file (created if missing); many at once with `--input`
-canon scenario new <SCENARIO_ID> --title <TEXT> [--subject-id <SUBJECT_ID>] [--lane <NAME>] [--case <NAME>] [--flow <FLOW_ID>] [--change-id <CHANGE_ID> (with --flow)] [--actor-id <ACTOR_ID>] [--feature <FILE>] [--project-id <PROJECT_ID>] [--input]
+canon scenario new <SCENARIO_ID> --title <TEXT> [--subject-id <SUBJECT_ID>] [--lane <NAME>] [--case <NAME>] [--flow <FLOW_ID>] [--change-id <CHANGE_ID> (with --flow)] [--actor-id <ACTOR_ID>] [--session-id <SESSION_ID>] [--feature <FILE>] [--project-id <PROJECT_ID>] [--input]
 ```
 ```bash
 canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature

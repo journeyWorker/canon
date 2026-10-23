@@ -1,3 +1,3 @@
 canon scenario new: wrote `@cart.add.01` to <repo>/.canon/specs/kind=feature/area=cart/add.feature — written directly; nothing to promote
 canon scenario new: keep the `# canon: {...}` provenance lines when you fill in the scenario: one right after `Feature:` and one above the scenario's tags; without them `canon inventory sync` aborts on missing-provenance
-next: canon subject move cart --to specced --actor-id <unit> — cart has its scenarios and every required case; move it on
+next: canon subject move cart --to specced --actor-id <unit> --session-id <session> — cart has its scenarios and every required case; move it on

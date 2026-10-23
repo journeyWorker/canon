@@ -65,7 +65,7 @@ canon divergence list --as-of 2030-01-01
 ```
 ```text
 # Create a fresh .feature file for a new area.surface
-canon feature new <SURFACE> --title <TEXT> [--actor-id <ACTOR_ID>] [--project-id <PROJECT_ID>] [--input]
+canon feature new <SURFACE> --title <TEXT> [--actor-id <ACTOR_ID>] [--session-id <SESSION_ID>] [--project-id <PROJECT_ID>] [--input]
 ```
 ```bash
 canon feature new billing.invoice --title Invoices
@@ -107,7 +107,7 @@ canon retrieve --for-role reviewer --domain dev --limit 20
 ```
 ```text
 # Append a tagged scenario stub to its .feature file (created if missing); many at once with `--input`
-canon scenario new <SCENARIO_ID> --title <TEXT> [--subject-id <SUBJECT_ID>] [--lane <NAME>] [--case <NAME>] [--flow <FLOW_ID>] [--change-id <CHANGE_ID> (with --flow)] [--actor-id <ACTOR_ID>] [--feature <FILE>] [--project-id <PROJECT_ID>] [--input]
+canon scenario new <SCENARIO_ID> --title <TEXT> [--subject-id <SUBJECT_ID>] [--lane <NAME>] [--case <NAME>] [--flow <FLOW_ID>] [--change-id <CHANGE_ID> (with --flow)] [--actor-id <ACTOR_ID>] [--session-id <SESSION_ID>] [--feature <FILE>] [--project-id <PROJECT_ID>] [--input]
 ```
 ```bash
 canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature
@@ -142,7 +142,7 @@ canon subject adopt demo --change-id add-login
 ```
 ```text
 # Author a new subject at status `proposed`
-canon subject new <SUBJECT_ID> --domain <NAME> --title <TEXT> [--summary <TEXT>] [--owner-role <ROLE>] [--actor-id <ACTOR_ID>] [--input]
+canon subject new <SUBJECT_ID> --domain <NAME> --title <TEXT> [--summary <TEXT>] [--owner-role <ROLE>] [--actor-id <ACTOR_ID>] [--session-id <SESSION_ID>] [--input]
 ```
 ```bash
 canon subject new payments --domain dev --title Payments
