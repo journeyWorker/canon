@@ -18,7 +18,12 @@ use tempfile::TempDir;
 
 /// What a `read` leaf may write, which its `effectNote` must name. A path here
 /// is gitignored by `canon init`; the test checks that too.
-const ALLOWED_WRITES: &[(&str, &[&str])] = &[("query", &[".canon/audit/access.jsonl"])];
+const ALLOWED_WRITES: &[(&str, &[&str])] = &[
+    ("query", &[".canon/audit/access.jsonl"]),
+    // Scratch directories in the system temp dir, removed on exit: nothing under the repo.
+    ("selftest", &[]),
+    ("gate selftest", &[]),
+];
 
 /// Invocations beyond each leaf's schema example that reach a different read
 /// path: `--json` renderings, other record kinds, the routes that used to

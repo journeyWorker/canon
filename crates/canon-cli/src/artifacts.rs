@@ -112,15 +112,17 @@ pub fn run_verify(repo: &Path, full: bool, json: bool) -> i32 {
             "subject": c.file.subject, "path": c.file.path, "sha256": c.file.sha256, "blob": c.blob.as_str(), "detail": line,
         })).collect::<Vec<_>>(),
     });
+    let mut coverage = crate::coverage::Coverage::new();
+    coverage.count("boundFiles", checks.len()).count("stored", stored).count("workingTreeOnly", tree_only);
     if problems.is_empty() {
         if json {
-            crate::json_out::data("artifacts verify", &crate::json_out::untyped(data));
+            crate::json_out::data_with_meta("artifacts verify", &crate::json_out::untyped(data), coverage.meta());
         }
         return 0;
     }
     CliError::failed("ARTIFACTS_VERIFY_FAILED", format!("{} bound file(s) are missing from the artifact store or altered", problems.len()))
         .hint("re-upload a file the working tree still holds with `canon evidence vault`, or re-run and re-attest it with `canon evidence add`; see data.problems")
-        .emit_with_data("canon artifacts verify", json, &crate::json_out::untyped(data))
+        .emit_with_data_and_meta("canon artifacts verify", json, &crate::json_out::untyped(data), coverage.meta())
 }
 
 /// One blob in the local store.

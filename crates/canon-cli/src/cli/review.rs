@@ -76,9 +76,8 @@ pub struct ReviewOptions {
     /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger file is refused
     #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
     pub max_artifact_mib: u64,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,

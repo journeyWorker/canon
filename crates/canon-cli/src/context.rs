@@ -372,7 +372,13 @@ pub fn resolve_repo_root(repo: &Path) -> PathBuf {
     if repo != Path::new(".") {
         return repo.to_path_buf();
     }
-    let cwd = std::env::current_dir().unwrap_or_else(|_| repo.to_path_buf());
+    discover_repo_root()
+}
+
+/// The nearest ancestor of the current directory holding a `canon.yaml`,
+/// else the current directory: what `--repo` means when it is absent (D5).
+pub fn discover_repo_root() -> PathBuf {
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     cwd.ancestors().find(|dir| dir.join("canon.yaml").is_file()).map(Path::to_path_buf).unwrap_or(cwd)
 }
 
@@ -387,9 +393,9 @@ pub const CONFIG_EXEMPT: &[(&str, &str)] = &[
     ("demo init", "scaffolds a new repo, canon.yaml included"),
     ("demo add", "refuses with DEMO_NOT_INITIALIZED when `demo init` has not run"),
     ("context", "a capability query that never fails: without a canon.yaml it describes the built-in surface"),
-    ("regime-key", "its --repo names a repository in the regime key, not a directory"),
-    ("adapter validate", "reads one response file; --repo only verifies a context-pack join"),
-    ("adapter authorize", "reads .canon/policy.yaml only, and requires --repo"),
+    ("regime-key", "reads no repo: it only builds a key from its arguments"),
+    ("adapter validate", "reads one response file; the context-pack join runs only when a canon.yaml is found"),
+    ("adapter authorize", "reads .canon/policy.yaml only; an absent policy is default denial"),
     ("context-pack new", "a context pack is made from the git tree and never reads canon.yaml"),
     ("context-pack show", "a context pack is made from the git tree and never reads canon.yaml"),
     ("context-pack verify", "a context pack is made from the git tree and never reads canon.yaml"),
@@ -401,6 +407,9 @@ pub const CONFIG_EXEMPT: &[(&str, &str)] = &[
     ("learn approve", "the strategy store defaults to `.canon/learn`; canon.yaml only tunes it"),
     ("learn promote", "the strategy store defaults to `.canon/learn`; canon.yaml only tunes it"),
     ("learn rollback", "the strategy store defaults to `.canon/learn`; canon.yaml only tunes it"),
+    ("skills install", "projects the guides into the directory; canon.yaml only records the provider choice"),
+    ("skills check", "inspects the directory's install; canon.yaml only supplies the provider choice"),
+    ("skills doctor", "inspects the directory's install; canon.yaml only supplies the provider choice"),
     ("gate task", "run by agent hooks and pre-commit scripts: it flips a plan row on evidence it finds and refuses otherwise"),
     ("gate promote", "run by agent hooks and pre-commit scripts: with nothing staged it reports so"),
     ("gate install-hooks", "installs hook seams into a repo that may not be set up yet"),
@@ -414,34 +423,28 @@ pub fn needs_config(command: &str) -> bool {
     !CONFIG_EXEMPT.iter().any(|(exempt, _)| *exempt == command)
 }
 
-/// The repo root a command that needs canon state runs against
-/// ([`resolve_repo_root`]), or the `CONFIG_MISSING` refusal when no
-/// `canon.yaml` is there: `--repo` absent or `.` searched cwd and its
-/// ancestors, any other `--repo` named that directory as given.
-pub fn require_config(repo: &Path) -> Result<PathBuf, CliError> {
-    let root = resolve_repo_root(repo);
+/// The repo root a command that needs canon state runs against, or the
+/// `CONFIG_MISSING` refusal when no `canon.yaml` is there. `repo` is `--repo`
+/// as given (absent: the nearest ancestor of the current directory holding a
+/// `canon.yaml`; present: that directory, no search).
+pub fn require_config(repo: Option<&Path>) -> Result<PathBuf, CliError> {
+    let root = match repo {
+        Some(dir) if dir == Path::new(".") => std::env::current_dir().unwrap_or_else(|_| dir.to_path_buf()),
+        Some(dir) => dir.to_path_buf(),
+        None => discover_repo_root(),
+    };
     if root.join("canon.yaml").is_file() {
         return Ok(root);
     }
-    let searched = if repo == Path::new(".") { format!("`{}` and its parent directories", root.display()) } else { format!("`{}`", root.display()) };
+    let searched = if repo.is_none() { format!("`{}` and its parent directories", root.display()) } else { format!("`{}`", root.display()) };
     Err(CliError::refused("CONFIG_MISSING", format!("no canon.yaml in {searched}"))
         .field("--repo")
         .hint(format!("run `canon init` in the repository root to set canon up, or pass --repo <dir> naming a directory that holds canon.yaml (searched {searched})")))
 }
 
-/// Resolve the `canon.yaml` path a `--repo`/`--canon-yaml`-accepting verb
-/// reads from (s26 D2, relocated from `query.rs` so `canon tier age` can
-/// share it verbatim rather than inventing a third resolution shape): an
-/// explicit `--canon-yaml` (`Some`) wins, used AS-IS -- no ancestor walk,
-/// no dependency on `repo` at all (back-compat, spec "--canon-yaml
-/// remains an explicit override that bypasses the ancestor walk"). `None`
-/// resolves `repo` through [`resolve_repo_root`], then joins `canon.yaml`
-/// onto the resolved root.
-pub fn resolve_canon_yaml(repo: &Path, canon_yaml: Option<&Path>) -> PathBuf {
-    match canon_yaml {
-        Some(path) => path.to_path_buf(),
-        None => resolve_repo_root(repo).join("canon.yaml"),
-    }
+/// The `canon.yaml` of `repo`, resolved through [`resolve_repo_root`].
+pub fn resolve_canon_yaml(repo: &Path) -> PathBuf {
+    resolve_repo_root(repo).join("canon.yaml")
 }
 
 /// Phase 1 (design D1): resolve the project's schema registry + policy

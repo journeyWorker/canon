@@ -1,5 +1,5 @@
 canon v1 — installed (claude,codex)
-canon skills install: wrote `skills: { providers: [claude, codex] }` to ./canon.yaml
+canon skills install: wrote `skills: { providers: [claude, codex] }` to <repo>/canon.yaml
 owned-paths: canon writes these; exclude them from formatters and linters:
   .claude/skills/canon/**
   .agents/skills/canon/**

@@ -146,7 +146,7 @@ pub enum Command {
     },
     // ── Specs & authoring ──
     /// Validate a spec/artifact corpus against canon's format
-    #[command(name = "format", visible_alias = "fmt", after_help = "Examples:\n  canon format spec\n  canon format spec --repo ~/work/myrepo")]
+    #[command(name = "format", after_help = "Examples:\n  canon format                  Every configured spec root\n  canon format spec\n  canon format spec --repo ~/work/myrepo")]
     Format(FormatArgs),
     /// Scaffold a new .feature spec file
     Feature {
@@ -271,7 +271,7 @@ pub enum Command {
     /// Run canon's built-in fixture self-tests
     Selftest(SelftestArgs),
     /// Describe canon's own commands: list them, or show one command's arguments, options, effect and exit codes
-    #[command(after_help = "Examples:\n  canon schema\n  canon schema --all --json\n  canon schema evidence add --json\n  CANON_ROLE=reviewer canon schema --json\n  canon schema --errors --json\n\nGenerated from the command tree itself, so it never drifts from what the parser accepts.\nTouches no repo and no network: it works from any directory. An alias (`fmt`) resolves to its\ncanonical command and the output names the canonical one. An unknown path exits 2 and names the\nnearest matches.\n\nWith a declared role (CANON_ROLE or --as) the bare listing shows only that role's commands; --all\nlists every command. A command whose effect depends on its arguments carries `effectNote`.")]
+    #[command(after_help = "Examples:\n  canon schema\n  canon schema --all --json\n  canon schema evidence add --json\n  CANON_ROLE=reviewer canon schema --json\n  canon schema --errors --json\n\nGenerated from the command tree itself, so it never drifts from what the parser accepts.\nTouches no repo and no network: it works from any directory. An unknown path exits 2 and names the\nnearest matches.\n\nWith a declared role (CANON_ROLE or --as) the bare listing shows only that role's commands; --all\nlists every command. A command whose effect depends on its arguments carries `effectNote`.")]
     Schema(SchemaArgs),
     /// Write the shell completion script for canon (bash, zsh or fish)
     #[command(after_help = "Examples:\n  canon completion zsh > ~/.zfunc/_canon\n  canon completion bash > /etc/bash_completion.d/canon\n  canon completion fish > ~/.config/fish/completions/canon.fish\n\nThe script is generated from the command tree, so it completes exactly what the parser accepts. It needs no repo and no network.")]
@@ -293,5 +293,41 @@ pub struct PromoteArgs {
 impl PromoteArgs {
     pub fn flag(self) -> crate::write_mode::PromoteFlag {
         crate::write_mode::PromoteFlag::from_flags(self.promote, self.no_promote)
+    }
+}
+
+/// `--repo <DIR>`, declared once and flattened into every leaf that reads a
+/// repo (0.28 D5). Absent: the nearest ancestor of the current directory
+/// holding a `canon.yaml`, else the current directory. Present: that
+/// directory, as given (no ancestor walk). `init` and `demo init` set up the
+/// directory they are given and keep their own option.
+///
+/// Dereferences to the resolved root, so a handler passes `&repo` wherever a
+/// path is wanted; the walk runs at most once per parse.
+#[derive(clap::Args, Clone, Debug, Default)]
+pub struct RepoArgs {
+    /// The repo to act on (default: the nearest ancestor directory holding a canon.yaml)
+    #[arg(long = "repo", value_name = "DIR")]
+    pub(crate) repo: Option<std::path::PathBuf>,
+    #[arg(skip)]
+    resolved: std::sync::OnceLock<std::path::PathBuf>,
+}
+
+impl RepoArgs {
+    /// `--repo` as typed, when present.
+    pub fn given(&self) -> Option<&std::path::Path> {
+        self.repo.as_deref()
+    }
+}
+
+impl std::ops::Deref for RepoArgs {
+    type Target = std::path::PathBuf;
+    fn deref(&self) -> &std::path::PathBuf {
+        self.resolved.get_or_init(|| match &self.repo {
+            // `--repo .` names the current directory itself, not "search upward".
+            Some(dir) if dir.as_os_str() == "." => std::env::current_dir().unwrap_or_else(|_| dir.clone()),
+            Some(dir) => dir.clone(),
+            None => crate::context::discover_repo_root(),
+        })
     }
 }

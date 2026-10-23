@@ -10,9 +10,8 @@ pub struct ContextPackNewArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete pack manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -30,9 +29,8 @@ pub struct PromptAddArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete bundle manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -53,9 +51,8 @@ pub struct LearnPromoteArgs {
     /// The StrategyId (ULID) to promote
     #[arg(value_name = "STRATEGY_ID", value_parser = crate::learn::parse_strategy_id)]
     pub strategy_id: StrategyId,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Evaluation bundle produced by the honest promotion adapter
     #[arg(long)]
     pub evaluation: Option<PathBuf>,
@@ -81,8 +78,8 @@ pub struct LearnApproveArgs {
     pub evaluation: PathBuf,
     #[arg(long)]
     pub principal: String,
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     #[arg(long)]
     pub json: bool,
 }
@@ -101,8 +98,8 @@ pub struct LearnRollbackArgs {
     pub approved_at: String,
     #[arg(long)]
     pub contradicting_trajectory_id: Option<String>,
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,

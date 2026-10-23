@@ -110,7 +110,7 @@ fn extra_args(command: &str, scratch: &Path) -> Vec<String> {
         // `--role` is optional in the schema (a declared role supplies it), but the sweep declares none.
         "divergence accept" | "evidence add" | "evidence audit" | "review scenario" | "review change" => vec!["--role".into(), "reviewer".into()],
         "ingest sessions" => vec!["--home".into(), path("home")],
-        "skills install" | "skills check" | "skills doctor" => vec!["--target".into(), path("skills-target"), "--source".into(), path("no-skills-source")],
+        "skills install" | "skills check" | "skills doctor" => vec!["--repo".into(), path("skills-target"), "--source".into(), path("no-skills-source")],
         _ => Vec::new(),
     }
 }
@@ -123,7 +123,7 @@ fn every_leaf_command_answers_json_with_one_document_and_a_coded_error() {
     let leaves: Vec<String> = listing["data"]["commands"].as_array().unwrap().iter().map(|c| c["command"].as_str().unwrap().to_string()).collect();
     assert!(leaves.len() > 60, "{leaves:?}");
 
-    let regime = String::from_utf8(run(repo.path(), &["regime-key", "--role", "reviewer", "--repo", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
+    let regime = String::from_utf8(run(repo.path(), &["regime-key", "--role", "reviewer", "--repo-name", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
     let registry: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
     let skipped: Vec<&str> = SKIPPED.iter().map(|(command, _)| *command).collect();
     let mut problems = Vec::new();
@@ -217,12 +217,14 @@ fn gate_check_reports_its_violations_as_json_and_keeps_its_exit_code() {
 fn a_clean_gate_is_data_with_exit_zero() {
     let dir = TempDir::new().unwrap();
     ok(dir.path(), &["init", "--providers", "none"]);
+    ok(dir.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     let out = run(dir.path(), &["gate", "check", "--json"]);
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
     let body: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(body["data"]["clean"], true);
     assert_eq!(body["data"]["violations"].as_array().unwrap().len(), 0);
     assert_eq!(body["meta"]["command"], "gate check");
+    assert_eq!(body["meta"]["coverage"]["subjects"], 1, "the gate says what it examined: {body}");
 }
 
 #[test]

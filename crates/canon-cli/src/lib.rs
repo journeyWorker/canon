@@ -15,6 +15,7 @@ pub mod change;
 pub mod cli;
 pub mod context;
 pub mod context_pack;
+pub mod coverage;
 pub mod dashboard;
 pub mod dashboard_briefs;
 pub mod removed;

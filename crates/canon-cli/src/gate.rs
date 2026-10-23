@@ -147,7 +147,13 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).chain(unrefreshable).chain(reverify).chain(crate::policy_approval::violation(&repo)).collect());
     let mut advisories: Vec<serde_json::Value> = Vec::new();
     let advisory = |kind: &str, message: String, items: Vec<String>| serde_json::json!({ "kind": kind, "message": message, "items": items });
-    crate::say_raw!(json, "{}", format_gate_report(&report));
+    let coverage = gate_coverage(&repo, &gate_context);
+    let unverifiable = report.is_clean() && coverage.examined_nothing();
+    if unverifiable {
+        crate::say_raw!(json, "canon gate check: unverifiable — nothing to examine (0 scenarios, 0 subjects, 0 changes, 0 evidence records)\n");
+    } else {
+        crate::say_raw!(json, "{}", format_gate_report(&report));
+    }
     if let Some(count) = canon_gate::spec_coverage::coverage_off_scenarios(&gate_context) {
         crate::say_raw!(json, "{}", format_coverage_off_advisory(count));
         advisories.push(advisory("spec_coverage_off", format!("{count} scenario(s) are not checked for evidence; see .canon/policy.yaml"), Vec::new()));
@@ -200,16 +206,45 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
         .iter()
         .map(|v| serde_json::json!({ "class": v.class.as_str(), "subject": v.subject, "message": v.detail, "line": v.line() }))
         .collect();
-    let data = serde_json::json!({ "clean": report.is_clean(), "violations": violations, "advisories": advisories });
+    let mut data = serde_json::json!({ "clean": report.is_clean(), "violations": violations, "advisories": advisories });
+    if unverifiable {
+        // Nothing was examined: a vacuous pass must not read as clean (D3).
+        crate::coverage::mark_unverifiable(&mut data);
+        return crate::coverage::unverifiable_error("canon gate check", "no scenario, subject, change or evidence record", "run `canon inventory sync` after authoring specs, or `canon context` to see what can be authored, then run `canon gate check` again")
+            .emit_with_data_and_meta("canon gate check", json, &crate::json_out::untyped(data), coverage.meta());
+    }
     if report.is_clean() {
         if json {
-            crate::json_out::data("gate check", &crate::json_out::untyped(data));
+            crate::json_out::data_with_meta("gate check", &crate::json_out::untyped(data), coverage.meta());
         }
         return 0;
     }
     CliError::failed("GATE_VIOLATIONS", format!("{} violation(s)", report.violations.len()))
         .hint("fix each violation named in data.violations, then run `canon gate check` again")
-        .emit_with_data("canon gate check", json, &crate::json_out::untyped(data))
+        .emit_with_data_and_meta("canon gate check", json, &crate::json_out::untyped(data), coverage.meta())
+}
+
+/// What the gate looked at: the configured spec roots with the scenarios
+/// each holds, and the subjects, changes and evidence it joined.
+fn gate_coverage(repo: &Path, gate: &canon_gate::GateContext) -> crate::coverage::Coverage {
+    let mut coverage = crate::coverage::Coverage::new();
+    match crate::inventory::load_spec_roots(&repo.join("canon.yaml")) {
+        Ok(roots) => {
+            for root in roots {
+                let scenarios = gate.scenarios.iter().filter(|s| s.project_id == root.id).count();
+                coverage.root(root.id.as_str(), root.root.strip_prefix(repo).unwrap_or(&root.root).display().to_string(), scenarios);
+            }
+        }
+        Err(err) => {
+            coverage.skip("specs.roots", err.to_string());
+        }
+    }
+    coverage
+        .count("scenarios", gate.scenarios.len())
+        .count("subjects", gate.subjects.len())
+        .count("changes", gate.changes.len())
+        .count("evidence", gate.evidence.len() + gate.audits.len());
+    coverage
 }
 
 /// The one-line advisory (0.14 D3) printed when the spec corpus has

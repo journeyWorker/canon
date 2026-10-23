@@ -201,9 +201,15 @@ impl CliError {
     /// exit code is the whole signal there. In JSON mode the one document
     /// carries `error` (the branch point), `data` (the report) and `meta`.
     pub fn emit_with_data<R: Report>(&self, command: &str, json: bool, data: &R) -> i32 {
+        self.emit_with_data_and_meta(command, json, data, serde_json::Value::Null)
+    }
+
+    /// [`CliError::emit_with_data`] with extra `meta` keys beside `command`
+    /// (`coverage`, …).
+    pub fn emit_with_data_and_meta<R: Report>(&self, command: &str, json: bool, data: &R, extra_meta: serde_json::Value) -> i32 {
         debug_assert!(is_registered(self.code), "error code {} is not in cli_error::all_codes()", self.code);
         if json {
-            crate::json_out::print_failure(command, self, Some(data));
+            crate::json_out::print_failure_with_meta(command, self, Some(data), extra_meta);
         }
         self.exit
     }
@@ -426,6 +432,7 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "TASK_ROW_NOT_FOUND", meaning: "the task's row is missing from its plan document", exit: 2, retryable: false },
     CodeInfo { code: "TIER_FAILED", meaning: "tier aging failed", exit: 1, retryable: false },
     CodeInfo { code: "TYPED_ATOMS_INVALID", meaning: "the typed-atoms file for the change does not parse", exit: 2, retryable: false },
+    CodeInfo { code: "UNVERIFIABLE", meaning: "a check examined nothing, so it cannot report clean: data.unverifiable is true and meta.coverage says what was looked at", exit: 1, retryable: false },
     CodeInfo { code: "UNKNOWN_COMMAND", meaning: "`canon schema` was given a command path canon does not have", exit: 2, retryable: false },
     CodeInfo { code: "UNKNOWN_FIELD", meaning: "`--fields` names a field the records do not have", exit: 2, retryable: false },
     CodeInfo { code: "UNKNOWN_ROLE", meaning: "`CANON_ROLE` holds a value that is not a role (planner, implementer, reviewer, orchestrator)", exit: 2, retryable: false },

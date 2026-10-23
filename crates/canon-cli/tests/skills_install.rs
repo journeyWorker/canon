@@ -502,7 +502,7 @@ fn canonical_check_and_doctor_report_legacy_codex_remnant_with_fix() {
     let output = Command::new(env!("CARGO_BIN_EXE_canon"))
         .args(["skills", "check", "--providers", "claude,codex", "--source"])
         .arg(&source)
-        .arg("--target")
+        .arg("--repo")
         .arg(&target)
         .output()
         .expect("spawn canon skills check");
@@ -588,7 +588,7 @@ fn set_lock_version(target: &Path, version: Option<&str>) {
 }
 
 fn canon(args: &[&str], source: &Path, target: &Path) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).arg("--source").arg(source).arg("--target").arg(target).output().unwrap()
+    Command::new(env!("CARGO_BIN_EXE_canon")).args(args).arg("--source").arg(source).arg("--repo").arg(target).output().unwrap()
 }
 
 /// skills.install.40

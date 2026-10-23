@@ -330,9 +330,9 @@ pub fn envelope_with_next<R: Report>(command: &str, data: &R, after: &After, ext
     serde_json::from_str(&success_text(command, data, Some(after), extra_meta)).expect("the envelope is JSON")
 }
 
-fn failure_text<R: Report>(command: &str, error: &CliError, data: Option<&R>) -> String {
+fn failure_text<R: Report>(command: &str, error: &CliError, data: Option<&R>, extra_meta: Value) -> String {
     let schema_version = if data.is_some() { R::SCHEMA_VERSION } else { DEFAULT_SCHEMA_VERSION };
-    let document = Failure { ok: false, error: error.body(), data, meta: build_meta(command, schema_version, None, Value::Null) };
+    let document = Failure { ok: false, error: error.body(), data, meta: build_meta(command, schema_version, None, extra_meta) };
     let text = serde_json::to_string(&document).expect("an error serializes");
     #[cfg(debug_assertions)]
     validate::<R>(&text);
@@ -342,12 +342,17 @@ fn failure_text<R: Report>(command: &str, error: &CliError, data: Option<&R>) ->
 /// Prints the failure envelope on stdout (nothing on stderr), with `data` when
 /// the command keeps a partial report.
 pub fn print_failure<R: Report>(command: &str, error: &CliError, data: Option<&R>) {
-    println!("{}", failure_text(command, error, data));
+    print_failure_with_meta(command, error, data, Value::Null);
+}
+
+/// [`print_failure`] with extra `meta` keys beside `command` (`coverage`, …).
+pub fn print_failure_with_meta<R: Report>(command: &str, error: &CliError, data: Option<&R>, extra_meta: Value) {
+    println!("{}", failure_text(command, error, data, extra_meta));
 }
 
 /// The failure envelope as a value.
 pub fn failure_value<R: Report>(command: &str, error: &CliError, data: Option<&R>) -> Value {
-    serde_json::from_str(&failure_text(command, error, data)).expect("the envelope is JSON")
+    serde_json::from_str(&failure_text(command, error, data, Value::Null)).expect("the envelope is JSON")
 }
 
 /// The `meta` member a command's warnings travel in (0.25): `{ "warnings":

@@ -68,7 +68,7 @@ pub(crate) const EXAMPLES: &[(&str, &str)] = &[
     ("prompt show", "canon prompt show reviewer@v1"),
     ("purge", "canon purge --kind session --before 2020-01-01T00:00:00Z --plan"),
     ("query", "canon query --kind evidence"),
-    ("regime-key", "canon regime-key --role reviewer --repo my-repo --area api --hash abcdef012345"),
+    ("regime-key", "canon regime-key --role reviewer --repo-name my-repo --area api --hash abcdef012345"),
     ("report", "canon report"),
     ("retrieve", "canon retrieve --role reviewer --domain dev"),
     ("review change", "canon review change add-login --actor-id alice --pin abc123 --role reviewer --original-spec-ref docs/prd.md"),

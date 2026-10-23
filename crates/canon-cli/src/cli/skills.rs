@@ -12,9 +12,8 @@ pub struct ContextPackNewArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete pack manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -32,9 +31,8 @@ pub struct PromptAddArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete bundle manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -43,9 +41,8 @@ pub struct PromptAddArgs {
 /// The flags of `demo add`.
 #[derive(clap::Args)]
 pub struct DemoAddArgs {
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -79,9 +76,8 @@ pub struct DivergenceAddArgs {
     pub role: RoleId,
     #[command(flatten)]
     pub promote: PromoteArgs,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -102,9 +98,8 @@ pub struct SkillsInstallArgs {
     /// Source directory; defaults to CANON_SKILLS_SOURCE or canon/skills.
     #[arg(long)]
     pub source: Option<PathBuf>,
-    /// Consumer repo root to materialize into.
-    #[arg(long, default_value = ".")]
-    pub target: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Providers to project (`claude`, `codex`, `omp`, `pi`, a comma-separated list, or `none`);
     /// also rewrites `skills.providers` in the target's canon.yaml. Omitted: canon.yaml
     /// `skills.providers`, else the install lock's providers, else the detected `.claude`,
@@ -121,9 +116,8 @@ pub struct SkillsInstallArgs {
 pub struct SkillsCheckArgs {
     #[arg(long)]
     pub source: Option<PathBuf>,
-    /// Consumer repo root to inspect.
-    #[arg(long, default_value = ".")]
-    pub target: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install.
     #[arg(long)]
     pub providers: Option<String>,
@@ -136,9 +130,8 @@ pub struct SkillsCheckArgs {
 pub struct SkillsDoctorArgs {
     #[arg(long)]
     pub source: Option<PathBuf>,
-    /// Consumer repo root to inspect.
-    #[arg(long, default_value = ".")]
-    pub target: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install.
     #[arg(long)]
     pub providers: Option<String>,

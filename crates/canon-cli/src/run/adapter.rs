@@ -7,7 +7,7 @@ use std::process::ExitCode;
 
 pub fn run(cmd: AdapterCommand) -> ExitCode {
     match cmd {
-        AdapterCommand::Validate(AdapterValidateArgs { response, repo, json }) => run_adapter_validate(&response, repo.as_deref(), json),
+        AdapterCommand::Validate(AdapterValidateArgs { response, repo, json }) => run_adapter_validate(&response, &repo, json),
         AdapterCommand::Authorize(AdapterAuthorizeArgs { response, repo, json }) => run_adapter_authorize(&response, &repo, json),
     }
 }
@@ -15,17 +15,25 @@ pub fn run(cmd: AdapterCommand) -> ExitCode {
 /// `canon adapter validate` is deliberately read-only: it parses one response
 /// envelope and prints a redacted summary. Provider execution and capability
 /// enforcement remain outside canon.
-fn run_adapter_validate(response: &std::path::Path, repo: Option<&std::path::Path>, json: bool) -> ExitCode {
+fn run_adapter_validate(response: &std::path::Path, repo: &std::path::Path, json: bool) -> ExitCode {
     let mut summary = match crate::adapter::validate_response(response) {
         Ok(summary) => summary,
         Err(error) => {
-            return ExitCode::from(CliError::failed("ADAPTER_REFUSED", error.to_string()).hint("fix the response envelope the message names; `canon adapter validate --response <file>` re-checks it").emit("canon adapter validate", json) as u8);
+            // A missing or unreadable file is a refusal (2); an envelope that does not validate is the check's finding (1).
+            let refused = matches!(error, crate::adapter::AdapterError::Io { .. });
+            let message = error.to_string();
+            let error = if refused {
+                CliError::refused("ADAPTER_REFUSED", message).hint("check that the --response path names a readable file; `canon adapter validate --response <file>` re-checks it")
+            } else {
+                CliError::failed("ADAPTER_REFUSED", message).hint("fix the response envelope the message names; `canon adapter validate --response <file>` re-checks it")
+            };
+            return ExitCode::from(error.emit("canon adapter validate", json) as u8);
         }
     };
 
-    if let Some(repo) = repo {
-        let repo = crate::context::resolve_repo_root(repo);
-        summary.context_join_verified = Some(verify_adapter_context_join(&repo, &summary));
+    // The context-pack join needs canon state: it runs when a canon.yaml is found (given or discovered) and is skipped otherwise.
+    if repo.join("canon.yaml").is_file() {
+        summary.context_join_verified = Some(verify_adapter_context_join(repo, &summary));
     }
 
     if json {
@@ -55,7 +63,15 @@ fn run_adapter_authorize(response: &std::path::Path, repo: &std::path::Path, jso
     let result = match crate::adapter::authorize_response(response, repo) {
         Ok(result) => result,
         Err(error) => {
-            return ExitCode::from(CliError::failed("ADAPTER_REFUSED", error.to_string()).hint("fix the response envelope the message names; `canon adapter validate --response <file>` re-checks it").emit("canon adapter authorize", json) as u8);
+            // A missing or unreadable file is a refusal (2); an envelope that does not validate is the check's finding (1).
+            let refused = matches!(error, crate::adapter::AdapterError::Io { .. });
+            let message = error.to_string();
+            let error = if refused {
+                CliError::refused("ADAPTER_REFUSED", message).hint("check that the --response path names a readable file; `canon adapter validate --response <file>` re-checks it")
+            } else {
+                CliError::failed("ADAPTER_REFUSED", message).hint("fix the response envelope the message names; `canon adapter validate --response <file>` re-checks it")
+            };
+            return ExitCode::from(error.emit("canon adapter authorize", json) as u8);
         }
     };
     if json && result.execution_authorized {
@@ -81,7 +97,7 @@ fn verify_adapter_context_join(repo: &std::path::Path, summary: &crate::adapter:
     if crate::context_pack::verify(repo, &summary.context_pack_id).is_err() {
         return false;
     }
-    let Ok(outcome) = crate::query::run(repo, None, RecordKind::Run, None, None, None, None, false) else {
+    let Ok(outcome) = crate::query::run(repo, RecordKind::Run, None, None, None, None, false) else {
         return false;
     };
     outcome.records.iter().any(|record| {

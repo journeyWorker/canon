@@ -1,4 +1,4 @@
-//! Integration test for `canon fmt --check` (S11 task 2.1), invoking the
+//! Integration test for `canon format` (S11 task 2.1), invoking the
 //! actually-built `canon` binary against the `canon-fmt` crate's own
 //! fixture corpus (which reproduces a donor project's real, audited drift)
 //! — never `canon_cli`'s library functions in-process, same discipline
@@ -19,22 +19,10 @@ fn stdout(output: &Output) -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
 }
 
+/// `canon format <DIR>` validates unconditionally: a corpus with real
+/// violations exits nonzero and lists each audited failure class once.
 #[test]
-fn fmt_check_exits_nonzero_and_lists_audited_gap_categories() {
-    let output = run_canon(&["fmt", "--check", &fixture_root().to_string_lossy()]);
-    assert!(!output.status.success(), "fmt --check on a corpus with real violations must exit nonzero");
-    let text = stdout(&output);
-    for class in ["layout-grammar", "missing-actor", "free-text-ref", "joined-ref", "abbreviated-sha", "one-way-backref"] {
-        assert!(text.contains(&format!("[{class}]")), "expected `[{class}]` in output:\n{text}");
-    }
-}
-
-/// The `fmt` command is now `format` (with `fmt` kept as a visible alias),
-/// and validation runs unconditionally — no `--check` required. The
-/// two-word `canon format <root>` invocation must exit nonzero and print
-/// the same failure classes as the aliased `fmt --check` form above.
-#[test]
-fn format_without_check_flag_exits_nonzero_and_lists_the_same_failure_classes() {
+fn format_exits_nonzero_and_lists_the_audited_failure_classes() {
     let output = run_canon(&["format", &fixture_root().to_string_lossy()]);
     assert!(!output.status.success(), "format on a corpus with real violations must exit nonzero");
     let text = stdout(&output);
@@ -55,14 +43,11 @@ fn format_without_check_flag_exits_nonzero_and_lists_the_same_failure_classes() 
     assert_eq!(headings.len(), expected.len(), "one heading per observed class and no other:\n{text}");
 }
 
-/// s26 `repo-flag-uniformity` D1/F3: `--repo <repo-dir>` combined with a
-/// repo-relative positional `<root>` resolves the identical corpus, and
-/// produces byte-identical stdout/exit-code, to the bare-positional
-/// invocation above (`resolve_repo_root(repo).join(root)` == the fixture
-/// root when `repo` is the fixture root's parent and `root` is its final
-/// path component).
+/// `--repo <repo-dir>` combined with a repo-relative `<DIR>` resolves the
+/// identical corpus, and produces byte-identical stdout and the same exit
+/// code as the absolute-path invocation.
 #[test]
-fn fmt_check_with_repo_flag_resolves_identically_to_the_bare_positional_form() {
+fn format_with_repo_flag_resolves_identically_to_the_absolute_form() {
     let fixture = fixture_root();
     let relative_root = fixture.file_name().expect("fixture root has a final component");
     // `--repo` names a canon repo (it must hold a canon.yaml): the fixture corpus, linked in beside one.
@@ -70,8 +55,8 @@ fn fmt_check_with_repo_flag_resolves_identically_to_the_bare_positional_form() {
     std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap();
     std::os::unix::fs::symlink(&fixture, repo.path().join(relative_root)).unwrap();
 
-    let bare = run_canon(&["fmt", "--check", &repo.path().join(relative_root).to_string_lossy()]);
-    let with_repo = run_canon(&["fmt", "--check", &relative_root.to_string_lossy(), "--repo", &repo.path().to_string_lossy()]);
+    let bare = run_canon(&["format", &repo.path().join(relative_root).to_string_lossy()]);
+    let with_repo = run_canon(&["format", &relative_root.to_string_lossy(), "--repo", &repo.path().to_string_lossy()]);
 
     assert_eq!(with_repo.status.code(), bare.status.code(), "exit code must match the bare positional form");
     assert_eq!(stdout(&with_repo), stdout(&bare), "stdout must be byte-identical to the bare positional form");

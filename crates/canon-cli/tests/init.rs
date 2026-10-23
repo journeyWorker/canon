@@ -266,15 +266,16 @@ fn init_keeps_an_existing_policy_yaml_byte_identical() {
     assert_eq!(std::fs::read_to_string(dir.path().join(".canon/policy.yaml")).unwrap(), "trust_required:\n  test-run: agent\n");
 }
 
-/// The starter policy is live: on a fresh init the gate is clean on an
-/// empty corpus and red on an unevidenced scenario, with no advisory
-/// that coverage is off.
+/// The starter policy is live: on a fresh init the gate has nothing to
+/// examine (`unverifiable`, never clean) and is red on an unevidenced
+/// scenario, with no advisory that coverage is off.
 #[test]
 fn init_starter_policy_makes_the_gate_report_an_unevidenced_scenario() {
     let dir = tempfile::tempdir().unwrap();
     assert!(run_canon(&["init", "--repo", "."], dir.path()).status.success());
-    let clean = run_canon(&["gate", "check"], dir.path());
-    assert_eq!(clean.status.code(), Some(0), "{}{}", stdout(&clean), stderr(&clean));
+    let empty = run_canon(&["gate", "check"], dir.path());
+    assert_eq!(empty.status.code(), Some(1), "{}{}", stdout(&empty), stderr(&empty));
+    assert!(!stdout(&empty).contains("violation(s)"), "an empty corpus has no violation, it is unverifiable: {}", stdout(&empty));
 
     let scenario = run_canon(&["scenario", "new", "cart.add.01", "--title", "An out-of-stock item is refused", "--case", "failure"], dir.path());
     assert!(scenario.status.success(), "{}", stderr(&scenario));

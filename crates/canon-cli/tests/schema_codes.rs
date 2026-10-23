@@ -43,6 +43,8 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     // `check` is shared by `brief check` and `brief approve`.
     ("brief_check.rs", &["brief check", "brief approve", "brief show"]),
     ("change.rs", &["change new"]),
+    // `unverifiable_error`: the failure of a check that examined nothing, emitted by each check.
+    ("coverage.rs", &["gate check", "format", "status"]),
     ("context_pack.rs", &["context-pack", "prompt"]),
     // The server's refusals (`to_cli_error`, the request guards) and the briefs page's.
     ("dashboard.rs", &["dashboard"]),
@@ -125,7 +127,7 @@ fn emitted_command(line: &str) -> Option<String> {
     if line.contains(".emit(command,") {
         return Some("<caller>".to_string());
     }
-    let start = ["emit(\"canon", "emit(&format!(\"canon", "emit_with_data(\"canon", "human(\"canon"].iter().find_map(|p| line.find(p))?;
+    let start = ["emit(\"canon", "emit(&format!(\"canon", "emit_with_data(\"canon", "emit_with_data_and_meta(\"canon", "human(\"canon"].iter().find_map(|p| line.find(p))?;
     let rest = &line[start..];
     let quoted = &rest[rest.find("\"canon")? + 1..];
     let text = &quoted[..quoted.find('"')?];

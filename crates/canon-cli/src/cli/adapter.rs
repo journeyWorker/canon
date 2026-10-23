@@ -9,9 +9,8 @@ pub struct ContextPackNewArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete pack manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -30,9 +29,8 @@ pub struct AdapterValidateArgs {
     /// JSON response file to validate
     #[arg(long)]
     pub response: PathBuf,
-    /// Optional repo root for context-pack join verification
-    #[arg(long)]
-    pub repo: Option<PathBuf>,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the normalized core summary as JSON
     #[arg(long)]
     pub json: bool,
@@ -43,9 +41,8 @@ pub struct AdapterAuthorizeArgs {
     /// JSON response file to validate and authorize
     #[arg(long)]
     pub response: PathBuf,
-    /// Repository root containing `.canon/policy.yaml`
-    #[arg(long)]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output authorization result as JSON
     #[arg(long)]
     pub json: bool,

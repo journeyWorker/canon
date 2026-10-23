@@ -145,6 +145,33 @@ pub fn find_shape(root: &Command, args: &[String]) -> Option<RemovedShape> {
     None
 }
 
+/// An option or command word 0.28 removed, with what replaces it. Unlike
+/// [`FLAGS`] (a rename), the replacement may be a different mechanism
+/// (`--target` became the shared `--repo`), so the row carries its own hint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Dropped {
+    /// Space-separated command paths (without `canon`) the spelling is gone from.
+    /// A command word is named by its parent's path (empty: the root).
+    pub commands: &'static [&'static str],
+    /// The removed option long name without `--`, or the removed command word.
+    pub old: &'static str,
+    /// What to type instead (the `expected` of the usage error).
+    pub replacement: &'static str,
+    /// The sentence completing the hint: what to do instead.
+    pub note: &'static str,
+    /// Whether `old` is a command word rather than an option.
+    pub command_word: bool,
+}
+
+/// Every spelling 0.28 removed in the context rework (D5, D12).
+pub const DROPPED: &[Dropped] = &[
+    Dropped { commands: &["skills install", "skills check", "skills doctor"], old: "target", replacement: "--repo", note: "the repo is `--repo <DIR>` on every command; omit it to use the nearest directory holding canon.yaml", command_word: false },
+    Dropped { commands: &["ingest sessions", "query", "tier age"], old: "canon-yaml", replacement: "--repo", note: "the repo's canon.yaml is found from `--repo <DIR>`, or from the nearest directory holding one when it is omitted", command_word: false },
+    Dropped { commands: &["regime-key"], old: "repo", replacement: "--repo-name", note: "the <repo> segment of the key is `--repo-name <NAME>`; `--repo` now names a directory on other commands", command_word: false },
+    Dropped { commands: &["format"], old: "check", replacement: "canon format", note: "`canon format` always validates; drop the flag", command_word: false },
+    Dropped { commands: &[""], old: "fmt", replacement: "format", note: "the `fmt` alias is gone; use `canon format [<DIR>]`", command_word: true },
+];
+
 /// The commands whose `--kind` names a record kind. A `<kind>_record` value
 /// of it was the 0.23 spelling.
 pub const KIND_COMMANDS: &[&str] = &["export", "purge", "query"];
@@ -184,16 +211,21 @@ pub struct Removed {
     pub replacement: String,
     /// The argument the usage error points at, e.g. `--change` or `--kind`.
     pub field: String,
+    /// What to do instead, for a spelling 0.28 dropped ([`DROPPED`]); `None` for a rename.
+    pub note: Option<&'static str>,
 }
 
 impl Removed {
     /// The usage error's message.
     pub fn message(&self) -> String {
-        format!("{} was removed in 0.25.0", self.used)
+        format!("{} was removed in {}", self.used, if self.note.is_some() { "0.28.0" } else { "0.25.0" })
     }
 
     /// The usage error's hint: the old spelling, the release that renamed it, the new one.
     pub fn hint(&self) -> String {
+        if let Some(note) = self.note {
+            return format!("{} was removed in 0.28.0; {note}", self.used);
+        }
         format!("{} was renamed {} in {RENAMED_IN}; use {}", self.used, self.replacement, self.replacement)
     }
 }
@@ -227,7 +259,7 @@ pub fn find(root: &Command, args: &[String]) -> Option<Removed> {
                     let value = inline.or_else(|| args.get(i + 1).map(String::as_str));
                     if name == "kind" && KIND_COMMANDS.contains(&here.as_str()) {
                         if let Some((old, new)) = value.and_then(|v| kind_replacement(v).map(|n| (v, n))) {
-                            return Some(Removed { command: here, used: format!("--kind {old}"), replacement: format!("--kind {new}"), field: "--kind".into() });
+                            return Some(Removed { command: here, used: format!("--kind {old}"), replacement: format!("--kind {new}"), field: "--kind".into(), note: None });
                         }
                     }
                     if arg.get_action().takes_values() && inline.is_none() {
@@ -235,8 +267,11 @@ pub fn find(root: &Command, args: &[String]) -> Option<Removed> {
                     }
                 }
                 None => {
+                    if let Some(row) = DROPPED.iter().find(|d| !d.command_word && d.old == name && d.commands.contains(&here.as_str())) {
+                        return Some(Removed { command: here, used: format!("--{name}"), replacement: row.replacement.to_string(), field: format!("--{name}"), note: Some(row.note) });
+                    }
                     if let Some(row) = FLAGS.iter().find(|f| f.old == name && f.commands.iter().any(|c| covers(c, &here))) {
-                        return Some(Removed { command: here, used: format!("--{}", row.old), replacement: format!("--{}", row.new), field: format!("--{}", row.old) });
+                        return Some(Removed { command: here, used: format!("--{}", row.old), replacement: format!("--{}", row.new), field: format!("--{}", row.old), note: None });
                     }
                 }
             }
@@ -249,6 +284,8 @@ pub fn find(root: &Command, args: &[String]) -> Option<Removed> {
         } else if let Some(sub) = cmd.find_subcommand(token) {
             path.push(sub.get_name().to_string());
             cmd = sub;
+        } else if let Some(row) = DROPPED.iter().find(|d| d.command_word && d.old == token && d.commands.contains(&path.join(" ").as_str())) {
+            return Some(Removed { command: token.to_string(), used: format!("canon {token}"), replacement: row.replacement.to_string(), field: token.to_string(), note: Some(row.note) });
         }
         i += 1;
     }
@@ -347,7 +384,7 @@ mod tests {
 
     #[test]
     fn a_removed_flag_is_found_in_both_value_forms() {
-        let expected = Some(Removed { command: "change new".into(), used: "--subject".into(), replacement: "--subject-id".into(), field: "--subject".into() });
+        let expected = Some(Removed { command: "change new".into(), used: "--subject".into(), replacement: "--subject-id".into(), field: "--subject".into(), note: None });
         assert_eq!(find_in(&["change", "new", "x", "--subject", "demo"]), expected);
         assert_eq!(find_in(&["change", "new", "x", "--subject=demo", "--json"]), expected);
         assert_eq!(find_in(&["change", "new", "x", "--subject-id", "demo"]), None);
@@ -367,9 +404,9 @@ mod tests {
     }
 
     #[test]
-    fn the_hint_names_the_release_and_the_new_spelling() {
+    fn the_hint_names_the_new_spelling() {
         let removed = find_in(&["change", "new", "x", "--subject", "demo"]).unwrap();
-        assert_eq!(removed.hint(), "--subject was renamed --subject-id in 0.24.0; use --subject-id");
+        assert!(removed.hint().contains("--subject-id"));
     }
 
     #[test]

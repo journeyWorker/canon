@@ -201,7 +201,8 @@ fn inventory_sync_49_the_pre_0_17_layout_fails_the_gate_closed_and_status_names_
         assert!(next[0]["why"].as_str().unwrap().contains("spec root(s) `root`"), "{report}");
 
         std::fs::rename(repo.join("specs/features/kind=feature"), repo.join("specs/kind=feature")).unwrap();
-        let gate = ok(repo, &["gate", "check"]);
+        // Whatever the gate then finds (an empty corpus is `unverifiable`), it no longer names the old layout.
+        let gate = canon(repo, &["gate", "check"]);
         assert!(!stdout(&gate).contains("pre-0.17"), "{}", stdout(&gate));
     }
 }
