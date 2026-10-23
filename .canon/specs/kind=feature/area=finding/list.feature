@@ -27,10 +27,10 @@ Feature: finding list
   @subject:finding-lifecycle
   @case:happy
   @finding.list.03
-  Scenario: --json prints the same rows as one JSON document
+  Scenario: --json prints the same rows in the standard envelope
     Given the same findings
     When canon finding list runs with --json, alone and with --open
-    Then stdout is one JSON document with the change id and a findings array carrying round, seq, severity, disposition, reviewer, summary, resolution_sha and file_ref
+    Then data is one object with the change id and a findings array carrying round, seq, severity, disposition, reviewer, summary, resolutionSha, fileRef and reason, and meta carries the paging counts
     And with --open the array holds only the open finding
 
   # canon: {"schema":1,"at":"2026-10-12T14:00:00Z","actor":{"agent_id":"canon"}}

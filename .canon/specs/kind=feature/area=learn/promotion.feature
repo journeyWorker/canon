@@ -8,7 +8,7 @@ Feature: learn promotion
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a quarantined distilled strategy and a regime carrying enough corroborating successes to clear its gate
     And a valid paired evaluation of it and a human approval signed by a policy-pinned signer
-    When that strategy is promoted with the evaluation and the approval
+    When canon strategy promote runs with the evaluation and the approval
     Then the command succeeds and a file appears in the git-tracked strategies tier
     And the strategy has moved from derived memory into something a person can review in a diff
     And the same promotion without the evaluation and the approval is refused and writes nothing
@@ -30,7 +30,7 @@ Feature: learn promotion
   Scenario: A dry run previews the promotion and writes nothing
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a strategy that would otherwise pass its gate
-    When promotion is run as a dry run
+    When canon strategy promote is run with --dry-run
     Then the command succeeds and shows what it would write
     And no file is created in the git-tracked tier
 
@@ -40,7 +40,7 @@ Feature: learn promotion
   Scenario: A strategy with no corroborating trajectories is blocked by the gate
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a distilled strategy whose regime holds no resolved trajectories at all
-    When it is promoted
+    When canon strategy promote is run
     Then the command refuses
     And the strategy stays out of the git-tracked tier, because nothing corroborates it
 
@@ -50,7 +50,7 @@ Feature: learn promotion
   Scenario: Unresolved trajectories never count toward a promotion
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a regime carrying more pending trajectories than the gate's minimum
-    When the strategy distilled from them is promoted
+    When canon strategy promote is run on the strategy distilled from them
     Then the command still refuses
     And volume of unresolved evidence is not evidence
 
@@ -60,7 +60,7 @@ Feature: learn promotion
   Scenario: A later contradiction resets the streak and blocks the promotion
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a regime with enough successes to clear the gate, followed by one failure
-    When the strategy is promoted
+    When canon strategy promote is run
     Then the command refuses
     And the gate counts the streak up to the contradiction, not the total number of successes
 

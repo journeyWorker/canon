@@ -141,21 +141,21 @@ Feature: inventory sync
   @subject:inventory-sync
   @case:happy
   @inventory.sync.40
-  Scenario: A reader refreshes a stale scenario index once and names the files
+  Scenario: A writer refreshes a stale scenario index once and names the files, and a reader never does
     Given a scenario written by scenario new and never synced
-    When canon status runs with --json
-    Then exactly one stderr line names the changed feature file and the records written
-    And stdout stays JSON that counts the scenario
-    And the next reader is silent
+    When canon status runs with --json, and then canon artifacts store runs
+    Then status writes no index record and prints no refresh line, and its stdout stays JSON that counts the scenario
+    And exactly one stderr line from canon artifacts store names the changed feature file and the records written
+    And the next writer is silent
 
   # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
   @subject:inventory-sync
   @case:happy
   @inventory.sync.41
-  Scenario: Review add and subject status read a scenario that was never synced
+  Scenario: Review scenario and subject move see a scenario that was never synced
     Given a scenario written by scenario new and never synced
-    When review add and subject status run
-    Then each refreshes the index first and succeeds without inventory sync
+    When canon review scenario and canon subject move run
+    Then each refreshes the index first, says so in one line and succeeds without inventory sync
 
   # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
   @subject:inventory-sync
@@ -163,18 +163,18 @@ Feature: inventory sync
   @inventory.sync.42
   Scenario: A root that cannot sync is named and a directory without canon.yaml is never written
     Given a feature file whose provenance comments are missing
-    When canon status runs
+    When canon artifacts store runs
     Then one stderr line names the root that was not refreshed and points at inventory sync
     And no scenario record is written
-    And a reader in a directory without canon.yaml writes nothing
+    And commands run in a directory without canon.yaml refuse with exit 2 and write nothing
 
   # canon: {"schema":1,"at":"2026-10-11T15:45:12Z","actor":{"agent_id":"canon"}}
   @subject:inventory-sync
   @case:happy
   @inventory.sync.43
-  Scenario: A deleted scenario is marked removed the same way by a reader's refresh and by a full sync
+  Scenario: A deleted scenario is marked removed the same way by a writer's refresh and by a full sync
     Given two indexed scenarios and the feature file of one of them deleted
-    When one repository runs gate check and an identical one runs inventory sync
+    When one repository runs a writer such as canon artifacts store and an identical one runs inventory sync
     Then both append the same record marking the deleted scenario removed
     And the gate and query no longer report it
     And adding the scenario back makes the gate grade it again
@@ -186,7 +186,7 @@ Feature: inventory sync
   Scenario: A root that cannot sync marks no scenario removed
     Given an indexed scenario whose feature file is deleted
     And a remaining feature file whose provenance comments are missing
-    When canon status and inventory sync run
+    When canon artifacts store and inventory sync run
     Then the root is named as not refreshed and inventory sync exits 1
     And no record marks the deleted scenario removed
 
@@ -194,9 +194,9 @@ Feature: inventory sync
   @subject:inventory-sync
   @case:edge
   @inventory.sync.45
-  Scenario: Concurrent syncs and refreshes write each index record once
+  Scenario: Concurrent syncs and writers' refreshes write each index record once
     Given a stale scenario index and the index lock held by another process
-    When two inventory syncs and two refreshing readers start
+    When two inventory syncs and two refreshing writers start
     Then none of them writes while the lock is held
     And once it is released exactly one of them writes one record per scenario
 
@@ -204,9 +204,9 @@ Feature: inventory sync
   @subject:inventory-sync
   @case:edge
   @inventory.sync.46
-  Scenario: Artifact ingest names no scenario whose latest record marks it removed
+  Scenario: Record ingest names no scenario whose latest record marks it removed
     Given a titled scenario whose latest index record marks it removed
-    When artifact ingest joins an event keyed to that scenario
+    When canon ingest records joins an event keyed to that scenario
     Then the event carries no scenario title in either record read order
     And once a later record adds the scenario back the event carries its title again
 
@@ -216,10 +216,10 @@ Feature: inventory sync
   @inventory.sync.47
   Scenario: A root the refresh cannot index fails the gate, refuses shipping and holds status on the sync
     Given a verifying subject whose only scenario is indexed and evidenced, so it could ship
-    And its feature file is then edited and loses a provenance comment, so the readers' refresh refuses the root
+    And its feature file is then edited and loses a provenance comment, so the refresh refuses the root
     When canon gate check runs
     Then it exits 1 with an uncovered-cell violation naming the root and saying canon inventory sync lists the problems
-    And canon subject status to shipped is refused with exit 1 by the same violation, and the subject stays verifying
+    And canon subject move to shipped is refused with exit 1 by the same violation, and the subject stays verifying
     And canon status's only next step is canon inventory sync, naming the root, with no step that moves a subject on
     And once the provenance comment is restored the gate has no such violation and the subject ships
 
@@ -253,4 +253,25 @@ Feature: inventory sync
     Given a .feature file that holds a scenario the scenario index does not
     When canon status and canon gate check run
     Then each answers as it would after canon inventory sync and writes no index record, no archive file and no refresh line
-    And a command that records something, such as canon evidence vault, still refreshes the index and says so in one line
+    And a command that records something, such as canon artifacts store, still refreshes the index and says so in one line
+
+  # canon: {"schema":1,"at":"2026-10-23T11:58:30Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:inventory-sync
+  @case:happy
+  @inventory.sync.51
+  Scenario: A dry run reports the records a sync would write and writes none
+    Given a repository with a spec root holding one scenario the index does not hold
+    When canon inventory sync is run with --dry-run
+    Then it exits 0 and reports dryRun true and the one record it would write
+    And the working tree and .canon are byte-identical afterwards
+    And the same command without --dry-run then writes that record
+
+  # canon: {"schema":1,"at":"2026-10-23T11:58:38Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:inventory-sync
+  @case:failure
+  @inventory.sync.52
+  Scenario: A dry run refuses exactly as the real run would and writes nothing
+    Given a repository whose configuration makes canon inventory sync refuse
+    When canon inventory sync is run with --dry-run and without it
+    Then both exit with the same code and the same error code
+    And the working tree and .canon are byte-identical after the dry run

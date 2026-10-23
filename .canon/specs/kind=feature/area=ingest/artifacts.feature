@@ -18,7 +18,7 @@ Feature: ingest artifacts
   Scenario: One pass drives both input shapes and lands one regime-keyed trajectory
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a repository holding a committed handoff and a review ledger carrying one open finding
-    When artifacts are ingested
+    When canon ingest records is run
     Then the records-source handoff adapter reports read, not unavailable, and parses one event per state transition it implies
     And the path-source ledger adapter reports read and parses the finding
     And exactly one verdict is derived, because a handoff transition carries no verdict by design
@@ -61,7 +61,7 @@ Feature: ingest artifacts
   Scenario: Re-ingesting an unchanged corpus persists nothing new
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a corpus already ingested once
-    When artifacts are ingested again with nothing changed
+    When canon ingest records is run again with nothing changed
     Then zero new trajectories are persisted
     And the second pass is a no-op rather than a second copy of the first pass's conclusions
 
@@ -81,7 +81,7 @@ Feature: ingest artifacts
   Scenario: Reading canon's own records and reading a raw path are mutually exclusive, and the conflict is caught first
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a configuration asking for native records and also naming a raw ledger root
-    When artifacts are ingested
+    When canon ingest records is run
     Then the command fails before any source is read
     And the error names the conflicting field rather than quietly picking one of the two
 
@@ -91,7 +91,7 @@ Feature: ingest artifacts
   Scenario: A source with nowhere to write degrades to unavailable and the rest of the pass still runs
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a repository whose handoff kind is unrouted while its other artifact sources are routed
-    When artifacts are ingested
+    When canon ingest records is run
     Then that source is reported unavailable rather than silently read as empty
     And the remaining sources are still driven to completion in the same pass
     And the command as a whole does not abort

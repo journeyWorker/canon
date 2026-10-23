@@ -46,19 +46,19 @@ Feature: evidence add
   @subject:evidence-attestation
   @case:failure
   @evidence.add.05
-  Scenario: A scenario id with no project id cannot close the join and is refused
+  Scenario: A scenario id with no project id is inferred from the one spec root and refused when several are configured
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
-    Given an add naming a scenario id and omitting the project id
-    When it is invoked
-    Then it exits two and names the missing project id
-    And the record is refused rather than written for the gate to silently ignore
+    Given an add naming a scenario id and omitting the project id, once in a repository with one spec root and once in a repository with two
+    When it is invoked in each
+    Then the repository with one root takes that root as the project id and writes the record
+    And the repository with two roots exits two and writes nothing, rather than writing a record for the gate to silently ignore
 
   @subject:evidence-attestation
   @case:failure
   @evidence.add.06
-  Scenario: An empty evidence kind or reference is refused rather than written
+  Scenario: An empty evidence class or reference is refused rather than written
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
-    Given an add whose kind is only whitespace, and another whose reference is empty
+    Given an add whose class is only whitespace, and another whose reference is empty
     When each is invoked
     Then both exit two
     And nothing is staged, because a companion naming no class and no reference tells a reader nothing
@@ -101,7 +101,7 @@ Feature: evidence add
   # canon: {"schema":1,"at":"2026-10-01T00:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given an evidence add with approval metadata but no detached SSH signature
     When the add is invoked
-    Then it is refused before staging, even when --approval-by and --approval-role are both supplied
+    Then it is refused before staging, even when --approver and --approval-role are both supplied
     And CANON_ACTOR does not substitute for authenticated approval
 
   # canon: {"schema":1,"at":"2026-10-08T15:13:25Z","actor":{"agent_id":"canon"}}
@@ -168,11 +168,11 @@ Feature: evidence add
   @subject:evidence-attestation
   @case:happy
   @evidence.add.17
-  Scenario: The vault stores the bytes of records written before the store existed
+  Scenario: The artifact store keeps the bytes of records written before the store existed
     Given a committed record whose bound report has no stored blob but is unchanged in the working tree
-    When the vault runs
+    When `canon artifacts store` runs
     Then it stores the report's bytes under its digest and says it stored one file
-    And the gate stops advising the vault, and a second run stores nothing new
+    And the gate stops advising `canon artifacts store`, and a second run stores nothing new
 
   # canon: {"schema":1,"at":"2026-10-10T15:43:50Z","actor":{"agent_id":"canon"}}
   @subject:evidence-attestation
@@ -198,7 +198,7 @@ Feature: evidence add
   @evidence.add.20
   Scenario: A session id outside the SessionId grammar is refused and nothing is written
     Given a session id with a control character, surrounding whitespace, or nothing at all
-    When evidence add or review add is run with it
+    When evidence add or review scenario is run with it
     Then the command exits 2 naming --session-id
     And nothing is staged or committed
 
@@ -206,11 +206,12 @@ Feature: evidence add
   @subject:evidence-attestation
   @case:happy
   @evidence.add.21
-  Scenario: Every write command says whether it staged or wrote directly
-    Given the write commands evidence add, finding add and close, review add, divergence add and resolve, subject new, adopt and status, scenario new and feature new
+  Scenario: Every write command either stages its record or writes directly, as its mode says
+    Given the write commands evidence add, finding add and close, review scenario, divergence add and resolve, subject new, adopt and move, change new, scenario new and feature new
     When each succeeds
-    Then a staged write ends with the promote command that commits it
-    And a direct write ends with written directly; nothing to promote
+    Then a direct write leaves nothing staged: feature new, scenario new, change new, subject new, adopt and move, and review scenario
+    And a staged write run with --no-promote leaves its record staged for `canon gate promote`
+    And without --no-promote the staged writers promote their own record in the same run, so nothing is left to promote
 
   # canon: {"schema":1,"at":"2026-10-10T18:33:15Z","actor":{"agent_id":"canon"}}
   @subject:evidence-attestation
@@ -263,10 +264,11 @@ Feature: evidence add
   @subject:evidence-attestation
   @case:failure
   @evidence.add.44
-  Scenario: Audit flags are required with --kind audit and refused on every other kind
+  Scenario: Audit options are required on evidence audit and refused on evidence add
     Given a scenario
-    When an audit is added without the evaluator flags, or evaluator flags are given on a test-run, or an audit carries --verdict or --task, an unknown result, or a digest that is not a sha256
-    Then each add exits 2 naming the flag and nothing is staged
+    When an audit is recorded with `canon evidence audit` without the evaluator options, or with a task id, a verdict, an unknown result, or a digest that is not a sha256, or `canon evidence add` is given the evaluator options or the audit class
+    Then each invocation exits 2 with nothing on stdout, and the evidence add refusals name `canon evidence audit`
+    And nothing is staged
 
   # canon: {"schema":1,"at":"2026-10-10T19:35:33Z","actor":{"agent_id":"canon"}}
   @subject:evidence-attestation
@@ -274,7 +276,7 @@ Feature: evidence add
   @evidence.add.45
   Scenario: An audit is recorded beside the declared verdict and never replaces it
     Given a scenario with a faithful declared record
-    When an external evaluator's refuted audit with a counterexample report is added with --kind audit
+    When an external evaluator's refuted audit with a counterexample report is recorded with `canon evidence audit`
     Then the record carries the evaluator id, version, digest and result, and a divergent verdict
     And the counterexample report is bound and stored like any report
     And the scenario's declared verdict is still the faithful one
@@ -318,7 +320,7 @@ Feature: evidence add
     Given a canon.yaml whose write section says promote always
     When a staged write runs
     Then it is refused with exit 2 naming the write section and nothing is staged
-    And init --check-config reports the write section as failed
+    And init --check reports the write section as failed
     And --promote together with --no-promote is a usage error with exit 2
 
   # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}
@@ -376,7 +378,7 @@ Feature: evidence add
     Then each add exits 1 with an unreviewed-promotion line naming the subject and that brief.md
     And the refusal tells the agent to stop, report the brief and wait for the human's answer, and names --override-reason
     And nothing is staged or committed
-    And canon review add and canon finding add for the same scenario and change are not refused
+    And canon review scenario and canon finding add for the same scenario and change are not refused
 
   # canon: {"schema":1,"at":"2026-10-12T07:30:41Z","actor":{"agent_id":"canon"}}
   @subject:evidence-attestation
@@ -420,7 +422,7 @@ Feature: evidence add
     Then each add exits 1 with an unreviewed-promotion line naming .canon/changes/<change>/brief.md as not existing yet, the external proposal.md it must point at with a "Source:" line, and the approval to record there
     And nothing is staged or committed
     And once that canon brief.md holds the "Source:" line and the "Approved:" line, both adds succeed
-    And the external proposal.md is never edited, and canon gate task flips the external task row
+    And the external proposal.md is never edited, and canon task done flips the external task row
 
   # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
   @subject:evidence-attestation
@@ -462,7 +464,7 @@ Feature: evidence add
     When evidence is added with --all-scenarios
     Then the add exits 1 with the brief refusal and nothing is staged for any scenario
     And a summary carrying a fabrication marker refuses the batch the same way
-    And --all-scenarios with --scenario-id, --task, --report-case or an approval, or without --report or --project-id, is refused with exit 2
+    And --all-scenarios with --scenario-id, --task-id, --report-case or an approval, or without --report, is refused with exit 2
     And a batch whose second record fails to stage, or whose second promotion is refused, leaves no record staged or committed and no new blob, and a read-only destination is refused before anything is written
 
   # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
@@ -471,7 +473,7 @@ Feature: evidence add
   @evidence.add.84
   Scenario: A task's report with no scenario id binds every case in it
     Given a task row and a report whose cases carry no scenario id
-    When evidence is added with --task and --report and no --scenario-id
+    When evidence is added with --task-id and --report and no --scenario-id
     Then the record binds every case in the report
     And when any case failed, a faithful verdict is refused with exit 1 and nothing is staged
 
@@ -494,7 +496,7 @@ Feature: evidence add
   Scenario: A write that makes a pinned review stale names the review and its re-pin command
     Given a scenario with a current signed review that pinned what its latest evidence said
     When new evidence for the scenario with a different verdict or different checks is added, alone or in a batch
-    Then the add prints one line per review now stale naming the reviewer, the scenario and the `canon review add ... --pin <sha>` command that re-pins it
+    Then the add prints one line per review now stale naming the reviewer, the scenario and the `canon review scenario` command that re-pins it
     And that command keeps the review's session when it recorded one
     And running that command makes the review current again
     And evidence that says the same, with the same verdict from the same checks, leaves the review current and prints no such line
@@ -517,7 +519,7 @@ Feature: evidence add
   Scenario: A fabrication marker is refused the way every other gate-red refusal of evidence add is
     Given a summary holding "TBD" and a command result reading "n/a"
     When evidence is added with them
-    Then the command exits 1 with one "canon evidence add: refused —" line per finding, each naming fabricated-evidence, the scenario, the field and the marker
+    Then the command exits 1 with the code EVIDENCE_FABRICATED and one line per finding, each naming fabricated-evidence, the scenario, the field and the marker
     And nothing is staged or committed
 
   # canon: {"schema":1,"at":"2026-10-18T09:00:00Z","actor":{"agent_id":"attachments-impl"}}
@@ -649,3 +651,96 @@ Feature: evidence add
     When evidence approval-payload names a --project-id that is no configured root
     Then it exits 2 with UNKNOWN_SPEC_ROOT and prints no payload bytes
     And the payload for the configured root is still printed
+
+  # canon: {"schema":1,"at":"2026-10-23T12:02:58Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.106
+  Scenario: One evidence add document records one attestation and an array or NDJSON records one per element
+    Given a git work tree holding two indexed scenarios
+    When evidence add is given its arguments as one JSON object with --input, then as a JSON array, then as NDJSON from a file
+    Then the object writes one record and returns the ordinary report
+    And the array and the NDJSON each return a batch report with one item per element, in order, each written
+    And an array of one element is still a batch
+
+  # canon: {"schema":1,"at":"2026-10-23T12:03:02Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.107
+  Scenario: A batch with one invalid element writes nothing and points at the element
+    Given a batch of two evidence documents whose second carries a value outside its closed set, or lacks a required key
+    When evidence add is run on it with --input
+    Then it exits 2 and the error's field points at that element and key, such as /items/1/verdict
+    And nothing is written, not even the valid first element
+
+  # canon: {"schema":1,"at":"2026-10-23T12:03:06Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.108
+  Scenario: Repeating an evidence add that already landed writes nothing and is reported unchanged
+    Given an evidence add that already landed
+    When the same add is repeated, alone or as a batch
+    Then it exits 0 and the report says unchanged, each batch element being unchanged
+    And nothing is written, and the ledger still holds the one record
+
+  # canon: {"schema":1,"at":"2026-10-23T12:03:11Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.109
+  Scenario: A record names the commit it is about, HEAD by default, with the code tree it saw
+    Given a scenario in a git work tree and an evidence add that names no revision
+    When it is invoked
+    Then the record names the full sha that HEAD resolves to
+    And it carries the code tree of the code it saw and a worktree-dirty flag of false
+
+  # canon: {"schema":1,"at":"2026-10-23T12:03:15Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.110
+  Scenario: Uncommitted code is recorded as dirty and never refused
+    Given a git work tree whose code differs from HEAD, with a new untracked file
+    When evidence is added for a scenario
+    Then the add succeeds and the record names HEAD and carries a worktree-dirty flag of true
+    And a review made on the same working tree records the code tree of what it saw, which differs from HEAD's
+    And once that working tree is committed the commit's code tree equals the one the review recorded, so the review covers it
+
+  # canon: {"schema":1,"at":"2026-10-23T12:03:19Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.111
+  Scenario: Outside git, or before the first commit, an evidence add is refused with NO_COMMIT
+    Given a directory with no git repository, and a git repository with no commit, each holding an indexed scenario
+    When evidence add runs in each
+    Then it exits 2 with NO_COMMIT and a hint to run git init and commit
+    And nothing is written
+
+  # canon: {"schema":1,"at":"2026-10-23T12:03:23Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:evidence-attestation
+  @case:happy
+  @evidence.add.112
+  Scenario: A bound report decides the verdict of a single-scenario add
+    Given a scenario and three JUnit reports that name it: one where every case passed, one with a skipped case and none failed, one with a failed case
+    When evidence is added for the scenario with each report and no --verdict
+    Then the passing report records faithful, the report with a skipped case and none failed records not-applicable, and the report with a failed case records divergent
+    And each add succeeds, because the report decided the verdict and nothing contradicts it
+
+  # canon: {"schema":1,"at":"2026-10-23T12:03:28Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.113
+  Scenario: An explicit faithful verdict over a failed or skipped case is refused and nothing is written
+    Given a scenario and a report whose case for it is skipped, and another whose case failed
+    When evidence is added for the scenario with each report and --verdict faithful
+    Then each add exits 1 and nothing is written
+    And the same adds without --verdict succeed and record the verdict the report decides
+
+  # canon: {"schema":1,"at":"2026-10-23T12:03:34Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:evidence-attestation
+  @case:edge
+  @evidence.add.114
+  Scenario: An override is recorded, echoed in the add's overrides and listed by status
+    Given a subject owning a scenario whose change brief has no answer from the human
+    When evidence is added for the scenario, then again with --override-reason
+    Then the first add is refused with exit 1, and the second succeeds
+    And the JSON report lists the waiver in its overrides, with the reason and the code of the refusal it waived
+    And canon status lists the override with its reason

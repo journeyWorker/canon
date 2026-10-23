@@ -12,7 +12,7 @@ Feature: authoring init
     And no openspec directory is created
     And .canon/policy.yaml turns spec_coverage on with require_evidence, require_cases [failure] and require_review
     And the policy says a human approves it, and so does the init output
-    And AGENTS.md holds the canon block naming the loop, canon status and the canon skill
+    And AGENTS.md holds the canon block, which points at canon status
 
   # canon: {"schema":1,"at":"2026-10-10T15:34:47Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
@@ -49,12 +49,12 @@ Feature: authoring init
 
   # canon: {"schema":1,"at":"2026-10-10T15:34:48Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
-  @case:failure
+  @case:edge
   @authoring.init.05
-  Scenario: A rerun with nothing to refresh refuses to overwrite canon.yaml
+  Scenario: A rerun with nothing to refresh leaves canon.yaml alone and reports unchanged
     Given a repo that already has canon.yaml
     When canon init runs with --no-agents-md
-    Then there is nothing left to refresh, so it exits 2 refusing to overwrite canon.yaml
+    Then there is nothing left to refresh, so it exits 0 and, with --json, reports meta.unchanged
     And canon.yaml is byte-identical and no AGENTS.md is written
 
   # canon: {"schema":1,"at":"2026-10-10T15:34:48Z","actor":{"agent_id":"canon"}}
@@ -65,7 +65,7 @@ Feature: authoring init
     Given the starter policy that canon init writes
     When the gate's policy loader resolves it
     Then it reports zero diagnostics, the unknown-key check included
-    And on a fresh init the gate is clean with no scenarios
+    And on a fresh init, with nothing to examine, the gate exits 1 as unverifiable and reports no violation
     And once an unevidenced scenario is indexed the gate is red naming it, with no coverage-off advisory
 
   # canon: {"schema":1,"at":"2026-10-10T15:34:48Z","actor":{"agent_id":"canon"}}
@@ -123,8 +123,8 @@ Feature: authoring init
   Scenario: Init names the command that approves its starter policy
     Given an empty repository
     When canon init writes the starter policy
-    Then its output says a human approves the policy with `canon policy approve --by <who>`
-    And the AGENTS.md block names the same command
+    Then its output says a human approves the policy with `canon policy approve --approver <who>`
+    And the starter policy file says a human approves it
 
   # canon: {"schema":1,"at":"2026-10-11T14:43:35Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
@@ -194,9 +194,9 @@ Feature: authoring init
   @subject:authoring-scaffold
   @case:edge
   @authoring.init.71
-  Scenario: The scenario index a reader rebuilds stays out of git
+  Scenario: The scenario index a writer rebuilds stays out of git
     Given a repository initialized with canon init whose feature file is committed
-    When a reader rebuilds the stale scenario index
+    When a writing command rebuilds the stale scenario index
     Then the init gitignore covers .canon/ledger/kind=scenario/
     And git status reports nothing untracked
 
@@ -206,7 +206,7 @@ Feature: authoring init
   @authoring.init.72
   Scenario: The scenario index lock stays out of git
     Given a repository initialized with canon init whose feature file is committed
-    When a reader refreshes the stale scenario index and takes the index lock
+    When a writing command refreshes the stale scenario index and takes the index lock
     Then the init gitignore covers .canon/scenario-index.lock
     And git status reports nothing untracked
 
@@ -240,7 +240,7 @@ Feature: authoring init
     When canon init runs with no terminal and no --providers
     Then it installs the canon skill for omp only and says where
     And canon.yaml ends with `skills: { providers: [omp] }` and the install lock records omp only
-    And canon init --check-config passes the skills section and canon skills doctor reports healthy from canon.yaml
+    And canon init --check passes the skills section and canon skills doctor reports healthy from canon.yaml
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
@@ -262,7 +262,7 @@ Feature: authoring init
     When canon init runs with no terminal and no --providers
     Then it exits 0, installs nothing and writes no install lock
     And its output says no harness was detected and names `canon skills install --providers=<list>`
-    And canon.yaml carries the skills section only as a commented example, which check-config reports as not configured
+    And canon.yaml carries the skills section only as a commented example, which init --check reports as not configured
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
@@ -288,12 +288,11 @@ Feature: authoring init
   @subject:authoring-scaffold
   @case:failure
   @authoring.init.95
-  Scenario: A missing skill source keeps the recorded choice and names the install to run
-    Given an empty repository holding a .pi directory, and no skill source
+  Scenario: A missing skill source override keeps the recorded choice and names the install to run
+    Given an empty repository holding a .pi directory, and CANON_SKILLS_SOURCE naming a directory that does not exist
     When canon init runs with no terminal and no --providers
-    Then it records `providers: [pi]` in canon.yaml, installs nothing and exits 2
-    And it names the missing source and `canon skills install` with CANON_SKILLS_SOURCE or --source
-    And that install, once the source exists, projects pi from canon.yaml
+    Then it records `providers: [pi]` in canon.yaml, installs nothing and exits 2 with INIT_SKILL_INSTALL_FAILED
+    And canon skills install, run without the override, projects pi from canon.yaml with the stub the binary carries
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
@@ -314,7 +313,7 @@ Feature: authoring init
     Given a repo whose canon.yaml exists and whose gitignore lacks canon lines added since it was set up
     When canon init runs again
     Then it adds each missing canon gitignore line once under its comment, names them, and keeps the rest of the gitignore and canon.yaml byte-identical
-    And with --no-agents-md it only adds the lines, and with none missing that run is the overwrite refusal
+    And with --no-agents-md it only adds the lines, and with none missing that run is a no-op that exits 0
 
   # canon: {"schema":1,"at":"2026-10-21T16:35:52Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
@@ -330,9 +329,9 @@ Feature: authoring init
   @subject:authoring-scaffold
   @case:failure
   @authoring.init.99
-  Scenario: init --check-config warns about a missing managed gitignore line and names the fix
+  Scenario: init --check warns about a missing managed gitignore line and names the fix
     Given a repo whose gitignore lacks one of the lines canon init manages
-    When init --check-config runs
+    When init --check runs
     Then it prints a [WARN] gitignore line naming the missing entries and the fix, canon migrate
     And it exits 0, because a missing ignore line is not a config failure
     And a repo that is neither a git checkout nor has a gitignore draws no such line
@@ -341,8 +340,8 @@ Feature: authoring init
   @subject:authoring-scaffold
   @case:edge
   @authoring.init.100
-  Scenario: A scenario edit and a reader run leave only the edited feature in git status
+  Scenario: A scenario edit and an index refresh leave only the edited feature in git status
     Given a git repository freshly initialized with canon init, with a committed feature file holding one scenario
-    When canon gate check indexes the scenario, the scenario is edited, and canon gate check runs again
+    When canon inventory sync indexes the scenario, the scenario is edited, and canon inventory sync runs again
     Then the init gitignore covers .canon/archive/kind=scenario/, where the superseded index version went, which no reader needs from git
     And git status reports only the edited feature file

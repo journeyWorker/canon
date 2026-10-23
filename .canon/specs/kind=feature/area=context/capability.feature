@@ -123,7 +123,7 @@ Feature: context capability
     Given a repository whose policy enforces spec coverage
     When the capability outline is printed
     Then its first line points to status, followed by a blank line and the capability version
-    And the JSON surface carries exactly the same top-level keys and capability version as before
+    And the JSON surface carries the same sections under the same capability version, the commands and families included, and the header adds no field
 
   # canon: {"schema":1,"at":"2026-10-10T15:35:48Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
@@ -140,7 +140,7 @@ Feature: context capability
   @case:happy
   @context.capability.14
   Scenario: One concept has one flag spelling across every command
-    Given the whole command tree as `canon schema --all --json` and `canon schema <command> --json` show it
+    Given the whole command tree as `canon schema --json` and `canon schema <command> --json` show it
     When every visible flag of every command is read
     Then no two flags differ only by an -id suffix
     And change, project, subject, actor, scenario, session and run each appear only as --<name>-id
@@ -161,9 +161,9 @@ Feature: context capability
   @context.capability.16
   Scenario: A removed flag spelling is a usage error whose hint names the flag that replaced it
     Given a repo with a change and a brief
-    When `canon brief check --change <slug> --json` runs, the spelling 0.23 took and 0.24 deprecated
-    Then it exits 2 with the USAGE error, field `--change`, and the hint `--change was renamed --change-id in 0.24.0; use --change-id`
-    And nothing runs, and `--change=<slug>` and `--change` placed before the subcommand are refused the same way
+    When `canon scenario new demo.login.01 --title A --change add-login --json` runs, the spelling 0.23 took and 0.24 deprecated
+    Then it exits 2 with the USAGE error, field `--change`, `expected` listing `--change-id`, and a hint
+    And nothing runs, and `--change=<slug>` and a `--change` missing its value are refused the same way
     And `--change-id <slug>` runs, and the JSON envelope carries no meta.deprecated
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
@@ -173,7 +173,7 @@ Feature: context capability
   Scenario: A removed --kind value is a usage error whose hint names the value that replaced it
     Given a repo with no records
     When `canon query --kind review_record --json` runs
-    Then it exits 2 with the USAGE error and the hint `--kind review_record was renamed --kind review in 0.24.0; use --kind review`
+    Then it exits 2 with the USAGE error, field `--kind`, and `expected` naming `--kind review`
     And query, export and purge refuse every <kind>_record value the same way, and `--kind review` runs
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
@@ -210,12 +210,12 @@ Feature: context capability
   @subject:context-capability
   @case:failure
   @context.capability.21
-  Scenario: A scenario batch line with a removed key name refuses the batch and names the key to use
-    Given an NDJSON file for `canon scenario new --from` whose line uses the key subject, change or project
+  Scenario: A scenario batch element with a removed key name refuses the batch and names the key to use
+    Given a JSON array for `canon scenario new --input` whose second element uses the key subject, change or project
     When the batch runs
-    Then it exits 2 and writes nothing
-    And the line's error names the key that replaced it, as `subject-id`, in its hint
-    And a file using subject-id, change-id and project-id is written as before
+    Then it exits 2 with INPUT_UNKNOWN_FIELD and writes nothing
+    And the error's field points at the element and the key, as `/items/1/subject`, and `expected` lists the key that replaced it, `subjectId`
+    And an array using subjectId, projectId and changeId is written as before
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
@@ -243,19 +243,19 @@ Feature: context capability
   @context.capability.24
   Scenario: A command that needs canon state refuses without a canon.yaml, and the ones that run without it still do
     Given a directory with no canon.yaml in it or above it
-    When a command that reads or records repository state runs there, such as status, query, finding list, report or subject new
+    When a command that reads or records repository state runs there, such as status, query, finding list, report build or subject new
     Then it exits 2 with CONFIG_MISSING and writes nothing
-    And init, schema, context, regime-key and retrieve still run there, and init creates the canon.yaml the others look for
+    And init, schema, context, regime show and retrieve still run there, and init creates the canon.yaml the others look for
 
   # canon: {"schema":1,"at":"2026-10-22T04:48:48Z","actor":{"agent_id":"canon-impl-027"}}
   @subject:context-capability
   @case:edge
   @context.capability.25
-  Scenario: The schema reports a --repo default of the nearest canon.yaml, not the literal dot
-    Given a command whose --repo defaults to the dot
+  Scenario: The schema reports no --repo default, because an absent --repo means the nearest canon.yaml, not the literal dot
+    Given a command that acts on a repository
     When canon schema <command> --json lists its options
-    Then the default of --repo reads as the nearest ancestor directory with a canon.yaml
-    And it is no longer reported as the literal dot, which is not what the command does
+    Then --repo has no default, and its help says an absent --repo is the nearest ancestor directory with a canon.yaml
+    And init is the one exception: it sets up the directory it is given, which defaults to the current one
 
   # canon: {"schema":1,"at":"2026-10-22T04:49:11Z","actor":{"agent_id":"canon-impl-027"}}
   @subject:context-capability
@@ -266,3 +266,193 @@ Feature: context capability
     When every command the schema declares effect read runs in it, with its example and the other reads that used to write
     Then the file tree, ignored files included, and git status are the same afterwards
     And the only exception is a path the command's effectNote names, which is gitignored and never committed
+
+  # canon: {"schema":1,"at":"2026-10-23T11:48:18Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:happy
+  @context.capability.27
+  Scenario: The schema of a command is the node of the checked-in command spec
+    Given the command spec checked in at docs/cli/canon.cli.json
+    When canon schema is run for every leaf command of that spec
+    Then each answer's data is the spec's node for that command, field for field
+    And the bare listing names exactly the spec's leaf commands and no other
+
+  # canon: {"schema":1,"at":"2026-10-23T11:48:38Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:failure
+  @context.capability.28
+  Scenario: A checked-in spec that differs from the CLI is a drift that names the commands
+    Given the checked-in command spec and the spec the CLI generates
+    When the two are compared
+    Then they are identical on the unmodified tree
+    And a spec missing a command is reported as in the CLI and not in the spec, naming the command
+    And a spec carrying a command the CLI lacks, or a node whose fields were edited, is reported by that command's name, and a byte of difference anywhere else is a drift too
+
+  # canon: {"schema":1,"at":"2026-10-23T11:48:50Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:happy
+  @context.capability.29
+  Scenario: A success is the envelope ok, data and meta
+    Given a repository set up with canon init
+    When status, schema, context and skills show run with --json
+    Then each exits 0 and prints one document whose only keys are ok, data and meta, with ok true
+    And meta names the command, a major.minor schema version, the canon version and the repository context
+
+  # canon: {"schema":1,"at":"2026-10-23T11:49:05Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:failure
+  @context.capability.30
+  Scenario: A failure is an error object with a code, a message, a hint and a retryable flag
+    Given a repository with a change whose brief is still the template
+    When a command is refused, given a usage error, or finds blockers, each with --json
+    Then the document is ok false with an error carrying a registered code, a message, a hint and retryable
+    And a usage error names the argument it refused in field, and its hint holds a call that works
+    And a refusal carries no data, while a failing check keeps its report in data
+    And canon schema --error explains each code that was printed
+
+  # canon: {"schema":1,"at":"2026-10-23T11:49:15Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:edge
+  @context.capability.31
+  Scenario: In JSON mode a warning is carried in meta.warnings and stderr stays empty
+    Given a repository and a role value no policy or default names
+    When a record is written with that role and --json, and again without --json
+    Then with --json the command exits 0, stderr is empty and the warning is in meta.warnings
+    And without --json the same warning is on stderr
+
+  # canon: {"schema":1,"at":"2026-10-23T11:49:29Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:failure
+  @context.capability.32
+  Scenario: In JSON mode a failure leaves stderr empty, even one clap or the removed-spelling table refused
+    Given a usage error clap raises, a removed spelling, an unknown command, a refused read, a missing repo flag target and a directory with no canon.yaml
+    When each runs with --json, wherever the flag sits in the argv
+    Then each exits 2 with stderr empty and one document on stdout that is ok false with an error code
+    And the same refusal without --json goes to stderr and leaves stdout empty
+
+  # canon: {"schema":1,"at":"2026-10-23T11:49:47Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:happy
+  @context.capability.33
+  Scenario: Exit 0 is ok, exit 1 is the command's finding and exit 2 is a refusal
+    Given a repository holding a change whose brief has blockers, and a corpus with a format violation
+    When status, format, brief check, gate check and a refused call are run
+    Then status exits 0, and format, brief check and a gate check that examined nothing exit 1 with their finding in data
+    And a usage error or an unknown change exits 2
+    And the exit table of the spec lists exactly 0, 1 and 2
+
+  # canon: {"schema":1,"at":"2026-10-23T11:49:58Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:failure
+  @context.capability.34
+  Scenario: A usage error is exit 2 and its hint is a call that parses
+    Given a repository holding a subject and a change
+    When commands are run missing a required argument, with an unknown option, or with no operand
+    Then each exits 2 with the USAGE error and a hint containing a working call
+    And the call in the hint, followed by --help, parses and exits 0
+
+  # canon: {"schema":1,"at":"2026-10-23T11:50:10Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:failure
+  @context.capability.35
+  Scenario: A removed leaf is a usage error whose hint names the leaf that replaced it
+    Given the 0.27 leaves evidence vault, gate task, subject status, learn promote, review add, regime-key and divergence status
+    When each is run with --json
+    Then each exits 2 with the USAGE error, the removed spelling in field and the 0.28 spelling in expected
+    And the hint names the leaf that replaced it, and that leaf parses as written
+    And nothing was run, so the repository is unchanged
+
+  # canon: {"schema":1,"at":"2026-10-23T11:50:24Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:failure
+  @context.capability.36
+  Scenario: A removed option is a usage error whose hint names the option that replaced it
+    Given the 0.27 options format --check, query --canon-yaml, retrieve -k, init --check-config, evidence add --kind audit and tier age --dry-run
+    When each is run with --json
+    Then each exits 2 with the USAGE error and the removed option in field
+    And the hint names the option that replaced it, which the command takes
+    And nothing was run, so the repository is unchanged
+
+  # canon: {"schema":1,"at":"2026-10-23T11:50:40Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:failure
+  @context.capability.37
+  Scenario: A bare group is a usage error whose hint names the leaf to run
+    Given canon brief and canon report, which ran bare in 0.27, and a group that never did
+    When each is run bare with --json
+    Then each exits 2 with the USAGE error and stderr empty
+    And the hint of brief and report names the leaf to run, canon brief show and canon report build, and that leaf parses as written
+    And the other group is still the ordinary usage error with a hint
+
+  # canon: {"schema":1,"at":"2026-10-23T11:51:05Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:happy
+  @context.capability.38
+  Scenario: Context lists every command, filtered to the role that asks
+    Given the generated command spec and a repository with no canon.yaml
+    When canon context is run with no role, and again as each of planner, implementer, reviewer and orchestrator
+    Then the commands section lists every leaf of the spec, each with its effect and roles
+    And each role's run lists exactly the leaves that role may use
+
+  # canon: {"schema":1,"at":"2026-10-23T11:51:23Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:happy
+  @context.capability.39
+  Scenario: Context names the kinds users see, evidence included, and every artifact family
+    Given the record kinds and artifact families the model registers
+    When canon context is run
+    Then its kinds are every record kind under the name users type, evidence rather than evidence_record, and its cel section names the same kinds
+    And its families are every artifact family in order, and the capability version is 6
+    And every closed --kind value of query, export and purge is one of those kinds
+
+  # canon: {"schema":1,"at":"2026-10-23T11:51:38Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:failure
+  @context.capability.40
+  Scenario: Context refuses an unknown field with exit 2
+    Given a directory with no canon.yaml
+    When canon context is run with --fields naming a section that does not exist, with --json and without
+    Then it exits 2 and, with --json, names UNKNOWN_FIELD
+    And the named sections that do exist are the only keys canon context returns when --fields lists them
+
+  # canon: {"schema":1,"at":"2026-10-23T11:51:50Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:happy
+  @context.capability.41
+  Scenario: Completion prints a script for each supported shell
+    Given a directory with no canon.yaml
+    When canon completion is run for bash, zsh and fish
+    Then each exits 0 and prints a script that names canon and completes its own command
+    And with --json the document carries the shell and the same script, and stderr is empty
+
+  # canon: {"schema":1,"at":"2026-10-23T11:52:01Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:failure
+  @context.capability.42
+  Scenario: Completion refuses a shell it does not know
+    Given a directory with no canon.yaml
+    When canon completion is run with a shell it does not support, or with none
+    Then each exits 2
+    And a supported shell still runs with --as given, because completion needs no repo
+
+  # canon: {"schema":1,"at":"2026-10-23T11:52:25Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:edge
+  @context.capability.43
+  Scenario: An unknown role value runs and warns with the closest known role
+    Given a repository whose policy names the custom role auditor
+    When a record is written with --role reviwer, with --role zzzzzzzz, and with --role reviewer and auditor
+    Then the misspelt role runs and the warning names the closest known role, reviewer
+    And a role with nothing close runs and warns without a suggestion
+    And a known role and a policy-named role run with no warning
+
+  # canon: {"schema":1,"at":"2026-10-23T11:53:03Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:context-capability
+  @case:failure
+  @context.capability.44
+  Scenario: An unknown CANON_ROLE value is refused with UNKNOWN_ROLE, except where a command never consults it
+    Given CANON_ROLE set to a value that is not a role
+    When canon status runs, and canon schema and canon context run, and canon status runs with --as naming a valid role
+    Then status exits 2 with UNKNOWN_ROLE, naming the value, and with stderr empty under --json
+    And schema and context still run, because they never consult the variable
+    And the flag wins over the variable, and an unknown --as value is a usage error

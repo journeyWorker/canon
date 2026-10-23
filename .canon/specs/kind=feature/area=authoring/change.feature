@@ -7,11 +7,11 @@ Feature: authoring change
   @authoring.change.01
   Scenario: A new change is written in canon's own changes dir, imported and adopted with no plans source
     Given a repo set up by canon init alone, whose canon.yaml lists no plans source, and a subject
-    When canon change new is run with a slug, the subject and a title
-    Then .canon/changes/<slug>/brief.md and tasks.md are written, the title as the brief's Why
+    When canon change new is run with a slug, --subject-id and --title
+    Then .canon/changes/<slug>/brief.md is written, the title as the brief's Intent, and no tasks.md is written
     And no openspec directory is created and canon.yaml is byte-identical
     And the change is imported with canon's own provenance and carries the subject, and the subject lists the change
-    And a task row added to tasks.md imports as <slug>#1, and canon gate task flips it there
+    And a tasks.md written by hand imports its task row as <slug>#1, and canon task done <slug>#1 flips it there
 
   # canon: {"schema":1,"at":"2026-10-10T15:34:48Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
@@ -52,7 +52,7 @@ Feature: authoring change
     Given a repo where the subject record can be written but the change record cannot
     When canon change new is run
     Then it exits 2, keeping the change dir and the subject record that now lists the change
-    And it prints the command that completes the link: canon ingest plans, then canon subject adopt
+    And it prints the command that completes the link: canon ingest plans, then canon subject adopt <subject> --change-id <slug>
     And running that command completes the link, and running the adopt again writes nothing
 
   # canon: {"schema":1,"at":"2026-10-12T12:00:00Z","actor":{"agent_id":"017-p2-impl"}}

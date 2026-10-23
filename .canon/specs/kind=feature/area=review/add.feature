@@ -1,4 +1,4 @@
-Feature: review add
+Feature: review scenario
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:review-attestation
@@ -150,7 +150,7 @@ Feature: review add
   @case:failure
   @review.add.24
   Scenario: An indeterminate or unavailable review is a gap, never an approval
-    Given a review recorded with --outcome indeterminate or unavailable
+    Given a review recorded with --review-outcome indeterminate or unavailable
     When the gate and the status guard check the scenario
     Then it is unreviewed-promotion with a detail naming the reviewer and the outcome
     And it counts as no approval even without distinct_actor, and as no rejection either
@@ -171,7 +171,7 @@ Feature: review add
   @case:happy
   @review.add.26
   Scenario: A review records the reviewer runtime that produced it
-    Given --reviewer-provider, --reviewer-model and --reviewer-harness on review add
+    Given --reviewer-provider, --reviewer-model and --reviewer-harness on review scenario
     When the review is written
     Then the record carries each value exactly as given
     And an empty or padded label is a usage error
@@ -206,7 +206,7 @@ Feature: review add
   Scenario: A review stores the files the reviewer looked at and records their path and digest
     Given a screenshot and a recording inside the repository
     When a review is added with --artifact for each, one of them given twice
-    Then each file's bytes are stored in .canon/artifacts/sha256/ under their digest and review add says so
+    Then each file's bytes are stored in .canon/artifacts/sha256/ under their digest and the review says so
     And the review records each file once as its path and sha256, in the order given
     And a review without --artifact carries no artifacts field
     And `canon gate check` stays clean after the working-tree files change
@@ -229,7 +229,7 @@ Feature: review add
   Scenario: A review artifact outside the repository, missing, or over the size limit is refused and nothing is written
     Given a file outside the repository, a path that names no file, and a file over --max-artifact-mib
     When a review is added with each as --artifact
-    Then review add exits 2 with a refusal naming the file and why
+    Then review scenario exits 2 with a refusal naming the file and why
     And no review is written and no bytes are stored
 
   # canon: {"schema":1,"at":"2026-10-11T14:44:56Z","actor":{"agent_id":"canon"}}
@@ -247,7 +247,7 @@ Feature: review add
   @review.add.60
   Scenario: A new review of a scenario whose review from before pinning went stale clears it
     Given a review written before 0.15 that is stale because its scenario changed after the commit it pinned
-    When the same reviewer reviews the scenario again with `canon review add`
+    When the same reviewer reviews the scenario again with `canon review scenario`
     Then the new review pins what it saw and supersedes the old one
     And `canon gate check` exits 0
 
@@ -255,7 +255,7 @@ Feature: review add
   @subject:review-attestation
   @case:failure
   @review.add.61
-  Scenario: The subject status guard and status judge a review that predates 0.23 as the gate does
+  Scenario: The subject move guard and status judge a review that predates 0.23 as the gate does
     Given a building subject whose scenario's review predates 0.23 pinning
     When the subject is moved to verifying
     Then the guard refuses with the gate's detail naming `canon migrate` and prints the advisory for the subject's own scenarios
@@ -266,42 +266,42 @@ Feature: review add
   @subject:review-attestation
   @case:happy
   @review.add.80
-  Scenario: One review add signs off several scenarios with one reviewer, pin and set of artifacts
+  Scenario: One review scenario call signs off several scenarios with one reviewer, commit and set of artifacts
     Given three indexed scenarios
-    When a review is added with --scenario-id repeated and --scenario-ids-from a file of ids with comments
-    Then one review is written per scenario, each pinning its own scenario and evidence, with the same reviewer, pin and artifacts
+    When canon review scenario names all three as operands, with one --artifact
+    Then one review is written per scenario, each pinning its own scenario and evidence, with the same reviewer, commit and artifacts
     And the artifacts are stored once
 
   # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
   @subject:review-attestation
   @case:failure
   @review.add.81
-  Scenario: A batch review with any scenario that has no record writes nothing
+  Scenario: A review of several scenarios where any has no record writes nothing
     Given two indexed scenarios and one id with no scenario record
-    When a review is added for all three
-    Then the add exits 2 naming the unindexed id, and no review is written for any of them
-    And an ids file with a line that is not a scenario id is refused with exit 2, naming the line
-    And when writing the second review fails, the first review and every blob the call stored are removed, and a read-only review directory is refused before anything is written
+    When canon review scenario names all three
+    Then the call exits 2 with REVIEW_SCENARIO_NOT_INDEXED, and no review is written for any of them
+    And a call naming no scenario is refused with exit 2 and writes nothing
+    And when writing the second review fails, the first review and every blob the call stored are removed
 
   # canon: {"schema":1,"at":"2026-10-12T18:00:00Z","actor":{"agent_id":"018-n3-impl"}}
   @subject:review-attestation
   @case:edge
   @review.add.90
-  Scenario: A lost review blob whose working-tree file still matches is a vault advisory, as for evidence
+  Scenario: A lost review blob whose working-tree file still matches is an artifact-store advisory, as for evidence
     Given a review bound to a screenshot whose stored blob was deleted while the working-tree file is unchanged
     When `canon gate check` runs
-    Then it exits 0 with no stale-evidence, and the evidence-artifacts advisory names the scenario, the path, the digest and the reviewer and says to run `canon evidence vault`
-    And `canon evidence vault` stores the blob back from the working tree, and the advisory goes away
+    Then it exits 0 with no stale-evidence, and the evidence-artifacts advisory names the scenario, the path, the digest and the reviewer and says to run `canon artifacts store`
+    And `canon artifacts store` stores the blob back from the working tree, and the advisory goes away
     And once the blob is lost again and the working-tree file changes, the gate exits 1 with stale-evidence naming the review
 
   # canon: {"schema":1,"at":"2026-10-12T18:00:00Z","actor":{"agent_id":"018-n3-impl"}}
   @subject:review-attestation
   @case:edge
   @review.add.91
-  Scenario: A review that went stale and was reviewed again by another reviewer is superseded, so its files are neither checked nor vaulted
+  Scenario: A review that went stale and was reviewed again by another reviewer is superseded, so its files are neither checked nor stored
     Given a review bound to a screenshot, then new evidence for its scenario, then another reviewer's review bound to a recording
     When the first review's stored blob is lost while its working-tree file still matches
-    Then `canon gate check` exits 0 with no advisory for the file, and `canon evidence vault` stores nothing for it, counting only the newer review's file
+    Then `canon gate check` exits 0 with no advisory for the file, and `canon artifacts store` stores nothing for it, counting only the newer review's file
     And once its working-tree file changes too, `canon gate check` still exits 0 and names neither the file nor the first review
     And when the newer review's blob is lost and its working-tree file changes, the gate exits 1 with stale-evidence naming the newer review only
 
@@ -311,5 +311,77 @@ Feature: review add
   @review.add.92
   Scenario: A review for a project id that names no configured spec root is refused
     Given a repo whose canon.yaml configures one spec root, game, and a scenario indexed under it
-    When review add names a --project-id that is no configured root
+    When review scenario names a --project-id that is no configured root
     Then it exits 2 with UNKNOWN_SPEC_ROOT, writes no review record, and the hint names the configured root
+
+  # canon: {"schema":1,"at":"2026-10-23T12:07:06Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:review-attestation
+  @case:happy
+  @review.add.93
+  Scenario: One review scenario document records one review per scenario and an array records one per element
+    Given a git work tree holding indexed scenarios
+    When review scenario is given its arguments as one JSON object with --input, then as a JSON array
+    Then the object writes one review per operand and returns the ordinary report
+    And the array returns a batch report with one item per element, in order, each written
+
+  # canon: {"schema":1,"at":"2026-10-23T12:07:12Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:review-attestation
+  @case:failure
+  @review.add.94
+  Scenario: A batch with one invalid or unindexed element writes nothing and points at the element
+    Given a batch of two review documents whose second carries a review outcome outside the closed set, and a call naming a scenario no record carries
+    When review scenario is run on each with --input
+    Then the batch exits 2 and the error's field points at that element and key, such as /items/1/reviewOutcome
+    And the unindexed scenario is refused with REVIEW_SCENARIO_NOT_INDEXED
+    And no review is written in either case, not even for the valid first element
+
+  # canon: {"schema":1,"at":"2026-10-23T12:07:18Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:review-attestation
+  @case:edge
+  @review.add.95
+  Scenario: Repeating a review that already landed writes nothing and is reported unchanged
+    Given a review that already landed
+    When the identical review is repeated, alone or as a batch
+    Then it exits 0 and the report says unchanged, each batch element being unchanged
+    And nothing is written, and the ledger still holds the one review
+
+  # canon: {"schema":1,"at":"2026-10-23T12:07:23Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:review-attestation
+  @case:happy
+  @review.add.96
+  Scenario: A review pins the commit it is about, HEAD by default, with the code tree it saw
+    Given a review that names no revision, in a git work tree
+    When it is written
+    Then the review pins the full sha HEAD resolves to
+    And it carries the code tree it saw and a worktree-dirty flag of false
+
+  # canon: {"schema":1,"at":"2026-10-23T12:07:27Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:review-attestation
+  @case:edge
+  @review.add.97
+  Scenario: Any git revision names the commit a review pins, resolved to the full sha
+    Given a repository with two commits
+    When a review names its revision by a short sha, a branch name, HEAD~1 or the full sha
+    Then each review pins the full sha that revision resolves to
+    And each records the code tree of that commit and is not marked dirty
+
+  # canon: {"schema":1,"at":"2026-10-23T12:07:31Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:review-attestation
+  @case:edge
+  @review.add.98
+  Scenario: A review of uncommitted code is recorded as dirty and covers the commit later made from that code
+    Given a working tree whose code differs from HEAD, with a new untracked file
+    When a review is written
+    Then the write succeeds, the review pins HEAD and is marked dirty, and it records the code tree of the working code, which differs from HEAD's
+    And once that working tree is committed the commit's code tree equals the one the review recorded, so the review is current
+    And once the code changes again the code tree differs, so the review no longer covers it
+
+  # canon: {"schema":1,"at":"2026-10-23T12:07:36Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:review-attestation
+  @case:failure
+  @review.add.99
+  Scenario: Outside git, or before the first commit, a review is refused with NO_COMMIT
+    Given a directory with no git repository, and a git repository with no commit, each holding an indexed scenario and a chore brief
+    When review scenario and review change run in each
+    Then each exits 2 with NO_COMMIT and a hint to run git init and commit
+    And nothing is written

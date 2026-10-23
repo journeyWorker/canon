@@ -308,12 +308,12 @@ Feature: subject lifecycle
   @subject:subject-lifecycle
   @case:failure
   @subject.lifecycle.31
-  Scenario: A reopen needs a reason and a reason needs a reopen
+  Scenario: A reopen needs a reason and any other transition may carry one
     Given a shipped subject
     When it is moved to verifying with no reason, or with a blank one
     Then the command refuses as a usage error saying the reopen needs one line of reason
-    And a reason given to any other transition is refused the same way
     And the subject stays shipped
+    And a reason given to any other move is accepted and recorded on the subject with the actor, and the next move without one clears it
 
   # canon: {"schema":1,"at":"2026-10-12T18:00:03Z","actor":{"agent_id":"018-n2-impl"}}
   @subject:subject-lifecycle

@@ -99,7 +99,7 @@ Feature: query read
   @query.read.81
   Scenario: A query audits into the repository it read, never the current directory
     Given a canon repository and an unrelated current directory
-    When canon query reads the repository through --repo or --canon-yaml
+    When canon query reads the repository through --repo
     Then the access event is appended to that repository's .canon/audit/access.jsonl
     And the current directory is left unchanged
 

@@ -59,12 +59,12 @@ Feature: skills install
   @subject:skills-install
   @case:happy
   @skills.install.08
-  Scenario: Codex receives the skill where Codex discovers skills, frontmatter intact
+  Scenario: Codex receives the skill where Codex discovers skills, as a stub with the source's frontmatter
     Given a canonical skill source whose frontmatter names the skill and describes it, with reference and script sidecars
     When the skill is installed for Codex
-    Then Codex's skill file is the source byte for byte, in the canon skill directory under the agents skills root Codex scans
+    Then Codex's skill file is a stub in the canon skill directory under the agents skills root Codex scans, carrying the source's frontmatter, pointing at canon skills show canon and naming this canon's version
     And its frontmatter opens the file and carries the skill's name and a non-empty description
-    And the reference and script sidecars sit beside it
+    And the script sidecars sit beside it and the reference files are not projected, because the guide comes from the binary
     And nothing is written under the Codex config directory
     And a target holding the Codex config directory selects Codex when no provider is named
     And a second install reports unchanged and the read-only check is clean
@@ -98,39 +98,34 @@ Feature: skills install
   @subject:skills-install
   @case:edge
   @skills.install.11
-  Scenario: The projected skill claims build work in a canon repo and opens with the working loop
-    Given canon's own skill source and its committed Claude, Codex, OMP and Pi projections
-    When each projected SKILL.md is read
-    Then it is the source byte for byte
-    And its description claims build, implement, feature and fix work in a repo that has canon.yaml, ahead of generic site, app or game builder skills
-    And its description stays within the 1024-character limit skill loaders enforce
-    And its first section is the working loop, naming brief, subject, scenarios, units, implement, evidence, independent review and transition in that order
-    And the command reference comes after the loop
+  Scenario: The stub claims build work in a canon repo and the guide it points at opens with the working loop
+    Given canon's own skill source and the guide built into the binary
+    When the skill is installed for Claude, Codex, OMP and Pi, and canon skills show canon prints the guide
+    Then each projected SKILL.md is a stub that keeps the source's frontmatter, points at canon skills show canon and names this canon's version, with no reference files beside it
+    And its description claims build, implement, feature and fix work in a repo that has canon.yaml, within the 1024-character limit skill loaders enforce
+    And the guide's first section is the working loop, naming brief, subject, scenarios, units, implement, evidence, independent review and transition in that order
     And the AGENTS.md block canon init writes names the same steps in the same order
 
   # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
   @subject:skills-install
   @case:happy
   @skills.install.20
-  Scenario: The skill and the AGENTS.md block carry one human approval per scope
-    Given canon's own skill source and the AGENTS.md block canon init writes
-    When each is read with its wrapped lines joined
-    Then each says a new subject or a scope change needs one human answer approving the brief and the policy
-    And each tells the agent to record that answer at once with canon brief approve --change <slug> --by <the human> --note "<their words>", which writes the "Approved: <who> <when> — "<words>" (brief sha256:<digest>)" line into .canon/changes/<slug>/brief.md and records the policy approval in the same call, and never to approve without a human answer
-    And each says a brief edited after its approval needs a new human answer before it counts as approved again
-    And each says a change from an external plan gets its brief there too, a brief.md whose "Source: <path>" line points at the plan, which canon never edits
-    And each says that inside an approved scope the agent never stops for a human, that independent review happens on every change, and that when no human can answer it writes the assumption and proceeds
-    And each says a fix or follow-up stays in the approved change, never a canon change new, because a new change is a new scope, and that tasks.md is an optional work note nothing gates on
-    And each says the agent moves the subject to shipped itself once the guard passes, unless the brief says the human ships
+  Scenario: One human answer approves the brief and the policy per scope, and an edited brief needs a new answer
+    Given a change whose brief has no blocker
+    When the human's answer is recorded with canon brief approve <slug> --approver <the human> --note "<their words>"
+    Then the "Approved: <who> <when> — "<words>" (brief sha256:<digest>)" line is written into .canon/changes/<slug>/brief.md and the policy approval is recorded in the same call
+    And a brief edited after its approval counts as not approved: status and evidence add name the change and the canon brief approve command that records a new answer, and evidence add exits 1 until it is recorded
+    And approving again replaces the one Approved line instead of adding a second
 
   # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
   @subject:skills-install
   @case:failure
   @skills.install.21
-  Scenario: The skill and the AGENTS.md block name no second human stop
-    Given canon's own skill source and the AGENTS.md block canon init writes
-    When each is read with its wrapped lines joined
-    Then neither keeps a fixed pair of human stops, a brief approval for every request, or a rule that the agent never runs the policy approval for the human
+  Scenario: Only three acts stop for a human and every other leaf stays open to the roles that call it
+    Given canon's command listing
+    When the leaves that name no agent role are collected
+    Then they are exactly brief approve, policy approve and divergence accept
+    And every other leaf names at least one agent role, so no second human stop exists
 
   # canon: {"schema":1,"at":"2026-10-11T14:43:36Z","actor":{"agent_id":"canon"}}
   @subject:skills-install
@@ -180,25 +175,23 @@ Feature: skills install
   @subject:skills-install
   @case:failure
   @skills.install.22
-  Scenario: The skill, the AGENTS.md block and the write help name no bookkeeping step the commands already do
-    Given canon's own skill source, the AGENTS.md block canon init writes, and the help of canon evidence, canon finding and canon finding add
-    When each is read with its wrapped lines joined
-    Then the working loop never tells the agent to run canon format specs or canon ingest plans
-    And it names canon inventory sync only for a command that printed "NOT refreshed"
-    And every mention of canon gate promote is conditioned on write.promote manual
-    And no help loop lists canon gate promote as a step of its own
+  Scenario: The write commands do their own bookkeeping, so no extra format, import, index or promote step is needed
+    Given a repo with a subject
+    When a scenario is written with canon scenario new, then canon format and canon gate check run, and evidence is added to the scenario
+    Then canon format finds the written corpus clean and canon gate check indexes the new scenario itself, naming it as having no evidence, with no canon inventory sync or canon ingest plans in between
+    And canon evidence add promotes its record in the same run, so the gate no longer names the scenario
+    And with --no-promote the record stays staged, the gate still names the scenario, and the next step is canon gate promote
 
   # canon: {"schema":1,"at":"2026-10-12T07:31:04Z","actor":{"agent_id":"canon"}}
   @subject:skills-install
   @case:failure
   @skills.install.44
-  Scenario: The skill and the AGENTS.md block stop at the brief and never assume the approval
-    Given canon's own skill source and the AGENTS.md block canon init writes
-    When each is read with its wrapped lines joined
-    Then each tells the agent to write the brief, then stop and report it, and to build and attest nothing for that scope until the human answers
-    And each says the approval is never assumed, even when the human said they cannot answer until the agent reports, because the brief is that report
-    And each limits proceeding on an assumption to the brief's questions and work inside an approved scope, never the approval
-    And each calls the ship refusal and the evidence add refusal backstops, with the stop at the brief
+  Scenario: An unapproved brief blocks attestation until the human's answer is recorded, and the approval is never assumed
+    Given a verifying subject whose only adopted change has a brief with no Approved line
+    When canon evidence add runs for any of the subject's scenarios, with no override reason
+    Then each call exits 1 with BRIEF_UNAPPROVED naming the change's brief.md, so nothing is attested for that scope
+    And once the human's answer is recorded with canon brief approve the same call succeeds
+    And an approved brief edited afterwards refuses again with BRIEF_CHANGED_SINCE_APPROVAL naming the brief
 
   # canon: {"schema":1,"at":"2026-10-12T10:31:30Z","actor":{"agent_id":"canon"}}
   @subject:skills-install
@@ -264,7 +257,7 @@ Feature: skills install
     When canon skills install, check and doctor run with no provider named
     Then each exits 1 naming the expected shape or the unknown provider
     And nothing is projected and canon.yaml is byte-identical
-    And canon init --check-config reports the skills section as FAIL with the same reason
+    And canon init --check reports the skills section as FAIL with the same reason
 
   # canon: {"schema":1,"at":"2026-10-12T14:00:00Z","actor":{"agent_id":"canon"}}
   @subject:skills-install
@@ -274,7 +267,7 @@ Feature: skills install
     Given a target whose canon.yaml selects Claude and Codex
     When canon skills install and canon skills doctor run
     Then each ends with an owned-paths block of one glob per line
-    And the block lists the selected providers' projections first, then every machine-written path under .canon sorted, including .canon/ledger/** and .canon/artifacts/**
+    And the block lists the selected providers' projections first, then every machine-written path under .canon sorted, including .canon/ledger/**, .canon/artifacts/** and the migration backups .canon/migrate-backup/**
     And an unchanged install prints the same block
     And .canon/specs, .canon/policy.yaml and .canon/changes are never listed, since people write them by hand and linters should still see them
 
@@ -294,10 +287,10 @@ Feature: skills install
   @case:failure
   @skills.install.58
   Scenario: A projected file whose content changed stays drift
-    Given an installed Claude projection where SKILL.md gained a paragraph, the hook script's `rm -rf a b` became `rm -rfab` and its `\` continuation was joined, and a command inside a reference file's code fence gained a space
+    Given installed Claude and Codex projections where the Claude SKILL.md gained a paragraph, the hook script's `rm -rf a b` became `rm -rfab` and its `\` continuation was joined, and an inline command in the Codex stub gained a space
     When canon skills check and canon skills doctor run
     Then the check exits 1 and calls each file stale
-    And the doctor reports each stale and never as formatter-rewritten, because whitespace between tokens, backslashes and code fences are never normalized away
+    And the doctor reports each stale and never as formatter-rewritten, because whitespace between tokens and backslashes are never normalized away
 
   # canon: {"schema":1,"at":"2026-10-21T11:50:35Z","actor":{"agent_id":"canon-impl-025"}}
   @subject:skills-install
@@ -368,3 +361,44 @@ Feature: skills install
     Given a canon repo whose gitignore lacks a line canon init manages
     When canon skills doctor runs
     Then it prints a gitignore line naming the missing entries and the fix, canon migrate, instead of status: healthy
+
+  # canon: {"schema":1,"at":"2026-10-23T11:49:14Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:skills-install
+  @case:happy
+  @skills.install.65
+  Scenario: skills show prints the guide built into the binary, with no repo and for any role
+    Given a directory that holds no canon repo
+    When canon skills show canon runs, and canon skills show role-implementer, and with --json
+    Then stdout is the embedded guide byte for byte and stderr is empty, whatever role is declared, even one that is no role
+    And --json envelopes name, this canon's version and the markdown
+    And --full appends every reference after the core guide, and changes nothing on another name
+
+  # canon: {"schema":1,"at":"2026-10-23T11:49:18Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.66
+  Scenario: skills show refuses a name that is not a built-in guide
+    Given the names canon schema skills show lists: canon and each reference
+    When canon skills show names anything else
+    Then it exits 2 with ok false
+
+  # canon: {"schema":1,"at":"2026-10-23T11:49:27Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:skills-install
+  @case:happy
+  @skills.install.67
+  Scenario: Install writes a stub that points at the guide and no reference files
+    Given an empty repository and no canon/skills tree
+    When canon init --providers claude,codex runs, and then canon skills install
+    Then each projected SKILL.md is a short stub with the skill's frontmatter, this canon's version, and pointers to canon skills show canon and canon schema
+    And no reference directory is projected and the install lock lists no reference file, while the retrieve script is projected from the binary
+    And the AGENTS.md block points at canon skills show canon, canon skills check exits 0 and a second install changes nothing
+
+  # canon: {"schema":1,"at":"2026-10-23T11:49:36Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:skills-install
+  @case:failure
+  @skills.install.68
+  Scenario: A human-only act refuses every agent role
+    Given a repo set up by canon init
+    When brief approve, policy approve and divergence accept run as planner, implementer, reviewer or orchestrator, by --as and by CANON_ROLE
+    Then each exits 2 with HUMAN_ONLY, not retryable, and a hint naming the leaf and the options only the human supplies
+    And the refusal changes nothing, and without a declared role the leaf runs

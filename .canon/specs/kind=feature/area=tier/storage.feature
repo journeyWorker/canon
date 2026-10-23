@@ -24,24 +24,24 @@ Feature: tier storage
   @subject:tier-storage
   @case:happy
   @tier.storage.03
-  Scenario: Asking what aging would do changes nothing
+  Scenario: The bare run previews what aging would do and changes nothing
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given one record past its aging threshold and one still within it
-    When aging is run as a dry run
-    Then it reports one candidate, naming the kind, the rungs it would cross, and the threshold
+    When canon tier age is run bare
+    Then it exits zero and reports one candidate effect and a plan digest, and that it is not committed
     And both records are still in the source rung, and nothing was written to the destination
 
   @subject:tier-storage
   @case:happy
   @tier.storage.04
-  Scenario: Aging moves what is past the threshold, leaves what is not, and settles
+  Scenario: Committing the previewed plan moves what is past the threshold, leaves what is not, and settles
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given one record past its aging threshold and one still within it
-    When aging is run for real
-    Then it reports one moved and none already aged
+    When canon tier age is run with --commit and the plan digest the preview printed
+    Then it reports one moved and none already aged, and that it is committed
     And the aged record has left the source rung and landed on the destination
     And the within-threshold record is untouched
-    And running it again moves nothing and duplicates nothing
+    And previewing again lists no effect to move, and committing that plan moves nothing and duplicates nothing
 
   @subject:tier-storage
   @case:happy
@@ -94,3 +94,25 @@ Feature: tier storage
     When they are folded
     Then the record of the greater schema wins
     And the digest never overrules a newer format generation, so the winner is stated by the data rather than decided by a hash
+
+  # canon: {"schema":1,"at":"2026-10-23T11:53:53Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:tier-storage
+  @case:failure
+  @tier.storage.10
+  Scenario: A plan that changed since its preview is refused and moves nothing
+    Given a preview of canon tier age that printed a plan digest
+    And another record past the threshold landed after that preview
+    When canon tier age is run with --commit and the old digest
+    Then it exits 2 with PLAN_CHANGED
+    And no record moved, so the source rung still holds every record and the destination none
+    And previewing again prints a new digest that commits
+
+  # canon: {"schema":1,"at":"2026-10-23T11:58:21Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:tier-storage
+  @case:failure
+  @tier.storage.11
+  Scenario: The removed dry-run flag of a destructive command is a usage error pointing at the bare preview
+    Given a repository with an aging rule and a record past its threshold
+    When canon tier age is run with --dry-run, with --canon-yaml, or with --commit and no plan digest
+    Then each exits 2 as a usage error
+    And the bare run is the preview, so nothing was written

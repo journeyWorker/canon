@@ -1,4 +1,4 @@
-Feature: gate task
+Feature: task done
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:gate-trust-spine
@@ -19,7 +19,7 @@ Feature: gate task
     Given a committed faithful evidence record for an open row
     When that task is asked to complete
     Then the command succeeds and the row is checked
-    And a second identical call succeeds and leaves the document byte-identical
+    And a second identical call succeeds, reports unchanged and leaves the document byte-identical
     And nothing about the second call depends on whether the first one ran
 
   @subject:gate-trust-spine
@@ -59,7 +59,7 @@ Feature: gate task
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a plan document carrying row one and nothing else
     When completion is claimed for a row number that document does not have
-    Then the command exits one and says there is no matching row
+    Then the command exits two as refused and says there is no matching row
     And no row is flipped in place of the one that was named
 
   @subject:gate-trust-spine
@@ -109,7 +109,7 @@ Feature: gate task
   @gate.task.80
   Scenario: A task flipped on a canon command with nothing bound draws a warning
     Given a task whose only evidence binds no file and cites a canon command such as `canon gate check` as its --ref
-    When canon gate task flips it
+    When canon task done flips it
     Then the row still flips and the command exits 0
     And stderr warns that the evidence is a canon command's output and names the artifact or report to bind
 
@@ -119,5 +119,5 @@ Feature: gate task
   @gate.task.81
   Scenario: Task evidence that binds its proof flips without a warning
     Given a task whose evidence binds an artifact, and another whose --ref is not a canon command
-    When canon gate task flips each
+    When canon task done flips each
     Then neither prints the warning

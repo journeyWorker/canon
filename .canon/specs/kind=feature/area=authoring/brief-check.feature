@@ -9,7 +9,7 @@ Feature: authoring brief check
     Given a repo whose canon.yaml sets no language and a brief written in Korean prose with English product terms, code spans and a Source line
     When canon brief check runs, in text and with --json
     Then the brief is judged with the Korean rules and the text output prints one line, "language: ko (detected)"
-    And the JSON carries language "ko" and languageSource "detected" and no languageNote, an English brief reads "en (detected)", and bare canon brief reads the same resolution
+    And the JSON carries language "ko" and languageSource "detected" and no languageNote, an English brief reads "en (detected)", and canon brief show reads the same resolution
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
@@ -40,7 +40,7 @@ Feature: authoring brief check
     Given a brief written in Japanese or in Chinese, and one of its sections removed
     When canon brief check runs
     Then the language is named "ja" or "zh", detected, and no prose rule reads the text
-    And the structure rules still apply: the missing section is a blocker and the command exits 2
+    And the structure rules still apply: the missing section is a blocker and the command exits 1
 
   # canon: {"schema":1,"at":"2026-10-21T16:40:17Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:authoring-scaffold
@@ -151,3 +151,14 @@ Feature: authoring brief check
     When canon brief check runs
     Then no sentence-length, paragraph-length, parenthetical, phrase or ending finding reads the table rows, while its cells are read for code citations, decision history and stock vocabulary
     And prose.length still counts the table's characters
+
+  # canon: {"schema":1,"at":"2026-10-23T11:48:11Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.brief-check.16
+  Scenario: A brief with blockers exits 1 and keeps its report, and a check that is refused exits 2
+    Given a change whose brief has a structure blocker, and a slug that names no change
+    When canon brief check runs on each, with --json
+    Then the brief with the blocker exits 1 with ok false and error code BRIEF_HAS_BLOCKERS, and data still carries the findings and counts
+    And the same brief with its blocker fixed exits 0 even while advisories remain
+    And the unknown slug exits 2 with BRIEF_NOT_FOUND and no report
