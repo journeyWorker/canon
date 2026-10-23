@@ -116,6 +116,31 @@ fn fields_projects_records_and_an_unknown_field_is_refused() {
     assert!(json(&bad)["error"]["message"].as_str().unwrap().contains("nope"));
 }
 
+#[test]
+fn fields_match_in_either_case_style_and_an_unknown_one_gets_suggestions() {
+    let fixture = five_trajectories();
+    let plain = fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--all", "--fields", "reward,at"]);
+    let mixed = fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--all", "--fields", "Reward,AT"]);
+    assert!(mixed.status.success(), "{}", stderr(&mixed));
+    assert_eq!(json(&mixed)["data"]["records"], json(&plain)["data"]["records"], "the case style of a field name changes nothing");
+
+    // A snake_case record field is also reachable by its camelCase spelling, and the output key stays as stored.
+    let snake = fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--limit", "1"]);
+    let record = json(&snake)["data"]["records"][0].clone();
+    let key = record.as_object().unwrap().keys().find(|k| k.contains('_')).expect("a trajectory record has a snake_case field").clone();
+    let camel: String = key.split('_').enumerate().map(|(i, w)| if i == 0 { w.to_string() } else { w[..1].to_uppercase() + &w[1..] }).collect();
+    let by_camel = fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--limit", "1", "--fields", &camel]);
+    assert!(by_camel.status.success(), "{}", stderr(&by_camel));
+    let projected = json(&by_camel)["data"]["records"][0].clone();
+    assert_eq!(projected.as_object().unwrap().keys().collect::<Vec<_>>(), vec![&key], "{projected}");
+
+    let bad = fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--fields", "rewrd"]);
+    assert_eq!(bad.status.code(), Some(2));
+    let body = json(&bad);
+    assert_eq!(body["error"]["code"], "UNKNOWN_FIELD");
+    assert!(body["error"]["suggestions"].as_array().unwrap().iter().any(|s| s == "reward"), "{body}");
+}
+
 fn purge_fixture() -> Fixture {
     let fixture = Fixture::new(ROUTING, AGING);
     std::fs::create_dir_all(fixture.root.path().join(".canon/learn")).unwrap();

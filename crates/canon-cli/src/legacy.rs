@@ -397,11 +397,16 @@ pub fn detect(repo: &Path) -> Option<Detected> {
     (found.hooks || found.scripts || found.skill).then_some(found)
 }
 
+/// Said whenever the full 0.27 skill projection is on disk: those files are the old guide and still name removed
+/// commands, so an agent that reads them first copies a dead spelling.
+const STALE_GUIDE: &str = "the canon skill files installed in this repo (.claude, .agents, .pi, .omp, .canon/skills) are the 0.27 guide and name commands 0.28 removed (`canon migrate --dry-run` among them): do not follow them; run `canon migrate --json` (a bare run only previews), then read `canon skills show canon`";
+
 /// The `canon migrate --json` step that comes first in `meta.next`.
 fn migrate_step(found: &Detected) -> NextStep {
+    let stale = if found.skill { format!("; {STALE_GUIDE}") } else { String::new() };
     NextStep {
         command: "canon migrate --json".into(),
-        why: format!("this repo holds 0.27-era canon state ({}); the preview lists what it rewrites and the exact command that applies it", found.what()),
+        why: format!("this repo holds 0.27-era canon state ({}); the preview lists what it rewrites and the exact command that applies it{stale}", found.what()),
         actor: StepActor::Agent,
         role: Some(crate::role::Role::Orchestrator),
     }
@@ -411,8 +416,16 @@ fn migrate_step(found: &Detected) -> NextStep {
 /// puts `canon migrate --json` first in `meta.next` ([`crate::json_out::prepend_next`]).
 pub fn announce(repo: &Path) {
     if let Some(found) = detect(repo) {
-        crate::json_out::warn(format!("this repo holds 0.27-era canon state ({}); run `canon migrate --json` to preview the upgrade", found.what()));
+        let stale = if found.skill { format!("; {STALE_GUIDE}") } else { "; run `canon migrate --json` to preview the upgrade".to_string() };
+        crate::json_out::warn(format!("this repo holds 0.27-era canon state ({}){stale}", found.what()));
         crate::json_out::prepend_next(migrate_step(&found));
+    }
+}
+
+/// For the `migrate` preview: the stale-guide warning when the 0.27 skill projection is still installed.
+pub fn warn_stale_guide(repo: &Path) {
+    if skills::has_full_projection(repo) {
+        crate::json_out::warn(STALE_GUIDE.to_string());
     }
 }
 

@@ -233,7 +233,7 @@ use crate::gate::{evidence_staging_dir, typed_evidence_contract_for_task};
 
 /// What `canon evidence add` tells the agent when a brief refuses the
 /// attestation (0.16 M7): the stop belongs at the brief.
-const BRIEF_STOP: &str = "stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their answer with `canon brief approve --approver <the human> --note \"<their words>\"` only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record";
+const BRIEF_STOP: &str = "stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. The human records their answer in their own shell (`canon brief approve --approver <their name> --note \"<their words>\"`, or on `canon dashboard`); never run it yourself or unset your role to run it; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record";
 
 /// The refusal for a note a fabrication-marker scan rejected: one line per
 /// violation, exit 1 like every other gate-red refusal of this command
@@ -288,7 +288,7 @@ fn brief_refusals(repo: &Path, ctx: &GateContext, task_id: Option<&TaskId>, scen
             violation: Violation::new(
                 FailureClass::UnreviewedPromotion,
                 subject.subject_id.as_str(),
-                format!("evidence for {what}: brief not approved — {}, so the human has not answered it; once they do, {}", brief.unanswered(), brief.record()),
+                format!("evidence for {what}: brief not approved — {}, so the human has not answered it; {}", brief.unanswered(), brief.record()),
             ),
             changed: brief.changed,
         })

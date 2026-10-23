@@ -13,8 +13,9 @@ into the `canon` binary, so it always matches the version you run:
 - `canon skills show <name>` prints one topic or role guide (the table at the
   end lists every name); `canon skills show canon --full` prints this guide
   followed by every topic.
-- `canon <command> --help` and `canon schema <command>` describe a command.
-  Never guess an option name.
+- Your role guide's **Commands** block lists every option of every leaf the
+  role uses. Ask `canon schema <command>` (or `--help`) only for a leaf it does
+  not list, or after a `USAGE` refusal. Never guess an option name.
 
 The `SKILL.md` your harness loaded is only a stub that sends you here.
 
@@ -32,9 +33,10 @@ a feature, a one-line request included. A human is needed once per scope:
   answer until you report: the brief is that report. The one answer
   approves the brief and the policy, `.canon/policy.yaml`, which is what
   the gate grades the work against. The human may also approve it on the `canon dashboard` briefs page; you never use that form.
-  Record it only from the human's answer:
-  `canon brief approve <slug> --approver <the human> --note "<their words>"`
-  (the leaf refuses every agent role; the hint it prints is addressed to the human).
+  The human records the answer, never you:
+  `canon brief approve <slug> --approver <their name> --note "<their words>"`
+  refuses every agent role (`HUMAN_ONLY`). Report that exact call, slug filled in, and
+  wait; never remove or unset your role (`env -u CANON_ROLE`, dropping `--as`) to run it yourself.
   Never edit the policy to make the gate pass: a policy that differs from
   the approved one fails closed (`POLICY_CHANGED_SINCE_APPROVAL`, not
   waivable); stop and ask the human. A brief edited after its
@@ -161,7 +163,7 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   steps `status` would give, narrowed to what the write touched. `actor: human`
   marks a step only the human takes.
 - Your role guide's **Commands** block (`canon skills show role-<role>`) is
-  your complete command set. Run `canon schema <command> --json` only for a
+  your complete command set, every option of every leaf included. Run `canon schema <command> --json` only for a
   command it does not list, or after a `USAGE` refusal (read `error.field`
   and `error.expected` first). `canon schema` alone lists every command.
 - Pass `--json` and read stdout as one document, nothing on stderr. Success is
@@ -195,7 +197,8 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
 - `--override-reason <text>` is the only way to proceed past a waivable
   refusal; it is recorded, echoed in `data.overrides[]` and listed by `status`
   for the human. There is no `--force`. `brief approve`, `policy approve` and
-  `divergence accept` are human-only and refuse every agent role.
+  `divergence accept` are human-only and refuse every agent role: report the
+  exact call, ids filled in, and wait; never unset your role to run one.
 
 ### Many records at once: `--input`
 

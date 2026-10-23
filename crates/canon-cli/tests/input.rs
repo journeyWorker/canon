@@ -483,6 +483,17 @@ fn unknown_keys_null_conflicts_and_the_flags_only_options_are_refused() {
     assert!(expected.contains(&"title") && expected.contains(&"operands") && !expected.contains(&"repo"), "{expected:?}");
     assert!(body["error"]["suggestions"].as_array().unwrap().iter().any(|s| s == "title"), "{body}");
 
+    // A plural of a valid key is refused with the singular as the first suggestion and in the hint.
+    let (code, body) = run(&["--input", r#"{"operands":["a"],"domain":"dev","titles":"x"}"#], None);
+    assert_eq!((code, body["error"]["code"].as_str()), (Some(2), Some("INPUT_UNKNOWN_FIELD")), "{body}");
+    assert_eq!(body["error"]["suggestions"][0], "title", "{body}");
+    assert!(body["error"]["hint"].as_str().unwrap().contains("\"title\""), "{body}");
+    let out = canon(repo, home.path(), &["finding", "add", "--input", r#"[{"changeId":"c","round":1,"seq":1,"severity":"note","actorId":"a","summary":"s","scenarioIds":["a.b.01"]}]"#, "--json"], None);
+    let body = json_of(&out);
+    assert_eq!((out.status.code(), body["error"]["code"].as_str()), (Some(2), Some("INPUT_UNKNOWN_FIELD")), "{body}");
+    assert_eq!(body["error"]["suggestions"][0], "scenarioId", "{body}");
+    assert!(body["error"]["hint"].as_str().unwrap().contains("\"scenarioId\": [...]"), "{body}");
+
     for key in ["repo", "as", "json", "commit", "planDigest"] {
         let doc = format!(r#"{{"operands":["a"],"domain":"dev","title":"A","{key}":"x"}}"#);
         let (code, body) = run(&["--input", &doc], None);

@@ -2014,9 +2014,9 @@ pub struct Step {
 /// re-approval when its text changed after the approval (0.19 D3).
 fn approve_step(ev: &Evaluation, fresh: &str) -> Step {
     let why = if matches!(ev.approval, crate::brief::Approval::Changed { .. }) {
-        format!("the brief changed after its approval ({}); the human answers the changed brief and `canon brief approve` records it", crate::brief::CHANGED_CODE)
+        format!("the brief changed after its approval ({}); the human answers the changed brief and records it with `canon brief approve` (their own shell or `canon dashboard`, never yours)", crate::brief::CHANGED_CODE)
     } else {
-        format!("{fresh}; `canon brief approve --approver <the human> --note \"<their words>\"` records it")
+        format!("{fresh}; the human records it with `canon brief approve --approver <their name> --note \"<their words>\"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role")
     };
     Step { step: "approve", why }
 }

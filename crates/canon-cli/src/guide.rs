@@ -100,7 +100,8 @@ This repo is managed with canon (canon {version}). Canon records the work as evi
 
 - Run `canon skills show canon` for the full guide (`--full` appends every reference).
 - Run `canon skills show role-implementer` for your role (also `role-planner`, `role-reviewer`, `role-orchestrator`).
-- Never guess a flag: `canon schema` lists every command and `canon schema task done` shows one.
+- Never guess a flag: your role guide's Commands block lists every option of every leaf the role uses; ask `canon schema <command>` only for a leaf it does not list, or after a `USAGE` refusal.
+- Human-only acts (`canon brief approve`, `canon policy approve`, `canon divergence accept`): you never run them, and never remove your role to get past the refusal; report the exact call, ids filled in, and wait for the human.
 "
     )
 }
