@@ -78,7 +78,7 @@ pub const ROLE_MEMORY_PANEL: &str = "Per-`(role, regime_key)` strategy counts (`
 /// current state, so the pointer to the surface that answers that
 /// question ships in the panel itself rather than only in
 /// `canon_report::divergence`'s module doc.
-pub const REVIEW_BURNDOWN_PANEL: &str = "Review-feedback burn-down over time (`mart_review_burndown`) — a per-day trend over raw `Divergence.status` events, so `divergence_open_running_total` is a running `opened - resolved` event count, NOT the number open now. For current state per scenario, run `canon divergence status`.\n\n";
+pub const REVIEW_BURNDOWN_PANEL: &str = "Review-feedback burn-down over time (`mart_review_burndown`) — a per-day trend over raw `Divergence.status` events, so `divergence_open_running_total` is a running `opened - resolved` event count, NOT the number open now. For current state per scenario, run `canon divergence list`.\n\n";
 
 /// The `## Flywheel funnel` panel's prose, named so the honesty
 /// property this string carries is testable on its own rather than

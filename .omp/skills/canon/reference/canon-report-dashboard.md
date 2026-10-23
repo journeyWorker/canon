@@ -220,7 +220,7 @@ computes it; nothing here is derived a second time.
   window down by `EvidenceRecord.verdict`. `divergence_open_running_total` is
   a running `opened - resolved` event count, NOT the number open now —
   the two differ whenever one `resolved` record closes several findings on a
-  scenario. For current state per scenario, run `canon divergence status`.
+  scenario. For current state per scenario, run `canon divergence list`.
 
 - **Scope status** (`mart_scope_status`) —
   Every specified scenario × evidence-verified × plan-carried × spec-covered (`mart_scope_status`). Driven by the spec corpus, so a scenario no plan task declares still appears — with a NULL `task_id`, which is the worklist entry.

@@ -162,7 +162,7 @@ pub struct GateContext {
     /// Divergence lifecycle events, unfolded. `crate::spec_coverage`
     /// folds them through `canon_model::fold` rather than reading
     /// `status` off individual rows, so the gate and
-    /// `canon divergence status` cannot disagree about which scenarios
+    /// `canon divergence list` cannot disagree about which scenarios
     /// are open.
     pub divergences: Vec<Divergence>,
     /// Subjects, for the `spec_coverage.scope` status filter. Loaded

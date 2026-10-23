@@ -287,14 +287,15 @@ fn repeating_review_add_returns_the_existing_review_and_writes_nothing() {
 // ---- 4b. every replay-safe or content-keyed leaf: an identical repeat is unchanged -----------
 
 /// Every file of the repo with its bytes, except git's own, the hot store's
-/// SQLite side files and the access-audit log (a run that read records
+/// SQLite files and the access-audit log (a run that read records
 /// appends to it by design, and says so).
 fn tree(dir: &Path) -> std::collections::BTreeMap<std::path::PathBuf, Vec<u8>> {
     fn walk(root: &Path, dir: &Path, out: &mut std::collections::BTreeMap<std::path::PathBuf, Vec<u8>>) {
         for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().into_owned();
-            if name == ".git" || name.ends_with("-shm") || name.ends_with("-wal") || path.ends_with(".canon/audit") {
+            // the hot store's SQLite file is page-level state (a checkpoint may rewrite it), never records
+            if name == ".git" || name == "hot.db" || name.ends_with("-shm") || name.ends_with("-wal") || path.ends_with(".canon/audit") {
                 continue;
             }
             if path.is_dir() {
@@ -320,7 +321,9 @@ fn repeats_unchanged(dir: &Path, args: &[&str]) {
     let again = run(dir, &argv);
     assert_eq!(again.status.code(), Some(0), "{args:?} again: {}{}", String::from_utf8_lossy(&again.stdout), String::from_utf8_lossy(&again.stderr));
     assert_eq!(body(&again)["meta"]["unchanged"], true, "{args:?}: {}", String::from_utf8_lossy(&again.stdout));
-    assert!(tree(dir) == after_first, "{args:?}: the repeat changed the tree");
+    let after_again = tree(dir);
+    let differing: Vec<&std::path::PathBuf> = after_first.keys().chain(after_again.keys()).filter(|k| after_first.get(*k) != after_again.get(*k)).collect();
+    assert!(differing.is_empty(), "{args:?}: the repeat changed the tree: {differing:?}");
 }
 
 /// A destructive leaf is previewed, then committed with the preview's digest.

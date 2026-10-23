@@ -402,7 +402,7 @@ fn evidenced_scenarios(ctx: &GateContext) -> BTreeSet<(ProjectId, ScenarioId)> {
 }
 
 /// The divergence fold's live-binding input, derived through the ONE
-/// shared derivation `canon divergence status` uses
+/// shared derivation `canon divergence list` uses
 /// ([`canon_store::fold::live_bindings_of`]) so the two surfaces cannot
 /// disagree about which scenarios are open.
 fn live_bindings(ctx: &GateContext) -> BTreeMap<(ProjectId, ScenarioId), canon_model::fold::BindingSnapshot> {

@@ -111,7 +111,7 @@ where
 /// copy in canon-gate would be exactly the divergent derivation the
 /// shared fold exists to prevent — the two surfaces would disagree
 /// about which scenarios are open, which is the one thing
-/// `canon divergence status` and the gate must never do. `canon-store`
+/// `canon divergence list` and the gate must never do. `canon-store`
 /// is the lowest crate both callers already depend on, and the only one
 /// holding both `fold_latest_by_key` and
 /// [`crate::partition::content_digest12`].
