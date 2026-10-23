@@ -440,6 +440,10 @@ fn tree(root: &Path) -> std::collections::BTreeMap<PathBuf, Vec<u8>> {
     fn walk(dir: &Path, out: &mut std::collections::BTreeMap<PathBuf, Vec<u8>>) {
         for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
             let path = entry.path();
+            // git refreshes its own index when canon reads the work tree; that is not a canon write
+            if entry.file_name() == ".git" {
+                continue;
+            }
             if path.is_dir() {
                 walk(&path, out);
             } else {
