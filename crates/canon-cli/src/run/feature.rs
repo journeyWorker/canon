@@ -8,7 +8,7 @@ use std::process::ExitCode;
 
 pub fn run(cmd: FeatureCommand) -> ExitCode {
     match cmd {
-        FeatureCommand::New(FeatureNewArgs { surface, title, actor_id, project_id, repo, json }) => run_feature_new(&repo, &surface, &title, project_id.as_ref(), &actor_id, json),
+        FeatureCommand::New(FeatureNewArgs { surface, title, actor_id, project_id, repo, json, .. }) => run_feature_new(&repo, &surface, &title, project_id.as_ref(), &actor_id, json),
     }
 }
 

@@ -22,6 +22,8 @@ pub struct ReviewScenarioArgs {
     pub scenario_ids: Vec<ScenarioId>,
     #[command(flatten)]
     pub review: ReviewOptions,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 /// The flags of `review change`.
@@ -32,6 +34,8 @@ pub struct ReviewChangeArgs {
     pub change_id: ChangeId,
     #[command(flatten)]
     pub review: ReviewOptions,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 /// The options both review leaves share.

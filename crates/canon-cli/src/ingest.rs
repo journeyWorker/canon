@@ -538,7 +538,7 @@ fn git_worktree_roots(repo_root: &Path) -> Option<Vec<PathBuf>> {
 /// (Codex/Hermes) split. `project_key` is stamped onto every
 /// normalized session whose workspace resolves into the scope,
 /// independent of `all_workspaces`.
-pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: bool, all_workspaces: bool, dry_run: bool) -> Result<IngestOutcome, IngestError> {
+fn run_pass(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: bool, all_workspaces: bool, dry_run: bool) -> Result<IngestOutcome, IngestError> {
     let repo_root = canon_yaml.parent().unwrap_or_else(|| Path::new("."));
     let cursors = CursorStore::open(repo_root.join(paths::INGEST_CURSORS_DIR));
     let scope = ProjectScope::resolve(repo_root, home, all_workspaces);
@@ -810,6 +810,17 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
         degrade_reason: None,
         dry_run,
     })
+}
+
+/// One `canon ingest sessions` pass ([`run_pass`]); a pass that found every
+/// transcript already ingested (none re-parsed, nothing written or left
+/// unwritten) is marked unchanged ([`crate::json_out::mark_unchanged`]).
+pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: bool, all_workspaces: bool, dry_run: bool) -> Result<IngestOutcome, IngestError> {
+    let outcome = run_pass(canon_yaml, home, use_env_roots, full_rescan, all_workspaces, dry_run)?;
+    if outcome.unwritten.is_none() && outcome.runs_written == 0 && outcome.events_written == 0 && outcome.adapters.iter().all(|adapter| adapter.reparsed == 0) {
+        crate::json_out::mark_unchanged();
+    }
+    Ok(outcome)
 }
 
 /// A file's `(mtime_ms, size)` for the cursor's informational summary

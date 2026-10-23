@@ -27,8 +27,9 @@ const EMIT_WINDOW: usize = 6;
 /// Files that are not error sites: the registry and the generated table, and
 /// `context.rs`, whose one code (`CONFIG_MISSING`, built by `require_config`)
 /// is emitted by `run::entry` for every command that needs canon state (see
-/// [`needs_config_leaves`]).
-const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs", "context.rs"];
+/// [`needs_config_leaves`]); `input.rs`, whose INPUT_* codes `derive` attributes to every
+/// leaf that takes `--input`.
+const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs", "context.rs", "input.rs"];
 
 /// Codes registered ahead of the commands that emit them (none: every code is emitted).
 const AWAITING_WIRING: &[&str] = &[];
@@ -239,6 +240,16 @@ fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
     }
     for leaf in needs_config_leaves() {
         table.get_mut(leaf).expect("leaf has a row").insert("CONFIG_MISSING");
+    }
+    // `--input` (`input.rs`, run by `main` before the command): every INPUT_* code is possible on every
+    // leaf that takes the option, and a batch is refused only where it is unsupported.
+    for leaf in META.iter().filter(|m| m.effect != canon_cli::schema::Effect::Read) {
+        for info in all_codes().iter().filter(|c| c.code.starts_with("INPUT_")) {
+            if info.code == "INPUT_BATCH_UNSUPPORTED" && canon_cli::input::batch_supported(leaf.path) {
+                continue;
+            }
+            table.get_mut(leaf.path).expect("leaf has a row").insert(info.code);
+        }
     }
     // The human-only refusal (`run::human_only`) is emitted for its caller's leaf.
     for leaf in HUMAN_ONLY_LEAVES {

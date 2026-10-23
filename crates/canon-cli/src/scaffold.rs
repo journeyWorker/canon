@@ -351,7 +351,7 @@ impl Planner {
                 let key = (spec.subject.as_ref().map(|s| s.as_str().to_string()), spec.change.as_ref().map(|c| c.as_str().to_string()), flow.clone());
                 let repo_root = &self.repo_root;
                 let found = self.flows.entry(key).or_insert_with(|| crate::brief_check::flow_tag_value(repo_root, spec.subject.as_ref(), spec.change.as_ref(), flow)).clone();
-                Some(found.map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e).hint("`canon schema scenario new` lists the accepted arguments and their forms").field("flow"))?)
+                Some(found.map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e).hint("`canon schema scenario new` lists the accepted arguments and their forms").field("--flow"))?)
             }
         };
         for (axis, value) in [("lane", spec.lane.as_deref()), ("case", spec.case.as_deref())] {
@@ -373,7 +373,7 @@ impl Planner {
                 // own root selection — the SAME [`resolve_spec_root`], so
                 // `--project-id` means one thing across both commands and an
                 // unresolvable root is never guessed at.
-                let root = resolve_spec_root("canon scenario new", &self.roots, spec.project.as_ref()).map_err(|msg| CliError::refused("SPEC_ROOT_UNRESOLVED", msg).hint("pass --project-id <id> naming a configured spec root (`specs.roots[]` in canon.yaml)").field("project-id"))?;
+                let root = resolve_spec_root("canon scenario new", &self.roots, spec.project.as_ref()).map_err(|msg| CliError::refused("SPEC_ROOT_UNRESOLVED", msg).hint("pass --project-id <id> naming a configured spec root (`specs.roots[]` in canon.yaml)").field("--project-id"))?;
                 resolve_feature_path(root, tag.area(), tag.surface())
             }
             Some(feature) => {
@@ -385,7 +385,7 @@ impl Planner {
                     return Err(CliError::refused("FEATURE_OUTSIDE_SPEC_ROOTS", format!("`{}` does not resolve under any configured `specs.roots[]` entry ({}); never a silent orphan write outside the validated corpus",
                         resolved.display(),
                         self.roots.iter().map(|r| r.root.display().to_string()).collect::<Vec<_>>().join(", ")
-                    )).hint("put the file under a configured `specs.roots[]` entry, or add its root to canon.yaml").field("feature"));
+                    )).hint("put the file under a configured `specs.roots[]` entry, or add its root to canon.yaml").field("--feature"));
                 }
                 resolved
             }
@@ -402,7 +402,7 @@ impl Planner {
                     tag.as_str(),
                     root.id.as_str(),
                     root.root.display()
-                )).hint("choose an unused scenario id; `canon inventory sync` refreshes the index of the existing ones").field("id"));
+                )).hint("choose an unused scenario id; `canon inventory sync` refreshes the index of the existing ones").field("SCENARIO_ID"));
             }
         }
 
@@ -417,7 +417,7 @@ impl Planner {
         // `.feature` file that already carries" the tag, the SAME target
         // file, regardless of corpus-root config.
         if canon_fmt::gherkin::scan(&existing).scenario_ids.iter().any(|t| t == tag.as_str()) {
-            return Err(CliError::refused("SCENARIO_TAG_EXISTS", format!("`@{}` already exists in `{}`; never a silent duplicate", tag.as_str(), feature_path.display())).hint("choose an unused scenario id; `canon inventory sync` refreshes the index of the existing ones").field("id"));
+            return Err(CliError::refused("SCENARIO_TAG_EXISTS", format!("`@{}` already exists in `{}`; never a silent duplicate", tag.as_str(), feature_path.display())).hint("choose an unused scenario id; `canon inventory sync` refreshes the index of the existing ones").field("SCENARIO_ID"));
         }
         Ok(Planned { feature_path, flow_tag, existing })
     }
@@ -472,55 +472,6 @@ pub struct ScenarioNewReport<'a> {
 
 impl Report for ScenarioNewReport<'_> {}
 
-/// One scenario written by `canon scenario new --from`.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct WrittenLine {
-    /// The 1-based line of the input.
-    pub line: usize,
-    pub id: String,
-    pub path: String,
-}
-
-/// `canon scenario new --from`: every scenario of the batch, written.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ScenarioNewBatchReport {
-    pub items: Vec<WrittenLine>,
-}
-
-impl Report for ScenarioNewBatchReport {}
-
-/// Why one input line of `canon scenario new --from` was refused.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct RefusedLineError<'a> {
-    pub code: &'a str,
-    pub message: &'a str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub hint: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub field: Option<&'a str>,
-}
-
-/// One refused input line of `canon scenario new --from`.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct RefusedLine<'a> {
-    pub line: usize,
-    pub id: Option<&'a str>,
-    pub error: RefusedLineError<'a>,
-}
-
-/// The `data` of a refused `canon scenario new --from`: every refused line; nothing was written.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ScenarioNewRefusal<'a> {
-    pub items: Vec<RefusedLine<'a>>,
-}
-
-impl Report for ScenarioNewRefusal<'_> {}
-
 /// `canon feature new`: the feature file created.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -566,170 +517,6 @@ pub fn run_scenario_new(repo: &Path, spec: &ScenarioSpec, actor: &Actor, at: Dat
     crate::say!(json, "canon scenario new: {PROVENANCE_NOTE}");
     let scope = crate::next::Scope::Scenarios(vec![tag.as_str().to_string()]);
     crate::next::finish_with_meta(&repo_root, "scenario new", &scope, false, json, &ScenarioNewReport { scenario_id: tag.as_str(), feature: feature_path.display().to_string() }, provenance_meta());
-    0
-}
-
-/// One `--from` line: the single form's fields by their long flag names
-/// (`id` for the positional tag). The removed names of the renamed flags
-/// (`subject`, `change`, `project`) are refused with the name to use
-/// ([`removed_key_refusal`]).
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-struct BatchLine {
-    id: String,
-    title: String,
-    #[serde(rename = "subject-id")]
-    subject_id: Option<String>,
-    lane: Option<String>,
-    case: Option<String>,
-    flow: Option<String>,
-    #[serde(rename = "change-id")]
-    change_id: Option<String>,
-    feature: Option<PathBuf>,
-    #[serde(rename = "project-id")]
-    project_id: Option<String>,
-}
-
-/// The refusal for a `--from` line that still carries a removed key.
-fn removed_key_refusal(line: &serde_json::Value) -> Option<CliError> {
-    ["subject", "change", "project"].into_iter().find_map(|old| {
-        line.get(old)?;
-        let new = crate::removed::batch_key_replacement(old)?;
-        Some(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", format!("`{old}` was removed in 0.25.0")).hint(crate::removed::batch_key_hint(old, new)).field(old).expected([new]))
-    })
-}
-
-impl BatchLine {
-    /// The same grammar checks the single form's clap parsers make.
-    fn into_spec(self) -> Result<ScenarioSpec, CliError> {
-        fn field<T>(name: &'static str, parsed: Result<T, String>) -> Result<T, CliError> {
-            parsed.map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e).hint("`canon schema scenario new` lists the accepted arguments and their forms").field(name))
-        }
-        if self.change_id.is_some() && self.flow.is_none() {
-            return Err(CliError::refused("SCAFFOLD_INVALID_ARGUMENT", "`change-id` needs `flow`").hint("`canon schema scenario new` lists the accepted arguments and their forms").field("change-id"));
-        }
-        Ok(ScenarioSpec {
-            tag: field("id", parse_scenario_tag(&self.id))?,
-            title: self.title,
-            subject: self.subject_id.as_deref().map(|s| field("subject-id", crate::subject::parse_subject_id(s))).transpose()?,
-            lane: self.lane.as_deref().map(|s| field("lane", parse_lane_slug(s))).transpose()?,
-            case: self.case.as_deref().map(|s| field("case", parse_lane_slug(s))).transpose()?,
-            flow: self.flow,
-            change: self.change_id.as_deref().map(|s| field("change-id", crate::subject::parse_change_id(s))).transpose()?,
-            feature: self.feature,
-            project: self.project_id.as_deref().map(|s| field("project-id", crate::review::parse_project_id(s))).transpose()?,
-        })
-    }
-}
-
-/// A `--from` line that failed validation.
-struct BadLine {
-    line: usize,
-    id: Option<String>,
-    error: CliError,
-}
-
-impl BadLine {
-    fn to_report(&self) -> RefusedLine<'_> {
-        RefusedLine {
-            line: self.line,
-            id: self.id.as_deref(),
-            error: RefusedLineError { code: self.error.code, message: &self.error.message, hint: self.error.hint.as_deref(), field: self.error.field.as_deref() },
-        }
-    }
-}
-
-/// `canon scenario new --from <file|->`: one scenario per NDJSON line
-/// (blank lines and `#` comments skipped), each with the single form's
-/// fields by long flag name. Every line is validated first, with the checks
-/// of the single form plus a repeated id within the batch; any bad line
-/// refuses the whole batch (`2`, nothing written) and `data.items` names
-/// each one. Otherwise every scenario is written as N single calls would
-/// write them, under one provenance timestamp, and `data.items` lists
-/// `{line, id, path}` for each.
-pub fn run_scenario_batch(repo: &Path, source: &str, actor: &Actor, at: DateTime<Utc>, json: bool) -> i32 {
-    const COMMAND: &str = "canon scenario new";
-    let text = if source == "-" {
-        let mut text = String::new();
-        std::io::Read::read_to_string(&mut std::io::stdin(), &mut text).map(|_| text)
-    } else {
-        fs::read_to_string(source)
-    };
-    let text = match text {
-        Ok(text) => text,
-        Err(e) => return CliError::refused("REPO_UNREADABLE", format!("--from {source}: {e}")).hint("check that the repository is readable from here, or pass --repo <path> for its root").field("from").emit(COMMAND, json),
-    };
-    let lines: Vec<(usize, &str)> = text.lines().enumerate().map(|(i, l)| (i + 1, l.trim())).filter(|(_, l)| !l.is_empty() && !l.starts_with('#')).collect();
-    if lines.is_empty() {
-        return CliError::refused("SCAFFOLD_INVALID_ARGUMENT", format!("--from {source} holds no scenario line (one JSON object per line)")).hint("`canon schema scenario new` lists the accepted arguments and their forms").field("from").emit(COMMAND, json);
-    }
-
-    let repo_root = resolve_repo_root(repo);
-    let mut planner = match Planner::new(&repo_root) {
-        Ok(planner) => planner,
-        Err(e) => return e.emit(COMMAND, json),
-    };
-    let prov_line = provenance_line(at, actor);
-    let mut seen: HashMap<String, usize> = HashMap::new();
-    let mut bad: Vec<BadLine> = Vec::new();
-    let mut good: Vec<(usize, ScenarioSpec, Planned)> = Vec::new();
-    for (line, raw) in &lines {
-        let value: serde_json::Value = match serde_json::from_str(raw) {
-            Ok(value) => value,
-            Err(e) => {
-                bad.push(BadLine { line: *line, id: None, error: CliError::refused("SCAFFOLD_INVALID_ARGUMENT", format!("not a JSON object: {e}")).hint("`canon schema scenario new` lists the accepted arguments and their forms") });
-                continue;
-            }
-        };
-        let id = value.get("id").and_then(|v| v.as_str()).map(str::to_string);
-        let removed = removed_key_refusal(&value);
-        let planned = removed
-            .map_or(Ok(()), Err)
-            .and_then(|()| serde_json::from_value::<BatchLine>(value).map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e.to_string()).hint("`canon schema scenario new` lists the accepted arguments and their forms")))
-            .and_then(BatchLine::into_spec)
-            .and_then(|spec| {
-                let planned = planner.plan(&spec)?;
-                match seen.get(spec.tag.as_str()) {
-                    Some(first) => Err(CliError::refused("SCENARIO_TAG_EXISTS", format!("`@{}` repeats line {first} of this batch; never a silent duplicate", spec.tag.as_str())).hint("choose an unused scenario id; `canon inventory sync` refreshes the index of the existing ones").field("id")),
-                    None => Ok((spec, planned)),
-                }
-            });
-        // The first line to use an id owns it, valid or not.
-        if let Some(id) = id.as_deref().and_then(|id| parse_scenario_tag(id).ok()) {
-            seen.entry(id.as_str().to_string()).or_insert(*line);
-        }
-        match planned {
-            Ok((spec, planned)) => good.push((*line, spec, planned)),
-            Err(error) => bad.push(BadLine { line: *line, id, error }),
-        }
-    }
-
-    if !bad.is_empty() {
-        for item in &bad {
-            crate::human_err!("{COMMAND}: line {}{}: {} — {}", item.line, item.id.as_deref().map(|id| format!(" (`{id}`)")).unwrap_or_default(), item.error.code, item.error.message);
-        }
-        let refusal = CliError::refused("SCAFFOLD_INVALID_ARGUMENT", format!("{} of {} line(s) invalid; nothing written", bad.len(), lines.len())).hint("fix the listed lines and run the batch again");
-        crate::human_err!("{}", refusal.human(COMMAND));
-        return refusal.emit_with_data(COMMAND, json, &ScenarioNewRefusal { items: bad.iter().map(BadLine::to_report).collect() });
-    }
-
-    let mut pending = Vec::new();
-    let mut items = Vec::new();
-    let mut ids = Vec::new();
-    for (line, spec, planned) in good {
-        items.push(WrittenLine { line, id: spec.tag.as_str().to_string(), path: planned.feature_path.display().to_string() });
-        ids.push(spec.tag.as_str().to_string());
-        stage(&mut pending, planned, &spec, &prov_line);
-    }
-    if let Err(e) = write_pending(&pending) {
-        return e.emit(COMMAND, json);
-    }
-    for item in &items {
-        crate::say!(json, "{COMMAND}: wrote `@{}` to {}", item.id, item.path);
-    }
-    crate::say!(json, "{COMMAND}: wrote {} scenario(s) — {}", items.len(), crate::write_mode::DIRECT);
-    crate::say!(json, "{COMMAND}: {PROVENANCE_NOTE}");
-    crate::next::finish_with_meta(&repo_root, "scenario new", &crate::next::Scope::Scenarios(ids), false, json, &ScenarioNewBatchReport { items }, provenance_meta());
     0
 }
 

@@ -2310,7 +2310,7 @@ fn resolve_dispatched_run(repo: &Path, run_id: Option<&RunId>) -> Result<(), Art
 /// joins to nothing — or, worse, one that joins to the wrong run.
 /// [`plan_trajectory`] states where the value lands and why it is outside
 /// both write-identity digests.
-pub fn run(repo: &Path, run_id: Option<&RunId>, dry_run: bool) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
+fn run_pass(repo: &Path, run_id: Option<&RunId>, dry_run: bool) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = repo.join("canon.yaml");
     let canon_yaml_text = std::fs::read_to_string(&canon_yaml_path).unwrap_or_default();
@@ -2635,6 +2635,17 @@ pub fn run(repo: &Path, run_id: Option<&RunId>, dry_run: bool) -> Result<Artifac
         trajectories_marked,
         trajectories_left_pending,
     })
+}
+
+/// One `canon ingest records` pass ([`run_pass`]); a pass that persisted,
+/// converged and marked nothing found the records already ingested and is
+/// marked unchanged ([`crate::json_out::mark_unchanged`]).
+pub fn run(repo: &Path, run_id: Option<&RunId>, dry_run: bool) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
+    let outcome = run_pass(repo, run_id, dry_run)?;
+    if outcome.trajectories_persisted.is_empty() && outcome.trajectories_converged_deleted == 0 && outcome.trajectories_marked == 0 {
+        crate::json_out::mark_unchanged();
+    }
+    Ok(outcome)
 }
 
 /// Human-readable run summary — one line per adapter (its `status`

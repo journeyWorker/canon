@@ -33,6 +33,7 @@ pub mod git_rev;
 pub mod guide;
 pub mod ingest;
 pub mod init;
+pub mod input;
 pub mod inventory;
 pub mod inventory_selftest;
 pub mod json_out;

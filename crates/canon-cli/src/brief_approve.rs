@@ -89,6 +89,12 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 /// [`crate::dashboard_briefs::CHANGED_SINCE_PAGE_LOAD`] when the file's
 /// bytes differ, and nothing is written.
 pub fn approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, expected_sha256: Option<&str>) -> Result<Approved, CliError> {
+    approve_checked(repo, change, by, note, expected_sha256).map(|(approved, _)| approved)
+}
+
+/// [`approve`], also saying whether the brief and the policy already carried
+/// this very approval, in which case nothing was written.
+fn approve_checked(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, expected_sha256: Option<&str>) -> Result<(Approved, bool), CliError> {
     let (by, note) = (by.trim(), note.trim());
     for (flag, value) in [("--approver", by), ("--note", note)] {
         if value.is_empty() {
@@ -119,16 +125,21 @@ pub fn approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, exp
     if let Some(expected) = expected_sha256 {
         verify_bytes(&checked.brief, Some(text.as_bytes()), expected)?;
     }
+    // The same approval again, by the same human, on a brief and a policy
+    // that already carry it: nothing to write.
+    let policy_approved = !matches!(crate::policy_approval::approval_state(repo), ApprovalState::NoPolicy);
+    if already_approved_so(&text, by, note) && (!policy_approved || crate::policy_approval::matching_approval(repo, by, Some(note)).is_some()) {
+        return Ok((Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&text), approved_by: by.to_string(), policy_approved }, true));
+    }
     let when = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let approved = approved_text(&text, by, &when, note).map_err(|e| refuse("BRIEF_UNAPPROVABLE", &e, EXIT_REFUSED))?;
     // Policy first: a failed policy write leaves the brief untouched, and a
     // failed brief write leaves a policy approval that is true on its own.
-    let policy_approved = !matches!(crate::policy_approval::approval_state(repo), ApprovalState::NoPolicy);
     if policy_approved {
         crate::policy_approval::record(repo, by, Some(note)).map_err(|e| refuse("POLICY_APPROVAL_FAILED", &e, EXIT_ERROR))?;
     }
     std::fs::write(&path, &approved).map_err(|e| refuse("BRIEF_WRITE_FAILED", &format!("cannot write `{}`: {e}", checked.brief), EXIT_ERROR))?;
-    Ok(Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&approved), approved_by: by.to_string(), policy_approved })
+    Ok((Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&approved), approved_by: by.to_string(), policy_approved }, false))
 }
 
 /// The findings that stop an approval: blockers, coverage rules excluded.
@@ -147,14 +158,31 @@ fn verify_bytes(brief: &str, bytes: Option<&[u8]>, expected: &str) -> Result<(),
 /// `canon brief approve`. Returns the process exit code.
 pub fn run_approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
-    let approved = match approve(&repo, change, by, note, None) {
-        Ok(approved) => approved,
+    let (approved, unchanged) = match approve_checked(&repo, change, by, note, None) {
+        Ok(done) => done,
         Err(e) => return e.emit("canon brief approve", json),
     };
+    if unchanged {
+        crate::json_out::mark_unchanged();
+    }
     if !json {
         let policy = if approved.policy_approved { "; policy approval recorded too" } else { "; no policy file, so no policy approval" };
-        println!("canon brief approve: {} approved by `{}` ({}){policy}", approved.brief, approved.approved_by, approved.digest);
+        let verb = if unchanged { "already approved, unchanged" } else { "approved" };
+        println!("canon brief approve: {} {verb} by `{}` ({}){policy}", approved.brief, approved.approved_by, approved.digest);
     }
     crate::next::finish(&repo, "brief approve", &crate::next::Scope::Change(approved.change.clone()), false, json, &approved);
     0
+}
+
+/// Whether `text` already carries an `Approved:` line by `by` with `note`
+/// that binds the brief's current body: the line a repeat of the same
+/// approval would write, up to the time it was written.
+fn already_approved_so(text: &str, by: &str, note: &str) -> bool {
+    let body = format!("{}\n\n", without_field(text, "Approved:").trim_end());
+    let tail = format!(" — \"{note}\" (brief {})", brief_digest(&body));
+    field(text, "Approved:")
+        .and_then(|value| value.strip_prefix(by))
+        .and_then(|value| value.strip_prefix(' '))
+        .and_then(|value| value.strip_suffix(tail.as_str()))
+        .is_some_and(|when| !when.is_empty() && !when.contains(char::is_whitespace))
 }

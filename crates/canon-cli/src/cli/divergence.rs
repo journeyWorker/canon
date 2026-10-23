@@ -40,6 +40,8 @@ pub struct DivergenceAddArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Subcommand)]
@@ -81,6 +83,8 @@ pub struct DivergenceResolveArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Args)]
@@ -110,6 +114,8 @@ pub struct DivergenceDeferArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Args)]
@@ -143,6 +149,8 @@ pub struct DivergenceAcceptArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Args)]

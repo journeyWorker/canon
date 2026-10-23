@@ -7,8 +7,8 @@ use super::record_role;
 
 pub fn run(cmd: ReviewCommand) -> ExitCode {
     match cmd {
-        ReviewCommand::Scenario(ReviewScenarioArgs { scenario_ids, review }) => run_review("canon review scenario", scenario_ids, None, review),
-        ReviewCommand::Change(ReviewChangeArgs { change_id, review }) => run_review("canon review change", Vec::new(), Some(change_id), review),
+        ReviewCommand::Scenario(ReviewScenarioArgs { scenario_ids, review, .. }) => run_review("canon review scenario", scenario_ids, None, review),
+        ReviewCommand::Change(ReviewChangeArgs { change_id, review, .. }) => run_review("canon review change", Vec::new(), Some(change_id), review),
     }
 }
 

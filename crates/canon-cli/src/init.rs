@@ -363,11 +363,14 @@ struct InitLog {
     /// runs `init` inside its own command and prints one of its own.
     emit_data: bool,
     steps: Vec<InitStep>,
+    /// Whether any step wrote (or, under `--dry-run`, would write) something; a run
+    /// that did not found the repo already set up and reports `meta.unchanged`.
+    wrote: bool,
 }
 
 impl InitLog {
     fn new(json: bool, dry_run: bool, emit_data: bool) -> Self {
-        Self { json, dry_run, emit_data, steps: Vec::new() }
+        Self { json, dry_run, emit_data, steps: Vec::new(), wrote: false }
     }
 
     fn step(&mut self, step: &str, detail: impl Into<String>, line: String) {
@@ -377,6 +380,9 @@ impl InitLog {
 
     fn finish(self, repo: &Path) -> i32 {
         if self.emit_data {
+            if !self.wrote {
+                crate::json_out::mark_unchanged();
+            }
             crate::next::finish(repo, "init", &crate::next::Scope::Repo, false, self.json, &InitReport { dry_run: self.dry_run, steps: self.steps });
         }
         0
@@ -562,6 +568,7 @@ fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkill
                 .collect::<Vec<_>>()
                 .join(", ");
             let verb = if dry_run { "would install" } else { "installed" };
+            log.wrote |= report.changed || report.config_written.is_some();
             log.step("skills-installed", dirs.clone(), format!("canon init: {verb} the canon skill for {} ({dirs})", skills::provider_names(&report.providers)));
             Ok(())
         }
@@ -596,6 +603,7 @@ fn write_agents_md(path: &Path, existing: Option<&str>, merged: &str, dry_run: b
         (true, true) => "would refresh",
         (false, true) => "would write",
     };
+    log.wrote = true;
     log.step("agents-md", path.display().to_string(), format!("canon init: {verb} the canon block in {}", path.display()));
     Ok(())
 }
@@ -619,6 +627,7 @@ fn scaffold_policy(repo: &Path, level: PolicyLevel, dry_run: bool, log: &mut Ini
                 file.write_all(starter_policy(level).as_bytes())?;
             }
             let verb = if dry_run { "would write" } else { "wrote" };
+            log.wrote = true;
             log.step(
                 "policy",
                 path.display().to_string(),
@@ -718,11 +727,16 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
                 }
             }
             let verb = if dry_run { "would write" } else { "wrote" };
+            log.wrote = true;
             log.step("config", canon_yaml_path.display().to_string(), format!("canon init: {verb} {}", canon_yaml_path.display()));
         }
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
             let missing = missing_gitignore_lines(repo);
             if agents.is_none() && missing.is_empty() {
+                if emit_data {
+                    log.step("config-exists", canon_yaml_path.display().to_string(), format!("canon init: {} already exists and nothing is left to refresh", canon_yaml_path.display()));
+                    return log.finish(repo);
+                }
                 return CliError::refused("INIT_CONFIG_EXISTS", format!("`{}` already exists; never overwriting an existing config", canon_yaml_path.display())).hint("keep the existing canon.yaml and check it with `canon init --check`, or remove it first to start over").emit("canon init", json);
             }
             let what = if agents.is_some() { "the AGENTS.md block and the canon .gitignore lines" } else { "the canon .gitignore lines" };
@@ -735,7 +749,10 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
                 log.step("language-ignored", "--language", "canon init: --language is not applied to an existing canon.yaml; add `language: <tag>` to it by hand".to_string());
             }
             match gitignore_step(repo, dry_run) {
-                Ok(added) if !added.is_empty() => log.step("gitignore", added.join(", "), format!("canon init: {} .gitignore: {}", if dry_run { "would add to" } else { "added to" }, added.join(", "))),
+                Ok(added) if !added.is_empty() => {
+                    log.wrote = true;
+                    log.step("gitignore", added.join(", "), format!("canon init: {} .gitignore: {}", if dry_run { "would add to" } else { "added to" }, added.join(", ")));
+                }
                 Ok(_) => {}
                 Err(e) => {
                     return CliError::refused("WRITE_FAILED", format!("failed to update `.gitignore`: {e}")).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);

@@ -619,7 +619,8 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
         // Row already `[x]` — idempotent no-op, regardless of the
         // evidence decision (fail-open only for an ALREADY-satisfied
         // row, never a fresh flip).
-        crate::say!(json, "canon task done: {task_id} already done (idempotent no-op)");
+        crate::say!(json, "canon task done: {task_id} already done (unchanged; nothing written)");
+        crate::json_out::mark_unchanged();
         if json {
             crate::json_out::data("task done", &TaskDoneReport { task_id: task_id.as_str(), flipped: false, document: None });
         }
@@ -979,6 +980,9 @@ pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: b
         Ok(report) => {
             crate::say_raw!(json, "{}", format_promote_report(&report, dry_run));
             let data = promote_report(&report, dry_run);
+            if report.is_clean() && report.promoted.is_empty() && report.recovered.is_empty() {
+                crate::json_out::mark_unchanged();
+            }
             if report.is_clean() {
                 if dry_run {
                     if json {
@@ -1260,6 +1264,9 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
         crate::say!(json, "canon gate install-hooks: {}", if dry_run { "would install" } else { "installed" });
     } else {
         crate::say!(json, "canon gate install-hooks: no diff, nothing written");
+    }
+    if !changed && !script_written {
+        crate::json_out::mark_unchanged();
     }
     if json {
         crate::json_out::data("gate install-hooks", &GateInstallHooksReport { dry_run, installed: changed, pre_commit_script_written: script_written });

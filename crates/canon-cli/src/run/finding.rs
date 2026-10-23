@@ -23,6 +23,7 @@ pub fn run(cmd: FindingCommand) -> ExitCode {
             promote,
             repo,
             json,
+            ..
         }) => ExitCode::from(crate::finding::run_add(
             &repo,
             &crate::finding::FindingArgs {
@@ -45,7 +46,7 @@ pub fn run(cmd: FindingCommand) -> ExitCode {
                 json,
             },
         ) as u8),
-        FindingCommand::Close(FindingCloseArgs { change_id, round, seq, disposition, resolution_rev, reason, actor_id, role, session_id, promote, repo, json }) => {
+        FindingCommand::Close(FindingCloseArgs { change_id, round, seq, disposition, resolution_rev, reason, actor_id, role, session_id, promote, repo, json, .. }) => {
             ExitCode::from(crate::finding::run_close(
                 &repo,
                 &crate::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_rev, reason, actor_id, role, session_id, promote: promote.flag(), json },

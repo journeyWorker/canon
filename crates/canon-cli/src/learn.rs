@@ -175,7 +175,9 @@ pub fn run_promote_with_evidence(
         return report_block(decision.as_ref().expect("blocked implies a decision"), demotion_failure.as_deref(), json);
     }
 
-    let outcome = if dry_run {
+    // A repeat of a promotion that is already in place writes nothing.
+    let already = !dry_run && already_promoted(&strategy_store, strategy_id, &git_tier_root, evidence.as_ref());
+    let outcome = if dry_run || already {
         plan_promotion(&strategy_store, strategy_id, &git_tier_root)
     } else if let Some((evaluation, approval)) = evidence.as_ref() {
         promote_strategy_approved(&strategy_store, strategy_id, &git_tier_root, evaluation, approval)
@@ -193,6 +195,9 @@ pub fn run_promote_with_evidence(
                 if blocked {
                     return report_block(decision.as_ref().expect("blocked implies a decision"), None, json);
                 }
+            } else if already {
+                crate::json_out::mark_unchanged();
+                crate::say!(json, "unchanged: {strategy_id} is already promoted at {}; nothing written", path.display());
             } else {
                 crate::say!(json, "promoted {strategy_id} -> {}", path.display());
             }
@@ -205,6 +210,26 @@ pub fn run_promote_with_evidence(
             CliError::failed("LEARN_PROMOTION_FAILED", err.to_string()).hint("the message names the cause; fix it and run `canon strategy promote` again (`--dry-run` previews)").emit("canon strategy promote", json);
             ExitCode::from(1)
         }
+    }
+}
+
+/// Whether the strategy is already active with its git-tier file in place:
+/// byte-identical to a re-render, or, for an activation with evidence, carrying
+/// the digests of this very evaluation and approval.
+fn already_promoted(store: &ParquetStrategyStore, id: &StrategyId, git_tier_root: &Path, evidence: Option<&(PromotionEvaluation, PromotionApproval)>) -> bool {
+    let Ok(Some(item)) = store.find_by_id(id) else { return false };
+    if item.lifecycle != Some(StrategyLifecycle::Active) || item.demotion.is_some() {
+        return false;
+    }
+    let Ok(plan) = plan_promotion(store, id, git_tier_root) else { return false };
+    let Ok(on_disk) = std::fs::read_to_string(&plan.path) else { return false };
+    match evidence {
+        None => on_disk == plan.rendered,
+        Some((evaluation, approval)) => on_disk
+            .strip_prefix("---\n")
+            .and_then(|rest| rest.split_once("\n---\n"))
+            .and_then(|(front, _)| serde_yaml::from_str::<serde_yaml::Value>(front).ok())
+            .is_some_and(|front| front["evaluation_digest"].as_str() == Some(evaluation.digest().as_str()) && front["approval_digest"].as_str() == Some(approval.integrity_digest.as_str())),
     }
 }
 
@@ -376,8 +401,12 @@ pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: 
             return ExitCode::from(CliError::failed("LEARN_INVALID_ARGUMENT", format!("invalid --approval-at timestamp: {error}")).hint("`canon schema strategy rollback` lists the accepted arguments and their forms").emit("canon strategy rollback", json) as u8);
         }
     };
+    let was_rolled_back = matches!(store.find_by_id(strategy_id), Ok(Some(item)) if item.lifecycle == Some(StrategyLifecycle::RolledBack));
     match rollback_strategy_authenticated(&store, *strategy_id, reason, actor, contradicting, &repo.join(&config.strategies_root), &signature, approved_at) {
         Ok(record) => {
+            if was_rolled_back {
+                crate::json_out::mark_unchanged();
+            }
             if json {
                 let data = StrategyRollbackReport::from(&record);
                 crate::next::finish(&repo, "strategy rollback", &crate::next::Scope::Repo, false, true, &data);

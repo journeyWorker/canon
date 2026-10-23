@@ -357,7 +357,7 @@ pub fn load_manifest_spec(repo: &Path, manifest: &Path) -> Result<ContextPackSpe
 /// Load an explicit JSON input manifest and create its immutable pack.
 pub fn create_from_manifest(repo: &Path, manifest: &Path) -> Result<ContextPack, ContextPackError> {
     let spec = load_manifest_spec(repo, manifest)?;
-    create(repo, &spec)
+    mark_unchanged_if_nothing_written(|| create(repo, &spec))
 }
 
 /// Register a prompt bundle described by a repository-local JSON manifest.
@@ -366,7 +366,7 @@ pub fn register_prompt_bundle_from_manifest(repo: &Path, name: &str, version: &s
     let path = safe_path(&repo, manifest)?;
     let bytes = std::fs::read(&path).map_err(|e| io(&path, e))?;
     let spec: ContextPackSpec = serde_json::from_slice(&bytes).map_err(|e| ContextPackError::Serialize(e.to_string()))?;
-    register_prompt_bundle(&repo, name, version, &spec)
+    mark_unchanged_if_nothing_written(|| register_prompt_bundle(&repo, name, version, &spec))
 }
 
 
@@ -563,6 +563,23 @@ fn is_digest(value: &str) -> bool {
 fn pack_path(repo: &Path, id: &str) -> PathBuf { repo.join(CONTEXT_PACK_DIR).join("manifests").join(format!("{id}.json")) }
 fn object_path(repo: &Path, id: &str) -> PathBuf { repo.join(CONTEXT_PACK_DIR).join("objects").join(id.replace(':', "-") + ".json") }
 
+std::thread_local! {
+    /// How many immutable files this thread has actually written; a call that
+    /// finds every file already stored (byte-identical) leaves it unchanged.
+    static FRESH_WRITES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// Runs `op` and says canon found everything it would store already stored
+/// (see [`crate::json_out::mark_unchanged`]).
+fn mark_unchanged_if_nothing_written<T>(op: impl FnOnce() -> Result<T, ContextPackError>) -> Result<T, ContextPackError> {
+    let before = FRESH_WRITES.with(std::cell::Cell::get);
+    let out = op()?;
+    if FRESH_WRITES.with(std::cell::Cell::get) == before {
+        crate::json_out::mark_unchanged();
+    }
+    Ok(out)
+}
+
 fn write_immutable(path: &Path, bytes: &[u8]) -> Result<(), ContextPackError> {
     if path.exists() {
         let existing = std::fs::read(path).map_err(|e| io(path, e))?;
@@ -572,7 +589,9 @@ fn write_immutable(path: &Path, bytes: &[u8]) -> Result<(), ContextPackError> {
         }
         return Ok(());
     }
-    write_atomic(path, bytes).map_err(|e| io(path, e))
+    write_atomic(path, bytes).map_err(|e| io(path, e))?;
+    FRESH_WRITES.with(|n| n.set(n.get() + 1));
+    Ok(())
 }
 
 fn validate_label(value: &str) -> Result<(), ContextPackError> {

@@ -50,7 +50,7 @@ pub fn usage_error(error: &clap::Error) -> ExitCode {
 /// refused argument (`field`, `received`), what would have parsed (`expected`),
 /// the nearest valid words (`suggestions`), and a working invocation (`hint`),
 /// all read from the clap tree, never clap's usage text.
-fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String, CliError) {
+pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String, CliError) {
     use clap::error::{ContextKind, ContextValue, ErrorKind};
     let text = error.render().to_string();
     let message = text.lines().find(|line| !line.trim().is_empty()).unwrap_or_default().trim().trim_start_matches("error: ").to_string();

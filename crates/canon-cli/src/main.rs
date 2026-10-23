@@ -4,13 +4,20 @@
 use std::process::ExitCode;
 
 use canon_cli::cli::{self, Cli};
+use canon_cli::input::Expanded;
 use canon_cli::run::entry::{argv_wants_json, refuse_without_config, set_sigpipe, usage_error};
 use clap::FromArgMatches;
 
 fn main() -> ExitCode {
     set_sigpipe(true);
-    let command = cli::command();
-    let mut matches = match command.clone().try_get_matches() {
+    let mut command = cli::command();
+    command.build();
+    // `--input` becomes ordinary arguments (or runs a batch) before clap parses.
+    let args = match canon_cli::input::expand(&command, std::env::args_os().collect()) {
+        Expanded::Argv(args) => args,
+        Expanded::Exit(code) => return code,
+    };
+    let mut matches = match command.clone().try_get_matches_from(args) {
         Ok(matches) => matches,
         Err(error) => return usage_error(&error),
     };

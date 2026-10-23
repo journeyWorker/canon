@@ -1192,8 +1192,12 @@ fn tracked_index_files(repo: &Path) -> usize {
 /// sync clean: the migration stands, and `canon inventory sync` lists
 /// what to fix.
 fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Plan, backup_dir: Option<String>, json: bool) -> i32 {
-    match crate::inventory::run_sync(repo, None) {
+    match crate::inventory::rebuild(repo, None) {
         Ok(outcome) if outcome.is_clean() => {
+            // Nothing planned but the index rebuild, and the rebuild wrote nothing: a repeat that found the repo migrated.
+            if plan.effects.iter().all(|effect| effect.action == "rebuild") && outcome.total_written() == 0 {
+                crate::json_out::mark_unchanged();
+            }
             log.line(format!("canon migrate: rebuilt the scenario index: {} record(s) written", outcome.total_written()));
             // After the index: a pre-0.15 review is judged against the
             // scenario digests the rebuilt index holds.

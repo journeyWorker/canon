@@ -12,7 +12,7 @@ pub fn run(cmd: ContextPackCommand) -> ExitCode {
 }
 
 fn run_context_pack_add(args: ContextPackAddArgs) -> ExitCode {
-    let ContextPackAddArgs { manifest, repo, json } = args;
+    let ContextPackAddArgs { manifest, repo, json, .. } = args;
     let repo = crate::context::resolve_repo_root(&repo);
     match crate::context_pack::create_from_manifest(&repo, &manifest) {
         Ok(pack) => {

@@ -6,7 +6,7 @@ use std::process::ExitCode;
 
 pub fn run(cmd: PluginCommand) -> ExitCode {
     match cmd {
-        PluginCommand::Sync(PluginSyncArgs { plugin_id, repo, spec_root, dry_run, json }) => run_plugin_sync(&repo, &plugin_id, spec_root.as_deref(), dry_run.dry_run, json),
+        PluginCommand::Sync(PluginSyncArgs { plugin_id, repo, spec_root, dry_run, json, .. }) => run_plugin_sync(&repo, &plugin_id, spec_root.as_deref(), dry_run.dry_run, json),
     }
 }
 

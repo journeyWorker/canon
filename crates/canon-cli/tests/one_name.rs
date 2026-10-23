@@ -354,36 +354,28 @@ fn context_capability_20_a_removed_spelling_is_refused_only_on_the_commands_that
     assert_eq!(renamed["error"]["expected"], serde_json::json!(["--change-id"]), "{renamed}");
 }
 
-/// context.capability.21: a `scenario new --from` line with a removed key refuses
-/// the batch and names the key to use.
+/// context.capability.21: a batch element with a removed key name is refused, and the refusal
+/// names the key to use; the renamed keys write.
 #[test]
-fn context_capability_21_a_scenario_batch_line_with_a_removed_key_name_refuses_the_batch() {
+fn context_capability_21_a_batch_element_with_a_removed_key_name_refuses_the_batch() {
     let dir = repo_with_change();
     let repo = dir.path();
-    let file = repo.join("batch.ndjson");
-    for (key, new) in [("subject", "subject-id"), ("project", "project-id"), ("change", "change-id")] {
-        let lines = [r#"{"id":"demo.login.01","title":"One","subject-id":"demo"}"#.to_string(), format!(r#"{{"id":"demo.login.02","title":"Two","{key}":"{}"}}"#, match key { "subject" => "demo", "project" => "root", _ => "add-login" })];
-        std::fs::write(&file, lines.join("\n")).unwrap();
-        let out = canon_in(repo, &["scenario", "new", "--from", "batch.ndjson", "--json"]);
+    for (key, new) in [("subject", "subjectId"), ("project", "projectId"), ("change", "changeId")] {
+        let doc = format!(r#"[{{"operands":["demo.login.01"],"title":"One","subjectId":"demo"}},{{"operands":["demo.login.02"],"title":"Two","{key}":"x"}}]"#);
+        let out = canon_in(repo, &["scenario", "new", "--input", &doc, "--json"]);
         assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
         let body: Value = serde_json::from_slice(&out.stdout).expect("one JSON document");
-        assert_eq!(body["error"]["code"], "SCAFFOLD_INVALID_ARGUMENT", "{body}");
-        let item = &body["data"]["items"][0];
-        assert_eq!(item["line"], 2, "{body}");
-        assert_eq!(item["error"]["field"], key, "{body}");
-        assert_eq!(item["error"]["hint"], format!("`{key}` was renamed `{new}` in 0.24.0; use `{new}`"), "{body}");
+        assert_eq!(body["error"]["code"], "INPUT_UNKNOWN_FIELD", "{body}");
+        assert_eq!(body["error"]["field"], format!("/items/1/{key}"), "{body}");
+        assert!(body["error"]["expected"].as_array().unwrap().iter().any(|k| k == new), "{body}");
         assert!(!repo.join(".canon/specs/kind=feature/area=demo/login.feature").exists(), "a refused batch writes nothing");
     }
 
-    let lines = [
-        r#"{"id":"demo.login.01","title":"One","subject-id":"demo","project-id":"root"}"#,
-        r#"{"id":"demo.login.02","title":"Two","subject-id":"demo","case":"failure","flow":"F1","change-id":"add-login"}"#,
-    ];
-    std::fs::write(&file, lines.join("\n")).unwrap();
     let brief_path = repo.join(".canon/changes/add-login/brief.md");
     let brief = std::fs::read_to_string(&brief_path).unwrap().replace("## User flow\n", "## User flow\n\n1. F1 The visitor submits credentials → lands on the catalog.\n");
     std::fs::write(&brief_path, brief).unwrap();
-    let out = canon_in(repo, &["scenario", "new", "--from", "batch.ndjson", "--json"]);
+    let doc = r#"[{"operands":["demo.login.01"],"title":"One","subjectId":"demo","projectId":"root"},{"operands":["demo.login.02"],"title":"Two","subjectId":"demo","case":"failure","flow":"F1","changeId":"add-login"}]"#;
+    let out = canon_in(repo, &["scenario", "new", "--input", doc, "--json"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let feature = std::fs::read_to_string(repo.join(".canon/specs/kind=feature/area=demo/login.feature")).unwrap();
     assert_eq!(feature.matches("@subject:demo").count(), 2, "{feature}");

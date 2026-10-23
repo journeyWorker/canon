@@ -431,6 +431,77 @@ fn finding_add_refuses_a_second_record_at_an_occupied_seq() {
     assert_eq!(committed_findings(repo).len(), 1);
 }
 
+fn json_of(output: &Output) -> serde_json::Value {
+    serde_json::from_slice(&output.stdout).unwrap_or_else(|e| panic!("stdout is not JSON ({e}): {}", stdout(output)))
+}
+
+/// Every file under `root`, with its bytes, so a repeat can be shown to write nothing.
+fn tree(root: &Path) -> std::collections::BTreeMap<PathBuf, Vec<u8>> {
+    fn walk(dir: &Path, out: &mut std::collections::BTreeMap<PathBuf, Vec<u8>>) {
+        for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(&path, out);
+            } else {
+                out.insert(path.clone(), std::fs::read(&path).unwrap());
+            }
+        }
+    }
+    let mut out = std::collections::BTreeMap::new();
+    walk(root, &mut out);
+    out
+}
+
+/// An identical `finding add` repeated, staged or committed, writes nothing and
+/// says so; the same key with another body is still refused.
+#[test]
+fn an_identical_finding_add_is_unchanged_and_writes_nothing() {
+    let dir = repo();
+    let repo = dir.path();
+    let args = ["--round", "4", "--seq", "1", "--actor-id", "r", "--summary", "the same finding", "--json"];
+
+    let first = add(repo, &args);
+    assert!(first.status.success(), "{}", stdout(&first));
+    assert!(json_of(&first)["meta"].get("unchanged").is_none(), "the first add writes");
+
+    let before = tree(repo);
+    let staged_repeat = add(repo, &args);
+    assert_eq!(staged_repeat.status.code(), Some(0), "{}", stderr(&staged_repeat));
+    assert_eq!(json_of(&staged_repeat)["meta"]["unchanged"], true);
+    assert_eq!(tree(repo), before, "a repeat of a staged finding writes nothing");
+
+    assert!(run_canon(&["gate", "promote", "--repo", "."], repo).status.success());
+    let before = tree(repo);
+    let committed_repeat = add(repo, &args);
+    assert_eq!(committed_repeat.status.code(), Some(0), "{}", stderr(&committed_repeat));
+    assert_eq!(json_of(&committed_repeat)["meta"]["unchanged"], true);
+    assert_eq!(tree(repo), before, "a repeat of a committed finding writes nothing");
+
+    let other = add(repo, &["--round", "4", "--seq", "1", "--actor-id", "r", "--summary", "another finding", "--json"]);
+    assert_eq!(other.status.code(), Some(2), "{}", stdout(&other));
+}
+
+/// Closing a finding to the disposition it already has writes nothing and is `meta.unchanged`.
+#[test]
+fn closing_a_finding_to_its_current_disposition_is_unchanged() {
+    let dir = repo();
+    let repo = dir.path();
+    assert!(add(repo, &["--round", "5", "--seq", "1", "--actor-id", "r", "--summary", "to close"]).status.success());
+    assert!(run_canon(&["gate", "promote", "--repo", "."], repo).status.success());
+    let close = ["finding", "close", "s43-findings-are-records", "--round", "5", "--seq", "1", "--disposition", "rejected", "--reason", "works as designed", "--repo", ".", "--json"];
+
+    let first = run_canon(&close, repo);
+    assert!(first.status.success(), "{}", stdout(&first));
+    assert!(json_of(&first)["meta"].get("unchanged").is_none(), "the first close writes");
+    assert!(run_canon(&["gate", "promote", "--repo", "."], repo).status.success());
+
+    let before = tree(repo);
+    let again = run_canon(&close, repo);
+    assert_eq!(again.status.code(), Some(0), "{}", stderr(&again));
+    assert_eq!(json_of(&again)["meta"]["unchanged"], true);
+    assert_eq!(tree(repo), before, "a repeated close writes nothing");
+}
+
 /// A neighbouring `seq` in the same round is a different finding: the
 /// collision check must not degrade into a per-round refusal.
 #[test]

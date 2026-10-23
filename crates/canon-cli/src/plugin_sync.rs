@@ -303,7 +303,11 @@ pub fn run_sync(repo: &std::path::Path, plugin_id: &str, spec_root_override: Opt
         }
     }
 
-    Ok(PluginSyncOutcome { plugin_id: plugin_id.to_string(), roots, dry_run })
+    let outcome = PluginSyncOutcome { plugin_id: plugin_id.to_string(), roots, dry_run };
+    if outcome.is_clean() && outcome.total_written() == 0 {
+        crate::json_out::mark_unchanged();
+    }
+    Ok(outcome)
 }
 
 fn overlay_write_error_to_string(err: &OverlayWriteError) -> String {

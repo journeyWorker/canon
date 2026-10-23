@@ -36,6 +36,8 @@ pub struct GatePromoteArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Args)]
@@ -59,6 +61,8 @@ pub struct GateInstallHooksArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 /// The staged record kinds `gate promote --kind` drains: the closed subset of

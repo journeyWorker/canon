@@ -50,6 +50,10 @@ fn entry<R: Report>(command: &'static str, name: &str) -> ReportSchema {
     ReportSchema { command, name: name.to_string(), schema_version: R::SCHEMA_VERSION, schema: schema_of::<R>() }
 }
 
+fn batch_entry<R: Report + 'static>(command: &'static str, name: &str) -> ReportSchema {
+    ReportSchema { command, name: name.to_string(), schema_version: crate::input::BatchReport::<R>::SCHEMA_VERSION, schema: schema_of::<crate::input::BatchReport<R>>() }
+}
+
 /// The JSON Schema of `R` as a value.
 pub fn schema_of<R: JsonSchema>() -> Value {
     // A report is only ever serialized, so its schema follows what `Serialize` writes (renames, skipped fields).
@@ -89,9 +93,7 @@ pub fn report_schemas() -> Vec<ReportSchema> {
         entry::<policy_approval::PolicyShowReport<'static>>("policy show", "PolicyShowReport"),
         entry::<review::ReviewReport>("review change", "ReviewChangeReport"),
         entry::<review::ReviewReport>("review scenario", "ReviewScenarioReport"),
-        entry::<scaffold::ScenarioNewBatchReport>("scenario new", "ScenarioNewBatchReport"),
         entry::<scaffold::ScenarioNewReport<'static>>("scenario new", "ScenarioNewReport"),
-        entry::<scaffold::ScenarioNewRefusal<'static>>("scenario new", "ScenarioNewRefusalReport"),
         entry::<evidence::ArtifactsStoreReport<'static>>("artifacts store", "ArtifactsStoreReport"),
         entry::<artifacts::ArtifactsVerifyReport<'static>>("artifacts verify", "ArtifactsVerifyReport"),
         entry::<adapter::AuthorizationResult>("adapter authorize", "AdapterAuthorizeReport"),
@@ -142,6 +144,47 @@ pub fn report_schemas() -> Vec<ReportSchema> {
         entry::<crate::skills::SkillsDoctorReport<'static>>("skills doctor", "SkillsDoctorReport"),
         entry::<crate::skills::SkillsInstallReport<'static>>("skills install", "SkillsInstallReport"),
         entry::<crate::skills::SkillsShowReport>("skills show", "SkillsShowReport"),
+        batch_entry::<change::ChangeNewReport<'static>>("change new", "BatchChangeNewReport"),
+        batch_entry::<demo::DemoReviewReport>("demo review", "BatchDemoReviewReport"),
+        batch_entry::<demo::DemoInitReport>("demo init", "BatchDemoInitReport"),
+        batch_entry::<dispatch::DispatchBeginReport<'static>>("dispatch begin", "BatchDispatchBeginReport"),
+        batch_entry::<dispatch::DispatchEndReport<'static>>("dispatch end", "BatchDispatchEndReport"),
+        batch_entry::<divergence::DivergenceAcceptReport<'static>>("divergence accept", "BatchDivergenceAcceptReport"),
+        batch_entry::<divergence::DivergenceAddReport>("divergence add", "BatchDivergenceAddReport"),
+        batch_entry::<divergence::DivergenceCommitReport>("divergence defer", "BatchDivergenceDeferReport"),
+        batch_entry::<divergence::DivergenceCommitReport>("divergence resolve", "BatchDivergenceResolveReport"),
+        batch_entry::<evidence::EvidenceAddReport>("evidence add", "BatchEvidenceAddReport"),
+        batch_entry::<evidence::EvidenceAddReport>("evidence audit", "BatchEvidenceAuditReport"),
+        batch_entry::<scaffold::FeatureNewReport<'static>>("feature new", "BatchFeatureNewReport"),
+        batch_entry::<finding::FindingAddReport<'static>>("finding add", "BatchFindingAddReport"),
+        batch_entry::<finding::FindingCloseReport<'static>>("finding close", "BatchFindingCloseReport"),
+        batch_entry::<gate::GateInstallHooksReport>("gate install-hooks", "BatchGateInstallHooksReport"),
+        batch_entry::<gate::GatePromoteReport>("gate promote", "BatchGatePromoteReport"),
+        batch_entry::<gate::TaskDoneReport<'static>>("task done", "BatchTaskDoneReport"),
+        batch_entry::<learn::StrategyPromoteReport>("strategy promote", "BatchStrategyPromoteReport"),
+        batch_entry::<learn::StrategyRollbackReport>("strategy rollback", "BatchStrategyRollbackReport"),
+        batch_entry::<policy_approval::PolicyApproveReport<'static>>("policy approve", "BatchPolicyApproveReport"),
+        batch_entry::<review::ReviewReport>("review change", "BatchReviewChangeReport"),
+        batch_entry::<review::ReviewReport>("review scenario", "BatchReviewScenarioReport"),
+        batch_entry::<scaffold::ScenarioNewReport<'static>>("scenario new", "BatchScenarioNewReport"),
+        batch_entry::<evidence::ArtifactsStoreReport<'static>>("artifacts store", "BatchArtifactsStoreReport"),
+        batch_entry::<brief_approve::Approved>("brief approve", "BatchBriefApproveReport"),
+        batch_entry::<context_pack::ContextPack>("context-pack add", "BatchContextPackAddReport"),
+        batch_entry::<artifact_ingest::ArtifactIngestOutcome>("ingest records", "BatchIngestRecordsReport"),
+        batch_entry::<plans::PlansOutcome>("ingest plans", "BatchIngestPlansReport"),
+        batch_entry::<context_pack::PromptBundleVersion>("prompt add", "BatchPromptAddReport"),
+        batch_entry::<subject::SubjectReport<'static>>("subject adopt", "BatchSubjectAdoptReport"),
+        batch_entry::<subject::SubjectReport<'static>>("subject new", "BatchSubjectNewReport"),
+        batch_entry::<subject::SubjectReport<'static>>("subject move", "BatchSubjectMoveReport"),
+        batch_entry::<subject::SubjectReport<'static>>("subject unadopt", "BatchSubjectUnadoptReport"),
+        batch_entry::<crate::retention::ExportReport>("export", "BatchExportReport"),
+        batch_entry::<crate::ingest::IngestSessionsReport<'static>>("ingest sessions", "BatchIngestSessionsReport"),
+        batch_entry::<crate::init::InitReport>("init", "BatchInitReport"),
+        batch_entry::<crate::inventory::InventorySyncReport<'static>>("inventory sync", "BatchInventorySyncReport"),
+        batch_entry::<crate::plugin_sync::PluginSyncReport<'static>>("plugin sync", "BatchPluginSyncReport"),
+        batch_entry::<crate::report::ReportBuildReport>("report build", "BatchReportBuildReport"),
+        batch_entry::<crate::report::ReportSnapshotReport<'static>>("report snapshot", "BatchReportSnapshotReport"),
+        batch_entry::<crate::skills::SkillsInstallReport<'static>>("skills install", "BatchSkillsInstallReport"),
     ];
     schemas.sort_by(|a, b| a.command.cmp(b.command).then_with(|| a.name.cmp(&b.name)));
     schemas

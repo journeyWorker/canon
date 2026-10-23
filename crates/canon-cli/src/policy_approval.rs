@@ -240,6 +240,15 @@ pub fn run_show(repo: &Path, json: bool) -> i32 {
     0
 }
 
+/// The recorded approval when it already covers the policy's current bytes
+/// and says what a repeat of `by` with `note` would record, up to its time.
+pub fn matching_approval(repo: &Path, by: &str, note: Option<&str>) -> Option<PolicyApproval> {
+    match approval_state(repo) {
+        ApprovalState::Approved(approval) if approval.approved_by == by && approval.note.as_deref() == note => Some(approval),
+        _ => None,
+    }
+}
+
 /// Writes the policy approval record for `by` under an already-resolved
 /// repo root. `Err` carries the refusal text (no policy to approve, an
 /// empty `by`, or a read/write failure). Shared by `canon policy approve`
@@ -274,17 +283,24 @@ pub fn record(repo: &Path, by: &str, note: Option<&str>) -> Result<PolicyApprova
 /// failure).
 pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
-    match record(&repo, by, note) {
+    let existing = matching_approval(&repo, by, note);
+    let unchanged = existing.is_some();
+    match existing.map_or_else(|| record(&repo, by, note), Ok) {
         Ok(approval) => {
-            crate::say!(
-                json,
-                "canon policy approve: {} ({}) approved by `{}` — wrote {} — {}",
-                paths::POLICY_FILE,
-                approval.policy_digest,
-                approval.approved_by,
-                paths::POLICY_APPROVAL_FILE,
-                crate::write_mode::DIRECT
-            );
+            if unchanged {
+                crate::json_out::mark_unchanged();
+                crate::say!(json, "canon policy approve: {} ({}) already approved by `{}` — unchanged; nothing written", paths::POLICY_FILE, approval.policy_digest, approval.approved_by);
+            } else {
+                crate::say!(
+                    json,
+                    "canon policy approve: {} ({}) approved by `{}` — wrote {} — {}",
+                    paths::POLICY_FILE,
+                    approval.policy_digest,
+                    approval.approved_by,
+                    paths::POLICY_APPROVAL_FILE,
+                    crate::write_mode::DIRECT
+                );
+            }
             let data = PolicyApproveReport { policy: paths::POLICY_FILE, policy_digest: &approval.policy_digest, approved_by: &approval.approved_by, approved_at: &approval.approved_at, approval: paths::POLICY_APPROVAL_FILE };
             crate::next::finish(&repo, "policy approve", &crate::next::Scope::Repo, false, json, &data);
             0

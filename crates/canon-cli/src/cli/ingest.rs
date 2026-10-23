@@ -38,6 +38,8 @@ pub struct IngestSessionsArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Args)]
@@ -58,6 +60,8 @@ pub struct IngestRecordsArgs {
     /// Attribute this pass's trajectories to a dispatched run (a RunId minted by `canon dispatch begin`)
     #[arg(long, value_name = "RUN_ID", value_parser = crate::dispatch::parse_run_id)]
     pub run_id: Option<RunId>,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Args)]
@@ -75,4 +79,6 @@ pub struct IngestPlansArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
