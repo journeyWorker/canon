@@ -27,7 +27,7 @@
       "$ref": "#/$defs/RoleId"
     },
     "reopen": {
-      "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject status <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nstatus` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical.",
+      "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject move <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nmove` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical.",
       "anyOf": [
         {
           "$ref": "#/$defs/Reopen"
@@ -47,7 +47,7 @@
       "$ref": "#/$defs/SubjectStatus"
     },
     "status_override": {
-      "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject status --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject status` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for.",
+      "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject move --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject move` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for.",
       "anyOf": [
         {
           "$ref": "#/$defs/StatusOverride"
@@ -58,7 +58,7 @@
       ]
     },
     "status_reason": {
-      "description": "The note an operator gave the transition that wrote this record\n(`canon subject status <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject status` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical.",
+      "description": "The note an operator gave the transition that wrote this record\n(`canon subject move <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject move` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical.",
       "anyOf": [
         {
           "$ref": "#/$defs/StatusReason"

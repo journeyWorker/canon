@@ -1,4 +1,4 @@
-//! `canon subject {new,adopt,status}` (s36 `subject-domain-loop`): the
+//! `canon subject {new,adopt,move}` (s36 `subject-domain-loop`): the
 //! authoring + lifecycle surface for the reviewed 13th record kind,
 //! [`canon_model::Subject`] — the durable product/management unit a
 //! team plans, designs, builds, verifies, and ships across many
@@ -490,7 +490,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
     }
 }
 
-/// `canon subject adopt <change_id> --subject-id <id>` (module doc): link
+/// `canon subject adopt <subject_id> --change-id <id>` (module doc): link
 /// an imported plan [`Change`] to a [`Subject`] via [`adopt_change`],
 /// printing the result. Exit `2` on any refusal or store failure.
 /// Rerunning it on a linked pair writes nothing and exits `0`. A change
@@ -527,7 +527,7 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_
     }
 }
 
-/// `canon subject unadopt <change_id> --subject-id <id>` (0.25 D1): take
+/// `canon subject unadopt <subject_id> --change-id <id>` (0.25 D1): take
 /// the link [`run_adopt`] made back, on both sides. Refused for a change
 /// whose canon brief carries an `Approved:` line: it is the subject's
 /// approved scope. An unlinked pair writes nothing and exits `0`.
@@ -727,7 +727,7 @@ pub(crate) fn lookup_adoption(repo: &Path, subject_id: &SubjectId, change_id: &C
     Ok((find_subject(&registry, subject_id)?, find_change(&registry, change_id)?))
 }
 
-/// `canon subject adopt <change> --subject-id <subject>`: the command that
+/// `canon subject adopt <subject> --change-id <change>`: the command that
 /// completes a half-written adoption. Safe to rerun: [`persist_adoption`]
 /// writes only the side that still lacks the link, and nothing once both
 /// carry it.
@@ -1087,9 +1087,8 @@ pub fn run_move(
     }
 }
 
-/// `canon subject show <id>` without `--to` (0.21 D1): show the subject
-/// and write nothing. `--override-reason` and `--reason` belong to a
-/// transition, so passing either here is refused rather than ignored.
+/// `canon subject show <id>` (0.21 D1): show the subject and write
+/// nothing. `--override-reason` and `--reason` belong to `canon subject move`.
 pub fn run_show(repo: &Path, subject_id: &SubjectId, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = resolve_canon_yaml(&repo);

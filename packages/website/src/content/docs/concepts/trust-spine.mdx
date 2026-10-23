@@ -149,8 +149,11 @@ them to what the evidence says, which keeps the ones that were current and
 leaves the stale ones stale. `gate check` prints one advisory naming how
 many scenarios still wait for it. In CI, check out full history
 (`actions/checkout` with `fetch-depth: 0`) for the job that runs
-`canon migrate`; it previews first, and acts only with
-`--commit --plan-digest` (see [CLI reference](/cli/#upgrading-from-027)).
+`canon migrate`; the bare run only previews and prints a `planDigest`, and
+`--commit --plan-digest` applies exactly that plan. Besides the review
+pins, 0.28's `migrate` rewrites a 0.27 install's hook commands and canon
+scripts to the 0.28 spellings and replaces the full skill projection with
+the stub (see [CLI reference](/cli/#upgrading-from-027)).
 
 With `block_on_findings`, review findings (`canon finding add
 --severity blocker|should-fix|note`) are read at their latest version per

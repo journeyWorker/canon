@@ -198,24 +198,24 @@ pub struct Subject {
     pub change_ids: Vec<ChangeId>,
     /// The accountable waiver this record's status transition was let
     /// through under, when `spec_coverage.require_review` refused it and
-    /// the operator passed `canon subject status --override-reason`.
+    /// the operator passed `canon subject move --override-reason`.
     /// Skipped when absent, so every subject written without one stays
-    /// byte-identical on the wire. Each `canon subject status` write
+    /// byte-identical on the wire. Each `canon subject move` write
     /// clears it and sets it again only when it waives something, so a
     /// waiver never outlives the status it was granted for.
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
     pub status_override: Option<StatusOverride>,
     /// Who reopened this subject from `shipped` to `verifying`, and why
-    /// (0.18 D3, `canon subject status <id> --to verifying --reason`). Set
+    /// (0.18 D3, `canon subject move <id> --to verifying --reason`). Set
     /// only on the record that reopens; every other `canon subject
-    /// status` write clears it, like [`Self::status_override`]. Skipped
+    /// move` write clears it, like [`Self::status_override`]. Skipped
     /// when absent, so every other subject stays byte-identical.
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
     pub reopen: Option<Reopen>,
     /// The note an operator gave the transition that wrote this record
-    /// (`canon subject status <id> --to <state> --reason`, 0.21.1), on
+    /// (`canon subject move <id> --to <state> --reason`, 0.21.1), on
     /// any transition; a reopen records it here too, next to
-    /// [`Self::reopen`]. Every `canon subject status` write clears it
+    /// [`Self::reopen`]. Every `canon subject move` write clears it
     /// and sets it again only when given a `--reason`. Skipped when
     /// absent, so every other subject stays byte-identical.
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]

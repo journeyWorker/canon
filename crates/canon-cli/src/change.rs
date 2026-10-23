@@ -25,7 +25,7 @@
 //! [`crate::subject::persist_adoption`] for the order) cannot be written
 //! atomically, so a failure between them keeps the change dir and the
 //! subject record and prints the command that completes the link,
-//! `canon ingest plans && canon subject adopt <slug> --subject-id <id>`,
+//! `canon ingest plans && canon subject adopt <id> --change-id <slug>`,
 //! which is safe to rerun.
 //!
 //! # Refusals (exit `2`, nothing written)

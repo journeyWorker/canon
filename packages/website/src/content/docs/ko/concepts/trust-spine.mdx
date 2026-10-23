@@ -127,18 +127,15 @@ subject가 `require_review.scope`에 있는 모든 시나리오(`spec_coverage.s
 파일을 고쳐 sync하거나 시나리오를 다시 증명하면 리뷰는 낡은 것이 되어, 스펙·증거
 또는 둘 다를 명시한 `unreviewed-promotion`이 됩니다. `signed` 리뷰만 인정되며,
 `--review-outcome indeterminate`나 `unavailable`로 기록된 리뷰어 실행은 공백이고,
-리뷰어별 최신 리뷰가 이깁니다. 0.15 이전에 쓴 리뷰는 pin 정보가 없지만, 리뷰한
-커밋(`pin`)은 남아 있습니다. 게이트는 `git`으로 그 커밋의 시나리오를 읽어
-`inventory sync`와 같은 시나리오별 digest를 계산합니다. 그 digest가 지금과 같고
-리뷰보다 새로운 선언 증거가 없으면 리뷰는 유효(current)하고, 아니면
-낡은(stale) 리뷰가 됩니다. 커밋이나 그 커밋의 시나리오가 클론에 없으면(얕은
-체크아웃, 히스토리 재작성) 판정 불가(undecidable)로 두고 계속 인정합니다. 커밋이
-없다는 이유로 위반이 되지는 않습니다. `gate check`는 `advisory: N review(s)
-predate review pinning (0.15) and were checked against the commit each one
-pinned: C current, S stale, U undecidable …` 한 줄을 출력합니다. 시나리오에 다른
-유효한 리뷰가 이미 있으면 그 낡은 리뷰는 superseded로 세고, 리뷰가 아직 필요한
-시나리오만 다시 리뷰하라고 나열합니다. CI에서는 게이트 job의 체크아웃을 전체
-히스토리(`actions/checkout`의 `fetch-depth: 0`)로 받으세요.
+리뷰어별 최신 리뷰가 이깁니다. 0.23 이전에 쓴 리뷰는 증거 레코드 파일(0.15 이전에는 리뷰한 커밋만)을 고정하고
+있어서, `canon migrate`가 증거가 지금 말하는 내용으로 다시 쓰기 전까지는 인정되지
+않습니다. migrate는 당시 유효했던 리뷰는 유지하고 낡은 리뷰는 낡은 채로 둡니다.
+`gate check`는 아직 리뷰를 기다리는 시나리오 수를 알리는 advisory 한 줄을
+출력합니다. CI에서는 `canon migrate`를 실행하는 job의 체크아웃을 전체
+히스토리(`actions/checkout`의 `fetch-depth: 0`)로 받으세요. 옵션 없이 실행하면
+미리보기와 `planDigest`만 출력하고, `--commit --plan-digest`가 그 계획을 그대로
+적용합니다. 0.28의 `migrate`는 리뷰 pin 외에도 0.27 설치의 훅 명령과 canon
+스크립트를 0.28 철자로 고치고 전체 스킬 프로젝션을 스텁으로 교체합니다.
 
 커밋하지 않은 코드에 대한 리뷰도 기록할 수 있습니다. 리뷰는 `--rev`의 커밋 대신
 작업 트리의 `codeTree`와 `worktreeDirty`를 담고, 그 코드를 커밋한 뒤에도 코드
