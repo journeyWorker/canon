@@ -99,7 +99,7 @@ impl Report {
         }
         if self.stale > 0 {
             lines.push(format!(
-                "canon migrate: left {} stale review(s) as they are: the scenario or its evidence changed since the review, so each stays stale until it is reviewed again (`canon review add`)",
+                "canon migrate: left {} stale review(s) as they are: the scenario or its evidence changed since the review, so each stays stale until it is reviewed again (`canon review scenario`)",
                 self.stale
             ));
         }

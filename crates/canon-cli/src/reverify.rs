@@ -211,7 +211,7 @@ pub fn chore_violations(repo: &Path, ctx: &GateContext, subject: &Subject) -> Ve
 /// The `canon review add --change-id` step a chore's review gap names.
 pub fn chore_review_remedy(change: &ChangeId) -> String {
     format!(
-        "have a reviewer record one review of the chore: `canon review add --project-id <root> --change-id {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<brief>\"`",
+        "have a reviewer record one review of the chore: `canon review change {} --project-id <root> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<brief>\"`",
         change.as_str()
     )
 }

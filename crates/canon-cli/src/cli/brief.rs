@@ -13,7 +13,7 @@ pub enum BriefCommand {
     /// Read the brief against the rules: blocker and advisory findings (exit 0 clean, 2 blockers, 1 error)
     Check(BriefCheckArgs),
     /// Record the human's approval of the brief, bound to its text; refused while `brief check` has blockers
-    #[command(after_help = "Examples:\n  canon brief approve --change-id add-login --by Ana --note 'Go. Ship the failure flow too.'\n\nWrites `Approved: <who> <when> — \"<words>\" (brief sha256:<digest>)` into the\nbrief (the digest covers the brief without its `Approved:` lines) and records\n`canon policy approve` in the same call. Edit the brief afterwards and it reads as\nnot approved (BRIEF_CHANGED_SINCE_APPROVAL) until a human answers again and this\nruns again. Run it only from the human's answer, with their words as --note.")]
+    #[command(after_help = "Examples:\n  canon brief approve add-login --by Ana --note 'Go. Ship the failure flow too.'\n\nWrites `Approved: <who> <when> — \"<words>\" (brief sha256:<digest>)` into the\nbrief (the digest covers the brief without its `Approved:` lines) and records\n`canon policy approve` in the same call. Edit the brief afterwards and it reads as\nnot approved (BRIEF_CHANGED_SINCE_APPROVAL) until a human answers again and this\nruns again. Run it only from the human's answer, with their words as --note.")]
     Approve(BriefApproveArgs),
 }
 
@@ -35,7 +35,7 @@ pub struct BriefShowArgs {
 #[derive(Args)]
 pub struct BriefCheckArgs {
     /// The change to read (default: the repo's only live change)
-    #[arg(long, value_parser = crate::subject::parse_change_id)]
+    #[arg(value_name = "CHANGE_ID", value_parser = crate::subject::parse_change_id)]
     pub change_id: Option<ChangeId>,
     /// Repo root (default: nearest ancestor with a canon.yaml)
     #[arg(long, default_value = ".")]
@@ -55,7 +55,7 @@ pub struct BriefApproveArgs {
     #[arg(long)]
     pub note: String,
     /// The change to read (default: the repo's only live change)
-    #[arg(long, value_parser = crate::subject::parse_change_id)]
+    #[arg(value_name = "CHANGE_ID", value_parser = crate::subject::parse_change_id)]
     pub change_id: Option<ChangeId>,
     /// Repo root (default: nearest ancestor with a canon.yaml)
     #[arg(long, default_value = ".")]

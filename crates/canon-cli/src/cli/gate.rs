@@ -78,6 +78,7 @@ pub struct GateCheckArgs {
 #[derive(Args)]
 pub struct GateTaskArgs {
     /// The task id (<change_id>#<n>)
+    #[arg(value_name = "TASK_ID")]
     pub task_id: String,
     /// Repo root (default: nearest ancestor with a canon.yaml)
     #[arg(long, default_value = ".")]

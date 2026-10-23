@@ -70,7 +70,7 @@ const CASES_DOC: &str = "  # Every feature surface (`<area>.<surface>`) needs at
 const CASES_KEY: &str = "  require_cases: [failure]\n";
 
 const REVIEW_DOC: &str = "  # Every scenario of a subject in `verifying` or `shipped` needs a
-  # review (`canon review add`) by an actor other than its evidence
+  # review (`canon review scenario`) by an actor other than its evidence
   # author, and an open blocker finding on an adopted change blocks.
 ";
 const REVIEW_KEY: &str = "  require_review: {}\n";

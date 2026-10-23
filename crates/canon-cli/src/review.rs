@@ -1,4 +1,4 @@
-//! `canon review add` (s15 P3b, native-verdict-lifecycle spec): the
+//! `canon review scenario` / `canon review change` (s15 P3b, native-verdict-lifecycle spec): the
 //! ONLY producer of `canon_model::Review` records — without it, S1's
 //! `Review`/`Divergence` kinds have no way to exist on the ledger at
 //! all and `canon-gate`'s review index (`crate::trust::review_index`)
@@ -101,18 +101,16 @@ pub fn parse_runtime_label(s: &str) -> Result<String, String> {
     Ok(s.to_string())
 }
 
-/// `canon review add`'s arguments. `upstream_ref`/`original_spec_ref`
-/// are the raw `--upstream-ref`/`--original-spec-ref` values — exactly
-/// one MUST be `Some`.
+/// `canon review scenario` / `canon review change`'s arguments (one library
+/// path, two leaves: a change review sets `change`). `upstream_ref` /
+/// `original_spec_ref` are the raw `--upstream-ref` / `--original-spec-ref`
+/// values — exactly one MUST be `Some`.
 pub struct ReviewAddArgs {
     pub project_id: ProjectId,
-    /// `--scenario-id`, repeatable (0.18 D1): one review per scenario.
+    /// The scenarios of `review scenario <SCENARIO_ID>...`: one review per scenario.
     pub scenario_ids: Vec<ScenarioId>,
-    /// `--scenario-ids-from <file|->`: more ids, one per line, `#`
-    /// starting a comment ([`parse_scenario_ids`]).
-    pub scenario_ids_from: Option<String>,
-    /// `--change-id <slug>`: a change-level review of a chore (module doc);
-    /// excludes the scenario ids.
+    /// The change of `review change <CHANGE_ID>`: a change-level review of a
+    /// chore (module doc); `scenario_ids` is then empty.
     pub change: Option<ChangeId>,
     pub reviewer: String,
     pub pin: String,
@@ -133,89 +131,65 @@ pub struct ReviewAddArgs {
     pub json: bool,
 }
 
-/// The scenario ids of a `--scenario-ids-from` file: one per line, `#`
-/// starting a comment that runs to the end of the line, blank lines
-/// skipped. A line that is not a scenario id is an error naming it.
-pub fn parse_scenario_ids(text: &str) -> Result<Vec<ScenarioId>, String> {
-    text.lines()
-        .enumerate()
-        .filter_map(|(index, line)| {
-            let id = line.split('#').next().unwrap_or_default().trim();
-            (!id.is_empty()).then(|| ScenarioId::parse(id).map_err(|e| format!("line {}: `{id}` is not a scenario id: {e}", index + 1)))
-        })
-        .collect()
+impl ReviewAddArgs {
+    /// The leaf this invocation is, for `meta.command` and next steps.
+    fn command(&self) -> &'static str {
+        if self.change.is_some() { "review change" } else { "review scenario" }
+    }
+
+    /// [`Self::command`] as the human lines name it.
+    fn full(&self) -> String {
+        format!("canon {}", self.command())
+    }
 }
 
-/// Every scenario id the invocation names, in order and each once:
-/// `--scenario-id` first, then `--scenario-ids-from` (`-` reads stdin).
-fn requested_scenarios(args: &ReviewAddArgs) -> Result<Vec<ScenarioId>, String> {
-    let mut ids = args.scenario_ids.clone();
-    if let Some(source) = &args.scenario_ids_from {
-        let text = if source == "-" {
-            let mut text = String::new();
-            std::io::Read::read_to_string(&mut std::io::stdin(), &mut text).map_err(|e| format!("--scenario-ids-from -: {e}"))?;
-            text
-        } else {
-            std::fs::read_to_string(source).map_err(|e| format!("--scenario-ids-from {source}: {e}"))?
-        };
-        ids.extend(parse_scenario_ids(&text).map_err(|e| format!("--scenario-ids-from {source}: {e}"))?);
-    }
-    let mut unique: Vec<ScenarioId> = Vec::new();
-    for id in ids {
-        if !unique.contains(&id) {
-            unique.push(id);
+/// Every scenario id the invocation names, in order and each once.
+fn requested_scenarios(args: &ReviewAddArgs) -> Vec<ScenarioId> {
+    let mut unique: Vec<ScenarioId> = Vec::with_capacity(args.scenario_ids.len());
+    for id in &args.scenario_ids {
+        if !unique.contains(id) {
+            unique.push(id.clone());
         }
     }
-    if unique.is_empty() {
-        return Err("no scenario to review: give --scenario-id <id> (repeatable), --scenario-ids-from <file|->, or --change-id <slug> for a chore".to_string());
-    }
-    Ok(unique)
+    unique
 }
 
-/// `canon review add` (module doc). Both provenance refs `None` or both
-/// `Some`, no scenario, and any scenario without a record are refused
-/// before any write is attempted. With several scenarios (0.18 D1) it
-/// writes one review per scenario with the same reviewer, pin and
+/// `canon review scenario` and `canon review change` (module doc). Both
+/// provenance refs `None` or both `Some`, and any scenario without a record,
+/// are refused before any write is attempted. With several scenarios (0.18
+/// D1) it writes one review per scenario with the same reviewer, pin and
 /// artifacts, each pinning its own scenario, all or nothing. Returns the
 /// process exit code: `0` on a successful write, `2` on a
 /// refused/malformed invocation.
 pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
+    let cmd = args.full();
     let provenance_ref = match (&args.upstream_ref, &args.original_spec_ref) {
         (Some(r), None) => ProvenanceRef::UpstreamRef(r.clone()),
         (None, Some(r)) => ProvenanceRef::OriginalSpecRef(r.clone()),
         (None, None) => {
-            return CliError::refused("REVIEW_INVALID_ARGUMENT", "neither --upstream-ref nor --original-spec-ref given; a review must carry a resolvable provenance ref").hint("pass exactly one of --upstream-ref <ref> or --original-spec-ref <ref>").emit("canon review add", args.json);
+            return CliError::refused("REVIEW_INVALID_ARGUMENT", "neither --upstream-ref nor --original-spec-ref given; a review must carry a resolvable provenance ref").hint("pass exactly one of --upstream-ref <ref> or --original-spec-ref <ref>").emit(&args.full(), args.json);
         }
         (Some(_), Some(_)) => {
-            return CliError::refused("REVIEW_INVALID_ARGUMENT", "--upstream-ref and --original-spec-ref are mutually exclusive; exactly one provenance ref is required").hint("pass exactly one of --upstream-ref <ref> or --original-spec-ref <ref>").emit("canon review add", args.json);
+            return CliError::refused("REVIEW_INVALID_ARGUMENT", "--upstream-ref and --original-spec-ref are mutually exclusive; exactly one provenance ref is required").hint("pass exactly one of --upstream-ref <ref> or --original-spec-ref <ref>").emit(&args.full(), args.json);
         }
     };
-    let scenario_ids = if args.change.is_some() {
-        Vec::new()
-    } else {
-        match requested_scenarios(args) {
-            Ok(ids) => ids,
-            Err(e) => {
-                return CliError::refused("REVIEW_INVALID_ARGUMENT", e.to_string()).hint("`canon schema review add` lists the accepted arguments and their forms").emit("canon review add", args.json);
-            }
-        }
-    };
+    let scenario_ids = if args.change.is_some() { Vec::new() } else { requested_scenarios(args) };
 
     let repo = resolve_repo_root(repo);
     if let Err(error) = crate::inventory::require_spec_root(&repo, &args.project_id) {
-        return error.emit("canon review add", args.json);
+        return error.emit(&args.full(), args.json);
     }
     let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon review add", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit(&args.full(), args.json);
         }
     };
     let brief_digest = match &args.change {
         Some(change) => match chore_brief_digest(&repo, change) {
             Ok(digest) => Some(digest),
             Err(message) => {
-                return CliError::refused("REVIEW_INVALID_ARGUMENT", message).field("--change-id").hint("a change-level review is for a chore change whose brief is in the repository; review feature scenarios with --scenario-id").emit("canon review add", args.json);
+                return CliError::refused("REVIEW_INVALID_ARGUMENT", message).field("CHANGE_ID").hint("a change-level review is for a chore change whose brief is in the repository; review feature scenarios with `canon review scenario <SCENARIO_ID>...`").emit(&cmd, args.json);
             }
         },
         None => None,
@@ -228,12 +202,12 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         let nothing = if scenario_ids.len() > 1 { " (nothing is written for any of the scenarios)" } else { "" };
         return CliError::refused("REVIEW_SCENARIO_NOT_INDEXED", format!("no scenario record for {ids} in spec root `{}`; a review pins the scenario it saw, so index it first (`canon inventory sync`){nothing}",
             args.project_id.as_str()
-        )).hint("run `canon inventory sync`, then run `canon review add` again").emit("canon review add", args.json);
+        )).hint(format!("run `canon inventory sync`, then run `{cmd}` again")).emit(&cmd, args.json);
     }
     let bound = match crate::evidence_attach::bind_artifacts(&repo, &args.artifacts, args.max_artifact_mib.saturating_mul(canon_gate::artifact_store::MIB)) {
         Ok(bound) => bound,
         Err(e) => {
-            let refusal = CliError::refused("REVIEW_ARTIFACT_REFUSED", e.message().to_string()).hint("`canon schema review add` lists the artifact options and their limits");
+            let refusal = CliError::refused("REVIEW_ARTIFACT_REFUSED", e.message().to_string()).hint("`canon schema review` lists the artifact options and their limits");
             let refusal = match e.hint() {
                 Some(hint) => refusal.hint(hint),
                 None => refusal,
@@ -242,7 +216,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
                 Some(flag) => refusal.field(flag),
                 None => refusal,
             };
-            return refusal.emit("canon review add", args.json);
+            return refusal.emit(&args.full(), args.json);
         }
     };
     let mut artifacts: Vec<ReviewArtifact> = Vec::new();
@@ -268,7 +242,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         review.reviewer_model = args.reviewer_model.clone();
         review.reviewer_harness = args.reviewer_harness.clone();
         review.artifacts = artifacts.clone();
-        let pinned = format!("canon review add: pinned change {} at brief digest {}; the review counts only while the brief is unchanged", change.as_str(), &digest.as_str()[..12]);
+        let pinned = format!("{cmd}: pinned change {} at brief digest {}; the review counts only while the brief is unchanged", change.as_str(), &digest.as_str()[..12]);
         review.pins = Some(ReviewPins { scenario_digest: digest, scenario_digest_scope: PinnedSpec::Brief, checks: Some(Vec::new()), evidence: Vec::new() });
         reviews.push((review, pinned));
     }
@@ -288,7 +262,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         review.reviewer_harness = args.reviewer_harness.clone();
         review.artifacts = artifacts.clone();
         let pinned = format!(
-            "canon review add: pinned {} at {} {} and the verdict and checks of its {} role(s) of evidence; the review counts only while they are unchanged",
+            "{cmd}: pinned {} at {} {} and the verdict and checks of its {} role(s) of evidence; the review counts only while they are unchanged",
             scenario.scenario_id.as_str(),
             match pins.scenario_digest_scope {
                 PinnedSpec::Scenario => "scenario digest",
@@ -317,13 +291,13 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     let unchanged: Vec<(String, crate::retry::Existing)> =
         reviews.iter().zip(&repeats).filter_map(|((review, _), repeat)| repeat.clone().map(|existing| (review.target().to_string(), existing))).collect();
     for (scenario, existing) in &unchanged {
-        crate::say!(args.json, "canon review add: unchanged — an identical review of {scenario} is already {}; nothing written", existing.describe());
+        crate::say!(args.json, "{cmd}: unchanged — an identical review of {scenario} is already {}; nothing written", existing.describe());
     }
     let reviews: Vec<(Review, String)> = reviews.into_iter().zip(&repeats).filter(|(_, repeat)| repeat.is_none()).map(|(review, _)| review).collect();
     if reviews.is_empty() {
         if args.json {
             let wrote: Vec<serde_json::Value> = unchanged.iter().map(|(scenario, existing)| serde_json::json!({ "location": existing.committed, "scenarioId": scenario, "unchanged": true })).collect();
-            crate::json_out::data_with_meta("review add", serde_json::json!({ "outcome": args.outcome.as_str(), "reviews": wrote, "blobsStored": 0 }), serde_json::json!({ "unchanged": true }));
+            crate::json_out::data_with_meta(args.command(), serde_json::json!({ "outcome": args.outcome.as_str(), "reviews": wrote, "blobsStored": 0 }), serde_json::json!({ "unchanged": true }));
         }
         return 0;
     }
@@ -340,20 +314,20 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
             if reviews.len() > 1 {
                 error = error.hint("no review is written: every review and blob this run wrote or stored was removed");
             }
-            return error.emit("canon review add", args.json);
+            return error.emit(&args.full(), args.json);
         }
     };
     for (_, pinned) in &reviews {
         crate::say!(args.json, "{pinned}");
     }
     if !files.is_empty() {
-        crate::say!(args.json, "{}", crate::evidence_attach::stored_line(&repo, "canon review add", files.len(), stored));
+        crate::say!(args.json, "{}", crate::evidence_attach::stored_line(&repo, &args.full(), files.len(), stored));
     }
     if !args.outcome.is_signed() {
-        crate::say!(args.json, "canon review add: outcome `{}` is recorded as a review gap, never as an approval", args.outcome.as_str());
+        crate::say!(args.json, "{cmd}: outcome `{}` is recorded as a review gap, never as an approval", args.outcome.as_str());
     }
     for (location, deduped) in &written {
-        crate::say!(args.json, "canon review add: wrote {location} ({}) — {}", if *deduped { "deduped" } else { "new" }, crate::write_mode::DIRECT);
+        crate::say!(args.json, "{cmd}: wrote {location} ({}) — {}", if *deduped { "deduped" } else { "new" }, crate::write_mode::DIRECT);
     }
     let mut wrote: Vec<serde_json::Value> = written.iter().map(|(location, deduped)| serde_json::json!({ "location": location, "deduped": deduped })).collect();
     wrote.extend(unchanged.iter().map(|(scenario, existing)| serde_json::json!({ "location": existing.committed, "scenarioId": scenario, "unchanged": true })));
@@ -361,7 +335,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         Some(change) => crate::next::Scope::Change(change.as_str().to_string()),
         None => crate::next::Scope::Scenarios(scenario_ids.iter().map(|id| id.as_str().to_string()).collect()),
     };
-    crate::next::finish(&repo, "review add", &scope, false, args.json, serde_json::json!({ "outcome": args.outcome.as_str(), "reviews": wrote, "blobsStored": stored }));
+    crate::next::finish(&repo, args.command(), &scope, false, args.json, serde_json::json!({ "outcome": args.outcome.as_str(), "reviews": wrote, "blobsStored": stored }));
     0
 }
 
@@ -444,7 +418,6 @@ mod tests {
         ReviewAddArgs {
             project_id: ProjectId::parse("app-a").unwrap(),
             scenario_ids: vec![ScenarioId::parse("world.firstbuy-hotdeal.26").unwrap()],
-            scenario_ids_from: None,
             change: None,
             reviewer: "reviewer-1".into(),
             pin: "abc123pin".into(),

@@ -234,7 +234,7 @@ impl BriefStatus {
 
     /// The re-approval advice for a digest-less approval line.
     pub fn record_digest_hint(&self) -> String {
-        format!("re-approve with `canon brief approve --change-id {} --by <the human> --note \"<their words>\"`", self.change.as_deref().unwrap_or("<change>"))
+        format!("re-approve with `canon brief approve {} --by <the human> --note \"<their words>\"`", self.change.as_deref().unwrap_or("<change>"))
     }
 
     /// How the agent records the human's answer, for an enforced brief.
@@ -245,10 +245,10 @@ impl BriefStatus {
         }
         match (self.brief_exists, &self.source) {
             (false, Some(source)) => format!(
-                "create {brief} holding a `Source: {source}` line, then record their words with `canon brief approve --change-id {} --by <the human> --note \"<their words>\"`",
+                "create {brief} holding a `Source: {source}` line, then record their words with `canon brief approve {} --by <the human> --note \"<their words>\"`",
                 self.change.as_deref().unwrap_or("<change>")
             ),
-            _ => format!("record their words with `canon brief approve --change-id {} --by <the human> --note \"<their words>\"`", self.change.as_deref().unwrap_or("<change>")),
+            _ => format!("record their words with `canon brief approve {} --by <the human> --note \"<their words>\"`", self.change.as_deref().unwrap_or("<change>")),
         }
     }
 }

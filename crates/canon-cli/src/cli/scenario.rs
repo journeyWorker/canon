@@ -97,7 +97,7 @@ pub enum ScenarioCommand {
 #[derive(Args)]
 pub struct ScenarioNewArgs {
     /// <area>.<surface>.<nn> scenario tag
-    #[arg(value_parser = crate::scaffold::parse_scenario_tag)]
+    #[arg(value_name = "SCENARIO_ID", value_parser = crate::scaffold::parse_scenario_tag)]
     pub tag: Option<ScenarioId>,
     /// Write many scenarios from NDJSON (a file, or `-` for stdin): one JSON object per line,
     /// blank lines and `#` comments skipped. A line carries this command's fields by long flag

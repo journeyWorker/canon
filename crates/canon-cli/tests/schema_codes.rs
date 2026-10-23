@@ -38,7 +38,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     // `store_error`: the refusal of a store that cannot be opened or attached, emitted by both commands.
     ("artifacts.rs", &["artifacts verify", "artifacts migrate"]),
     // `CHANGED_CODE`, picked by `evidence add`'s brief refusal.
-    ("brief.rs", &["evidence add"]),
+    ("brief.rs", &["evidence add", "evidence audit"]),
     ("brief_approve.rs", &["brief approve"]),
     // `check` is shared by `brief check` and `brief approve`.
     ("brief_check.rs", &["brief check", "brief approve", "brief show"]),
@@ -50,21 +50,24 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("demo.rs", &["demo"]),
     ("dispatch.rs", &["dispatch begin", "dispatch end"]),
     ("divergence.rs", &["divergence"]),
-    ("evidence.rs", &["evidence add"]),
+    ("evidence.rs", &["evidence add", "evidence audit"]),
     ("finding.rs", &["finding add", "finding close"]),
     // The typed-atom errors `canon evidence add` reports with `gate task`'s grading;
     // `promote_after_stage`'s command comes from its caller.
-    ("gate.rs", &["gate task", "evidence add"]),
+    ("gate.rs", &["gate task", "evidence add", "evidence audit"]),
     ("init.rs", &["init"]),
     // `require_spec_root`: the refusal of a `--project-id` no configured spec root carries, made by every write command that takes one.
-    ("inventory.rs", &["evidence add", "evidence approval-payload", "review add", "divergence add", "divergence resolve", "divergence defer", "divergence accept", "scenario new"]),
+    ("inventory.rs", &["evidence add", "evidence audit", "evidence approval-payload", "review scenario", "review change", "divergence add", "divergence resolve", "divergence defer", "divergence accept", "scenario new"]),
     ("learn.rs", &["learn"]),
     ("ledger.rs", &["ledger compact"]),
     // Every code is next to its emit.
     ("main.rs", &[]),
     ("run/mod.rs", &[]),
     ("run/entry.rs", &[]),
-    ("run/divergence.rs", &[]),
+    // `project_for`: `--project-id` is required when several spec roots exist, for each of these.
+    ("run/divergence.rs", &["divergence add", "divergence resolve", "divergence defer", "divergence accept"]),
+    ("run/evidence.rs", &["evidence add", "evidence audit", "evidence approval-payload"]),
+    ("run/review.rs", &["review scenario", "review change"]),
     ("run/top.rs", &[]),
     ("run/adapter.rs", &[]),
     ("run/ingest.rs", &[]),
@@ -78,7 +81,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     // `ScopeError::to_cli_error`, emitted by `query`.
     ("query.rs", &["query"]),
     ("retention.rs", &["export", "purge"]),
-    ("review.rs", &["review add"]),
+    ("review.rs", &["review scenario", "review change"]),
     // Every code is next to its `human("canon selftest")`.
     ("selftest.rs", &[]),
     // The shared scenario validation (`Planner`) builds its errors for its caller, `scenario new`.

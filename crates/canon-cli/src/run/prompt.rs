@@ -6,14 +6,14 @@ use std::process::ExitCode;
 pub fn run(cmd: PromptCommand) -> ExitCode {
     match cmd {
         PromptCommand::Add(args) => run_prompt_add(args),
-        PromptCommand::Show(PromptShowArgs { name, version, repo, json }) => run_prompt_show(&repo, &name, &version, json),
+        PromptCommand::Show(PromptShowArgs { bundle, repo, json }) => run_prompt_show(&repo, &bundle.name, &bundle.version, json),
     }
 }
 
 fn run_prompt_add(args: PromptAddArgs) -> ExitCode {
-    let PromptAddArgs { name, version, manifest, repo, json } = args;
+    let PromptAddArgs { bundle, manifest, repo, json } = args;
     let repo = crate::context::resolve_repo_root(&repo);
-    match crate::context_pack::register_prompt_bundle_from_manifest(&repo, &name, &version, &manifest) {
+    match crate::context_pack::register_prompt_bundle_from_manifest(&repo, &bundle.name, &bundle.version, &manifest) {
         Ok(bundle) => {
             if json {
                 crate::json_out::data("prompt add", serde_json::to_value(&bundle).expect("prompt bundle is serializable"));

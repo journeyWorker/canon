@@ -67,6 +67,7 @@ pub fn path(cmd: &Command) -> &'static str {
         Command::Evidence { action } => match action {
             EvidenceCommand::ApprovalPayload(_) => "evidence approval-payload",
             EvidenceCommand::Add(_) => "evidence add",
+            EvidenceCommand::Audit(_) => "evidence audit",
             EvidenceCommand::Vault(_) => "evidence vault",
         },
         Command::Artifacts { action } => match action {
@@ -79,7 +80,8 @@ pub fn path(cmd: &Command) -> &'static str {
             FindingCommand::List(_) => "finding list",
         },
         Command::Review { action } => match action {
-            ReviewCommand::Add(_) => "review add",
+            ReviewCommand::Scenario(_) => "review scenario",
+            ReviewCommand::Change(_) => "review change",
         },
         Command::Divergence { action } => match action {
             DivergenceCliCommand::Add(_) => "divergence add",
