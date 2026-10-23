@@ -238,10 +238,24 @@ fn effects(repo: &Path, plan: &Plan, config_changes: bool, ledger: Vec<Effect>, 
     out.extend(plan.changes.iter().chain(&plan.renames).map(|c| &c.change).chain(plan.reimport.iter().map(|(change, _)| change)).map(|change| Effect::record("reimport", change.as_str())));
     out.extend(ledger);
     if let Some(pins) = pins {
-        let reviews = pins.record_pinned + pins.unpinned_current + pins.undecidable;
-        if reviews + pins.acceptances > 0 {
-            out.push(Effect::record("pin", "reviews").detail(format!("{reviews} review(s), {} acceptance(s)", pins.acceptances)));
+        for rewrite in &pins.rewrites {
+            let effect = Effect::path("rewrite", rewrite.from.clone().unwrap_or_else(|| rewrite.to.clone()));
+            out.push(match &rewrite.from {
+                Some(from) if *from != rewrite.to => effect.detail(format!("{} pinned to its evidence, filed as {}", rewrite.kind.as_str(), rewrite.to)),
+                _ => effect.detail(format!("{} pinned to its evidence", rewrite.kind.as_str())),
+            });
         }
+    }
+    let mut backed_up = plan.legacy.backed_up();
+    if config_changes {
+        backed_up.push("canon.yaml".to_string());
+    }
+    if !plan.gitignore.is_empty() {
+        backed_up.push(".gitignore".to_string());
+    }
+    let copies = backed_up.iter().filter(|path| fs::symlink_metadata(repo.join(path)).is_ok_and(|meta| meta.is_file())).count();
+    if copies > 0 {
+        out.push(Effect::path("write", format!("{}/", canon_model::paths::MIGRATE_BACKUP_DIR)).detail(format!("copies of the {copies} file(s) it rewrites")));
     }
     if index_changes {
         out.push(Effect::record("rebuild", "scenario index"));

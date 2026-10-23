@@ -378,3 +378,37 @@ fn migrate_pins_07_a_moved_root_is_searched_at_its_former_path_and_only_for_its_
     let out = migrate(repo);
     assert!(out.contains(&format!("{MIGRATED} 2 review(s)")) && out.contains("1 of those could not be checked"), "a is current at its former root, b is undecidable: {out}");
 }
+
+/// migrate.pins.08: the preview lists every review record the commit rewrites,
+/// also when the scenario index is not built yet (it is derived and ignored by
+/// git, so a fresh clone has none): each rewritten record is one effect naming
+/// the file it replaces and the file that takes its place, and after the commit
+/// the ledger changed in exactly those files.
+#[test]
+fn migrate_pins_08_the_preview_lists_every_review_record_it_rewrites() {
+    let (dir, _) = legacy_repo();
+    let repo = dir.path();
+    std::fs::remove_dir_all(repo.join(".canon/ledger/kind=scenario")).unwrap();
+    commit_ledger(repo);
+    let reviews = |repo: &Path| -> std::collections::BTreeSet<String> { walk(&repo.join(".canon/ledger/kind=review")).into_iter().map(|p| p.strip_prefix(repo).unwrap().display().to_string()).collect() };
+    let before = reviews(repo);
+    assert_eq!(before.len(), 2);
+
+    let out = canon(repo, &["migrate", "--json"]);
+    assert!(out.status.success(), "{}", text(&out));
+    let preview: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(reviews(repo), before, "a preview writes nothing");
+    let effects = preview["data"]["effects"].as_array().unwrap();
+    let rewrites: Vec<&serde_json::Value> = effects.iter().filter(|e| e["action"] == "rewrite" && e["path"].as_str().is_some_and(|p| p.contains("kind=review"))).collect();
+    assert_eq!(rewrites.len(), 2, "one effect per review record: {effects:?}");
+    let digest = preview["data"]["planDigest"].as_str().unwrap().to_string();
+
+    let done = canon(repo, &["migrate", "--commit", "--plan-digest", &digest, "--json"]);
+    assert!(done.status.success(), "{}", text(&done));
+    let after = reviews(repo);
+    let listed_from: std::collections::BTreeSet<String> = rewrites.iter().map(|e| e["path"].as_str().unwrap().to_string()).collect();
+    assert_eq!(listed_from, before.difference(&after).cloned().collect(), "the files the commit removed are the ones the preview named");
+    for review in after.difference(&before) {
+        assert!(rewrites.iter().any(|e| e["detail"].as_str().is_some_and(|d| d.contains(review.as_str()))), "{review} is the new file of a listed effect: {rewrites:?}");
+    }
+}
