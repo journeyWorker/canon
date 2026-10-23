@@ -92,8 +92,19 @@ pub fn kind_parser() -> impl clap::builder::TypedValueParser<Value = RecordKind>
     crate::cli_error::closed_set(visible.collect::<Vec<_>>(), parse_kind)
 }
 
+/// `purge --kind`'s clap parser: the record kinds purge accepts
+/// ([`canon_store::tier::PURGEABLE_KINDS`]), a closed subset of [`kind_parser`]'s.
+pub fn purgeable_kind_parser() -> impl clap::builder::TypedValueParser<Value = RecordKind> {
+    let visible = canon_store::tier::PURGEABLE_KINDS.iter().map(|k| clap::builder::PossibleValue::new(kind_cli_name(*k)));
+    crate::cli_error::closed_set(visible.collect::<Vec<_>>(), parse_kind)
+}
+
 /// `--since`'s `clap` value parser — an RFC3339/ISO-8601 timestamp.
 pub fn parse_since(s: &str) -> Result<DateTime<Utc>, String> {
+    // A bare date is midnight UTC.
+    if let Ok(date) = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d") {
+        return Ok(date.and_time(chrono::NaiveTime::MIN).and_utc());
+    }
     DateTime::parse_from_rfc3339(s).map(|dt| dt.with_timezone(&Utc)).map_err(|e| format!("invalid --since timestamp `{s}`: {e}"))
 }
 

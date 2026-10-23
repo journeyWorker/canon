@@ -1,2 +1,11 @@
-canon subject status: cart → verifying — written directly; nothing to promote
-next: canon subject status cart --to shipped --actor-id <unit> — cart: every scenario is evidenced and reviewed, with no blocker or case gap, and no brief is written to approve; ship it yourself unless the brief says the human ships
+canon migrate: plan:
+  .gitignore: add .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/
+  rebuild the scenario index (full sync)
+  left: .canon stays where it is: the openspec reader cannot read it (invalid-change-id-grammar)
+  left: .git stays where it is: the openspec reader cannot read it (invalid-change-id-grammar)
+canon migrate: added to .gitignore: .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/
+  change           moved 1 of 2 file(s) (0.2 KiB); 1 stay
+  subject          moved 3 of 4 file(s) (0.8 KiB); 1 stay
+canon ledger compact: moved 4 superseded version(s) to .canon/archive; `canon query --history` reads them
+canon migrate: rebuilt the scenario index: 0 record(s) written
+canon migrate: pinned 1 review(s) to what their evidence says (the verdict and the checks of its latest record): 0 were pinned to evidence records, 1 to a commit before 0.15; 1 of those could not be checked because their commit, or the scenario at it, is not in this clone, so they are pinned as the scenario stands (check out full history, `fetch-depth: 0` in CI, to check them)

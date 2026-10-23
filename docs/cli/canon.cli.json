@@ -191,7 +191,8 @@
       "about": "Check or move the evidence artifact store (local, or an object-store tier)",
       "aliases": [],
       "children": [
-        "artifacts migrate",
+        "artifacts move",
+        "artifacts store",
         "artifacts verify"
       ],
       "command": "artifacts",
@@ -204,20 +205,21 @@
     {
       "about": "Move the local artifact blobs to an object-store tier, verify them, and remove the local copies",
       "aliases": [],
-      "command": "artifacts migrate",
+      "command": "artifacts move",
       "effect": "destructive",
       "errorCodes": [
-        "ARTIFACTS_MIGRATE_REFUSED",
+        "ARTIFACTS_MOVE_REFUSED",
         "ARTIFACTS_STORE_UNREACHABLE",
         "CONFIG_MISSING",
         "CONFIG_UNREADABLE",
+        "PLAN_CHANGED",
         "REPO_UNREADABLE",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon artifacts migrate --to cold --dry-run"
+        "canon artifacts move --tier cold"
       ],
       "exits": [
         {
@@ -231,25 +233,138 @@
       ],
       "idempotency": "replay-safe",
       "inputs": [],
-      "name": "migrate",
+      "name": "move",
       "nodeKind": "leaf",
       "operands": [],
       "options": [
         {
           "aliases": [],
           "default": [],
-          "help": "The backend to move to: the name of an `s3` tier in canon.yaml (for example `cold`)",
+          "help": "The tier to move to: the name of an `s3` tier in canon.yaml (for example `cold`)",
           "kind": "value",
-          "name": "to",
+          "name": "tier",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "BACKEND"
+          "valueName": "TIER"
         },
         {
           "aliases": [],
           "default": [],
-          "help": "Preview what would be uploaded and removed, without writing anything",
+          "help": "Act on the previewed plan; needs --plan-digest",
+          "kind": "flag",
+          "name": "commit",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--plan-digest"
+          ]
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The `planDigest` the preview printed; the run acts only if the plan recomputed now has this digest",
+          "kind": "value",
+          "name": "plan-digest",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--commit"
+          ],
+          "valueName": "DIGEST"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
+          "kind": "value",
+          "name": "repo",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Output JSON instead of the human-readable form",
+          "kind": "flag",
+          "name": "json",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "report",
+          "report": "ArtifactsMoveReport",
+          "schemaRef": "#/schemas/ArtifactsMoveReport",
+          "schemaVersion": "1.0"
+        }
+      ],
+      "path": [
+        "artifacts",
+        "move"
+      ],
+      "requiredOneOf": [],
+      "roles": [
+        "orchestrator"
+      ],
+      "supportsJson": true
+    },
+    {
+      "about": "Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/)",
+      "aliases": [],
+      "command": "artifacts store",
+      "effect": "write",
+      "effectNote": "refreshes stale scenario-index records first",
+      "errorCodes": [
+        "ARTIFACTS_STORE_FAILED",
+        "CONFIG_MISSING",
+        "CONFIG_UNREADABLE",
+        "REPO_UNREADABLE",
+        "UNKNOWN_ROLE",
+        "USAGE"
+      ],
+      "examples": [
+        "canon artifacts store"
+      ],
+      "exits": [
+        {
+          "code": 0,
+          "meaning": "success"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
+        }
+      ],
+      "idempotency": "replay-safe",
+      "inputs": [],
+      "name": "store",
+      "nodeKind": "leaf",
+      "operands": [],
+      "options": [
+        {
+          "aliases": [],
+          "default": [
+            "25"
+          ],
+          "help": "Per-file size limit for the artifact store, in MiB",
+          "kind": "value",
+          "name": "max-artifact-mib",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "MIB"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
           "kind": "flag",
           "name": "dry-run",
           "possibleValues": [],
@@ -281,14 +396,14 @@
       "outputs": [
         {
           "kind": "report",
-          "report": "ArtifactsMoveReport",
+          "report": "ArtifactsStoreReport",
           "schemaRef": null,
           "schemaVersion": null
         }
       ],
       "path": [
         "artifacts",
-        "migrate"
+        "store"
       ],
       "requiredOneOf": [],
       "roles": [
@@ -2597,7 +2712,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Preview without writing anything",
+          "help": "Validate fully and report what would be written, without writing anything",
           "kind": "flag",
           "name": "dry-run",
           "possibleValues": [],
@@ -2948,8 +3063,7 @@
       "children": [
         "evidence add",
         "evidence approval-payload",
-        "evidence audit",
-        "evidence vault"
+        "evidence audit"
       ],
       "command": "evidence",
       "name": "evidence",
@@ -3849,92 +3963,6 @@
       "supportsJson": true
     },
     {
-      "about": "Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/)",
-      "aliases": [],
-      "command": "evidence vault",
-      "effect": "write",
-      "effectNote": "refreshes stale scenario-index records first",
-      "errorCodes": [
-        "CONFIG_MISSING",
-        "CONFIG_UNREADABLE",
-        "EVIDENCE_VAULT_FAILED",
-        "REPO_UNREADABLE",
-        "UNKNOWN_ROLE",
-        "USAGE"
-      ],
-      "examples": [
-        "canon evidence vault"
-      ],
-      "exits": [
-        {
-          "code": 0,
-          "meaning": "success"
-        },
-        {
-          "code": 2,
-          "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
-        }
-      ],
-      "idempotency": "replay-safe",
-      "inputs": [],
-      "name": "vault",
-      "nodeKind": "leaf",
-      "operands": [],
-      "options": [
-        {
-          "aliases": [],
-          "default": [
-            "25"
-          ],
-          "help": "Per-file size limit for the artifact store, in MiB",
-          "kind": "value",
-          "name": "max-artifact-mib",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "MIB"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
-          "kind": "value",
-          "name": "repo",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "DIR"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Output JSON instead of the human-readable form",
-          "kind": "flag",
-          "name": "json",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        }
-      ],
-      "outputs": [
-        {
-          "kind": "report",
-          "report": "ArtifactsStoreReport",
-          "schemaRef": null,
-          "schemaVersion": null
-        }
-      ],
-      "path": [
-        "evidence",
-        "vault"
-      ],
-      "requiredOneOf": [],
-      "roles": [
-        "orchestrator"
-      ],
-      "supportsJson": true
-    },
-    {
       "about": "Export a redacted retention manifest without deleting records",
       "aliases": [],
       "command": "export",
@@ -4106,6 +4134,16 @@
           "repeatable": true,
           "required": false,
           "valueName": "FIELDS"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
         }
       ],
       "outputs": [
@@ -5215,6 +5253,16 @@
         {
           "aliases": [],
           "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
@@ -5290,7 +5338,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Preview without writing anything",
+          "help": "Validate fully and report what would be written, without writing anything",
           "kind": "flag",
           "name": "dry-run",
           "possibleValues": [],
@@ -5482,11 +5530,11 @@
       "supportsJson": true
     },
     {
-      "about": "Import agent sessions, artifacts, and plans into canon's store",
+      "about": "Import agent sessions, records, and plans into canon's store",
       "aliases": [],
       "children": [
-        "ingest artifacts",
         "ingest plans",
+        "ingest records",
         "ingest sessions"
       ],
       "command": "ingest",
@@ -5497,9 +5545,122 @@
       ]
     },
     {
-      "about": "Import review/divergence/task/handoff artifacts and derive verdicts",
+      "about": "Import plans as Change/Task records: canon's own .canon/changes, then the configured external sources (openspec, superpowers)",
       "aliases": [],
-      "command": "ingest artifacts",
+      "command": "ingest plans",
+      "effect": "write",
+      "errorCodes": [
+        "CONFIG_MISSING",
+        "INGEST_FAILED",
+        "INGEST_SOURCE_UNUSABLE",
+        "UNKNOWN_ROLE",
+        "USAGE"
+      ],
+      "examples": [
+        "canon ingest plans"
+      ],
+      "exits": [
+        {
+          "code": 0,
+          "meaning": "ingested"
+        },
+        {
+          "code": 1,
+          "meaning": "INGEST_SOURCE_UNUSABLE: every source is unusable"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: CONFIG_MISSING, or an invalid argument"
+        }
+      ],
+      "idempotency": "replay-safe",
+      "inputs": [],
+      "name": "plans",
+      "nodeKind": "leaf",
+      "operands": [],
+      "options": [
+        {
+          "aliases": [],
+          "default": [],
+          "help": "One-shot override: import this dialect's --plan-source root (requires --plan-source)",
+          "kind": "value",
+          "name": "dialect",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--plan-source"
+          ],
+          "valueName": "DIALECT"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "One-shot override's source root (paired with --dialect)",
+          "kind": "value",
+          "name": "plan-source",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--dialect"
+          ],
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
+          "kind": "value",
+          "name": "repo",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Output JSON instead of the human-readable form",
+          "kind": "flag",
+          "name": "json",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "report",
+          "report": "IngestPlansReport",
+          "schemaRef": "#/schemas/IngestPlansReport",
+          "schemaVersion": "1.0"
+        }
+      ],
+      "path": [
+        "ingest",
+        "plans"
+      ],
+      "requiredOneOf": [],
+      "roles": [
+        "orchestrator"
+      ],
+      "supportsJson": true
+    },
+    {
+      "about": "Import review/divergence/task/handoff records and derive verdicts",
+      "aliases": [],
+      "command": "ingest records",
       "effect": "write",
       "errorCodes": [
         "CONFIG_MISSING",
@@ -5508,7 +5669,7 @@
         "USAGE"
       ],
       "examples": [
-        "canon ingest artifacts"
+        "canon ingest records"
       ],
       "exits": [
         {
@@ -5522,7 +5683,7 @@
       ],
       "idempotency": "replay-safe",
       "inputs": [],
-      "name": "artifacts",
+      "name": "records",
       "nodeKind": "leaf",
       "operands": [],
       "options": [
@@ -5563,6 +5724,16 @@
         {
           "aliases": [],
           "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
@@ -5592,104 +5763,7 @@
       ],
       "path": [
         "ingest",
-        "artifacts"
-      ],
-      "requiredOneOf": [],
-      "roles": [
-        "orchestrator"
-      ],
-      "supportsJson": true
-    },
-    {
-      "about": "Import plans as Change/Task records: canon's own .canon/changes, then the configured external sources (openspec, superpowers)",
-      "aliases": [],
-      "command": "ingest plans",
-      "effect": "write",
-      "errorCodes": [
-        "CONFIG_MISSING",
-        "INGEST_FAILED",
-        "INGEST_SOURCE_UNUSABLE",
-        "UNKNOWN_ROLE",
-        "USAGE"
-      ],
-      "examples": [
-        "canon ingest plans"
-      ],
-      "exits": [
-        {
-          "code": 0,
-          "meaning": "ingested"
-        },
-        {
-          "code": 1,
-          "meaning": "INGEST_SOURCE_UNUSABLE: every source is unusable"
-        },
-        {
-          "code": 2,
-          "meaning": "refused: CONFIG_MISSING, or an invalid argument"
-        }
-      ],
-      "idempotency": "replay-safe",
-      "inputs": [],
-      "name": "plans",
-      "nodeKind": "leaf",
-      "operands": [],
-      "options": [
-        {
-          "aliases": [],
-          "default": [],
-          "help": "One-shot override: import this dialect's --source root (requires --source)",
-          "kind": "value",
-          "name": "dialect",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "DIALECT"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "One-shot override's source root (paired with --dialect)",
-          "kind": "value",
-          "name": "source",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "SOURCE"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
-          "kind": "value",
-          "name": "repo",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "DIR"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Output JSON instead of the human-readable form",
-          "kind": "flag",
-          "name": "json",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        }
-      ],
-      "outputs": [
-        {
-          "kind": "report",
-          "report": "IngestPlansReport",
-          "schemaRef": "#/schemas/IngestPlansReport",
-          "schemaVersion": "1.0"
-        }
-      ],
-      "path": [
-        "ingest",
-        "plans"
+        "records"
       ],
       "requiredOneOf": [],
       "roles": [
@@ -5795,6 +5869,16 @@
         {
           "aliases": [],
           "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
@@ -5878,6 +5962,7 @@
         {
           "aliases": [],
           "conflictsWith": [
+            "--dry-run",
             "--language",
             "--no-agents-md",
             "--no-policy",
@@ -5965,6 +6050,19 @@
           "repeatable": false,
           "required": false,
           "valueName": "TAG"
+        },
+        {
+          "aliases": [],
+          "conflictsWith": [
+            "--check-config"
+          ],
+          "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
         },
         {
           "aliases": [],
@@ -6063,6 +6161,16 @@
           "repeatable": false,
           "required": false,
           "valueName": "SPEC_ROOT"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
         },
         {
           "aliases": [],
@@ -6318,7 +6426,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Preview without writing anything",
+          "help": "Validate fully and report what would be written, without writing anything",
           "kind": "flag",
           "name": "dry-run",
           "possibleValues": [],
@@ -6520,11 +6628,12 @@
         "CONFIG_UNREADABLE",
         "LEDGER_ARCHIVE_UNAVAILABLE",
         "LEDGER_COMPACT_FAILED",
+        "PLAN_CHANGED",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
-        "canon ledger compact --dry-run"
+        "canon ledger compact"
       ],
       "exits": [
         {
@@ -6545,12 +6654,29 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Report what would move and write nothing",
+          "help": "Act on the previewed plan; needs --plan-digest",
           "kind": "flag",
-          "name": "dry-run",
+          "name": "commit",
           "possibleValues": [],
           "repeatable": false,
-          "required": false
+          "required": false,
+          "requires": [
+            "--plan-digest"
+          ]
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The `planDigest` the preview printed; the run acts only if the plan recomputed now has this digest",
+          "kind": "value",
+          "name": "plan-digest",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--commit"
+          ],
+          "valueName": "DIGEST"
         },
         {
           "aliases": [],
@@ -6578,8 +6704,8 @@
         {
           "kind": "report",
           "report": "LedgerCompactReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/LedgerCompactReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -6604,6 +6730,7 @@
         "MIGRATE_REFUSED",
         "MIGRATE_STOPPED",
         "MIGRATE_UNCOMMITTED",
+        "PLAN_CHANGED",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED"
@@ -6645,12 +6772,29 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Print the plan and write nothing",
+          "help": "Act on the previewed plan; needs --plan-digest",
           "kind": "flag",
-          "name": "dry-run",
+          "name": "commit",
           "possibleValues": [],
           "repeatable": false,
-          "required": false
+          "required": false,
+          "requires": [
+            "--plan-digest"
+          ]
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The `planDigest` the preview printed; the run acts only if the plan recomputed now has this digest",
+          "kind": "value",
+          "name": "plan-digest",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--commit"
+          ],
+          "valueName": "DIGEST"
         },
         {
           "aliases": [],
@@ -6667,8 +6811,8 @@
         {
           "kind": "report",
           "report": "MigrateReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/MigrateReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -6762,6 +6906,16 @@
           "repeatable": false,
           "required": false,
           "valueName": "SPEC_ROOT"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
         },
         {
           "aliases": [],
@@ -7177,21 +7331,20 @@
       "supportsJson": true
     },
     {
-      "about": "Remove allowlisted records older than a cutoff: `--plan` shows the removal set and its planDigest, `--confirm <planDigest>` deletes it",
+      "about": "Remove allowlisted records older than a cutoff: the bare run previews the removal set and its planDigest, `--commit --plan-digest <DIGEST>` deletes it",
       "aliases": [],
       "command": "purge",
       "effect": "destructive",
-      "effectNote": "writes one audit line",
+      "effectNote": "a committed run writes one audit line; a preview writes nothing",
       "errorCodes": [
         "CONFIG_MISSING",
         "PLAN_CHANGED",
-        "PURGE_PLAN_REQUIRED",
         "RETENTION_PURGE_FAILED",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
-        "canon purge --kind session --before 2020-01-01T00:00:00Z --plan"
+        "canon purge --kind session --before 2020-01-01T00:00:00Z"
       ],
       "exits": [
         {
@@ -7216,20 +7369,10 @@
           "kind": "value",
           "name": "kind",
           "possibleValues": [
-            "change",
-            "task",
-            "scenario",
             "session",
             "run",
             "event",
-            "handoff",
-            "review",
-            "divergence",
-            "trajectory",
-            "strategy_item",
-            "evidence",
-            "subject",
-            "finding"
+            "trajectory"
           ],
           "repeatable": false,
           "required": true,
@@ -7249,6 +7392,33 @@
         {
           "aliases": [],
           "default": [],
+          "help": "Act on the previewed plan; needs --plan-digest",
+          "kind": "flag",
+          "name": "commit",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--plan-digest"
+          ]
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The `planDigest` the preview printed; the run acts only if the plan recomputed now has this digest",
+          "kind": "value",
+          "name": "plan-digest",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--commit"
+          ],
+          "valueName": "DIGEST"
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
           "kind": "value",
           "name": "repo",
@@ -7256,33 +7426,6 @@
           "repeatable": false,
           "required": false,
           "valueName": "DIR"
-        },
-        {
-          "aliases": [],
-          "conflictsWith": [
-            "--confirm"
-          ],
-          "default": [],
-          "help": "Print the removal set and its `planDigest`; delete nothing",
-          "kind": "flag",
-          "name": "plan",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        },
-        {
-          "aliases": [],
-          "conflictsWith": [
-            "--plan"
-          ],
-          "default": [],
-          "help": "Delete, but only if the plan recomputed now has this `planDigest`",
-          "kind": "value",
-          "name": "confirm",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "PLAN_DIGEST"
         },
         {
           "aliases": [],
@@ -7299,8 +7442,8 @@
         {
           "kind": "report",
           "report": "PurgeReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/PurgeReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -9049,6 +9192,16 @@
         {
           "aliases": [],
           "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
@@ -9243,6 +9396,16 @@
           "repeatable": false,
           "required": false,
           "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
         },
         {
           "aliases": [],
@@ -9642,6 +9805,16 @@
         {
           "aliases": [],
           "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
@@ -9689,6 +9862,7 @@
       "effect": "destructive",
       "errorCodes": [
         "CONFIG_MISSING",
+        "PLAN_CHANGED",
         "TIER_FAILED",
         "UNKNOWN_ROLE",
         "USAGE"
@@ -9715,12 +9889,29 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Preview without writing anything",
+          "help": "Act on the previewed plan; needs --plan-digest",
           "kind": "flag",
-          "name": "dry-run",
+          "name": "commit",
           "possibleValues": [],
           "repeatable": false,
-          "required": false
+          "required": false,
+          "requires": [
+            "--plan-digest"
+          ]
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The `planDigest` the preview printed; the run acts only if the plan recomputed now has this digest",
+          "kind": "value",
+          "name": "plan-digest",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--commit"
+          ],
+          "valueName": "DIGEST"
         },
         {
           "aliases": [],
@@ -9748,8 +9939,8 @@
         {
           "kind": "report",
           "report": "TierAgeReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/TierAgeReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -10254,9 +10445,15 @@
       "retryable": false
     },
     {
-      "code": "ARTIFACTS_MIGRATE_REFUSED",
+      "code": "ARTIFACTS_MOVE_REFUSED",
       "exit": 2,
-      "meaning": "`artifacts migrate` cannot move the blobs: the target is not an s3 tier, a local blob does not match its name, or the object store holds a bad copy",
+      "meaning": "`artifacts move` cannot move the blobs: the target is not an s3 tier, a local blob does not match its name, or the object store holds a bad copy",
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_STORE_FAILED",
+      "exit": 2,
+      "meaning": "`artifacts store` could not write a blob",
       "retryable": false
     },
     {
@@ -10566,12 +10763,6 @@
       "retryable": true
     },
     {
-      "code": "EVIDENCE_VAULT_FAILED",
-      "exit": 2,
-      "meaning": "the evidence vault could not write a blob",
-      "retryable": false
-    },
-    {
       "code": "FEATURE_EXISTS",
       "exit": 2,
       "meaning": "the feature file already exists",
@@ -10848,9 +11039,15 @@
       "retryable": false
     },
     {
+      "code": "NO_COMMIT",
+      "exit": 2,
+      "meaning": "a command needed a commit and the directory is not a git work tree or has no commits",
+      "retryable": false
+    },
+    {
       "code": "PLAN_CHANGED",
       "exit": 2,
-      "meaning": "the data changed since `purge --plan`, so the confirmed digest no longer matches; nothing was deleted",
+      "meaning": "the plan recomputed under `--commit` no longer has the `--plan-digest` the preview printed; nothing was written",
       "retryable": false
     },
     {
@@ -10911,12 +11108,6 @@
       "code": "PROMPT_BUNDLE_INVALID",
       "exit": 2,
       "meaning": "a prompt bundle is invalid",
-      "retryable": false
-    },
-    {
-      "code": "PURGE_PLAN_REQUIRED",
-      "exit": 2,
-      "meaning": "`purge` deletes only a reviewed plan: run `purge --plan`, then `purge --confirm <planDigest>`",
       "retryable": false
     },
     {
@@ -11571,6 +11762,120 @@
         "contextJoinVerified"
       ],
       "title": "ValidationSummary",
+      "type": "object"
+    },
+    "ArtifactsMoveReport": {
+      "$defs": {
+        "Effect": {
+          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "properties": {
+            "action": {
+              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Where it goes, or why, when `action` alone does not say.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "path": {
+              "description": "The file acted on, relative to the repo.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "record": {
+              "description": "The record acted on (an id, key or digest) when it is not a file.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:ArtifactsMoveReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon artifacts move`'s `data`: the plan and what the run did to the blobs.",
+      "properties": {
+        "alreadyInStore": {
+          "description": "Blobs the store already held, verified.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "backend": {
+          "description": "The tier the blobs live in after the move (`local` for the no-op).",
+          "type": "string"
+        },
+        "blobs": {
+          "description": "Blobs in the local store.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "committed": {
+          "description": "`true` once the run acted, `false` for a preview.",
+          "type": "boolean"
+        },
+        "configWritten": {
+          "type": "boolean"
+        },
+        "effects": {
+          "description": "Everything the run would do, in the order it does it.",
+          "items": {
+            "$ref": "#/$defs/Effect"
+          },
+          "type": "array"
+        },
+        "gitignoreAdded": {
+          "type": "boolean"
+        },
+        "planDigest": {
+          "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+          "type": "string"
+        },
+        "removedLocal": {
+          "description": "Local copies this run removed (0 in a preview).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "skipped": {
+          "description": "Entries of the local store that are not blobs and stay.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "uploaded": {
+          "description": "Blobs this run uploaded (0 in a preview).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "backend",
+        "blobs",
+        "uploaded",
+        "alreadyInStore",
+        "removedLocal",
+        "configWritten",
+        "gitignoreAdded",
+        "skipped",
+        "planDigest",
+        "effects",
+        "committed"
+      ],
+      "title": "ArtifactsMoveReport",
       "type": "object"
     },
     "BriefApproveReport": {
@@ -13697,6 +14002,10 @@
           "minimum": 0,
           "type": "integer"
         },
+        "dryRun": {
+          "description": "A `--dry-run` preview: nothing was persisted and no cursor moved;\nthe `*Persisted` counts are what a real pass would persist.",
+          "type": "boolean"
+        },
         "duplicateChangeId": {
           "format": "uint",
           "minimum": 0,
@@ -13735,6 +14044,7 @@
         }
       },
       "required": [
+        "dryRun",
         "sources",
         "changesPersisted",
         "tasksPersisted",
@@ -13847,7 +14157,7 @@
       },
       "$id": "urn:canon:report:IngestRecordsReport",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "One `canon ingest artifacts` pass's outcome.",
+      "description": "One `canon ingest records` pass's outcome.",
       "properties": {
         "adapters": {
           "items": {
@@ -13861,6 +14171,10 @@
             "$ref": "#/$defs/ConvergenceConflict"
           },
           "type": "array"
+        },
+        "dryRun": {
+          "description": "A `--dry-run` preview: nothing was written; the counts are what a\nreal pass would do (convergence of superseded copies is not previewed).",
+          "type": "boolean"
         },
         "strategyItemsRebuilt": {
           "description": "Sum of every regime's freshly-distilled `StrategyItem` count\n([`NamespaceConvergence::items`]) — the count that actually lands\nin `stg_strategy_items`, i.e. what makes S9's `mart_role_memory`\nnon-empty.",
@@ -13911,6 +14225,7 @@
         }
       },
       "required": [
+        "dryRun",
         "adapters",
         "verdictsDerived",
         "trajectoriesPersisted",
@@ -13923,6 +14238,243 @@
         "trajectoriesLeftPending"
       ],
       "title": "ArtifactIngestOutcome",
+      "type": "object"
+    },
+    "LedgerCompactReport": {
+      "$defs": {
+        "Effect": {
+          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "properties": {
+            "action": {
+              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Where it goes, or why, when `action` alone does not say.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "path": {
+              "description": "The file acted on, relative to the repo.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "record": {
+              "description": "The record acted on (an id, key or digest) when it is not a file.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "type": "object"
+        },
+        "LedgerKindRow": {
+          "description": "One kind's row in a compaction report.",
+          "properties": {
+            "bytes": {
+              "description": "Total bytes of the superseded files.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "files": {
+              "description": "Files in the ledger before the move.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "live": {
+              "description": "Files that stay.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "moved": {
+              "description": "Files moved (0 in a preview).",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "superseded": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "kind",
+            "files",
+            "live",
+            "superseded",
+            "moved",
+            "bytes"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:LedgerCompactReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon ledger compact`'s `data`: the plan and what each kind held and moved.",
+      "properties": {
+        "archive": {
+          "description": "The archive directory, relative to the repo.",
+          "type": "string"
+        },
+        "bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "committed": {
+          "description": "`true` once the run acted, `false` for a preview.",
+          "type": "boolean"
+        },
+        "effects": {
+          "description": "Everything the run would do, in the order it does it.",
+          "items": {
+            "$ref": "#/$defs/Effect"
+          },
+          "type": "array"
+        },
+        "files": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kinds": {
+          "items": {
+            "$ref": "#/$defs/LedgerKindRow"
+          },
+          "type": "array"
+        },
+        "live": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "moved": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "planDigest": {
+          "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+          "type": "string"
+        },
+        "superseded": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "archive",
+        "kinds",
+        "files",
+        "live",
+        "superseded",
+        "moved",
+        "bytes",
+        "planDigest",
+        "effects",
+        "committed"
+      ],
+      "title": "LedgerCompactReport",
+      "type": "object"
+    },
+    "MigrateReport": {
+      "$defs": {
+        "Effect": {
+          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "properties": {
+            "action": {
+              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Where it goes, or why, when `action` alone does not say.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "path": {
+              "description": "The file acted on, relative to the repo.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "record": {
+              "description": "The record acted on (an id, key or digest) when it is not a file.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:MigrateReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon migrate`'s `data`: the plan, the steps it printed and, once it\nrebuilt the scenario index, how many records that wrote.",
+      "properties": {
+        "committed": {
+          "description": "`true` once the run acted, `false` for a preview.",
+          "type": "boolean"
+        },
+        "effects": {
+          "description": "Everything the run would do, in the order it does it.",
+          "items": {
+            "$ref": "#/$defs/Effect"
+          },
+          "type": "array"
+        },
+        "index": {
+          "description": "The rebuild's own report when it found the corpus unclean (`MIGRATE_INDEX_FAILED`)."
+        },
+        "indexRecordsWritten": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "planDigest": {
+          "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+          "type": "string"
+        },
+        "steps": {
+          "description": "What the run planned, did and noted, one line each.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "steps",
+        "planDigest",
+        "effects",
+        "committed"
+      ],
+      "title": "MigrateReport",
       "type": "object"
     },
     "PromptAddReport": {
@@ -14145,6 +14697,160 @@
         "prompts"
       ],
       "title": "PromptBundleVersion",
+      "type": "object"
+    },
+    "PurgeReport": {
+      "$defs": {
+        "Effect": {
+          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "properties": {
+            "action": {
+              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Where it goes, or why, when `action` alone does not say.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "path": {
+              "description": "The file acted on, relative to the repo.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "record": {
+              "description": "The record acted on (an id, key or digest) when it is not a file.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "type": "object"
+        },
+        "PurgeLearnStore": {
+          "description": "The learn store's counts in a `trajectory` purge report.",
+          "properties": {
+            "backend": {
+              "type": "string"
+            },
+            "deleted": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "matched": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "backend",
+            "matched",
+            "deleted"
+          ],
+          "type": "object"
+        },
+        "PurgeRung": {
+          "description": "One rung's counts in a purge report.",
+          "properties": {
+            "backend": {
+              "type": "string"
+            },
+            "deleted": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "matched": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "rung": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "rung",
+            "backend",
+            "matched",
+            "deleted"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:PurgeReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon purge`'s `data`: the plan (`planDigest`, `effects[]`, `committed`)\nand what each rung matched and deleted.",
+      "properties": {
+        "before": {
+          "type": "string"
+        },
+        "committed": {
+          "description": "`true` once the run acted, `false` for a preview.",
+          "type": "boolean"
+        },
+        "effects": {
+          "description": "Everything the run would do, in the order it does it.",
+          "items": {
+            "$ref": "#/$defs/Effect"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "learnStore": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PurgeLearnStore"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "planDigest": {
+          "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+          "type": "string"
+        },
+        "rungs": {
+          "items": {
+            "$ref": "#/$defs/PurgeRung"
+          },
+          "type": "array"
+        },
+        "sourceScope": {
+          "type": "string"
+        },
+        "unavailable": {
+          "description": "Rungs the plan could not reach.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "before",
+        "sourceScope",
+        "rungs",
+        "unavailable",
+        "planDigest",
+        "effects",
+        "committed"
+      ],
+      "title": "PurgeReport",
       "type": "object"
     },
     "RetrieveReport": {
@@ -16233,6 +16939,121 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "description": "`data` of the subject leaves: the Subject record, embedded verbatim (it keeps the ledger record's own schema and snake_case keys).",
       "title": "SubjectReport"
+    },
+    "TierAgeReport": {
+      "$defs": {
+        "Effect": {
+          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "properties": {
+            "action": {
+              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Where it goes, or why, when `action` alone does not say.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "path": {
+              "description": "The file acted on, relative to the repo.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "record": {
+              "description": "The record acted on (an id, key or digest) when it is not a file.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "type": "object"
+        },
+        "TierAgeRule": {
+          "description": "One `aging:` rule in `canon tier age`'s report.",
+          "properties": {
+            "after": {
+              "description": "The rule's threshold (`30d`).",
+              "type": "string"
+            },
+            "alreadyAged": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "candidates": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "destination": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "moved": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "source",
+            "destination",
+            "after",
+            "candidates",
+            "moved",
+            "alreadyAged"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:TierAgeReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon tier age`'s `data`: the plan and one entry per `aging:` rule.",
+      "properties": {
+        "committed": {
+          "description": "`true` once the run acted, `false` for a preview.",
+          "type": "boolean"
+        },
+        "effects": {
+          "description": "Everything the run would do, in the order it does it.",
+          "items": {
+            "$ref": "#/$defs/Effect"
+          },
+          "type": "array"
+        },
+        "planDigest": {
+          "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+          "type": "string"
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/TierAgeRule"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "rules",
+        "planDigest",
+        "effects",
+        "committed"
+      ],
+      "title": "TierAgeReport",
+      "type": "object"
     }
   },
   "specVersion": "1"

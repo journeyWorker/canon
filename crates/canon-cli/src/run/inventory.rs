@@ -7,7 +7,7 @@ use std::process::ExitCode;
 
 pub fn run(cmd: InventoryCommand) -> ExitCode {
     match cmd {
-        InventoryCommand::Sync(InventorySyncArgs { repo, spec_root, json }) => run_inventory_sync(&repo, spec_root.as_deref(), json),
+        InventoryCommand::Sync(InventorySyncArgs { repo, spec_root, dry_run, json }) => run_inventory_sync(&repo, spec_root.as_deref(), dry_run.dry_run, json),
     }
 }
 
@@ -19,8 +19,8 @@ pub fn run(cmd: InventoryCommand) -> ExitCode {
 /// mirrors `canon review add`/`canon divergence add`'s own refused-
 /// invocation exit code), `0` otherwise (including the common
 /// zero-writes no-op re-sync case).
-fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path>, json: bool) -> ExitCode {
-    match crate::inventory::run_sync(repo, spec_root) {
+fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path>, dry_run: bool, json: bool) -> ExitCode {
+    match if dry_run { crate::inventory::preview_sync(repo, spec_root) } else { crate::inventory::run_sync(repo, spec_root) } {
         Ok(outcome) => {
             crate::say_raw!(json, "{}", crate::inventory::format_human(&outcome));
             let data = crate::inventory::format_json(&outcome);

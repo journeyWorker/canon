@@ -8,8 +8,8 @@ pub fn run(cmd: SubjectCommand) -> ExitCode {
         SubjectCommand::New(SubjectNewArgs { id, domain, title, summary, owner_role, actor_id, repo, json }) => {
             ExitCode::from(crate::subject::run_new(&repo, &id, &domain, &title, &summary, &owner_role, &actor_id, json) as u8)
         }
-        SubjectCommand::Adopt(SubjectAdoptArgs { change_id, subject_id, repo, json }) => ExitCode::from(crate::subject::run_adopt(&repo, &change_id, &subject_id, json) as u8),
-        SubjectCommand::Unadopt(SubjectUnadoptArgs { change_id, subject_id, repo, json }) => ExitCode::from(crate::subject::run_unadopt(&repo, &change_id, &subject_id, json) as u8),
+        SubjectCommand::Adopt(SubjectAdoptArgs { change_id, subject_id, repo, dry_run, json }) => ExitCode::from(crate::subject::run_adopt(&repo, &change_id, &subject_id, dry_run.dry_run, json) as u8),
+        SubjectCommand::Unadopt(SubjectUnadoptArgs { change_id, subject_id, repo, dry_run, json }) => ExitCode::from(crate::subject::run_unadopt(&repo, &change_id, &subject_id, dry_run.dry_run, json) as u8),
         SubjectCommand::Status(SubjectStatusArgs { id, to, override_reason, reason, actor_id, repo, json }) => {
             crate::inventory::refresh_stale_index(&repo, "canon subject status");
             ExitCode::from(match to {

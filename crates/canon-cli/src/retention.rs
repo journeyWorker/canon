@@ -13,6 +13,10 @@ use serde_json::{json, Value};
 
 use crate::cli_error::CliError;
 use crate::context::resolve_canon_yaml;
+use crate::json_out::Report;
+use crate::safety::{Effect, Mode, Plan};
+use schemars::JsonSchema;
+use serde::Serialize;
 use crate::tiers;
 
 #[derive(Debug, thiserror::Error)]
@@ -25,8 +29,8 @@ pub enum RetentionError {
     Learn(#[from] canon_learn::LearnError),
     #[error("partial purge: {matched} record(s) matched; at least {deleted} deleted: {reason}; purge backends are non-transactional")]
     PartialPurge { matched: usize, deleted: usize, reason: String },
-    #[error("plan digest {expected} no longer matches the data (now {actual})")]
-    PlanChanged { expected: String, actual: String },
+    #[error("{}", .0.message)]
+    Refusal(Box<CliError>),
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
     #[error("json: {0}")]
@@ -160,103 +164,105 @@ fn loaded_trajectory_store(repo: &Path, yaml: &Path) -> Result<ParquetTrajectory
     Ok(ParquetTrajectoryStore::open(learn_root.join("trajectories")))
 }
 
-fn print_human(value: &Value, summary: &str) {
-    println!("{summary}");
-    println!("{}", serde_json::to_string_pretty(value).expect("manifest is serializable"));
+/// One rung's counts in a purge report.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PurgeRung {
+    pub rung: String,
+    pub backend: String,
+    pub matched: usize,
+    pub deleted: usize,
 }
 
-fn purge_value(outcome: &PurgeOutcome, learn_counts: Option<(usize, usize)>) -> Value {
-    let mut value = json!({
-        "schema": "canon.retention.purge",
-        "version": 1,
-        "kind": outcome.kind.as_str(),
-        "before": outcome.before.to_rfc3339(),
-        "dry_run": outcome.dry_run,
-        "source_scope": "routed_and_aging_destinations",
-        "rungs": outcome.rungs.iter().map(|r| json!({"rung": r.rung.as_str(), "backend": r.backend.as_str(), "matched": r.matched, "deleted": r.deleted})).collect::<Vec<_>>(),
-        "unavailable": outcome.unavailable,
-    });
-    if let Some((matched, deleted)) = learn_counts {
-        value.as_object_mut().expect("purge manifest object").insert("learn_store".to_string(), json!({"backend": "parquet", "matched": matched, "deleted": deleted}));
+/// The learn store's counts in a `trajectory` purge report.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PurgeLearnStore {
+    pub backend: &'static str,
+    pub matched: usize,
+    pub deleted: usize,
+}
+
+/// `canon purge`'s `data`: the plan (`planDigest`, `effects[]`, `committed`)
+/// and what each rung matched and deleted.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PurgeReport {
+    pub kind: String,
+    pub before: String,
+    pub source_scope: &'static str,
+    pub rungs: Vec<PurgeRung>,
+    /// Rungs the plan could not reach.
+    pub unavailable: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub learn_store: Option<PurgeLearnStore>,
+    #[serde(flatten)]
+    pub plan: Plan,
+}
+
+impl Report for PurgeReport {}
+
+/// The `data` of a purge that stopped partway: tiers are not transactional, so
+/// some records may be gone.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PartialPurgeReport {
+    pub kind: String,
+    pub before: String,
+    pub status: &'static str,
+    pub matched: usize,
+    pub deleted: usize,
+    pub error: String,
+    pub atomic: bool,
+}
+
+impl Report for PartialPurgeReport {}
+
+fn purge_report(outcome: &PurgeOutcome, learn_counts: Option<(usize, usize)>, plan: Plan) -> PurgeReport {
+    PurgeReport {
+        kind: crate::query::kind_cli_name(outcome.kind).to_string(),
+        before: outcome.before.to_rfc3339(),
+        source_scope: "routed_and_aging_destinations",
+        rungs: outcome.rungs.iter().map(|r| PurgeRung { rung: r.rung.as_str().to_string(), backend: r.backend.as_str().to_string(), matched: r.matched, deleted: r.deleted }).collect(),
+        unavailable: outcome.unavailable.clone(),
+        learn_store: learn_counts.map(|(matched, deleted)| PurgeLearnStore { backend: "parquet", matched, deleted }),
+        plan,
     }
-    value
 }
 
-fn partial_purge_value(kind: RecordKind, before: DateTime<Utc>, matched: usize, deleted: usize, error: &str) -> Value {
-    json!({
-        "schema": "canon.retention.purge",
-        "version": 1,
-        "kind": kind.as_str(),
-        "before": before.to_rfc3339(),
-        "dry_run": false,
-        "status": "partial",
-        "matched": matched,
-        "deleted": deleted,
-        "error": error,
-        "atomic": false,
-    })
+fn partial_purge_report(kind: RecordKind, before: DateTime<Utc>, matched: usize, deleted: usize, error: &str) -> PartialPurgeReport {
+    PartialPurgeReport { kind: crate::query::kind_cli_name(kind).to_string(), before: before.to_rfc3339(), status: "partial", matched, deleted, error: error.to_string(), atomic: false }
 }
 
-/// What `canon purge` was asked to do. A bare `purge` is refused before
-/// this is built: deleting needs a reviewed plan.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PurgeMode {
-    /// `--plan`: report what would be removed and its `planDigest`; delete nothing.
-    Plan,
-    /// `--confirm <digest>`: delete only if the plan recomputed now still has this digest.
-    Confirm(String),
+/// The plan of a purge: one `delete` per record the removal set holds, in
+/// every rung and in the learn store, and one `skip` per rung that could not
+/// be reached (a plan that differs there is a different plan).
+fn purge_effects(outcome: &PurgeOutcome, keys: &[String], learn_keys: Option<&[String]>) -> Vec<Effect> {
+    let mut effects: Vec<Effect> = keys.iter().map(|key| Effect::record("delete", key.as_str())).collect();
+    effects.extend(learn_keys.unwrap_or_default().iter().map(|key| Effect::record("delete", format!("learn:parquet:{key}"))));
+    effects.extend(outcome.unavailable.iter().map(|rung| Effect::record("skip", rung.as_str()).detail("unreachable")));
+    effects
 }
 
-/// The digest of a purge plan: the kind, the cutoff, what the preflight
-/// counted at every rung and in the learn store, and the identity of every
-/// record it would remove (the sorted keys, streamed into the hash). A
-/// record added, removed or swapped for another between `--plan` and
-/// `--confirm` changes the digest even when the count does not.
-fn plan_digest(kind: RecordKind, before: DateTime<Utc>, outcome: &PurgeOutcome, learn_matched: Option<usize>, keys: &[String], learn_keys: Option<&[String]>) -> String {
-    use sha2::{Digest, Sha256};
-    let header = json!({
-        "kind": kind.as_str(),
-        "before": before.to_rfc3339(),
-        "rungs": outcome.rungs.iter().map(|r| json!([r.rung.as_str(), r.backend.as_str(), r.matched])).collect::<Vec<_>>(),
-        "unavailable": outcome.unavailable,
-        "learn_matched": learn_matched,
-    });
-    let mut hasher = Sha256::new();
-    hasher.update(header.to_string().as_bytes());
-    for (label, set) in [("registry", Some(keys)), ("learn", learn_keys)] {
-        hasher.update(format!("\n{label}:{}\n", set.map_or(0, <[String]>::len)).as_bytes());
-        for key in set.unwrap_or_default() {
-            hasher.update(key.as_bytes());
-            hasher.update(b"\n");
-        }
-    }
-    hasher.finalize().iter().map(|b| format!("{b:02x}")).collect()
-}
-
-pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Option<PurgeMode>, json_output: bool) -> u8 {
-    let Some(mode) = mode else {
-        return CliError::refused("PURGE_PLAN_REQUIRED", "`canon purge` deletes only a reviewed plan, and none was given")
-            .hint(format!("run `canon purge --kind {} --before {} --plan`, review it, then rerun with `--confirm <planDigest>`", crate::query::kind_cli_name(kind), before.to_rfc3339()))
-            .emit("canon purge", json_output) as u8;
-    };
+/// `canon purge --kind K --before T [--commit --plan-digest D]`. A bare run
+/// previews and writes nothing, not even the access-audit line; `--commit`
+/// deletes only when the plan recomputed now has the digest given. `base` is
+/// the command line without the safety flags ([`crate::safety::command`]).
+pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mode, base: &str, json_output: bool) -> u8 {
     let result = (|| -> Result<(), RetentionError> {
         let (yaml, registry) = loaded_registry(repo, kind)?;
         let learn_store = if kind == RecordKind::Trajectory { Some(loaded_trajectory_store(repo, &yaml)?) } else { None };
         let learn_preflight = if let Some(store) = &learn_store { Some(store.purge_before(before, true)?) } else { None };
-        let plan = RetentionService::new(&registry).purge(kind, before, true)?;
+        let preflight = RetentionService::new(&registry).purge(kind, before, true)?;
         let keys = RetentionService::new(&registry).purge_plan_keys(kind, before)?;
         let learn_keys = if let Some(store) = &learn_store { Some(store.purge_keys_before(before)?) } else { None };
-        let digest = plan_digest(kind, before, &plan, learn_preflight, &keys, learn_keys.as_deref());
-        let confirmed = match &mode {
-            PurgeMode::Plan => false,
-            PurgeMode::Confirm(expected) if *expected == digest => true,
-            PurgeMode::Confirm(expected) => return Err(RetentionError::PlanChanged { expected: expected.clone(), actual: digest }),
-        };
-        let outcome = if confirmed { RetentionService::new(&registry).purge(kind, before, false)? } else { plan };
+        let plan = Plan::new(purge_effects(&preflight, &keys, learn_keys.as_deref()));
+        let commit = plan.gate(mode, base).map_err(|e| RetentionError::Refusal(Box::new(e)))?;
+        let outcome = if commit { RetentionService::new(&registry).purge(kind, before, false)? } else { preflight };
         let registry_matched: usize = outcome.rungs.iter().map(|r| r.matched).sum();
         let registry_deleted: usize = outcome.rungs.iter().map(|r| r.deleted).sum();
         let learn_counts = if let Some(store) = learn_store {
-            if !confirmed {
+            if !commit {
                 Some((learn_preflight.expect("trajectory preflight count"), 0))
             } else {
                 let count = store.purge_before(before, false).map_err(|err| RetentionError::PartialPurge {
@@ -269,46 +275,25 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
         } else {
             None
         };
-        let learn_matched = learn_counts.map(|(matched, _)| matched).unwrap_or(0);
-        let learn_deleted = learn_counts.map(|(_, deleted)| deleted).unwrap_or(0);
-        let mut value = purge_value(&outcome, learn_counts);
-        value.as_object_mut().expect("purge manifest object").insert("planDigest".to_string(), json!(digest));
-        let matched = registry_matched + learn_matched;
-        let deleted = registry_deleted + learn_deleted;
-        append_access_audit(repo, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted)?;
-        let summary = if confirmed {
-            format!("canon purge --kind {}: {} matched, {} deleted", crate::query::kind_cli_name(kind), matched, deleted)
+        let matched = registry_matched + learn_counts.map_or(0, |(matched, _)| matched);
+        let deleted = registry_deleted + learn_counts.map_or(0, |(_, deleted)| deleted);
+        if commit {
+            append_access_audit(repo, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted)?;
+        }
+        let report = purge_report(&outcome, learn_counts, if commit { plan.committed() } else { plan });
+        if commit {
+            if !json_output {
+                println!("canon purge --kind {}: {matched} matched, {deleted} deleted", crate::query::kind_cli_name(kind));
+            }
+            crate::next::finish(repo, "purge", &crate::next::Scope::Repo, false, json_output, &report);
         } else {
-            format!(
-                "canon purge --kind {} --plan: {matched} record(s) would be removed (planDigest {digest}); delete them with `canon purge --kind {} --before {} --confirm {digest}`",
-                crate::query::kind_cli_name(kind),
-                crate::query::kind_cli_name(kind),
-                before.to_rfc3339()
-            )
-        };
-        if !json_output {
-            print_human(&value, &summary);
-        } else if confirmed {
-            crate::next::finish(repo, "purge", &crate::next::Scope::Repo, false, true, &crate::json_out::untyped(value));
-        } else {
-            // A plan deletes nothing: the one step is the human's review, then the confirm.
-            let step = crate::status::NextStep {
-                command: format!("review the plan, then run `canon purge --kind {} --before {} --confirm {digest}`", crate::query::kind_cli_name(kind), before.to_rfc3339()),
-                why: "the plan only lists what would be removed; deleting takes a reviewed plan digest".into(),
-                actor: crate::status::StepActor::Human,
-                role: None,
-            };
-            crate::json_out::data_with_next("purge", &crate::json_out::untyped(value), &crate::next::After::fixed(vec![step]));
+            crate::safety::finish_preview(base, "purge", &report.plan, "the plan only lists what would be removed; deleting takes its planDigest", json_output, &report);
         }
         Ok(())
     })();
     match result {
         Ok(()) => 0,
-        Err(RetentionError::PlanChanged { expected, actual }) => {
-            CliError::refused("PLAN_CHANGED", format!("the plan digest {expected} no longer matches the data (now {actual}); nothing was deleted"))
-                .hint(format!("run `canon purge --kind {} --before {} --plan` again and review it", crate::query::kind_cli_name(kind), before.to_rfc3339()))
-                .emit("canon purge", json_output) as u8
-        }
+        Err(RetentionError::Refusal(error)) => error.emit("canon purge", json_output) as u8,
         Err(err) => {
             let (matched, deleted) = match &err {
                 RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) => (*matched, *deleted),
@@ -319,10 +304,10 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
             if matched > 0 || deleted > 0 {
                 let _ = append_access_audit(repo, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted);
             }
-            let error = CliError::refused("RETENTION_PURGE_FAILED", err.to_string()).hint("run `canon purge --plan` again to see what remains, then confirm with `--confirm <planDigest>`");
+            let error = CliError::refused("RETENTION_PURGE_FAILED", err.to_string()).hint(format!("run `{base}` again to see what remains, then commit its plan with `--commit --plan-digest <planDigest>`"));
             let partial = match &err {
                 RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) | RetentionError::PartialPurge { matched, deleted, .. } => {
-                    Some(partial_purge_value(kind, before, *matched, *deleted, &err.to_string()))
+                    Some(partial_purge_report(kind, before, *matched, *deleted, &err.to_string()))
                 }
                 _ => None,
             };
@@ -330,7 +315,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
                 // One document: the partial-purge manifest is `data` beside the shared `error`.
                 Some(manifest) if json_output => {
                     crate::human_err!("{}", error.human("canon purge"));
-                    error.emit_with_data("canon purge", true, &crate::json_out::untyped(manifest)) as u8
+                    error.emit_with_data("canon purge", true, &manifest) as u8
                 }
                 _ => error.emit("canon purge", json_output) as u8,
             }
@@ -358,6 +343,7 @@ pub fn run_export(
     include_sensitive: bool,
     page: &crate::paging::Page,
     fields: Option<&[String]>,
+    dry_run: bool,
 ) -> u8 {
     let mut next_cursor_line = None;
     let result = (|| -> Result<(), ExportFailure> {
@@ -401,6 +387,21 @@ pub fn run_export(
             manifest.as_object_mut().expect("manifest object").insert("sensitive_records".to_string(), Value::Array(rows.iter().map(|r| r.0.clone()).collect()));
         }
         let encoded = serde_json::to_vec_pretty(&manifest)?;
+        if dry_run {
+            // The same refusal an unwritable `--out` would meet, with nothing written and no audit line.
+            if let Some(path) = out {
+                crate::write_mode::check_creatable(path, false)?;
+            }
+            if json_output {
+                let data = json!({ "dryRun": true, "out": out.map(|p| p.display().to_string()), "kind": kind.as_str(), "recordCount": rows.len() });
+                let (_, page_meta) = crate::json_out::split_meta(manifest);
+                crate::next::finish_with_meta(repo, "export", &crate::next::Scope::Repo, false, true, &crate::json_out::untyped(data), page_meta);
+            } else {
+                crate::human_err!("canon export: would write {} record(s){}", rows.len(), out.map(|p| format!(" to {}", p.display())).unwrap_or_default());
+            }
+            next_cursor_line = meta.human_line();
+            return Ok(());
+        }
         if let Some(path) = out {
             #[cfg(unix)]
             {
@@ -493,15 +494,16 @@ mod tests {
             rungs: vec![],
             unavailable: vec![],
         };
-        let value = purge_value(&outcome, Some((3, 2)));
-        assert_eq!(value["learn_store"]["backend"], "parquet");
-        assert_eq!(value["learn_store"]["matched"], 3);
-        assert_eq!(value["learn_store"]["deleted"], 2);
+        let value = serde_json::to_value(purge_report(&outcome, Some((3, 2)), Plan::new(Vec::new()))).unwrap();
+        assert_eq!(value["learnStore"]["backend"], "parquet");
+        assert_eq!(value["learnStore"]["matched"], 3);
+        assert_eq!(value["learnStore"]["deleted"], 2);
+        assert_eq!(value["committed"], false);
     }
 
     #[test]
     fn partial_purge_manifest_preserves_non_atomic_counts() {
-        let value = partial_purge_value(RecordKind::Event, Utc::now(), 8, 3, "cold failed");
+        let value = serde_json::to_value(partial_purge_report(RecordKind::Event, Utc::now(), 8, 3, "cold failed")).unwrap();
         assert_eq!(value["status"], "partial");
         assert_eq!(value["matched"], 8);
         assert_eq!(value["deleted"], 3);

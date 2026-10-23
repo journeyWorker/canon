@@ -129,7 +129,7 @@
 //! staged record never names bytes the store lacks. `canon gate check`
 //! re-hashes them. `--max-artifact-mib` raises the per-file limit
 //! (`canon_gate::DEFAULT_MAX_ARTIFACT_MIB`); a larger file is refused.
-//! [`run_vault`] stores the bytes for records written before the store
+//! [`run_store`] stores the bytes for records written before the store
 //! existed.
 //!
 //! # The suffix is a DOCUMENT write, so its inputs are refused, not escaped
@@ -1542,7 +1542,7 @@ fn head_sha(repo: &Path) -> Option<String> {
     (out.status.success() && !sha.is_empty()).then_some(sha)
 }
 
-/// `canon evidence vault` (0.14 D4): store the bytes for committed
+/// `canon artifacts store` (0.14 D4): store the bytes for committed
 /// evidence records written before the artifact store existed, and for
 /// the files of current reviews whose blob was lost (0.18 D5).
 ///
@@ -1559,7 +1559,7 @@ fn head_sha(repo: &Path) -> Option<String> {
 /// whatever it could store: whether an unstored file matters is the
 /// gate's question, and a superseded record's lost file never does. `2`
 /// when the ledger cannot be read or a write fails.
-pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
+pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) -> i32 {
     use canon_gate::artifact_store::{working_tree_path, ArtifactStore, Observed, StoreError, StoreLock, StoreOutcome, MIB};
 
     let repo = resolve_repo_root(repo);
@@ -1569,7 +1569,7 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
     let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(gate_context) => gate_context,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon evidence vault", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon artifacts store", json);
         }
     };
     let files: std::collections::BTreeSet<(String, String)> = gate_context
@@ -1586,16 +1586,16 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
     // One hold of the store lock for the whole pass, so "already
     // stored" is never decided while another writer may still roll back.
     // Nothing to store takes no lock.
-    let lock = match (!files.is_empty()).then(|| StoreLock::acquire(&repo)).transpose() {
+    let lock = match (!files.is_empty() && !dry_run).then(|| StoreLock::acquire(&repo)).transpose() {
         Ok(lock) => lock,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon evidence vault", json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon artifacts store", json);
         }
     };
     // Read under the lock, like every writer (`store_files_held`).
     let store = match ArtifactStore::open(&repo) {
         Ok(store) => store,
-        Err(e) => return CliError::refused("EVIDENCE_VAULT_FAILED", format!("the artifact store cannot be used: {e}")).hint(e.hint()).emit("canon evidence vault", json),
+        Err(e) => return CliError::refused("ARTIFACTS_STORE_FAILED", format!("the artifact store cannot be used: {e}")).hint(e.hint()).emit("canon artifacts store", json),
     };
     // The lock guards the local store only; an object store is not held
     // against other writers for the length of its uploads.
@@ -1603,9 +1603,9 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
     for (path, sha256) in &files {
         let observed = store.observe(&repo, sha256, false);
         if let Observed::Unavailable(why) = &observed {
-            return CliError::refused("EVIDENCE_VAULT_FAILED", format!("could not check {}: {why}", store.display(sha256)))
+            return CliError::refused("ARTIFACTS_STORE_FAILED", format!("could not check {}: {why}", store.display(sha256)))
                 .hint(canon_gate::artifact_store::OBJECT_STORE_HINT)
-                .emit("canon evidence vault", json);
+                .emit("canon artifacts store", json);
         }
         if observed.as_str() == sha256 {
             already += 1;
@@ -1630,6 +1630,10 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
             ));
             continue;
         }
+        if dry_run {
+            stored.push(format!("{} <- {path}", store.display(sha256)));
+            continue;
+        }
         let outcome = match &store {
             ArtifactStore::Local => lock.as_ref().expect("the lock is taken whenever there is a file").store(sha256, file),
             ArtifactStore::Object(object) => object.upload(sha256, file),
@@ -1639,25 +1643,26 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
             Ok(StoreOutcome::AlreadyStored) => already += 1,
             Err(StoreError::Changed { actual, .. }) => missing.push(format!("{path} (recorded sha256 {sha256}): working tree: {actual}")),
             Err(e) => {
-                return CliError::refused("EVIDENCE_VAULT_FAILED", format!("could not write {}: {e}", store.display(sha256))).hint(e.hint()).emit("canon evidence vault", json);
+                return CliError::refused("ARTIFACTS_STORE_FAILED", format!("could not write {}: {e}", store.display(sha256))).hint(e.hint()).emit("canon artifacts store", json);
             }
         }
     }
 
     crate::say!(
         json,
-        "canon evidence vault: {} bound file(s) — stored {}, already stored {already}, could not store {}",
+        "canon artifacts store: {} bound file(s) — {} {}, already stored {already}, could not store {}",
         files.len(),
+        if dry_run { "would store" } else { "stored" },
         stored.len(),
         missing.len()
     );
     for line in &stored {
-        crate::say!(json, "  stored {line}");
+        crate::say!(json, "  {} {line}", if dry_run { "would store" } else { "stored" });
     }
     for line in &missing {
         crate::say!(json, "  not stored {line}");
     }
-    if !stored.is_empty() && store.is_local() {
+    if !stored.is_empty() && store.is_local() && !dry_run {
         crate::say!(json, "commit {}/ with the ledger", canon_model::paths::ARTIFACTS_SHA256_DIR);
     }
     if !missing.is_empty() {
@@ -1665,8 +1670,8 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
     }
     if json {
         crate::json_out::data(
-            "evidence vault",
-            &crate::json_out::untyped(serde_json::json!({ "boundFiles": files.len(), "stored": stored, "alreadyStored": already, "notStored": missing })));
+            "artifacts store",
+            &crate::json_out::untyped(serde_json::json!({ "dryRun": dry_run, "boundFiles": files.len(), "stored": stored, "alreadyStored": already, "notStored": missing })));
     }
     0
 }

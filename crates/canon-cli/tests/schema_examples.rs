@@ -16,7 +16,7 @@ use tempfile::TempDir;
 const NEEDS_STATE: &[(&str, &str)] = &[
     ("adapter authorize", "a provider's adapter response file"),
     ("adapter validate", "a provider's adapter response file"),
-    ("artifacts migrate", "a canon.yaml with an s3 tier named cold: the scratch repo has none, so the target is refused"),
+    ("artifacts move", "a canon.yaml with an s3 tier named cold: the scratch repo has none, so the target is refused"),
     ("brief approve", "a brief with no blockers (the scaffolded one is a template to fill in)"),
     ("brief check", "a finished brief: the scaffolded one has blocker findings, which exit 2 by contract"),
     ("context-pack new", "a context manifest file"),

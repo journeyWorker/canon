@@ -283,6 +283,9 @@ pub struct NonCleanSource {
 #[derive(Debug, Clone, Default, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlansOutcome {
+    /// A `--dry-run` preview: nothing was persisted and no cursor moved;
+    /// the `*Persisted` counts are what a real pass would persist.
+    pub dry_run: bool,
     pub sources: Vec<PlanSourceSummary>,
     pub changes_persisted: usize,
     pub tasks_persisted: usize,
@@ -321,7 +324,7 @@ struct RawPlanSource {
 /// One `scan(digest) -> gate -> parse -> collision-filter -> persist`
 /// pass over every configured plan source, in config/one-shot order
 /// (module doc).
-pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<PlansOutcome, PlansError> {
+pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: bool) -> Result<PlansOutcome, PlansError> {
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = repo.join("canon.yaml");
 
@@ -330,7 +333,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
         // Absent `plans:` (config-driven path only — the one-shot pair
         // always yields exactly one source) — a clean, explicit
         // no-op; never a hardcoded default root (task 3.2).
-        return Ok(PlansOutcome::default());
+        return Ok(PlansOutcome { dry_run, ..PlansOutcome::default() });
     }
     validate_source_roots(&sources)?;
 
@@ -352,7 +355,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
 
     let cursors = CursorStore::open(repo.join(".canon/ingest/cursors"));
 
-    let mut outcome = PlansOutcome::default();
+    let mut outcome = PlansOutcome { dry_run, ..PlansOutcome::default() };
     let mut seen_change_ids: BTreeSet<ChangeId> = BTreeSet::new();
     let mut pending_cursors: Vec<SourceCursor> = Vec::new();
     let mut adoptions = Adoptions::default();
@@ -423,7 +426,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
         let duplicate_change_id = duplicate_change_ids.len();
 
         let Persisted { changes_persisted, changes_unwritten, tasks_persisted, tasks_unwritten } =
-            persist_candidates(&store, &mut adoptions, accepted_changes, accepted_tasks, &mut outcome)?;
+            persist_candidates(&store, &mut adoptions, accepted_changes, accepted_tasks, &mut outcome, dry_run)?;
 
         // s23 durable-import-diagnostics: a malformed-nonzero,
         // zero-persisted pass produced no durable evidence at all --
@@ -436,7 +439,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
         // durable (task 3.4/spec) — a collision-skip alone never
         // blocks it (a deliberate, successful outcome, not a failure).
         let fully_durable = changes_unwritten == 0 && tasks_unwritten == 0 && !malformed_zero_persisted;
-        if fully_durable {
+        if fully_durable && !dry_run {
             let mut fresh = SourceCursor::empty(cursor_id);
             for (path, mtime_ms, size, digest) in &readable {
                 fresh.record(path, *mtime_ms, *size, digest.clone());
@@ -473,7 +476,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
             duplicate_change_id,
             unmapped,
             malformed,
-            cursor_advanced: fully_durable,
+            cursor_advanced: fully_durable && !dry_run,
         });
     }
 
@@ -517,11 +520,11 @@ struct Persisted {
 /// Persist admitted candidates (module doc "Persistence + the
 /// `unwritten` seam"), each `Change` first carrying its adoption
 /// ([`Adoptions::carry`]). Unwritten bodies land in `outcome`.
-fn persist_candidates(store: &TierRegistry, adoptions: &mut Adoptions, changes: Vec<Change>, tasks: Vec<Task>, outcome: &mut PlansOutcome) -> Result<Persisted, PlansError> {
+fn persist_candidates(store: &TierRegistry, adoptions: &mut Adoptions, changes: Vec<Change>, tasks: Vec<Task>, outcome: &mut PlansOutcome, dry_run: bool) -> Result<Persisted, PlansError> {
     let mut persisted = Persisted { changes_persisted: 0, changes_unwritten: 0, tasks_persisted: 0, tasks_unwritten: 0 };
     for mut change in changes {
         adoptions.carry(store, &mut change)?;
-        match persist_or_unwritten(store, change)? {
+        match persist_or_unwritten(store, change, dry_run)? {
             None => persisted.changes_persisted += 1,
             Some(unwritten) => {
                 persisted.changes_unwritten += 1;
@@ -530,7 +533,7 @@ fn persist_candidates(store: &TierRegistry, adoptions: &mut Adoptions, changes: 
         }
     }
     for task in tasks {
-        match persist_or_unwritten(store, task)? {
+        match persist_or_unwritten(store, task, dry_run)? {
             None => persisted.tasks_persisted += 1,
             Some(unwritten) => {
                 persisted.tasks_unwritten += 1;
@@ -617,7 +620,7 @@ pub(crate) fn refresh_change(repo: &Path, change_id: &ChangeId) -> Result<Change
         refresh.changes_parsed += changes.len();
         refresh.malformed += malformed.len();
         let admitted = admit_source_candidates(&mut seen_change_ids, changes, tasks);
-        persist_candidates(&store, &mut adoptions, admitted.changes, admitted.tasks, &mut unwritten)?;
+        persist_candidates(&store, &mut adoptions, admitted.changes, admitted.tasks, &mut unwritten, false)?;
     }
     Ok(refresh)
 }
@@ -896,9 +899,10 @@ fn canonicalize_or(path: &Path) -> PathBuf {
 /// non-fatal; the caller reports the record and does not advance this
 /// source's cursor. Any OTHER `StoreError` (Io/Json/Layout/…) is a
 /// genuine failure and propagates.
-fn persist_or_unwritten<T: CanonRecord>(store: &TierRegistry, record: T) -> Result<Option<T>, PlansError> {
-    match store.persist(&record) {
-        Ok(_) => Ok(None),
+fn persist_or_unwritten<T: CanonRecord>(store: &TierRegistry, record: T, dry_run: bool) -> Result<Option<T>, PlansError> {
+    let written = if dry_run { store.check_persist::<T>() } else { store.persist(&record).map(drop) };
+    match written {
+        Ok(()) => Ok(None),
         Err(StoreError::DuplicatePath { .. }) => Ok(None),
         Err(StoreError::TierUnavailable { .. }) | Err(StoreError::UnroutedKind { .. }) => Ok(Some(record)),
         Err(err) => Err(PlansError::Store(err)),
@@ -909,6 +913,9 @@ fn persist_or_unwritten<T: CanonRecord>(store: &TierRegistry, record: T) -> Resu
 /// diagnostics + malformed tallies").
 pub fn format_human(outcome: &PlansOutcome) -> String {
     let mut out = String::new();
+    if outcome.dry_run {
+        out.push_str("dry run: nothing is written; `persisted` counts what a real pass would persist\n");
+    }
     for src in &outcome.sources {
         if src.skipped_unchanged {
             out.push_str(&format!("{} ({}): skipped unchanged (watermark)\n", src.dialect, src.root));

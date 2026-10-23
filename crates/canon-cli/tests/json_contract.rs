@@ -49,7 +49,7 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
         (("evidence add", "kind"), "test-run"),
         (("export", "kind"), "evidence"),
         (("query", "kind"), "evidence"),
-        (("purge", "kind"), "evidence"),
+        (("purge", "kind"), "session"),
         (("change new", "slug"), "another-change"),
         (("dispatch end", "status"), "succeeded"),
         (("subject new", "id"), "demo-two"),

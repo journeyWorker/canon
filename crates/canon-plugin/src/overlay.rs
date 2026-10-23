@@ -260,6 +260,14 @@ pub fn write_overlay(tier: &GitTier, decl: &OverlayDecl, body: RawRecord) -> Res
     tier.write_namespaced(&decl.identity, &natural_key, body).map_err(OverlayWriteError::Store)
 }
 
+/// [`write_overlay`] under `--dry-run`: the same validation and refusal and
+/// the receipt it would return, nothing written.
+pub fn check_overlay(tier: &GitTier, decl: &OverlayDecl, body: &RawRecord) -> Result<NamespacedWriteReceipt, OverlayWriteError> {
+    validate_overlay_body(decl, body).map_err(OverlayWriteError::Validation)?;
+    let natural_key = derive_natural_key(decl, body);
+    tier.check_namespaced(&decl.identity, &natural_key, body).map_err(OverlayWriteError::Store)
+}
+
 #[cfg(test)]
 mod tests {
     use canon_model::ids::RoleId;

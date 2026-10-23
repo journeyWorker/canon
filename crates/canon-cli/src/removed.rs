@@ -30,7 +30,7 @@ pub const FLAGS: &[FlagRename] = &[
     FlagRename { commands: &["feature new", "scenario new"], old: "project", new: "project-id" },
     FlagRename { commands: &["change new", "retrieve", "scenario new"], old: "subject", new: "subject-id" },
     FlagRename { commands: &["feature new", "learn rollback", "scenario new"], old: "actor", new: "actor-id" },
-    FlagRename { commands: &["ingest artifacts"], old: "run", new: "run-id" },
+    FlagRename { commands: &["ingest records"], old: "run", new: "run-id" },
 ];
 
 /// A leaf's primary object moved into operand position, or a leaf split
@@ -71,15 +71,27 @@ pub const SHAPES: &[ShapeChange] = &[
     ShapeChange { command: "review change", old: &["outcome"], hint: "`--outcome` is now `--review-outcome <signed|indeterminate|unavailable>`" },
     ShapeChange { command: "review change", old: &["scenario-id", "scenario-ids-from"], hint: "scenarios are reviewed with `canon review scenario <SCENARIO_ID>... ...`" },
     ShapeChange { command: "evidence add", old: &["evaluator-id", "evaluator-version", "evaluator-digest", "audit-result"], hint: "an external evaluator's re-audit is `canon evidence audit <SCENARIO_ID> --ref <REF> --evaluator-id <ID> --evaluator-version <TEXT> --evaluator-digest <SHA256> --audit-result <confirmed|refuted|indeterminate>`" },
+    ShapeChange { command: "purge", old: &["plan", "confirm", "dry-run"], hint: "`purge` previews by default; act with `canon purge --kind <KIND> --before <TIMESTAMP> --commit --plan-digest <DIGEST>` (the digest is in the preview)" },
+    ShapeChange { command: "artifacts move", old: &["to"], hint: "`artifacts migrate --to` is now `canon artifacts move --tier <TIER>`" },
+    ShapeChange { command: "artifacts move", old: &["dry-run"], hint: "the bare run is the preview; act with `canon artifacts move --tier <TIER> --commit --plan-digest <DIGEST>`" },
+    ShapeChange { command: "migrate", old: &["dry-run"], hint: "the bare run is the preview; act with `canon migrate --commit --plan-digest <DIGEST>`" },
+    ShapeChange { command: "ledger compact", old: &["dry-run"], hint: "the bare run is the preview; act with `canon ledger compact --commit --plan-digest <DIGEST>`" },
+    ShapeChange { command: "tier age", old: &["dry-run"], hint: "the bare run is the preview; act with `canon tier age --commit --plan-digest <DIGEST>`" },
+    ShapeChange { command: "ingest plans", old: &["source"], hint: "`--source` is now `--plan-source`: `canon ingest plans --dialect <NAME> --plan-source <DIR>`" },
 ];
 
 /// A command word 0.28 removed because its modes became leaves of their own
 /// (`review add` → `review scenario` / `review change`): `(group path, word, hint)`.
-pub const LEAVES: &[(&str, &str, &str)] = &[(
-    "review",
-    "add",
-    "`review add` was split by what it reviews: `canon review scenario <SCENARIO_ID>...` for scenarios, `canon review change <CHANGE_ID>` for a chore change",
-)];
+pub const LEAVES: &[(&str, &str, &str)] = &[
+    (
+        "review",
+        "add",
+        "`review add` was split by what it reviews: `canon review scenario <SCENARIO_ID>...` for scenarios, `canon review change <CHANGE_ID>` for a chore change",
+    ),
+    ("evidence", "vault", "`evidence vault` is now `canon artifacts store`"),
+    ("ingest", "artifacts", "`ingest artifacts` is now `canon ingest records`"),
+    ("artifacts", "migrate", "`artifacts migrate --to <TIER>` is now `canon artifacts move --tier <TIER>` (the bare run previews; `--commit --plan-digest <DIGEST>` acts)"),
+];
 
 /// A removed shape an invocation used.
 #[derive(Debug, Clone, PartialEq, Eq)]

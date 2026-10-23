@@ -104,7 +104,7 @@ pub enum Command {
     #[command(after_help = "Examples:\n  canon init\n  canon init --policy light\n  canon init --providers claude,codex\n  canon init --no-agents-md --no-policy\n  canon init --check-config\n\nPolicy levels (--policy, default strict): light requires evidence on every\nscenario; standard adds a `@case:failure` scenario per feature surface; strict\nadds independent review. The level is the first line of .canon/policy.yaml and\n`canon status` shows it.\n\nHarnesses (--providers): on a terminal, init asks which harnesses get the canon\nskill, with the detected ones (.claude, .codex, .omp, .pi directories) checked.\nWithout a terminal or --providers it takes the detected ones; with none detected\nit installs nothing and says how to choose. The answer is recorded as\n`skills: { providers: [...] }` in canon.yaml (`--providers none` records `[]`).\n\nRerunning in a repo that has canon.yaml leaves canon.yaml and .canon/policy.yaml\nalone and only refreshes the canon block in AGENTS.md.")]
     Init(InitArgs),
     /// Bring a repo from an earlier canon up to date: the 0.17 layout (specs, changes, approvals, skills, .gitignore), the 0.23 latest-only ledger (superseded versions to .canon/archive) and 0.23 review pins
-    #[command(after_help = "Examples:\n  canon migrate --dry-run\n  canon migrate\n\nPrints the plan, then applies it; --dry-run stops after the plan. Idempotent:\na second run finds nothing to move, and a run that stopped partway is finished\nby the next one.\n\n- A spec root's features/kind=feature/ moves to <root>/kind=feature/ (git mv in a\n  git work tree). A root at the repo-level `specs` moves to .canon/specs, and\n  canon.yaml records `former_roots: [specs]` so reviews pinned before the move\n  still find their scenarios.\n- Changes `canon change new` wrote under openspec/changes move to\n  .canon/changes/<slug>/ (proposal.md -> brief.md, tasks.md alongside); every\n  other change stays and is named. A change counts as canon's when its files are\n  still that command's scaffold and its first stored version was already adopted:\n  0.16 kept no durable provenance. A false positive keeps its content and ids and\n  is one `git mv` to undo; --dry-run shows exactly which changes move.\n  canon init's `{ dialect: openspec, root: . }` source goes once nothing unread is\n  left under it.\n- An external proposal.md's Approved: line is copied into a canon pointer\n  brief, .canon/changes/<change>/brief.md, with a Source: line.\n- skills.providers is written from the install lock; missing canon .gitignore\n  lines are added; the scenario index is rebuilt (full sync).\n- Superseded ledger versions move to .canon/archive (`canon ledger compact`);\n  `canon query --history` still reads them.\n- Reviews written before 0.23 are re-pinned to what their evidence says: a\n  review current under the old rule stays current, a stale one stays stale.\n\nRefuses (exit 2, nothing written) on uncommitted changes under a path it\nmoves, on a destination that already exists, on a change directory that could\nstop halfway, and on a canon.yaml edit it cannot make with every other byte\nkept. canon.yaml is written atomically.")]
+    #[command(after_help = "Examples:\n  canon migrate\n  canon migrate --commit --plan-digest <DIGEST>\n\nThe bare run prints the plan and its planDigest and writes nothing; --commit --plan-digest applies exactly that plan. Idempotent:\na second run finds nothing to move, and a run that stopped partway is finished\nby the next one.\n\n- A spec root's features/kind=feature/ moves to <root>/kind=feature/ (git mv in a\n  git work tree). A root at the repo-level `specs` moves to .canon/specs, and\n  canon.yaml records `former_roots: [specs]` so reviews pinned before the move\n  still find their scenarios.\n- Changes `canon change new` wrote under openspec/changes move to\n  .canon/changes/<slug>/ (proposal.md -> brief.md, tasks.md alongside); every\n  other change stays and is named. A change counts as canon's when its files are\n  still that command's scaffold and its first stored version was already adopted:\n  0.16 kept no durable provenance. A false positive keeps its content and ids and\n  is one `git mv` to undo; --dry-run shows exactly which changes move.\n  canon init's `{ dialect: openspec, root: . }` source goes once nothing unread is\n  left under it.\n- An external proposal.md's Approved: line is copied into a canon pointer\n  brief, .canon/changes/<change>/brief.md, with a Source: line.\n- skills.providers is written from the install lock; missing canon .gitignore\n  lines are added; the scenario index is rebuilt (full sync).\n- Superseded ledger versions move to .canon/archive (`canon ledger compact`);\n  `canon query --history` still reads them.\n- Reviews written before 0.23 are re-pinned to what their evidence says: a\n  review current under the old rule stays current, a stale one stays stale.\n\nRefuses (exit 2, nothing written) on uncommitted changes under a path it\nmoves, on a destination that already exists, on a change directory that could\nstop halfway, and on a canon.yaml edit it cannot make with every other byte\nkept. canon.yaml is written atomically.")]
     Migrate(MigrateArgs),
     /// Record who approved the gate's policy (.canon/policy.yaml) and which bytes
     #[command(after_help = "Examples:\n  canon policy approve --by alice --note 'reviewed the starter policy'\n\nWrites .canon/policy.approval.json (commit it): the policy's sha256, who\napproved it, when, and the note. `canon gate check` and `canon status` print an\nadvisory while the policy was never approved. A policy that changed since its\napproval (or whose approval cannot be read) fails closed: `gate check` exits 1\nand `subject status` refuses to ship or reopen; `--override-reason` does not\nwaive it. `canon policy show` reads the approval back.")]
@@ -215,8 +215,8 @@ pub enum Command {
         action: DivergenceCliCommand,
     },
     // ── Ingest & memory ──
-    /// Import agent sessions, artifacts, and plans into canon's store
-    #[command(after_help = "Examples:\n  canon ingest sessions --watch\n  canon ingest artifacts\n  canon ingest plans")]
+    /// Import agent sessions, records, and plans into canon's store
+    #[command(after_help = "Examples:\n  canon ingest sessions --watch\n  canon ingest records\n  canon ingest plans")]
     Ingest {
         #[command(subcommand)]
         action: IngestCommand,
@@ -240,7 +240,7 @@ pub enum Command {
     Query(QueryArgs),
     /// Export a redacted retention manifest without deleting records
     Export(ExportArgs),
-    /// Remove allowlisted records older than a cutoff: `--plan` shows the removal set and its planDigest, `--confirm <planDigest>` deletes it
+    /// Remove allowlisted records older than a cutoff: the bare run previews the removal set and its planDigest, `--commit --plan-digest <DIGEST>` deletes it
     Purge(PurgeArgs),
     /// Generate the status report (write, --check, or --snapshot)
     Report(ReportArgs),
@@ -263,7 +263,7 @@ pub enum Command {
         action: TierCommand,
     },
     /// Keep the ledger to the current version of each record
-    #[command(after_help = "Examples:\n  canon ledger compact --dry-run\n  canon ledger compact\n\nMoves every superseded version of a record (an evidence record a newer one replaced, a\nscenario or finding rewritten since) from .canon/ledger to .canon/archive, once. The\nledger then holds the current decision per key, and every default read (status, gate\ncheck, guards, query) reads only that; `canon query --kind <kind> --history` reads the\narchive too. Appending a new version moves the versions it supersedes on its own, so\nthis is for a ledger written before 0.23, or after an interrupted move. Idempotent;\n`canon migrate` runs it. A record that carries a standing claim (a flagged overlay, a\nbrief override, an approval at the current evidence) stays in the ledger.")]
+    #[command(after_help = "Examples:\n  canon ledger compact\n  canon ledger compact --commit --plan-digest <DIGEST>\n\nThe bare run previews the move and prints its planDigest.\n\nMoves every superseded version of a record (an evidence record a newer one replaced, a\nscenario or finding rewritten since) from .canon/ledger to .canon/archive, once. The\nledger then holds the current decision per key, and every default read (status, gate\ncheck, guards, query) reads only that; `canon query --kind <kind> --history` reads the\narchive too. Appending a new version moves the versions it supersedes on its own, so\nthis is for a ledger written before 0.23, or after an interrupted move. Idempotent;\n`canon migrate` runs it. A record that carries a standing claim (a flagged overlay, a\nbrief override, an approval at the current evidence) stays in the ledger.")]
     Ledger {
         #[command(subcommand)]
         action: LedgerCommand,
@@ -294,6 +294,33 @@ impl PromoteArgs {
     pub fn flag(self) -> crate::write_mode::PromoteFlag {
         crate::write_mode::PromoteFlag::from_flags(self.promote, self.no_promote)
     }
+}
+
+/// `--dry-run`, declared once with one help string and flattened into every
+/// writing leaf that offers a preview (0.28 D6): full validation (it refuses
+/// with the code the real run would), nothing written, a report of what the
+/// run would write. The five destructive leaves take [`SafetyArgs`] instead.
+#[derive(clap::Args, Clone, Copy, Debug, Default)]
+pub struct DryRunArgs {
+    /// Validate fully and report what would be written, without writing anything
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
+/// `--commit --plan-digest <DIGEST>`, flattened into exactly the five
+/// destructive leaves (`purge`, `artifacts move`, `migrate`, `ledger compact`,
+/// `tier age`; 0.28 D6). The bare run is the preview: it prints the plan with
+/// its `planDigest`, exits 0 and writes nothing. `--commit` acts only when the
+/// plan recomputed now still has `--plan-digest` (`PLAN_CHANGED`, exit 2).
+/// [`SafetyArgs::mode`] is what a handler reads.
+#[derive(clap::Args, Clone, Debug, Default)]
+pub struct SafetyArgs {
+    /// Act on the previewed plan; needs --plan-digest
+    #[arg(long, requires = "plan_digest")]
+    pub commit: bool,
+    /// The `planDigest` the preview printed; the run acts only if the plan recomputed now has this digest
+    #[arg(long, value_name = "DIGEST", requires = "commit")]
+    pub plan_digest: Option<String>,
 }
 
 /// `--repo <DIR>`, declared once and flattened into every leaf that reads a

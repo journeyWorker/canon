@@ -50,8 +50,8 @@ pub struct DemoAddArgs {
 pub enum IngestCommand {
     /// Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes)
     Sessions(IngestSessionsArgs),
-    /// Import review/divergence/task/handoff artifacts and derive verdicts
-    Artifacts(IngestArtifactsArgs),
+    /// Import review/divergence/task/handoff records and derive verdicts
+    Records(IngestRecordsArgs),
     /// Import plans as Change/Task records: canon's own .canon/changes, then the configured external sources (openspec, superpowers)
     Plans(IngestPlansArgs),
 }
@@ -75,13 +75,15 @@ pub struct IngestSessionsArgs {
     /// Scan every workspace on this machine, not just this project
     #[arg(long)]
     pub all_workspaces: bool,
+    #[command(flatten)]
+    pub dry_run: crate::cli::DryRunArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
 }
 
 #[derive(Args)]
-pub struct IngestArtifactsArgs {
+pub struct IngestRecordsArgs {
     /// Keep polling instead of exiting after one pass
     #[arg(long)]
     pub watch: bool,
@@ -90,6 +92,8 @@ pub struct IngestArtifactsArgs {
     pub interval_secs: u64,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
+    #[command(flatten)]
+    pub dry_run: crate::cli::DryRunArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -100,14 +104,16 @@ pub struct IngestArtifactsArgs {
 
 #[derive(Args)]
 pub struct IngestPlansArgs {
-    /// One-shot override: import this dialect's --source root (requires --source)
-    #[arg(long)]
+    /// One-shot override: import this dialect's --plan-source root (requires --plan-source)
+    #[arg(long, requires = "plan_source")]
     pub dialect: Option<String>,
     /// One-shot override's source root (paired with --dialect)
-    #[arg(long)]
-    pub source: Option<PathBuf>,
+    #[arg(long, value_name = "DIR", requires = "dialect")]
+    pub plan_source: Option<PathBuf>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
+    #[command(flatten)]
+    pub dry_run: crate::cli::DryRunArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,

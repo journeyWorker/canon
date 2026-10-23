@@ -17,7 +17,7 @@ fn project_for(repo: &Path, given: Option<ProjectId>, command: &str, json: bool)
 pub fn run(cmd: DivergenceCliCommand) -> ExitCode {
     match cmd {
         DivergenceCliCommand::Add(args) => run_divergence_add(args),
-        DivergenceCliCommand::Promote(DivergencePromoteArgs { repo, dry_run, json }) => ExitCode::from(crate::divergence::run_promote(&repo, dry_run, json) as u8),
+        DivergenceCliCommand::Promote(DivergencePromoteArgs { repo, dry_run, json }) => ExitCode::from(crate::divergence::run_promote(&repo, dry_run.dry_run, json) as u8),
         DivergenceCliCommand::Resolve(DivergenceResolveArgs { project_id, scenario_id, sha, round, reviewer, detail, actor_id, role, repo, json }) => {
             let project_id = match project_for(&repo, project_id, "canon divergence resolve", json) {
                 Ok(id) => id,

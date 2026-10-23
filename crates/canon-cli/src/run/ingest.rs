@@ -8,13 +8,13 @@ use std::process::ExitCode;
 
 pub fn run(cmd: IngestCommand) -> ExitCode {
     match cmd {
-        IngestCommand::Sessions(IngestSessionsArgs { watch, interval_secs, home, repo, full, all_workspaces, json }) => run_ingest_sessions(&repo.join("canon.yaml"), home.as_deref(), watch, interval_secs, full, all_workspaces, json),
-        IngestCommand::Artifacts(IngestArtifactsArgs { watch, interval_secs, repo, json, run_id }) => run_ingest_artifacts(&repo, watch, interval_secs, json, run_id.as_ref()),
-        IngestCommand::Plans(IngestPlansArgs { dialect, source, repo, json }) => run_ingest_plans(&repo, dialect.as_deref(), source.as_deref(), json),
+        IngestCommand::Sessions(IngestSessionsArgs { watch, interval_secs, home, repo, full, all_workspaces, dry_run, json }) => run_ingest_sessions(&repo.join("canon.yaml"), home.as_deref(), watch, interval_secs, full, all_workspaces, dry_run.dry_run, json),
+        IngestCommand::Records(IngestRecordsArgs { watch, interval_secs, repo, dry_run, json, run_id }) => run_ingest_records(&repo, watch, interval_secs, dry_run.dry_run, json, run_id.as_ref()),
+        IngestCommand::Plans(IngestPlansArgs { dialect, plan_source, repo, dry_run, json }) => run_ingest_plans(&repo, dialect.as_deref(), plan_source.as_deref(), dry_run.dry_run, json),
     }
 }
 
-fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Path>, watch: bool, interval_secs: u64, full: bool, all_workspaces: bool, json: bool) -> ExitCode {
+fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Path>, watch: bool, interval_secs: u64, full: bool, all_workspaces: bool, dry_run: bool, json: bool) -> ExitCode {
     let home = match home {
         Some(h) => h.to_path_buf(),
         None => match std::env::var_os("HOME") {
@@ -26,7 +26,7 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
     };
 
     loop {
-        match crate::ingest::run(canon_yaml, &home, true, full, all_workspaces) {
+        match crate::ingest::run(canon_yaml, &home, true, full, all_workspaces, dry_run) {
             Ok(outcome) if json => {
                 // One document per pass (one per poll under `--watch`); the human summary is for human mode.
                 crate::json_out::data("ingest sessions", &crate::json_out::untyped(crate::ingest::summary_json(&outcome)));
@@ -60,7 +60,7 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
     }
 }
 
-/// `canon ingest artifacts` (S14 `s14-artifact-ingest-cli`): see
+/// `canon ingest records` (S14 `s14-artifact-ingest-cli`): see
 /// `crate::artifact_ingest`'s module doc — the artifact/verdict
 /// half of canon's join spine, mirroring `run_ingest_sessions`'s
 /// scan-loop shape one level up (`--repo`-resolved, never `--home`).
@@ -68,18 +68,18 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
 /// `--run-id` is the explicit attribution edge (s42
 /// `close-the-open-loops`, task 3.2) — omitted, a trajectory records no
 /// run rather than a guessed one.
-fn run_ingest_artifacts(repo: &std::path::Path, watch: bool, interval_secs: u64, json: bool, run_id: Option<&RunId>) -> ExitCode {
+fn run_ingest_records(repo: &std::path::Path, watch: bool, interval_secs: u64, dry_run: bool, json: bool, run_id: Option<&RunId>) -> ExitCode {
     loop {
-        match crate::artifact_ingest::run(repo, run_id) {
+        match crate::artifact_ingest::run(repo, run_id, dry_run) {
             Ok(outcome) => {
                 if json {
-                    crate::next::finish(repo, "ingest artifacts", &crate::next::Scope::Repo, false, true, &outcome);
+                    crate::next::finish(repo, "ingest records", &crate::next::Scope::Repo, false, true, &outcome);
                 } else {
                     print!("{}", crate::artifact_ingest::format_human(&outcome));
                 }
             }
             Err(err) => {
-                return ExitCode::from(CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again").emit("canon ingest artifacts", json) as u8);
+                return ExitCode::from(CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again").emit("canon ingest records", json) as u8);
             }
         }
         if !watch {
@@ -89,7 +89,7 @@ fn run_ingest_artifacts(repo: &std::path::Path, watch: bool, interval_secs: u64,
     }
 }
 
-/// `canon ingest plans [--dialect <id> --source <path>] [--repo <dir>]
+/// `canon ingest plans [--dialect <id> --plan-source <path>] [--repo <dir>]
 /// [--json]` (s17 P3, extended s18 P2/B1): see `crate::plans`'s
 /// module doc. Prints the human summary (or `--json`'s full structured
 /// outcome), then -- mirroring `run_ingest_sessions`'s own ReviewS3Full
@@ -109,8 +109,8 @@ fn run_ingest_artifacts(repo: &std::path::Path, watch: bool, interval_secs: u64,
 /// Distinct from the `Err(err)` arm below (a malformed CONFIGURATION,
 /// s17's own `PlansError` paths), which keeps failing loud with its own
 /// exit code before any source is even scanned.
-fn run_ingest_plans(repo: &std::path::Path, dialect: Option<&str>, source: Option<&std::path::Path>, json: bool) -> ExitCode {
-    match crate::plans::run(repo, dialect, source) {
+fn run_ingest_plans(repo: &std::path::Path, dialect: Option<&str>, source: Option<&std::path::Path>, dry_run: bool, json: bool) -> ExitCode {
+    match crate::plans::run(repo, dialect, source, dry_run) {
         Ok(outcome) => {
             if json {
                 if outcome.non_clean_sources.is_empty() {

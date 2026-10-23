@@ -6,7 +6,7 @@ use std::process::ExitCode;
 
 pub fn run(cmd: PluginCommand) -> ExitCode {
     match cmd {
-        PluginCommand::Sync(PluginSyncArgs { plugin_id, repo, spec_root, json }) => run_plugin_sync(&repo, &plugin_id, spec_root.as_deref(), json),
+        PluginCommand::Sync(PluginSyncArgs { plugin_id, repo, spec_root, dry_run, json }) => run_plugin_sync(&repo, &plugin_id, spec_root.as_deref(), dry_run.dry_run, json),
     }
 }
 
@@ -18,8 +18,8 @@ pub fn run(cmd: PluginCommand) -> ExitCode {
 /// failed for some candidate (`outcome.is_clean()` false), `0`
 /// otherwise (including the common zero-new-writes idempotent re-sync
 /// case).
-fn run_plugin_sync(repo: &std::path::Path, plugin_id: &str, spec_root: Option<&std::path::Path>, json: bool) -> ExitCode {
-    match crate::plugin_sync::run_sync(repo, plugin_id, spec_root) {
+fn run_plugin_sync(repo: &std::path::Path, plugin_id: &str, spec_root: Option<&std::path::Path>, dry_run: bool, json: bool) -> ExitCode {
+    match crate::plugin_sync::run_sync(repo, plugin_id, spec_root, dry_run) {
         Ok(outcome) => {
             crate::say_raw!(json, "{}", crate::plugin_sync::format_human(&outcome));
             let data = crate::plugin_sync::format_json(&outcome);

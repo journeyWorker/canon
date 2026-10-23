@@ -6,37 +6,49 @@ use std::process::ExitCode;
 
 pub fn run(cmd: SkillsCommand) -> ExitCode {
     match cmd {
-        SkillsCommand::Install(SkillsInstallArgs { source, repo, providers, json }) => run_skills_install(source.as_deref(), &repo, providers.as_deref(), json),
+        SkillsCommand::Install(SkillsInstallArgs { source, repo, providers, dry_run, json }) => run_skills_install(source.as_deref(), &repo, providers.as_deref(), dry_run.dry_run, json),
         SkillsCommand::Check(SkillsCheckArgs { source, repo, providers, json }) => run_skills_check(source.as_deref(), &repo, providers.as_deref(), json),
         SkillsCommand::Doctor(SkillsDoctorArgs { source, repo, providers, json }) => run_skills_doctor(source.as_deref(), &repo, providers.as_deref(), json),
     }
 }
 
-fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>, json: bool) -> ExitCode {
+fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>, dry_run: bool, json: bool) -> ExitCode {
     let source = crate::skills::resolve_source(source);
     if !source.join("SKILL.src.md").is_file() {
-        return match crate::skills::install(&source, target) {
+        return match crate::skills::install(&source, target, dry_run) {
             Ok(report) => {
                 for skill in &report.installed {
-                    let status = if skill.changed { "installed" } else { "unchanged" };
+                    let status = match (skill.changed, dry_run) {
+                        (true, false) => "installed",
+                        (true, true) => "would install",
+                        (false, _) => "unchanged",
+                    };
                     crate::say!(json, "{} v{} — {}", skill.name, skill.version, status);
                 }
                 if json {
                     let skills: Vec<_> = report.installed.iter().map(|s| serde_json::json!({ "name": s.name, "version": s.version, "changed": s.changed })).collect();
-                    crate::json_out::data("skills install", &crate::json_out::untyped(serde_json::json!({ "skills": skills })));
+                    crate::json_out::data("skills install", &crate::json_out::untyped(serde_json::json!({ "dryRun": dry_run, "skills": skills })));
                 }
                 ExitCode::SUCCESS
             }
             Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).hint("check that the target directory is writable; `canon skills doctor` diagnoses the installation").emit("canon skills install", json) as u8) }
         };
     }
-    match crate::skills::install_canonical(&source, target, providers) {
+    match crate::skills::install_canonical(&source, target, providers, dry_run) {
         Ok(report) => {
             let selection = crate::skills::ProviderSelection { providers: report.providers.clone(), origin: report.origin };
-            let status = if report.changed { "installed" } else { "unchanged" };
+            let status = match (report.changed, dry_run) {
+                (true, false) => "installed",
+                (true, true) => "would install",
+                (false, _) => "unchanged",
+            };
             if report.providers.is_empty() {
                 let hint = if report.origin == crate::skills::ProviderOrigin::Detected { format!("; {}", crate::skills::CHOOSE_PROVIDERS) } else { String::new() };
-                let lock = if report.changed { "; install lock rewritten" } else { "" };
+                let lock = match (report.changed, dry_run) {
+                    (true, false) => "; install lock rewritten",
+                    (true, true) => "; install lock would be rewritten",
+                    (false, _) => "",
+                };
                 crate::say!(json, "canon v1 — nothing installed: no provider selected ({}){lock}{hint}", selection.describe());
             } else if report.origin == crate::skills::ProviderOrigin::Flag {
                 crate::say!(json, "canon v1 — {status} ({})", selection.names());
@@ -44,10 +56,10 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
                 crate::say!(json, "canon v1 — {status} ({}; {})", selection.names(), selection.describe());
             }
             if let Some(path) = &report.config_written {
-                crate::say!(json, "canon skills install: wrote `skills: {{ providers: [{}] }}` to {}", report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "), path.display());
+                crate::say!(json, "canon skills install: {} `skills: {{ providers: [{}] }}` to {}", if dry_run { "would write" } else { "wrote" }, report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", "), path.display());
             }
             for orphan in &report.pruned {
-                crate::say!(json, "pruned: {} ({}) — the bundle no longer ships it; {}", orphan.path.display(), orphan.provider.as_str(), orphan.reason());
+                crate::say!(json, "{}: {} ({}) — the bundle no longer ships it; {}", if dry_run { "would prune" } else { "pruned" }, orphan.path.display(), orphan.provider.as_str(), orphan.reason());
             }
             for orphan in &report.kept {
                 crate::say!(json, "kept: {} ({}) — the bundle no longer ships it; {}; {}", orphan.path.display(), orphan.provider.as_str(), orphan.reason(), orphan.by_hand());
@@ -60,6 +72,7 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
                 crate::json_out::data(
                     "skills install",
                     &crate::json_out::untyped(serde_json::json!({
+                        "dryRun": dry_run,
                         "providers": report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>(),
                         "selection": selection.describe(),
                         "changed": report.changed,

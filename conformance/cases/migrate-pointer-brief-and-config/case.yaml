@@ -1,9 +1,9 @@
 description: "0.17 D6: `canon migrate` on a repo whose corpus already sits in .canon/specs: an external openspec change whose proposal.md holds the Approved: line 0.16 recorded gets a canon pointer brief (Source: + that line) and the proposal is not edited; the openspec source stays because a change is left under it; skills.providers comes from the install lock; the missing canon .gitignore lines are added; the index is rebuilt. `canon status` then reads the approval from the canon brief, and a second run writes nothing"
 env: { CANON_ACTOR: canon }
 steps:
-  - args: [migrate, --dry-run]
-    exit: 0
   - args: [migrate]
+    exit: 0
+  - args: [migrate, --commit, --plan-digest, "06a218b925d1e6f9c6f8c0962cf022e50f829c8f8ee04c3d1f5e1b8267d31bfd"]
     exit: 0
   - args: [subject, new, checkout, --domain, shop, --title, Checkout]
     exit: 0

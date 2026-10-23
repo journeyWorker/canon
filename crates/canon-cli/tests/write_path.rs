@@ -301,14 +301,14 @@ fn a_writer_refreshes_a_stale_index_once_and_a_reader_never_does() {
     let gate = ok(repo, &["gate", "check"]);
     assert!(scenario_records(repo).is_empty(), "the gate writes no index record: {}", stderr(&gate));
 
-    let out = ok(repo, &["evidence", "vault"]);
+    let out = ok(repo, &["artifacts", "store"]);
     let lines: Vec<String> = stderr(&out).lines().map(str::to_string).collect();
     assert_eq!(lines.len(), 1, "one line says what was refreshed: {lines:?}");
-    assert!(lines[0].starts_with("canon evidence vault: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/"), "{lines:?}");
+    assert!(lines[0].starts_with("canon artifacts store: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/"), "{lines:?}");
     assert!(lines[0].ends_with(": 1 record(s) written"), "{lines:?}");
     assert_eq!(scenario_records(repo).len(), 1);
 
-    let quiet = ok(repo, &["evidence", "vault"]);
+    let quiet = ok(repo, &["artifacts", "store"]);
     assert!(!stderr(&quiet).contains("scenario index"), "a fresh index is not refreshed again: {}", stderr(&quiet));
     assert_eq!(scenario_records(repo).len(), 1);
 }
@@ -332,9 +332,9 @@ fn an_edited_feature_file_is_reindexed_by_the_next_writer_and_only_that_file() {
     let gate = canon(repo, &["gate", "check"]);
     assert_eq!(scenario_records(repo).len(), 2, "the gate writes nothing: {}", stderr(&gate));
 
-    let out = ok(repo, &["evidence", "vault"]);
+    let out = ok(repo, &["artifacts", "store"]);
     let err = stderr(&out);
-    assert!(err.contains("canon evidence vault: refreshed the scenario index from 1 changed feature file(s)") && err.contains(": 1 record(s) written"), "{err}");
+    assert!(err.contains("canon artifacts store: refreshed the scenario index from 1 changed feature file(s)") && err.contains(": 1 record(s) written"), "{err}");
     let records = scenario_records(repo);
     assert_eq!(records.len(), 3, "one new record for the edited scenario, none for the untouched one");
     assert!(records.iter().any(|r| r["title"] == "A run ends at zero health"), "{records:?}");
@@ -379,16 +379,16 @@ fn a_root_that_cannot_sync_is_named_and_a_dir_without_canon_yaml_is_never_writte
     assert_ne!(broken, text, "the fixture must actually lose its provenance comments");
     std::fs::write(&feature, broken).unwrap();
 
-    let out = canon(repo, &["evidence", "vault"]);
+    let out = canon(repo, &["artifacts", "store"]);
     let err = stderr(&out);
-    assert!(err.contains("canon evidence vault: found the scenario index stale for 1 changed feature file(s)"), "{err}");
+    assert!(err.contains("canon artifacts store: found the scenario index stale for 1 changed feature file(s)"), "{err}");
     assert!(err.contains("NOT refreshed: root `root`") && err.contains("`canon inventory sync` lists them"), "{err}");
     assert!(scenario_records(repo).is_empty(), "an aborted root writes nothing");
 
     let bare = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(bare.path().join(".canon/specs/kind=feature")).unwrap();
     std::fs::copy(&feature, bare.path().join(".canon/specs/kind=feature/run.feature")).unwrap();
-    for args in [&["gate", "check", "--repo", "."][..], &["status", "--repo", "."][..], &["evidence", "vault", "--repo", "."][..]] {
+    for args in [&["gate", "check", "--repo", "."][..], &["status", "--repo", "."][..], &["artifacts", "store", "--repo", "."][..]] {
         let refused = canon(bare.path(), args);
         assert_eq!(refused.status.code(), Some(2), "{args:?}: {}", stderr(&refused));
     }
@@ -441,9 +441,9 @@ fn a_deleted_scenario_is_removed_the_same_way_by_a_refresh_and_by_a_full_sync() 
     let copied = Command::new("cp").arg("-R").arg(refreshed.path().join(".")).arg(synced.path()).status().unwrap();
     assert!(copied.success());
 
-    let err = stderr(&canon(refreshed.path(), &["evidence", "vault"]));
+    let err = stderr(&canon(refreshed.path(), &["artifacts", "store"]));
     assert!(
-        err.contains("canon evidence vault: refreshed the scenario index from 1 scenario(s) no longer in any feature file (game.shop.01): 1 record(s) written"),
+        err.contains("canon artifacts store: refreshed the scenario index from 1 scenario(s) no longer in any feature file (game.shop.01): 1 record(s) written"),
         "{err}"
     );
     let sync = ok(synced.path(), &["inventory", "sync"]);
@@ -476,8 +476,8 @@ fn a_root_that_cannot_sync_marks_no_scenario_removed() {
     let text = std::fs::read_to_string(&run).unwrap();
     std::fs::write(&run, text.lines().filter(|l| !l.trim_start().starts_with("# canon:")).map(|l| format!("{l}\n")).collect::<String>()).unwrap();
 
-    let err = stderr(&canon(repo, &["evidence", "vault"]));
-    assert!(err.contains("canon evidence vault: found the scenario index stale for 1 changed feature file(s)"), "{err}");
+    let err = stderr(&canon(repo, &["artifacts", "store"]));
+    assert!(err.contains("canon artifacts store: found the scenario index stale for 1 changed feature file(s)"), "{err}");
     assert!(err.contains("and 1 scenario(s) no longer in any feature file (game.shop.01): 0 record(s) written; NOT refreshed: root `root`"), "{err}");
     let sync = canon(repo, &["inventory", "sync"]);
     assert_eq!(sync.status.code(), Some(1), "{}", stdout(&sync));
@@ -553,7 +553,7 @@ fn concurrent_syncs_and_refreshes_write_each_index_record_once() {
     let spawn = |args: &[&str]| {
         Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").current_dir(repo).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().expect("spawn canon")
     };
-    let children = [spawn(&["inventory", "sync"]), spawn(&["inventory", "sync"]), spawn(&["evidence", "vault"]), spawn(&["evidence", "vault"])];
+    let children = [spawn(&["inventory", "sync"]), spawn(&["inventory", "sync"]), spawn(&["artifacts", "store"]), spawn(&["artifacts", "store"])];
     std::thread::sleep(std::time::Duration::from_millis(500));
     assert!(scenario_records(repo).is_empty(), "nothing writes the index while another process holds the lock");
     lock.unlock().unwrap();
@@ -599,7 +599,7 @@ fn the_scenario_index_a_writer_rebuilds_stays_out_of_git() {
     git(repo, &["add", "-A"]);
     git(repo, &["commit", "-q", "-m", "spec"]);
 
-    let out = ok(repo, &["evidence", "vault"]);
+    let out = ok(repo, &["artifacts", "store"]);
     assert!(stderr(&out).contains("refreshed the scenario index"), "{}", stderr(&out));
     assert_eq!(scenario_records(repo).len(), 1);
     ok(repo, &["query", "--kind", "subject"]);
@@ -619,7 +619,7 @@ fn the_scenario_index_lock_stays_out_of_git() {
     git(repo, &["add", "-A"]);
     git(repo, &["commit", "-q", "-m", "spec"]);
 
-    ok(repo, &["evidence", "vault"]);
+    ok(repo, &["artifacts", "store"]);
     assert!(repo.join(".canon/scenario-index.lock").is_file(), "the refresh took the lock");
     assert_eq!(git(repo, &["status", "--porcelain"]), "", "the lock file must not show up as untracked");
 }

@@ -255,7 +255,7 @@ fn an_unproven_strategy_is_blocked_by_the_promotion_gate() {
 }
 
 /// The exact state this repo was in before the flywheel was wired:
-/// `canon ingest artifacts` created trajectories and never resolved
+/// `canon ingest records` created trajectories and never resolved
 /// them, so every sample sat at `VerdictOutcome::Pending`. A `Pending`
 /// sample neither corroborates nor contradicts, so a wall of them must
 /// still be a refusal — not an accidental promotion.

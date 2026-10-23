@@ -156,7 +156,9 @@ fn commit_ledger(repo: &Path) {
 
 fn migrate(repo: &Path) -> String {
     commit_ledger(repo);
-    let out = ok(repo, &["migrate"]);
+    let preview = ok(repo, &["migrate"]);
+    let digest = preview.lines().find_map(|line| line.strip_prefix("planDigest ")).and_then(|rest| rest.split(';').next()).expect("a preview prints its planDigest").to_string();
+    let out = ok(repo, &["migrate", "--commit", "--plan-digest", &digest]);
     commit_ledger(repo);
     out
 }

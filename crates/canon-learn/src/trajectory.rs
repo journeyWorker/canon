@@ -67,7 +67,7 @@ pub struct Trajectory {
     /// column structurally pinned at `0`.)
     ///
     /// `None` is the honest, and overwhelmingly common, value. It is
-    /// NEVER inferred: `canon ingest artifacts` stamps this only from
+    /// NEVER inferred: `canon ingest records` stamps this only from
     /// its own explicit `--run-id <RunId>`, never from a timestamp, a
     /// role, or the most recent dispatch manifest, because a wrong
     /// attribution is worse than none — the mart would then assert a
@@ -153,7 +153,7 @@ impl Trajectory {
     ///
     /// Takes the caller's own `Option` verbatim rather than a bare
     /// [`RunId`], deliberately. Every caller's attribution is itself
-    /// optional (`canon ingest artifacts` has a run only when invoked
+    /// optional (`canon ingest records` has a run only when invoked
     /// with `--run-id`), so a `RunId`-taking setter would push an
     /// `if let`/`map` branch onto each call site — and a branch that
     /// has to decide "is there a run here" is exactly where a `None`

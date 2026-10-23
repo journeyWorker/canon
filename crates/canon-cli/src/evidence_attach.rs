@@ -317,7 +317,7 @@ pub fn store_files_held<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<HeldS
         return Ok(HeldStore { lock: None, published: Vec::new(), uploaded: 0 });
     };
     let lock = StoreLock::acquire(repo).map_err(|e| (first, e))?;
-    // The backend is read UNDER the lock, so a `canon artifacts migrate`
+    // The backend is read UNDER the lock, so a `canon artifacts move`
     // that finished while this call waited is seen, and no blob is
     // written to a local store the repo no longer uses.
     let store = ArtifactStore::open(repo).map_err(|e| (first, e))?;

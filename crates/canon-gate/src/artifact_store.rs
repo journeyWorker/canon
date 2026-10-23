@@ -47,7 +47,7 @@
 //! - The stored blob exists and hashes to the recorded digest: clean.
 //! - The blob is missing, and the working-tree path still hashes to the
 //!   recorded digest: clean, with an advisory ([`unstored_attachments`])
-//!   naming `canon evidence vault`. This is the back-compat path for
+//!   naming `canon artifacts store`. This is the back-compat path for
 //!   records written before the store existed (0.11–0.13).
 //! - Anything else (a corrupt blob, or a missing blob and a working-tree
 //!   file that is gone or changed): a `stale-evidence` violation naming
@@ -67,7 +67,7 @@
 //! re-checked, the way a superseded evidence record's is not. The rule is
 //! the evidence rule above: an intact blob is clean; a missing blob whose
 //! working-tree file still matches is an advisory
-//! ([`unstored_attachments`], naming `canon evidence vault`, which stores
+//! ([`unstored_attachments`], naming `canon artifacts store`, which stores
 //! review artifacts too); anything else is `stale-evidence` on the
 //! review's scenario, and the detail names the reviewer, the review's
 //! actor and its time.
@@ -90,7 +90,7 @@
 //! --full` downloads and re-hashes), and the working-tree fallback does
 //! not apply — a blob the store lacks is `stale-evidence` whatever the
 //! working tree holds, because the fallback exists for records older than
-//! the store, and `canon evidence vault` uploads those. A store that
+//! the store, and `canon artifacts store` uploads those. A store that
 //! cannot be reached or attached ([`Observed::Unavailable`],
 //! [`StoreError::Unattached`]) is a violation with a hint, never a pass.
 
@@ -774,7 +774,7 @@ fn check_files(repo: &Path, files: Vec<BoundFileRef>, store: &ArtifactStore, ful
 
 /// One attachment on a latest record, or a current review, whose bytes
 /// exist only in the working tree (module doc's back-compat path): not a
-/// violation, an advisory pointing at `canon evidence vault`.
+/// violation, an advisory pointing at `canon artifacts store`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnstoredAttachment {
     pub subject: String,
@@ -885,7 +885,7 @@ impl GateCheck for ArtifactStoreCheck {
 fn remedy(blob: &Observed, store: &ArtifactStore, reattest: &str) -> String {
     match blob {
         Observed::Unavailable(_) => "the artifact store could not be reached, so the bound bytes cannot be verified; check that it is reachable and that its credentials (CANON_S3_ENDPOINT, CANON_S3_ACCESS_KEY, CANON_S3_SECRET_KEY) are set, then run the gate again".to_string(),
-        Observed::Missing if !store.is_local() => format!("the bound bytes are not in the artifact store; `canon evidence vault` uploads them again when the working-tree file still matches, otherwise {reattest}"),
+        Observed::Missing if !store.is_local() => format!("the bound bytes are not in the artifact store; `canon artifacts store` uploads them again when the working-tree file still matches, otherwise {reattest}"),
         Observed::Missing => format!("the bound bytes are gone, {reattest}"),
         _ => format!("the stored blob does not match its name, so its bytes were altered, {reattest}"),
     }

@@ -296,7 +296,7 @@ fn evidence_vault_exits_zero_and_lists_the_files_it_could_not_store() {
     if store.exists() {
         std::fs::remove_dir_all(&store).unwrap();
     }
-    let out = run(dir.path(), &["evidence", "vault", "--json"]);
+    let out = run(dir.path(), &["artifacts", "store", "--json"]);
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
     assert_eq!(body(&out)["data"]["notStored"].as_array().unwrap().len(), 1);
 }
@@ -314,7 +314,7 @@ fn dispatch_diff_exits_zero_whatever_it_finds() {
 #[test]
 fn the_exceptions_declare_only_the_exits_they_have() {
     let dir = TempDir::new().unwrap();
-    for (command, exits) in [(vec!["context"], vec![0, 2]), (vec!["dispatch", "diff"], vec![0, 2]), (vec!["evidence", "vault"], vec![0, 2]), (vec!["gate", "check"], vec![0, 1, 2])] {
+    for (command, exits) in [(vec!["context"], vec![0, 2]), (vec!["dispatch", "diff"], vec![0, 2]), (vec!["artifacts", "store"], vec![0, 2]), (vec!["gate", "check"], vec![0, 1, 2])] {
         let mut args = vec!["schema"];
         args.extend(&command);
         args.push("--json");

@@ -23,6 +23,11 @@ use canon_store::git_tier::GitTier;
 use canon_store::tier::{Tier, WriteReceipt};
 use chrono::{DateTime, Utc};
 
+/// The `planDigest` a destructive leaf's human preview printed (its last line).
+pub fn preview_digest(stdout: &str) -> Option<String> {
+    stdout.lines().find_map(|line| line.strip_prefix("planDigest ")).and_then(|rest| rest.split(';').next()).map(str::to_string)
+}
+
 /// A tempdir-rooted fixture: `<root>/canon.yaml`, `<root>/.canon/ledger`
 /// (git tier), `<root>/r2-local` (the offline r2 tier's local root,
 /// bound in via `canon-cli`'s `CANON_R2_LOCAL_ROOT` test seam).

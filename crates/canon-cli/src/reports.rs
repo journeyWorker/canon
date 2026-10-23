@@ -50,7 +50,7 @@ pub fn schema_of<R: JsonSchema>() -> Value {
 /// A command not listed still prints its `data` through `json_out::untyped`
 /// until a later slice types it.
 pub fn report_schemas() -> Vec<ReportSchema> {
-    use crate::{adapter, artifact_ingest, brief_approve, brief_check, completion, context, context_pack, plans, retrieve, selftest, status, subject};
+    use crate::{adapter, artifact_ingest, artifacts, ledger, migrate, retention, tier, brief_approve, brief_check, completion, context, context_pack, plans, retrieve, selftest, status, subject};
     let mut schemas: Vec<ReportSchema> = vec![
         entry::<adapter::AuthorizationResult>("adapter authorize", "AdapterAuthorizeReport"),
         entry::<adapter::ValidationSummary>("adapter validate", "AdapterValidateReport"),
@@ -62,8 +62,13 @@ pub fn report_schemas() -> Vec<ReportSchema> {
         entry::<context_pack::ContextPack>("context-pack new", "ContextPackAddReport"),
         entry::<context_pack::ContextPack>("context-pack show", "ContextPackShowReport"),
         entry::<context_pack::VerifyReport>("context-pack verify", "ContextPackVerifyReport"),
-        entry::<artifact_ingest::ArtifactIngestOutcome>("ingest artifacts", "IngestRecordsReport"),
+        entry::<artifact_ingest::ArtifactIngestOutcome>("ingest records", "IngestRecordsReport"),
         entry::<plans::PlansOutcome>("ingest plans", "IngestPlansReport"),
+        entry::<artifacts::ArtifactsMoveReport>("artifacts move", "ArtifactsMoveReport"),
+        entry::<ledger::LedgerCompactReport>("ledger compact", "LedgerCompactReport"),
+        entry::<migrate::MigrateReport>("migrate", "MigrateReport"),
+        entry::<retention::PurgeReport>("purge", "PurgeReport"),
+        entry::<tier::TierAgeReport>("tier age", "TierAgeReport"),
         entry::<context_pack::PromptBundleVersion>("prompt add", "PromptAddReport"),
         entry::<context_pack::PromptBundleVersion>("prompt show", "PromptShowReport"),
         entry::<retrieve::RetrieveReport<'static>>("retrieve", "RetrieveReport"),

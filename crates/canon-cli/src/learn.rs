@@ -47,7 +47,7 @@
 //! own test). An override flag would reintroduce exactly the defeat that
 //! validation exists to prevent. A rejected promotion is a statement
 //! that the evidence is not there yet — the fix is to resolve the
-//! trajectories (`canon ingest artifacts`), not to bypass the gate.
+//! trajectories (`canon ingest records`), not to bypass the gate.
 
 use std::path::Path;
 use std::process::ExitCode;
@@ -89,7 +89,7 @@ pub fn run_promote_with_evidence(
     // A genuinely absent `learn:` section resolves to `LearnConfig::default()`
     // inside `from_manifest`; only a MALFORMED section reaches `Err`, and that
     // fails loud rather than silently promoting into the wrong store root
-    // (same discipline `canon ingest artifacts` holds).
+    // (same discipline `canon ingest records` holds).
     let learn_config = match LearnConfig::from_manifest(&canon_yaml_text) {
         Ok(config) => config,
         Err(err) => {
@@ -341,7 +341,7 @@ fn report_block(decision: &PromotionDecision, demotion_failure: Option<&str>, js
             .hint("the strategy is still active; fix the strategy store named above and run `canon learn promote` again to retry the demotion"),
         None => CliError::failed("LEARN_PROMOTION_BLOCKED", format!("blocked by the promotion gate: {}", decision.reason())).hint(
             "the gate reads each trajectory's RESOLVED `verdict_record.outcome`, not its raw verdict rows — \
-             run `canon ingest artifacts` to resolve pending trajectories for this regime, then retry.",
+             run `canon ingest records` to resolve pending trajectories for this regime, then retry.",
         ),
     };
     ExitCode::from(error.emit("canon learn promote", json) as u8)

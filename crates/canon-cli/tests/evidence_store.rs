@@ -1,5 +1,5 @@
 //! 0.14 D4/D5 through the real binary: bound evidence stays provable
-//! (the artifact store, `canon evidence vault`, the gate's re-hash), and
+//! (the artifact store, `canon artifacts store`, the gate's re-hash), and
 //! evidence is not shaped by tasks (scenario-only summaries, repeatable
 //! report cases, aggregated task rows, task status in the record store,
 //! and one task+scenario record answering both joins).
@@ -125,7 +125,7 @@ fn a_stored_blob_keeps_a_rewritten_report_provable_and_a_lost_one_is_stale_evide
 }
 
 /// A record written before the store existed (0.11–0.13) is proven
-/// from the working tree, with an advisory; `canon evidence vault`
+/// from the working tree, with an advisory; `canon artifacts store`
 /// stores its bytes and the advisory goes away.
 #[test]
 fn an_unstored_binding_is_an_advisory_until_canon_evidence_vault_stores_it() {
@@ -140,14 +140,14 @@ fn an_unstored_binding_is_an_advisory_until_canon_evidence_vault_stores_it() {
 
     let advisory = canon(repo, &["gate", "check"]);
     assert!(advisory.status.success(), "{}", text(&advisory));
-    assert!(text(&advisory).contains("canon evidence vault") && text(&advisory).contains("unstored game.run.01 reports/junit.xml"), "{}", text(&advisory));
+    assert!(text(&advisory).contains("canon artifacts store") && text(&advisory).contains("unstored game.run.01 reports/junit.xml"), "{}", text(&advisory));
 
-    let vault = ok(repo, &["evidence", "vault"]);
+    let vault = ok(repo, &["artifacts", "store"]);
     assert!(text(&vault).contains("stored 1, already stored 0, could not store 0"), "{}", text(&vault));
     assert_eq!(std::fs::read(blob(repo, bytes)).unwrap(), bytes);
     let quiet = canon(repo, &["gate", "check"]);
     assert!(quiet.status.success() && !text(&quiet).contains("unstored"), "{}", text(&quiet));
-    let again = ok(repo, &["evidence", "vault"]);
+    let again = ok(repo, &["artifacts", "store"]);
     assert!(text(&again).contains("stored 0, already stored 1"), "the vault is idempotent: {}", text(&again));
 }
 

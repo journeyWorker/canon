@@ -141,7 +141,7 @@ mod tests {
             rebuild_namespace(&trajectory_store, &strategy_store, &regime()).unwrap().iter().map(|i| i.id).collect();
         assert_eq!(injected.len(), 2, "fixture distilled two strategies");
 
-        // A routine later `canon ingest artifacts` over the same regime.
+        // A routine later `canon ingest records` over the same regime.
         rebuild_namespace(&trajectory_store, &strategy_store, &regime()).unwrap();
 
         let current: Vec<crate::ids::StrategyId> = strategy_store.query_by_regime_key(&regime()).unwrap().iter().map(|i| i.id).collect();

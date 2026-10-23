@@ -366,6 +366,8 @@ impl RootSyncOutcome {
 #[derive(Debug, Clone, Default)]
 pub struct SyncOutcome {
     pub roots: Vec<RootSyncOutcome>,
+    /// A `--dry-run` preview: `written` counts what the sync would write.
+    pub dry_run: bool,
 }
 
 impl SyncOutcome {
@@ -391,10 +393,20 @@ impl SyncOutcome {
 /// run, so it never interleaves with another sync or a reader's
 /// [`refresh_stale_index`].
 pub fn run_sync(repo: &Path, spec_root: Option<&Path>) -> Result<SyncOutcome, InventoryError> {
+    sync_repo(repo, spec_root, false)
+}
+
+/// [`run_sync`] under `--dry-run`: the same validation and the same
+/// decisions, but no lock file and no record written.
+pub fn preview_sync(repo: &Path, spec_root: Option<&Path>) -> Result<SyncOutcome, InventoryError> {
+    sync_repo(repo, spec_root, true)
+}
+
+fn sync_repo(repo: &Path, spec_root: Option<&Path>, dry_run: bool) -> Result<SyncOutcome, InventoryError> {
     let repo = resolve_repo_root(repo);
     let ctx = SyncCtx::from_repo(&repo)?;
-    let _lock = lock_index(&ctx.repo)?;
-    run_sync_with_ctx(&ctx, spec_root)
+    let _lock = if dry_run { None } else { Some(lock_index(&ctx.repo)?) };
+    sync_with_ctx(&ctx, spec_root, dry_run)
 }
 
 /// The ONE downstream sync entry point (module doc / spec-ledger-selftest
@@ -405,6 +417,10 @@ pub fn run_sync(repo: &Path, spec_root: Option<&Path>) -> Result<SyncOutcome, In
 /// a fixture run owns its fresh scratch directory, and [`run_sync`]
 /// holds the lock around this call.
 pub fn run_sync_with_ctx(ctx: &SyncCtx, spec_root_override: Option<&Path>) -> Result<SyncOutcome, InventoryError> {
+    sync_with_ctx(ctx, spec_root_override, false)
+}
+
+fn sync_with_ctx(ctx: &SyncCtx, spec_root_override: Option<&Path>, dry_run: bool) -> Result<SyncOutcome, InventoryError> {
     let roots = ctx.spec_roots(spec_root_override)?;
     let tier = GitTier::new(&ctx.ledger_root);
     // Never an agent-authored attestation — a deterministic
@@ -417,9 +433,14 @@ pub fn run_sync_with_ctx(ctx: &SyncCtx, spec_root_override: Option<&Path>) -> Re
 
     let mut outcomes = Vec::with_capacity(roots.len());
     for (spec_root, scanned) in roots.iter().zip(&scans) {
-        outcomes.push(sync_one_root(&tier, &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None)?);
+        let outcome = if dry_run {
+            plan_one_root(|| latest_index(&tier), &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None)?.outcome
+        } else {
+            sync_one_root(&tier, &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None)?
+        };
+        outcomes.push(outcome);
     }
-    Ok(SyncOutcome { roots: outcomes })
+    Ok(SyncOutcome { roots: outcomes, dry_run })
 }
 
 /// Every scenario id the `.feature` corpus declares, per project, over
@@ -916,8 +937,9 @@ pub fn format_human(outcome: &SyncOutcome) -> String {
     for root in &outcome.roots {
         if root.is_clean() {
             let removed = if root.removed > 0 { format!(" ({} marking scenario(s) no longer in any feature file as removed)", root.removed) } else { String::new() };
+            let verb = if outcome.dry_run { "would be written" } else { "written" };
             out.push_str(&format!(
-                "canon inventory sync: root `{}` ({}) — {} scenario(s) scanned, {} record(s) written{removed}\n",
+                "canon inventory sync: root `{}` ({}) — {} scenario(s) scanned, {} record(s) {verb}{removed}\n",
                 root.id,
                 root.root.display(),
                 root.scanned,
@@ -967,7 +989,7 @@ pub fn format_json(outcome: &SyncOutcome) -> serde_json::Value {
             })
         })
         .collect();
-    serde_json::json!({ "clean": outcome.is_clean(), "totalWritten": outcome.total_written(), "roots": roots })
+    serde_json::json!({ "dryRun": outcome.dry_run, "clean": outcome.is_clean(), "totalWritten": outcome.total_written(), "roots": roots })
 }
 
 /// One root's stale part of the scenario index ([`stale_roots`]).

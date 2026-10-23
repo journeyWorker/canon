@@ -194,9 +194,5 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
                 ) as u8,
             )
         }
-        EvidenceCommand::Vault(EvidenceVaultArgs { max_artifact_mib, repo, json }) => {
-            crate::inventory::refresh_stale_index(&repo, "canon evidence vault");
-            ExitCode::from(crate::evidence::run_vault(&repo, max_artifact_mib, json) as u8)
-        }
     }
 }

@@ -159,6 +159,9 @@ pub struct IngestOutcome {
     /// or `session`/`run`/`event` simply not routed yet) — those cases keep
     /// [`format_human`]'s generic fallback prose.
     pub degrade_reason: Option<String>,
+    /// A `--dry-run` preview: nothing was persisted and no cursor moved;
+    /// `runs_written`/`events_written` count what a real pass would write.
+    pub dry_run: bool,
 }
 
 /// Optional per-source scan-root overrides parsed from `canon.yaml`'s
@@ -535,7 +538,7 @@ fn git_worktree_roots(repo_root: &Path) -> Option<Vec<PathBuf>> {
 /// (Codex/Hermes) split. `project_key` is stamped onto every
 /// normalized session whose workspace resolves into the scope,
 /// independent of `all_workspaces`.
-pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: bool, all_workspaces: bool) -> Result<IngestOutcome, IngestError> {
+pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: bool, all_workspaces: bool, dry_run: bool) -> Result<IngestOutcome, IngestError> {
     let repo_root = canon_yaml.parent().unwrap_or_else(|| Path::new("."));
     let cursors = CursorStore::open(repo_root.join(paths::INGEST_CURSORS_DIR));
     let scope = ProjectScope::resolve(repo_root, home, all_workspaces);
@@ -673,6 +676,7 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
                 unwritten: Some(normalized.sessions),
                 degrade_class: Some("config_unavailable"),
                 degrade_reason: None,
+                dry_run,
             });
         }
         Err(other) => return Err(other.into()),
@@ -696,6 +700,7 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
             unwritten: Some(normalized.sessions),
             degrade_class: Some("unrouted"),
             degrade_reason: None,
+            dry_run,
         });
     }
 
@@ -727,6 +732,7 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
             unwritten: Some(normalized.sessions),
             degrade_class: Some("tier_unavailable"),
             degrade_reason: Some(degrade_reasons.join("; ")),
+            dry_run,
         });
     }
 
@@ -745,7 +751,9 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
     let mut run_buf: Vec<canon_model::records::Run> = Vec::new();
     let mut event_buf: Vec<canon_model::records::Event> = Vec::new();
     for session in &normalized.sessions {
-        session_buf.push(session.session.clone());
+        if !dry_run {
+            session_buf.push(session.session.clone());
+        }
         // s37 (`execution-graph-topology`): persist the session's ROOT
         // run AND every child run `normalize` derived for a distinct
         // `agent_id` — `NormalizedSession::runs()` yields root-first,
@@ -756,28 +764,37 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
         // still landed as one flat run. A single-agent session yields
         // exactly one run here, unchanged.
         for run in session.runs() {
-            run_buf.push(run.clone());
+            if !dry_run {
+                run_buf.push(run.clone());
+            }
             runs_written += 1;
         }
         for event in &session.events {
-            event_buf.push(event.clone());
             events_written += 1;
+            if dry_run {
+                continue;
+            }
+            event_buf.push(event.clone());
             if event_buf.len() >= EVENT_FLUSH {
                 persist_many_idempotent(&store, &std::mem::take(&mut event_buf))?;
             }
         }
     }
-    persist_many_idempotent(&store, &session_buf)?;
-    persist_many_idempotent(&store, &run_buf)?;
-    persist_many_idempotent(&store, &event_buf)?;
+    if !dry_run {
+        persist_many_idempotent(&store, &session_buf)?;
+        persist_many_idempotent(&store, &run_buf)?;
+        persist_many_idempotent(&store, &event_buf)?;
+    }
 
     // Durable-write succeeded (S3 3.2): advance each (re-)parsed
     // source's cursor. Best-effort — a cursor write failure only costs
     // a re-parse next pass (digest-idempotent, S3 4.2), never the
     // just-persisted records.
-    for mut cursor in pending_cursors {
-        cursor.refresh_summary();
-        let _ = cursors.write(&cursor);
+    if !dry_run {
+        for mut cursor in pending_cursors {
+            cursor.refresh_summary();
+            let _ = cursors.write(&cursor);
+        }
     }
 
     Ok(IngestOutcome {
@@ -791,6 +808,7 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
         unwritten: None,
         degrade_class: None,
         degrade_reason: None,
+        dry_run,
     })
 }
 
@@ -981,8 +999,9 @@ pub fn format_human(outcome: &IngestOutcome) -> String {
     out.push_str(&format!("rows skipped (malformed session_id): {}\n", outcome.skipped_rows));
     match &outcome.unwritten {
         None => {
-            out.push_str(&format!("runs written: {}\n", outcome.runs_written));
-            out.push_str(&format!("events written: {}\n", outcome.events_written));
+            let verb = if outcome.dry_run { "would be written" } else { "written" };
+            out.push_str(&format!("runs {verb}: {}\n", outcome.runs_written));
+            out.push_str(&format!("events {verb}: {}\n", outcome.events_written));
         }
         Some(sessions) => {
             let reason = outcome
@@ -1024,6 +1043,7 @@ pub fn summary_json(outcome: &IngestOutcome) -> serde_json::Value {
         })
         .collect();
     serde_json::json!({
+        "dryRun": outcome.dry_run,
         "scope": outcome.scope_summary,
         "adapters": adapters,
         "sessionsNormalized": outcome.sessions_normalized,
@@ -1095,6 +1115,7 @@ fn degraded_metadata(outcome: &IngestOutcome, sessions: &[NormalizedSession]) ->
         _ => "session ingest did not reach a durable tier",
     });
     serde_json::json!({
+        "dryRun": outcome.dry_run,
         "scope": outcome.scope_summary,
         "adapters": adapters,
         "counts": {
@@ -1195,7 +1216,7 @@ mod tests {
         write_fixture_home(dir.path());
         let canon_yaml = write_canon_yaml(dir.path(), false);
 
-        let outcome = run(&canon_yaml, dir.path(), false, false, true).unwrap();
+        let outcome = run(&canon_yaml, dir.path(), false, false, true, false).unwrap();
         assert_eq!(outcome.sessions_normalized, 1);
         assert_eq!(outcome.runs_written, 0);
         assert!(outcome.unwritten.is_some());
@@ -1222,7 +1243,7 @@ mod tests {
         .unwrap();
         let canon_yaml = write_canon_yaml(dir.path(), false);
 
-        let outcome = run(&canon_yaml, dir.path(), false, false, true).unwrap();
+        let outcome = run(&canon_yaml, dir.path(), false, false, true, false).unwrap();
         assert_eq!(outcome.malformed_records, 1, "the corrupt line must be counted, not just silently skipped");
         assert_eq!(outcome.adapters[0].malformed_records, 1);
         assert_eq!(outcome.sessions_normalized, 1, "the two valid records around the corrupt line still normalize");
@@ -1238,7 +1259,7 @@ mod tests {
         write_fixture_home(dir.path());
         let canon_yaml = write_canon_yaml(dir.path(), true);
 
-        let outcome = run(&canon_yaml, dir.path(), false, false, true).unwrap();
+        let outcome = run(&canon_yaml, dir.path(), false, false, true, false).unwrap();
         assert_eq!(outcome.sessions_normalized, 1);
         assert_eq!(outcome.runs_written, 1);
         assert_eq!(outcome.events_written, 1);
@@ -1248,7 +1269,7 @@ mod tests {
         // home skips the source wholesale — nothing is re-parsed or
         // re-persisted (the cursor written after pass 1 matches every
         // present file's digest).
-        let second = run(&canon_yaml, dir.path(), false, false, true).unwrap();
+        let second = run(&canon_yaml, dir.path(), false, false, true, false).unwrap();
         assert_eq!(second.runs_written, 0, "unchanged source is watermark-skipped, not re-parsed");
         assert_eq!(second.events_written, 0);
         assert_eq!(second.adapters[0].reparsed, 0, "unchanged source is not re-parsed");
@@ -1282,7 +1303,7 @@ mod tests {
         let before = count_records();
         assert!(before >= 3, "pass 1 persisted session + run + event records");
 
-        let forced = run(&canon_yaml, dir.path(), false, true, true).unwrap();
+        let forced = run(&canon_yaml, dir.path(), false, true, true, false).unwrap();
         assert_eq!(forced.runs_written, 1, "forced full rescan re-parses");
         assert_eq!(forced.events_written, 1);
         assert_eq!(count_records(), before, "the forced reset re-scan must not duplicate any record (S3 6.8)");
@@ -1298,8 +1319,8 @@ mod tests {
         write_fixture_home(dir.path());
         let canon_yaml = write_canon_yaml(dir.path(), true);
 
-        assert_eq!(run(&canon_yaml, dir.path(), false, false, true).unwrap().runs_written, 1);
-        assert_eq!(run(&canon_yaml, dir.path(), false, false, true).unwrap().runs_written, 0, "unchanged -> skipped");
+        assert_eq!(run(&canon_yaml, dir.path(), false, false, true, false).unwrap().runs_written, 1);
+        assert_eq!(run(&canon_yaml, dir.path(), false, false, true, false).unwrap().runs_written, 0, "unchanged -> skipped");
 
         // Append a NEW session -> omp's file digest changes.
         let s = dir.path().join(".omp/agent/sessions/-tmp-proj/s1.jsonl");
@@ -1310,7 +1331,7 @@ mod tests {
         );
         std::fs::write(&s, body).unwrap();
 
-        let third = run(&canon_yaml, dir.path(), false, false, true).unwrap();
+        let third = run(&canon_yaml, dir.path(), false, false, true, false).unwrap();
         assert!(third.runs_written >= 1, "the changed omp source re-parses");
         assert_eq!(third.adapters[0].skipped_unchanged, 0, "the changed omp source is NOT skipped");
     }
@@ -1325,7 +1346,7 @@ mod tests {
         write_fixture_home(dir.path());
         let canon_yaml = write_canon_yaml(dir.path(), true);
 
-        assert_eq!(run(&canon_yaml, dir.path(), false, false, true).unwrap().runs_written, 1);
+        assert_eq!(run(&canon_yaml, dir.path(), false, false, true, false).unwrap().runs_written, 1);
         let count = |dir: &Path| -> usize {
             fn walk(dir: &Path, n: &mut usize) {
                 if let Ok(rd) = std::fs::read_dir(dir) {
@@ -1353,7 +1374,7 @@ mod tests {
         std::fs::remove_file(&cursor).unwrap();
 
         // next pass finds no cursor -> re-parses omp in full ...
-        let reset = run(&canon_yaml, dir.path(), false, false, true).unwrap();
+        let reset = run(&canon_yaml, dir.path(), false, false, true, false).unwrap();
         assert_eq!(reset.adapters[0].skipped_unchanged, 0, "reset source is NOT skipped");
         assert!(reset.runs_written >= 1, "reset source is re-parsed");
         // ... but the digest-idempotent write path adds no duplicate.
@@ -1366,7 +1387,7 @@ mod tests {
         write_fixture_home(dir.path());
         let missing_canon_yaml = dir.path().join("does-not-exist.yaml");
 
-        let outcome = run(&missing_canon_yaml, dir.path(), false, false, true).unwrap();
+        let outcome = run(&missing_canon_yaml, dir.path(), false, false, true, false).unwrap();
         assert_eq!(outcome.sessions_normalized, 1);
         assert!(outcome.unwritten.is_some());
     }
@@ -1392,7 +1413,7 @@ mod tests {
         let path = dir.path().join("canon.yaml");
         std::fs::write(&path, "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\ningest:\n  sources:\n    omp:\n      roots: [custom-omp]\n").unwrap();
 
-        let outcome = run(&path, dir.path(), false, false, true).unwrap();
+        let outcome = run(&path, dir.path(), false, false, true, false).unwrap();
         assert_eq!(outcome.sessions_normalized, 1, "only the configured-root session is scanned (replace, not union)");
         let json = format_json(&outcome).unwrap();
         assert!(json.contains("cfg_ses_1"), "the configured-root session appears: {json}");
@@ -1408,7 +1429,7 @@ mod tests {
         let path = dir.path().join("canon.yaml");
         std::fs::write(&path, "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\ningest:\n  sources:\n    omp:\n      roots: []\n").unwrap();
 
-        let outcome = run(&path, dir.path(), false, false, true).unwrap();
+        let outcome = run(&path, dir.path(), false, false, true, false).unwrap();
         assert_eq!(outcome.sessions_normalized, 0, "explicit `roots: []` scans zero; the default home fixture is NOT ingested");
     }
 
@@ -1421,7 +1442,7 @@ mod tests {
         let path = dir.path().join("canon.yaml");
         std::fs::write(&path, "tiers:\n  local: { backend: git, root: .canon/ledger }\ningest:\n  sources:\n    claude:\n      roots: [x]\n").unwrap();
 
-        let err = run(&path, dir.path(), false, false, true).unwrap_err();
+        let err = run(&path, dir.path(), false, false, true, false).unwrap_err();
         assert!(matches!(err, IngestError::Config(_)), "unknown source id must fail loud, got {err:?}");
         let msg = err.to_string();
         assert!(msg.contains("claude"), "names the offending id: {msg}");
@@ -1436,7 +1457,7 @@ mod tests {
         let path = dir.path().join("canon.yaml");
         std::fs::write(&path, "tiers:\n  local: { backend: git, root: .canon/ledger }\ningest:\n  sources:\n    omp:\n      root: [x]\n").unwrap();
 
-        let err = run(&path, dir.path(), false, false, true).unwrap_err();
+        let err = run(&path, dir.path(), false, false, true, false).unwrap_err();
         assert!(matches!(err, IngestError::Config(_)), "a `root:` typo must fail loud, got {err:?}");
     }
 
@@ -1450,7 +1471,7 @@ mod tests {
         let path = dir.path().join("canon.yaml");
         std::fs::write(&path, "[unterminated flow sequence\n").unwrap();
 
-        let err = run(&path, dir.path(), false, false, true).unwrap_err();
+        let err = run(&path, dir.path(), false, false, true, false).unwrap_err();
         assert!(matches!(err, IngestError::Config(_)), "present-but-invalid YAML must fail loud, got {err:?}");
     }
 
@@ -1470,7 +1491,7 @@ mod tests {
         std::fs::write(&canon_yaml, yaml).unwrap();
         std::env::remove_var("CANON_R2_BUCKET_INGEST_S29_D6_UNSET");
 
-        let outcome = run(&canon_yaml, dir.path(), false, false, true).unwrap();
+        let outcome = run(&canon_yaml, dir.path(), false, false, true, false).unwrap();
         assert_eq!(outcome.sessions_normalized, 1);
         assert_eq!(outcome.runs_written, 1, "the unrelated unattached cold rung must never be attempted for a session/run/event pass");
         assert_eq!(outcome.events_written, 1);
@@ -1491,7 +1512,7 @@ mod tests {
         std::fs::write(&canon_yaml, yaml).unwrap();
         std::env::remove_var("CANON_PG_DSN_INGEST_S29_D6_UNSET");
 
-        let outcome = run(&canon_yaml, dir.path(), false, false, true).unwrap();
+        let outcome = run(&canon_yaml, dir.path(), false, false, true, false).unwrap();
         assert!(outcome.unwritten.is_some(), "the hot rung's dsn_env is unset -- session/run/event must degrade to unwritten");
         assert!(
             outcome.degrade_reason.as_deref().is_some_and(|r| r.contains("CANON_PG_DSN_INGEST_S29_D6_UNSET")),
@@ -1516,7 +1537,7 @@ mod tests {
         let canon_yaml = dir.path().join("canon.yaml");
         std::fs::write(&canon_yaml, yaml).unwrap();
 
-        let err = run(&canon_yaml, dir.path(), false, false, true).unwrap_err();
+        let err = run(&canon_yaml, dir.path(), false, false, true, false).unwrap_err();
         assert!(matches!(err, IngestError::Tiers(_)), "a malformed pg schema must fail loud as a Tiers error, got {err:?}");
         assert!(err.to_string().contains("Bad-Schema"), "must name the offending schema: {err}");
     }
@@ -1588,7 +1609,7 @@ mod tests {
     fn default_scope_uses_metadata_only_unwritten_output() {
         let fixture = build_two_project_fixture(false);
 
-        let outcome = run(&fixture.canon_yaml, fixture.home.path(), false, false, false).unwrap();
+        let outcome = run(&fixture.canon_yaml, fixture.home.path(), false, false, false, false).unwrap();
         assert_eq!(outcome.sessions_normalized, 2, "project A's own session + its linked worktree's session; project B excluded");
         assert!(outcome.scope_summary.contains("2 roots"), "scope: {}", outcome.scope_summary);
 
@@ -1617,7 +1638,7 @@ mod tests {
         let source = source_dir.join("ing_ses_a.jsonl");
         let before = std::fs::read(&source).unwrap();
 
-        let outcome = run(&fixture.canon_yaml, fixture.home.path(), false, false, false).unwrap();
+        let outcome = run(&fixture.canon_yaml, fixture.home.path(), false, false, false, false).unwrap();
         let sessions = outcome.unwritten.as_ref().expect("unrouted fixture uses metadata-only unwritten output");
         assert!(sessions.iter().flat_map(|session| &session.events).all(|event| event.label != "user_directive"));
         assert_eq!(std::fs::read(&source).unwrap(), before, "ingest must never rewrite the source transcript");
@@ -1646,7 +1667,7 @@ mod tests {
         )
         .unwrap();
 
-        let outcome = run(&fixture.canon_yaml, fixture.home.path(), false, false, false).unwrap();
+        let outcome = run(&fixture.canon_yaml, fixture.home.path(), false, false, false, false).unwrap();
         let payload: serde_json::Value = serde_json::from_str(&format_json(&outcome).unwrap()).unwrap();
         assert_eq!(payload["failure"]["class"], "tier_unavailable");
         assert!(payload["failure"]["reason"].as_str().unwrap().contains(dsn_env));
@@ -1673,7 +1694,7 @@ mod tests {
         )
         .unwrap();
 
-        let outcome = run(&fixture.canon_yaml, fixture.home.path(), false, false, false).unwrap();
+        let outcome = run(&fixture.canon_yaml, fixture.home.path(), false, false, false, false).unwrap();
         let json = format_json(&outcome).unwrap();
         assert!(!json.contains("do the a thing"), "degraded metadata must omit captured directive text: {json}");
         let payload: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -1684,7 +1705,7 @@ mod tests {
     fn all_workspaces_flag_restores_the_machine_wide_scan() {
         let fixture = build_two_project_fixture(false);
 
-        let outcome = run(&fixture.canon_yaml, fixture.home.path(), false, false, true).unwrap();
+        let outcome = run(&fixture.canon_yaml, fixture.home.path(), false, false, true, false).unwrap();
         assert_eq!(outcome.sessions_normalized, 3, "all three sessions are ingested with --all-workspaces");
         assert_eq!(outcome.scope_summary, "all workspaces");
 
@@ -1696,11 +1717,11 @@ mod tests {
     fn default_scope_second_pass_is_steady_state_zero_reparsed() {
         let fixture = build_two_project_fixture(true);
 
-        let first = run(&fixture.canon_yaml, fixture.home.path(), false, false, false).unwrap();
+        let first = run(&fixture.canon_yaml, fixture.home.path(), false, false, false, false).unwrap();
         assert_eq!(first.runs_written, 2);
         assert!(first.unwritten.is_none());
 
-        let second = run(&fixture.canon_yaml, fixture.home.path(), false, false, false).unwrap();
+        let second = run(&fixture.canon_yaml, fixture.home.path(), false, false, false, false).unwrap();
         assert_eq!(second.runs_written, 0, "steady state: nothing new to persist");
         let total_reparsed: usize = second.adapters.iter().map(|a| a.reparsed).sum();
         assert_eq!(total_reparsed, 0, "every present in-scope file was unchanged this pass");
@@ -1902,11 +1923,11 @@ mod tests {
         write_fixture_home(dir.path());
         let canon_yaml = write_canon_yaml(dir.path(), true);
 
-        let first = run(&canon_yaml, dir.path(), false, false, true).unwrap();
+        let first = run(&canon_yaml, dir.path(), false, false, true, false).unwrap();
         assert_eq!(first.adapters[0].client_id, "omp");
         assert_eq!(first.runs_written, 1, "pass 1 parses and persists");
 
-        let second = run(&canon_yaml, dir.path(), false, false, true).unwrap();
+        let second = run(&canon_yaml, dir.path(), false, false, true, false).unwrap();
         assert_eq!(second.adapters[0].reparsed, 0, "pass 2 at the SAME parse version is watermark-skipped");
         assert!(second.adapters[0].skipped_unchanged >= 1);
 
