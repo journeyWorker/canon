@@ -21,8 +21,12 @@ fn main() -> ExitCode {
         Err(error) => return usage_error(&error.format(&mut command.clone())),
     };
     // The role is resolved before any command runs, so an unknown `CANON_ROLE` refuses the invocation.
+    // `canon schema` never fails on the role: a bad `CANON_ROLE` is a warning there.
     if let Err(error) = canon_cli::role::init(cli.declared_role) {
-        return ExitCode::from(error.emit("canon", argv_wants_json()) as u8);
+        if !matches!(cli.command, canon_cli::cli::Command::Schema(_)) {
+            return ExitCode::from(error.emit("canon", argv_wants_json()) as u8);
+        }
+        canon_cli::json_out::warn(error.message);
     }
     if let Some(code) = refuse_without_config(&parsed) {
         return code;

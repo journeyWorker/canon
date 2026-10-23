@@ -20,16 +20,19 @@ pub mod finding;
 pub mod gate;
 pub mod ingest;
 pub mod inventory;
-pub mod learn;
 pub mod ledger;
 pub mod meta;
 pub mod plugin;
 pub mod policy;
 pub mod prompt;
+pub mod regime;
+pub mod report;
 pub mod review;
 pub mod scenario;
 pub mod skills;
+pub mod strategy;
 pub mod subject;
+pub mod task;
 pub mod tier;
 pub mod top;
 
@@ -38,7 +41,10 @@ pub use policy::PolicyCommand;
 pub use context_pack::ContextPackCommand;
 pub use adapter::AdapterCommand;
 pub use prompt::PromptCommand;
-pub use learn::LearnCommand;
+pub use strategy::StrategyCommand;
+pub use regime::RegimeCommand;
+pub use report::ReportCommand;
+pub use task::TaskCommand;
 pub use demo::DemoCommand;
 pub use dispatch::DispatchCommand;
 pub use ingest::IngestCommand;
@@ -72,7 +78,7 @@ pub fn command() -> clap::Command {
     version,
     about = "Specs, evidence gates, and agent memory for your repo",
     long_about = "canon keeps a repo's specs, review evidence, and agent strategy \
-memory in one place: author .feature specs, gate task completion on real evidence, \
+memory in one place: author .feature specs, task done completion on real evidence, \
 ingest agent sessions, and retrieve role-scoped guidance.",
     arg_required_else_help = true,
     propagate_version = true,
@@ -90,7 +96,7 @@ Learn more:
   inspect the target without deleting user files."
 )]
 pub struct Cli {
-    /// The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` lists the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` defaults to it
+    /// The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` defaults to it
     #[arg(long = "as", global = true, value_enum, value_name = "ROLE")]
     pub declared_role: Option<crate::role::Role>,
     #[command(subcommand)]
@@ -101,30 +107,30 @@ pub struct Cli {
 pub enum Command {
     // ── Getting started ──
     /// Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home)
-    #[command(after_help = "Examples:\n  canon init\n  canon init --policy light\n  canon init --providers claude,codex\n  canon init --no-agents-md --no-policy\n  canon init --check-config\n\nPolicy levels (--policy, default strict): light requires evidence on every\nscenario; standard adds a `@case:failure` scenario per feature surface; strict\nadds independent review. The level is the first line of .canon/policy.yaml and\n`canon status` shows it.\n\nHarnesses (--providers): on a terminal, init asks which harnesses get the canon\nskill, with the detected ones (.claude, .codex, .omp, .pi directories) checked.\nWithout a terminal or --providers it takes the detected ones; with none detected\nit installs nothing and says how to choose. The answer is recorded as\n`skills: { providers: [...] }` in canon.yaml (`--providers none` records `[]`).\n\nRerunning in a repo that has canon.yaml leaves canon.yaml and .canon/policy.yaml\nalone and only refreshes the canon block in AGENTS.md.")]
+    #[command(after_help = "Examples:\n  canon init\n  canon init --policy light\n  canon init --providers claude,codex\n  canon init --no-agents-md --no-policy\n  canon init --check\n\nPolicy levels (--policy, default strict): light requires evidence on every\nscenario; standard adds a `@case:failure` scenario per feature surface; strict\nadds independent review. The level is the first line of .canon/policy.yaml and\n`canon status` shows it.\n\nHarnesses (--providers): on a terminal, init asks which harnesses get the canon\nskill, with the detected ones (.claude, .codex, .omp, .pi directories) checked.\nWithout a terminal or --providers it takes the detected ones; with none detected\nit installs nothing and says how to choose. The answer is recorded as\n`skills: { providers: [...] }` in canon.yaml (`--providers none` records `[]`).\n\nRerunning in a repo that has canon.yaml leaves canon.yaml and .canon/policy.yaml\nalone and only refreshes the canon block in AGENTS.md.")]
     Init(InitArgs),
     /// Bring a repo from an earlier canon up to date: the 0.17 layout (specs, changes, approvals, skills, .gitignore), the 0.23 latest-only ledger (superseded versions to .canon/archive) and 0.23 review pins
     #[command(after_help = "Examples:\n  canon migrate --dry-run\n  canon migrate\n\nPrints the plan, then applies it; --dry-run stops after the plan. Idempotent:\na second run finds nothing to move, and a run that stopped partway is finished\nby the next one.\n\n- A spec root's features/kind=feature/ moves to <root>/kind=feature/ (git mv in a\n  git work tree). A root at the repo-level `specs` moves to .canon/specs, and\n  canon.yaml records `former_roots: [specs]` so reviews pinned before the move\n  still find their scenarios.\n- Changes `canon change new` wrote under openspec/changes move to\n  .canon/changes/<slug>/ (proposal.md -> brief.md, tasks.md alongside); every\n  other change stays and is named. A change counts as canon's when its files are\n  still that command's scaffold and its first stored version was already adopted:\n  0.16 kept no durable provenance. A false positive keeps its content and ids and\n  is one `git mv` to undo; --dry-run shows exactly which changes move.\n  canon init's `{ dialect: openspec, root: . }` source goes once nothing unread is\n  left under it.\n- An external proposal.md's Approved: line is copied into a canon pointer\n  brief, .canon/changes/<change>/brief.md, with a Source: line.\n- skills.providers is written from the install lock; missing canon .gitignore\n  lines are added; the scenario index is rebuilt (full sync).\n- Superseded ledger versions move to .canon/archive (`canon ledger compact`);\n  `canon query --history` still reads them.\n- Reviews written before 0.23 are re-pinned to what their evidence says: a\n  review current under the old rule stays current, a stale one stays stale.\n\nRefuses (exit 2, nothing written) on uncommitted changes under a path it\nmoves, on a destination that already exists, on a change directory that could\nstop halfway, and on a canon.yaml edit it cannot make with every other byte\nkept. canon.yaml is written atomically.")]
     Migrate(MigrateArgs),
     /// Record who approved the gate's policy (.canon/policy.yaml) and which bytes
-    #[command(after_help = "Examples:\n  canon policy approve --by alice --note 'reviewed the starter policy'\n\nWrites .canon/policy.approval.json (commit it): the policy's sha256, who\napproved it, when, and the note. `canon gate check` and `canon status` print an\nadvisory while the policy was never approved. A policy that changed since its\napproval (or whose approval cannot be read) fails closed: `gate check` exits 1\nand `subject status` refuses to ship or reopen; `--override-reason` does not\nwaive it. `canon policy show` reads the approval back.")]
+    #[command(after_help = "Examples:\n  canon policy approve --approver alice --note 'reviewed the starter policy'\n\nWrites .canon/policy.approval.json (commit it): the policy's sha256, who\napproved it, when, and the note. `canon gate check` and `canon status` print an\nadvisory while the policy was never approved. A policy that changed since its\napproval (or whose approval cannot be read) fails closed: `gate check` exits 1\nand `subject move` refuses to ship or reopen; `--override-reason` does not\nwaive it. `canon policy show` reads the approval back.")]
     Policy {
         #[command(subcommand)]
         action: PolicyCommand,
     },
     /// Try the evidence loop end-to-end in a throwaway demo repo
-    #[command(after_help = "Examples:\n  canon demo init --repo /tmp/canon-demo && cd /tmp/canon-demo\n  canon gate check   # RED\n  canon demo add && canon gate check   # GREEN")]
+    #[command(after_help = "Examples:\n  canon demo init --repo /tmp/canon-demo && cd /tmp/canon-demo\n  canon gate check   # RED\n  canon demo review && canon gate check   # GREEN")]
     Demo {
         #[command(subcommand)]
         action: DemoCommand,
     },
     /// Show where this repo stands: subjects by status, their gaps, and the next commands
-    #[command(after_help = "Examples:\n  canon status\n  canon status --json\n\nA read: exits 0 whatever it finds, and writes nothing. The counts come from the\nsame joins `canon gate check` and `canon subject status` use.")]
+    #[command(after_help = "Examples:\n  canon status\n  canon status --json\n\nA read: exits 0 whatever it finds, and writes nothing. The counts come from the\nsame joins `canon gate check` and `canon subject move` use.")]
     Status(StatusArgs),
     /// Show what you can author here: record kinds, fields, enums, policies
     Context(ContextArgs),
     /// Create, inspect, and verify reproducible context packs
-    #[command(after_help = "Examples:\n  canon context-pack new --manifest .canon/context-manifest.json\n  canon context-pack show sha256:<pack-digest> --repo . --json\n  canon context-pack verify sha256:<pack-digest>")]
+    #[command(after_help = "Examples:\n  canon context-pack add --manifest .canon/context-manifest.json\n  canon context-pack show sha256:<pack-digest> --repo . --json\n  canon context-pack verify sha256:<pack-digest>")]
     ContextPack {
         #[command(subcommand)]
         action: ContextPackCommand,
@@ -181,14 +187,20 @@ pub enum Command {
         action: InventoryCommand,
     },
     // ── Evidence loop ──
-    /// Run evidence gates, flip task checkboxes, install hooks
-    #[command(after_help = "Examples:\n  canon gate check\n  canon gate task my-change#3\n  canon gate install-hooks")]
+    /// Run evidence gates, promote staged records, install hooks
+    #[command(after_help = "Examples:\n  canon gate check\n  canon task done my-change#3\n  canon gate install-hooks")]
     Gate {
         #[command(subcommand)]
         action: GateCommand,
     },
+    /// Flip a plan task's checkbox once committed evidence supports it
+    #[command(after_help = "Examples:\n  canon task done my-change#3")]
+    Task {
+        #[command(subcommand)]
+        action: TaskCommand,
+    },
     /// Author a staged, attributed evidence attestation for a plan task
-    #[command(after_help = "Examples:\n  canon evidence add --task my-change#3.1 --kind test-run --ref 'cargo test -p canon-cli' --role implementer\n\nThe loop:\n  canon evidence add ...    Record an EvidenceRecord (promoted in the same run under\n                            `write: { promote: auto }`, which `canon init` writes)\n  canon gate task <id>      Flip the checkbox on it\nUnder `write.promote: manual` (no `write:` key), run `canon gate promote` after\neach add to commit it (assigns run_seq).\n\nSee `canon evidence add --help` for exactly what the gate does and does not check.")]
+    #[command(after_help = "Examples:\n  canon evidence add --task-id my-change#3.1 --class test-run --ref 'cargo test -p canon-cli' --role implementer\n\nThe loop:\n  canon evidence add ...    Record an EvidenceRecord (promoted in the same run under\n                            `write: { promote: auto }`, which `canon init` writes)\n  canon task done <id>      Flip the checkbox on it\nUnder `write.promote: manual` (no `write:` key), run `canon gate promote` after\neach add to commit it (assigns run_seq).\n\nSee `canon evidence add --help` for exactly what the gate does and does not check.")]
     Evidence {
         #[command(subcommand)]
         action: EvidenceCommand,
@@ -199,7 +211,7 @@ pub enum Command {
         action: ArtifactsCommand,
     },
     /// Record one code-review finding as a durable record
-    #[command(after_help = "Examples:\n  canon finding add --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --severity blocker --disposition open --reviewer review-voice \\\n      --summary 'a release metric is asserted, never computed'\n  canon finding close s43-findings-are-records --round 1 --seq 1 \\\n      --disposition fixed --resolution-sha $(git rev-parse HEAD)\n\nThe loop:\n  canon finding add ...     Record a Finding\n  canon finding close ...   Record its disposition TRANSITION, once fixed\nEach is promoted in the same run under `write: { promote: auto }`, which\n`canon init` writes. Under `write.promote: manual` (no `write:` key), run\n`canon gate promote` after each to commit it.\n\nThe committed finding STAYS when it is closed: the ledger is append-only and\nthe pair IS the history. Every reader folds by natural key to the latest\nversion, so the finding is still counted once.\n\nRECORDED OBSERVATION, NOT PROOF — canon never verifies that the defect\nexisted, that it was fixed, or that --introduced-by is the true cause.\nSee `canon finding add --help` for exactly what it does and does not establish.")]
+    #[command(after_help = "Examples:\n  canon finding add --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --severity blocker --disposition open --actor-id review-voice \\\n      --summary 'a release metric is asserted, never computed'\n  canon finding close s43-findings-are-records --round 1 --seq 1 \\\n      --disposition fixed --resolution-sha $(git rev-parse HEAD)\n\nThe loop:\n  canon finding add ...     Record a Finding\n  canon finding close ...   Record its disposition TRANSITION, once fixed\nEach is promoted in the same run under `write: { promote: auto }`, which\n`canon init` writes. Under `write.promote: manual` (no `write:` key), run\n`canon gate promote` after each to commit it.\n\nThe committed finding STAYS when it is closed: the ledger is append-only and\nthe pair IS the history. Every reader folds by natural key to the latest\nversion, so the finding is still counted once.\n\nRECORDED OBSERVATION, NOT PROOF — canon never verifies that the defect\nexisted, that it was fixed, or that --introduced-by is the true cause.\nSee `canon finding add --help` for exactly what it does and does not establish.")]
     Finding {
         #[command(subcommand)]
         action: FindingCommand,
@@ -224,9 +236,9 @@ pub enum Command {
     /// Fetch role-scoped strategy guidance
     Retrieve(RetrieveArgs),
     /// Promote a proven strategy into the git-tracked tier
-    Learn {
+    Strategy {
         #[command(subcommand)]
-        action: LearnCommand,
+        action: StrategyCommand,
     },
     /// Begin an agent run with retrieved guidance recorded
     Dispatch {
@@ -234,7 +246,10 @@ pub enum Command {
         action: DispatchCommand,
     },
     /// Build a canonical regime key for hook scripts
-    RegimeKey(RegimeKeyArgs),
+    Regime {
+        #[command(subcommand)]
+        action: RegimeCommand,
+    },
     // ── Reading & reporting ──
     /// Read stored records across every storage tier
     Query(QueryArgs),
@@ -242,8 +257,11 @@ pub enum Command {
     Export(ExportArgs),
     /// Remove allowlisted records older than a cutoff: `--plan` shows the removal set and its planDigest, `--confirm <planDigest>` deletes it
     Purge(PurgeArgs),
-    /// Generate the status report (write, --check, or --snapshot)
-    Report(ReportArgs),
+    /// Build, check, or snapshot the status report
+    Report {
+        #[command(subcommand)]
+        action: ReportCommand,
+    },
     /// Serve the local status dashboard
     Dashboard(DashboardArgs),
     // ── Maintenance ──
@@ -271,7 +289,7 @@ pub enum Command {
     /// Run canon's built-in fixture self-tests
     Selftest(SelftestArgs),
     /// Describe canon's own commands: list them, or show one command's arguments, options, effect and exit codes
-    #[command(after_help = "Examples:\n  canon schema\n  canon schema --all --json\n  canon schema evidence add --json\n  CANON_ROLE=reviewer canon schema --json\n  canon schema --errors --json\n\nGenerated from the command tree itself, so it never drifts from what the parser accepts.\nTouches no repo and no network: it works from any directory. An unknown path exits 2 and names the\nnearest matches.\n\nWith a declared role (CANON_ROLE or --as) the bare listing shows only that role's commands; --all\nlists every command. A command whose effect depends on its arguments carries `effectNote`.")]
+    #[command(after_help = "Examples:\n  canon schema\n  canon schema --json\n  canon schema evidence add --json\n  canon schema --as reviewer --json\n  canon schema --errors --json\n  canon schema --error CONFIG_MISSING\n\nGenerated from the command tree itself, so it never drifts from what the parser accepts.\nTouches no repo and no network: it works from any directory. An unknown path exits 2 and names the\nnearest matches.\n\nThe bare listing is unfiltered: every command. `--as <ROLE>` lists only that role's commands; the\nCANON_ROLE variable never filters or fails `schema` (an invalid value is a warning in meta.warnings).\nA command whose effect depends on its arguments carries `effectNote`.")]
     Schema(SchemaArgs),
     /// Write the shell completion script for canon (bash, zsh or fish)
     #[command(after_help = "Examples:\n  canon completion zsh > ~/.zfunc/_canon\n  canon completion bash > /etc/bash_completion.d/canon\n  canon completion fish > ~/.config/fish/completions/canon.fish\n\nThe script is generated from the command tree, so it completes exactly what the parser accepts. It needs no repo and no network.")]

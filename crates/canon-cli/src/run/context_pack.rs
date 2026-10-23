@@ -5,26 +5,26 @@ use std::process::ExitCode;
 
 pub fn run(cmd: ContextPackCommand) -> ExitCode {
     match cmd {
-        ContextPackCommand::New(args) => run_context_pack_new(args),
+        ContextPackCommand::Add(args) => run_context_pack_add(args),
         ContextPackCommand::Show(ContextPackShowArgs { id, repo, json }) => run_context_pack_show(&repo, &id, json),
         ContextPackCommand::Verify(ContextPackVerifyArgs { id, repo, json }) => run_context_pack_verify(&repo, &id, json),
     }
 }
 
-fn run_context_pack_new(args: ContextPackNewArgs) -> ExitCode {
-    let ContextPackNewArgs { manifest, repo, json } = args;
+fn run_context_pack_add(args: ContextPackAddArgs) -> ExitCode {
+    let ContextPackAddArgs { manifest, repo, json } = args;
     let repo = crate::context::resolve_repo_root(&repo);
     match crate::context_pack::create_from_manifest(&repo, &manifest) {
         Ok(pack) => {
             if json {
-                crate::json_out::data("context-pack new", &pack);
+                crate::json_out::data("context-pack add", &pack);
             } else {
                 println!("{}", pack.id);
             }
             ExitCode::SUCCESS
         }
         Err(error) => {
-            ExitCode::from(error.to_cli_error().emit("canon context-pack new", json) as u8)
+            ExitCode::from(error.to_cli_error().emit("canon context-pack add", json) as u8)
         }
     }
 }

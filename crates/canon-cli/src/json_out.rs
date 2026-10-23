@@ -200,7 +200,7 @@ pub fn set_repo(repo: PathBuf) {
     let _ = REPO.set(repo);
 }
 
-/// `command` as the schema id: `canon gate check`, `gate check` and `canon report --check` are `gate check` and `report`.
+/// `command` as the schema id: `canon gate check`, `gate check` and `canon report check` are `gate check` and `report`.
 pub fn command_id(command: &str) -> String {
     let mut words = command.split_whitespace().peekable();
     if words.peek() == Some(&"canon") {

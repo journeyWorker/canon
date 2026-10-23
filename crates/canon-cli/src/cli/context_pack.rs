@@ -3,9 +3,9 @@
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
-/// The flags of `context-pack new`.
+/// The flags of `context-pack add`.
 #[derive(clap::Args)]
-pub struct ContextPackNewArgs {
+pub struct ContextPackAddArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
@@ -19,7 +19,7 @@ pub struct ContextPackNewArgs {
 #[derive(Subcommand)]
 pub enum ContextPackCommand {
     /// Create an immutable context pack from a repository-local JSON manifest
-    New(ContextPackNewArgs),
+    Add(ContextPackAddArgs),
     /// Show a context pack after verifying its manifest and content objects
     Show(ContextPackShowArgs),
     /// Verify a context pack's manifest and immutable content objects

@@ -122,6 +122,8 @@ class TraceCheckTests(unittest.TestCase):
             '{"error":{"code":"USAGE","hint":"--actor was renamed --actor-id in 0.24.0; use --actor-id"}}'), "naming")
         self.assertEqual(trace_check.classify_failure(
             "hint: --kind review_record was renamed --kind review in 0.24.0; use --kind review"), "naming")
+        self.assertEqual(trace_check.classify_failure(
+            '{"error":{"code":"USAGE","hint":"--agent-id was removed in 0.28.0; use `--actor-id`"}}'), "naming")
 
 
 if __name__ == "__main__":

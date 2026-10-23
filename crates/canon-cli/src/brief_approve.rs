@@ -1,4 +1,4 @@
-//! `canon brief approve <slug> --by <human> --note "<words>"`
+//! `canon brief approve <slug> --approver <human> --note "<words>"`
 //! (0.19 D3, #46): the one call that records a human's answer to a brief.
 //!
 //! It writes `Approved: <who> <when> — "<words>" (brief sha256:<digest>)`
@@ -10,7 +10,7 @@
 //! brief makes every reader say `BRIEF_CHANGED_SINCE_APPROVAL`.
 //!
 //! Refused (exit 2) while `canon brief check` has blocker findings, and
-//! for an empty `--by`/`--note`; exit 1 for an operational error. Existing
+//! for an empty `--approver`/`--note`; exit 1 for an operational error. Existing
 //! `Approved:` lines are replaced, so re-approving leaves exactly one.
 //! Canon cannot tell a human from an agent running this command: the
 //! skill makes it a human stop, and `--note` carries their words.
@@ -63,7 +63,7 @@ impl Report for Approved {}
 /// The next step for each code [`approve`] refuses with.
 fn hint_for(code: &str) -> &'static str {
     match code {
-        "APPROVAL_INCOMPLETE" => "pass --by <name> and --note <the human's answer>, each one non-empty line",
+        "APPROVAL_INCOMPLETE" => "pass --approver <name> and --note <the human's answer>, each one non-empty line",
         "BRIEF_HAS_BLOCKERS" => "run `canon brief check`, clear the blockers it lists, then ask the human to approve",
         "BRIEF_UNAPPROVABLE" => "fix the brief as the message says (`canon brief check` re-reads it), then run `canon brief approve` again",
         "BRIEF_UNREADABLE" => "check that brief.md is a readable UTF-8 file, then run `canon brief approve` again",
@@ -90,7 +90,7 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 /// bytes differ, and nothing is written.
 pub fn approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, expected_sha256: Option<&str>) -> Result<Approved, CliError> {
     let (by, note) = (by.trim(), note.trim());
-    for (flag, value) in [("--by", by), ("--note", note)] {
+    for (flag, value) in [("--approver", by), ("--note", note)] {
         if value.is_empty() {
             return Err(refuse("APPROVAL_INCOMPLETE", &format!("{flag} must carry the human's answer, not be empty"), EXIT_REFUSED));
         }

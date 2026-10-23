@@ -14,7 +14,7 @@ pub enum PolicyCommand {
 pub struct PolicyApproveArgs {
     /// Who approved it (a human's name or id)
     #[arg(long)]
-    pub by: String,
+    pub approver: String,
     /// Why, or what was reviewed
     #[arg(long)]
     pub note: Option<String>,

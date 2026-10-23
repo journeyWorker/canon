@@ -117,7 +117,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     let language = match crate::language::configured(&repo) {
         Ok(language) => language,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon change new", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon change new", json);
         }
     };
 

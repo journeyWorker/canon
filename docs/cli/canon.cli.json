@@ -411,6 +411,7 @@
         "CHANGE_AMBIGUOUS",
         "CONFIG_MISSING",
         "CONFIG_UNREADABLE",
+        "HUMAN_ONLY",
         "NO_BRIEF",
         "POLICY_APPROVAL_FAILED",
         "SPEC_ROOTS_UNREADABLE",
@@ -418,7 +419,7 @@
         "USAGE"
       ],
       "examples": [
-        "canon brief approve --by alice --note \"approved as written\""
+        "canon brief approve add-search --approver alice --note \"approved as written\""
       ],
       "exits": [
         {
@@ -454,11 +455,11 @@
           "default": [],
           "help": "Who approved (the human, not the agent)",
           "kind": "value",
-          "name": "by",
+          "name": "approver",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "BY"
+          "valueName": "APPROVER"
         },
         {
           "aliases": [],
@@ -770,14 +771,14 @@
           ],
           "help": "`feature` (default): the PRD brief. `chore`: a short brief for work that changes how the subject is built or kept, never what it does",
           "kind": "value",
-          "name": "kind",
+          "name": "change-kind",
           "possibleValues": [
             "feature",
             "chore"
           ],
           "repeatable": false,
           "required": false,
-          "valueName": "KIND"
+          "valueName": "CHANGE_KIND"
         },
         {
           "aliases": [],
@@ -961,7 +962,7 @@
           "kind": "value",
           "name": "fields",
           "possibleValues": [],
-          "repeatable": true,
+          "repeatable": false,
           "required": false,
           "valueName": "FIELDS"
         }
@@ -990,7 +991,7 @@
       "about": "Create, inspect, and verify reproducible context packs",
       "aliases": [],
       "children": [
-        "context-pack new",
+        "context-pack add",
         "context-pack show",
         "context-pack verify"
       ],
@@ -1004,7 +1005,7 @@
     {
       "about": "Create an immutable context pack from a repository-local JSON manifest",
       "aliases": [],
-      "command": "context-pack new",
+      "command": "context-pack add",
       "effect": "write",
       "errorCodes": [
         "CONTEXT_GIT_UNAVAILABLE",
@@ -1022,7 +1023,7 @@
         "USAGE"
       ],
       "examples": [
-        "canon context-pack new --manifest .canon/context-manifest.json"
+        "canon context-pack add --manifest .canon/context-manifest.json"
       ],
       "exits": [
         {
@@ -1036,7 +1037,7 @@
       ],
       "idempotency": "content-keyed",
       "inputs": [],
-      "name": "new",
+      "name": "add",
       "nodeKind": "leaf",
       "operands": [],
       "options": [
@@ -1083,7 +1084,7 @@
       ],
       "path": [
         "context-pack",
-        "new"
+        "add"
       ],
       "requiredOneOf": [],
       "roles": [
@@ -1392,8 +1393,8 @@
       "about": "Try the evidence loop end-to-end in a throwaway demo repo",
       "aliases": [],
       "children": [
-        "demo add",
-        "demo init"
+        "demo init",
+        "demo review"
       ],
       "command": "demo",
       "name": "demo",
@@ -1401,76 +1402,6 @@
       "path": [
         "demo"
       ]
-    },
-    {
-      "about": "Record the missing reviewer evidence (gate turns GREEN)",
-      "aliases": [],
-      "command": "demo add",
-      "effect": "write",
-      "errorCodes": [
-        "DEMO_NOT_INITIALIZED",
-        "UNKNOWN_ROLE",
-        "USAGE",
-        "WRITE_FAILED"
-      ],
-      "examples": [
-        "canon demo add"
-      ],
-      "exits": [
-        {
-          "code": 0,
-          "meaning": "success"
-        },
-        {
-          "code": 2,
-          "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
-        }
-      ],
-      "idempotency": "appends",
-      "inputs": [],
-      "name": "add",
-      "nodeKind": "leaf",
-      "operands": [],
-      "options": [
-        {
-          "aliases": [],
-          "default": [],
-          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
-          "kind": "value",
-          "name": "repo",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "DIR"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Output JSON instead of the human-readable form",
-          "kind": "flag",
-          "name": "json",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        }
-      ],
-      "outputs": [
-        {
-          "kind": "report",
-          "report": "DemoReviewReport",
-          "schemaRef": null,
-          "schemaVersion": null
-        }
-      ],
-      "path": [
-        "demo",
-        "add"
-      ],
-      "requiredOneOf": [],
-      "roles": [
-        "orchestrator"
-      ],
-      "supportsJson": true
     },
     {
       "about": "Scaffold the demo repo (gate starts RED)",
@@ -1544,6 +1475,76 @@
       "supportsJson": true
     },
     {
+      "about": "Record the missing reviewer evidence (gate turns GREEN)",
+      "aliases": [],
+      "command": "demo review",
+      "effect": "write",
+      "errorCodes": [
+        "DEMO_NOT_INITIALIZED",
+        "UNKNOWN_ROLE",
+        "USAGE",
+        "WRITE_FAILED"
+      ],
+      "examples": [
+        "canon demo review"
+      ],
+      "exits": [
+        {
+          "code": 0,
+          "meaning": "success"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
+        }
+      ],
+      "idempotency": "appends",
+      "inputs": [],
+      "name": "review",
+      "nodeKind": "leaf",
+      "operands": [],
+      "options": [
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
+          "kind": "value",
+          "name": "repo",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Output JSON instead of the human-readable form",
+          "kind": "flag",
+          "name": "json",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "report",
+          "report": "DemoReviewReport",
+          "schemaRef": null,
+          "schemaVersion": null
+        }
+      ],
+      "path": [
+        "demo",
+        "review"
+      ],
+      "requiredOneOf": [],
+      "roles": [
+        "orchestrator"
+      ],
+      "supportsJson": true
+    },
+    {
       "about": "Begin an agent run with retrieved guidance recorded",
       "aliases": [],
       "children": [
@@ -1581,7 +1582,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon dispatch begin --role implementer --regime implementer/my-repo/api/abcdef012345"
+        "canon dispatch begin --regime implementer/my-repo/api/abcdef012345 --role implementer"
       ],
       "exits": [
         {
@@ -1607,7 +1608,7 @@
           "name": "role",
           "possibleValues": [],
           "repeatable": false,
-          "required": true,
+          "required": false,
           "valueName": "ROLE"
         },
         {
@@ -1628,16 +1629,16 @@
           ],
           "help": "The dispatching agent's id (recorded as the run's actor)",
           "kind": "value",
-          "name": "agent-id",
+          "name": "actor-id",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "AGENT_ID"
+          "valueName": "ACTOR_ID"
         },
         {
           "aliases": [],
           "default": [],
-          "help": "Declared provider metadata (copied verbatim; never inferred from --agent-id)",
+          "help": "Declared provider metadata (copied verbatim; never inferred from --actor-id)",
           "kind": "value",
           "name": "provider",
           "possibleValues": [],
@@ -1683,11 +1684,11 @@
           "default": [],
           "help": "Explicit repository-relative ContextPack input manifest",
           "kind": "value",
-          "name": "context-manifest",
+          "name": "manifest",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "CONTEXT_MANIFEST"
+          "valueName": "MANIFEST"
         },
         {
           "aliases": [],
@@ -1705,22 +1706,22 @@
           "default": [],
           "help": "Plan task this run serves (<change_id>#<n>); validated against the plan corpus",
           "kind": "value",
-          "name": "task",
+          "name": "task-id",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "TASK"
+          "valueName": "TASK_ID"
         },
         {
           "aliases": [],
           "default": [],
           "help": "RunId (ULID) of the run that dispatched this one",
           "kind": "value",
-          "name": "parent-run",
+          "name": "parent-run-id",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "PARENT_RUN"
+          "valueName": "PARENT_RUN_ID"
         },
         {
           "aliases": [],
@@ -1853,7 +1854,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon dispatch end 01ARZ3NDEKTSV4RRFFQ69G5FAV --status succeeded"
+        "canon dispatch end 01ARZ3NDEKTSV4RRFFQ69G5FAV --run-outcome succeeded"
       ],
       "exits": [
         {
@@ -1889,14 +1890,14 @@
           "default": [],
           "help": "Terminal outcome: succeeded or failed",
           "kind": "value",
-          "name": "status",
+          "name": "run-outcome",
           "possibleValues": [
             "succeeded",
             "failed"
           ],
           "repeatable": false,
           "required": true,
-          "valueName": "STATUS"
+          "valueName": "RUN_OUTCOME"
         },
         {
           "aliases": [],
@@ -1945,9 +1946,8 @@
         "divergence accept",
         "divergence add",
         "divergence defer",
-        "divergence promote",
-        "divergence resolve",
-        "divergence status"
+        "divergence list",
+        "divergence resolve"
       ],
       "command": "divergence",
       "name": "divergence",
@@ -1967,13 +1967,14 @@
         "CONFIG_UNREADABLE",
         "DIVERGENCE_ACCEPT_REFUSED",
         "DIVERGENCE_INVALID_ARGUMENT",
+        "HUMAN_ONLY",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon divergence accept auth.login.01 --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --expiry 2030-01-01 --reviewer alice --role reviewer"
+        "canon divergence accept auth.login.01 --actor-id alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --expiry 2030-01-01 --role reviewer"
       ],
       "exits": [
         {
@@ -2050,31 +2051,18 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
-          "kind": "value",
-          "name": "reviewer",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": true,
-          "valueName": "REVIEWER"
-        },
-        {
-          "aliases": [],
-          "default": [
-            "canon"
-          ],
-          "help": "The invoking actor's id",
+          "help": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
           "kind": "value",
           "name": "actor-id",
           "possibleValues": [],
           "repeatable": false,
-          "required": false,
+          "required": true,
           "valueName": "ACTOR_ID"
         },
         {
           "aliases": [],
           "default": [],
-          "help": "Must be reviewer. Required unless the declared role (--as / CANON_ROLE) is reviewer, which it then defaults to",
+          "help": "Must be reviewer (default: the declared role, --as / CANON_ROLE; required when none is declared)",
           "kind": "value",
           "name": "role",
           "possibleValues": [],
@@ -2132,7 +2120,7 @@
       "supportsJson": true
     },
     {
-      "about": "Add a divergence candidate, staged with no run_seq yet (commit it with `canon divergence promote`, or in the same run with --promote / `write: { promote: auto }`)",
+      "about": "Add a divergence candidate, staged with no run_seq yet (commit it with `canon gate promote --kind divergence`, or in the same run with --promote / `write: { promote: auto }`)",
       "aliases": [],
       "command": "divergence add",
       "effect": "write",
@@ -2148,7 +2136,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon divergence add auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --reviewer alice --role reviewer"
+        "canon divergence add auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --actor-id alice --role reviewer"
       ],
       "exits": [
         {
@@ -2206,13 +2194,18 @@
           "default": [
             "open"
           ],
-          "help": "open / still-divergent / resolved / deferred (deferred needs --reason/--expiry)",
+          "help": "The divergence state to record (deferred needs --reason and --expiry)",
           "kind": "value",
-          "name": "status",
-          "possibleValues": [],
+          "name": "state",
+          "possibleValues": [
+            "open",
+            "still-divergent",
+            "resolved",
+            "deferred"
+          ],
           "repeatable": false,
           "required": false,
-          "valueName": "STATUS"
+          "valueName": "STATE"
         },
         {
           "aliases": [],
@@ -2252,13 +2245,13 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
           "kind": "value",
-          "name": "reviewer",
+          "name": "actor-id",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "REVIEWER"
+          "valueName": "ACTOR_ID"
         },
         {
           "aliases": [],
@@ -2275,26 +2268,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "canon"
-          ],
-          "help": null,
-          "kind": "value",
-          "name": "actor-id",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "ACTOR_ID"
-        },
-        {
-          "aliases": [],
           "default": [],
-          "help": null,
+          "help": "The role this record is attributed to (default: the role declared with --as / CANON_ROLE)",
           "kind": "value",
           "name": "role",
           "possibleValues": [],
           "repeatable": false,
-          "required": true,
+          "required": false,
           "valueName": "ROLE"
         },
         {
@@ -2381,7 +2361,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon divergence defer auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --reviewer alice --reason \"waiting on the vendor\" --expiry 2030-01-01T00:00:00Z --role reviewer"
+        "canon divergence defer auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --actor-id alice --reason \"waiting on the vendor\" --expiry 2030-01-01T00:00:00Z --role reviewer"
       ],
       "exits": [
         {
@@ -2450,13 +2430,13 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
           "kind": "value",
-          "name": "reviewer",
+          "name": "actor-id",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "REVIEWER"
+          "valueName": "ACTOR_ID"
         },
         {
           "aliases": [],
@@ -2482,26 +2462,13 @@
         },
         {
           "aliases": [],
-          "default": [
-            "canon"
-          ],
-          "help": null,
-          "kind": "value",
-          "name": "actor-id",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "ACTOR_ID"
-        },
-        {
-          "aliases": [],
           "default": [],
-          "help": null,
+          "help": "The role this record is attributed to (default: the role declared with --as / CANON_ROLE)",
           "kind": "value",
           "name": "role",
           "possibleValues": [],
           "repeatable": false,
-          "required": true,
+          "required": false,
           "valueName": "ROLE"
         },
         {
@@ -2546,269 +2513,9 @@
       "supportsJson": true
     },
     {
-      "about": "Promote all staged candidates, assigning run_seq",
+      "about": "List the current divergence burn-down state",
       "aliases": [],
-      "command": "divergence promote",
-      "effect": "write",
-      "errorCodes": [
-        "CONFIG_MISSING",
-        "CONFIG_UNREADABLE",
-        "DIVERGENCE_ACCEPT_REFUSED",
-        "DIVERGENCE_INVALID_ARGUMENT",
-        "PROMOTE_REFUSED",
-        "UNKNOWN_ROLE",
-        "USAGE",
-        "WRITE_FAILED"
-      ],
-      "examples": [
-        "canon divergence promote"
-      ],
-      "exits": [
-        {
-          "code": 0,
-          "meaning": "promoted, recovered or nothing staged"
-        },
-        {
-          "code": 1,
-          "meaning": "PROMOTE_REFUSED: the report stays in data"
-        },
-        {
-          "code": 2,
-          "meaning": "refused: CONFIG_MISSING, or an unreadable ledger"
-        }
-      ],
-      "idempotency": "replay-safe",
-      "inputs": [],
-      "name": "promote",
-      "nodeKind": "leaf",
-      "operands": [],
-      "options": [
-        {
-          "aliases": [],
-          "default": [],
-          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
-          "kind": "value",
-          "name": "repo",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "DIR"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Preview without writing anything",
-          "kind": "flag",
-          "name": "dry-run",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Output JSON instead of the human-readable form",
-          "kind": "flag",
-          "name": "json",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        }
-      ],
-      "outputs": [
-        {
-          "kind": "report",
-          "report": "GatePromoteReport",
-          "schemaRef": null,
-          "schemaVersion": null
-        }
-      ],
-      "path": [
-        "divergence",
-        "promote"
-      ],
-      "requiredOneOf": [],
-      "roles": [
-        "implementer"
-      ],
-      "supportsJson": true
-    },
-    {
-      "about": "Directly record a resolved divergence",
-      "aliases": [],
-      "command": "divergence resolve",
-      "effect": "write",
-      "errorCodes": [
-        "CONFIG_MISSING",
-        "CONFIG_UNREADABLE",
-        "DIVERGENCE_ACCEPT_REFUSED",
-        "DIVERGENCE_INVALID_ARGUMENT",
-        "DIVERGENCE_REFUSED",
-        "UNKNOWN_ROLE",
-        "UNKNOWN_SPEC_ROOT",
-        "USAGE",
-        "WRITE_FAILED"
-      ],
-      "examples": [
-        "canon divergence resolve auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --reviewer alice --role reviewer"
-      ],
-      "exits": [
-        {
-          "code": 0,
-          "meaning": "success"
-        },
-        {
-          "code": 2,
-          "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
-        }
-      ],
-      "idempotency": "appends",
-      "inputs": [],
-      "name": "resolve",
-      "nodeKind": "leaf",
-      "operands": [
-        {
-          "arity": {
-            "max": 1,
-            "min": 1
-          },
-          "description": "The scenario (`<area>.<surface>.<nn>`)",
-          "kind": "SCENARIO_ID",
-          "name": "scenario_id",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": true
-        }
-      ],
-      "options": [
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root",
-          "kind": "value",
-          "name": "project-id",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "PROJECT_ID"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": null,
-          "kind": "value",
-          "name": "sha",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": true,
-          "valueName": "SHA"
-        },
-        {
-          "aliases": [],
-          "default": [
-            "1"
-          ],
-          "help": null,
-          "kind": "value",
-          "name": "round",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "ROUND"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": null,
-          "kind": "value",
-          "name": "reviewer",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": true,
-          "valueName": "REVIEWER"
-        },
-        {
-          "aliases": [],
-          "default": [
-            ""
-          ],
-          "help": null,
-          "kind": "value",
-          "name": "detail",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "DETAIL"
-        },
-        {
-          "aliases": [],
-          "default": [
-            "canon"
-          ],
-          "help": null,
-          "kind": "value",
-          "name": "actor-id",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "ACTOR_ID"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": null,
-          "kind": "value",
-          "name": "role",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": true,
-          "valueName": "ROLE"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
-          "kind": "value",
-          "name": "repo",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "DIR"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Output JSON instead of the human-readable form",
-          "kind": "flag",
-          "name": "json",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        }
-      ],
-      "outputs": [
-        {
-          "kind": "report",
-          "report": "DivergenceResolveReport",
-          "schemaRef": null,
-          "schemaVersion": null
-        }
-      ],
-      "path": [
-        "divergence",
-        "resolve"
-      ],
-      "requiredOneOf": [],
-      "roles": [
-        "implementer",
-        "reviewer"
-      ],
-      "supportsJson": true
-    },
-    {
-      "about": "Show the current divergence burn-down state",
-      "aliases": [],
-      "command": "divergence status",
+      "command": "divergence list",
       "effect": "read",
       "errorCodes": [
         "CONFIG_MISSING",
@@ -2822,7 +2529,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon divergence status"
+        "canon divergence list --as-of 2030-01-01"
       ],
       "exits": [
         {
@@ -2835,7 +2542,7 @@
         }
       ],
       "inputs": [],
-      "name": "status",
+      "name": "list",
       "nodeKind": "leaf",
       "operands": [],
       "options": [
@@ -2916,7 +2623,7 @@
           "kind": "value",
           "name": "fields",
           "possibleValues": [],
-          "repeatable": true,
+          "repeatable": false,
           "required": false,
           "valueName": "FIELDS"
         }
@@ -2931,7 +2638,7 @@
       ],
       "path": [
         "divergence",
-        "status"
+        "list"
       ],
       "requiredOneOf": [],
       "roles": [
@@ -2939,6 +2646,165 @@
         "implementer",
         "reviewer",
         "orchestrator"
+      ],
+      "supportsJson": true
+    },
+    {
+      "about": "Directly record a resolved divergence",
+      "aliases": [],
+      "command": "divergence resolve",
+      "effect": "write",
+      "errorCodes": [
+        "CONFIG_MISSING",
+        "CONFIG_UNREADABLE",
+        "DIVERGENCE_ACCEPT_REFUSED",
+        "DIVERGENCE_INVALID_ARGUMENT",
+        "DIVERGENCE_REFUSED",
+        "UNKNOWN_ROLE",
+        "UNKNOWN_SPEC_ROOT",
+        "USAGE",
+        "WRITE_FAILED"
+      ],
+      "examples": [
+        "canon divergence resolve auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --actor-id alice --role reviewer"
+      ],
+      "exits": [
+        {
+          "code": 0,
+          "meaning": "success"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
+        }
+      ],
+      "idempotency": "appends",
+      "inputs": [],
+      "name": "resolve",
+      "nodeKind": "leaf",
+      "operands": [
+        {
+          "arity": {
+            "max": 1,
+            "min": 1
+          },
+          "description": "The scenario (`<area>.<surface>.<nn>`)",
+          "kind": "SCENARIO_ID",
+          "name": "scenario_id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true
+        }
+      ],
+      "options": [
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root",
+          "kind": "value",
+          "name": "project-id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "PROJECT_ID"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": null,
+          "kind": "value",
+          "name": "sha",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true,
+          "valueName": "SHA"
+        },
+        {
+          "aliases": [],
+          "default": [
+            "1"
+          ],
+          "help": null,
+          "kind": "value",
+          "name": "round",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "ROUND"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
+          "kind": "value",
+          "name": "actor-id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true,
+          "valueName": "ACTOR_ID"
+        },
+        {
+          "aliases": [],
+          "default": [
+            ""
+          ],
+          "help": null,
+          "kind": "value",
+          "name": "detail",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "DETAIL"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The role this record is attributed to (default: the role declared with --as / CANON_ROLE)",
+          "kind": "value",
+          "name": "role",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "ROLE"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
+          "kind": "value",
+          "name": "repo",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Output JSON instead of the human-readable form",
+          "kind": "flag",
+          "name": "json",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "report",
+          "report": "DivergenceResolveReport",
+          "schemaRef": null,
+          "schemaVersion": null
+        }
+      ],
+      "path": [
+        "divergence",
+        "resolve"
+      ],
+      "requiredOneOf": [],
+      "roles": [
+        "implementer",
+        "reviewer"
       ],
       "supportsJson": true
     },
@@ -2989,7 +2855,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon evidence add --scenario-id auth.login.01 --kind test-run --ref \"npm test\" --role implementer"
+        "canon evidence add --scenario-id auth.login.01 --class test-run --ref \"npm test\" --role implementer"
       ],
       "exits": [
         {
@@ -3016,11 +2882,11 @@
           "default": [],
           "help": "Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given",
           "kind": "value",
-          "name": "task",
+          "name": "task-id",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "TASK"
+          "valueName": "TASK_ID"
         },
         {
           "aliases": [],
@@ -3036,23 +2902,23 @@
         {
           "aliases": [],
           "default": [],
-          "help": "What CLASS of evidence is attested to (test-run, review, ...) — the `evidence.kind` companion. `audit` is refused: an external evaluator's re-audit is `canon evidence audit`",
+          "help": "What CLASS of evidence is attested to (test-run, review, ...); default `test-run` when a --report is given. `audit` is refused: an external evaluator's re-audit is `canon evidence audit`",
           "kind": "value",
-          "name": "kind",
+          "name": "class",
           "possibleValues": [],
           "repeatable": false,
-          "required": true,
-          "valueName": "KIND"
+          "required": false,
+          "valueName": "CLASS"
         },
         {
           "aliases": [],
           "default": [],
-          "help": "The reference a reader can resolve: a command line, commit sha, or report path. NEVER run or resolved by canon",
+          "help": "The reference a reader can resolve: a command line, commit sha, or report path (default: the --report paths, comma-separated, when one is given). NEVER run or resolved by canon",
           "kind": "value",
           "name": "ref",
           "possibleValues": [],
           "repeatable": false,
-          "required": true,
+          "required": false,
           "valueName": "REF"
         },
         {
@@ -3141,7 +3007,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "The attesting role; `canon gate promote` derives its run_seq partition key from it. Required unless the declared role (--as / CANON_ROLE) is implementer or reviewer, which it then defaults to",
+          "help": "The attesting role; `canon gate promote` derives its run_seq partition key from it. Default: the declared role (--as / CANON_ROLE); required when none is declared",
           "kind": "value",
           "name": "role",
           "possibleValues": [],
@@ -3165,11 +3031,11 @@
           "default": [],
           "help": "Human approval identity; authentication comes only from the detached signature",
           "kind": "value",
-          "name": "approval-by",
+          "name": "approver",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "APPROVAL_BY"
+          "valueName": "APPROVER"
         },
         {
           "aliases": [],
@@ -3187,22 +3053,22 @@
           "default": [],
           "help": "Armored SSH detached signature file. Canon never signs on the user's behalf",
           "kind": "value",
-          "name": "approval-signature-file",
+          "name": "signature-file",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "APPROVAL_SIGNATURE_FILE"
+          "valueName": "SIGNATURE_FILE"
         },
         {
           "aliases": [],
           "default": [],
-          "help": "RFC3339 timestamp included in the signed approval payload",
+          "help": "Timestamp (RFC3339 or YYYY-MM-DD) included in the signed approval payload",
           "kind": "value",
           "name": "approval-at",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "APPROVAL_AT"
+          "valueName": "TIMESTAMP"
         },
         {
           "aliases": [],
@@ -3364,7 +3230,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon evidence approval-payload --scenario-id auth.login.01 --project-id root --artifact-sha 0123456789abcdef0123456789abcdef01234567 --approval-by alice --approval-at 2030-01-01T00:00:00Z"
+        "canon evidence approval-payload --scenario-id auth.login.01 --project-id root --artifact-sha 0123456789abcdef0123456789abcdef01234567 --approver alice --approval-at 2030-01-01T00:00:00Z"
       ],
       "exits": [
         {
@@ -3387,11 +3253,11 @@
           "default": [],
           "help": null,
           "kind": "value",
-          "name": "task",
+          "name": "task-id",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "TASK"
+          "valueName": "TASK_ID"
         },
         {
           "aliases": [],
@@ -3451,24 +3317,24 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "Who approved (the human whose detached signature the payload is for)",
           "kind": "value",
-          "name": "approval-by",
+          "name": "approver",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "APPROVAL_BY"
+          "valueName": "APPROVER"
         },
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "The approval time that is signed into the payload: RFC3339, or YYYY-MM-DD (UTC midnight)",
           "kind": "value",
           "name": "approval-at",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "APPROVAL_AT"
+          "valueName": "TIMESTAMP"
         },
         {
           "aliases": [],
@@ -3647,7 +3513,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "The attesting role; `canon gate promote` derives its run_seq partition key from it. Required unless the declared role (--as / CANON_ROLE) is implementer or reviewer, which it then defaults to",
+          "help": "The attesting role; `canon gate promote` derives its run_seq partition key from it. Default: the declared role (--as / CANON_ROLE); required when none is declared",
           "kind": "value",
           "name": "role",
           "possibleValues": [],
@@ -3950,7 +3816,7 @@
         "USAGE"
       ],
       "examples": [
-        "canon export --kind evidence"
+        "canon export --kind evidence --output evidence.json"
       ],
       "exits": [
         {
@@ -4021,11 +3887,12 @@
           "default": [],
           "help": null,
           "kind": "value",
-          "name": "out",
+          "name": "output",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "OUT"
+          "short": "o",
+          "valueName": "FILE"
         },
         {
           "aliases": [],
@@ -4103,7 +3970,7 @@
           "kind": "value",
           "name": "fields",
           "possibleValues": [],
-          "repeatable": true,
+          "repeatable": false,
           "required": false,
           "valueName": "FIELDS"
         }
@@ -4299,7 +4166,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --reviewer alice --summary \"Token is logged\""
+        "canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --actor-id alice --summary \"Token is logged\""
       ],
       "exits": [
         {
@@ -4386,13 +4253,13 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Who raised it (line breaks refused)",
+          "help": "The reviewer who raised it, recorded as the finding's reviewer and author (line breaks refused)",
           "kind": "value",
-          "name": "reviewer",
+          "name": "actor-id",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "REVIEWER"
+          "valueName": "ACTOR_ID"
         },
         {
           "aliases": [],
@@ -4459,19 +4326,6 @@
           "repeatable": true,
           "required": false,
           "valueName": "SCENARIO_IDS"
-        },
-        {
-          "aliases": [],
-          "default": [
-            "canon"
-          ],
-          "help": "The authoring actor's id (recorded as the record's author; line breaks refused)",
-          "kind": "value",
-          "name": "actor-id",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "ACTOR_ID"
         },
         {
           "aliases": [],
@@ -4898,7 +4752,7 @@
           "kind": "value",
           "name": "fields",
           "possibleValues": [],
-          "repeatable": true,
+          "repeatable": false,
           "required": false,
           "valueName": "FIELDS"
         }
@@ -5016,14 +4870,12 @@
       "supportsJson": true
     },
     {
-      "about": "Run evidence gates, flip task checkboxes, install hooks",
+      "about": "Run evidence gates, promote staged records, install hooks",
       "aliases": [],
       "children": [
         "gate check",
         "gate install-hooks",
-        "gate promote",
-        "gate selftest",
-        "gate task"
+        "gate promote"
       ],
       "command": "gate",
       "name": "gate",
@@ -5189,7 +5041,7 @@
         {
           "aliases": [],
           "default": [
-            "canon gate task"
+            "canon task done"
           ],
           "help": "The command the hook runs",
           "kind": "value",
@@ -5242,7 +5094,7 @@
       "supportsJson": true
     },
     {
-      "about": "Promote staged evidence records to the committed ledger",
+      "about": "Promote staged records (evidence, findings, divergences) to the committed ledger",
       "aliases": [],
       "command": "gate promote",
       "effect": "write",
@@ -5254,7 +5106,7 @@
         "USAGE"
       ],
       "examples": [
-        "canon gate promote"
+        "canon gate promote --kind evidence"
       ],
       "exits": [
         {
@@ -5290,6 +5142,21 @@
         {
           "aliases": [],
           "default": [],
+          "help": "Promote only this kind of staged record (default: every kind)",
+          "kind": "value",
+          "name": "kind",
+          "possibleValues": [
+            "evidence",
+            "finding",
+            "divergence"
+          ],
+          "repeatable": false,
+          "required": false,
+          "valueName": "KIND"
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Preview without writing anything",
           "kind": "flag",
           "name": "dry-run",
@@ -5319,161 +5186,6 @@
       "path": [
         "gate",
         "promote"
-      ],
-      "requiredOneOf": [],
-      "roles": [
-        "implementer"
-      ],
-      "supportsJson": true
-    },
-    {
-      "about": "Run the gate's self-contained fixture self-test",
-      "aliases": [],
-      "command": "gate selftest",
-      "effect": "read",
-      "effectNote": "scratch directories in the system temp dir, removed on exit",
-      "errorCodes": [
-        "SELFTEST_FAILED",
-        "UNKNOWN_ROLE",
-        "USAGE"
-      ],
-      "examples": [
-        "canon gate selftest"
-      ],
-      "exits": [
-        {
-          "code": 0,
-          "meaning": "every fixture is clean"
-        },
-        {
-          "code": 1,
-          "meaning": "a fixture failed"
-        }
-      ],
-      "inputs": [],
-      "name": "selftest",
-      "nodeKind": "leaf",
-      "operands": [],
-      "options": [
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Output JSON instead of the human-readable form",
-          "kind": "flag",
-          "name": "json",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        }
-      ],
-      "outputs": [
-        {
-          "kind": "report",
-          "report": "SelftestReport",
-          "schemaRef": "#/schemas/SelftestReport",
-          "schemaVersion": "1.0"
-        }
-      ],
-      "path": [
-        "gate",
-        "selftest"
-      ],
-      "requiredOneOf": [],
-      "roles": [
-        "orchestrator"
-      ],
-      "supportsJson": true
-    },
-    {
-      "about": "Flip one task checkbox, gated on real evidence (fails closed)",
-      "aliases": [],
-      "command": "gate task",
-      "effect": "write",
-      "errorCodes": [
-        "CONFIG_UNREADABLE",
-        "GATE_TASK_BLOCKED",
-        "GATE_TASK_EVIDENCE_INVALID",
-        "GATE_TASK_INVALID_ARGUMENT",
-        "GATE_TASK_UNSUPPORTED",
-        "PROMOTE_FAILED",
-        "PROMOTE_REFUSED",
-        "REPO_UNREADABLE",
-        "TASK_NOT_FOUND",
-        "TASK_ROW_NOT_FOUND",
-        "TYPED_ATOMS_INVALID",
-        "UNKNOWN_ROLE",
-        "USAGE",
-        "WRITE_FAILED"
-      ],
-      "examples": [
-        "canon gate task add-login#1"
-      ],
-      "exits": [
-        {
-          "code": 0,
-          "meaning": "the task row was flipped, or already was"
-        },
-        {
-          "code": 1,
-          "meaning": "GATE_TASK_BLOCKED: the row is not ready to flip; nothing is written"
-        },
-        {
-          "code": 2,
-          "meaning": "refused: CONFIG_MISSING, an unknown task, or an unreadable plan"
-        }
-      ],
-      "idempotency": "replay-safe",
-      "inputs": [],
-      "name": "task",
-      "nodeKind": "leaf",
-      "operands": [
-        {
-          "arity": {
-            "max": 1,
-            "min": 1
-          },
-          "description": "The task id (<change_id>#<n>)",
-          "kind": "TASK_ID",
-          "name": "task_id",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": true
-        }
-      ],
-      "options": [
-        {
-          "aliases": [],
-          "default": [],
-          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
-          "kind": "value",
-          "name": "repo",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "DIR"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Output JSON instead of the human-readable form",
-          "kind": "flag",
-          "name": "json",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        }
-      ],
-      "outputs": [
-        {
-          "kind": "report",
-          "report": "TaskDoneReport",
-          "schemaRef": null,
-          "schemaVersion": null
-        }
-      ],
-      "path": [
-        "gate",
-        "task"
       ],
       "requiredOneOf": [],
       "roles": [
@@ -5887,7 +5599,7 @@
           "default": [],
           "help": "Validate an existing canon.yaml instead of writing one",
           "kind": "flag",
-          "name": "check-config",
+          "name": "check",
           "possibleValues": [],
           "repeatable": false,
           "required": false
@@ -5895,7 +5607,7 @@
         {
           "aliases": [],
           "conflictsWith": [
-            "--check-config"
+            "--check"
           ],
           "default": [],
           "help": "Do not write or refresh the canon block in AGENTS.md",
@@ -5908,7 +5620,7 @@
         {
           "aliases": [],
           "conflictsWith": [
-            "--check-config",
+            "--check",
             "--no-policy"
           ],
           "default": [],
@@ -5927,7 +5639,7 @@
         {
           "aliases": [],
           "conflictsWith": [
-            "--check-config",
+            "--check",
             "--policy"
           ],
           "default": [],
@@ -5941,7 +5653,7 @@
         {
           "aliases": [],
           "conflictsWith": [
-            "--check-config"
+            "--check"
           ],
           "default": [],
           "help": "Harnesses to install the canon skill for, without asking (`claude`, `codex`, `omp`, `pi`, comma-separated; `none` for none)",
@@ -5955,7 +5667,7 @@
         {
           "aliases": [],
           "conflictsWith": [
-            "--check-config"
+            "--check"
           ],
           "default": [],
           "help": "Language the briefs are written in (`en`, `ko`, or any tag: `en` headings, structure rules only); recorded as `language:` in canon.yaml",
@@ -6090,409 +5802,6 @@
       "requiredOneOf": [],
       "roles": [
         "implementer",
-        "orchestrator"
-      ],
-      "supportsJson": true
-    },
-    {
-      "about": "Promote a proven strategy into the git-tracked tier",
-      "aliases": [],
-      "children": [
-        "learn approve",
-        "learn promote",
-        "learn rollback"
-      ],
-      "command": "learn",
-      "name": "learn",
-      "nodeKind": "group",
-      "path": [
-        "learn"
-      ]
-    },
-    {
-      "about": "Produce an unsigned, externally signable approval payload",
-      "aliases": [],
-      "command": "learn approve",
-      "effect": "read",
-      "errorCodes": [
-        "CONFIG_UNREADABLE",
-        "LEARN_DEMOTION_FAILED",
-        "LEARN_EVALUATION_REJECTED",
-        "LEARN_INVALID_INPUT",
-        "LEARN_STRATEGY_NOT_FOUND",
-        "REPO_UNREADABLE",
-        "UNKNOWN_ROLE",
-        "USAGE"
-      ],
-      "examples": [
-        "canon learn approve 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --principal alice"
-      ],
-      "exits": [
-        {
-          "code": 0,
-          "meaning": "success"
-        },
-        {
-          "code": 2,
-          "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
-        }
-      ],
-      "idempotency": "replay-safe",
-      "inputs": [],
-      "name": "approve",
-      "nodeKind": "leaf",
-      "operands": [
-        {
-          "arity": {
-            "max": 1,
-            "min": 1
-          },
-          "description": "The StrategyId (ULID) whose approval payload is printed",
-          "kind": "STRATEGY_ID",
-          "name": "strategy_id",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": true
-        }
-      ],
-      "options": [
-        {
-          "aliases": [],
-          "default": [],
-          "help": null,
-          "kind": "value",
-          "name": "evaluation",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": true,
-          "valueName": "EVALUATION"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": null,
-          "kind": "value",
-          "name": "principal",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": true,
-          "valueName": "PRINCIPAL"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
-          "kind": "value",
-          "name": "repo",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "DIR"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": null,
-          "kind": "flag",
-          "name": "json",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        }
-      ],
-      "outputs": [
-        {
-          "kind": "artifact",
-          "mediaType": "application/octet-stream",
-          "report": "StrategyApprovalPayloadReport",
-          "schemaRef": null,
-          "schemaVersion": null
-        }
-      ],
-      "path": [
-        "learn",
-        "approve"
-      ],
-      "requiredOneOf": [],
-      "roles": [
-        "orchestrator"
-      ],
-      "supportsJson": true
-    },
-    {
-      "about": "Promote a strategy after paired evaluation and signed approval",
-      "aliases": [],
-      "command": "learn promote",
-      "effect": "write",
-      "errorCodes": [
-        "CONFIG_UNREADABLE",
-        "LEARN_DEMOTION_FAILED",
-        "LEARN_INVALID_ARGUMENT",
-        "LEARN_INVALID_INPUT",
-        "LEARN_PROMOTION_BLOCKED",
-        "LEARN_PROMOTION_FAILED",
-        "LEARN_SIGNATURE_UNREADABLE",
-        "UNKNOWN_ROLE",
-        "USAGE"
-      ],
-      "examples": [
-        "canon learn promote 01ARZ3NDEKTSV4RRFFQ69G5FAV"
-      ],
-      "exits": [
-        {
-          "code": 0,
-          "meaning": "promoted, or a dry run"
-        },
-        {
-          "code": 1,
-          "meaning": "promotion blocked: the report names why"
-        },
-        {
-          "code": 2,
-          "meaning": "refused: CONFIG_MISSING, or an argument error"
-        }
-      ],
-      "idempotency": "replay-safe",
-      "inputs": [],
-      "name": "promote",
-      "nodeKind": "leaf",
-      "operands": [
-        {
-          "arity": {
-            "max": 1,
-            "min": 1
-          },
-          "description": "The StrategyId (ULID) to promote",
-          "kind": "STRATEGY_ID",
-          "name": "strategy_id",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": true
-        }
-      ],
-      "options": [
-        {
-          "aliases": [],
-          "default": [],
-          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
-          "kind": "value",
-          "name": "repo",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "DIR"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Evaluation bundle produced by the honest promotion adapter",
-          "kind": "value",
-          "name": "evaluation",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "EVALUATION"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Approval JSON containing the detached SSH signature",
-          "kind": "value",
-          "name": "approval",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "APPROVAL"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Optional detached signature file to attach to approval JSON",
-          "kind": "value",
-          "name": "signature",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "SIGNATURE"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Preview without writing anything",
-          "kind": "flag",
-          "name": "dry-run",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Output JSON instead of the human-readable form",
-          "kind": "flag",
-          "name": "json",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        }
-      ],
-      "outputs": [
-        {
-          "kind": "report",
-          "report": "StrategyPromoteReport",
-          "schemaRef": null,
-          "schemaVersion": null
-        }
-      ],
-      "path": [
-        "learn",
-        "promote"
-      ],
-      "requiredOneOf": [],
-      "roles": [
-        "orchestrator"
-      ],
-      "supportsJson": true
-    },
-    {
-      "about": "Disable an active strategy with durable rollback provenance",
-      "aliases": [],
-      "command": "learn rollback",
-      "effect": "write",
-      "errorCodes": [
-        "CONFIG_UNREADABLE",
-        "LEARN_DEMOTION_FAILED",
-        "LEARN_INVALID_ARGUMENT",
-        "LEARN_ROLLBACK_FAILED",
-        "LEARN_SIGNATURE_UNREADABLE",
-        "LEARN_TRAJECTORY_NOT_FOUND",
-        "REPO_UNREADABLE",
-        "UNKNOWN_ROLE",
-        "USAGE"
-      ],
-      "examples": [
-        "canon learn rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason \"regressed in production\" --actor-id alice --signature-file approval.sig --approved-at 2030-01-01T00:00:00Z"
-      ],
-      "exits": [
-        {
-          "code": 0,
-          "meaning": "success"
-        },
-        {
-          "code": 2,
-          "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
-        }
-      ],
-      "idempotency": "replay-safe",
-      "inputs": [],
-      "name": "rollback",
-      "nodeKind": "leaf",
-      "operands": [
-        {
-          "arity": {
-            "max": 1,
-            "min": 1
-          },
-          "description": "The StrategyId (ULID) to roll back",
-          "kind": "STRATEGY_ID",
-          "name": "strategy_id",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": true
-        }
-      ],
-      "options": [
-        {
-          "aliases": [],
-          "default": [],
-          "help": null,
-          "kind": "value",
-          "name": "reason",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": true,
-          "valueName": "REASON"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": null,
-          "kind": "value",
-          "name": "actor-id",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": true,
-          "valueName": "ACTOR_ID"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": null,
-          "kind": "value",
-          "name": "signature-file",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": true,
-          "valueName": "SIGNATURE_FILE"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": null,
-          "kind": "value",
-          "name": "approved-at",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": true,
-          "valueName": "APPROVED_AT"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": null,
-          "kind": "value",
-          "name": "contradicting-trajectory-id",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "CONTRADICTING_TRAJECTORY_ID"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
-          "kind": "value",
-          "name": "repo",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "DIR"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Output JSON instead of the human-readable form",
-          "kind": "flag",
-          "name": "json",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        }
-      ],
-      "outputs": [
-        {
-          "kind": "report",
-          "report": "StrategyRollbackReport",
-          "schemaRef": null,
-          "schemaVersion": null
-        }
-      ],
-      "path": [
-        "learn",
-        "rollback"
-      ],
-      "requiredOneOf": [],
-      "roles": [
         "orchestrator"
       ],
       "supportsJson": true
@@ -6813,12 +6122,13 @@
       "effect": "write",
       "errorCodes": [
         "CONFIG_MISSING",
+        "HUMAN_ONLY",
         "POLICY_APPROVAL_FAILED",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
-        "canon policy approve --by alice"
+        "canon policy approve --approver alice --note \"reviewed the starter policy\""
       ],
       "exits": [
         {
@@ -6841,11 +6151,11 @@
           "default": [],
           "help": "Who approved it (a human's name or id)",
           "kind": "value",
-          "name": "by",
+          "name": "approver",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "BY"
+          "valueName": "APPROVER"
         },
         {
           "aliases": [],
@@ -7411,16 +6721,16 @@
           "default": [],
           "help": "Project a plugin's overlay fields onto each record (fail-soft)",
           "kind": "value",
-          "name": "plugin",
+          "name": "plugin-id",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "PLUGIN"
+          "valueName": "PLUGIN_ID"
         },
         {
           "aliases": [],
           "conflictsWith": [
-            "--plugin"
+            "--plugin-id"
           ],
           "default": [],
           "help": "Every version of the kind, the ledger's and the archive's, oldest first, instead of the current records",
@@ -7518,7 +6828,7 @@
           "kind": "value",
           "name": "fields",
           "possibleValues": [],
-          "repeatable": true,
+          "repeatable": false,
           "required": false,
           "valueName": "FIELDS"
         }
@@ -7546,7 +6856,20 @@
     {
       "about": "Build a canonical regime key for hook scripts",
       "aliases": [],
-      "command": "regime-key",
+      "children": [
+        "regime show"
+      ],
+      "command": "regime",
+      "name": "regime",
+      "nodeKind": "group",
+      "path": [
+        "regime"
+      ]
+    },
+    {
+      "about": "Build a canonical regime key for hook scripts",
+      "aliases": [],
+      "command": "regime show",
       "effect": "read",
       "errorCodes": [
         "REGIME_KEY_INVALID",
@@ -7554,7 +6877,7 @@
         "USAGE"
       ],
       "examples": [
-        "canon regime-key --role reviewer --repo-name my-repo --area api --hash abcdef012345"
+        "canon regime show --role-segment reviewer --repo-name my-repo --area api --hash abcdef012345"
       ],
       "exits": [
         {
@@ -7567,7 +6890,7 @@
         }
       ],
       "inputs": [],
-      "name": "regime-key",
+      "name": "show",
       "nodeKind": "leaf",
       "operands": [],
       "options": [
@@ -7576,11 +6899,11 @@
           "default": [],
           "help": "The <role> segment (canonicalized)",
           "kind": "value",
-          "name": "role",
+          "name": "role-segment",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "ROLE"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -7635,7 +6958,8 @@
         }
       ],
       "path": [
-        "regime-key"
+        "regime",
+        "show"
       ],
       "requiredOneOf": [],
       "roles": [
@@ -7644,30 +6968,44 @@
       "supportsJson": true
     },
     {
-      "about": "Generate the status report (write, --check, or --snapshot)",
+      "about": "Build, check, or snapshot the status report",
       "aliases": [],
+      "children": [
+        "report build",
+        "report check",
+        "report snapshot"
+      ],
       "command": "report",
+      "name": "report",
+      "nodeKind": "group",
+      "path": [
+        "report"
+      ]
+    },
+    {
+      "about": "Write the status report (.canon/REPORT.md)",
+      "aliases": [],
+      "command": "report build",
       "effect": "write",
-      "effectNote": "with --check it only compares the report on disk with a fresh render and writes nothing; scratch files go under the system temp dir",
+      "effectNote": "scratch files go under the system temp dir",
       "errorCodes": [
         "CONFIG_MISSING",
         "CONFIG_UNREADABLE",
         "REPORT_FAILED",
-        "REPORT_STALE",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
-        "canon report"
+        "canon report build"
       ],
       "exits": [
         {
           "code": 0,
-          "meaning": "built, or (--check) fresh"
+          "meaning": "built"
         },
         {
           "code": 1,
-          "meaning": "REPORT_FAILED, or (--check) the report is missing or has drifted (REPORT_STALE)"
+          "meaning": "REPORT_FAILED: the ledger could not be read or duckdb is missing"
         },
         {
           "code": 2,
@@ -7676,7 +7014,7 @@
       ],
       "idempotency": "replay-safe",
       "inputs": [],
-      "name": "report",
+      "name": "build",
       "nodeKind": "leaf",
       "operands": [],
       "options": [
@@ -7690,27 +7028,6 @@
           "repeatable": false,
           "required": false,
           "valueName": "DIR"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Byte-diff against .canon/REPORT.md (0 clean, 1 drift); --snapshot wins if both given",
-          "kind": "flag",
-          "name": "check",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Export panel marts to <dir>/*.parquet + manifest.json instead",
-          "kind": "value",
-          "name": "snapshot",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "SNAPSHOT"
         },
         {
           "aliases": [],
@@ -7732,7 +7049,173 @@
         }
       ],
       "path": [
-        "report"
+        "report",
+        "build"
+      ],
+      "requiredOneOf": [],
+      "roles": [
+        "orchestrator"
+      ],
+      "supportsJson": true
+    },
+    {
+      "about": "Byte-diff .canon/REPORT.md against a fresh build (0 fresh, 1 missing or drifted); writes nothing",
+      "aliases": [],
+      "command": "report check",
+      "effect": "read",
+      "effectNote": "scratch files go under the system temp dir; writes no repo file",
+      "errorCodes": [
+        "CONFIG_MISSING",
+        "CONFIG_UNREADABLE",
+        "REPORT_FAILED",
+        "REPORT_STALE",
+        "UNKNOWN_ROLE",
+        "USAGE"
+      ],
+      "examples": [
+        "canon report check"
+      ],
+      "exits": [
+        {
+          "code": 0,
+          "meaning": "fresh"
+        },
+        {
+          "code": 1,
+          "meaning": "REPORT_STALE: the report is missing or has drifted, or REPORT_FAILED"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: CONFIG_MISSING, or an invalid argument"
+        }
+      ],
+      "inputs": [],
+      "name": "check",
+      "nodeKind": "leaf",
+      "operands": [],
+      "options": [
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
+          "kind": "value",
+          "name": "repo",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Output JSON instead of the human-readable form",
+          "kind": "flag",
+          "name": "json",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "report",
+          "report": "ReportCheckReport",
+          "schemaRef": null,
+          "schemaVersion": null
+        }
+      ],
+      "path": [
+        "report",
+        "check"
+      ],
+      "requiredOneOf": [],
+      "roles": [
+        "orchestrator"
+      ],
+      "supportsJson": true
+    },
+    {
+      "about": "Export the panel marts to <DIR>/*.parquet plus manifest.json",
+      "aliases": [],
+      "command": "report snapshot",
+      "effect": "write",
+      "effectNote": "scratch files go under the system temp dir",
+      "errorCodes": [
+        "CONFIG_MISSING",
+        "CONFIG_UNREADABLE",
+        "REPORT_FAILED",
+        "UNKNOWN_ROLE",
+        "USAGE"
+      ],
+      "examples": [
+        "canon report snapshot snapshot-out"
+      ],
+      "exits": [
+        {
+          "code": 0,
+          "meaning": "written"
+        },
+        {
+          "code": 1,
+          "meaning": "the ledger could not be read"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: CONFIG_MISSING, or an invalid argument"
+        }
+      ],
+      "idempotency": "replay-safe",
+      "inputs": [],
+      "name": "snapshot",
+      "nodeKind": "leaf",
+      "operands": [
+        {
+          "arity": {
+            "max": 1,
+            "min": 1
+          },
+          "description": "The output directory (created if absent)",
+          "kind": "DIR",
+          "name": "dir",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true
+        }
+      ],
+      "options": [
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
+          "kind": "value",
+          "name": "repo",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Output JSON instead of the human-readable form",
+          "kind": "flag",
+          "name": "json",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "report",
+          "report": "ReportSnapshotReport",
+          "schemaRef": null,
+          "schemaVersion": null
+        }
+      ],
+      "path": [
+        "report",
+        "snapshot"
       ],
       "requiredOneOf": [],
       "roles": [
@@ -7751,7 +7234,7 @@
         "USAGE"
       ],
       "examples": [
-        "canon retrieve --role reviewer --domain dev"
+        "canon retrieve --for-role reviewer --domain dev --limit 20"
       ],
       "exits": [
         {
@@ -7773,7 +7256,7 @@
           "default": [],
           "help": "Role scope; with --regime must equal its leading segment",
           "kind": "value",
-          "name": "role",
+          "name": "for-role",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
@@ -7815,14 +7298,13 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Top-k cap (default: canon's DEFAULT_K)",
+          "help": "Cap on the guidance items returned (default: 5)",
           "kind": "value",
-          "name": "k",
+          "name": "limit",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "short": "k",
-          "valueName": "K"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -7881,7 +7363,7 @@
       ]
     },
     {
-      "about": "Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required). The review signs the chore's invariants and checks against the diff and pins the change's brief; an edit to the brief stales it. A chore needs exactly this one review before `subject status --to shipped`",
+      "about": "Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required). The review signs the chore's invariants and checks against the diff and pins the change's brief; an edit to the brief stales it. A chore needs exactly this one review before `subject move --to shipped`",
       "aliases": [],
       "command": "review change",
       "effect": "write",
@@ -8640,6 +8122,7 @@
       "effect": "read",
       "errorCodes": [
         "UNKNOWN_COMMAND",
+        "UNKNOWN_ERROR_CODE",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
@@ -8686,6 +8169,7 @@
         {
           "aliases": [],
           "conflictsWith": [
+            "--error",
             "path"
           ],
           "default": [],
@@ -8698,13 +8182,18 @@
         },
         {
           "aliases": [],
+          "conflictsWith": [
+            "--errors",
+            "path"
+          ],
           "default": [],
-          "help": "List every command instead of only the declared role's",
-          "kind": "flag",
-          "name": "all",
+          "help": "Show one error code: its meaning, exit, retryable and fix (an unknown code exits 2)",
+          "kind": "value",
+          "name": "error",
           "possibleValues": [],
           "repeatable": false,
-          "required": false
+          "required": false,
+          "valueName": "CODE"
         }
       ],
       "outputs": [
@@ -8739,7 +8228,7 @@
         "USAGE"
       ],
       "examples": [
-        "canon selftest"
+        "canon selftest --suite trust-spine-gate"
       ],
       "exits": [
         {
@@ -8760,6 +8249,29 @@
       "nodeKind": "leaf",
       "operands": [],
       "options": [
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Run only this suite (default: every suite)",
+          "kind": "value",
+          "name": "suite",
+          "possibleValues": [
+            "trust-spine-gate",
+            "tiered-storage",
+            "typed-authoring-vocabulary",
+            "policy-expressions",
+            "format-authority",
+            "session-ingest",
+            "canon-context",
+            "artifact-ingest",
+            "spec-ledger-selftest",
+            "plugin-overlays",
+            "plan-import"
+          ],
+          "repeatable": false,
+          "required": false,
+          "valueName": "NAME"
+        },
         {
           "aliases": [],
           "default": [],
@@ -8841,11 +8353,11 @@
           "default": [],
           "help": null,
           "kind": "value",
-          "name": "source",
+          "name": "skills-source",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "SOURCE"
+          "valueName": "SKILLS_SOURCE"
         },
         {
           "aliases": [],
@@ -8927,11 +8439,11 @@
           "default": [],
           "help": null,
           "kind": "value",
-          "name": "source",
+          "name": "skills-source",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "SOURCE"
+          "valueName": "SKILLS_SOURCE"
         },
         {
           "aliases": [],
@@ -9018,11 +8530,11 @@
           "default": [],
           "help": "Source directory; defaults to CANON_SKILLS_SOURCE or canon/skills",
           "kind": "value",
-          "name": "source",
+          "name": "skills-source",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "SOURCE"
+          "valueName": "SKILLS_SOURCE"
         },
         {
           "aliases": [],
@@ -9137,7 +8649,7 @@
           "kind": "value",
           "name": "fields",
           "possibleValues": [],
-          "repeatable": true,
+          "repeatable": false,
           "required": false,
           "valueName": "FIELDS"
         }
@@ -9163,12 +8675,436 @@
       "supportsJson": true
     },
     {
+      "about": "Promote a proven strategy into the git-tracked tier",
+      "aliases": [],
+      "children": [
+        "strategy approval-payload",
+        "strategy promote",
+        "strategy rollback"
+      ],
+      "command": "strategy",
+      "name": "strategy",
+      "nodeKind": "group",
+      "path": [
+        "strategy"
+      ]
+    },
+    {
+      "about": "The unsigned approval payload bytes an external signer signs (a read: identical arguments give identical bytes)",
+      "aliases": [],
+      "command": "strategy approval-payload",
+      "effect": "read",
+      "errorCodes": [
+        "CONFIG_UNREADABLE",
+        "LEARN_DEMOTION_FAILED",
+        "LEARN_EVALUATION_REJECTED",
+        "LEARN_INVALID_INPUT",
+        "LEARN_STRATEGY_NOT_FOUND",
+        "REPO_UNREADABLE",
+        "UNKNOWN_ROLE",
+        "USAGE"
+      ],
+      "examples": [
+        "canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --approver alice --approval-at 2030-01-01T00:00:00Z"
+      ],
+      "exits": [
+        {
+          "code": 0,
+          "meaning": "success"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
+        }
+      ],
+      "idempotency": "replay-safe",
+      "inputs": [],
+      "name": "approval-payload",
+      "nodeKind": "leaf",
+      "operands": [
+        {
+          "arity": {
+            "max": 1,
+            "min": 1
+          },
+          "description": "The StrategyId (ULID) whose approval payload is printed",
+          "kind": "STRATEGY_ID",
+          "name": "strategy_id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true
+        }
+      ],
+      "options": [
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The paired evaluation bundle the approval is for",
+          "kind": "value",
+          "name": "evaluation",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true,
+          "valueName": "EVALUATION"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Who approves (the human whose detached signature the payload is for)",
+          "kind": "value",
+          "name": "approver",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true,
+          "valueName": "APPROVER"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The approval time that is signed into the payload: RFC3339, or YYYY-MM-DD (UTC midnight)",
+          "kind": "value",
+          "name": "approval-at",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true,
+          "valueName": "TIMESTAMP"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
+          "kind": "value",
+          "name": "repo",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Envelope the payload as JSON instead of printing its bytes",
+          "kind": "flag",
+          "name": "json",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "artifact",
+          "mediaType": "application/octet-stream",
+          "report": "StrategyApprovalPayloadReport",
+          "schemaRef": "#/schemas/StrategyApprovalPayloadReport",
+          "schemaVersion": "1.0"
+        }
+      ],
+      "path": [
+        "strategy",
+        "approval-payload"
+      ],
+      "requiredOneOf": [],
+      "roles": [
+        "orchestrator"
+      ],
+      "supportsJson": true
+    },
+    {
+      "about": "Promote a strategy after paired evaluation and signed approval",
+      "aliases": [],
+      "command": "strategy promote",
+      "effect": "write",
+      "errorCodes": [
+        "CONFIG_UNREADABLE",
+        "LEARN_DEMOTION_FAILED",
+        "LEARN_INVALID_ARGUMENT",
+        "LEARN_INVALID_INPUT",
+        "LEARN_PROMOTION_BLOCKED",
+        "LEARN_PROMOTION_FAILED",
+        "LEARN_SIGNATURE_UNREADABLE",
+        "UNKNOWN_ROLE",
+        "USAGE"
+      ],
+      "examples": [
+        "canon strategy promote 01ARZ3NDEKTSV4RRFFQ69G5FAV"
+      ],
+      "exits": [
+        {
+          "code": 0,
+          "meaning": "promoted, or a dry run"
+        },
+        {
+          "code": 1,
+          "meaning": "promotion blocked: the report names why"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: CONFIG_MISSING, or an argument error"
+        }
+      ],
+      "idempotency": "replay-safe",
+      "inputs": [],
+      "name": "promote",
+      "nodeKind": "leaf",
+      "operands": [
+        {
+          "arity": {
+            "max": 1,
+            "min": 1
+          },
+          "description": "The StrategyId (ULID) to promote",
+          "kind": "STRATEGY_ID",
+          "name": "strategy_id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true
+        }
+      ],
+      "options": [
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
+          "kind": "value",
+          "name": "repo",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Evaluation bundle produced by the honest promotion adapter",
+          "kind": "value",
+          "name": "evaluation",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--approval"
+          ],
+          "valueName": "EVALUATION"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Approval JSON containing the detached SSH signature",
+          "kind": "value",
+          "name": "approval",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--evaluation"
+          ],
+          "valueName": "APPROVAL"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Detached signature file to attach to the approval JSON",
+          "kind": "value",
+          "name": "signature-file",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--approval"
+          ],
+          "valueName": "SIGNATURE_FILE"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Preview without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Output JSON instead of the human-readable form",
+          "kind": "flag",
+          "name": "json",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "report",
+          "report": "StrategyPromoteReport",
+          "schemaRef": null,
+          "schemaVersion": null
+        }
+      ],
+      "path": [
+        "strategy",
+        "promote"
+      ],
+      "requiredOneOf": [],
+      "roles": [
+        "orchestrator"
+      ],
+      "supportsJson": true
+    },
+    {
+      "about": "Disable an active strategy with durable rollback provenance",
+      "aliases": [],
+      "command": "strategy rollback",
+      "effect": "write",
+      "errorCodes": [
+        "CONFIG_UNREADABLE",
+        "LEARN_DEMOTION_FAILED",
+        "LEARN_INVALID_ARGUMENT",
+        "LEARN_ROLLBACK_FAILED",
+        "LEARN_SIGNATURE_UNREADABLE",
+        "LEARN_TRAJECTORY_NOT_FOUND",
+        "REPO_UNREADABLE",
+        "UNKNOWN_ROLE",
+        "USAGE"
+      ],
+      "examples": [
+        "canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason \"regressed in production\" --actor-id alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z"
+      ],
+      "exits": [
+        {
+          "code": 0,
+          "meaning": "success"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
+        }
+      ],
+      "idempotency": "replay-safe",
+      "inputs": [],
+      "name": "rollback",
+      "nodeKind": "leaf",
+      "operands": [
+        {
+          "arity": {
+            "max": 1,
+            "min": 1
+          },
+          "description": "The StrategyId (ULID) to roll back",
+          "kind": "STRATEGY_ID",
+          "name": "strategy_id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true
+        }
+      ],
+      "options": [
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Why the strategy is rolled back (signed: `strategy:<id>:rollback:<sha256(reason)>`)",
+          "kind": "value",
+          "name": "reason",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true,
+          "valueName": "REASON"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The approver; must be a policy-pinned approver",
+          "kind": "value",
+          "name": "actor-id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true,
+          "valueName": "ACTOR_ID"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Detached signature file over the rollback payload",
+          "kind": "value",
+          "name": "signature-file",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true,
+          "valueName": "SIGNATURE_FILE"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "When the approver signed: RFC3339, or YYYY-MM-DD (UTC midnight)",
+          "kind": "value",
+          "name": "approval-at",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true,
+          "valueName": "TIMESTAMP"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "A trajectory that contradicts the strategy (must exist in the trajectory store)",
+          "kind": "value",
+          "name": "contradicting-trajectory-id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "CONTRADICTING_TRAJECTORY_ID"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
+          "kind": "value",
+          "name": "repo",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Output JSON instead of the human-readable form",
+          "kind": "flag",
+          "name": "json",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "report",
+          "report": "StrategyRollbackReport",
+          "schemaRef": null,
+          "schemaVersion": null
+        }
+      ],
+      "path": [
+        "strategy",
+        "rollback"
+      ],
+      "requiredOneOf": [],
+      "roles": [
+        "orchestrator"
+      ],
+      "supportsJson": true
+    },
+    {
       "about": "Create and manage subjects (durable product units)",
       "aliases": [],
       "children": [
         "subject adopt",
+        "subject move",
         "subject new",
-        "subject status",
+        "subject show",
         "subject unadopt"
       ],
       "command": "subject",
@@ -9270,6 +9206,155 @@
       "requiredOneOf": [],
       "roles": [
         "planner",
+        "orchestrator"
+      ],
+      "supportsJson": true
+    },
+    {
+      "about": "Move a subject to another lifecycle state (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason)",
+      "aliases": [],
+      "command": "subject move",
+      "effect": "write",
+      "effectNote": "reads without --to: `subject move <id>` shows the subject and writes nothing; with --to it refreshes stale scenario-index records first",
+      "errorCodes": [
+        "CONFIG_MISSING",
+        "POLICY_APPROVAL_UNREADABLE",
+        "POLICY_CHANGED_SINCE_APPROVAL",
+        "REPO_UNREADABLE",
+        "SUBJECT_GATE_VIOLATION",
+        "SUBJECT_INVALID_ARGUMENT",
+        "SUBJECT_INVALID_TRANSITION",
+        "SUBJECT_NOT_FOUND",
+        "SUBJECT_REASON_REQUIRED",
+        "UNKNOWN_ROLE",
+        "USAGE",
+        "WRITE_FAILED"
+      ],
+      "examples": [
+        "canon subject move demo --to specced"
+      ],
+      "exits": [
+        {
+          "code": 0,
+          "meaning": "the transition was recorded"
+        },
+        {
+          "code": 1,
+          "meaning": "SUBJECT_GATE_VIOLATION: an evidence, brief, review or policy-approval guard blocked the transition; the record is unchanged"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: an invalid transition, a missing reason, an unknown subject, or CONFIG_MISSING"
+        }
+      ],
+      "idempotency": "once",
+      "inputs": [],
+      "name": "move",
+      "nodeKind": "leaf",
+      "operands": [
+        {
+          "arity": {
+            "max": 1,
+            "min": 1
+          },
+          "description": "The subject to move",
+          "kind": "SUBJECT_ID",
+          "name": "id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true
+        }
+      ],
+      "options": [
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The state to move the subject to (proposed/specced/building/verifying/shipped/retired)",
+          "kind": "value",
+          "name": "to",
+          "possibleValues": [
+            "proposed",
+            "specced",
+            "building",
+            "verifying",
+            "shipped",
+            "retired"
+          ],
+          "repeatable": false,
+          "required": true,
+          "valueName": "STATE"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Move anyway when only the require_review checks (unreviewed-promotion, open-blocker) refuse; the reason is recorded on the subject and `canon gate check` lists the gaps as advisories",
+          "kind": "value",
+          "name": "override-reason",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "OVERRIDE_REASON"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Why the subject moves (required for shipped → verifying, optional on every other transition); recorded on the subject with the actor",
+          "kind": "value",
+          "name": "reason",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "REASON"
+        },
+        {
+          "aliases": [],
+          "default": [
+            "canon"
+          ],
+          "help": "The invoking actor's id, recorded with an --override-reason waiver or a --reason",
+          "kind": "value",
+          "name": "actor-id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "ACTOR_ID"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
+          "kind": "value",
+          "name": "repo",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Output JSON instead of the human-readable form",
+          "kind": "flag",
+          "name": "json",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "report",
+          "report": "SubjectMoveReport",
+          "schemaRef": "#/schemas/SubjectMoveReport",
+          "schemaVersion": "1.0"
+        }
+      ],
+      "path": [
+        "subject",
+        "move"
+      ],
+      "requiredOneOf": [],
+      "roles": [
         "orchestrator"
       ],
       "supportsJson": true
@@ -9424,45 +9509,34 @@
       "supportsJson": true
     },
     {
-      "about": "Show a subject, or with --to transition its lifecycle status (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason)",
+      "about": "Show a subject (read-only)",
       "aliases": [],
-      "command": "subject status",
-      "effect": "write",
-      "effectNote": "reads without --to: `subject status <id>` shows the subject and writes nothing; with --to it refreshes stale scenario-index records first",
+      "command": "subject show",
+      "effect": "read",
+      "effectNote": "refreshes stale scenario-index records first",
       "errorCodes": [
         "CONFIG_MISSING",
-        "POLICY_APPROVAL_UNREADABLE",
-        "POLICY_CHANGED_SINCE_APPROVAL",
         "REPO_UNREADABLE",
         "SUBJECT_GATE_VIOLATION",
-        "SUBJECT_INVALID_ARGUMENT",
-        "SUBJECT_INVALID_TRANSITION",
         "SUBJECT_NOT_FOUND",
-        "SUBJECT_REASON_REQUIRED",
         "UNKNOWN_ROLE",
-        "USAGE",
-        "WRITE_FAILED"
+        "USAGE"
       ],
       "examples": [
-        "canon subject status demo --to specced"
+        "canon subject show demo"
       ],
       "exits": [
         {
           "code": 0,
-          "meaning": "the transition was recorded, or the subject was shown (no --to)"
-        },
-        {
-          "code": 1,
-          "meaning": "SUBJECT_GATE_VIOLATION: an evidence, brief, review or policy-approval guard blocked the transition; the record is unchanged"
+          "meaning": "shown"
         },
         {
           "code": 2,
-          "meaning": "refused: an invalid transition, a missing reason, an unknown subject, or CONFIG_MISSING"
+          "meaning": "refused: an unknown subject (SUBJECT_NOT_FOUND), or CONFIG_MISSING"
         }
       ],
-      "idempotency": "once",
       "inputs": [],
-      "name": "status",
+      "name": "show",
       "nodeKind": "leaf",
       "operands": [
         {
@@ -9470,7 +9544,7 @@
             "max": 1,
             "min": 1
           },
-          "description": "The subject to show, or transition with --to",
+          "description": "The subject to show",
           "kind": "SUBJECT_ID",
           "name": "id",
           "possibleValues": [],
@@ -9479,59 +9553,6 @@
         }
       ],
       "options": [
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Move the subject to this state (proposed/specced/building/verifying/shipped/retired); without it the subject is shown and nothing is written",
-          "kind": "value",
-          "name": "to",
-          "possibleValues": [
-            "proposed",
-            "specced",
-            "building",
-            "verifying",
-            "shipped",
-            "retired"
-          ],
-          "repeatable": false,
-          "required": false,
-          "valueName": "STATE"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Move anyway when only the require_review checks (unreviewed-promotion, open-blocker) refuse; the reason is recorded on the subject and `canon gate check` lists the gaps as advisories",
-          "kind": "value",
-          "name": "override-reason",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "OVERRIDE_REASON"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Why the subject moves (required for shipped → verifying, optional on every other transition); recorded on the subject with the actor",
-          "kind": "value",
-          "name": "reason",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "REASON"
-        },
-        {
-          "aliases": [],
-          "default": [
-            "canon"
-          ],
-          "help": "The invoking actor's id, recorded with an --override-reason waiver or a --reason",
-          "kind": "value",
-          "name": "actor-id",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "ACTOR_ID"
-        },
         {
           "aliases": [],
           "default": [],
@@ -9557,14 +9578,14 @@
       "outputs": [
         {
           "kind": "report",
-          "report": "SubjectMoveReport",
-          "schemaRef": "#/schemas/SubjectMoveReport",
+          "report": "SubjectShowReport",
+          "schemaRef": "#/schemas/SubjectShowReport",
           "schemaVersion": "1.0"
         }
       ],
       "path": [
         "subject",
-        "status"
+        "show"
       ],
       "requiredOneOf": [],
       "roles": [
@@ -9666,6 +9687,116 @@
       "roles": [
         "planner",
         "orchestrator"
+      ],
+      "supportsJson": true
+    },
+    {
+      "about": "Flip a plan task's checkbox once committed evidence supports it",
+      "aliases": [],
+      "children": [
+        "task done"
+      ],
+      "command": "task",
+      "name": "task",
+      "nodeKind": "group",
+      "path": [
+        "task"
+      ]
+    },
+    {
+      "about": "Flip one task checkbox, gated on real evidence (fails closed)",
+      "aliases": [],
+      "command": "task done",
+      "effect": "write",
+      "errorCodes": [
+        "CONFIG_UNREADABLE",
+        "GATE_TASK_BLOCKED",
+        "GATE_TASK_EVIDENCE_INVALID",
+        "GATE_TASK_INVALID_ARGUMENT",
+        "GATE_TASK_UNSUPPORTED",
+        "PROMOTE_FAILED",
+        "PROMOTE_REFUSED",
+        "REPO_UNREADABLE",
+        "TASK_NOT_FOUND",
+        "TASK_ROW_NOT_FOUND",
+        "TYPED_ATOMS_INVALID",
+        "UNKNOWN_ROLE",
+        "USAGE",
+        "WRITE_FAILED"
+      ],
+      "examples": [
+        "canon task done add-login#1"
+      ],
+      "exits": [
+        {
+          "code": 0,
+          "meaning": "the task row was flipped, or already was"
+        },
+        {
+          "code": 1,
+          "meaning": "GATE_TASK_BLOCKED: the row is not ready to flip; nothing is written"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: CONFIG_MISSING, an unknown task, or an unreadable plan"
+        }
+      ],
+      "idempotency": "replay-safe",
+      "inputs": [],
+      "name": "done",
+      "nodeKind": "leaf",
+      "operands": [
+        {
+          "arity": {
+            "max": 1,
+            "min": 1
+          },
+          "description": "The task id (<change_id>#<n>)",
+          "kind": "TASK_ID",
+          "name": "task_id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true
+        }
+      ],
+      "options": [
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
+          "kind": "value",
+          "name": "repo",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Output JSON instead of the human-readable form",
+          "kind": "flag",
+          "name": "json",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "report",
+          "report": "TaskDoneReport",
+          "schemaRef": null,
+          "schemaVersion": null
+        }
+      ],
+      "path": [
+        "task",
+        "done"
+      ],
+      "requiredOneOf": [],
+      "roles": [
+        "implementer"
       ],
       "supportsJson": true
     },
@@ -10238,918 +10369,1085 @@
     {
       "code": "ADAPTER_EXECUTION_NOT_AUTHORIZED",
       "exit": 1,
+      "fix": "Have the adapter return a response that authorizes execution, or do not run the command through this adapter.",
       "meaning": "the adapter response did not authorize execution",
       "retryable": false
     },
     {
       "code": "ADAPTER_REFUSED",
       "exit": 1,
+      "fix": "Fix the adapter so it returns a well-formed response, then run the command again.",
       "meaning": "an adapter response was malformed or refused",
       "retryable": false
     },
     {
       "code": "APPROVAL_INCOMPLETE",
       "exit": 2,
+      "fix": "Pass a single-line, non-empty --approver and --note to `canon brief approve`.",
       "meaning": "`brief approve` got an empty or multi-line --by or --note",
       "retryable": false
     },
     {
       "code": "ARTIFACTS_MIGRATE_REFUSED",
       "exit": 2,
+      "fix": "Target an s3 tier, restore any local blob whose content does not match its name, and replace the bad object-store copy named in the error.",
       "meaning": "`artifacts migrate` cannot move the blobs: the target is not an s3 tier, a local blob does not match its name, or the object store holds a bad copy",
       "retryable": false
     },
     {
       "code": "ARTIFACTS_STORE_UNREACHABLE",
       "exit": 2,
+      "fix": "Check the artifact store tier's endpoint and credentials in canon.yaml, then run the command again.",
       "meaning": "the artifact store tier cannot be attached or reached, so no blob can be verified or uploaded",
       "retryable": true
     },
     {
       "code": "ARTIFACTS_VERIFY_FAILED",
       "exit": 1,
+      "fix": "Restore or re-store each file listed in data.problems, then run `canon artifacts verify` again.",
       "meaning": "a bound file is missing from the artifact store or altered; data.problems names each",
       "retryable": false
     },
     {
       "code": "BRIEF_CHANGED_SINCE_APPROVAL",
       "exit": 1,
+      "fix": "Review the edited brief and have the human run `canon brief approve` again.",
       "meaning": "the brief was edited after the human approved it, so it reads as not approved until approved again",
       "retryable": false
     },
     {
       "code": "BRIEF_CHANGED_SINCE_PAGE_LOAD",
       "exit": 2,
+      "fix": "Reload the dashboard page to see the current brief, then approve it again.",
       "meaning": "the dashboard was asked to approve a brief whose file differs from the copy the page showed the human; nothing was recorded",
       "retryable": false
     },
     {
       "code": "BRIEF_HAS_BLOCKERS",
       "exit": 1,
+      "fix": "Resolve every blocker finding in the brief (see `canon brief check`), then approve it.",
       "meaning": "the brief has blocker findings, so it cannot be approved yet",
       "retryable": false
     },
     {
       "code": "BRIEF_NOT_FOUND",
       "exit": 2,
+      "fix": "Pass the id of a change that has a brief; `canon change list` shows them.",
       "meaning": "the named change has no brief",
       "retryable": false
     },
     {
       "code": "BRIEF_UNAPPROVABLE",
       "exit": 2,
+      "fix": "Close the open code fence or other construct in the brief text so an `Approved:` line can be added, then approve again.",
       "meaning": "the brief's text cannot take an `Approved:` line (for example an open code fence)",
       "retryable": false
     },
     {
       "code": "BRIEF_UNAPPROVED",
       "exit": 1,
+      "fix": "Have the human approve the subject's brief with `canon brief approve` before attesting.",
       "meaning": "an attestation was refused because the subject's brief has no human approval",
       "retryable": false
     },
     {
       "code": "BRIEF_UNREADABLE",
       "exit": 2,
+      "fix": "Check that the brief file exists and is readable, then run the command again.",
       "meaning": "the brief file could not be read",
       "retryable": false
     },
     {
       "code": "BRIEF_WRITE_FAILED",
       "exit": 1,
+      "fix": "Check that the brief file and its directory are writable, then run the command again.",
       "meaning": "the brief file could not be written",
       "retryable": false
     },
     {
       "code": "CHANGE_ADOPTION_INCOMPLETE",
       "exit": 2,
+      "fix": "Run the repair command named in the hint to link the change to its subject.",
       "meaning": "the change was written but its subject link was not; the hint names the repair",
       "retryable": false
     },
     {
       "code": "CHANGE_AMBIGUOUS",
       "exit": 2,
+      "fix": "Pass the id of the change you mean as the operand.",
       "meaning": "several live changes have a brief; pass the change id as the operand",
       "retryable": false
     },
     {
       "code": "CHANGE_EXISTS",
       "exit": 2,
+      "fix": "Choose a different slug for the new change, or work on the existing one.",
       "meaning": "a change (or its archive) already uses that slug",
       "retryable": false
     },
     {
       "code": "CHANGE_INVALID_ARGUMENT",
       "exit": 2,
+      "fix": "Correct the arguments to `canon change new` so a brief can be built from them.",
       "meaning": "`change new` could not build a brief from the given arguments",
       "retryable": false
     },
     {
       "code": "CONFIG_MISSING",
       "exit": 2,
+      "fix": "Run `canon init` or pass --repo <DIR> to a directory holding canon.yaml.",
       "meaning": "canon.yaml does not exist",
       "retryable": false
     },
     {
       "code": "CONFIG_UNREADABLE",
       "exit": 2,
+      "fix": "Fix the canon.yaml, policy or setting named in the error, then run `canon init --check` to confirm.",
       "meaning": "canon.yaml, policy or a setting it carries could not be read or is invalid",
       "retryable": false
     },
     {
       "code": "CONTEXT_GIT_UNAVAILABLE",
       "exit": 1,
+      "fix": "Run the command inside a git checkout with a resolvable HEAD and git on the PATH.",
       "meaning": "a context pack needs a git identity that is not available",
       "retryable": false
     },
     {
       "code": "CONTEXT_INPUT_MISSING",
       "exit": 2,
+      "fix": "Create the selected context input or drop it from the selection.",
       "meaning": "a selected context input does not exist",
       "retryable": false
     },
     {
       "code": "CONTEXT_MANIFEST_INVALID",
       "exit": 2,
+      "fix": "Rewrite the context input manifest with a supported version.",
       "meaning": "the context input manifest has an unsupported version",
       "retryable": false
     },
     {
       "code": "CONTEXT_OBJECT_CONFLICT",
       "exit": 1,
+      "fix": "Do not overwrite the immutable context object; build a new pack from the current inputs.",
       "meaning": "an immutable context object already holds different bytes",
       "retryable": false
     },
     {
       "code": "CONTEXT_PACK_NOT_FOUND",
       "exit": 2,
+      "fix": "Pass the id of an existing context pack; `canon context list` shows them.",
       "meaning": "no context pack with that id",
       "retryable": false
     },
     {
       "code": "CONTEXT_PACK_TAMPERED",
       "exit": 1,
+      "fix": "Discard the stale or altered pack and build a new one.",
       "meaning": "a context pack is stale or was changed after it was created",
       "retryable": false
     },
     {
       "code": "CONTEXT_SECRET_DETECTED",
       "exit": 2,
+      "fix": "Remove the plaintext secret from the selected input or deselect it, then build the pack again.",
       "meaning": "a selected context input contains plaintext secret material",
       "retryable": false
     },
     {
       "code": "CONTEXT_UNSAFE_PATH",
       "exit": 2,
+      "fix": "Select only repository-relative paths that stay inside the repository and contain no symlink.",
       "meaning": "a selected path is absolute, leaves the repository, or contains a symlink",
       "retryable": false
     },
     {
       "code": "DASHBOARD_BAD_REQUEST",
       "exit": 2,
+      "fix": "Send requests only through the briefs page the dashboard serves.",
       "meaning": "a dashboard request was not the one the briefs page sends: wrong method, content type, length or body",
       "retryable": false
     },
     {
       "code": "DASHBOARD_CONFIG_INVALID",
       "exit": 2,
+      "fix": "Fix the dashboard section of canon.yaml, then start the dashboard again.",
       "meaning": "the dashboard's canon.yaml section is present but unusable",
       "retryable": false
     },
     {
       "code": "DASHBOARD_FAILED",
       "exit": 1,
+      "fix": "Read the I/O error in the message, fix its cause, then start the dashboard again.",
       "meaning": "the dashboard could not start for a reason that is not one of the other DASHBOARD_ codes (an I/O failure)",
       "retryable": false
     },
     {
       "code": "DASHBOARD_NOT_BUILT",
       "exit": 1,
+      "fix": "Use a canon binary that embeds the dashboard app, or build the dashboard into the repo.",
       "meaning": "this canon binary embeds no dashboard app and the repo holds no build of canon's own",
       "retryable": false
     },
     {
       "code": "DASHBOARD_ORIGIN_REFUSED",
       "exit": 2,
+      "fix": "Open the dashboard at the exact address it is bound to.",
       "meaning": "a dashboard request came with a Host or Origin that is not the bound address, so it was refused before anything was read",
       "retryable": false
     },
     {
       "code": "DASHBOARD_PORT_IN_USE",
       "exit": 1,
+      "fix": "Stop the process holding the port or choose another port, then start the dashboard again.",
       "meaning": "the dashboard's port is already bound by another process",
       "retryable": true
     },
     {
       "code": "DEMO_NOT_INITIALIZED",
       "exit": 2,
-      "meaning": "`demo add` ran before `demo init`",
+      "fix": "Run `canon demo init` before `canon demo review`.",
+      "meaning": "`demo review` ran before `demo init`",
       "retryable": false
     },
     {
       "code": "DISPATCH_ALREADY_ENDED",
       "exit": 2,
+      "fix": "Nothing to do: the run is already ended; start a new dispatch run if more work is needed.",
       "meaning": "the dispatch run was already ended",
       "retryable": false
     },
     {
       "code": "DISPATCH_END_IN_PROGRESS",
       "exit": 1,
+      "fix": "Wait a moment and run `canon dispatch end` again.",
       "meaning": "another process is closing the run; retry",
       "retryable": true
     },
     {
       "code": "DISPATCH_INVALID_ARGUMENT",
       "exit": 2,
+      "fix": "Remove the conflicting dispatch flags; see `canon schema` for the command's options.",
       "meaning": "a dispatch flag combination is invalid",
       "retryable": false
     },
     {
       "code": "DISPATCH_MANIFEST_MISMATCH",
       "exit": 2,
+      "fix": "Rename the manifest to match its run id, or correct the run id inside it.",
       "meaning": "the manifest's run id differs from its file name",
       "retryable": false
     },
     {
       "code": "DISPATCH_MANIFEST_UNREADABLE",
       "exit": 2,
+      "fix": "Restore the dispatch manifest as a readable run record.",
       "meaning": "the dispatch manifest is not a readable run record",
       "retryable": false
     },
     {
       "code": "DISPATCH_NOT_RUNNING",
       "exit": 2,
+      "fix": "Close only runs whose recorded status is running; inspect the manifest for this run's status.",
       "meaning": "the run's recorded status cannot be closed",
       "retryable": false
     },
     {
       "code": "DISPATCH_ROLE_REGIME_MISMATCH",
       "exit": 2,
+      "fix": "Pass a --role that matches the --regime's role, or change the --regime.",
       "meaning": "--role does not match the --regime's role",
       "retryable": false
     },
     {
       "code": "DISPATCH_RUN_NOT_FOUND",
       "exit": 2,
+      "fix": "Pass the id of an existing dispatch run.",
       "meaning": "no dispatch manifest for that run id",
       "retryable": false
     },
     {
       "code": "DIVERGENCE_ACCEPT_REFUSED",
       "exit": 2,
+      "fix": "Accept only divergent evidence as a reviewer whose actor and session did not attest it; `canon divergence list` shows candidates.",
       "meaning": "a divergence acceptance was refused: not a reviewer, the evidence is not divergent, or it was attested by the accepting actor or session",
       "retryable": false
     },
     {
       "code": "DIVERGENCE_INVALID_ARGUMENT",
       "exit": 2,
+      "fix": "Correct the divergence flag value; see `canon schema` for the command's options.",
       "meaning": "a divergence flag value is invalid",
       "retryable": false
     },
     {
       "code": "DIVERGENCE_REFUSED",
       "exit": 1,
+      "fix": "Resolve the gate rule the error names, then run `canon gate promote --kind divergence` again.",
       "meaning": "a divergence candidate was refused by a gate rule",
       "retryable": false
     },
     {
       "code": "EVIDENCE_APPROVAL_INVALID",
       "exit": 2,
+      "fix": "Attach a well-formed human approval that verifies against the brief.",
       "meaning": "the human approval attached to an attestation is missing, malformed or fails verification",
       "retryable": false
     },
     {
       "code": "EVIDENCE_BATCH_REFUSED",
       "exit": 2,
+      "fix": "Fix the entry the error names and submit the whole batch again; nothing was written.",
       "meaning": "a batch attestation was refused and none of it was written",
       "retryable": false
     },
     {
       "code": "EVIDENCE_BIND_REFUSED",
       "exit": 2,
+      "fix": "Pass a --report or --file that exists inside the repository and passes the binding rules named in the error.",
       "meaning": "a --report or --file binding was refused",
       "retryable": false
     },
     {
       "code": "EVIDENCE_CONTRACT_MISMATCH",
       "exit": 1,
+      "fix": "Record evidence whose kind and ref match the task's typed evidence contract.",
       "meaning": "the record's kind and ref differ from the task's typed evidence contract",
       "retryable": false
     },
     {
       "code": "EVIDENCE_FABRICATED",
       "exit": 1,
+      "fix": "Rewrite the note to state only what was actually run, without fabrication markers or unsupported verified claims.",
       "meaning": "the note carries a fabrication marker or an unsupported verified claim",
       "retryable": false
     },
     {
       "code": "EVIDENCE_INVALID_ARGUMENT",
       "exit": 2,
+      "fix": "Correct the `canon evidence add` arguments so none is empty, malformed or contradictory.",
       "meaning": "an `evidence add` argument is empty, malformed or contradicts another",
       "retryable": false
     },
     {
       "code": "EVIDENCE_REFUSED",
       "exit": 2,
+      "fix": "Satisfy the evidence rule named in the error, then attest again.",
       "meaning": "an attestation was refused by an evidence rule",
       "retryable": false
     },
     {
       "code": "EVIDENCE_REPORT_CONTRADICTION",
       "exit": 1,
+      "fix": "Re-run the check so the report supports the verdict, or change the verdict to match the report.",
       "meaning": "the bound report contradicts the verdict",
       "retryable": false
     },
     {
       "code": "EVIDENCE_STORE_FAILED",
       "exit": 2,
+      "fix": "Check the artifact store is reachable and writable, then run the command again.",
       "meaning": "a bound file could not be stored in the artifact store",
       "retryable": true
     },
     {
       "code": "EVIDENCE_VAULT_FAILED",
       "exit": 2,
+      "fix": "Check that the evidence vault directory is writable and has space, then run the command again.",
       "meaning": "the evidence vault could not write a blob",
       "retryable": false
     },
     {
       "code": "FEATURE_EXISTS",
       "exit": 2,
+      "fix": "Choose a different feature path or edit the existing file.",
       "meaning": "the feature file already exists",
       "retryable": false
     },
     {
       "code": "FEATURE_OUTSIDE_SPEC_ROOTS",
       "exit": 2,
+      "fix": "Place the feature under a specs.roots entry in canon.yaml, or add a root that covers it.",
       "meaning": "the feature path is under no configured specs.roots entry",
       "retryable": false
     },
     {
       "code": "FINDING_INVALID_ARGUMENT",
       "exit": 2,
+      "fix": "Correct the `canon finding` argument that is empty, malformed or out of range.",
       "meaning": "a `finding` argument is empty, malformed or out of range",
       "retryable": false
     },
     {
       "code": "FINDING_NOT_FOUND",
       "exit": 2,
+      "fix": "Pass the change, round and seq of a committed finding; `canon finding list` shows them.",
       "meaning": "no committed finding at that change, round and seq",
       "retryable": false
     },
     {
       "code": "FINDING_REASON_REQUIRED",
       "exit": 2,
+      "fix": "Pass a one-line --reason when closing a finding as rejected or deferred.",
       "meaning": "closing a finding as rejected or deferred needs a one-line --reason",
       "retryable": false
     },
     {
       "code": "FINDING_RESOLUTION_SHA_REQUIRED",
       "exit": 2,
+      "fix": "Pass --resolution-sha with the commit that fixed the finding.",
       "meaning": "a fixed finding needs --resolution-sha",
       "retryable": false
     },
     {
       "code": "FINDING_RESOLUTION_SHA_UNEXPECTED",
       "exit": 2,
+      "fix": "Drop --resolution-sha, or close the finding as fixed.",
       "meaning": "--resolution-sha was given with a disposition other than fixed",
       "retryable": false
     },
     {
       "code": "FINDING_SEQ_OCCUPIED",
       "exit": 2,
+      "fix": "Choose an unused seq for that change and round.",
       "meaning": "a finding already holds that change, round and seq",
       "retryable": false
     },
     {
       "code": "FINDING_STAGED",
       "exit": 2,
+      "fix": "Commit the staged finding, then close it.",
       "meaning": "the finding is still staged and cannot be closed until committed",
       "retryable": false
     },
     {
       "code": "FINDING_UNKNOWN_SCENARIO",
       "exit": 2,
+      "fix": "Pass a --scenario-id that the scenario index knows; run `canon inventory sync` if the scenario is new.",
       "meaning": "--scenario-id names a scenario the index does not know",
       "retryable": false
     },
     {
       "code": "FINDING_UNRESOLVABLE_COMMIT",
       "exit": 2,
+      "fix": "Pass a commit reference that exists in this repository.",
       "meaning": "a commit reference names no commit in this repository",
       "retryable": false
     },
     {
       "code": "FORMAT_VIOLATIONS",
       "exit": 1,
+      "fix": "Fix each violation listed in data.violations, then run `canon format` again.",
       "meaning": "`format` found spec-corpus violations; data.violations names each",
       "retryable": false
     },
     {
       "code": "GATE_TASK_BLOCKED",
       "exit": 1,
-      "meaning": "`gate task` refused to flip the task: its evidence does not support it",
+      "fix": "Attach the evidence the task requires, then run `canon task done` again.",
+      "meaning": "`task done` refused to flip the task: its evidence does not support it",
       "retryable": false
     },
     {
       "code": "GATE_TASK_EVIDENCE_INVALID",
       "exit": 1,
+      "fix": "Correct the task's evidence or typed atom named in the error, then run `canon task done` again.",
       "meaning": "the evidence or typed atom for the task is invalid",
       "retryable": false
     },
     {
       "code": "GATE_TASK_INVALID_ARGUMENT",
       "exit": 2,
+      "fix": "Pass a well-formed task id to `canon task done`.",
       "meaning": "the task id is malformed",
       "retryable": false
     },
     {
       "code": "GATE_TASK_UNSUPPORTED",
       "exit": 2,
+      "fix": "Mark the task done by hand in the plan document; this plan dialect cannot be flipped by canon.",
       "meaning": "the plan dialect cannot flip this task",
       "retryable": false
     },
     {
       "code": "GATE_VIOLATIONS",
       "exit": 1,
+      "fix": "Fix each violation listed in data.violations, then run the gate again.",
       "meaning": "the evidence gate found violations; data.violations names each",
       "retryable": false
     },
     {
       "code": "HOOKS_INSTALL_FAILED",
       "exit": 2,
+      "fix": "Check that the hook file is writable and not conflicting, then run the install again.",
       "meaning": "a hook entry could not be installed",
+      "retryable": false
+    },
+    {
+      "code": "HUMAN_ONLY",
+      "exit": 2,
+      "fix": "Ask the human to run the command themselves, supplying the options only they can give (--approver and --note); no flag grants it to an agent.",
+      "meaning": "this leaf records a human's decision (`brief approve`, `policy approve`, `divergence accept`), so every agent role (planner, implementer, reviewer, orchestrator declared with --as or CANON_ROLE) is refused",
       "retryable": false
     },
     {
       "code": "INGEST_FAILED",
       "exit": 1,
+      "fix": "Read the error message, fix the named source or input, then run the ingest again.",
       "meaning": "an ingest command failed",
       "retryable": false
     },
     {
       "code": "INGEST_SOURCE_UNUSABLE",
       "exit": 1,
+      "fix": "Fix the malformed plan source under its configured root, then run `canon ingest plans` again.",
       "meaning": "an `ingest plans` source was malformed and persisted nothing; check its root",
       "retryable": false
     },
     {
       "code": "INIT_AGENTS_MD_CONFLICT",
       "exit": 2,
+      "fix": "Move or merge the conflicting AGENTS.md content by hand, then run `canon init` again.",
       "meaning": "AGENTS.md cannot take the canon block without overwriting content",
       "retryable": false
     },
     {
       "code": "INIT_CONFIG_EXISTS",
       "exit": 2,
+      "fix": "Nothing to do: canon.yaml already exists; run `canon init --check` to verify it.",
       "meaning": "canon.yaml already exists and there is nothing else to refresh",
       "retryable": false
     },
     {
       "code": "INIT_INVALID_ARGUMENT",
       "exit": 2,
+      "fix": "Pass a supported language and skill providers to `canon init`.",
       "meaning": "an `init` option is invalid (language or skill providers)",
       "retryable": false
     },
     {
       "code": "INIT_SKILL_INSTALL_FAILED",
       "exit": 2,
+      "fix": "Fix the skill install target the error names, then run `canon skills install`.",
       "meaning": "canon.yaml was written but the canon skill was not installed",
       "retryable": false
     },
     {
       "code": "INVALID_CURSOR",
       "exit": 2,
+      "fix": "Restart the listing without --cursor and page with the cursor it returns.",
       "meaning": "`--cursor` is not one this listing issued, or the record it points after is gone",
       "retryable": false
     },
     {
       "code": "INVENTORY_ABORTED",
       "exit": 1,
+      "fix": "Fix the violations or duplicate scenarios listed in data.roots, then run `canon inventory sync` again.",
       "meaning": "`inventory sync` aborted a spec root on violations or duplicate scenarios; data.roots names each",
       "retryable": false
     },
     {
       "code": "INVENTORY_FAILED",
       "exit": 2,
+      "fix": "Fix the spec file the error names, then run `canon inventory sync` again.",
       "meaning": "the scenario index could not be built",
       "retryable": false
     },
     {
       "code": "LAYOUT_MIGRATION_REQUIRED",
       "exit": 2,
+      "fix": "Run `canon migrate` to move the spec root to the current layout.",
       "meaning": "the spec root uses a pre-0.17 layout; run `canon migrate`",
       "retryable": false
     },
     {
       "code": "LEARN_DEMOTION_FAILED",
       "exit": 1,
+      "fix": "Run `canon strategy rollback` on the still-active strategy, then retry the promotion.",
       "meaning": "promotion is blocked and the demotion a contradicting trajectory triggered also failed; the strategy is still active",
       "retryable": false
     },
     {
       "code": "LEARN_EVALUATION_REJECTED",
       "exit": 1,
+      "fix": "Supply an evaluation file that fits the candidate strategy, then run `canon strategy promote` again.",
       "meaning": "the promotion evaluation does not fit the candidate strategy",
       "retryable": false
     },
     {
       "code": "LEARN_INVALID_ARGUMENT",
       "exit": 2,
-      "meaning": "a `learn` flag value is invalid",
+      "fix": "Correct the `canon strategy` flag value; see `canon schema` for the command's options.",
+      "meaning": "a `strategy` flag value is invalid",
       "retryable": false
     },
     {
       "code": "LEARN_INVALID_INPUT",
       "exit": 2,
-      "meaning": "a `learn` evaluation or approval file is invalid",
+      "fix": "Fix the evaluation or approval file so it parses and matches its schema.",
+      "meaning": "a `strategy` evaluation or approval file is invalid",
       "retryable": false
     },
     {
       "code": "LEARN_PROMOTION_BLOCKED",
       "exit": 1,
+      "fix": "Resolve what the promotion gate reports for this strategy, then run `canon strategy promote` again.",
       "meaning": "the promotion gate blocks this strategy",
       "retryable": false
     },
     {
       "code": "LEARN_PROMOTION_FAILED",
       "exit": 1,
+      "fix": "Read the error message, fix its cause, then run `canon strategy promote` again.",
       "meaning": "the strategy could not be promoted",
       "retryable": false
     },
     {
       "code": "LEARN_ROLLBACK_FAILED",
       "exit": 1,
+      "fix": "Read the error message, fix its cause, then run `canon strategy rollback` again.",
       "meaning": "the strategy could not be rolled back",
       "retryable": false
     },
     {
       "code": "LEARN_SIGNATURE_UNREADABLE",
       "exit": 2,
+      "fix": "Pass the path of a readable detached signature file.",
       "meaning": "the detached signature file could not be read",
       "retryable": false
     },
     {
       "code": "LEARN_STRATEGY_NOT_FOUND",
       "exit": 2,
+      "fix": "Pass the id of an existing strategy.",
       "meaning": "no strategy with that id",
       "retryable": false
     },
     {
       "code": "LEARN_TRAJECTORY_NOT_FOUND",
       "exit": 2,
+      "fix": "Pass the id of a trajectory that exists, or omit the contradicting trajectory.",
       "meaning": "the contradicting trajectory does not exist",
       "retryable": false
     },
     {
       "code": "LEDGER_ARCHIVE_UNAVAILABLE",
       "exit": 2,
+      "fix": "Point --ledger-root at a directory named `ledger`, or rename the ledger directory so it has an archive.",
       "meaning": "`ledger compact` found no archive: the ledger root is not a directory named `ledger`",
       "retryable": false
     },
     {
       "code": "LEDGER_COMPACT_FAILED",
       "exit": 1,
+      "fix": "Fix the file-system problem the error names, then run `canon ledger compact` again to move the rest.",
       "meaning": "a superseded version could not be moved to the archive; what moved stays moved",
       "retryable": false
     },
     {
       "code": "MIGRATE_INDEX_FAILED",
       "exit": 1,
+      "fix": "Run `canon inventory sync` to rebuild the scenario index.",
       "meaning": "files moved but the scenario index was not rebuilt; run `canon inventory sync`",
       "retryable": false
     },
     {
       "code": "MIGRATE_PINS_FAILED",
       "exit": 2,
+      "fix": "Run `canon migrate` again to pin the reviews to their evidence.",
       "meaning": "files moved but the reviews were not pinned to what their evidence says; run `canon migrate` again",
       "retryable": false
     },
     {
       "code": "MIGRATE_REFUSED",
       "exit": 2,
+      "fix": "Fix the layout or config problem the error names, then run `canon migrate` again.",
       "meaning": "`migrate` refused: the repository's layout or config cannot be moved safely",
       "retryable": false
     },
     {
       "code": "MIGRATE_STOPPED",
       "exit": 2,
+      "fix": "Run `canon migrate` again to finish the rest.",
       "meaning": "`migrate` stopped partway; running it again finishes the rest",
       "retryable": false
     },
     {
       "code": "MIGRATE_UNCOMMITTED",
       "exit": 2,
+      "fix": "Commit or stash the uncommitted changes under the paths migrate moves, then run `canon migrate` again.",
       "meaning": "`migrate` refused because paths it moves have uncommitted changes",
       "retryable": false
     },
     {
       "code": "NO_BRIEF",
       "exit": 2,
+      "fix": "Run `canon change new` to create a change with a brief.",
       "meaning": "no live change has a brief",
       "retryable": false
     },
     {
       "code": "PLAN_CHANGED",
       "exit": 2,
-      "meaning": "the data changed since `purge --plan`, so the confirmed digest no longer matches; nothing was deleted",
+      "fix": "Run the command again without --commit to preview the new plan, then act with `--commit --plan-digest <DIGEST>`.",
+      "meaning": "the data changed since the preview, so the supplied --plan-digest no longer matches; nothing was deleted",
       "retryable": false
     },
     {
       "code": "PLAN_CORPUS_UNREADABLE",
       "exit": 2,
+      "fix": "Fix the plan sources configured in canon.yaml so every document can be read.",
       "meaning": "the plan corpus could not be read to resolve a task",
       "retryable": false
     },
     {
       "code": "PLAN_SOURCES_MISSING",
       "exit": 2,
+      "fix": "Configure plan sources in canon.yaml, then run the command again.",
       "meaning": "the repository configures no plan sources",
       "retryable": false
     },
     {
       "code": "PLUGIN_SYNC_ERRORS",
       "exit": 1,
+      "fix": "Fix each error listed in data.roots, then run `canon plugin sync` again.",
       "meaning": "`plugin sync` could not write some candidates; data.roots names each error",
       "retryable": false
     },
     {
       "code": "PLUGIN_SYNC_FAILED",
       "exit": 2,
+      "fix": "Read the error message, fix its cause, then run `canon plugin sync` again.",
       "meaning": "plugin sync failed",
       "retryable": false
     },
     {
       "code": "POLICY_APPROVAL_FAILED",
       "exit": 2,
+      "fix": "Check that .canon is writable, then have the human run `canon policy approve` again.",
       "meaning": "the policy approval could not be recorded",
       "retryable": false
     },
     {
       "code": "POLICY_APPROVAL_UNREADABLE",
       "exit": 2,
+      "fix": "Restore or repair `.canon/policy.approval.json`, or have the human run `canon policy approve` again.",
       "meaning": "`.canon/policy.approval.json` cannot be read, so the policy in force cannot be checked against its approval; shipping or reopening a subject refuses, and `--override-reason` does not waive it",
       "retryable": false
     },
     {
       "code": "POLICY_CHANGED_SINCE_APPROVAL",
       "exit": 1,
+      "fix": "Restore `.canon/policy.yaml` to the approved bytes, or have the human run `canon policy approve` again.",
       "meaning": "`.canon/policy.yaml` differs from the bytes a human approved; shipping or reopening a subject refuses until it is re-approved or restored, and `--override-reason` does not waive it",
       "retryable": false
     },
     {
       "code": "PROMOTE_FAILED",
       "exit": 1,
+      "fix": "Fix the ledger problem the error names, then run `canon gate promote` again.",
       "meaning": "a staged record was written but promoting it to the ledger failed",
       "retryable": false
     },
     {
       "code": "PROMOTE_REFUSED",
       "exit": 1,
+      "fix": "Fix each record listed in data.refused, then run `canon gate promote` again.",
       "meaning": "`gate promote` refused one or more staged records; data.refused names each",
       "retryable": false
     },
     {
       "code": "PROMPT_BUNDLE_INVALID",
       "exit": 2,
+      "fix": "Fix the prompt bundle so it parses and matches its schema.",
       "meaning": "a prompt bundle is invalid",
       "retryable": false
     },
     {
       "code": "PURGE_PLAN_REQUIRED",
       "exit": 2,
-      "meaning": "`purge` deletes only a reviewed plan: run `purge --plan`, then `purge --confirm <planDigest>`",
+      "fix": "Run `canon purge` with no flags to preview the plan, then act with `--commit --plan-digest <DIGEST>`.",
+      "meaning": "`purge` deletes only a reviewed plan: a bare run previews it, and `--commit --plan-digest <DIGEST>` acts on it",
       "retryable": false
     },
     {
       "code": "QUERY_FAILED",
       "exit": 1,
+      "fix": "Check that the ledger is readable, then run the query again.",
       "meaning": "the query could not read the ledger",
       "retryable": false
     },
     {
       "code": "QUERY_INVALID_ARGUMENT",
       "exit": 2,
+      "fix": "Remove the flag that does not apply to this kind; see `canon schema` for its options.",
       "meaning": "a query flag is invalid for this kind",
       "retryable": false
     },
     {
       "code": "REGIME_KEY_INVALID",
       "exit": 2,
+      "fix": "Pass a well-formed regime key; every part must be non-empty and valid.",
       "meaning": "a regime key part is malformed",
       "retryable": false
     },
     {
       "code": "REPORT_FAILED",
       "exit": 1,
+      "fix": "Read the error message, fix its cause, then run `canon report build` or `canon report check` again.",
       "meaning": "the report could not be built or checked",
       "retryable": false
     },
     {
       "code": "REPORT_STALE",
       "exit": 1,
-      "meaning": "`report --check` found the report missing or out of date",
+      "fix": "Run `canon report build` or `canon report snapshot` to refresh the report.",
+      "meaning": "`report check` found the report missing or out of date",
       "retryable": false
     },
     {
       "code": "REPO_UNREADABLE",
       "exit": 2,
+      "fix": "Check that --repo points at a readable repository and that the named input file exists.",
       "meaning": "the repository, its ledger or an input file could not be read",
       "retryable": false
     },
     {
       "code": "RETENTION_EXPORT_FAILED",
       "exit": 2,
+      "fix": "Check that the export destination is writable, then run the export again.",
       "meaning": "the export failed",
       "retryable": false
     },
     {
       "code": "RETENTION_PURGE_FAILED",
       "exit": 2,
+      "fix": "Fix the file-system problem the error names, then preview with `canon purge` and act with `--commit --plan-digest <DIGEST>`.",
       "meaning": "the purge failed or stopped partway",
       "retryable": false
     },
     {
       "code": "RETRIEVE_FAILED",
       "exit": 2,
+      "fix": "Read the error message, fix its cause, then run the retrieval again.",
       "meaning": "retrieval failed",
       "retryable": false
     },
     {
       "code": "REVIEW_ARTIFACT_REFUSED",
       "exit": 2,
+      "fix": "Bind an artifact that exists inside the repository and passes the rules named in the error.",
       "meaning": "a review's artifact binding was refused",
       "retryable": false
     },
     {
       "code": "REVIEW_INVALID_ARGUMENT",
       "exit": 2,
+      "fix": "Add the missing `canon review` argument or drop the one that contradicts another.",
       "meaning": "a `review scenario` or `review change` argument is missing or contradicts another",
       "retryable": false
     },
     {
       "code": "REVIEW_SCENARIO_NOT_INDEXED",
       "exit": 2,
+      "fix": "Run `canon inventory sync`, then review the scenario again.",
       "meaning": "a reviewed scenario has no indexed record; run `canon inventory sync`",
       "retryable": false
     },
     {
       "code": "SCAFFOLD_INVALID_ARGUMENT",
       "exit": 2,
+      "fix": "Correct the scaffold argument named in the error.",
       "meaning": "a scaffold argument is invalid",
       "retryable": false
     },
     {
       "code": "SCENARIO_TAG_EXISTS",
       "exit": 2,
+      "fix": "Choose a tag that is not already used, or edit the existing scenario.",
       "meaning": "the scenario tag already exists",
       "retryable": false
     },
     {
       "code": "SELFTEST_FAILED",
       "exit": 1,
+      "fix": "Read the failing suite or fixture in the output and fix the behavior it checks.",
       "meaning": "a selftest suite or fixture did not match its expected result",
       "retryable": false
     },
     {
       "code": "SERIALIZE_FAILED",
       "exit": 1,
+      "fix": "Report this canon bug with the command you ran; it cannot be fixed from the command line.",
       "meaning": "the result could not be serialized",
       "retryable": false
     },
     {
       "code": "SKILLS_DRIFT",
       "exit": 1,
+      "fix": "Run `canon skills install` to refresh the installed skills.",
       "meaning": "`skills check` found an installed skill missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version",
       "retryable": false
     },
     {
       "code": "SKILLS_FAILED",
       "exit": 1,
+      "fix": "Read the error message, fix its cause, then run the skills command again.",
       "meaning": "a skills command failed",
       "retryable": false
     },
     {
       "code": "SPEC_ROOTS_UNREADABLE",
       "exit": 2,
+      "fix": "Make the scenario files the brief's flow steps point at readable, or correct the paths.",
       "meaning": "the scenario files a brief's flow steps point at could not be read",
       "retryable": false
     },
     {
       "code": "SPEC_ROOT_UNRESOLVED",
       "exit": 2,
+      "fix": "Pass --project-id with the id of the spec root to use.",
       "meaning": "no single spec root could be chosen; pass --project-id",
       "retryable": false
     },
     {
       "code": "SUBJECT_ADOPT_REFUSED",
       "exit": 2,
+      "fix": "Fix the problem the error names, then run `canon subject adopt` again.",
       "meaning": "the change could not be adopted by the subject",
       "retryable": false
     },
     {
       "code": "SUBJECT_EXISTS",
       "exit": 2,
+      "fix": "Choose a different subject id, or use the existing subject (`canon subject show`).",
       "meaning": "a subject with that id already exists",
       "retryable": false
     },
     {
       "code": "SUBJECT_GATE_VIOLATION",
       "exit": 1,
+      "fix": "Fix each gate violation reported, then run `canon subject move` again.",
       "meaning": "the status transition is blocked by gate violations",
       "retryable": false
     },
     {
       "code": "SUBJECT_INVALID_ARGUMENT",
       "exit": 2,
+      "fix": "Correct the malformed `canon subject` argument.",
       "meaning": "a `subject` argument is malformed",
       "retryable": false
     },
     {
       "code": "SUBJECT_INVALID_TRANSITION",
       "exit": 2,
+      "fix": "Check the subject's status with `canon subject show` and request an allowed transition.",
       "meaning": "the status change is not an allowed transition",
       "retryable": false
     },
     {
       "code": "SUBJECT_NOT_FOUND",
       "exit": 2,
+      "fix": "Pass the id of an existing subject; `canon subject list` shows them.",
       "meaning": "no subject with that id",
       "retryable": false
     },
     {
       "code": "SUBJECT_REASON_REQUIRED",
       "exit": 2,
+      "fix": "Pass --reason when reopening a shipped subject with `canon subject move`.",
       "meaning": "reopening a shipped subject needs --reason",
       "retryable": false
     },
     {
       "code": "SUBJECT_UNADOPT_REFUSED",
       "exit": 2,
+      "fix": "Leave the change adopted, or remove its approved brief and the `@flow:<change>.*` scenario tags first.",
       "meaning": "the change carries an approved brief, or a scenario the subject owns is tagged `@flow:<change>.*`, so it stays adopted",
       "retryable": false
     },
     {
       "code": "TASK_NOT_FOUND",
       "exit": 2,
+      "fix": "Pass a task id that exists in the plan corpus.",
       "meaning": "the task id names no task in the plan corpus",
       "retryable": false
     },
     {
       "code": "TASK_ROW_NOT_FOUND",
       "exit": 2,
+      "fix": "Restore the task's row in its plan document, then run `canon task done` again.",
       "meaning": "the task's row is missing from its plan document",
       "retryable": false
     },
     {
       "code": "TIER_FAILED",
       "exit": 1,
+      "fix": "Read the error message, fix its cause, then run tier aging again.",
       "meaning": "tier aging failed",
       "retryable": false
     },
     {
       "code": "TYPED_ATOMS_INVALID",
       "exit": 2,
+      "fix": "Fix the change's typed-atoms file so it parses.",
       "meaning": "the typed-atoms file for the change does not parse",
       "retryable": false
     },
     {
       "code": "UNKNOWN_COMMAND",
       "exit": 2,
+      "fix": "Run `canon schema` to list the command paths canon has.",
       "meaning": "`canon schema` was given a command path canon does not have",
+      "retryable": false
+    },
+    {
+      "code": "UNKNOWN_ERROR_CODE",
+      "exit": 2,
+      "fix": "Run `canon schema --errors` to list every code.",
+      "meaning": "`canon schema --error <CODE>` was given a code canon does not have",
       "retryable": false
     },
     {
       "code": "UNKNOWN_FIELD",
       "exit": 2,
+      "fix": "Use only field names the records have; run `canon schema` to list them.",
       "meaning": "`--fields` names a field the records do not have",
       "retryable": false
     },
     {
       "code": "UNKNOWN_ROLE",
       "exit": 2,
+      "fix": "Set CANON_ROLE to planner, implementer, reviewer or orchestrator, or unset it.",
       "meaning": "`CANON_ROLE` holds a value that is not a role (planner, implementer, reviewer, orchestrator)",
       "retryable": false
     },
     {
       "code": "UNKNOWN_SPEC_ROOT",
       "exit": 2,
+      "fix": "Pass a --project-id that names a spec root configured in canon.yaml.",
       "meaning": "`--project-id` names no spec root configured in canon.yaml, so nothing was written",
       "retryable": false
     },
     {
       "code": "UNVERIFIABLE",
       "exit": 1,
+      "fix": "Widen the check so it examines something; meta.coverage says what was looked at.",
       "meaning": "a check examined nothing, so it cannot report clean: data.unverifiable is true and meta.coverage says what was looked at",
       "retryable": false
     },
     {
       "code": "USAGE",
       "exit": 2,
+      "fix": "Run the command with --help and correct the flag, subcommand or argument.",
       "meaning": "the command line did not parse: an unknown flag or subcommand, or a missing or malformed argument",
       "retryable": false
     },
     {
       "code": "WRITE_FAILED",
       "exit": 2,
+      "fix": "Check that the target path is writable and has space, then run the command again.",
       "meaning": "a file or ledger record could not be written",
       "retryable": false
     }
@@ -11172,7 +11470,7 @@
     {
       "aliases": [],
       "default": [],
-      "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` lists the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` defaults to it",
+      "help": "The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` defaults to it",
       "kind": "value",
       "name": "as",
       "possibleValues": [
@@ -11320,6 +11618,937 @@
       }
     ]
   },
+  "removed": [
+    {
+      "kind": "command",
+      "new": "artifacts move --tier",
+      "note": "the bare run previews; `--commit --plan-digest` acts",
+      "old": "artifacts migrate",
+      "rule": "D6, D1 Renames",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "bare",
+      "new": "brief show",
+      "note": "a group is never runnable; the change is an optional operand",
+      "old": "brief",
+      "rule": "D2",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "command",
+      "new": "context-pack add --manifest",
+      "note": "",
+      "old": "context-pack new",
+      "rule": "D1 Renames",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "command",
+      "new": "demo review",
+      "note": "",
+      "old": "demo add",
+      "rule": "D1 Renames",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "command",
+      "new": "gate promote --kind divergence",
+      "note": "",
+      "old": "divergence promote",
+      "rule": "D1 Renames",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "command",
+      "new": "divergence list",
+      "note": "",
+      "old": "divergence status",
+      "rule": "D1 Renames",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "command",
+      "new": "artifacts store",
+      "note": "",
+      "old": "evidence vault",
+      "rule": "D1 Renames",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "command",
+      "new": "format",
+      "note": "the `fmt` alias is gone; the directory is an optional operand",
+      "old": "fmt",
+      "rule": "D8, D12",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "command",
+      "new": "selftest --suite trust-spine-gate",
+      "note": "",
+      "old": "gate selftest",
+      "rule": "D1 Renames",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "command",
+      "new": "task done",
+      "note": "the task id is the operand; installed hooks are rewritten by `canon migrate`",
+      "old": "gate task",
+      "rule": "D1 Renames",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "command",
+      "new": "ingest records",
+      "note": "\"artifact\" now means the blob store only",
+      "old": "ingest artifacts",
+      "rule": "D1 Renames",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "command",
+      "new": "strategy promote",
+      "note": "the strategy id is the operand",
+      "old": "learn promote",
+      "rule": "D1 Renames",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "command",
+      "new": "strategy approval-payload --evaluation --approver --approval-at",
+      "note": "the strategy id is the operand; `approve` is reserved for commands that record a human approval",
+      "old": "learn approve",
+      "rule": "D1 Renames",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "command",
+      "new": "strategy rollback",
+      "note": "the strategy id is the operand",
+      "old": "learn rollback",
+      "rule": "D1 Renames",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "command",
+      "new": "regime show --role-segment --repo-name --area --hash",
+      "note": "",
+      "old": "regime-key",
+      "rule": "D1 Renames, D5",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "bare",
+      "new": "report build",
+      "note": "`report check` and `report snapshot` are the other two modes",
+      "old": "report",
+      "rule": "D1 Renames",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "command",
+      "new": "review scenario",
+      "note": "split by what it reviews: `review change` reviews a chore change",
+      "old": "review add",
+      "rule": "D1 Renames",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "command",
+      "new": "subject show",
+      "note": "`subject move --to` changes the state",
+      "old": "subject status",
+      "rule": "D1 Renames",
+      "scope": [],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "report check",
+      "note": "",
+      "old": "--check",
+      "rule": "D1 Renames",
+      "scope": [
+        "report"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "report snapshot",
+      "note": "the output directory is the operand",
+      "old": "--snapshot",
+      "rule": "D1 Renames",
+      "scope": [
+        "report"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "format",
+      "note": "`format` always validates; drop the flag",
+      "old": "--check",
+      "rule": "D12",
+      "scope": [
+        "format"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--check",
+      "note": "",
+      "old": "--check-config",
+      "rule": "D1 Renames",
+      "scope": [
+        "init"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "brief show",
+      "note": "the change is the operand",
+      "old": "--change-id",
+      "rule": "D1 r2",
+      "scope": [
+        "brief show",
+        "brief check",
+        "brief approve"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "brief show",
+      "note": "the change is the operand",
+      "old": "--change",
+      "rule": "D1 r2",
+      "scope": [
+        "brief show",
+        "brief check",
+        "brief approve"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "finding close",
+      "note": "the change is the operand",
+      "old": "--change-id",
+      "rule": "D1 r2",
+      "scope": [
+        "finding close"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "dispatch end",
+      "note": "the run is the operand",
+      "old": "--run-id",
+      "rule": "D1 r1",
+      "scope": [
+        "dispatch end"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "subject adopt",
+      "note": "the subject is the operand and the change is `--change-id`",
+      "old": "--subject-id",
+      "rule": "D1 r1",
+      "scope": [
+        "subject adopt",
+        "subject unadopt"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "prompt add",
+      "note": "name and version are one operand, name@version",
+      "old": "--name",
+      "rule": "D1 r1, D12",
+      "scope": [
+        "prompt add",
+        "prompt show"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "prompt add",
+      "note": "name and version are one operand, name@version",
+      "old": "--version",
+      "rule": "D1 r1, D12",
+      "scope": [
+        "prompt add",
+        "prompt show"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "divergence add",
+      "note": "the scenario is the operand",
+      "old": "--scenario-id",
+      "rule": "D1 r2",
+      "scope": [
+        "divergence add",
+        "divergence defer",
+        "divergence resolve",
+        "divergence accept"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "review scenario",
+      "note": "the scenarios are operands",
+      "old": "--scenario-id",
+      "rule": "D1 r2",
+      "scope": [
+        "review scenario"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--input",
+      "note": "a batch is an `--input` array",
+      "old": "--scenario-ids-from",
+      "rule": "D7",
+      "scope": [
+        "review scenario"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "review change",
+      "note": "a chore change is reviewed with `review change`",
+      "old": "--change-id",
+      "rule": "D1 Renames",
+      "scope": [
+        "review scenario"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "review scenario",
+      "note": "scenarios are reviewed with `review scenario`",
+      "old": "--scenario-id",
+      "rule": "D1 Renames",
+      "scope": [
+        "review change"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "review scenario",
+      "note": "scenarios are reviewed with `review scenario`",
+      "old": "--scenario-ids-from",
+      "rule": "D1 Renames",
+      "scope": [
+        "review change"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "review change",
+      "note": "the change is the operand",
+      "old": "--change-id",
+      "rule": "D1 r2",
+      "scope": [
+        "review change"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--input",
+      "note": "a batch is an `--input` array with `operands` per element",
+      "old": "--from",
+      "rule": "D7",
+      "scope": [
+        "scenario new"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "schema",
+      "note": "the listing is unfiltered; `--as` filters it by role",
+      "old": "--all",
+      "rule": "D3",
+      "scope": [
+        "schema"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--actor-id",
+      "note": "",
+      "old": "--agent-id",
+      "rule": "D1 Renames",
+      "scope": [
+        "dispatch begin"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--actor-id",
+      "note": "it is the reviewer, and required where `--reviewer` was",
+      "old": "--reviewer",
+      "rule": "D1 Renames, O9",
+      "scope": [
+        "divergence add",
+        "divergence defer",
+        "divergence resolve",
+        "divergence accept",
+        "finding add",
+        "review scenario",
+        "review change"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--approver",
+      "note": "",
+      "old": "--by",
+      "rule": "D1 Renames",
+      "scope": [
+        "brief approve",
+        "policy approve"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--approver",
+      "note": "",
+      "old": "--principal",
+      "rule": "D1 Renames",
+      "scope": [
+        "strategy approval-payload"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--approver",
+      "note": "",
+      "old": "--approval-by",
+      "rule": "D1 Renames",
+      "scope": [
+        "evidence add",
+        "evidence approval-payload"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--approval-at",
+      "note": "",
+      "old": "--approved-at",
+      "rule": "D1 Renames",
+      "scope": [
+        "strategy rollback"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--signature-file",
+      "note": "",
+      "old": "--signature",
+      "rule": "D1 Renames",
+      "scope": [
+        "strategy promote"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--signature-file",
+      "note": "",
+      "old": "--approval-signature-file",
+      "rule": "D1 Renames",
+      "scope": [
+        "evidence add"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--manifest",
+      "note": "",
+      "old": "--context-manifest",
+      "rule": "D1 Renames",
+      "scope": [
+        "dispatch begin"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--rev",
+      "note": "the commit the record is about; default HEAD",
+      "old": "--sha",
+      "rule": "D1 Renames, D7b",
+      "scope": [
+        "divergence add",
+        "divergence defer",
+        "divergence resolve"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--rev",
+      "note": "default HEAD",
+      "old": "--pin",
+      "rule": "D1 Renames, D7b",
+      "scope": [
+        "review scenario",
+        "review change"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--rev",
+      "note": "default HEAD",
+      "old": "--artifact-sha",
+      "rule": "D1 Renames, D7b",
+      "scope": [
+        "evidence add",
+        "evidence audit",
+        "evidence approval-payload"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--rev",
+      "note": "default HEAD",
+      "old": "--reviewed-sha",
+      "rule": "D7b",
+      "scope": [
+        "finding add"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--resolution-rev",
+      "note": "default HEAD when fixed",
+      "old": "--resolution-sha",
+      "rule": "D7b",
+      "scope": [
+        "finding add",
+        "finding close"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--introduced-rev",
+      "note": "no default",
+      "old": "--introduced-by",
+      "rule": "D7b",
+      "scope": [
+        "finding add"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--output",
+      "note": "`-o` is the short form",
+      "old": "--out",
+      "rule": "D1 Renames",
+      "scope": [
+        "export"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--limit",
+      "note": "",
+      "old": "-k",
+      "rule": "D1 Renames",
+      "scope": [
+        "retrieve"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--limit",
+      "note": "",
+      "old": "--k",
+      "rule": "D1 Renames",
+      "scope": [
+        "retrieve"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--for-role",
+      "note": "`--role` means only attribution",
+      "old": "--role",
+      "rule": "D12",
+      "scope": [
+        "retrieve"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--class",
+      "note": "an external re-audit is `evidence audit`, not `--class audit`",
+      "old": "--kind",
+      "rule": "D1 Renames, Q3",
+      "scope": [
+        "evidence add"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--change-kind",
+      "note": "`--kind` is reserved for record kinds",
+      "old": "--kind",
+      "rule": "D12",
+      "scope": [
+        "change new"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--run-outcome",
+      "note": "",
+      "old": "--status",
+      "rule": "D1 Renames, D12",
+      "scope": [
+        "dispatch end"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--state",
+      "note": "",
+      "old": "--status",
+      "rule": "D1 Renames, D12",
+      "scope": [
+        "divergence add"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--review-outcome",
+      "note": "",
+      "old": "--outcome",
+      "rule": "D12",
+      "scope": [
+        "review scenario",
+        "review change"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--task-id",
+      "note": "",
+      "old": "--task",
+      "rule": "D1 Renames",
+      "scope": [
+        "dispatch begin",
+        "evidence add",
+        "evidence approval-payload"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--plugin-id",
+      "note": "",
+      "old": "--plugin",
+      "rule": "D1 Renames",
+      "scope": [
+        "query"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--parent-run-id",
+      "note": "",
+      "old": "--parent-run",
+      "rule": "D1 Renames",
+      "scope": [
+        "dispatch begin"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--skills-source",
+      "note": "",
+      "old": "--source",
+      "rule": "D12",
+      "scope": [
+        "skills install",
+        "skills check",
+        "skills doctor"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--plan-source",
+      "note": "",
+      "old": "--source",
+      "rule": "D1 Renames, D12",
+      "scope": [
+        "ingest plans"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--role-segment",
+      "note": "",
+      "old": "--role",
+      "rule": "D1 Renames, D5",
+      "scope": [
+        "regime show"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--repo-name",
+      "note": "the repo segment of the key; `--repo` names a directory on other commands",
+      "old": "--repo",
+      "rule": "D1 Renames, D5",
+      "scope": [
+        "regime show"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--tier",
+      "note": "",
+      "old": "--to",
+      "rule": "D1 Renames",
+      "scope": [
+        "artifacts move"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--repo",
+      "note": "the repo is `--repo` on every command; omit it to use the nearest directory holding canon.yaml",
+      "old": "--target",
+      "rule": "D5",
+      "scope": [
+        "skills install",
+        "skills check",
+        "skills doctor"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--repo",
+      "note": "the repo's canon.yaml is found from `--repo`, or from the nearest directory holding one when it is omitted",
+      "old": "--canon-yaml",
+      "rule": "D5",
+      "scope": [
+        "ingest sessions",
+        "query",
+        "tier age"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--commit --plan-digest",
+      "note": "the bare run previews; `--commit --plan-digest` acts",
+      "old": "--dry-run",
+      "rule": "D6",
+      "scope": [
+        "artifacts move",
+        "ledger compact",
+        "migrate",
+        "tier age"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "purge",
+      "note": "the bare run previews",
+      "old": "--plan",
+      "rule": "D6",
+      "scope": [
+        "purge"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--commit --plan-digest",
+      "note": "the bare run previews; `--commit --plan-digest` acts",
+      "old": "--confirm",
+      "rule": "D6",
+      "scope": [
+        "purge"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "evidence audit",
+      "note": "an external evaluator's re-audit is its own command",
+      "old": "--evaluator-id",
+      "rule": "Q3",
+      "scope": [
+        "evidence add"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "evidence audit",
+      "note": "an external evaluator's re-audit is its own command",
+      "old": "--evaluator-version",
+      "rule": "Q3",
+      "scope": [
+        "evidence add"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "evidence audit",
+      "note": "an external evaluator's re-audit is its own command",
+      "old": "--evaluator-digest",
+      "rule": "Q3",
+      "scope": [
+        "evidence add"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "evidence audit",
+      "note": "an external evaluator's re-audit is its own command",
+      "old": "--audit-result",
+      "rule": "Q3",
+      "scope": [
+        "evidence add"
+      ],
+      "since": "0.28.0"
+    },
+    {
+      "kind": "option",
+      "new": "--change-id",
+      "note": "",
+      "old": "--change",
+      "rule": "one name per concept",
+      "scope": [
+        "scenario new"
+      ],
+      "since": "0.24.0"
+    },
+    {
+      "kind": "option",
+      "new": "--project-id",
+      "note": "",
+      "old": "--project",
+      "rule": "one name per concept",
+      "scope": [
+        "feature new",
+        "scenario new"
+      ],
+      "since": "0.24.0"
+    },
+    {
+      "kind": "option",
+      "new": "--subject-id",
+      "note": "",
+      "old": "--subject",
+      "rule": "one name per concept",
+      "scope": [
+        "change new",
+        "retrieve",
+        "scenario new"
+      ],
+      "since": "0.24.0"
+    },
+    {
+      "kind": "option",
+      "new": "--actor-id",
+      "note": "",
+      "old": "--actor",
+      "rule": "one name per concept",
+      "scope": [
+        "feature new",
+        "strategy rollback",
+        "scenario new"
+      ],
+      "since": "0.24.0"
+    },
+    {
+      "kind": "option",
+      "new": "--run-id",
+      "note": "",
+      "old": "--run",
+      "rule": "one name per concept",
+      "scope": [
+        "ingest records"
+      ],
+      "since": "0.24.0"
+    }
+  ],
   "schemas": {
     "AdapterAuthorizeReport": {
       "$defs": {
@@ -13791,7 +15020,7 @@
           "type": "object"
         },
         "ConvergenceConflict": {
-          "description": "One superseded copy the raw convergence KEPT rather than deleted,\nbecause it carries an independently-written field the canonical row\ndoes not (module doc, \"The derivation key is NOT enough to authorize\nthat delete\"). s42 (`close-the-open-loops`) re-review, `ReviewRuns`\nfinding 1.\n\nA report, never a resolution. Both rows stay exactly as they are, so\n`canon learn promote` keeps reading the contradiction off\n`query_by_regime_key` — which is the whole point: the alternative\nthis replaced silently deleted the loser and changed what the gate\nsaw.",
+          "description": "One superseded copy the raw convergence KEPT rather than deleted,\nbecause it carries an independently-written field the canonical row\ndoes not (module doc, \"The derivation key is NOT enough to authorize\nthat delete\"). s42 (`close-the-open-loops`) re-review, `ReviewRuns`\nfinding 1.\n\nA report, never a resolution. Both rows stay exactly as they are, so\n`canon strategy promote` keeps reading the contradiction off\n`query_by_regime_key` — which is the whole point: the alternative\nthis replaced silently deleted the loser and changed what the gate\nsaw.",
           "properties": {
             "canonicalId": {
               "description": "The row the smallest-id rule keeps\n([`canonical_driver_row`]) — the one whose provenance the kept\nrow was compared against.",
@@ -13822,7 +15051,7 @@
           "type": "object"
         },
         "PersistedTrajectory": {
-          "description": "One regime-keyed trajectory this pass persisted.",
+          "description": "One regime showed trajectory this pass persisted.",
           "properties": {
             "regimeKey": {
               "type": "string"
@@ -13856,7 +15085,7 @@
           "type": "array"
         },
         "convergenceConflicts": {
-          "description": "Superseded copies this pass REFUSED to delete because they carry\na `verdict_record` or `run_id` the canonical row does not — s42\n(`close-the-open-loops`) re-review (`ReviewRuns` finding 1). One\nentry per kept row, ordered by regime key then by the kept row's\nown id, so a repeat pass prints byte-identical lines.\n\nEmpty for every store this driver produced on its own, and for\nevery ordinary upgrade: the losing copies a pre-s38 pass appended\nwere never marked and never attributed, so they claim nothing.\nA non-empty entry means two stored rows disagree about a fact\n`canon learn promote` reads (module doc), and the disagreement is\nSTANDING — it is re-reported every pass until an operator removes\nthe row they judge wrong, because this driver will not pick for\nthem.",
+          "description": "Superseded copies this pass REFUSED to delete because they carry\na `verdict_record` or `run_id` the canonical row does not — s42\n(`close-the-open-loops`) re-review (`ReviewRuns` finding 1). One\nentry per kept row, ordered by regime key then by the kept row's\nown id, so a repeat pass prints byte-identical lines.\n\nEmpty for every store this driver produced on its own, and for\nevery ordinary upgrade: the losing copies a pre-s38 pass appended\nwere never marked and never attributed, so they claim nothing.\nA non-empty entry means two stored rows disagree about a fact\n`canon strategy promote` reads (module doc), and the disagreement is\nSTANDING — it is re-reported every pass until an operator removes\nthe row they judge wrong, because this driver will not pick for\nthem.",
           "items": {
             "$ref": "#/$defs/ConvergenceConflict"
           },
@@ -14832,6 +16061,40 @@
         "unowned"
       ],
       "title": "StatusReport",
+      "type": "object"
+    },
+    "StrategyApprovalPayloadReport": {
+      "$id": "urn:canon:report:StrategyApprovalPayloadReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon strategy approval-payload --json`: the payload an external signer signs.",
+      "properties": {
+        "approvalAt": {
+          "description": "The approval time signed into the payload (RFC3339, UTC).",
+          "type": "string"
+        },
+        "approver": {
+          "type": "string"
+        },
+        "instructions": {
+          "type": "string"
+        },
+        "payloadHex": {
+          "description": "The exact bytes to sign, hex-encoded.",
+          "type": "string"
+        },
+        "subject": {
+          "description": "The signed subject, `strategy:<id>`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "payloadHex",
+        "approver",
+        "approvalAt",
+        "subject",
+        "instructions"
+      ],
+      "title": "StrategyApprovalPayloadReport",
       "type": "object"
     },
     "SubjectAdoptReport": {

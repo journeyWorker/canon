@@ -54,13 +54,13 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("divergence.rs", &["divergence"]),
     ("evidence.rs", &["evidence add", "evidence audit"]),
     ("finding.rs", &["finding add", "finding close"]),
-    // The typed-atom errors `canon evidence add` reports with `gate task`'s grading;
+    // The typed-atom errors `canon evidence add` reports with `task done`'s grading;
     // `promote_after_stage`'s command comes from its caller.
-    ("gate.rs", &["gate task", "evidence add", "evidence audit"]),
+    ("gate.rs", &["task done", "evidence add", "evidence audit"]),
     ("init.rs", &["init"]),
     // `require_spec_root`: the refusal of a `--project-id` no configured spec root carries, made by every write command that takes one.
     ("inventory.rs", &["evidence add", "evidence audit", "evidence approval-payload", "review scenario", "review change", "divergence add", "divergence resolve", "divergence defer", "divergence accept", "scenario new"]),
-    ("learn.rs", &["learn"]),
+    ("learn.rs", &["strategy"]),
     ("ledger.rs", &["ledger compact"]),
     // Every code is next to its emit.
     ("main.rs", &[]),
@@ -79,7 +79,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("run/tier.rs", &[]),
     ("migrate.rs", &["migrate"]),
     ("policy_approval.rs", &["brief approve", "policy approve"]),
-    ("paging.rs", &["query", "finding list", "divergence status", "export"]),
+    ("paging.rs", &["query", "finding list", "divergence list", "export"]),
     // `ScopeError::to_cli_error`, emitted by `query`.
     ("query.rs", &["query"]),
     ("retention.rs", &["export", "purge"]),
@@ -105,6 +105,13 @@ const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans"), (
 
 /// Codes every command can emit, whatever its sources say: a `--json` usage
 /// error, and the refusal of an unknown `CANON_ROLE` before any command runs.
+/// Files whose `.emit(command, …)` takes the command from the caller, and the
+/// leaves that caller is: `run_report` serves the three `report` leaves.
+const CALLER_LEAVES: &[(&str, &[&str])] = &[("run/top.rs", &["report build", "report check", "report snapshot"])];
+
+/// The leaves that record a human's decision and refuse every agent role.
+const HUMAN_ONLY_LEAVES: &[&str] = &["brief approve", "policy approve", "divergence accept"];
+
 const GLOBAL: &[&str] = &["USAGE", "UNKNOWN_ROLE"];
 
 fn src_dir() -> PathBuf {
@@ -195,6 +202,7 @@ fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
                 let targets: Vec<&'static str> = match window.iter().find_map(|l| emitted_command(l)).or(spliced) {
                     // Bare `canon` is usage, every command has it; a caller-supplied
                     // command is covered by the `promote_after_stage` rule below.
+                    Some(command) if command == "<caller>" && CALLER_LEAVES.iter().any(|(file, _)| *file == name) => CALLER_LEAVES.iter().filter(|(file, _)| *file == name).flat_map(|(_, leaves)| leaves.iter().copied()).collect(),
                     Some(command) if command.is_empty() || command == "<caller>" => continue,
                     Some(command) => match command.strip_suffix(" {") {
                         Some(prefix) => {
@@ -225,6 +233,10 @@ fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
     }
     for leaf in needs_config_leaves() {
         table.get_mut(leaf).expect("leaf has a row").insert("CONFIG_MISSING");
+    }
+    // The human-only refusal (`run::human_only`) is emitted for its caller's leaf.
+    for leaf in HUMAN_ONLY_LEAVES {
+        table.get_mut(leaf).expect("leaf has a row").insert("HUMAN_ONLY");
     }
     for command in promoters {
         for leaf in leaves_under(&command) {

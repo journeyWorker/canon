@@ -87,7 +87,7 @@ fn a_node_is_a_leaf_xor_a_group_and_a_leaf_says_everything_an_agent_needs() {
                     assert!(operand["description"].as_str().is_some_and(|d| !d.is_empty()), "`{command}`: operand {} has no description", operand["name"]);
                 }
                 // A writing leaf declares how a repeat behaves; a read only where its table row does (the approval payloads).
-                let declaring_reads = ["evidence approval-payload", "learn approve"];
+                let declaring_reads = ["evidence approval-payload", "strategy approval-payload"];
                 if node["effect"] == "read" {
                     assert_eq!(node.get("idempotency").is_some(), declaring_reads.contains(&command), "read leaf `{command}`: unexpected idempotency declaration");
                 } else {
@@ -123,9 +123,9 @@ fn an_option_says_what_it_conflicts_with_and_requires() {
     };
     // `scenario new --change-id` requires `--flow` (a clap `requires`, which clap does not expose).
     assert_eq!(option("scenario new", "change-id")["requires"], serde_json::json!(["--flow"]));
-    // `--history` conflicts `--plugin` on `query`, whichever side declared it.
-    assert_eq!(option("query", "history")["conflictsWith"], serde_json::json!(["--plugin"]));
-    assert_eq!(option("query", "plugin")["conflictsWith"], serde_json::json!(["--history"]));
+    // `--history` conflicts `--plugin-id` on `query`, whichever side declared it.
+    assert_eq!(option("query", "history")["conflictsWith"], serde_json::json!(["--plugin-id"]));
+    assert_eq!(option("query", "plugin-id")["conflictsWith"], serde_json::json!(["--history"]));
     assert_eq!(option("query", "kind")["env"], Value::Null);
     assert_eq!(option("feature new", "actor-id")["env"], "CANON_ACTOR");
 }

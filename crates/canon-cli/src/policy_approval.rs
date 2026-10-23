@@ -1,4 +1,4 @@
-//! `canon policy approve --by <who> [--note <text>] [--repo <dir>]`
+//! `canon policy approve --approver <who> [--note <text>] [--repo <dir>]`
 //! (0.15 D5): who approved the policy, and which bytes they approved.
 //!
 //! `.canon/policy.yaml` is what the gate grades the work against, and the
@@ -92,7 +92,7 @@ pub fn approval_state(repo: &Path) -> ApprovalState {
 /// `None` when there is nothing to say (no policy, or an approval that
 /// still matches). Each line names the command that resolves it.
 pub fn advisory(repo: &Path) -> Option<String> {
-    const FIX: &str = "a human reviews it and runs `canon policy approve --by <who>`";
+    const FIX: &str = "a human reviews it and runs `canon policy approve --approver <who>`";
     match approval_state(repo) {
         ApprovalState::NoPolicy | ApprovalState::Approved(_) => None,
         ApprovalState::Unapproved => Some(format!("policy not approved: {} has no approval record ({}); {FIX}", paths::POLICY_FILE, paths::POLICY_APPROVAL_FILE)),
@@ -152,7 +152,7 @@ pub fn closed_failure(repo: &Path) -> Option<(Closed, String)> {
 
 /// What resolves [`closed_failure`]: the human re-approves, or the approved
 /// bytes come back.
-pub const REAPPROVE_HINT: &str = "the human re-approves the policy in force with `canon policy approve --by <human> --note \"<words>\"`, or restore the approved .canon/policy.yaml (and .canon/policy.approval.json) from git";
+pub const REAPPROVE_HINT: &str = "the human re-approves the policy in force with `canon policy approve --approver <human> --note \"<words>\"`, or restore the approved .canon/policy.yaml (and .canon/policy.approval.json) from git";
 
 /// [`closed_failure`] as the violation `canon gate check` reports.
 pub fn violation(repo: &Path) -> Option<canon_gate::Violation> {
@@ -211,7 +211,7 @@ pub fn run_show(repo: &Path, json: bool) -> i32 {
 /// and `canon brief approve`, which records both in one call.
 pub fn record(repo: &Path, by: &str, note: Option<&str>) -> Result<PolicyApproval, String> {
     if by.trim().is_empty() {
-        return Err("--by must name who approved the policy".to_string());
+        return Err("--approver must name who approved the policy".to_string());
     }
     let policy_path = repo.join(paths::POLICY_FILE);
     let policy = match fs::read(&policy_path) {
@@ -235,7 +235,7 @@ pub fn record(repo: &Path, by: &str, note: Option<&str>) -> Result<PolicyApprova
 }
 
 /// `canon policy approve`. Returns the process exit code: `0` written,
-/// `2` refused (no policy to approve, an empty `--by`, or a write
+/// `2` refused (no policy to approve, an empty `--approver`, or a write
 /// failure).
 pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
@@ -255,7 +255,7 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> i32
             0
         }
         Err(e) => {
-            CliError::refused("POLICY_APPROVAL_FAILED", e.to_string()).hint("with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --by <name>` again").emit("canon policy approve", json)
+            CliError::refused("POLICY_APPROVAL_FAILED", e.to_string()).hint("with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --approver <name>` again").emit("canon policy approve", json)
         }
     }
 }

@@ -3,7 +3,7 @@ import { getDuckDB } from "./duckdb-bundles";
 import { ensureParquetExtension } from "./duckdb-extensions";
 
 // Shape of `manifest.json` per the S9 SHARED SNAPSHOT CONTRACT (design.md
-// D3): the declared table -> file map `canon report --snapshot` writes.
+// D3): the declared table -> file map `canon report snapshot` writes.
 // The loader below reads ONLY this file — it never enumerates the
 // snapshot directory (a Wasm app cannot list arbitrary server directory
 // contents at runtime; D3's whole point).

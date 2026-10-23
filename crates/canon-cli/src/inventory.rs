@@ -197,7 +197,7 @@ fn load_spec_roots_with_former(canon_yaml: &Path) -> Result<Vec<(SpecRoot, Vec<P
 pub fn require_spec_root(repo: &Path, project_id: &ProjectId) -> Result<(), crate::cli_error::CliError> {
     use crate::cli_error::CliError;
     let roots = load_spec_roots(&repo.join("canon.yaml")).map_err(|e| {
-        CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again")
+        CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again")
     })?;
     check_spec_root(&roots, project_id)
 }
@@ -235,7 +235,7 @@ pub fn resolve_project_id(repo: &Path, given: Option<&ProjectId>, code: &'static
         Ok(roots) => roots,
         Err(e) => {
             return Err(CliError::refused("CONFIG_UNREADABLE", e.to_string())
-                .hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again")
+                .hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again")
                 .emit(command, json));
         }
     };
@@ -1031,7 +1031,7 @@ fn first_three(items: &[String]) -> String {
     }
 }
 
-/// A writer's stale-index refresh (0.16 D2): `canon subject status`,
+/// A writer's stale-index refresh (0.16 D2): `canon subject move`,
 /// `canon review add`, `canon evidence add` and the other commands that
 /// record something call this before they read the scenario index, so an
 /// edited, added or deleted scenario never needs a separate `canon
@@ -1209,7 +1209,7 @@ fn split_pre_0_17(repo: &Path, roots: Vec<SpecRoot>) -> (Vec<(SpecRoot, String)>
 
 /// Every configured spec root a grading reader must refuse
 /// ([`UnrefreshableRoot`]): the ONE decision `canon gate check`, the
-/// `verifying → shipped` guard of `canon subject status`, and `canon
+/// `verifying → shipped` guard of `canon subject move`, and `canon
 /// status` fail closed on (0.16 M6, 0.17 D1), so none of them grades or
 /// advances on an index the `.feature` corpus is not in. Readers that
 /// only report (`query`, `context`) keep the stderr line of

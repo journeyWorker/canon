@@ -64,7 +64,7 @@ pub fn run_verify(repo: &Path, full: bool, json: bool) -> i32 {
     let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(context) => context,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon artifacts verify", json);
+            return CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon artifacts verify", json);
         }
     };
     let store = match ArtifactStore::open(&repo) {

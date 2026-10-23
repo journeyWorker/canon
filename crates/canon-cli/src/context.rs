@@ -391,12 +391,12 @@ pub const CONFIG_EXEMPT: &[(&str, &str)] = &[
     ("init", "creates canon.yaml"),
     ("migrate", "carries its own CONFIG_MISSING refusal, worded for the layout it moves"),
     ("demo init", "scaffolds a new repo, canon.yaml included"),
-    ("demo add", "refuses with DEMO_NOT_INITIALIZED when `demo init` has not run"),
+    ("demo review", "refuses with DEMO_NOT_INITIALIZED when `demo init` has not run"),
     ("context", "a capability query that never fails: without a canon.yaml it describes the built-in surface"),
-    ("regime-key", "reads no repo: it only builds a key from its arguments"),
+    ("regime show", "reads no repo: it only builds a key from its arguments"),
     ("adapter validate", "reads one response file; the context-pack join runs only when a canon.yaml is found"),
     ("adapter authorize", "reads .canon/policy.yaml only; an absent policy is default denial"),
-    ("context-pack new", "a context pack is made from the git tree and never reads canon.yaml"),
+    ("context-pack add", "a context pack is made from the git tree and never reads canon.yaml"),
     ("context-pack show", "a context pack is made from the git tree and never reads canon.yaml"),
     ("context-pack verify", "a context pack is made from the git tree and never reads canon.yaml"),
     ("prompt add", "a prompt bundle is stored beside the git tree and never reads canon.yaml"),
@@ -404,13 +404,13 @@ pub const CONFIG_EXEMPT: &[(&str, &str)] = &[
     ("retrieve", "run by agent hooks in any directory: with no repo state it finds no guidance and prints none"),
     ("dispatch begin", "run by agent hooks in any directory: the run manifest and the learn store default to `.canon/`"),
     ("dispatch end", "closes a run `dispatch begin` opened, found by id under `.canon/`"),
-    ("learn approve", "the strategy store defaults to `.canon/learn`; canon.yaml only tunes it"),
-    ("learn promote", "the strategy store defaults to `.canon/learn`; canon.yaml only tunes it"),
-    ("learn rollback", "the strategy store defaults to `.canon/learn`; canon.yaml only tunes it"),
+    ("strategy approval-payload", "the strategy store defaults to `.canon/learn`; canon.yaml only tunes it"),
+    ("strategy promote", "the strategy store defaults to `.canon/learn`; canon.yaml only tunes it"),
+    ("strategy rollback", "the strategy store defaults to `.canon/learn`; canon.yaml only tunes it"),
     ("skills install", "projects the guides into the directory; canon.yaml only records the provider choice"),
     ("skills check", "inspects the directory's install; canon.yaml only supplies the provider choice"),
     ("skills doctor", "inspects the directory's install; canon.yaml only supplies the provider choice"),
-    ("gate task", "run by agent hooks and pre-commit scripts: it flips a plan row on evidence it finds and refuses otherwise"),
+    ("task done", "run by agent hooks and pre-commit scripts: it flips a plan row on evidence it finds and refuses otherwise"),
     ("gate promote", "run by agent hooks and pre-commit scripts: with nothing staged it reports so"),
     ("gate install-hooks", "installs hook seams into a repo that may not be set up yet"),
     ("completion", "writes a shell script from the command tree: no repo state"),
@@ -723,7 +723,7 @@ fn summarize_risk_tier(rule: &RiskTierRule) -> RiskTierSurface {
 }
 
 /// A [`SubjectStatus`]'s wire spelling — the same vocabulary
-/// `canon subject status` and `canon query --status` accept, so the
+/// `canon subject move` and `canon query --status` accept, so the
 /// surface prints values an operator can paste straight back into
 /// `policy.yaml`.
 fn subject_status_slug(status: &SubjectStatus) -> &'static str {

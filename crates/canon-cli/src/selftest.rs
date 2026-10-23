@@ -1,4 +1,4 @@
-//! `canon selftest [--json]` (design §8 "Testing Strategy": "every
+//! `canon selftest [--suite <NAME>] [--json]` (design §8 "Testing Strategy": "every
 //! gate/check crate ships fixture corpora with rebindable roots + an
 //! EXPECTED violations file; `canon selftest` runs all fixtures and
 //! diffs") — the GENERALIZED, cross-crate self-test COMMAND + registration
@@ -29,8 +29,8 @@
 //! Change/Task ids + statuses + named drop counts, registered the
 //! SAME way.
 //!
-//! ADDITIVE alongside `canon gate selftest` (S5), which stays
-//! canon-gate-scoped: this aggregator REGISTERS that one as a suite
+//! `canon selftest --suite trust-spine-gate` is the gate's own suite: this
+//! aggregator REGISTERS it as a suite
 //! (zero new gate logic) plus every other crate that exposes the shared
 //! `pub fn selftest() -> Result<usize, Vec<String>>` fixture-suite
 //! contract — `canon-store` (S2), `canon-vocab` (S10), `canon-policy`
@@ -152,11 +152,32 @@ fn suites() -> Vec<Suite> {
     ]
 }
 
+/// The registered suite names, the closed set of `--suite`.
+pub const SUITE_NAMES: &[&str] = &[
+    "trust-spine-gate",
+    "tiered-storage",
+    "typed-authoring-vocabulary",
+    "policy-expressions",
+    "format-authority",
+    "session-ingest",
+    "canon-context",
+    "artifact-ingest",
+    "spec-ledger-selftest",
+    "plugin-overlays",
+    "plan-import",
+];
+
 /// Run every registered suite (never short-circuits — a failing suite
 /// never hides a later one's result).
 pub fn run() -> SelftestReport {
+    run_suite(None)
+}
+
+/// Run the registered suite named `only`, or every suite when `None`.
+pub fn run_suite(only: Option<&str>) -> SelftestReport {
     let suites = suites()
         .into_iter()
+        .filter(|(name, _)| only.is_none_or(|only| only == *name))
         .map(|(name, run)| match run() {
             Ok(passed) => SuiteResult { name, passed, failures: Vec::new() },
             Err(failures) => SuiteResult { name, passed: 0, failures },
@@ -190,8 +211,8 @@ impl crate::json_out::Report for SelftestSummary {}
 
 /// `canon selftest`'s CLI entry: `0` when every suite is clean, `1` on
 /// any failure. `--json` emits a machine-readable per-suite summary.
-pub fn run_selftest(json: bool) -> ExitCode {
-    let report = run();
+pub fn run_selftest(suite: Option<&str>, json: bool) -> ExitCode {
+    let report = run_suite(suite);
     if json {
         let summary = SelftestSummary {
             clean: report.is_clean(),
@@ -225,6 +246,19 @@ mod tests {
         // P5's spec-ledger-selftest + s16 P6's plugin-overlays + s17
         // P4's plan-import.
         assert_eq!(report.suites.len(), 11, "expected 11 registered suites, got {}", report.suites.len());
+    }
+
+    #[test]
+    fn suite_names_are_the_registered_suites_in_order() {
+        let registered: Vec<&str> = suites().into_iter().map(|(name, _)| name).collect();
+        assert_eq!(registered, SUITE_NAMES);
+    }
+
+    #[test]
+    fn one_suite_runs_alone() {
+        let report = run_suite(Some("trust-spine-gate"));
+        assert_eq!(report.suites.len(), 1);
+        assert!(report.is_clean());
     }
 
     #[test]

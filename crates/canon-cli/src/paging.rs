@@ -1,6 +1,6 @@
 //! Bounded collections and field projection (0.20 D4).
 //!
-//! `query`, `finding list`, `divergence status` and `export` return at most
+//! `query`, `finding list`, `divergence list` and `export` return at most
 //! `--limit` records (default [`DEFAULT_LIMIT`]); `--all` lifts the bound and
 //! `--cursor` resumes after the last record of the previous page. The JSON
 //! `meta` carries `returned`, `total`, `hasMore` and `nextCursor`; human mode

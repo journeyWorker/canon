@@ -1,10 +1,10 @@
 //! Whether a subject's brief is approved (0.16 D1, 0.17 D3): the one
 //! decision `canon status` reports, the `verifying → shipped` guard of
-//! `canon subject status` enforces, and `canon evidence add` refuses on
+//! `canon subject move` enforces, and `canon evidence add` refuses on
 //! (0.16 M7). All call [`brief_of`], so status never says `ship` for a
 //! subject the guard would refuse on its brief, never suggests an
 //! attestation `evidence add` would refuse, and the guards never refuse
-//! a subject status reads as needing no brief.
+//! a subject move reads as needing no brief.
 //!
 //! One human answer approves a subject's scope: its brief and the
 //! policy. The agent records it, from that answer only, as an
@@ -235,7 +235,7 @@ impl BriefStatus {
 
     /// The re-approval advice for a digest-less approval line.
     pub fn record_digest_hint(&self) -> String {
-        format!("re-approve with `canon brief approve {} --by <the human> --note \"<their words>\"`", self.change.as_deref().unwrap_or("<change>"))
+        format!("re-approve with `canon brief approve {} --approver <the human> --note \"<their words>\"`", self.change.as_deref().unwrap_or("<change>"))
     }
 
     /// How the agent records the human's answer, for an enforced brief.
@@ -246,16 +246,16 @@ impl BriefStatus {
         }
         match (self.brief_exists, &self.source) {
             (false, Some(source)) => format!(
-                "create {brief} holding a `Source: {source}` line, then record their words with `canon brief approve {} --by <the human> --note \"<their words>\"`",
+                "create {brief} holding a `Source: {source}` line, then record their words with `canon brief approve {} --approver <the human> --note \"<their words>\"`",
                 self.change.as_deref().unwrap_or("<change>")
             ),
-            _ => format!("record their words with `canon brief approve {} --by <the human> --note \"<their words>\"`", self.change.as_deref().unwrap_or("<change>")),
+            _ => format!("record their words with `canon brief approve {} --approver <the human> --note \"<their words>\"`", self.change.as_deref().unwrap_or("<change>")),
         }
     }
 }
 
 /// The `openspec` plan source roots an external change's `proposal.md`
-/// is found under, resolved the way `canon gate task` resolves plan
+/// is found under, resolved the way `canon task done` resolves plan
 /// sources (an absent `plans:` section falls back to the repo root).
 /// `Err` names why `canon.yaml`'s `plans:` section cannot be read; then
 /// no external proposal is found.

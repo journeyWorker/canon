@@ -334,7 +334,7 @@ struct Planner {
 
 impl Planner {
     fn new(repo_root: &Path) -> Result<Self, CliError> {
-        let roots = SyncCtx::from_repo(repo_root).and_then(|ctx| ctx.spec_roots(None)).map_err(|e| CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again"))?;
+        let roots = SyncCtx::from_repo(repo_root).and_then(|ctx| ctx.spec_roots(None)).map_err(|e| CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again"))?;
         let corpus = roots.iter().map(|root| corpus_tags(&root.root)).collect();
         Ok(Self { repo_root: repo_root.to_path_buf(), roots, corpus, flows: HashMap::new() })
     }
@@ -710,7 +710,7 @@ pub fn run_feature_new(
     let roots = match SyncCtx::from_repo(&repo_root).and_then(|ctx| ctx.spec_roots(None)) {
         Ok(roots) => roots,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon feature new", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon feature new", json);
         }
     };
     let root = match resolve_spec_root("canon feature new", &roots, project) {

@@ -28,7 +28,7 @@ const DEMO_SCENARIO: &str = "auth.login.01";
 
 /// The demo's `policy.yaml`: every cell that carries evidence requires an
 /// independent `reviewer`-role record. `demo init` seeds only the `dev`
-/// record, so the reviewer cell is uncovered until `demo add`.
+/// record, so the reviewer cell is uncovered until `demo review`.
 const DEMO_POLICY_YAML: &str = "\
 # canon demo policy (.canon/policy.yaml): every evidenced cell needs an
 # independent `reviewer`-role evidence record. `canon demo init` seeds
@@ -96,29 +96,29 @@ pub fn run_demo_init(repo: &Path, json: bool) -> i32 {
     crate::say!(json, "  Watch it flip:");
     crate::say!(json, "");
     crate::say!(json, "      canon gate check      # RED:   uncovered-cell {DEMO_SCENARIO}");
-    crate::say!(json, "      canon demo add     # record the reviewer's evidence");
+    crate::say!(json, "      canon demo review     # record the reviewer's evidence");
     crate::say!(json, "      canon gate check      # GREEN: clean");
     if json {
         crate::json_out::data(
             "demo init",
-            &crate::json_out::untyped(serde_json::json!({ "repo": repo.display().to_string(), "scenario": DEMO_SCENARIO, "next": ["canon gate check", "canon demo add", "canon gate check"] })));
+            &crate::json_out::untyped(serde_json::json!({ "repo": repo.display().to_string(), "scenario": DEMO_SCENARIO, "next": ["canon gate check", "canon demo review", "canon gate check"] })));
     }
     0
 }
 
-/// `canon demo add [--repo <dir>]`: record the missing reviewer evidence
+/// `canon demo review [--repo <dir>]`: record the missing reviewer evidence
 /// for [`DEMO_SCENARIO`], clearing the `uncovered-cell` the seeded dev
 /// evidence left. Resolves the repo root the same nearest-ancestor way
 /// every other subcommand does. Exit `0` on success, `2` when no demo
 /// scaffold is present.
-pub fn run_demo_add(repo: &Path, json: bool) -> i32 {
+pub fn run_demo_review(repo: &Path, json: bool) -> i32 {
     let root = resolve_repo_root(repo);
     if !root.join("canon.yaml").exists() {
-        return CliError::refused("DEMO_NOT_INITIALIZED", format!("no `canon.yaml` found under `{}` — run `canon demo init` first", root.display())).hint("run `canon demo init` first, or pass --repo <the demo directory>").emit("canon demo add", json);
+        return CliError::refused("DEMO_NOT_INITIALIZED", format!("no `canon.yaml` found under `{}` — run `canon demo init` first", root.display())).hint("run `canon demo init` first, or pass --repo <the demo directory>").emit("canon demo review", json);
     }
 
     if let Err(e) = write_evidence(&root, "reviewer-agent", "reviewer") {
-        return CliError::refused("WRITE_FAILED", format!("failed to record reviewer evidence: {e}")).hint("check that the path is writable and the disk has room, then run the command again").emit("canon demo add", json);
+        return CliError::refused("WRITE_FAILED", format!("failed to record reviewer evidence: {e}")).hint("check that the path is writable and the disk has room, then run the command again").emit("canon demo review", json);
     }
 
     crate::say!(json, "canon demo: recorded the reviewer's evidence for scenario `{DEMO_SCENARIO}`.");
@@ -127,7 +127,7 @@ pub fn run_demo_add(repo: &Path, json: bool) -> i32 {
     crate::say!(json, "");
     crate::say!(json, "      canon gate check      # GREEN: clean");
     if json {
-        crate::json_out::data("demo add", &crate::json_out::untyped(serde_json::json!({ "scenario": DEMO_SCENARIO, "next": ["canon gate check"] })));
+        crate::json_out::data("demo review", &crate::json_out::untyped(serde_json::json!({ "scenario": DEMO_SCENARIO, "next": ["canon gate check"] })));
     }
     0
 }

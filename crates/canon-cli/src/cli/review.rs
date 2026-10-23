@@ -9,7 +9,7 @@ pub enum ReviewCommand {
     /// Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required). A review pins the scenario's digest and what its latest evidence says (verdict and checks); it counts only while both are unchanged. Each scenario must be indexed, or nothing is written (exit 2)
     #[command(group(clap::ArgGroup::new("provenance").args(["upstream_ref", "original_spec_ref"]).required(true).multiple(false)))]
     Scenario(ReviewScenarioArgs),
-    /// Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required). The review signs the chore's invariants and checks against the diff and pins the change's brief; an edit to the brief stales it. A chore needs exactly this one review before `subject status --to shipped`
+    /// Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required). The review signs the chore's invariants and checks against the diff and pins the change's brief; an edit to the brief stales it. A chore needs exactly this one review before `subject move --to shipped`
     #[command(group(clap::ArgGroup::new("provenance").args(["upstream_ref", "original_spec_ref"]).required(true).multiple(false)))]
     Change(ReviewChangeArgs),
 }

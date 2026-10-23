@@ -3,19 +3,6 @@
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
-/// The flags of `context-pack new`.
-#[derive(clap::Args)]
-pub struct ContextPackNewArgs {
-    /// Repository-relative input manifest
-    #[arg(long)]
-    pub manifest: PathBuf,
-    #[command(flatten)]
-    pub repo: crate::cli::RepoArgs,
-    /// Output the complete pack manifest as JSON
-    #[arg(long)]
-    pub json: bool,
-}
-
 /// The flags of `prompt add`.
 #[derive(clap::Args)]
 pub struct PromptAddArgs {

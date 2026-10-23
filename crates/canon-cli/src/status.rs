@@ -73,7 +73,7 @@
 //! ownership, verdicts, required cases, audits, and the review guard,
 //! open blockers only under `block_on_findings`, where `require_review`
 //! covers `shipped`) is flagged red ([`SubjectSummary::red`]), and its
-//! only step is the reopen, `canon subject status <id> --to verifying
+//! only step is the reopen, `canon subject move <id> --to verifying
 //! --reason …`: the follow-up goes into its approved change as tasks,
 //! then scenario, evidence and review, and it ships again through every
 //! guard. A subject's changes are joined from both sides
@@ -402,7 +402,7 @@ pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> i32 {
     // A ledger that could not be read gave the report nothing to count (D3): `unverifiable`, never a silent pass.
     let coverage = status_coverage(&repo, &report);
     let unverifiable = coverage.examined_nothing();
-    let error = unverifiable.then(|| crate::coverage::unverifiable_error("canon status", "nothing: canon.yaml or the ledger could not be read", "fix what `warnings` names (`canon init --check-config` reports what is wrong in canon.yaml), then run `canon status` again"));
+    let error = unverifiable.then(|| crate::coverage::unverifiable_error("canon status", "nothing: canon.yaml or the ledger could not be read", "fix what `warnings` names (`canon init --check` reports what is wrong in canon.yaml), then run `canon status` again"));
     if json {
         let after = crate::next::After::of_status(&report);
         let mut meta = crate::json_out::warnings_meta(&report.warnings);
@@ -527,7 +527,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
             warnings.extend(policy_warning(&policy));
             warnings.extend(crate::policy_approval::advisory(repo));
             warnings.push(format!("cannot read this repo's ledger: {e}"));
-            next.push(NextStep { command: "canon init --check-config".into(), why: "canon.yaml must load before anything can be counted".into(), actor: StepActor::Agent, role: Some(Role::Orchestrator) });
+            next.push(NextStep { command: "canon init --check".into(), why: "canon.yaml must load before anything can be counted".into(), actor: StepActor::Agent, role: Some(Role::Orchestrator) });
             let mut report = finish(repo, &policy, warnings, Vec::new(), Vec::new(), None, next);
             report.examined = false;
             return report;
@@ -564,7 +564,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     let plan_roots: Vec<PathBuf> = match crate::brief::plan_roots(repo) {
         Ok(roots) => roots,
         Err(e) => {
-            warnings.push(format!("canon.yaml's `plans:` section cannot be read ({e}), so no brief reads as approved; `canon init --check-config` names the problem"));
+            warnings.push(format!("canon.yaml's `plans:` section cannot be read ({e}), so no brief reads as approved; `canon init --check` names the problem"));
             Vec::new()
         }
     };
@@ -588,7 +588,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Orchestrator),
-            command: "canon init --check-config".into(),
+            command: "canon init --check".into(),
             why: format!(
                 "set `{settings}` in canon.yaml, then check it: status and the gate read only the local rung, so every count and step would rest on an empty corpus"
             ),
@@ -1028,10 +1028,10 @@ fn shipped_red(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<String>
     classes.into_iter().map(|(class, count, first)| format!("{count} {class} (first: {first})")).collect()
 }
 
-/// `canon subject status <id> --to verifying --reason …`: the reopen command
+/// `canon subject move <id> --to verifying --reason …`: the reopen command
 /// status names for a red shipped subject (0.18 D3).
 pub(crate) fn reopen_command(id: &str) -> String {
-    format!("canon subject status {id} --to verifying --reason \"<why it reopens>\" --actor-id <unit>")
+    format!("canon subject move {id} --to verifying --reason \"<why it reopens>\" --actor-id <unit>")
 }
 
 /// The next scenario number free on `surface` within spec root `project`.
@@ -1261,7 +1261,7 @@ fn subject_steps(
                 actor: StepActor::Agent,
                 role: Some(Role::Implementer),
                 command: format!(
-                    "canon evidence add --scenario-id {} --project-id {} --kind test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
+                    "canon evidence add --scenario-id {} --project-id {} --class test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
                     first.scenario_id.as_str(),
                     first.project_id.as_str()
                 ),
@@ -1288,7 +1288,7 @@ fn subject_steps(
                 actor: StepActor::Agent,
                 role: Some(Role::Implementer),
                 command: format!(
-                    "canon evidence add --scenario-id {} --project-id {} --kind test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
+                    "canon evidence add --scenario-id {} --project-id {} --class test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
                     first.scenario_id.as_str(),
                     first.project_id.as_str()
                 ),
@@ -1381,7 +1381,7 @@ fn subject_steps(
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Orchestrator),
-            command: format!("canon subject status {id} --to {to} --actor-id <unit>"),
+            command: format!("canon subject move {id} --to {to} --actor-id <unit>"),
             why: match status {
                 SubjectStatus::Proposed | SubjectStatus::Specced => format!("{id} has its scenarios and every required case; move it on"),
                 SubjectStatus::Verifying => {

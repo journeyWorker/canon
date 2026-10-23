@@ -450,11 +450,22 @@ pub struct ErrorRow {
     pub exit: i32,
     /// Whether running the same command again, unchanged, can succeed.
     pub retryable: bool,
+    /// One sentence telling the caller what to do about the code.
+    pub fix: &'static str,
 }
 
 /// Every registered error code, sorted by code.
 pub fn error_rows() -> Vec<ErrorRow> {
-    crate::cli_error::all_codes().iter().map(|info| ErrorRow { code: info.code, meaning: info.meaning, exit: info.exit, retryable: info.retryable }).collect()
+    crate::cli_error::all_codes().iter().map(|info| ErrorRow { code: info.code, meaning: info.meaning, exit: info.exit, retryable: info.retryable, fix: info.fix }).collect()
+}
+
+/// Every removed spelling with its replacement (the README's Upgrading list
+/// and the usage-error hints are generated from it).
+pub fn removed_rows() -> Vec<Value> {
+    crate::removed_028::ROWS
+        .iter()
+        .map(|row| json!({ "kind": row.kind, "old": row.old, "scope": row.scope, "new": row.new, "note": row.note, "rule": row.rule, "since": row.since }))
+        .collect()
 }
 
 /// The record kinds and artifact families, linked to their JSON Schemas under
@@ -515,6 +526,7 @@ pub fn generate() -> Value {
         "exitTable": EXIT_TABLE.iter().map(|(code, meaning)| json!({ "code": code, "meaning": meaning })).collect::<Vec<_>>(),
         "envelopes": envelopes(),
         "errors": error_rows(),
+        "removed": removed_rows(),
         "commands": nodes(&root),
         "schemas": schemas(),
         "records": records(),
