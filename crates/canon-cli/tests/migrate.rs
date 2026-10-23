@@ -77,6 +77,22 @@ fn ok(repo: &Path, args: &[&str]) -> String {
     text(&out)
 }
 
+/// `canon migrate` as an agent applies it: the bare run previews, then
+/// `--commit --plan-digest` acts on that plan. A preview that refuses is
+/// returned as it is.
+fn commit(repo: &Path) -> Output {
+    let preview = canon(repo, &["migrate"]);
+    let stdout = String::from_utf8_lossy(&preview.stdout).into_owned();
+    let Some(digest) = stdout.lines().find_map(|line| line.strip_prefix("planDigest ")).and_then(|rest| rest.split(';').next()) else { return preview };
+    canon(repo, &["migrate", "--commit", "--plan-digest", digest])
+}
+
+fn ok_commit(repo: &Path) -> String {
+    let out = commit(repo);
+    assert!(out.status.success(), "canon migrate --commit: {}", text(&out));
+    text(&out)
+}
+
 fn git(repo: &Path, args: &[&str]) -> String {
     let out = Command::new("git")
         .args(["-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"])
@@ -206,7 +222,7 @@ fn authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout() {
     let repo = dir.path();
     let before: Vec<String> = files(repo, "").into_iter().filter(|f| !f.starts_with(".git/")).collect();
 
-    let dry = ok(repo, &["migrate", "--dry-run"]);
+    let dry = ok(repo, &["migrate"]);
     for line in [
         "canon migrate: plan:\n",
         "  move specs/features/kind=feature -> .canon/specs/kind=feature (spec root `root`; canon.yaml root: .canon/specs, former_roots: [specs])\n",
@@ -216,14 +232,14 @@ fn authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout() {
         "  canon.yaml: skills.providers: [claude, codex] (from the install lock)\n",
         "  .gitignore: add .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/\n",
         "  rebuild the scenario index (full sync)\n",
-        "canon migrate: --dry-run, nothing written\n",
+        "nothing written. To act: canon migrate --commit --plan-digest ",
     ] {
         assert!(dry.contains(line), "missing {line:?} in:\n{dry}");
     }
     let after_dry: Vec<String> = files(repo, "").into_iter().filter(|f| !f.starts_with(".git/")).collect();
     assert_eq!(after_dry, before, "--dry-run writes nothing");
 
-    let out = ok(repo, &["migrate"]);
+    let out = ok_commit(repo);
     assert!(out.contains("canon migrate: moved specs/features/kind=feature -> .canon/specs/kind=feature\n"), "{out}");
     assert!(out.contains("canon migrate: moved openspec/changes/add-cart -> .canon/changes/add-cart (proposal.md -> brief.md)\n"), "{out}");
     assert!(out.contains("canon migrate: re-imported change `add-cart` from .canon/changes/add-cart"), "{out}");
@@ -259,7 +275,7 @@ fn authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout() {
     assert!(subjects.iter().any(|s| s["change_ids"].as_array().unwrap().iter().any(|c| c == "add-cart")));
 
     let tree: Vec<String> = files(repo, "").into_iter().filter(|f| !f.starts_with(".git/") && !f.starts_with(".canon/ledger/kind=scenario/")).collect();
-    let again = canon(repo, &["migrate"]);
+    let again = commit(repo);
     assert_eq!(again.status.code(), Some(0), "{}", text(&again));
     let again = text(&again);
     assert!(again.starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout\n"), "{again}");
@@ -287,7 +303,7 @@ fn authoring_migrate_02_another_root_only_drops_its_features_level() {
     let moved = "game/specs/features/kind=feature/area=cart/add.feature";
     let inode = |path: &str| std::os::unix::fs::MetadataExt::ino(&std::fs::metadata(repo.join(path)).unwrap());
     let before = inode(moved);
-    let out = ok(repo, &["migrate"]);
+    let out = ok_commit(repo);
     assert!(out.contains("  move game/specs/features/kind=feature -> game/specs/kind=feature (spec root `game`)\n"), "{out}");
     assert_eq!(read(repo, "game/specs/kind=feature/area=cart/add.feature"), CART);
     assert_eq!(inode("game/specs/kind=feature/area=cart/add.feature"), before, "a plain rename: the same file, not a copy");
@@ -296,7 +312,7 @@ fn authoring_migrate_02_another_root_only_drops_its_features_level() {
     assert_eq!(read(repo, "canon.yaml"), yaml, "the root did not move, so canon.yaml is unchanged");
     assert!(out.contains("canon migrate: rebuilt the scenario index: 1 record(s) written\n"), "{out}");
 
-    let again = ok(repo, &["migrate"]);
+    let again = ok_commit(repo);
     assert!(again.starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout\n"), "a root already on the new layout is a no-op: {again}");
     assert_eq!(inode("game/specs/kind=feature/area=cart/add.feature"), before);
     assert_eq!(read(repo, "canon.yaml"), yaml);
@@ -312,7 +328,7 @@ fn authoring_migrate_03_a_dirty_path_it_moves_is_refused() {
     write(repo, "specs/features/kind=feature/area=cart/new.feature", CART);
     let yaml = read(repo, "canon.yaml");
 
-    let out = canon(repo, &["migrate"]);
+    let out = commit(repo);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     let err = String::from_utf8_lossy(&out.stderr);
     assert!(err.contains("canon migrate: MIGRATE_UNCOMMITTED — uncommitted changes under the paths it moves; commit or stash them, then run it again:"), "{err}");
@@ -331,7 +347,7 @@ fn authoring_migrate_04_an_existing_destination_is_refused() {
     write(repo, ".canon/specs/kind=feature/area=wish/save.feature", CART);
     commit_all(repo, "a corpus already at the destination");
 
-    let out = canon(repo, &["migrate", "--dry-run"]);
+    let out = canon(repo, &["migrate"]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(
         text(&out).contains("canon migrate: MIGRATE_REFUSED — spec root `root`: specs/features/kind=feature would move to .canon/specs/kind=feature, which already exists; move what is there out of the way first"),
@@ -356,7 +372,7 @@ fn authoring_migrate_05_an_external_approval_moves_into_a_pointer_brief() {
     ok(repo, &["ingest", "plans"]);
     commit_all(repo, "an external change");
 
-    let out = ok(repo, &["migrate"]);
+    let out = ok_commit(repo);
     assert!(
         out.contains("  write .canon/changes/checkout/brief.md (Source: openspec/changes/checkout/proposal.md; Approved: ana 2026-10-10 — \"go\"); the Approved: line stays in openspec/changes/checkout/proposal.md, which canon does not edit\n"),
         "{out}"
@@ -370,7 +386,7 @@ fn authoring_migrate_05_an_external_approval_moves_into_a_pointer_brief() {
     ok(repo, &["subject", "adopt", "cart", "--change-id", "checkout"]);
     let status = ok(repo, &["status"]);
     assert!(status.contains("brief: approved in .canon/changes/checkout/brief.md — ana 2026-10-10 — \"go\""), "{status}");
-    let again = ok(repo, &["migrate", "--dry-run"]);
+    let again = ok(repo, &["migrate"]);
     assert!(!again.contains("write .canon/changes/checkout/brief.md"), "a second run writes no brief: {again}");
 }
 
@@ -388,7 +404,7 @@ fn authoring_migrate_06_an_ambiguous_change_stays_and_is_named() {
     plant_change(repo, "hand-written", "By hand.", Some("cart"));
     commit_all(repo, "two ambiguous changes");
 
-    let out = ok(repo, &["migrate", "--dry-run"]);
+    let out = ok(repo, &["migrate"]);
     assert!(
         out.contains("  left: openspec/changes/half-done stays where it is: its files are `canon change new`'s scaffold, but its first stored version was not adopted into a subject, as `canon change new` adopts\n"),
         "{out}"
@@ -435,7 +451,7 @@ fn authoring_migrate_07_legacy_reviews_pinned_before_the_move_are_pinned_current
 
     let dir = legacy_repo();
     let repo = dir.path();
-    let out = ok(repo, &["migrate"]);
+    let out = ok_commit(repo);
     assert!(read(repo, "canon.yaml").contains("      root: .canon/specs\n      former_roots: [specs]\n"));
     assert!(out.contains("canon migrate: pinned 1 review(s) to what their evidence says") && !out.contains("could not be checked"), "checked at its former root, so not undecidable: {out}");
     let after = ok(repo, &["gate", "check"]);
@@ -447,7 +463,7 @@ fn authoring_migrate_07_legacy_reviews_pinned_before_the_move_are_pinned_current
     git(repo, &["mv", "specs", ".canon/specs"]);
     write(repo, "canon.yaml", &read(repo, "canon.yaml").replace("      root: specs\n", "      root: .canon/specs\n"));
     commit_all(repo, "move the root by hand");
-    let out = ok(repo, &["migrate"]);
+    let out = ok_commit(repo);
     assert!(!read(repo, "canon.yaml").contains("former_roots"), "{}", read(repo, "canon.yaml"));
     assert!(out.contains("canon migrate: pinned 1 review(s)") && out.contains("1 of those could not be checked"), "without former_roots the review is undecidable: {out}");
 }
@@ -463,7 +479,7 @@ fn authoring_migrate_08_a_canon_yaml_it_cannot_edit_safely_is_refused() {
     write(repo, "canon.yaml", &yaml);
     commit_all(repo, "a flow-style specs section");
 
-    let out = canon(repo, &["migrate"]);
+    let out = commit(repo);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(
         text(&out).contains("canon migrate: MIGRATE_REFUSED — could not rewrite canon.yaml `specs.roots` safely (its `roots:` entries are not a block list)"),
@@ -504,7 +520,7 @@ fn authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by
     let repo = dir.path();
     // The temp file canon.yaml is written through cannot be created.
     std::fs::create_dir(repo.join(".canon.yaml.canon-migrate.tmp")).unwrap();
-    let out = canon(repo, &["migrate"]);
+    let out = commit(repo);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(text(&out).contains("canon migrate: MIGRATE_STOPPED — failed to write"), "{}", text(&out));
     assert!(text(&out).contains("canon.yaml is unchanged, and running `canon migrate` again finishes what this run started"), "{}", text(&out));
@@ -512,7 +528,7 @@ fn authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by
     assert!(repo.join(NEW_FEATURE).is_file() && repo.join(".canon/changes/add-cart/brief.md").is_file(), "the moves happened before the write failed");
 
     std::fs::remove_dir(repo.join(".canon.yaml.canon-migrate.tmp")).unwrap();
-    let out = ok(repo, &["migrate"]);
+    let out = ok_commit(repo);
     assert!(
         out.contains("  spec root `root` is already at .canon/specs/kind=feature (an earlier run stopped before writing canon.yaml); canon.yaml root: .canon/specs, former_roots: [specs]\n"),
         "{out}"
@@ -523,7 +539,7 @@ fn authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by
     let latest = latest_change(repo, "add-cart");
     assert_eq!(latest["actor"]["agent_id"], "canon-plan-import-canon", "{latest}");
     assert_eq!(latest["subject_ids"], serde_json::json!(["cart"]), "{latest}");
-    assert!(ok(repo, &["migrate"]).starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout\n"));
+    assert!(ok_commit(repo).starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout\n"));
 }
 
 /// authoring.migrate.10: when a pointer brief cannot be written, the
@@ -545,14 +561,14 @@ fn authoring_migrate_10_a_failed_pointer_brief_keeps_the_source_that_holds_the_a
     commit_all(repo, "an external approval and the init source");
     set_mode(&repo.join(".canon/changes"), 0o555);
 
-    let out = canon(repo, &["migrate"]);
+    let out = commit(repo);
     set_mode(&repo.join(".canon/changes"), 0o755);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(text(&out).contains("canon migrate: MIGRATE_STOPPED — failed to write .canon/changes/checkout/brief.md"), "{}", text(&out));
     assert_eq!(read(repo, "canon.yaml"), yaml, "the source canon init wrote stays while the approval is not copied");
     assert!(repo.join("openspec/changes/.gitkeep").is_file());
 
-    let out = ok(repo, &["migrate"]);
+    let out = ok_commit(repo);
     assert!(out.contains("canon migrate: wrote .canon/changes/checkout/brief.md (Source: ext/openspec/changes/checkout/proposal.md)"), "{out}");
     assert_eq!(read(repo, ".canon/changes/checkout/brief.md"), "Source: ext/openspec/changes/checkout/proposal.md\n\nApproved: ana 2026-10-10 — \"go\"\n");
     assert!(read(repo, "canon.yaml").contains("  sources:\n    - dialect: openspec\n      root: ext\n"), "{}", read(repo, "canon.yaml"));
@@ -568,7 +584,7 @@ fn authoring_migrate_11_a_change_move_is_preflighted_and_a_half_moved_change_is_
     let dir = old_repo();
     let repo = dir.path();
     set_mode(&repo.join("openspec/changes/add-cart"), 0o555);
-    let out = canon(repo, &["migrate"]);
+    let out = commit(repo);
     set_mode(&repo.join("openspec/changes/add-cart"), 0o755);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(
@@ -582,13 +598,13 @@ fn authoring_migrate_11_a_change_move_is_preflighted_and_a_half_moved_change_is_
     // An earlier run moved the change dir and stopped before the rename.
     std::fs::create_dir_all(repo.join(".canon/changes")).unwrap();
     git(repo, &["mv", "openspec/changes/add-cart", ".canon/changes/add-cart"]);
-    let out = ok(repo, &["migrate"]);
+    let out = ok_commit(repo);
     assert!(out.contains("  rename .canon/changes/add-cart/proposal.md -> .canon/changes/add-cart/brief.md (an earlier run moved change `add-cart` and stopped before this rename)\n"), "{out}");
     assert!(out.contains("canon migrate: re-imported change `add-cart` from .canon/changes/add-cart"), "{out}");
     assert!(repo.join(".canon/changes/add-cart/brief.md").is_file() && !repo.join(".canon/changes/add-cart/proposal.md").exists());
     assert_eq!(latest_change(repo, "add-cart")["actor"]["agent_id"], "canon-plan-import-canon");
     assert_eq!(read(repo, "canon.yaml"), migrated_yaml());
-    assert!(ok(repo, &["migrate"]).starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout\n"));
+    assert!(ok_commit(repo).starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout\n"));
 }
 
 /// authoring.migrate.12: change material the openspec reader cannot read
@@ -603,14 +619,14 @@ fn authoring_migrate_12_unread_openspec_material_keeps_the_source() {
     write(repo, "openspec/changes/notes.txt", "loose notes\n");
     commit_all(repo, "unread material");
 
-    let out = ok(repo, &["migrate", "--dry-run"]);
+    let out = ok(repo, &["migrate"]);
     assert!(out.contains("  left: openspec/changes/broken stays where it is: the openspec reader cannot read it (missing-proposal-md)\n"), "{out}");
     assert!(out.contains("  move openspec/changes/add-cart -> .canon/changes/add-cart"), "{out}");
     assert!(!out.contains("remove the plans source"), "{out}");
 
     std::fs::remove_dir_all(repo.join("openspec/changes/broken")).unwrap();
     commit_all(repo, "only the notes are left");
-    let out = ok(repo, &["migrate"]);
+    let out = ok_commit(repo);
     assert!(out.contains("  left: the plans source `{ dialect: openspec, root: . }` stays: canon has not read openspec/changes/notes.txt\n"), "{out}");
     assert!(read(repo, "canon.yaml").contains("    - dialect: openspec\n      root: .\n"), "the source stays");
     assert_eq!(read(repo, "openspec/changes/notes.txt"), "loose notes\n");
@@ -631,11 +647,11 @@ fn authoring_migrate_13_adds_the_derived_directory_lines_to_an_existing_block_on
     write(repo, ".gitignore", old);
     commit_all(repo, "a 0.25 gitignore");
 
-    let dry = ok(repo, &["migrate", "--dry-run"]);
+    let dry = ok(repo, &["migrate"]);
     assert!(dry.contains("  .gitignore: add .canon/archive/kind=scenario/, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/\n"), "{dry}");
     assert_eq!(read(repo, ".gitignore"), old, "--dry-run writes nothing");
 
-    let out = ok(repo, &["migrate"]);
+    let out = ok_commit(repo);
     assert!(out.contains("canon migrate: added to .gitignore: .canon/archive/kind=scenario/, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/\n"), "{out}");
     let gitignore = read(repo, ".gitignore");
     assert!(gitignore.starts_with(old), "every existing byte is kept: {gitignore}");
@@ -643,7 +659,7 @@ fn authoring_migrate_13_adds_the_derived_directory_lines_to_an_existing_block_on
         assert_eq!(gitignore.lines().filter(|l| l.trim() == line).count(), 1, "{line} once in:\n{gitignore}");
     }
 
-    let again = ok(repo, &["migrate"]);
+    let again = ok_commit(repo);
     assert!(!again.contains("added to .gitignore"), "{again}");
     assert_eq!(read(repo, ".gitignore"), gitignore, "a second run adds none");
 }
@@ -663,13 +679,51 @@ fn authoring_migrate_14_a_kept_comment_gets_its_missing_line_and_no_second_comme
     write(repo, ".gitignore", &lost);
     commit_all(repo, "a gitignore that lost two lines and kept their comments");
 
-    let out = ok(repo, &["migrate"]);
+    let out = ok_commit(repo);
     assert!(out.contains("canon migrate: added to .gitignore: .canon/archive/kind=scenario/, .canon/learn/\n"), "{out}");
     assert_eq!(read(repo, ".gitignore"), full, "the lines return under their own comments, byte for byte");
     for comment in full.lines().filter(|line| line.starts_with('#')) {
         assert_eq!(read(repo, ".gitignore").lines().filter(|l| *l == comment).count(), 1, "{comment} once");
     }
 
-    ok(repo, &["migrate"]);
+    ok_commit(repo);
     assert_eq!(read(repo, ".gitignore"), full, "a second run changes nothing");
+}
+
+/// D6: the bare run previews (a digest, the effects, nothing written); the
+/// commit needs the digest of the plan recomputed now, and a stale one writes
+/// nothing; the 0.27 spelling is a usage error.
+#[test]
+fn migrate_previews_by_default_and_commits_only_the_previewed_plan() {
+    let dir = old_repo();
+    let repo = dir.path();
+    let tree = || -> Vec<String> { files(repo, "").into_iter().filter(|f| !f.starts_with(".git/")).collect() };
+    let before = tree();
+
+    let preview = canon(repo, &["migrate", "--json"]);
+    assert_eq!(preview.status.code(), Some(0), "{}", text(&preview));
+    let body: serde_json::Value = serde_json::from_slice(&preview.stdout).unwrap();
+    assert_eq!(body["data"]["committed"], false, "{body}");
+    assert!(body["data"]["effects"].as_array().unwrap().iter().any(|e| e["action"] == "move"), "{body}");
+    let digest = body["data"]["planDigest"].as_str().expect("a preview carries a planDigest").to_string();
+    assert_eq!(body["meta"]["next"][0]["argv"], serde_json::json!(["canon", "migrate", "--commit", "--plan-digest", digest, "--json"]), "{body}");
+    assert_eq!(tree(), before, "a preview writes nothing");
+
+    let stale = canon(repo, &["migrate", "--commit", "--plan-digest", &"0".repeat(64), "--json"]);
+    assert_eq!(stale.status.code(), Some(2), "{}", text(&stale));
+    let stale: serde_json::Value = serde_json::from_slice(&stale.stdout).unwrap();
+    assert_eq!(stale["error"]["code"], "PLAN_CHANGED", "{stale}");
+    assert_eq!(tree(), before, "a stale digest writes nothing");
+
+    let committed = canon(repo, &["migrate", "--commit", "--plan-digest", &digest, "--json"]);
+    assert_eq!(committed.status.code(), Some(0), "{}", text(&committed));
+    let committed: serde_json::Value = serde_json::from_slice(&committed.stdout).unwrap();
+    assert_eq!(committed["data"]["committed"], true, "{committed}");
+    assert!(repo.join(NEW_FEATURE).is_file() && !repo.join(OLD_FEATURE).exists(), "the plan moved the corpus");
+
+    for old in [&["--dry-run"][..], &["--commit"], &["--plan-digest", "abc"]] {
+        let mut args = vec!["migrate"];
+        args.extend_from_slice(old);
+        assert_eq!(canon(repo, &args).status.code(), Some(2), "{old:?}");
+    }
 }

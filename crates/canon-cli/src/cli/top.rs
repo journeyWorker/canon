@@ -12,7 +12,7 @@ pub struct InitArgs {
     #[arg(long, default_value = ".")]
     pub repo: PathBuf,
     /// Validate an existing canon.yaml instead of writing one
-    #[arg(long, conflicts_with_all = ["no_agents_md", "no_policy", "policy", "providers", "language"])]
+    #[arg(long, conflicts_with_all = ["no_agents_md", "no_policy", "policy", "providers", "language", "dry_run"])]
     pub check: bool,
     /// Do not write or refresh the canon block in AGENTS.md
     #[arg(long)]
@@ -29,6 +29,8 @@ pub struct InitArgs {
     /// Language the briefs are written in (`en`, `ko`, or any tag: `en` headings, structure rules only); recorded as `language:` in canon.yaml
     #[arg(long, value_name = "TAG")]
     pub language: Option<String>,
+    #[command(flatten)]
+    pub dry_run: crate::cli::DryRunArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -38,9 +40,8 @@ pub struct InitArgs {
 pub struct MigrateArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
-    /// Print the plan and write nothing
-    #[arg(long)]
-    pub dry_run: bool,
+    #[command(flatten)]
+    pub safety: crate::cli::SafetyArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -166,22 +167,20 @@ pub struct ExportArgs {
     /// Keep only these fields of each exported record (comma-separated): kind, at, id, digest; an unknown field is refused
     #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
     pub fields: Option<Vec<String>>,
+    #[command(flatten)]
+    pub dry_run: crate::cli::DryRunArgs,
 }
 
 #[derive(Args)]
 pub struct PurgeArgs {
-    #[arg(long, value_parser = crate::query::kind_parser())]
+    #[arg(long, value_parser = crate::query::purgeable_kind_parser())]
     pub kind: RecordKind,
     #[arg(long, value_parser = crate::timestamp::parse)]
     pub before: DateTime<Utc>,
     #[command(flatten)]
+    pub safety: crate::cli::SafetyArgs,
+    #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
-    /// Print the removal set and its `planDigest`; delete nothing
-    #[arg(long, conflicts_with = "confirm")]
-    pub plan: bool,
-    /// Delete, but only if the plan recomputed now has this `planDigest`
-    #[arg(long, value_name = "PLAN_DIGEST")]
-    pub confirm: Option<String>,
     #[arg(long)]
     pub json: bool,
 }

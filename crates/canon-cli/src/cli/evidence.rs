@@ -15,9 +15,6 @@ pub enum EvidenceCommand {
     /// Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator)
     #[command(after_help = "Records an external evaluator's re-audit of one scenario: --evaluator-id, --evaluator-version, --evaluator-digest <sha256>, --audit-result confirmed|refuted|indeterminate, and optional --report/--artifact counterexamples, bound and stored like any report. canon never generates or runs the audit. An audit never becomes the scenario's declared verdict; a refuted latest audit is false-success in canon gate check, whatever the declared verdict says.")]
     Audit(EvidenceAuditArgs),
-    /// Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/)
-    #[command(after_help = "For records written before canon stored bound bytes (0.11-0.13), and for any evidence file, or file of a current review, whose stored blob was lost. Each attachment whose working-tree file still hashes to the recorded digest is copied into .canon/artifacts/sha256/<hex>; everything else is listed as not stored, with why. A superseded review's files are not vaulted, as the gate does not check them. Commit the store with the ledger.\n\nExit 0 when the pass ran (the gate decides whether an unstored file matters), 2 when the ledger cannot be read or a write fails.")]
-    Vault(EvidenceVaultArgs),
 }
 
 #[derive(Args)]
@@ -130,17 +127,6 @@ pub struct EvidenceAddArgs {
     pub json: bool,
 }
 
-#[derive(Args)]
-pub struct EvidenceVaultArgs {
-    /// Per-file size limit for the artifact store, in MiB
-    #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
-    pub max_artifact_mib: u64,
-    #[command(flatten)]
-    pub repo: crate::cli::RepoArgs,
-    /// Output JSON instead of the human-readable form
-    #[arg(long)]
-    pub json: bool,
-}
 
 /// The flags of `evidence audit`: an external evaluator's re-audit of one scenario.
 #[derive(Args)]

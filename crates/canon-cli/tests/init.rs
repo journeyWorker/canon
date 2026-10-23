@@ -777,7 +777,9 @@ fn authoring_init_99_check_config_warns_about_a_missing_gitignore_line_and_names
     let body: serde_json::Value = serde_json::from_str(&stdout(&json)).unwrap();
     assert!(body["data"]["sections"].as_array().unwrap().iter().any(|s| s["section"] == "gitignore" && s["status"] == "warn"), "{body}");
 
-    let migrated = run_canon(&["migrate", "--repo", "."], repo);
+    let preview = run_canon(&["migrate", "--repo", "."], repo);
+    let digest = stdout(&preview).lines().find_map(|line| line.strip_prefix("planDigest ")).and_then(|rest| rest.split(';').next()).expect("a preview prints its planDigest").to_string();
+    let migrated = run_canon(&["migrate", "--repo", ".", "--commit", "--plan-digest", &digest], repo);
     assert!(migrated.status.success(), "{}{}", stdout(&migrated), stderr(&migrated));
     assert!(!stdout(&run_canon(&["init", "--check", "--repo", "."], repo)).contains("[WARN]"));
 

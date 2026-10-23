@@ -10,9 +10,8 @@ pub enum TierCommand {
 
 #[derive(Args)]
 pub struct TierAgeArgs {
-    /// Preview without writing anything
-    #[arg(long)]
-    pub dry_run: bool,
+    #[command(flatten)]
+    pub safety: crate::cli::SafetyArgs,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form

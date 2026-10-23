@@ -2,5 +2,5 @@ canon gate check: clean (0 violations)
 
 advisory: spec_coverage is off — 2 scenario(s) are not checked for evidence; see .canon/policy.yaml
 
-evidence artifacts: 1 bound file(s) not in the artifact store — not failing the gate; run `canon evidence vault` to store them before the working tree changes:
+evidence artifacts: 1 bound file(s) not in the artifact store — not failing the gate; run `canon artifacts store` to store them before the working tree changes:
   unstored cart.add.01 reports/cart-badge.png (sha256 98480205986e97b7aebbc23224203c1dc96c32eeacf9237258980f436c985b79, review by `reviewer-2`) is verified against the working tree only

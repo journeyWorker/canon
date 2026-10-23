@@ -2,26 +2,50 @@
 
 use crate::cli::tier::*;
 use crate::cli_error::CliError;
+use crate::safety::{Mode, Plan};
 use std::process::ExitCode;
 
 pub fn run(cmd: TierCommand) -> ExitCode {
     match cmd {
-        TierCommand::Age(TierAgeArgs { dry_run, repo, json }) => run_tier_age(&repo, dry_run, json),
+        TierCommand::Age(TierAgeArgs { safety, repo, json }) => run_tier_age(&repo, &safety.mode(), json),
     }
 }
 
-fn run_tier_age(repo: &std::path::Path, dry_run: bool, json: bool) -> ExitCode {
+/// `canon tier age`: the bare run previews the moves; `--commit --plan-digest`
+/// applies exactly that plan.
+fn run_tier_age(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> ExitCode {
+    let base = crate::safety::command("tier age", &[], repo);
+    let failed = |err: String| ExitCode::from(CliError::failed("TIER_FAILED", err).hint("check the `tiers` settings in canon.yaml and that the destinations are reachable, then run `canon tier age` again").emit("canon tier age", json) as u8);
     let canon_yaml_path = crate::context::resolve_canon_yaml(repo);
-    match crate::tier::run(&canon_yaml_path, dry_run) {
+    let loaded = match crate::tiers::build_tiers(&canon_yaml_path) {
+        Ok(loaded) => loaded,
+        Err(err) => return failed(err.to_string()),
+    };
+    let (planned, effects) = match crate::tier::preview(&loaded) {
+        Ok(planned) => planned,
+        Err(err) => return failed(err.to_string()),
+    };
+    let plan = Plan::new(effects);
+    let commit = match plan.gate(mode, &base) {
+        Ok(commit) => commit,
+        Err(err) => return ExitCode::from(err.emit("canon tier age", json) as u8),
+    };
+    if !commit {
+        if !json && planned.is_empty() {
+            println!("{}", crate::tier::format_report(&planned).trim_end());
+        }
+        let report = crate::tier::report(&planned, plan);
+        crate::safety::finish_preview(&base, "tier age", &report.plan, "the plan only lists what would move; moving takes its planDigest", json, &report);
+        return ExitCode::SUCCESS;
+    }
+    match crate::tier::apply(loaded, &planned) {
         Ok(reports) => {
-            crate::say_raw!(json, "{}", crate::tier::format_report(&reports, dry_run));
+            crate::say_raw!(json, "{}", crate::tier::format_report(&reports));
             if json {
-                crate::json_out::data("tier age", &crate::json_out::untyped(crate::tier::format_json(&reports, dry_run)));
+                crate::json_out::data("tier age", &crate::tier::report(&reports, plan.committed()));
             }
             ExitCode::SUCCESS
         }
-        Err(err) => {
-            ExitCode::from(CliError::failed("TIER_FAILED", err.to_string()).hint("check the `tiers` settings in canon.yaml and that the destinations are reachable, then run `canon tier age` again").emit("canon tier age", json) as u8)
-        }
+        Err(err) => failed(err.to_string()),
     }
 }

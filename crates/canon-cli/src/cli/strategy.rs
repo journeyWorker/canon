@@ -30,9 +30,8 @@ pub struct StrategyPromoteArgs {
     /// Detached signature file to attach to the approval JSON
     #[arg(long, requires = "approval")]
     pub signature_file: Option<PathBuf>,
-    /// Preview without writing anything
-    #[arg(long)]
-    pub dry_run: bool,
+    #[command(flatten)]
+    pub dry_run: crate::cli::DryRunArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,

@@ -1,7 +1,7 @@
 //! 0.23 D3 through the real binary: evidence bytes off git. `canon.yaml`'s
 //! `artifact_store:` block selects an object-store tier; writes upload by digest
 //! key and keep no local copy, the gate and `canon artifacts verify` ask the
-//! store, and `canon artifacts migrate` moves a local store there.
+//! store, and `canon artifacts move` moves a local store there.
 //!
 //! The object store is the debug-build local-filesystem substitute
 //! (`CANON_R2_LOCAL_ROOT`, the seam `canon tier age` tests use), so these
@@ -50,6 +50,17 @@ impl Repo {
         let out = self.canon(args);
         assert!(out.status.success(), "canon {args:?}: {}", text(&out));
         out
+    }
+
+    /// `artifacts move --tier <tier>` as an agent runs it: the bare run previews,
+    /// then `--commit --plan-digest` acts on that plan; both with `--json`.
+    fn move_to(&self, tier: &str) -> Output {
+        let preview = self.canon(&["artifacts", "move", "--tier", tier, "--json"]);
+        if !preview.status.success() {
+            return preview;
+        }
+        let digest = stdout_json(&preview)["data"]["planDigest"].as_str().expect("a preview carries a planDigest").to_string();
+        self.canon(&["artifacts", "move", "--tier", tier, "--commit", "--plan-digest", &digest, "--json"])
     }
 
     /// The object a bucket holds for `bytes`.
@@ -149,7 +160,7 @@ fn evidence_add_with_an_object_backend_uploads_by_digest_keeps_no_local_blob_and
 
 /// Acceptance: a missing remote object refuses at the gate with a hint, even
 /// though the working-tree file still matches (the local store's back-compat
-/// fallback does not apply to an object store); `evidence vault` uploads it
+/// fallback does not apply to an object store); `artifacts store` uploads it
 /// again from the working tree.
 #[test]
 fn a_missing_remote_object_fails_the_gate_with_a_hint_and_vault_uploads_it_again() {
@@ -163,7 +174,7 @@ fn a_missing_remote_object_fails_the_gate_with_a_hint_and_vault_uploads_it_again
     let out = text(&gate);
     assert!(out.contains("stale-evidence game.run.01") && out.contains("`reports/smoke.json`"), "{out}");
     assert!(out.contains(&sha(V1)) && out.contains("cold:artifacts/sha256/") && out.contains(": missing"), "names the digest and the store key: {out}");
-    assert!(out.contains("not in the artifact store") && out.contains("canon evidence vault"), "carries the fix: {out}");
+    assert!(out.contains("not in the artifact store") && out.contains("canon artifacts store"), "carries the fix: {out}");
 
     let verify = repo.canon(&["artifacts", "verify", "--json"]);
     assert_eq!(verify.status.code(), Some(1), "{}", text(&verify));
@@ -171,7 +182,7 @@ fn a_missing_remote_object_fails_the_gate_with_a_hint_and_vault_uploads_it_again
     assert_eq!(body["error"]["code"], "ARTIFACTS_VERIFY_FAILED");
     assert_eq!(body["data"]["problems"][0]["sha256"], sha(V1));
 
-    let vault = repo.ok(&["evidence", "vault"]);
+    let vault = repo.ok(&["artifacts", "store"]);
     assert!(text(&vault).contains("stored 1, already stored 0") && !text(&vault).contains("commit .canon/artifacts"), "{}", text(&vault));
     assert_eq!(std::fs::read(repo.object(V1)).unwrap(), V1);
     assert!(repo.canon(&["gate", "check"]).status.success());
@@ -269,15 +280,31 @@ fn migrate_moves_verifies_removes_local_copies_and_is_idempotent_and_resumable()
     assert!(repo.local_blob(V1).exists() && repo.local_blob(v2).exists());
     let yaml_before = repo.canon_yaml();
 
-    // A dry run writes nothing.
-    let dry = repo.ok(&["artifacts", "migrate", "--to", "cold", "--dry-run"]);
-    assert!(text(&dry).contains("would upload 2") && text(&dry).contains("would remove 2 local copies"), "{}", text(&dry));
-    assert!(repo.local_blob(V1).exists() && !repo.object(V1).exists() && repo.canon_yaml() == yaml_before, "a dry run changes nothing");
+    // The bare run previews and writes nothing.
+    let preview = repo.ok(&["artifacts", "move", "--tier", "cold", "--json"]);
+    let preview_body = stdout_json(&preview);
+    let actions: Vec<&str> = preview_body["data"]["effects"].as_array().unwrap().iter().map(|e| e["action"].as_str().unwrap()).collect();
+    assert_eq!(actions.iter().filter(|a| **a == "upload").count(), 2, "{preview_body}");
+    assert_eq!(actions.iter().filter(|a| **a == "remove").count(), 2, "{preview_body}");
+    assert_eq!(preview_body["data"]["committed"], false, "{preview_body}");
+    assert!(repo.local_blob(V1).exists() && !repo.object(V1).exists() && repo.canon_yaml() == yaml_before, "a preview changes nothing");
+    let digest = preview_body["data"]["planDigest"].as_str().unwrap().to_string();
 
-    let run = repo.ok(&["artifacts", "migrate", "--to", "cold", "--json"]);
+    // A blob that lands between the preview and the commit makes the plan stale: nothing is written.
+    let v3: &[u8] = br#"{"at":"2026-10-10T16:00:00Z","checks":16}"#;
+    std::fs::write(repo.path().join("reports/third.json"), v3).unwrap();
+    assert!(repo.attest(&["--artifact", "reports/third.json"]).status.success());
+    let stale = repo.canon(&["artifacts", "move", "--tier", "cold", "--commit", "--plan-digest", &digest, "--json"]);
+    assert_eq!(stale.status.code(), Some(2), "{}", text(&stale));
+    assert_eq!(stdout_json(&stale)["error"]["code"], "PLAN_CHANGED");
+    assert!(repo.local_blob(V1).exists() && repo.local_blob(v3).exists() && !repo.object(V1).exists() && repo.canon_yaml() == yaml_before, "a stale digest changes nothing");
+
+    let run = repo.move_to("cold");
     let body = stdout_json(&run);
-    assert_eq!(body["data"]["uploaded"], 2);
-    assert_eq!(body["data"]["removedLocal"], 2);
+    assert_eq!(body["data"]["committed"], true, "{body}");
+    assert_eq!(body["data"]["committed"], true, "{body}");
+    assert_eq!(body["data"]["uploaded"], 3);
+    assert_eq!(body["data"]["removedLocal"], 3);
     assert_eq!(body["data"]["configWritten"], true);
     assert!(body["meta"]["next"].is_array(), "a write names what comes next: {body}");
     assert_eq!(std::fs::read(repo.object(V1)).unwrap(), V1);
@@ -295,7 +322,8 @@ fn migrate_moves_verifies_removes_local_copies_and_is_idempotent_and_resumable()
 
     // Idempotent: nothing left to move.
     let yaml_after = repo.canon_yaml();
-    let second = repo.ok(&["artifacts", "migrate", "--to", "cold", "--json"]);
+    let second = repo.move_to("cold");
+    assert!(second.status.success(), "{}", text(&second));
     let body = stdout_json(&second);
     assert_eq!((body["data"]["blobs"].as_u64(), body["data"]["uploaded"].as_u64(), body["data"]["configWritten"].as_bool()), (Some(0), Some(0), Some(false)), "{body}");
     assert_eq!(repo.canon_yaml(), yaml_after);
@@ -304,7 +332,8 @@ fn migrate_moves_verifies_removes_local_copies_and_is_idempotent_and_resumable()
     // removing a copy leaves a local blob; the next run removes it.
     std::fs::create_dir_all(repo.path().join(".canon/artifacts/sha256")).unwrap();
     std::fs::write(repo.local_blob(V1), V1).unwrap();
-    let resumed = repo.ok(&["artifacts", "migrate", "--to", "cold", "--json"]);
+    let resumed = repo.move_to("cold");
+    assert!(resumed.status.success(), "{}", text(&resumed));
     let body = stdout_json(&resumed);
     assert_eq!((body["data"]["uploaded"].as_u64(), body["data"]["alreadyInStore"].as_u64(), body["data"]["removedLocal"].as_u64()), (Some(0), Some(1), Some(1)), "{body}");
     assert!(!repo.path().join(".canon/artifacts").exists());
@@ -321,10 +350,10 @@ fn migrate_refuses_a_corrupt_local_blob_and_changes_nothing() {
     std::fs::write(&bad, b"what it holds").unwrap();
     let yaml = repo.canon_yaml();
 
-    let run = repo.canon(&["artifacts", "migrate", "--to", "cold", "--json"]);
+    let run = repo.canon(&["artifacts", "move", "--tier", "cold", "--json"]);
     assert_eq!(run.status.code(), Some(2), "{}", text(&run));
     let body = stdout_json(&run);
-    assert_eq!(body["error"]["code"], "ARTIFACTS_MIGRATE_REFUSED");
+    assert_eq!(body["error"]["code"], "ARTIFACTS_MOVE_REFUSED");
     assert!(body["error"]["message"].as_str().unwrap().contains(&sha(b"what it should hold")), "{body}");
     assert!(repo.local_blob(V1).exists() && bad.exists(), "nothing is removed");
     assert_eq!(repo.canon_yaml(), yaml, "canon.yaml is unchanged");
@@ -334,16 +363,16 @@ fn migrate_refuses_a_corrupt_local_blob_and_changes_nothing() {
 #[test]
 fn migrate_refuses_a_target_that_is_not_an_s3_tier_and_never_rewrites_a_block_it_did_not_write() {
     let repo = new_repo(None);
-    let hot = repo.canon(&["artifacts", "migrate", "--to", "hot"]);
+    let hot = repo.canon(&["artifacts", "move", "--tier", "hot"]);
     assert_eq!(hot.status.code(), Some(2), "{}", text(&hot));
-    assert!(text(&hot).contains("ARTIFACTS_MIGRATE_REFUSED") && text(&hot).contains("not an object store"), "{}", text(&hot));
+    assert!(text(&hot).contains("ARTIFACTS_MOVE_REFUSED") && text(&hot).contains("not an object store"), "{}", text(&hot));
 
     let explicit = new_repo(Some("artifact_store:\n  backend: local\n"));
-    let out = explicit.canon(&["artifacts", "migrate", "--to", "cold"]);
+    let out = explicit.canon(&["artifacts", "move", "--tier", "cold"]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(text(&out).contains("set it to `backend: cold` yourself"), "{}", text(&out));
 
-    let local = repo.canon(&["artifacts", "migrate", "--to", "local"]);
+    let local = repo.canon(&["artifacts", "move", "--tier", "local"]);
     assert!(local.status.success() && text(&local).contains("already local"), "{}", text(&local));
 }
 

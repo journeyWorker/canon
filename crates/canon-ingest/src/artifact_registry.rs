@@ -107,7 +107,7 @@ pub fn registry() -> &'static [ArtifactAdapterEntry] {
 }
 
 /// Look up one registered adapter by `adapter_id()` — the natural seam
-/// for a future `canon ingest artifacts --adapter <id>` selection
+/// for a future `canon ingest records --adapter <id>` selection
 /// (S4's own CLI subcommand is explicitly deferred past this
 /// foundation wave).
 pub fn find(adapter_id: &str) -> Option<&'static ArtifactAdapterEntry> {

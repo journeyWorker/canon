@@ -297,6 +297,8 @@ pub struct KindCompaction {
     pub moved: usize,
     /// Total bytes of the superseded files.
     pub bytes: u64,
+    /// The superseded files, relative to the ledger root, sorted (the same under `dry_run`).
+    pub paths: Vec<PathBuf>,
 }
 
 impl GitTier {
@@ -330,7 +332,7 @@ impl GitTier {
     /// Idempotent: a second call finds nothing superseded. Without an
     /// archive ([`archive_root_of`]) it does nothing.
     pub fn compact_kind(&self, kind: RecordKind, dry_run: bool) -> Result<KindCompaction, StoreError> {
-        let mut report = KindCompaction { kind, files: 0, live: 0, superseded: 0, moved: 0, bytes: 0 };
+        let mut report = KindCompaction { kind, files: 0, live: 0, superseded: 0, moved: 0, bytes: 0, paths: Vec::new() };
         if !is_archived_kind(kind) || self.archive_root().is_none() {
             return Ok(report);
         }
@@ -358,7 +360,7 @@ impl GitTier {
             Some((dir, belongs)) => self.scan_dir(kind, &dir, &belongs)?.0,
             None => self.scan_kind(kind)?.0,
         };
-        let mut report = KindCompaction { kind, files: 0, live: 0, superseded: 0, moved: 0, bytes: 0 };
+        let mut report = KindCompaction { kind, files: 0, live: 0, superseded: 0, moved: 0, bytes: 0, paths: Vec::new() };
         self.archive_rows(kind, rows, false, &mut report)?;
         Ok(report.moved)
     }
@@ -376,6 +378,7 @@ impl GitTier {
         for path in &moving {
             report.bytes += std::fs::metadata(self.root().join(path)).map_or(0, |m| m.len());
         }
+        report.paths = moving.iter().cloned().collect();
         if dry_run {
             return Ok(());
         }

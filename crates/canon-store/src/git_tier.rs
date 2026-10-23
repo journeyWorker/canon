@@ -394,6 +394,21 @@ impl GitTier {
     /// hand-tampered file at the SAME path holding DIFFERENT content is
     /// a loud `StoreError::Layout`, never a silent `deduped: true`.
     pub fn write_namespaced(&self, namespaced_kind: &str, natural_key: &str, body: RawRecord) -> Result<NamespacedWriteReceipt, StoreError> {
+        let (receipt, absolute, canonical) = self.plan_namespaced(namespaced_kind, natural_key, &body)?;
+        if !receipt.deduped {
+            crate::atomic::write_atomic(&absolute, &canonical)?;
+        }
+        Ok(receipt)
+    }
+
+    /// What [`GitTier::write_namespaced`] would do, without writing: the
+    /// same validation and the same refusal, and the receipt it would
+    /// return (`deduped` when the identical record is already stored).
+    pub fn check_namespaced(&self, namespaced_kind: &str, natural_key: &str, body: &RawRecord) -> Result<NamespacedWriteReceipt, StoreError> {
+        self.plan_namespaced(namespaced_kind, natural_key, body).map(|(receipt, _, _)| receipt)
+    }
+
+    fn plan_namespaced(&self, namespaced_kind: &str, natural_key: &str, body: &RawRecord) -> Result<(NamespacedWriteReceipt, PathBuf, Vec<u8>), StoreError> {
         crate::partition::validate_namespaced_kind(namespaced_kind)?;
         crate::partition::validate_natural_key(natural_key)?;
         crate::partition::natural_key_matches_body(natural_key, &body.0)?;
@@ -424,17 +439,12 @@ impl GitTier {
                     ),
                 )));
             }
-            return Ok(NamespacedWriteReceipt {
-                namespaced_kind: namespaced_kind.to_string(),
-                location: relative.display().to_string(),
-                digest,
-                deduped: true,
-            });
+            let receipt = NamespacedWriteReceipt { namespaced_kind: namespaced_kind.to_string(), location: relative.display().to_string(), digest, deduped: true };
+            return Ok((receipt, absolute, canonical));
         }
 
-        crate::atomic::write_atomic(&absolute, &canonical)?;
-
-        Ok(NamespacedWriteReceipt { namespaced_kind: namespaced_kind.to_string(), location: relative.display().to_string(), digest, deduped: false })
+        let receipt = NamespacedWriteReceipt { namespaced_kind: namespaced_kind.to_string(), location: relative.display().to_string(), digest, deduped: false };
+        Ok((receipt, absolute, canonical))
     }
 
     /// [`GitTier::write_namespaced`]'s read-side twin (s16 tasks.md

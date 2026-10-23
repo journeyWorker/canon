@@ -30,7 +30,7 @@
 //! `Run.injected_guidance` `StrategyRef`, a promoted
 //! `.canon/strategies/<role>/<id>.md`, and `mart_flywheel_funnel`'s
 //! `retrieved`/`applied` stages resolving across an ordinary `canon
-//! ingest artifacts` (the three joins `crate::ids`' module doc walks
+//! ingest records` (the three joins `crate::ids`' module doc walks
 //! through). Reading the wall clock here would defeat the derived id
 //! outright: `recorded_at` feeds the ULID's own time component.
 

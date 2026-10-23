@@ -177,13 +177,15 @@ fn compaction_is_idempotent_and_the_gate_and_status_say_the_same_after_it() {
     let (gate_before, gate_out_before) = gate(repo);
     let status_before = status_json(repo);
 
-    let dry = canon(repo, &["ledger", "compact", "--dry-run", "--json"]);
-    assert!(dry.status.success(), "{}", out(&dry));
-    assert_eq!(json(&dry)["data"]["dryRun"], true);
-    assert_eq!(json(&dry)["data"]["superseded"], 2, "the implementer's two older records");
-    assert_eq!((json(&dry)["data"]["moved"].as_u64(), ledger_count(repo, "evidence_record")), (Some(0), 4), "a dry run moves nothing");
+    let preview = canon(repo, &["ledger", "compact", "--json"]);
+    assert!(preview.status.success(), "{}", out(&preview));
+    assert_eq!(json(&preview)["data"]["committed"], false);
+    assert_eq!(json(&preview)["data"]["superseded"], 2, "the implementer's two older records");
+    assert_eq!(json(&preview)["data"]["effects"].as_array().unwrap().len(), 2, "one move per superseded file");
+    assert_eq!((json(&preview)["data"]["moved"].as_u64(), ledger_count(repo, "evidence_record")), (Some(0), 4), "a preview moves nothing");
+    let digest = json(&preview)["data"]["planDigest"].as_str().unwrap().to_string();
 
-    let first = canon(repo, &["ledger", "compact", "--json"]);
+    let first = canon(repo, &["ledger", "compact", "--commit", "--plan-digest", &digest, "--json"]);
     assert!(first.status.success(), "{}", out(&first));
     let first = json(&first);
     assert_eq!(first["data"]["moved"], 2);
@@ -196,11 +198,41 @@ fn compaction_is_idempotent_and_the_gate_and_status_say_the_same_after_it() {
     let second = canon(repo, &["ledger", "compact", "--json"]);
     assert_eq!(json(&second)["data"]["moved"], 0, "idempotent");
     assert_eq!(json(&second)["data"]["superseded"], 0);
+    let nothing = json(&second)["data"]["planDigest"].as_str().unwrap().to_string();
+    let again = canon(repo, &["ledger", "compact", "--commit", "--plan-digest", &nothing, "--json"]);
+    assert!(again.status.success(), "{}", out(&again));
+    assert_eq!(json(&again)["data"]["moved"], 0, "a second commit finds nothing to move");
 
     let (gate_after, gate_out_after) = gate(repo);
     assert_eq!((gate_before, &gate_out_before), (gate_after, &gate_out_after), "gate check is unchanged by compaction");
     assert_eq!(status_before, status_json(repo), "status is unchanged by compaction");
     assert_eq!(query_count(repo, "evidence", true), 4, "history still has every version");
+}
+
+#[test]
+fn compaction_commits_only_the_previewed_plan_and_the_old_flag_is_gone() {
+    let dir = repo();
+    let repo = dir.path();
+    for offset in [0, 10, 20] {
+        attest(repo, "impl-agent", "implementer", offset, EvidenceVerdict::Divergent);
+    }
+    inflate(repo);
+    let before = (ledger_count(repo, "evidence_record"), archive_count(repo, "evidence_record"));
+    let preview = canon(repo, &["ledger", "compact", "--json"]);
+    let digest = json(&preview)["data"]["planDigest"].as_str().unwrap().to_string();
+    assert_eq!((ledger_count(repo, "evidence_record"), archive_count(repo, "evidence_record")), before, "a preview moves nothing");
+
+    // A newer version arrives after the preview: the plan is another plan.
+    attest(repo, "impl-agent", "implementer", 30, EvidenceVerdict::Divergent);
+    inflate(repo);
+    let moved = (ledger_count(repo, "evidence_record"), archive_count(repo, "evidence_record"));
+    let stale = canon(repo, &["ledger", "compact", "--commit", "--plan-digest", &digest, "--json"]);
+    assert_eq!(stale.status.code(), Some(2), "{}", out(&stale));
+    assert_eq!(json(&stale)["error"]["code"], "PLAN_CHANGED");
+    assert_eq!((ledger_count(repo, "evidence_record"), archive_count(repo, "evidence_record")), moved, "a stale digest moves nothing");
+
+    assert_eq!(canon(repo, &["ledger", "compact", "--dry-run"]).status.code(), Some(2), "--dry-run is gone");
+    assert_eq!(canon(repo, &["ledger", "compact", "--commit"]).status.code(), Some(2), "--commit needs --plan-digest");
 }
 
 #[test]
@@ -211,7 +243,9 @@ fn migrate_compacts_the_ledger() {
         attest(repo, "impl-agent", "implementer", offset, EvidenceVerdict::Divergent);
     }
     inflate(repo);
-    let migrate = canon(repo, &["migrate"]);
+    let preview = canon(repo, &["migrate"]);
+    let digest = support::preview_digest(&String::from_utf8_lossy(&preview.stdout)).expect("a preview prints its planDigest");
+    let migrate = canon(repo, &["migrate", "--commit", "--plan-digest", &digest]);
     assert!(migrate.status.success(), "{}", out(&migrate));
     assert!(out(&migrate).contains("moved 2 superseded version(s)"), "{}", out(&migrate));
     assert_eq!((ledger_count(repo, "evidence_record"), archive_count(repo, "evidence_record")), (1, 2));

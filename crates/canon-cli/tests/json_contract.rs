@@ -48,7 +48,7 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
     let by_command: BTreeMap<(&str, &str), &str> = BTreeMap::from([
                 (("export", "kind"), "evidence"),
         (("query", "kind"), "evidence"),
-        (("purge", "kind"), "evidence"),
+        (("purge", "kind"), "session"),
         (("change new", "slug"), "another-change"),
         (("dispatch end", "run-outcome"), "succeeded"),
         (("subject new", "id"), "demo-two"),

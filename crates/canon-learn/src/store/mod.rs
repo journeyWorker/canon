@@ -141,7 +141,7 @@ pub trait TrajectoryStore {
     /// `remove_file` on a computed path instead of a tree walk.
     ///
     /// No caller is inconvenienced by that: the only production caller
-    /// (`canon ingest artifacts`' convergence) reads the ids it deletes
+    /// (`canon ingest records`' convergence) reads the ids it deletes
     /// out of [`TrajectoryStore::query_by_regime_key`] for the very
     /// regime it deletes from, so the key is always already in hand.
     ///

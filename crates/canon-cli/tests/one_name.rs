@@ -149,7 +149,9 @@ fn context_capability_14_one_concept_has_one_flag_spelling_across_every_command(
 #[test]
 fn context_capability_15_a_kind_value_never_carries_the_record_suffix() {
     let tree = command_tree();
-    for command in ["query", "export", "purge"] {
+    let purge = &tree.iter().find(|c| c.path == "purge").unwrap().kind_values;
+    assert_eq!(purge, &["session", "run", "event", "trajectory"], "purge takes only the kinds it can remove");
+    for command in ["query", "export"] {
         let values = &tree.iter().find(|c| c.path == command).unwrap().kind_values;
         assert!(values.contains(&"evidence".to_string()) && values.contains(&"strategy_item".to_string()), "{command}: {values:?}");
         assert!(values.iter().all(|v| !v.ends_with("_record")), "{command}: {values:?}");
@@ -234,7 +236,7 @@ fn context_capability_16_a_removed_flag_spelling_is_refused_with_the_flag_that_r
     for (args, old, new) in [
         (&["scenario", "new", "demo.login.01", "--title", "A", "--actor", "alice", "--json"][..], "--actor", "--actor-id"),
         (&["scenario", "new", "demo.login.01", "--title", "A", "--project", "root", "--json"], "--project", "--project-id"),
-        (&["ingest", "artifacts", "--run", "r1", "--json"], "--run", "--run-id"),
+        (&["ingest", "records", "--run", "r1", "--json"], "--run", "--run-id"),
     ] {
         let body = usage_error(&canon_in(repo, args));
         assert_eq!(body["error"]["field"], old, "{args:?}: {body}");
@@ -258,7 +260,7 @@ fn context_capability_17_a_removed_kind_value_is_refused_with_the_value_that_rep
         (&["query", "--kind", "review_record", "--json"][..], "review_record", "review"),
         (&["export", "--kind", "evidence_record", "--json"], "evidence_record", "evidence"),
         (&["query", "--kind=finding_record", "--json"], "finding_record", "finding"),
-        (&["purge", "--kind=session_record", "--before", "2020-01-01T00:00:00Z", "--plan", "--json"], "session_record", "session"),
+        (&["purge", "--kind=session_record", "--before", "2020-01-01T00:00:00Z", "--json"], "session_record", "session"),
     ] {
         let body = usage_error(&canon_in(repo, args));
         assert_eq!(body["error"]["field"], "--kind", "{args:?}: {body}");

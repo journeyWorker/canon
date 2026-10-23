@@ -92,6 +92,13 @@ pub fn kind_parser() -> impl clap::builder::TypedValueParser<Value = RecordKind>
     crate::cli_error::closed_set(visible.collect::<Vec<_>>(), parse_kind)
 }
 
+/// `purge --kind`'s clap parser: the record kinds purge accepts
+/// ([`canon_store::tier::PURGEABLE_KINDS`]), a closed subset of [`kind_parser`]'s.
+pub fn purgeable_kind_parser() -> impl clap::builder::TypedValueParser<Value = RecordKind> {
+    let visible = canon_store::tier::PURGEABLE_KINDS.iter().map(|k| clap::builder::PossibleValue::new(kind_cli_name(*k)));
+    crate::cli_error::closed_set(visible.collect::<Vec<_>>(), parse_kind)
+}
+
 /// `--change-id`'s `clap` value parser — grammar-level `ChangeId::parse`
 /// only; KIND-gating (whether `--change-id` even applies to the queried
 /// `--kind`) happens in [`validate_scope`], not here, so a malformed

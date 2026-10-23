@@ -196,7 +196,7 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     if !unstored.is_empty() {
         advisories.push(advisory(
             "unstored_attachments",
-            format!("{} bound file(s) not in the artifact store; run `canon evidence vault` to store them", unstored.len()),
+            format!("{} bound file(s) not in the artifact store; run `canon artifacts store` to store them", unstored.len()),
             unstored.iter().map(|a| a.line()).collect(),
         ));
     }
@@ -263,7 +263,7 @@ fn format_unstored_attachments(unstored: &[canon_gate::UnstoredAttachment]) -> S
         return String::new();
     }
     let mut out = format!(
-        "\nevidence artifacts: {} bound file(s) not in the artifact store — not failing the gate; run `canon evidence vault` to store them before the working tree changes:\n",
+        "\nevidence artifacts: {} bound file(s) not in the artifact store — not failing the gate; run `canon artifacts store` to store them before the working tree changes:\n",
         unstored.len()
     );
     for attachment in unstored {
@@ -1120,7 +1120,7 @@ fn promotable_kinds() -> String {
 /// `<repo>/.canon/scripts/`, matching spec.md's "a non-donor repo gets a generic
 /// pre-commit script" scenario.
 #[allow(clippy::too_many_arguments)]
-pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, command: &str, timeout: u32, json: bool) -> i32 {
+pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, command: &str, timeout: u32, dry_run: bool, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let entry = HookEntry::new(event, matcher.map(str::to_string), command, timeout);
 
@@ -1129,13 +1129,13 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
 
     let already_has_canon_gate_command = any_canon_gate_command(&read_json_or_default(&claude_path)) || any_canon_gate_command(&read_json_or_default(&codex_path));
 
-    let claude_outcome = match install_into(&claude_path, &entry) {
+    let claude_outcome = match install_into(&claude_path, &entry, dry_run) {
         Ok(o) => o,
         Err(e) => {
             return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
         }
     };
-    let codex_outcome = match install_into(&codex_path, &entry) {
+    let codex_outcome = match install_into(&codex_path, &entry, dry_run) {
         Ok(o) => o,
         Err(e) => {
             return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
@@ -1146,22 +1146,24 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
     if !already_has_canon_gate_command {
         let script_path = repo.join(paths::PRE_COMMIT_SCRIPT);
         if !script_path.exists() {
-            if let Err(e) = write_pre_commit_script(&script_path) {
-                return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", script_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon gate install-hooks", json);
+            if !dry_run {
+                if let Err(e) = write_pre_commit_script(&script_path) {
+                    return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", script_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon gate install-hooks", json);
+                }
             }
             script_written = true;
-            crate::say!(json, "canon gate install-hooks: wrote {}", script_path.display());
+            crate::say!(json, "canon gate install-hooks: {} {}", if dry_run { "would write" } else { "wrote" }, script_path.display());
         }
     }
 
     let changed = !matches!((claude_outcome, codex_outcome), (InstallOutcome::Unchanged, InstallOutcome::Unchanged));
     if changed {
-        crate::say!(json, "canon gate install-hooks: installed");
+        crate::say!(json, "canon gate install-hooks: {}", if dry_run { "would install" } else { "installed" });
     } else {
         crate::say!(json, "canon gate install-hooks: no diff, nothing written");
     }
     if json {
-        crate::json_out::data("gate install-hooks", &crate::json_out::untyped(serde_json::json!({ "installed": changed, "preCommitScriptWritten": script_written })));
+        crate::json_out::data("gate install-hooks", &crate::json_out::untyped(serde_json::json!({ "dryRun": dry_run, "installed": changed, "preCommitScriptWritten": script_written })));
     }
     0
 }
@@ -1179,10 +1181,13 @@ fn any_canon_gate_command(settings: &serde_json::Value) -> bool {
     })
 }
 
-fn install_into(path: &Path, entry: &HookEntry) -> std::io::Result<InstallOutcome> {
+fn install_into(path: &Path, entry: &HookEntry, dry_run: bool) -> std::io::Result<InstallOutcome> {
     let mut settings = read_json_or_default(path);
     let outcome = install_hooks(&mut settings, entry);
-    if matches!(outcome, InstallOutcome::Installed) {
+    if dry_run && matches!(outcome, InstallOutcome::Installed) {
+        crate::write_mode::check_creatable(path, true)?;
+    }
+    if matches!(outcome, InstallOutcome::Installed) && !dry_run {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }

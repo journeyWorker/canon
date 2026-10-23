@@ -5,4 +5,4 @@ canon migrate: plan:
   canon.yaml: every other byte kept
   rebuild the scenario index (full sync)
   left: 1 openspec change(s) not written by `canon change new` stay where they are, read as an external plan: c-checkout
-canon migrate: --dry-run, nothing written
+planDigest 06a218b925d1e6f9c6f8c0962cf022e50f829c8f8ee04c3d1f5e1b8267d31bfd; nothing written. To act: canon migrate --commit --plan-digest 06a218b925d1e6f9c6f8c0962cf022e50f829c8f8ee04c3d1f5e1b8267d31bfd

@@ -75,27 +75,23 @@ pub fn run(cli: Cli) -> ExitCode {
         Command::Query(QueryArgs { kind, since, repo, json, plugin_id, history, change_id, status, domain, include_sensitive, page, fields }) => {
             run_query(&repo, kind, since, json, plugin_id, history, change_id, status, domain, include_sensitive, page.page(), fields)
         }
-        Command::Export(ExportArgs { kind, before, after, output, repo, json, include_sensitive, page, fields }) => ExitCode::from(crate::retention::run_export(&repo, kind, before, after, output.as_deref(), json, include_sensitive, &page.page(), fields.as_deref())),
-        Command::Purge(PurgeArgs { kind, before, repo, plan, confirm, json }) => {
-            let mode = match (plan, confirm) {
-                (_, Some(digest)) => Some(crate::retention::PurgeMode::Confirm(digest)),
-                (true, None) => Some(crate::retention::PurgeMode::Plan),
-                (false, None) => None,
-            };
-            ExitCode::from(crate::retention::run_purge(&repo, kind, before, mode, json))
+        Command::Export(ExportArgs { kind, before, after, output, repo, json, include_sensitive, page, fields, dry_run }) => ExitCode::from(crate::retention::run_export(&repo, kind, before, after, output.as_deref(), json, include_sensitive, &page.page(), fields.as_deref(), dry_run.dry_run)),
+        Command::Purge(PurgeArgs { kind, before, safety, repo, json }) => {
+            let base = crate::safety::command("purge", &[("--kind", crate::query::kind_cli_name(kind).to_string()), ("--before", before.to_rfc3339())], &repo);
+            ExitCode::from(crate::retention::run_purge(&repo, kind, before, &safety.mode(), &base, json))
         }
         Command::Format(FormatArgs { dir, repo, json }) => run_fmt(dir.as_deref(), &repo, json),
         Command::Context(ContextArgs { repo, json, fields }) => run_context(&repo, json, fields),
         Command::Status(StatusArgs { repo, json, fields }) => ExitCode::from(crate::status::run(&repo, json, fields.as_deref()) as u8),
-        Command::Init(InitArgs { repo, check, no_agents_md, policy, no_policy, providers, language, json }) => {
+        Command::Init(InitArgs { repo, check, no_agents_md, policy, no_policy, providers, language, dry_run, json }) => {
             let policy = (!no_policy).then(|| policy.unwrap_or(crate::policy_level::PolicyLevel::Strict));
             let skills = match providers {
                 Some(list) => crate::init::SkillsChoice::Providers(list),
                 None => crate::init::SkillsChoice::Ask,
             };
-            run_init(&repo, check, crate::init::InitOptions { agents_md: !no_agents_md, policy, skills, language }, json)
+            run_init(&repo, check, crate::init::InitOptions { agents_md: !no_agents_md, policy, skills, language, dry_run: dry_run.dry_run }, json)
         }
-        Command::Migrate(MigrateArgs { repo, dry_run, json }) => ExitCode::from(crate::migrate::run(&repo, dry_run, json) as u8),
+        Command::Migrate(MigrateArgs { repo, safety, json }) => ExitCode::from(crate::migrate::run(&repo, &safety.mode(), json) as u8),
         Command::Retrieve(RetrieveArgs { for_role, regime, domain, subject_id, limit, repo, json }) => run_retrieve(&repo, &for_role, regime.as_ref(), domain.as_deref(), subject_id.as_ref(), limit, json),
         Command::Dashboard(DashboardArgs { repo, snapshot, port, json }) => run_dashboard(&repo, snapshot.as_deref(), port, json),
         Command::Selftest(SelftestArgs { suite, json }) => crate::selftest::run_selftest(suite.as_deref(), json),

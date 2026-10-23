@@ -1,4 +1,4 @@
-//! End-to-end integration test for `canon ingest artifacts [--repo]
+//! End-to-end integration test for `canon ingest records [--repo]
 //! [--watch]` (S14 `s14-artifact-ingest-cli`), invoking the actually-
 //! built `canon` binary against an offline fixture repo seeded with
 //! BOTH source shapes the driver must feed differently:
@@ -216,8 +216,8 @@ fn ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_re
     let repo = build_fixture_repo(tmp.path());
 
     // ── Run the actually-built `canon` binary. ──
-    let output = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo);
-    assert!(output.status.success(), "canon ingest artifacts must exit 0; stderr: {}", stderr(&output));
+    let output = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
+    assert!(output.status.success(), "canon ingest records must exit 0; stderr: {}", stderr(&output));
 
     let payload: Value = data_of(&stdout(&output));
 
@@ -298,7 +298,7 @@ fn ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_re
 }
 
 /// s42 (`close-the-open-loops`) task 3.2, end to end through the actual
-/// binary: `canon ingest artifacts --run-id <RunId>` stamps that run onto
+/// binary: `canon ingest records --run-id <RunId>` stamps that run onto
 /// the trajectory it writes, and the value survives all the way into
 /// canon-learn's parquet `body` — which is where
 /// `mart_flywheel_funnel`'s attribution stage reads it from.
@@ -316,7 +316,7 @@ fn ingest_artifacts_stamps_the_dispatched_run_it_was_given_and_rejects_one_it_wa
 
     // A well-formed ULID that no `canon dispatch begin` ever minted here.
     let unknown_run = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
-    let rejected = run_canon(&["ingest", "artifacts", "--repo", ".", "--run-id", unknown_run], &repo);
+    let rejected = run_canon(&["ingest", "records", "--repo", ".", "--run-id", unknown_run], &repo);
     assert!(!rejected.status.success(), "an unknown --run-id must fail the whole pass; stdout: {}", stdout(&rejected));
     assert!(
         stderr(&rejected).contains(unknown_run) && stderr(&rejected).contains("dispatch"),
@@ -335,8 +335,8 @@ fn ingest_artifacts_stamps_the_dispatched_run_it_was_given_and_rejects_one_it_wa
     let begun_payload: Value = data_of(&stdout(&begun));
     let run_id = begun_payload["run_id"].as_str().expect("run_id string").to_string();
 
-    let ingested = run_canon(&["ingest", "artifacts", "--repo", ".", "--run-id", &run_id, "--json"], &repo);
-    assert!(ingested.status.success(), "canon ingest artifacts --run-id must exit 0; stderr: {}", stderr(&ingested));
+    let ingested = run_canon(&["ingest", "records", "--repo", ".", "--run-id", &run_id, "--json"], &repo);
+    assert!(ingested.status.success(), "canon ingest records --run-id must exit 0; stderr: {}", stderr(&ingested));
     let payload: Value = data_of(&stdout(&ingested));
     let persisted = payload["trajectoriesPersisted"].as_array().expect("trajectories_persisted array");
     assert_eq!(persisted.len(), 1, "one regime-keyed trajectory persisted: {payload}");
@@ -353,7 +353,7 @@ fn ingest_artifacts_stamps_the_dispatched_run_it_was_given_and_rejects_one_it_wa
 }
 
 /// S4 tasks.md group 6 (write-time idempotence): a SECOND `canon
-/// ingest artifacts` pass over an UNCHANGED corpus must persist ZERO
+/// ingest records` pass over an UNCHANGED corpus must persist ZERO
 /// new trajectories — `crate::artifact_ingest::run`'s existence check
 /// (`trajectory_content_digest`: the identity-shape version, the
 /// `regime_key`, the ordered `VerdictRow` contents, and the RENDERED
@@ -362,7 +362,7 @@ fn ingest_artifacts_stamps_the_dispatched_run_it_was_given_and_rejects_one_it_wa
 /// double-writing the SAME evidence into `ParquetTrajectoryStore` —
 /// the genuine data-corruption bug this test guards against (an
 /// unbounded re-run would otherwise silently double verdict/mart
-/// counts every time `canon ingest artifacts` is re-invoked over an
+/// counts every time `canon ingest records` is re-invoked over an
 /// unchanged repo, e.g. a cron/CI re-run).
 #[test]
 fn a_second_ingest_over_an_unchanged_corpus_persists_zero_new_trajectories() {
@@ -370,8 +370,8 @@ fn a_second_ingest_over_an_unchanged_corpus_persists_zero_new_trajectories() {
     let repo = build_fixture_repo(tmp.path());
 
     // ── First pass: the baseline write. ──
-    let first = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo);
-    assert!(first.status.success(), "first canon ingest artifacts must exit 0; stderr: {}", stderr(&first));
+    let first = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
+    assert!(first.status.success(), "first canon ingest records must exit 0; stderr: {}", stderr(&first));
     let first_payload: Value = data_of(&stdout(&first));
     assert_eq!(first_payload["trajectoriesPersisted"].as_array().unwrap().len(), 1, "{first_payload}");
     assert_eq!(first_payload["trajectoriesSkippedDuplicate"], 0, "{first_payload}");
@@ -385,8 +385,8 @@ fn a_second_ingest_over_an_unchanged_corpus_persists_zero_new_trajectories() {
     let first_id = after_first[0].id;
 
     // ── Second pass over the SAME, unchanged corpus. ──
-    let second = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo);
-    assert!(second.status.success(), "second canon ingest artifacts must exit 0; stderr: {}", stderr(&second));
+    let second = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
+    assert!(second.status.success(), "second canon ingest records must exit 0; stderr: {}", stderr(&second));
     let second_payload: Value = data_of(&stdout(&second));
 
     // No NEW trajectory persisted, no verdict double-counted.
@@ -431,7 +431,7 @@ fn an_unrouted_handoff_source_degrades_to_unavailable_without_aborting_the_rest_
     std::fs::write(repo.join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n\nartifacts:\n  ledger_root: fixtures/ledger\n").unwrap();
     plant_ledger_code_review_finding(&repo.join("fixtures/ledger"));
 
-    let output = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo);
+    let output = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(output.status.success(), "stderr: {}", stderr(&output));
 
     let payload: Value = data_of(&stdout(&output));
@@ -478,7 +478,7 @@ fn a_malformed_learn_config_fails_loud_instead_of_silently_defaulting() {
     )
     .unwrap();
 
-    let output = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo);
+    let output = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(
         !output.status.success(),
         "a malformed `learn:` section must exit nonzero, never silently succeed: stdout: {} stderr: {}",
@@ -504,7 +504,7 @@ fn a_malformed_learn_config_fails_loud_instead_of_silently_defaulting() {
 #[test]
 fn ingest_artifacts_help_smoke() {
     let tmp = tempfile::tempdir().unwrap();
-    let output = run_canon(&["ingest", "artifacts", "--help"], tmp.path());
+    let output = run_canon(&["ingest", "records", "--help"], tmp.path());
     assert!(output.status.success());
     assert!(stdout(&output).contains("--repo"));
     assert!(stdout(&output).contains("--watch"));
@@ -524,7 +524,7 @@ fn native_flywheel_review_and_divergence_resolved_in_same_run_both_produce_traje
     let tmp = tempfile::tempdir().unwrap();
     let repo = build_native_flywheel_repo(tmp.path());
 
-    let output = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo);
+    let output = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(output.status.success(), "stderr: {}", stderr(&output));
     let payload: Value = data_of(&stdout(&output));
 
@@ -598,7 +598,7 @@ fn native_records_true_with_a_raw_path_fails_the_xor_before_any_read() {
     .unwrap();
     plant_ledger_code_review_finding(&repo.join("fixtures/ledger"));
 
-    let output = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo);
+    let output = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(
         !output.status.success(),
         "native_records:true + ledger_root must fail before any read, never silently succeed: stdout: {} stderr: {}",
@@ -644,11 +644,11 @@ fn handoff_adapter_is_unaffected_by_the_native_records_switch() {
     .unwrap();
     plant_handoff_in_git(&repo_on.join(".canon/ledger"));
 
-    let off = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo_off);
+    let off = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo_off);
     assert!(off.status.success(), "stderr: {}", stderr(&off));
     let off_payload: Value = data_of(&stdout(&off));
 
-    let on = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo_on);
+    let on = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo_on);
     assert!(on.status.success(), "stderr: {}", stderr(&on));
     let on_payload: Value = data_of(&stdout(&on));
 

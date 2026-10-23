@@ -166,8 +166,7 @@ fn one_shot_override_requires_both_flags_dialect_alone_fails() {
     write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\n");
 
     let output = run_canon(&["ingest", "plans", "--dialect", "openspec"], dir.path());
-    assert!(!output.status.success(), "`--dialect` without `--source` must fail loud");
-    assert!(stderr(&output).contains("together"), "stderr: {}", stderr(&output));
+    assert_eq!(output.status.code(), Some(2), "`--dialect` without `--plan-source` is a usage error");
 }
 
 #[test]
@@ -175,9 +174,8 @@ fn one_shot_override_requires_both_flags_source_alone_fails() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\n");
 
-    let output = run_canon(&["ingest", "plans", "--source", "."], dir.path());
-    assert!(!output.status.success(), "`--source` without `--dialect` must fail loud");
-    assert!(stderr(&output).contains("together"), "stderr: {}", stderr(&output));
+    let output = run_canon(&["ingest", "plans", "--plan-source", "."], dir.path());
+    assert_eq!(output.status.code(), Some(2), "`--plan-source` without `--dialect` is a usage error");
 }
 
 #[test]
@@ -185,7 +183,7 @@ fn one_shot_override_with_an_unknown_dialect_fails_loud() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\n");
 
-    let output = run_canon(&["ingest", "plans", "--dialect", "no-such-dialect", "--source", "."], dir.path());
+    let output = run_canon(&["ingest", "plans", "--dialect", "no-such-dialect", "--plan-source", "."], dir.path());
     assert!(!output.status.success());
     let err = stderr(&output);
     assert!(err.contains("no-such-dialect") && err.contains("openspec"), "stderr: {err}");
@@ -197,7 +195,7 @@ fn one_shot_override_bypasses_config_and_imports_the_given_source() {
     write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\n");
     write_change_dir(dir.path(), "add-widget", "Adds a widget.", &["- [x] 1.1 wire it — ✅ done", "- [ ] 1.2 ship it"]);
 
-    let json = ingest_json(dir.path(), &["--dialect", "openspec", "--source", "."]);
+    let json = ingest_json(dir.path(), &["--dialect", "openspec", "--plan-source", "."]);
     assert_eq!(json["changesPersisted"], 1, "{json}");
     assert_eq!(json["tasksPersisted"], 2, "{json}");
 }
@@ -269,12 +267,12 @@ fn one_shot_source_dot_at_repo_root_excludes_its_own_ledger_and_cursor_output_fr
     write_canon_yaml(dir.path(), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n  task: local\n");
     write_change_dir(dir.path(), "add-widget", "Adds a widget.", &["- [x] 1.1 wire it — ✅ done", "- [ ] 1.2 ship it"]);
 
-    let first = ingest_json(dir.path(), &["--dialect", "openspec", "--source", "."]);
+    let first = ingest_json(dir.path(), &["--dialect", "openspec", "--plan-source", "."]);
     assert_eq!(first["changesPersisted"], 1, "{first}");
     assert_eq!(first["tasksPersisted"], 2, "{first}");
     assert_eq!(first["sources"][0]["cursorAdvanced"], true, "{first}");
 
-    let second = ingest_json(dir.path(), &["--dialect", "openspec", "--source", "."]);
+    let second = ingest_json(dir.path(), &["--dialect", "openspec", "--plan-source", "."]);
     assert_eq!(
         second["changesPersisted"], 0,
         "the importer's own ledger+cursor output must be excluded from its own digest, or a `--source .` root self-churns forever: {second}"
@@ -536,7 +534,7 @@ fn ingest_plans_help_smoke() {
     assert!(output.status.success());
     let text = stdout(&output);
     assert!(text.contains("--dialect"));
-    assert!(text.contains("--source"));
+    assert!(text.contains("--plan-source"));
     assert!(text.contains("--repo"));
     assert!(text.contains("--json"));
 }
@@ -730,7 +728,7 @@ fn superpowers_dialect_end_to_end_import_via_one_shot_override() {
         &[("Task 1: Adapter", &["- [x] step one", "- [x] step two"]), ("Task 2: Docs", &["- [x] step one", "- [ ] step two"])],
     );
 
-    let json = ingest_json(dir.path(), &["--dialect", "superpowers", "--source", "plans"]);
+    let json = ingest_json(dir.path(), &["--dialect", "superpowers", "--plan-source", "plans"]);
     assert_eq!(json["changesPersisted"], 1, "{json}");
     assert_eq!(json["tasksPersisted"], 2, "{json}");
 

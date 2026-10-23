@@ -70,11 +70,11 @@ pub fn path(cmd: &Command) -> &'static str {
             EvidenceCommand::ApprovalPayload(_) => "evidence approval-payload",
             EvidenceCommand::Add(_) => "evidence add",
             EvidenceCommand::Audit(_) => "evidence audit",
-            EvidenceCommand::Vault(_) => "evidence vault",
         },
         Command::Artifacts { action } => match action {
             ArtifactsCommand::Verify(_) => "artifacts verify",
-            ArtifactsCommand::Migrate(_) => "artifacts migrate",
+            ArtifactsCommand::Store(_) => "artifacts store",
+            ArtifactsCommand::Move(_) => "artifacts move",
         },
         Command::Finding { action } => match action {
             FindingCommand::Add(_) => "finding add",
@@ -94,7 +94,7 @@ pub fn path(cmd: &Command) -> &'static str {
         },
         Command::Ingest { action } => match action {
             IngestCommand::Sessions(_) => "ingest sessions",
-            IngestCommand::Artifacts(_) => "ingest artifacts",
+            IngestCommand::Records(_) => "ingest records",
             IngestCommand::Plans(_) => "ingest plans",
         },
         Command::Retrieve(_) => "retrieve",

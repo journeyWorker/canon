@@ -274,16 +274,18 @@ fn find_change(registry: &TierRegistry, id: &ChangeId) -> Result<Option<Change>,
 /// Report a written subject: `human` and the `next:` line, or on `--json`
 /// the full record body (the updated record) with `meta.next` for the
 /// subject.
-fn report_subject(repo: &Path, subject: &Subject, verb: &str, json: bool, human: &str) {
-    report_subject_warning(repo, subject, verb, json, human, &[]);
+fn report_subject(repo: &Path, subject: &Subject, verb: &str, dry_run: bool, json: bool, human: &str) {
+    report_subject_warning(repo, subject, verb, dry_run, json, human, &[]);
 }
 
 /// [`report_subject`] with `warnings`: said on stderr, and in `--json`
 /// carried in `meta.warnings` ([`crate::json_out::warnings_meta`]).
+#[allow(clippy::too_many_arguments)]
 fn report_subject_warning(
     repo: &Path,
     subject: &Subject,
     verb: &str,
+    dry_run: bool,
     json: bool,
     human: &str,
     warnings: &[String],
@@ -294,14 +296,15 @@ fn report_subject_warning(
     for warning in warnings {
         crate::human_err!("canon subject {verb}: warning: {warning}");
     }
-    crate::next::finish_with_meta(
-        repo,
-        &format!("subject {verb}"),
-        &crate::next::Scope::Subject(subject.subject_id.as_str().to_string()),
-        false,
-        json,
-        &SubjectReport(subject),
-        crate::json_out::warnings_meta(warnings));
+    let scope = crate::next::Scope::Subject(subject.subject_id.as_str().to_string());
+    if dry_run {
+        // A preview marks itself: the subject as it would stand, plus `dryRun`.
+        let mut data = serde_json::to_value(subject).expect("a subject serializes");
+        data.as_object_mut().expect("a subject is an object").insert("dryRun".to_string(), serde_json::Value::Bool(true));
+        crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &crate::json_out::untyped(data), crate::json_out::warnings_meta(warnings));
+    } else {
+        crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &SubjectReport(subject), crate::json_out::warnings_meta(warnings));
+    }
 }
 
 /// `data` of the subject leaves: the Subject record, embedded verbatim (it keeps the ledger record's own schema and snake_case keys).
@@ -426,7 +429,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
     match registry.persist(&subject) {
         Ok(_) => {
             let human = format!("canon subject new: {} ({}, {}) — {}", subject.subject_id.as_str(), subject.domain, status_str(subject.status), crate::write_mode::DIRECT);
-            report_subject(&repo, &subject, "new", json, &human);
+            report_subject(&repo, &subject, "new", false, json, &human);
             0
         }
         Err(e) => {
@@ -442,26 +445,27 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
 /// may belong to several subjects (0.18 D4): adopting it under a second
 /// one adds that subject and says the change now belongs to each, never
 /// re-points it.
-pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json: bool) -> i32 {
-    match adopt_change(repo, change_id, subject_id) {
+pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_run: bool, json: bool) -> i32 {
+    match adopt_change(repo, change_id, subject_id, dry_run) {
         Ok((subject, owners, wrote)) => {
+            let (link, now_belongs) = if dry_run { ("would link", "would belong") } else { ("linked", "now belongs") };
+            let mode = if dry_run { "dry run, nothing written" } else { crate::write_mode::DIRECT };
             let human = if wrote && owners.len() > 1 {
                 format!(
-                    "canon subject adopt: linked change `{}` to subject `{}` as well; the change now belongs to {} — {}",
+                    "canon subject adopt: {link} change `{}` to subject `{}` as well; the change {now_belongs} to {} — {mode}",
                     change_id.as_str(),
                     subject_id.as_str(),
                     quoted_list(&owners),
-                    crate::write_mode::DIRECT
                 )
             } else if wrote {
-                format!("canon subject adopt: linked change `{}` to subject `{}` — {}", change_id.as_str(), subject_id.as_str(), crate::write_mode::DIRECT)
+                format!("canon subject adopt: {link} change `{}` to subject `{}` — {mode}", change_id.as_str(), subject_id.as_str())
             } else {
                 format!("canon subject adopt: change `{}` is already linked to subject `{}`; nothing written", change_id.as_str(), subject_id.as_str())
             };
             let warnings: Vec<String> = crate::brief::adoption_warning(repo, &subject, change_id)
                 .into_iter()
                 .collect();
-            report_subject_warning(repo, &subject, "adopt", json, &human, &warnings);
+            report_subject_warning(repo, &subject, "adopt", dry_run, json, &human, &warnings);
             0
         }
         Err(e) => {
@@ -474,16 +478,17 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json
 /// the link [`run_adopt`] made back, on both sides. Refused for a change
 /// whose canon brief carries an `Approved:` line: it is the subject's
 /// approved scope. An unlinked pair writes nothing and exits `0`.
-pub fn run_unadopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, json: bool) -> i32 {
-    match unadopt_change(repo, change_id, subject_id) {
+pub fn run_unadopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_run: bool, json: bool) -> i32 {
+    match unadopt_change(repo, change_id, subject_id, dry_run) {
         Ok(UnadoptOutcome::Refused(message, hint)) => CliError::refused("SUBJECT_UNADOPT_REFUSED", message).hint(hint).emit("canon subject unadopt", json),
         Ok(UnadoptOutcome::Done(subject, wrote)) => {
             let human = if wrote {
-                format!("canon subject unadopt: unlinked change `{}` from subject `{}` — {}", change_id.as_str(), subject_id.as_str(), crate::write_mode::DIRECT)
+                let (unlink, mode) = if dry_run { ("would unlink", "dry run, nothing written") } else { ("unlinked", crate::write_mode::DIRECT) };
+                format!("canon subject unadopt: {unlink} change `{}` from subject `{}` — {mode}", change_id.as_str(), subject_id.as_str())
             } else {
                 format!("canon subject unadopt: change `{}` is not linked to subject `{}`; nothing written", change_id.as_str(), subject_id.as_str())
             };
-            report_subject(repo, &subject, "unadopt", json, &human);
+            report_subject(repo, &subject, "unadopt", dry_run, json, &human);
             0
         }
         Err(e) => CliError::refused("SUBJECT_ADOPT_REFUSED", e).hint("fix what the message names, then run `canon subject unadopt` again").emit("canon subject unadopt", json),
@@ -506,6 +511,7 @@ fn unadopt_change(
     repo: &Path,
     change_id: &ChangeId,
     subject_id: &SubjectId,
+    dry_run: bool,
 ) -> Result<UnadoptOutcome, String> {
     let (subject, change) = lookup_adoption(repo, subject_id, change_id)?;
     let Some(mut subject) = subject else {
@@ -563,15 +569,20 @@ fn unadopt_change(
     if on_subject {
         subject.change_ids.retain(|id| id != change_id);
         subject.envelope.at = now;
-        registry
-            .persist(&subject)
-            .map_err(|e| format!("failed to record the unadoption: {e}; nothing was written"))?;
+        if dry_run {
+            registry.check_persist::<Subject>().map_err(|e| format!("failed to record the unadoption: {e}; nothing was written"))?;
+        } else {
+            registry
+                .persist(&subject)
+                .map_err(|e| format!("failed to record the unadoption: {e}; nothing was written"))?;
+        }
     }
     if on_change {
         change.subject_ids.retain(|id| id != subject_id);
         change.envelope.at = now;
         change.envelope.schema = RecordKind::Change.schema_version();
-        registry.persist(&change).map_err(|e| {
+        let written = if dry_run { registry.check_persist::<Change>() } else { registry.persist(&change).map(drop) };
+        written.map_err(|e| {
             format!(
                 "subject `{}` no longer lists change `{}`, but the change record could not be written: {e}; complete the unlink with `canon subject unadopt {} --change-id {}`",
                 subject_id.as_str(),
@@ -613,7 +624,7 @@ fn quoted_list(ids: &[SubjectId]) -> String {
 /// the write. `Ok` carries the subject, every subject the change now
 /// belongs to ([`change_owners`]), and whether anything was written
 /// (`false`: both sides already carried the link).
-pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId) -> Result<(Subject, Vec<SubjectId>, bool), String> {
+pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_run: bool) -> Result<(Subject, Vec<SubjectId>, bool), String> {
     let (subject, change) = lookup_adoption(repo, subject_id, change_id)?;
     let Some(subject) = subject else {
         return Err(format!("subject `{}` does not exist (author it with `canon subject new` first)", subject_id.as_str()));
@@ -621,8 +632,9 @@ pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &Subje
     let Some(change) = change else {
         return Err(format!("change `{}` does not exist (import it with `canon ingest plans` first)", change_id.as_str()));
     };
+    let adopted = if dry_run { preview_adoption(repo, change, subject) } else { persist_adoption(repo, change, subject) };
     let (subject, change, wrote) =
-        persist_adoption(repo, change, subject).map_err(|e| e.describe(change_id, subject_id, &adopt_command(change_id, subject_id)))?;
+        adopted.map_err(|e| e.describe(change_id, subject_id, &adopt_command(change_id, subject_id)))?;
     // The write is done; an owner list that cannot be read falls back to
     // the change's own side rather than reporting a written adoption as
     // refused.
@@ -745,6 +757,28 @@ pub(crate) fn persist_adoption(repo: &Path, mut change: Change, mut subject: Sub
         change.envelope.at = now;
         change.envelope.schema = RecordKind::Change.schema_version();
         registry.persist(&change).map_err(|e| AdoptionWriteError { subject_written: needs_subject, message: e.to_string() })?;
+    }
+    Ok((subject, change, true))
+}
+
+/// [`persist_adoption`] under `--dry-run`: the same decision and the same
+/// tier refusals, the records as they would stand, nothing written.
+fn preview_adoption(repo: &Path, mut change: Change, mut subject: Subject) -> Result<(Subject, Change, bool), AdoptionWriteError> {
+    let needs_subject = !subject.change_ids.contains(&change.change_id);
+    let needs_change = !change.subject_ids.contains(&subject.subject_id);
+    if !needs_subject && !needs_change {
+        return Ok((subject, change, false));
+    }
+    let repo = resolve_repo_root(repo);
+    let registry = registry_for(&resolve_canon_yaml(&repo), &[RecordKind::Change, RecordKind::Subject])
+        .map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
+    if needs_subject {
+        registry.check_persist::<Subject>().map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
+        subject.change_ids.push(change.change_id.clone());
+    }
+    if needs_change {
+        registry.check_persist::<Change>().map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
+        change.subject_ids.push(subject.subject_id.clone());
     }
     Ok((subject, change, true))
 }
@@ -986,7 +1020,7 @@ pub fn run_move(
 
     match registry.persist(&subject) {
         Ok(_) => {
-            report_subject_warning(&repo, &subject, "move", json, &format!("canon subject move: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT), &pending_note);
+            report_subject_warning(&repo, &subject, "move", false, json, &format!("canon subject move: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT), &pending_note);
             0
         }
         Err(e) => {

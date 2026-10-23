@@ -128,12 +128,12 @@ fn a_missing_or_altered_review_artifact_is_stale_evidence_naming_the_review() {
     let stale = |file: &str| out.lines().any(|l| l.contains("game.title.01") && l.contains(file) && l.contains("reviewer-2"));
     assert!(stale("reports/title.png"), "a missing blob with a changed working-tree file is stale:\n{out}");
     assert!(stale("reports/hud.webm"), "an altered blob is stale:\n{out}");
-    assert!(!out.contains("canon evidence vault"), "neither file is vouched for by the working tree:\n{out}");
+    assert!(!out.contains("canon artifacts store"), "neither file is vouched for by the working tree:\n{out}");
 }
 
 /// review.add.90 (0.18 D5, #36): a lost review blob whose working-tree
 /// file still matches is a vault advisory, as for evidence; `canon
-/// evidence vault` stores it back. Once the working-tree file changes too,
+/// artifacts store` stores it back. Once the working-tree file changes too,
 /// it is `stale-evidence`.
 #[test]
 fn a_lost_review_blob_with_a_matching_working_tree_is_a_vault_advisory() {
@@ -146,15 +146,15 @@ fn a_lost_review_blob_with_a_matching_working_tree_is_a_vault_advisory() {
     assert!(gate.status.success(), "a matching working tree vouches for a lost review blob: {}", text(&gate));
     let out = text(&gate);
     assert!(!out.contains("stale-evidence"), "{out}");
-    assert!(out.contains("not failing the gate; run `canon evidence vault`"), "{out}");
+    assert!(out.contains("not failing the gate; run `canon artifacts store`"), "{out}");
     let advisory = format!("  unstored game.title.01 reports/title.png (sha256 {}, review by `reviewer-2`) is verified against the working tree only", sha(TITLE));
     assert!(out.contains(&advisory), "{out}\nexpected: {advisory}");
 
-    let vault = ok(repo, &["evidence", "vault"]);
+    let vault = ok(repo, &["artifacts", "store"]);
     assert!(vault.contains("stored 1, already stored 0, could not store 0"), "{vault}");
     assert_eq!(std::fs::read(blob(repo, TITLE)).unwrap(), TITLE);
     let gate = ok(repo, &["gate", "check"]);
-    assert!(!gate.contains("canon evidence vault"), "the stored blob clears the advisory: {gate}");
+    assert!(!gate.contains("canon artifacts store"), "the stored blob clears the advisory: {gate}");
 
     std::fs::remove_file(blob(repo, TITLE)).unwrap();
     std::fs::write(repo.join("reports/title.png"), b"a later capture").unwrap();
@@ -252,9 +252,9 @@ fn a_stale_review_superseded_by_another_reviewers_newer_review_is_not_checked() 
     // the vault stores only the current review's file (already stored).
     std::fs::remove_file(blob(repo, TITLE)).unwrap();
     let gate = ok(repo, &["gate", "check"]);
-    assert!(!gate.contains("reports/title.png") && !gate.contains("canon evidence vault"), "{gate}");
-    let vault = ok(repo, &["evidence", "vault"]);
-    assert!(vault.contains("canon evidence vault: 1 bound file(s) — stored 0, already stored 1, could not store 0"), "{vault}");
+    assert!(!gate.contains("reports/title.png") && !gate.contains("canon artifacts store"), "{gate}");
+    let vault = ok(repo, &["artifacts", "store"]);
+    assert!(vault.contains("canon artifacts store: 1 bound file(s) — stored 0, already stored 1, could not store 0"), "{vault}");
     assert!(!blob(repo, TITLE).exists(), "a superseded review's file is not vaulted");
 
     std::fs::write(repo.join("reports/title.png"), b"a later capture").unwrap();

@@ -27,6 +27,8 @@ pub struct SkillsInstallArgs {
     /// projected to `.agents/skills/canon/`.
     #[arg(long)]
     pub providers: Option<String>,
+    #[command(flatten)]
+    pub dry_run: crate::cli::DryRunArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,

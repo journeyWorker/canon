@@ -498,7 +498,7 @@ fn write_lock(source_dir: &Path, lock: &Lock) -> Result<(), SkillsError> {
     write_file(&source_dir.join(".install-lock.json"), &json)
 }
 
-fn install_legacy(source_dir: &Path, target_dir: &Path) -> Result<InstallReport, SkillsError> {
+fn install_legacy(source_dir: &Path, target_dir: &Path, dry_run: bool) -> Result<InstallReport, SkillsError> {
     let discovered = discover_skills(source_dir)?;
     let previous_lock = load_lock(source_dir)?;
     let mut new_skills = BTreeMap::new();
@@ -517,7 +517,7 @@ fn install_legacy(source_dir: &Path, target_dir: &Path) -> Result<InstallReport,
                 version,
             },
         );
-        for provider in [Provider::Claude, Provider::Codex] {
+        for provider in [Provider::Claude, Provider::Codex].into_iter().filter(|_| !dry_run) {
             write_file_under(
                 target_dir,
                 &provider_skill_root(target_dir, provider)
@@ -533,7 +533,9 @@ fn install_legacy(source_dir: &Path, target_dir: &Path) -> Result<InstallReport,
         });
     }
     let lock = Lock { skills: new_skills };
-    write_lock(source_dir, &lock)?;
+    if !dry_run {
+        write_lock(source_dir, &lock)?;
+    }
     Ok(InstallReport { installed, lock })
 }
 
@@ -1256,6 +1258,12 @@ fn prune_orphans(target_dir: &Path, found: Vec<FoundOrphan<'_>>, selected: &[Pro
     Ok((pruned, kept))
 }
 
+/// What [`prune_orphans`] would return, without removing anything: the
+/// unmodified orphans prune, the modified ones are kept.
+fn preview_prune(found: Vec<FoundOrphan<'_>>) -> (Vec<Orphan>, Vec<Orphan>) {
+    found.into_iter().map(|f| f.orphan).partition(|orphan| !orphan.modified)
+}
+
 /// Filesystem access for the legacy Codex migration. Keys are
 /// [`is_legacy_codex_key`]-validated `/`-separated relative paths.
 ///
@@ -1551,6 +1559,7 @@ pub fn install_canonical(
     source_dir: &Path,
     target_dir: &Path,
     providers: Option<&str>,
+    dry_run: bool,
 ) -> Result<CanonicalInstallReport, SkillsError> {
     let selection = select_providers(target_dir, providers)?;
     let selected = selection.providers;
@@ -1601,7 +1610,9 @@ pub fn install_canonical(
             .iter()
             .any(|(path, bytes)| fs::read(path).ok().as_deref() != Some(bytes.as_slice()));
     let (mut pruned, mut kept) = (Vec::new(), Vec::new());
-    if changed {
+    if changed && dry_run {
+        (pruned, kept) = preview_prune(orphans);
+    } else if changed {
         for (path, bytes) in writes {
             write_bytes_under(target_dir, &path, &bytes)?;
         }
@@ -1615,7 +1626,9 @@ pub fn install_canonical(
     }
     let config_written = match config {
         Some((path, text)) => {
-            write_file(&path, &text)?;
+            if !dry_run {
+                write_file(&path, &text)?;
+            }
             Some(path)
         }
         None => None,
@@ -1631,9 +1644,9 @@ pub fn install_canonical(
     })
 }
 
-pub fn install(source_dir: &Path, target_dir: &Path) -> Result<InstallReport, SkillsError> {
+pub fn install(source_dir: &Path, target_dir: &Path, dry_run: bool) -> Result<InstallReport, SkillsError> {
     if source_dir.join("SKILL.src.md").is_file() {
-        let report = install_canonical(source_dir, target_dir, None)?;
+        let report = install_canonical(source_dir, target_dir, None, dry_run)?;
         let mut lock = Lock::default();
         lock.skills.insert(
             "canon".into(),
@@ -1651,7 +1664,7 @@ pub fn install(source_dir: &Path, target_dir: &Path) -> Result<InstallReport, Sk
             lock,
         });
     }
-    install_legacy(source_dir, target_dir)
+    install_legacy(source_dir, target_dir, dry_run)
 }
 
 pub fn check(

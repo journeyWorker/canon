@@ -10,9 +10,8 @@ pub enum LedgerCommand {
 
 #[derive(Args)]
 pub struct LedgerCompactArgs {
-    /// Report what would move and write nothing
-    #[arg(long)]
-    pub dry_run: bool,
+    #[command(flatten)]
+    pub safety: crate::cli::SafetyArgs,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form

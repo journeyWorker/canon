@@ -31,9 +31,8 @@ pub struct GatePromoteArgs {
     /// Promote only this kind of staged record (default: every kind)
     #[arg(long, value_enum, value_name = "KIND")]
     pub kind: Option<PromoteKind>,
-    /// Preview without writing anything
-    #[arg(long)]
-    pub dry_run: bool,
+    #[command(flatten)]
+    pub dry_run: crate::cli::DryRunArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -55,6 +54,8 @@ pub struct GateInstallHooksArgs {
     /// Hook timeout in seconds
     #[arg(long, default_value_t = 30)]
     pub timeout: u32,
+    #[command(flatten)]
+    pub dry_run: crate::cli::DryRunArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,

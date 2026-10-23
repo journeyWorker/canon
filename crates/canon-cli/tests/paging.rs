@@ -131,51 +131,58 @@ fn purge_args<'a>(before: &'a str, extra: &[&'a str]) -> Vec<&'a str> {
 }
 
 #[test]
-fn purge_plan_then_confirm_deletes_and_a_stale_digest_deletes_nothing() {
+fn purge_preview_then_commit_deletes_and_a_stale_digest_deletes_nothing() {
     let fixture = purge_fixture();
     let before = (Utc::now() - Duration::days(1)).to_rfc3339();
 
-    let plan = fixture.run_canon(&purge_args(&before, &["--plan"]));
-    assert!(plan.status.success(), "{}", stderr(&plan));
-    let plan_body = json(&plan);
-    let digest = plan_body["data"]["planDigest"].as_str().expect("plan carries a planDigest").to_string();
-    // The one step after a plan is the human's review, then the confirm that names the digest.
-    assert_eq!(plan_body["meta"]["command"], "purge", "{plan_body}");
-    let step = &plan_body["meta"]["next"][0];
-    assert_eq!(step["actor"], "human", "{plan_body}");
-    assert!(step["command"].as_str().unwrap().contains(&format!("--confirm {digest}")), "{plan_body}");
-    assert_eq!(fixture.git_file_count(), 2, "--plan deletes nothing");
+    let preview = fixture.run_canon(&purge_args(&before, &[]));
+    assert!(preview.status.success(), "{}", stderr(&preview));
+    let preview_body = json(&preview);
+    let digest = preview_body["data"]["planDigest"].as_str().expect("a preview carries a planDigest").to_string();
+    assert_eq!(preview_body["data"]["committed"], false, "{preview_body}");
+    assert_eq!(preview_body["data"]["effects"].as_array().unwrap().len(), 2, "one effect per record the plan removes: {preview_body}");
+    // The one step after a preview is the exact commit, digest filled in.
+    assert_eq!(preview_body["meta"]["command"], "purge", "{preview_body}");
+    let repo = fixture.root.path().display().to_string();
+    let expected = ["canon", "purge", "--kind", "trajectory", "--before", before.as_str(), "--repo", repo.as_str(), "--commit", "--plan-digest", digest.as_str(), "--json"];
+    assert_eq!(preview_body["meta"]["next"][0]["argv"], serde_json::json!(expected), "{preview_body}");
+    assert_eq!(fixture.git_file_count(), 2, "a preview deletes nothing");
+    assert!(!fixture.root.path().join(canon_model::paths::ACCESS_AUDIT_FILE).exists(), "a preview writes no audit line");
 
-    // A record the plan did not list lands between plan and confirm.
+    // A record the plan did not list lands between the preview and the commit.
     fixture.plant_trajectory_in_git(Utc::now() - Duration::days(3), 0.3);
-    let stale = fixture.run_canon(&purge_args(&before, &["--confirm", &digest]));
+    let stale = fixture.run_canon(&purge_args(&before, &["--commit", "--plan-digest", &digest]));
     assert_eq!(stale.status.code(), Some(2));
     assert_eq!(error_code(&stale), "PLAN_CHANGED");
     assert_eq!(fixture.git_file_count(), 3, "a stale digest deletes nothing");
 
-    let replan = fixture.run_canon(&purge_args(&before, &["--plan"]));
+    let replan = fixture.run_canon(&purge_args(&before, &[]));
     let fresh = json(&replan)["data"]["planDigest"].as_str().unwrap().to_string();
     assert_ne!(fresh, digest);
-    let confirmed = fixture.run_canon(&purge_args(&before, &["--confirm", &fresh]));
-    assert!(confirmed.status.success(), "{}", stderr(&confirmed));
-    assert_eq!(fixture.git_file_count(), 0, "the confirmed plan removed what it listed");
-    let confirmed_body = json(&confirmed);
-    assert_eq!(confirmed_body["data"]["planDigest"], fresh.as_str(), "{confirmed_body}");
-    assert!(confirmed_body["meta"]["next"].is_array(), "a confirmed purge is a write: {confirmed_body}");
+    let committed = fixture.run_canon(&purge_args(&before, &["--commit", "--plan-digest", &fresh]));
+    assert!(committed.status.success(), "{}", stderr(&committed));
+    assert_eq!(fixture.git_file_count(), 0, "the committed plan removed what it listed");
+    let committed_body = json(&committed);
+    assert_eq!(committed_body["data"]["planDigest"], fresh.as_str(), "{committed_body}");
+    assert_eq!(committed_body["data"]["committed"], true, "{committed_body}");
+    assert!(committed_body["meta"]["next"].is_array(), "a committed purge is a write: {committed_body}");
 }
 
 #[test]
-fn plain_purge_is_refused_with_the_way_to_a_plan() {
+fn the_old_purge_spellings_are_usage_errors_that_name_the_new_form() {
     let fixture = purge_fixture();
     let before = (Utc::now() - Duration::days(1)).to_rfc3339();
-    let out = fixture.run_canon(&purge_args(&before, &[]));
-    assert_eq!(out.status.code(), Some(2));
-    assert_eq!(error_code(&out), "PURGE_PLAN_REQUIRED");
-    assert!(json(&out)["error"]["hint"].as_str().unwrap().contains("--plan"));
+    for old in [&["--plan"][..], &["--confirm", "abc"], &["--dry-run"]] {
+        let out = fixture.run_canon(&purge_args(&before, old));
+        assert_eq!(out.status.code(), Some(2), "{old:?}");
+        assert_eq!(error_code(&out), "USAGE", "{old:?}");
+        assert!(json(&out)["error"]["hint"].as_str().unwrap().contains("--commit --plan-digest"), "{old:?}: {}", json(&out));
+    }
+    // --commit and --plan-digest come together.
+    for half in [&["--commit"][..], &["--plan-digest", "abc"]] {
+        assert_eq!(fixture.run_canon(&purge_args(&before, half)).status.code(), Some(2), "{half:?}");
+    }
     assert_eq!(fixture.git_file_count(), 2);
-
-    let dry_run = fixture.run_canon(&purge_args(&before, &["--dry-run"]));
-    assert_eq!(dry_run.status.code(), Some(2), "--dry-run is gone, not an alias");
 }
 
 fn first_file_under(dir: &std::path::Path) -> std::path::PathBuf {
@@ -193,7 +200,7 @@ fn first_file_under(dir: &std::path::Path) -> std::path::PathBuf {
 fn replacing_a_matching_record_with_another_at_equal_count_is_plan_changed() {
     let fixture = purge_fixture();
     let before = (Utc::now() - Duration::days(1)).to_rfc3339();
-    let plan = fixture.run_canon(&purge_args(&before, &["--plan"]));
+    let plan = fixture.run_canon(&purge_args(&before, &[]));
     assert!(plan.status.success(), "{}", stderr(&plan));
     let digest = json(&plan)["data"]["planDigest"].as_str().unwrap().to_string();
     assert_eq!(fixture.git_file_count(), 2);
@@ -203,7 +210,7 @@ fn replacing_a_matching_record_with_another_at_equal_count_is_plan_changed() {
     fixture.plant_trajectory_in_git(Utc::now() - Duration::days(3), 0.9);
     assert_eq!(fixture.git_file_count(), 2);
 
-    let out = fixture.run_canon(&purge_args(&before, &["--confirm", &digest]));
+    let out = fixture.run_canon(&purge_args(&before, &["--commit", "--plan-digest", &digest]));
     assert_eq!(out.status.code(), Some(2));
     assert_eq!(error_code(&out), "PLAN_CHANGED");
     assert_eq!(fixture.git_file_count(), 2, "nothing was deleted");

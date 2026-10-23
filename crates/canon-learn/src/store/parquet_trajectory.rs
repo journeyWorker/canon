@@ -459,7 +459,7 @@ mod tests {
     /// trajectory in place. It decodes, mutates the verdict, and
     /// re-encodes — so a field it does not know about is exactly what
     /// such a path drops. Attribution must survive the reward write-back
-    /// `canon ingest artifacts` performs immediately after every persist.
+    /// `canon ingest records` performs immediately after every persist.
     #[test]
     fn marking_a_verdict_preserves_the_stamped_run() {
         let dir = tempfile::tempdir().unwrap();

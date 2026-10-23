@@ -19,6 +19,8 @@ pub struct PluginSyncArgs {
     /// Sync exactly one ad hoc root, overriding canon.yaml's specs.roots[]
     #[arg(long)]
     pub spec_root: Option<PathBuf>,
+    #[command(flatten)]
+    pub dry_run: crate::cli::DryRunArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,

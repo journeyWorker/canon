@@ -57,6 +57,8 @@ pub struct SubjectAdoptArgs {
     pub change_id: ChangeId,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
+    #[command(flatten)]
+    pub dry_run: crate::cli::DryRunArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -72,6 +74,8 @@ pub struct SubjectUnadoptArgs {
     pub change_id: ChangeId,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
+    #[command(flatten)]
+    pub dry_run: crate::cli::DryRunArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,

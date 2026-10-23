@@ -172,3 +172,21 @@ mod tests {
         assert!(should_promote(dir.path(), PromoteFlag::Config).is_err());
     }
 }
+
+/// Whether a real run could create the file `path`: `path` is not a
+/// directory and its parent is one (`create_parents`: its nearest existing
+/// ancestor is). What a `--dry-run` asks instead of writing, so it refuses
+/// where the real write would.
+pub fn check_creatable(path: &Path, create_parents: bool) -> std::io::Result<()> {
+    if path.is_dir() {
+        return Err(std::io::Error::new(std::io::ErrorKind::IsADirectory, format!("`{}` is a directory", path.display())));
+    }
+    let parent = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let nearest = if create_parents { parent.ancestors().find(|ancestor| ancestor.exists()) } else { Some(parent) };
+    match nearest {
+        Some(dir) if dir.is_dir() => Ok(()),
+        Some(dir) if dir.exists() => Err(std::io::Error::new(std::io::ErrorKind::NotADirectory, format!("`{}` is not a directory", dir.display()))),
+        Some(dir) => Err(std::io::Error::new(std::io::ErrorKind::NotFound, format!("`{}` does not exist", dir.display()))),
+        None => Ok(()),
+    }
+}

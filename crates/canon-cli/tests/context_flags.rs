@@ -165,7 +165,7 @@ fn a_refused_read_or_export_writes_no_audit_line_and_a_served_one_does() {
     assert_eq!(refused.status.code(), Some(2));
     let bad_cursor = canon(repo.path(), &["export", "--kind", "change", "--cursor", "garbage", "--json"]);
     assert_eq!(bad_cursor.status.code(), Some(2), "{}", String::from_utf8_lossy(&bad_cursor.stdout));
-    let stale_plan = canon(repo.path(), &["purge", "--kind", "session", "--before", "2020-01-01", "--confirm", "0000", "--json"]);
+    let stale_plan = canon(repo.path(), &["purge", "--kind", "session", "--before", "2020-01-01T00:00:00Z", "--commit", "--plan-digest", "0000", "--json"]);
     assert_eq!(stale_plan.status.code(), Some(2), "{}", String::from_utf8_lossy(&stale_plan.stdout));
     assert_eq!(audit_lines(repo.path()), 0, "a refusal reads and deletes nothing, so it leaves no access line");
 

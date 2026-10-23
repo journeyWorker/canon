@@ -54,7 +54,7 @@ fn one_command_shows_options_with_their_shape() {
     for code in ["EVIDENCE_FABRICATED", "BRIEF_UNAPPROVED", "BRIEF_CHANGED_SINCE_APPROVAL", "EVIDENCE_INVALID_ARGUMENT", "USAGE"] {
         assert!(codes.contains(&code), "{code} missing from {codes:?}");
     }
-    assert!(!codes.contains(&"EVIDENCE_VAULT_FAILED"), "a sibling command's code leaked in: {codes:?}");
+    assert!(!codes.contains(&"ARTIFACTS_STORE_FAILED"), "a sibling command's code leaked in: {codes:?}");
     let exits: Vec<u64> = v["exits"].as_array().unwrap().iter().map(|e| e["code"].as_u64().unwrap()).collect();
     assert_eq!(exits, [0, 1, 2]);
 }
@@ -70,7 +70,7 @@ fn exits_follow_each_commands_own_contract() {
     assert_eq!(exits(&["context"]), [0, 2]);
     assert_eq!(exits(&["dispatch", "diff"]), [0, 2]);
     assert_eq!(exits(&["finding", "list"]), [0, 2]);
-    assert_eq!(exits(&["evidence", "vault"]), [0, 2]);
+    assert_eq!(exits(&["artifacts", "store"]), [0, 2]);
     assert_eq!(exits(&["gate", "check"]), [0, 1, 2]);
     assert_eq!(exits(&["brief", "check"]), [0, 1, 2]);
     assert_eq!(exits(&["finding", "add"]), [0, 2]);

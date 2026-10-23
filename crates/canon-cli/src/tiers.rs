@@ -23,7 +23,7 @@
 //!
 //! Two families of builder live here: the STRICT, all-or-nothing
 //! [`build_tiers`] (`canon tier age`'s only caller — s29 design D6
-//! moved `canon ingest sessions`/`canon ingest artifacts` OFF this
+//! moved `canon ingest sessions`/`canon ingest records` OFF this
 //! strict path onto the kind-scoped lenient one below, so `canon tier
 //! age`'s destructive move+delete remains the sole caller with no
 //! partial-success story, hence a declared-but-unreachable tier stays
@@ -340,7 +340,7 @@ pub(crate) fn tiers_needed_for(policy: &TierPolicy, kind: RecordKind) -> Result<
 /// needs it) and degraded -- e.g. the configured `dsn_env`/`bucket_env`
 /// name for an unset var, or a live connect/attach error's own text
 /// (s29 design D6) -- so a caller (`canon ingest sessions`/`canon
-/// ingest artifacts`) can print WHY a needed rung is unwritten instead
+/// ingest records`) can print WHY a needed rung is unwritten instead
 /// of a bare "tiers unreachable" guess.
 pub(crate) fn build_lenient_tiers_for_kinds(canon_yaml_path: &Path, kinds: &[RecordKind]) -> Result<LoadedTiers, TierCliError> {
     build_lenient_tiers_for_kinds_with(canon_yaml_path, kinds, false)
