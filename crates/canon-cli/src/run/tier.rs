@@ -17,7 +17,7 @@ fn run_tier_age(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> ExitCod
     let base = crate::safety::command("tier age", &[], repo);
     let failed = |err: String| ExitCode::from(CliError::failed("TIER_FAILED", err).hint("check the `tiers` settings in canon.yaml and that the destinations are reachable, then run `canon tier age` again").emit("canon tier age", json) as u8);
     let canon_yaml_path = crate::context::resolve_canon_yaml(repo);
-    let loaded = match crate::tiers::build_tiers(&canon_yaml_path) {
+    let loaded = match crate::tiers::build_tiers_for_read(&canon_yaml_path) {
         Ok(loaded) => loaded,
         Err(err) => return failed(err.to_string()),
     };
@@ -38,6 +38,11 @@ fn run_tier_age(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> ExitCod
         crate::safety::finish_preview(&base, "tier age", &report.plan, "the plan only lists what would move; moving takes its planDigest", json, &report);
         return ExitCode::SUCCESS;
     }
+    // Moving writes the hot db; the plan above only read it, so a preview or a refused digest leaves no db behind.
+    let loaded = match crate::tiers::build_tiers(&canon_yaml_path) {
+        Ok(loaded) => loaded,
+        Err(err) => return failed(err.to_string()),
+    };
     match crate::tier::apply(loaded, &planned) {
         Ok(reports) => {
             crate::say_raw!(json, "{}", crate::tier::format_report(&reports));

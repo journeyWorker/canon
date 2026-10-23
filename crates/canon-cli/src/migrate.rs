@@ -199,6 +199,7 @@ pub struct MigrateReport {
     pub index_records_written: Option<usize>,
     /// The rebuild's own report when it found the corpus unclean (`MIGRATE_INDEX_FAILED`).
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<crate::inventory::InventorySyncReport<'static>>")]
     pub index: Option<serde_json::Value>,
     #[serde(flatten)]
     pub plan: safety::Plan,

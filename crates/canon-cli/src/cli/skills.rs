@@ -27,7 +27,7 @@ pub struct SkillsInstallArgs {
     /// `skills.providers`, else the install lock's providers, else the detected `.claude`,
     /// `.codex`, `.omp`, `.pi` directories; none detected installs nothing. Codex is
     /// projected to `.agents/skills/canon/`.
-    #[arg(long)]
+    #[arg(long, value_name = "LIST")]
     pub providers: Option<String>,
     #[command(flatten)]
     pub dry_run: crate::cli::DryRunArgs,
@@ -40,12 +40,13 @@ pub struct SkillsInstallArgs {
 
 #[derive(Args)]
 pub struct SkillsCheckArgs {
-    #[arg(long)]
+    /// Source directory; defaults to CANON_SKILLS_SOURCE or canon/skills.
+    #[arg(long, value_name = "DIR")]
     pub skills_source: Option<PathBuf>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install.
-    #[arg(long)]
+    #[arg(long, value_name = "LIST")]
     pub providers: Option<String>,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
@@ -54,12 +55,13 @@ pub struct SkillsCheckArgs {
 
 #[derive(Args)]
 pub struct SkillsDoctorArgs {
-    #[arg(long)]
+    /// Source directory; defaults to CANON_SKILLS_SOURCE or canon/skills.
+    #[arg(long, value_name = "DIR")]
     pub skills_source: Option<PathBuf>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Providers to inspect (`claude`, `codex`, `omp`, `pi`, or a comma-separated list). Omitted: as for install.
-    #[arg(long)]
+    #[arg(long, value_name = "LIST")]
     pub providers: Option<String>,
     /// Output JSON instead of the human-readable form
     #[arg(long)]

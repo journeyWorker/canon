@@ -75,7 +75,7 @@ use canon_model::{RegimeKey, RoleId, StrategyRef, SubjectId};
 
 use crate::context::resolve_repo_root;
 
-/// `--role`'s `clap` value parser.
+/// `--role`'s clap value parser.
 pub fn parse_role(s: &str) -> Result<RoleId, String> {
     RoleId::parse(s).map_err(|e| e.to_string())
 }

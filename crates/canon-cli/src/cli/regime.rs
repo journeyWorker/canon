@@ -17,10 +17,10 @@ pub struct RegimeShowArgs {
     #[arg(long = "repo-name", value_name = "NAME")]
     pub repo_name: String,
     /// The <area> segment (canonicalized)
-    #[arg(long)]
+    #[arg(long, value_name = "NAME")]
     pub area: String,
     /// The <hash> segment (6-64-char lowercase hex; passed through, never re-hashed)
-    #[arg(long)]
+    #[arg(long, value_name = "HASH")]
     pub hash: String,
     /// Output JSON instead of the human-readable form
     #[arg(long)]

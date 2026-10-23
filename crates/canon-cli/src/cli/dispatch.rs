@@ -17,37 +17,37 @@ pub enum DispatchCommand {
 #[derive(Args)]
 pub struct DispatchBeginArgs {
     /// Role about to run; must equal --regime's leading segment
-    #[arg(long, value_parser = crate::retrieve::parse_role)]
+    #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
     pub role: Option<RoleId>,
     /// Full regime key (<role>/<repo>/<area>/<hash>) to retrieve guidance for
-    #[arg(long, value_parser = crate::retrieve::parse_regime)]
+    #[arg(long, value_parser = crate::retrieve::parse_regime, value_name = "KEY")]
     pub regime: RegimeKey,
     /// The dispatching agent's id (recorded as the run's actor)
-    #[arg(long, default_value = "canon")]
+    #[arg(long, default_value = "canon", value_name = "ACTOR_ID")]
     pub actor_id: String,
     /// Declared provider metadata (copied verbatim; never inferred from --actor-id)
-    #[arg(long)]
+    #[arg(long, value_name = "NAME")]
     pub provider: Option<String>,
     /// Declared model metadata (copied verbatim)
-    #[arg(long)]
+    #[arg(long, value_name = "NAME")]
     pub model: Option<String>,
     /// Skill that contributed to this run
-    #[arg(long)]
+    #[arg(long, value_name = "ID")]
     pub skill_id: Option<String>,
     /// Declared skill digest; requires --skill-id
-    #[arg(long)]
+    #[arg(long, value_name = "DIGEST")]
     pub skill_digest: Option<String>,
     /// Explicit repository-relative ContextPack input manifest
-    #[arg(long)]
+    #[arg(long, value_name = "FILE")]
     pub manifest: Option<PathBuf>,
     /// Registered prompt bundle to select (`name@version`)
-    #[arg(long, value_parser = crate::dispatch::parse_prompt_bundle)]
+    #[arg(long, value_parser = crate::dispatch::parse_prompt_bundle, value_name = "NAME@VERSION")]
     pub prompt_bundle: Option<crate::context_pack::PromptBundleSelection>,
     /// Plan task this run serves (<change_id>#<n>); validated against the plan corpus
-    #[arg(long, value_parser = crate::dispatch::parse_task_id)]
+    #[arg(long, value_parser = crate::dispatch::parse_task_id, value_name = "TASK_ID")]
     pub task_id: Option<TaskId>,
     /// RunId (ULID) of the run that dispatched this one
-    #[arg(long, value_parser = crate::dispatch::parse_run_id)]
+    #[arg(long, value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
     pub parent_run_id: Option<RunId>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -64,7 +64,7 @@ pub struct DispatchEndArgs {
     #[arg(value_name = "RUN_ID", value_parser = crate::dispatch::parse_run_id)]
     pub run_id: RunId,
     /// Terminal outcome: succeeded or failed
-    #[arg(long, value_parser = crate::dispatch::run_status_parser())]
+    #[arg(long, value_parser = crate::dispatch::run_status_parser(), value_name = "RUN_OUTCOME")]
     pub run_outcome: RunStatus,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

@@ -7,7 +7,7 @@ use std::path::PathBuf;
 #[derive(clap::Args)]
 pub struct ContextPackAddArgs {
     /// Repository-relative input manifest
-    #[arg(long)]
+    #[arg(long, value_name = "FILE")]
     pub manifest: PathBuf,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

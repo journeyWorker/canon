@@ -89,9 +89,9 @@ pub fn parse_session_id(s: &str) -> Result<SessionId, String> {
     SessionId::parse(s).map_err(|e| e.to_string())
 }
 
-/// `--outcome`'s `clap` value parser.
-pub fn parse_outcome(s: &str) -> Result<ReviewOutcome, String> {
-    ReviewOutcome::parse(s)
+/// `--review-outcome`'s `clap` value parser: one of the three outcomes, so the spec lists them as `possibleValues`.
+pub fn outcome_parser() -> impl clap::builder::TypedValueParser<Value = ReviewOutcome> {
+    crate::cli_error::closed_set(ReviewOutcome::ALL.iter().map(|o| o.as_str()).collect::<Vec<_>>(), ReviewOutcome::parse)
 }
 
 /// `--reviewer-provider|model|harness`'s `clap` value parser: one

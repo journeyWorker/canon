@@ -10,7 +10,7 @@ pub struct PromptAddArgs {
     #[arg(value_name = "NAME@VERSION", value_parser = crate::dispatch::parse_prompt_bundle)]
     pub bundle: crate::context_pack::PromptBundleSelection,
     /// Repository-relative input manifest
-    #[arg(long)]
+    #[arg(long, value_name = "FILE")]
     pub manifest: PathBuf,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

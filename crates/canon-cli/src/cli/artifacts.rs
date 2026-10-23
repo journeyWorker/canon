@@ -30,7 +30,7 @@ pub struct ArtifactsVerifyArgs {
 #[derive(Args)]
 pub struct ArtifactsStoreArgs {
     /// Per-file size limit for the artifact store, in MiB
-    #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
+    #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
     pub max_artifact_mib: u64,
     #[command(flatten)]
     pub dry_run: crate::cli::DryRunArgs,

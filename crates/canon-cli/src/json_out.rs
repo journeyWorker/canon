@@ -441,6 +441,7 @@ fn validate<R: Report>(text: &str) {
     static REPORTS: LazyLock<Mutex<HashMap<&'static str, Option<std::sync::Arc<Validator>>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
     let document: Value = serde_json::from_str(text).expect("a document is JSON");
+    witness::<R>(&document);
     let ok = document["ok"].as_bool().unwrap_or(false);
     let envelope = if ok { &ENVELOPES.0 } else { &ENVELOPES.1 };
     let problems: Vec<String> = envelope.iter_errors(&document).map(|e| format!("{} at {}", e, e.instance_path())).collect();
@@ -459,6 +460,21 @@ fn validate<R: Report>(text: &str) {
         let problems: Vec<String> = validator.iter_errors(data).map(|e| format!("{} at {}", e, e.instance_path())).collect();
         assert!(problems.is_empty(), "`data` breaks the schema of {}: {problems:?}\n{text}", std::any::type_name::<R>());
     }
+}
+
+/// T9: with `CANON_WITNESS_DIR` set, a debug build appends one line per document it
+/// prints, `{"command", "ok", "type"}` (`type` is the report's Rust type), to
+/// `<dir>/<pid>.ndjson`. `tests/grammar_t9_witness.rs` holds the lines of a whole
+/// suite run against the outputs the spec declares.
+#[cfg(debug_assertions)]
+fn witness<R: Report>(document: &Value) {
+    use std::io::Write;
+
+    let Some(dir) = std::env::var_os("CANON_WITNESS_DIR") else { return };
+    let line = json!({ "command": document["meta"]["command"], "ok": document["ok"], "type": std::any::type_name::<R>() });
+    let path = Path::new(&dir).join(format!("{}.ndjson", std::process::id()));
+    let written = std::fs::OpenOptions::new().create(true).append(true).open(&path).and_then(|mut file| writeln!(file, "{line}"));
+    assert!(written.is_ok(), "CANON_WITNESS_DIR is set and {} cannot be written", path.display());
 }
 
 /// A command's narration: each line is said (stdout in human mode) and kept,

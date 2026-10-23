@@ -20,10 +20,10 @@ pub struct IngestSessionsArgs {
     #[arg(long)]
     pub watch: bool,
     /// Seconds between polls
-    #[arg(long, default_value_t = 30)]
+    #[arg(long, default_value_t = 30, value_name = "N")]
     pub interval_secs: u64,
     /// The scan root's home directory (defaults to $HOME)
-    #[arg(long)]
+    #[arg(long, value_name = "DIR")]
     pub home: Option<PathBuf>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -48,7 +48,7 @@ pub struct IngestRecordsArgs {
     #[arg(long)]
     pub watch: bool,
     /// Seconds between polls
-    #[arg(long, default_value_t = 30)]
+    #[arg(long, default_value_t = 30, value_name = "N")]
     pub interval_secs: u64,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -67,7 +67,7 @@ pub struct IngestRecordsArgs {
 #[derive(Args)]
 pub struct IngestPlansArgs {
     /// One-shot override: import this dialect's --plan-source root (requires --plan-source)
-    #[arg(long, requires = "plan_source")]
+    #[arg(long, requires = "plan_source", value_name = "NAME")]
     pub dialect: Option<String>,
     /// One-shot override's source root (paired with --dialect)
     #[arg(long, value_name = "DIR", requires = "dialect")]

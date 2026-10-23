@@ -73,7 +73,8 @@ fn exits_follow_each_commands_own_contract() {
     assert_eq!(exits(&["artifacts", "store"]), [0, 2]);
     assert_eq!(exits(&["gate", "check"]), [0, 1, 2]);
     assert_eq!(exits(&["brief", "check"]), [0, 1, 2]);
-    assert_eq!(exits(&["finding", "add"]), [0, 2]);
+    // `PROMOTE_FAILED` (exit 1) is a code `finding add` lists, so its exit 1 is declared too.
+    assert_eq!(exits(&["finding", "add"]), [0, 1, 2]);
 }
 
 #[test]

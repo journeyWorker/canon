@@ -42,42 +42,42 @@ pub struct ReviewChangeArgs {
 #[derive(Args)]
 pub struct ReviewOptions {
     /// Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root
-    #[arg(long, value_parser = crate::review::parse_project_id)]
+    #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     /// The reviewer's id (recorded as the review's author and as its reviewer; line breaks refused)
-    #[arg(long)]
+    #[arg(long, value_name = "ACTOR_ID")]
     pub actor_id: String,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
     /// Provenance ref (mutually exclusive with --original-spec-ref; exactly one required)
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub upstream_ref: Option<String>,
     /// Provenance ref (mutually exclusive with --upstream-ref; exactly one required)
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub original_spec_ref: Option<String>,
     /// The reviewer's role. Required unless the declared role (--as / CANON_ROLE) is implementer or reviewer, which it then defaults to
-    #[arg(long, value_parser = crate::retrieve::parse_role)]
+    #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
     pub role: Option<RoleId>,
     /// The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count
-    #[arg(long, value_parser = crate::review::parse_session_id)]
+    #[arg(long, value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
     pub session_id: Option<canon_model::SessionId>,
     /// How the reviewer's run ended: signed (an approval), indeterminate (ran, reached no verdict) or unavailable (could not run). Only signed counts; the others are recorded as review gaps
-    #[arg(long, default_value = "signed", value_parser = crate::review::parse_outcome)]
+    #[arg(long, default_value = "signed", value_parser = crate::review::outcome_parser(), value_name = "REVIEW_OUTCOME")]
     pub review_outcome: canon_model::ReviewOutcome,
     /// The reviewer runtime's provider (e.g. anthropic, openai)
-    #[arg(long, value_parser = crate::review::parse_runtime_label)]
+    #[arg(long, value_parser = crate::review::parse_runtime_label, value_name = "NAME")]
     pub reviewer_provider: Option<String>,
     /// The reviewer runtime's model id
-    #[arg(long, value_parser = crate::review::parse_runtime_label)]
+    #[arg(long, value_parser = crate::review::parse_runtime_label, value_name = "NAME")]
     pub reviewer_model: Option<String>,
     /// The harness that ran the reviewer (e.g. omp, codex, claude)
-    #[arg(long, value_parser = crate::review::parse_runtime_label)]
+    #[arg(long, value_parser = crate::review::parse_runtime_label, value_name = "NAME")]
     pub reviewer_harness: Option<String>,
     /// A file the reviewer looked at (screenshot, recording); repeatable; must be inside the repo. Stored in .canon/artifacts/sha256/ and re-hashed by `canon gate check`
     #[arg(long = "artifact", value_name = "PATH")]
     pub artifacts: Vec<PathBuf>,
     /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger file is refused
-    #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
+    #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
     pub max_artifact_mib: u64,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

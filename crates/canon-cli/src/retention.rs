@@ -135,9 +135,10 @@ fn ensure_sensitive(repo: &Path, requested: bool) -> Result<(), RetentionError> 
     Ok(())
 }
 
-fn loaded_registry(repo: &Path, kind: RecordKind) -> Result<(PathBuf, TierRegistry), RetentionError> {
+/// The registry of the tiers `kind` lives in. `read_only`: an absent sqlite hot db is read as empty and not created.
+fn loaded_registry(repo: &Path, kind: RecordKind, read_only: bool) -> Result<(PathBuf, TierRegistry), RetentionError> {
     let yaml = resolve_canon_yaml(repo);
-    let loaded = tiers::build_lenient_tiers_for_kind(&yaml, kind)?;
+    let loaded = if read_only { tiers::build_lenient_tiers_for_kind_read(&yaml, kind)? } else { tiers::build_lenient_tiers_for_kind(&yaml, kind)? };
     let registry = TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite);
     Ok((yaml, registry))
 }
@@ -250,7 +251,7 @@ fn purge_effects(outcome: &PurgeOutcome, keys: &[String], learn_keys: Option<&[S
 /// the command line without the safety flags ([`crate::safety::command`]).
 pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mode, base: &str, json_output: bool) -> u8 {
     let result = (|| -> Result<(), RetentionError> {
-        let (yaml, registry) = loaded_registry(repo, kind)?;
+        let (yaml, registry) = loaded_registry(repo, kind, true)?;
         let learn_store = if kind == RecordKind::Trajectory { Some(loaded_trajectory_store(repo, &yaml)?) } else { None };
         let learn_preflight = if let Some(store) = &learn_store { Some(store.purge_before(before, true)?) } else { None };
         let preflight = RetentionService::new(&registry).purge(kind, before, true)?;
@@ -258,7 +259,8 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
         let learn_keys = if let Some(store) = &learn_store { Some(store.purge_keys_before(before)?) } else { None };
         let plan = Plan::new(purge_effects(&preflight, &keys, learn_keys.as_deref()));
         let commit = plan.gate(mode, base).map_err(|e| RetentionError::Refusal(Box::new(e)))?;
-        let outcome = if commit { RetentionService::new(&registry).purge(kind, before, false)? } else { preflight };
+        // Deleting writes the hot db; the plan above only read it, so a preview or a refused digest leaves no db behind.
+        let outcome = if commit { RetentionService::new(&loaded_registry(repo, kind, false)?.1).purge(kind, before, false)? } else { preflight };
         let registry_matched: usize = outcome.rungs.iter().map(|r| r.matched).sum();
         let registry_deleted: usize = outcome.rungs.iter().map(|r| r.deleted).sum();
         let learn_counts = if let Some(store) = learn_store {
@@ -450,7 +452,7 @@ pub fn run_export(
             crate::paging::check_known("canon export", requested, &RECORD_FIELDS).map_err(ExportFailure::Cursor)?;
         }
         ensure_sensitive(repo, include_sensitive)?;
-        let (_, registry) = loaded_registry(repo, kind)?;
+        let (_, registry) = loaded_registry(repo, kind, true)?;
         let mut query = TierQuery::kind(kind);
         if let Some(after) = after { query = query.since(after); }
         let rows = registry.query(&query)?.records;

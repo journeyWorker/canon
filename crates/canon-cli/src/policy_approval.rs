@@ -265,6 +265,12 @@ pub fn record(repo: &Path, by: &str, note: Option<&str>) -> Result<PolicyApprova
         }
         Err(e) => return Err(format!("cannot read {}: {e}", policy_path.display())),
     };
+    // Approving what is approved already, by the same approver in the same words, writes nothing: the record keeps its time.
+    if let ApprovalState::Approved(existing) = approval_state(repo) {
+        if existing.approved_by == by && existing.note.as_deref() == note {
+            return Ok(existing);
+        }
+    }
     let approval = PolicyApproval {
         policy_digest: policy_digest(&policy),
         approved_by: by.to_string(),

@@ -26,7 +26,7 @@ pub enum DemoCommand {
 #[derive(Args)]
 pub struct DemoInitArgs {
     /// Directory to set up (used as-is)
-    #[arg(long, default_value = ".")]
+    #[arg(long, default_value = ".", value_name = "DIR")]
     pub repo: PathBuf,
     /// Output JSON instead of the human-readable form
     #[arg(long)]

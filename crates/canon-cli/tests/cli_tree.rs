@@ -49,6 +49,42 @@ fn every_leaf_has_one_metadata_row_and_every_row_a_leaf() {
     assert_eq!(before, paths.len(), "a leaf has two metadata rows");
 }
 
+/// T2: a leaf has exactly one row in each table the spec is built from, and
+/// every row names a leaf: metadata, spec facts, error codes, the report
+/// schemas of its outputs. (The examples: `check_examples`, above.)
+#[test]
+fn every_leaf_has_its_rows_in_every_table_and_no_row_is_an_orphan() {
+    let root = cli::command();
+    let leaves = schema::leaf_paths(&root);
+    assert!(leaves.len() > 70, "the tree has its leaves ({})", leaves.len());
+    let facts = canon_cli::spec_facts::check_facts(&root);
+    assert!(facts.is_empty(), "{}", facts.join("\n"));
+    let mut problems = Vec::new();
+    let report_rows = canon_cli::reports::report_schemas();
+    for leaf in &leaves {
+        if schema::meta_for(leaf).is_none() {
+            problems.push(format!("`{leaf}` has no META row"));
+        }
+        if schema::error_codes(leaf).is_empty() {
+            problems.push(format!("`{leaf}` has no error-code row (schema_codes.rs)"));
+        }
+        if !report_rows.iter().any(|row| row.command == leaf) {
+            problems.push(format!("`{leaf}` has no report schema row (reports::report_schemas)"));
+        }
+    }
+    for row in META {
+        if !leaves.iter().any(|l| l == row.path) {
+            problems.push(format!("META row `{}` names no leaf", row.path));
+        }
+    }
+    for row in &report_rows {
+        if !leaves.iter().any(|l| l == row.command) {
+            problems.push(format!("report schema row {} names `{}`, which is no leaf", row.name, row.command));
+        }
+    }
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
 /// Splits an example invocation into words, honoring single and double quotes.
 fn words(line: &str) -> Vec<String> {
     let (mut out, mut cur, mut quote, mut started) = (Vec::new(), String::new(), None, false);
