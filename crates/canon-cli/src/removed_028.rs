@@ -37,26 +37,34 @@ pub struct Row {
     pub rule: &'static str,
     /// The release that removed the spelling.
     pub since: &'static str,
+    /// An option row only: the option's value becomes the operand of the replacement command, so the hint can name
+    /// the command the caller typed with the value filled in (see [`crate::removed`]).
+    pub operand: bool,
 }
 
 const V28: &str = "0.28.0";
 const V24: &str = "0.24.0";
 
 const fn command(old: &'static str, new: &'static str, note: &'static str, rule: &'static str) -> Row {
-    Row { kind: Kind::Command, old, scope: &[], new, note, rule, since: V28 }
+    Row { kind: Kind::Command, old, scope: &[], new, note, rule, since: V28, operand: false }
 }
 
 const fn bare(old: &'static str, new: &'static str, note: &'static str, rule: &'static str) -> Row {
-    Row { kind: Kind::Bare, old, scope: &[], new, note, rule, since: V28 }
+    Row { kind: Kind::Bare, old, scope: &[], new, note, rule, since: V28, operand: false }
 }
 
 const fn option(old: &'static str, scope: &'static [&'static str], new: &'static str, note: &'static str, rule: &'static str) -> Row {
-    Row { kind: Kind::Option, old, scope, new, note, rule, since: V28 }
+    Row { kind: Kind::Option, old, scope, new, note, rule, since: V28, operand: false }
+}
+
+/// An option whose value moved into the operand of `new` (or of the leaf it was typed on, when `scope` holds `new`).
+const fn operand(old: &'static str, scope: &'static [&'static str], new: &'static str, note: &'static str, rule: &'static str) -> Row {
+    Row { kind: Kind::Option, old, scope, new, note, rule, since: V28, operand: true }
 }
 
 /// An option 0.24 renamed; 0.25 stopped parsing the old name.
 const fn renamed_024(old: &'static str, scope: &'static [&'static str], new: &'static str) -> Row {
-    Row { kind: Kind::Option, old, scope, new, note: "", rule: "one name per concept", since: V24 }
+    Row { kind: Kind::Option, old, scope, new, note: "", rule: "one name per concept", since: V24, operand: false }
 }
 
 const CHANGE_OPERAND: &[&str] = &["brief show", "brief check", "brief approve"];
@@ -92,24 +100,24 @@ pub const ROWS: &[Row] = &[
     command("subject status", "subject show", "`subject move --to` changes the state", "D1 Renames"),
     // ── Modes that became leaves ──
     option("--check", &["report"], "report check", "", "D1 Renames"),
-    option("--snapshot", &["report"], "report snapshot", "the output directory is the operand", "D1 Renames"),
+    operand("--snapshot", &["report"], "report snapshot", "the output directory is the operand", "D1 Renames"),
     option("--check", &["format"], "format", "`format` always validates; drop the flag", "D12"),
     option("--check-config", &["init"], "--check", "", "D1 Renames"),
     // ── Primary object moved into the operand ──
-    option("--change-id", CHANGE_OPERAND, "brief show", "the change is the operand", "D1 r2"),
-    option("--change", CHANGE_OPERAND, "brief show", "the change is the operand", "D1 r2"),
-    option("--change-id", &["finding close"], "finding close", "the change is the operand", "D1 r2"),
-    option("--run-id", &["dispatch end"], "dispatch end", "the run is the operand", "D1 r1"),
-    option("--subject-id", &["subject adopt", "subject unadopt"], "subject adopt", "the subject is the operand and the change is `--change-id`", "D1 r1"),
-    option("--name", &["prompt add", "prompt show"], "prompt add", "name and version are one operand, name@version", "D1 r1, D12"),
-    option("--version", &["prompt add", "prompt show"], "prompt add", "name and version are one operand, name@version", "D1 r1, D12"),
-    option("--scenario-id", SCENARIO_OPERAND, "divergence add", "the scenario is the operand", "D1 r2"),
-    option("--scenario-id", &["review scenario"], "review scenario", "the scenarios are operands", "D1 r2"),
+    operand("--change-id", CHANGE_OPERAND, "brief show", "the change is the operand", "D1 r2"),
+    operand("--change", CHANGE_OPERAND, "brief show", "the change is the operand", "D1 r2"),
+    operand("--change-id", &["finding close"], "finding close", "the change is the operand", "D1 r2"),
+    operand("--run-id", &["dispatch end"], "dispatch end", "the run is the operand", "D1 r1"),
+    operand("--subject-id", &["subject adopt", "subject unadopt"], "subject adopt", "the subject is the operand and the change is `--change-id`", "D1 r1"),
+    operand("--name", &["prompt add", "prompt show"], "prompt add", "name and version are one operand, name@version", "D1 r1, D12"),
+    operand("--version", &["prompt add", "prompt show"], "prompt add", "name and version are one operand, name@version", "D1 r1, D12"),
+    operand("--scenario-id", SCENARIO_OPERAND, "divergence add", "the scenario is the operand", "D1 r2"),
+    operand("--scenario-id", &["review scenario"], "review scenario", "the scenarios are operands", "D1 r2"),
     option("--scenario-ids-from", &["review scenario"], "--input", "a batch is an `--input` array", "D7"),
-    option("--change-id", &["review scenario"], "review change", "a chore change is reviewed with `review change`", "D1 Renames"),
-    option("--scenario-id", &["review change"], "review scenario", "scenarios are reviewed with `review scenario`", "D1 Renames"),
+    operand("--change-id", &["review scenario"], "review change", "a chore change is reviewed with `review change`", "D1 Renames"),
+    operand("--scenario-id", &["review change"], "review scenario", "scenarios are reviewed with `review scenario`", "D1 Renames"),
     option("--scenario-ids-from", &["review change"], "review scenario", "scenarios are reviewed with `review scenario`", "D1 Renames"),
-    option("--change-id", &["review change"], "review change", "the change is the operand", "D1 r2"),
+    operand("--change-id", &["review change"], "review change", "the change is the operand", "D1 r2"),
     option("--from", &["scenario new"], "--input", "a batch is an `--input` array with `operands` per element", "D7"),
     option("--all", &["schema"], "schema", "the listing is unfiltered; `--as` filters it by role", "D3"),
     // ── Attribution and approval options ──

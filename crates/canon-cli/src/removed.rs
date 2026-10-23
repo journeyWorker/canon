@@ -57,6 +57,62 @@ impl Removed {
     fn from_row(row: &'static Row, command: String, used: String, field: String) -> Removed {
         Removed { command, used, replacement: row.new.to_string(), note: row.note, field, since: row.since }
     }
+
+    /// A removed option whose value became an operand: the replacement is the line the caller typed, on the
+    /// leaf the row names (the typed leaf when it is one of the row's own), with the value as the operand
+    /// and every other token kept, so it runs as it stands.
+    fn operand_row(row: &'static Row, command: String, used: String, args: &[String], path_at: &[usize]) -> Removed {
+        let mut taken = vec![false; args.len()];
+        for &i in path_at {
+            taken[i] = true;
+        }
+        let leaf = if row.scope.contains(&row.new) { command.as_str() } else { row.new };
+        let mut operand = take_option(args, &used, &mut taken);
+        if row.scope.iter().any(|scope| scope.starts_with("prompt ")) {
+            // `--name` and `--version` are one operand, name@version.
+            let (other, joined) = if used == "--name" { ("--version", true) } else { ("--name", false) };
+            let sibling = take_option(args, other, &mut taken);
+            operand = match (operand, sibling) {
+                (Some(a), Some(b)) if joined => Some(format!("{a}@{b}")),
+                (Some(a), Some(b)) => Some(format!("{b}@{a}")),
+                _ => None,
+            };
+        }
+        let mut words: Vec<String> = leaf.split(' ').map(str::to_string).collect();
+        words.extend(operand.map(|value| shell_word(&value)));
+        words.extend(args.iter().zip(&taken).filter(|(_, taken)| !**taken).map(|(arg, _)| shell_word(arg)));
+        Removed { command, used: used.clone(), replacement: words.join(" "), note: row.note, field: used, since: row.since }
+    }
+}
+
+/// The value of the option `name` (`--name value` or `--name=value`) in `args`,
+/// marking the tokens it used in `taken`; nothing after `--` is read.
+fn take_option(args: &[String], name: &str, taken: &mut [bool]) -> Option<String> {
+    for (i, arg) in args.iter().enumerate() {
+        if arg == "--" {
+            break;
+        }
+        if arg == name {
+            let value = args.get(i + 1).filter(|value| !value.starts_with("--"))?;
+            taken[i] = true;
+            taken[i + 1] = true;
+            return Some(value.clone());
+        }
+        if let Some(value) = arg.strip_prefix(name).and_then(|rest| rest.strip_prefix('=')) {
+            taken[i] = true;
+            return Some(value.to_string());
+        }
+    }
+    None
+}
+
+/// `word` as one shell word: as it is when it is plain, else in single quotes.
+fn shell_word(word: &str) -> String {
+    if !word.is_empty() && word.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_./:@=,+%".contains(&b)) {
+        word.to_string()
+    } else {
+        format!("'{}'", word.replace('\'', "'\\''"))
+    }
 }
 
 /// Whether `row` removed the option `old` on the command at `path`.
@@ -93,6 +149,7 @@ pub fn find(root: &Command, args: &[String]) -> Option<Removed> {
     root.build();
     let mut cmd = &root;
     let mut path: Vec<String> = Vec::new();
+    let mut path_at: Vec<usize> = Vec::new();
     let mut i = 0;
     while i < args.len() {
         let token = args[i].as_str();
@@ -119,6 +176,9 @@ pub fn find(root: &Command, args: &[String]) -> Option<Removed> {
                 }
                 None => {
                     if let Some(row) = option_row(&format!("--{name}"), &here) {
+                        if row.operand {
+                            return Some(Removed::operand_row(row, here, format!("--{name}"), args, &path_at));
+                        }
                         return Some(Removed::from_row(row, here, format!("--{name}"), format!("--{name}")));
                     }
                 }
@@ -139,6 +199,7 @@ pub fn find(root: &Command, args: &[String]) -> Option<Removed> {
             }
         } else if let Some(sub) = cmd.find_subcommand(token) {
             path.push(sub.get_name().to_string());
+            path_at.push(i);
             cmd = sub;
         } else if cmd.has_subcommands() {
             let following: Vec<&str> = args[i + 1..].iter().map(String::as_str).take_while(|a| !a.starts_with('-')).collect();

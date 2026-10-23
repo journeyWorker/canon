@@ -66,6 +66,17 @@ impl Role {
     }
 }
 
+/// The attribution of a record a leaf writes without a `--role` option: the
+/// declared role when there is one (D12), else `fallback` (what the leaf
+/// recorded before roles were declared; `None` records no role).
+pub fn attributed(agent_id: &str, fallback: Option<&canon_model::RoleId>) -> canon_model::Actor {
+    let declared = Role::current(None).map(|role| canon_model::RoleId::parse(role.as_str()).expect("a role name is a valid role id"));
+    match declared.as_ref().or(fallback) {
+        Some(role) => canon_model::Actor::new(agent_id, role.clone()),
+        None => canon_model::Actor::new_unattributed(agent_id),
+    }
+}
+
 impl std::fmt::Display for Role {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())

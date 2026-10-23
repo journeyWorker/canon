@@ -71,9 +71,17 @@ fn every_removed_spelling_exits_2_with_a_hint_naming_its_replacement() {
             assert_eq!(body["ok"], Value::Bool(false), "canon {shown}: {body}");
             assert_eq!(body["error"]["code"], "USAGE", "canon {shown}: {body}");
             let hint = body["error"]["hint"].as_str().unwrap_or_default();
-            assert!(hint.contains(row.new), "canon {shown}: hint lacks {:?}: {hint}", row.new);
             let expected: Vec<&str> = body["error"]["expected"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
-            assert!(expected.contains(&row.new), "canon {shown}: expected lacks {:?}: {expected:?}", row.new);
+            if row.operand {
+                // The typed leaf when it is one the row applies to, else the row's replacement.
+                let typed = argv[..argv.len() - 2].join(" ");
+                let leaf = if row.scope.contains(&row.new) { typed.as_str() } else { row.new };
+                assert!(hint.contains(&format!("canon {leaf}")), "canon {shown}: hint lacks `canon {leaf}`: {hint}");
+                assert!(expected.iter().any(|line| line.starts_with(leaf)), "canon {shown}: expected lacks {leaf:?}: {expected:?}");
+            } else {
+                assert!(hint.contains(row.new), "canon {shown}: hint lacks {:?}: {hint}", row.new);
+                assert!(expected.contains(&row.new), "canon {shown}: expected lacks {:?}: {expected:?}", row.new);
+            }
             exercised += 1;
         }
     }
@@ -129,5 +137,52 @@ fn the_spec_carries_the_whole_table() {
     for (spec_row, row) in removed.iter().zip(ROWS) {
         assert_eq!(spec_row["old"], row.old);
         assert_eq!(spec_row["new"], row.new);
+    }
+}
+
+/// A removed option whose value became an operand: the hint is the line the
+/// caller typed, on the leaf it typed, with the value filled in, and that line
+/// parses against the CLI.
+#[test]
+fn an_operand_hint_names_the_typed_leaf_with_the_typed_values() {
+    let cases: &[(&str, &str)] = &[
+        ("brief show --change-id pause-menu", "brief show pause-menu"),
+        ("brief check --change-id pause-menu", "brief check pause-menu"),
+        ("brief check --change=pause-menu", "brief check pause-menu"),
+        ("brief approve --change-id pause-menu --approver alice --note ok", "brief approve pause-menu --approver alice --note ok"),
+        ("brief approve --change pause-menu --approver alice --note ok", "brief approve pause-menu --approver alice --note ok"),
+        ("subject adopt --subject-id cart --change-id add-cart", "subject adopt cart --change-id add-cart"),
+        ("subject unadopt --subject-id cart --change-id add-cart", "subject unadopt cart --change-id add-cart"),
+        ("dispatch end --run-id 01ARZ3NDEKTSV4RRFFQ69G5FAV --run-outcome succeeded", "dispatch end 01ARZ3NDEKTSV4RRFFQ69G5FAV --run-outcome succeeded"),
+        ("prompt show --name p --version 1", "prompt show p@1"),
+        ("prompt show --version 1 --name p", "prompt show p@1"),
+        ("prompt add --name p --version 1 --manifest m.json", "prompt add p@1 --manifest m.json"),
+        ("divergence add --scenario-id a.b.01 --actor-id x", "divergence add a.b.01 --actor-id x"),
+        ("divergence defer --scenario-id a.b.01 --actor-id x --reason r --expiry 2030-01-01", "divergence defer a.b.01 --actor-id x --reason r --expiry 2030-01-01"),
+        ("divergence resolve --scenario-id a.b.01 --actor-id x", "divergence resolve a.b.01 --actor-id x"),
+        ("divergence accept --scenario-id a.b.01 --reason r --tracking t --actor-id x", "divergence accept a.b.01 --reason r --tracking t --actor-id x"),
+        ("finding close --change-id c1 --round 1 --seq 1 --disposition fixed", "finding close c1 --round 1 --seq 1 --disposition fixed"),
+        ("review scenario --scenario-id a.b.01 --actor-id x --upstream-ref u", "review scenario a.b.01 --actor-id x --upstream-ref u"),
+        ("review change --change-id c1 --actor-id x --upstream-ref u", "review change c1 --actor-id x --upstream-ref u"),
+        ("review scenario --change-id c1 --actor-id x --upstream-ref u", "review change c1 --actor-id x --upstream-ref u"),
+        ("review change --scenario-id a.b.01 --actor-id x --upstream-ref u", "review scenario a.b.01 --actor-id x --upstream-ref u"),
+        ("report --snapshot out", "report snapshot out"),
+    ];
+    let dir = tempfile::tempdir().unwrap();
+    for (typed, runnable) in cases {
+        let argv: Vec<&str> = typed.split(' ').collect();
+        let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(&argv).arg("--json").current_dir(dir.path()).output().expect("spawn canon");
+        assert_eq!(out.status.code(), Some(2), "canon {typed}: {}", String::from_utf8_lossy(&out.stdout));
+        let body: Value = serde_json::from_slice(&out.stdout).unwrap();
+        let expected: Vec<&str> = body["error"]["expected"].as_array().unwrap().iter().filter_map(Value::as_str).collect();
+        let first = expected.first().copied().unwrap_or_default();
+        // `--json` was typed after the leaf, so it rides along; the runnable line is the typed line less the removed spelling.
+        assert_eq!(first, format!("{runnable} --json"), "canon {typed}: {body}");
+        let hint = body["error"]["hint"].as_str().unwrap();
+        assert!(hint.contains(&format!("canon {first}")), "canon {typed}: {hint}");
+        let words: Vec<&str> = std::iter::once("canon").chain(first.split(' ')).collect();
+        if let Err(e) = tree().try_get_matches_from(words) {
+            panic!("`canon {first}` does not parse: {e}");
+        }
     }
 }

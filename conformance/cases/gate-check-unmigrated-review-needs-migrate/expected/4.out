@@ -1,6 +1,5 @@
 canon migrate: plan:
   .gitignore: add .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/
-  rebuild the scenario index (full sync)
   left: .canon stays where it is: the openspec reader cannot read it (invalid-change-id-grammar)
   left: .git stays where it is: the openspec reader cannot read it (invalid-change-id-grammar)
 canon migrate: added to .gitignore: .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/
