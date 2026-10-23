@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-1"
+  },
+  "at": "2026-10-23T13:10:22.664343418Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/policy.rs:48-80",
+  "kind": "finding",
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "scenario_ids": [
+    "policy.expressions.30"
+  ],
+  "schema": 1,
+  "seq": 22,
+  "severity": "should_fix",
+  "summary": "Standards pass: policy.expressions.30's Then 'neither canon's .gitignore nor the one canon init writes ignores the approval file' is never asserted. Mutation confirmed: putting .canon/policy.approval.json into init.rs GITIGNORE_LINES stays green",
+  "worktree_dirty": false
+}

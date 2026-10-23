@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-1"
+  },
+  "at": "2026-10-23T13:09:49.945591649Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/run/skills.rs:38-93",
+  "kind": "finding",
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "scenario_ids": [
+    "skills.install.07"
+  ],
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Standards pass: `canon skills install --providers gemini` (and check/doctor on an unknown provider) exits 1 SKILLS_FAILED, but D4 makes an invalid argument a refusal (exit 2) as `init --providers` already does (INIT_INVALID_ARGUMENT); the hint about a writable target is wrong too, and spec028_b.rs:185 asserts only non-zero so it hides this. Blast radius: skills check/doctor share the same mapping",
+  "worktree_dirty": false
+}

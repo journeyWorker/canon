@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-1"
+  },
+  "at": "2026-10-23T13:09:56.404637507Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/subject.rs:1002-1024",
+  "kind": "finding",
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "scenario_ids": [
+    "gate.check.40"
+  ],
+  "schema": 1,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "Spec fidelity pass: gate.check.40 says `canon gate check` exits 1 with unreviewed-promotion naming canon migrate, but its bound test asserts the gate exits 0 on a building subject (subject.rs:1016); only the subject-move guard refuses. Bind or add a case where the gate itself raises it (migrate_pins_01 does)",
+  "worktree_dirty": false
+}

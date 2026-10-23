@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-1"
+  },
+  "at": "2026-10-23T13:10:16.586936696Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/spec028_c.rs:381-457",
+  "kind": "finding",
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "scenario_ids": [
+    "context.capability.35",
+    "context.capability.36"
+  ],
+  "schema": 1,
+  "seq": 18,
+  "severity": "should_fix",
+  "summary": "Standards pass: context.capability.35/.36 'the removed spelling in field' is never asserted for removed leaves and for 5 of 6 removed options. Mutation confirmed: removed.rs:211 field = the 0.28 spelling stays green",
+  "worktree_dirty": false
+}

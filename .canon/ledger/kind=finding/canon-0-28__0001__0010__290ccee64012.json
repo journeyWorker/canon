@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-1"
+  },
+  "at": "2026-10-23T13:10:04.481115576Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/commits.rs:226-234",
+  "kind": "finding",
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "scenario_ids": [
+    "review.add.98"
+  ],
+  "schema": 1,
+  "seq": 10,
+  "severity": "should_fix",
+  "summary": "Standards pass: review.add.98 Thens 2-3 ('so the review is current' / 'no longer covers it') are asserted only with the test's own git_rev::code_tree calls; no canon surface judges the review, and canon-gate's review_gate.rs never reads code_tree, so the scenario claims behaviour canon does not implement for reviews",
+  "worktree_dirty": false
+}
