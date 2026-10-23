@@ -613,6 +613,24 @@ fn canon(args: &[&str], source: &Path, target: &Path) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_canon")).args(args).arg("--skills-source").arg(source).arg("--repo").arg(target).output().unwrap()
 }
 
+/// skills.install.55: a `--skills-source` directory that does not exist is an invalid argument too: exit 2 from install, check and doctor, nothing written.
+#[test]
+fn skills_install_55_a_missing_skills_source_is_refused_with_exit_two() {
+    let tmp = tempfile::tempdir().unwrap();
+    let target = tmp.path().join("target");
+    fs::create_dir_all(target.join(".claude")).unwrap();
+    fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
+    let missing = tmp.path().join("no-such-source");
+    for command in ["install", "check", "doctor"] {
+        let output = canon(&["skills", command, "--providers", "claude", "--json"], &missing, &target);
+        assert_eq!(output.status.code(), Some(2), "{command}: {}", String::from_utf8_lossy(&output.stdout));
+        let doc: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(doc["error"]["code"], "SKILLS_INVALID_ARGUMENT", "{command}: {doc}");
+        assert_eq!(doc["error"]["field"], "--skills-source", "{command}: {doc}");
+    }
+    assert!(!target.join(".claude/skills").exists() && !target.join(".canon").exists(), "nothing is written");
+}
+
 /// skills.install.40
 #[test]
 fn skills_install_40_the_lock_records_the_canon_version_and_the_source_commit() {
@@ -916,7 +934,7 @@ fn skills_install_55_a_malformed_skills_section_fails_loud() {
 
         let check = Command::new(env!("CARGO_BIN_EXE_canon")).args(["init", "--check", "--repo"]).arg(&target).output().unwrap();
         let out = String::from_utf8_lossy(&check.stdout);
-        assert_eq!(check.status.code(), Some(2), "{out}");
+        assert_eq!(check.status.code(), Some(1), "{out}");
         assert!(out.lines().any(|line| line.starts_with("[FAIL] skills: ") && line.contains(needle)), "{out}");
     }
 }

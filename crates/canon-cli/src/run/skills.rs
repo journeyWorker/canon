@@ -167,7 +167,7 @@ fn run_skills_show(name: &str, full: bool, json: bool) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// A failed skills command. An unknown provider or a malformed `skills:` section is an invalid argument, a refusal (exit 2, D4); anything else is an operational failure (exit 1).
+/// A failed skills command. An unknown provider, a malformed `skills:` section or a `--skills-source` directory that does not exist is an invalid argument, a refusal (exit 2, D4); anything else is an operational failure (exit 1).
 fn skills_error(err: &crate::skills::SkillsError) -> CliError {
     use crate::skills::SkillsError;
     match err {
@@ -177,7 +177,7 @@ fn skills_error(err: &crate::skills::SkillsError) -> CliError {
             .expected(["claude", "codex", "omp", "pi", "none"])
             .hint("pass `--providers` any subset of claude, codex, omp, pi (comma-separated), or `none`"),
         SkillsError::Config(_) => CliError::refused("SKILLS_INVALID_ARGUMENT", err.to_string()).hint("fix the `skills:` section of canon.yaml (`skills: { providers: [claude, codex, omp, pi] }`, any subset, `[]` for none), or pass `--providers`"),
-        SkillsError::SourceNotFound(_) | SkillsError::CanonicalSourceMissing(_) => CliError::failed("SKILLS_FAILED", err.to_string()).hint("point `--skills-source` at a directory that holds `SKILL.src.md`, or drop it to use the text built into canon"),
+        SkillsError::SourceNotFound(_) | SkillsError::CanonicalSourceMissing(_) => CliError::refused("SKILLS_INVALID_ARGUMENT", err.to_string()).field("--skills-source").hint("point `--skills-source` at a directory that holds `SKILL.src.md`, or drop it to use the text built into canon"),
         _ => CliError::failed("SKILLS_FAILED", err.to_string()).hint("check that the target directory is writable; `canon skills doctor` diagnoses the installation"),
     }
 }

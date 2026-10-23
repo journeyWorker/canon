@@ -1047,7 +1047,8 @@ fn an_unmigrated_review_does_not_count_and_the_gate_itself_refuses_a_verifying_s
     let gate = run(dir.path(), &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(1), "{}", stdout(&gate));
     let out = stdout(&gate);
-    assert!(out.contains("unreviewed-promotion world.demo.01") && out.contains("`canon migrate`"), "{out}");
+    let violation = out.lines().find(|line| line.contains("unreviewed-promotion world.demo.01")).unwrap_or_else(|| panic!("the gate raises it: {out}"));
+    assert!(violation.contains("predates 0.23 review pinning") && violation.contains("`canon migrate` rewrites it"), "the violation line itself names the cause and the repair: {violation}");
     assert!(out.contains(&format!("advisory: {UNMIGRATED_ADVISORY}\n")), "{out}");
     assert_eq!(current_subject(dir.path())["status"], "verifying");
 }

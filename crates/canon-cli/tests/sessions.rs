@@ -184,6 +184,12 @@ fn every_write_command_stages_or_writes_directly_as_its_mode_says() {
     let findings = committed(repo, "finding");
     assert!(!findings.is_empty() && findings.iter().all(|finding| finding["disposition"] == "rejected"), "the close promotes its record in the run: {findings:?}");
     assert!(records_under(repo, "_staging").is_empty(), "nothing is left to promote");
+    // With --no-promote the close stays staged and the committed finding keeps its disposition.
+    ok(repo, &["finding", "close", "cats", "--round", "1", "--seq", "1", "--disposition", "deferred", "--reason", "later", "--no-promote"]);
+    assert_eq!(records_under(repo, "_staging").len(), 1, "the close with --no-promote is staged");
+    assert!(committed(repo, "finding").iter().all(|finding| finding["disposition"] == "rejected"), "and the ledger still holds the earlier disposition: {:?}", committed(repo, "finding"));
+    ok(repo, &["gate", "promote"]);
+    assert!(records_under(repo, "_staging").is_empty(), "nothing is left to promote");
 
     direct(&[
         "review", "scenario", "game.run.01", "--project-id", "root", "--actor-id", "r", "--original-spec-ref", "specs/x.feature",

@@ -417,7 +417,9 @@ fn context_capability_36_a_removed_option_is_exit_two_with_the_option_that_repla
             continue;
         }
         let hint = error["hint"].as_str().unwrap_or_default();
-        assert!(hint.contains(replacement), "{args:?}: the hint names {replacement}: {error}");
+        let expected: Vec<&str> = error["expected"].as_array().expect("expected").iter().filter_map(Value::as_str).collect();
+        assert!(expected.iter().any(|e| e.split_whitespace().next() == Some(replacement)), "{args:?}: `expected` leads with the replacing option {replacement}: {error}");
+        assert!(hint.split('`').skip(1).step_by(2).any(|quoted| quoted.split_whitespace().any(|word| word == replacement)), "{args:?}: the hint quotes {replacement} as a whole option: {error}");
         let node = json_of(&canon(dir.path(), &[&["schema"][..], &leaf.split(' ').collect::<Vec<_>>(), &["--json"]].concat()));
         let options: Vec<&str> = node["data"]["options"].as_array().expect("options").iter().map(|o| o["name"].as_str().expect("name")).collect();
         assert!(options.contains(&replacement.trim_start_matches("--")), "`canon {leaf}` takes {replacement}: {options:?}");

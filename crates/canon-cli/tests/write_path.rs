@@ -185,7 +185,7 @@ fn a_malformed_write_section_or_both_flags_are_refused_before_anything_is_staged
     assert_eq!(staged(repo), 0);
 
     let check = canon(repo, &["init", "--check", "--repo", "."]);
-    assert_eq!(check.status.code(), Some(2), "CONFIG_UNREADABLE exits 2");
+    assert_eq!(check.status.code(), Some(1), "a failed section is a failed check: CONFIG_CHECK_FAILED exits 1");
     assert!(stdout(&check).contains("[FAIL] write:"), "{}", stdout(&check));
 
     std::fs::write(repo.join("canon.yaml"), &yaml).unwrap();

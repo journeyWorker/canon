@@ -6635,6 +6635,7 @@
       "effect": "write",
       "errorCodes": [
         "CONFIG_MISSING",
+        "CONFIG_UNREADABLE",
         "INGEST_FAILED",
         "INPUT_CONFLICT",
         "INPUT_ELEMENT_FAILED",
@@ -6809,8 +6810,8 @@
       "effect": "write",
       "effectNote": "--check writes nothing",
       "errorCodes": [
+        "CONFIG_CHECK_FAILED",
         "CONFIG_MISSING",
-        "CONFIG_UNREADABLE",
         "INIT_AGENTS_MD_CONFLICT",
         "INIT_CONFIG_EXISTS",
         "INIT_INVALID_ARGUMENT",
@@ -12965,6 +12966,13 @@
       "retryable": false
     },
     {
+      "code": "CONFIG_CHECK_FAILED",
+      "exit": 1,
+      "fix": "Fix each section `data.sections` marks FAIL, then run `canon init --check` again.",
+      "meaning": "`init --check` ran and a present canon.yaml section fails its loader",
+      "retryable": false
+    },
+    {
       "code": "CONFIG_MISSING",
       "exit": 2,
       "fix": "Run `canon init` or pass --repo <DIR> to a directory holding canon.yaml.",
@@ -13822,7 +13830,7 @@
       "code": "SKILLS_INVALID_ARGUMENT",
       "exit": 2,
       "fix": "Name providers from claude, codex, omp, pi (or none), and keep the canon.yaml `skills:` section a mapping whose `providers` is a list of those names.",
-      "meaning": "a skill provider is unknown, or the `skills:` section of canon.yaml is malformed",
+      "meaning": "a skill provider is unknown, the `skills:` section of canon.yaml is malformed, or the `--skills-source` directory does not exist",
       "retryable": false
     },
     {

@@ -49,7 +49,9 @@ fn approve_records_the_policy_digest_the_approver_the_time_and_the_note() {
     let dir = initialized_repo();
     let repo = dir.path();
 
+    let started = chrono::Utc::now();
     let out = run_canon(&["policy", "approve", "--approver", "alice", "--note", "reviewed the starter policy"], repo);
+    let finished = chrono::Utc::now();
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
     assert!(without_next(&stdout(&out)).ends_with("— written directly; nothing to promote\n"), "the direct-write suffix: {}", stdout(&out));
 
@@ -58,7 +60,8 @@ fn approve_records_the_policy_digest_the_approver_the_time_and_the_note() {
     assert_eq!(recorded["policy_digest"], format!("sha256:{:x}", Sha256::digest(&policy)), "{recorded}");
     assert_eq!(recorded["approved_by"], "alice");
     assert_eq!(recorded["note"], "reviewed the starter policy");
-    assert!(chrono::DateTime::parse_from_rfc3339(recorded["approved_at"].as_str().unwrap()).is_ok(), "{recorded}");
+    let at = chrono::DateTime::parse_from_rfc3339(recorded["approved_at"].as_str().unwrap()).expect("RFC3339").with_timezone(&chrono::Utc);
+    assert!(started - chrono::Duration::seconds(1) <= at && at <= finished + chrono::Duration::seconds(1), "approved_at is the time of the run: {at} not within {started}..{finished}");
     let text = std::fs::read_to_string(repo.join(APPROVAL)).unwrap();
     assert!(text.starts_with("{\n  \""), "pretty JSON: {text}");
 

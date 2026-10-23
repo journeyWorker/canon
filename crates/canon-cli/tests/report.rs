@@ -87,16 +87,18 @@ fn check_exit_codes_track_missing_no_drift_and_drift_across_the_full_lifecycle()
     assert!(stderr(&drift).contains("DRIFT"), "{}", stderr(&drift));
 }
 
-fn files_under(dir: &Path) -> Vec<(std::path::PathBuf, Vec<u8>)> {
+/// Every file (with its bytes) and every directory (with `None`) under `dir`.
+fn files_under(dir: &Path) -> Vec<(std::path::PathBuf, Option<Vec<u8>>)> {
     let mut out = Vec::new();
     let mut stack = vec![dir.to_path_buf()];
     while let Some(current) = stack.pop() {
         for entry in std::fs::read_dir(&current).unwrap().flatten() {
             let path = entry.path();
             if path.is_dir() {
+                out.push((path.clone(), None));
                 stack.push(path);
             } else {
-                out.push((path.clone(), std::fs::read(&path).unwrap()));
+                out.push((path.clone(), Some(std::fs::read(&path).unwrap())));
             }
         }
     }
@@ -114,6 +116,9 @@ fn report_check_over_empty_sources_reports_no_drift_creates_nothing_and_leaves_n
     std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap();
     let write = run_canon(&["report", "build", "--repo", "."], dir.path());
     assert!(write.status.success(), "stderr: {}", stderr(&write));
+    // The check must work from a repo with no ledger directory at all, and leave it that way.
+    let _ = std::fs::remove_dir_all(dir.path().join(".canon/ledger"));
+    assert!(!dir.path().join(".canon/ledger").exists());
     let before = files_under(dir.path());
 
     // A private temp dir for the child: whatever scratch the run makes lands here.

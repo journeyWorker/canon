@@ -946,7 +946,7 @@ pub fn run_check_config(repo: &Path, json: bool) -> i32 {
         }
         0
     } else {
-        CliError::failed("CONFIG_UNREADABLE", "a present canon.yaml section fails its loader").hint("data.sections names each failing section").emit_with_data("canon init --check", json, &data)
+        CliError::failed("CONFIG_CHECK_FAILED", "a present canon.yaml section fails its loader").hint("data.sections names each failing section").emit_with_data("canon init --check", json, &data)
     }
 }
 

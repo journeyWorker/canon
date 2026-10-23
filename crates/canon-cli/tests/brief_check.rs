@@ -375,7 +375,7 @@ fn init_language_is_validated_recorded_and_checked() {
 
     std::fs::write(dir.path().join("canon.yaml"), std::fs::read_to_string(dir.path().join("canon.yaml")).unwrap().replace("language: ko", "language: 한국어")).unwrap();
     let out = run(dir.path(), &["init", "--check"]);
-    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(out.status.code(), Some(1));
     assert!(stdout(&out).contains("[FAIL] language"), "{}", stdout(&out));
 }
 

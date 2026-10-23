@@ -349,7 +349,7 @@ fn ingest_sessions_dry_run_refuses_like_the_real_run() {
     std::fs::write(root.join("canon.yaml"), "tiers: [unclosed\n").unwrap();
     assert_eq!(
         bad_preview(&["ingest", "sessions", "--home", home.path().to_str().unwrap(), "--all-workspaces"], root, &[root, home.path()]),
-        "INGEST_FAILED"
+        "CONFIG_UNREADABLE"
     );
 }
 

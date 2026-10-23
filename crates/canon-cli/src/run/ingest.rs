@@ -50,7 +50,11 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
                 }
             }
             Err(err) => {
-                return ExitCode::from(CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again").emit("canon ingest sessions", json) as u8);
+                let error = match &err {
+                    crate::ingest::IngestError::Config(message) => CliError::refused("CONFIG_UNREADABLE", message.clone()).hint("fix the `ingest:` section of canon.yaml the message names, then run the command again"),
+                    _ => CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again"),
+                };
+                return ExitCode::from(error.emit("canon ingest sessions", json) as u8);
             }
         }
         if !watch {

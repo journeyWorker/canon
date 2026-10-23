@@ -5,4 +5,4 @@ steps:
   - args: [finding, add, --change-id, c-cart, --round, "1", --seq, "1", --severity, note, --actor-id, r, --summary, s]
     exit: 2
   - args: [init, --check]
-    exit: 2
+    exit: 1

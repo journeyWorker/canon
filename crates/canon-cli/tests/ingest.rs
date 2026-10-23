@@ -182,8 +182,12 @@ fn capture_privacy_rejects_an_absent_zero_or_negative_bound_and_persists_nothing
         std::fs::write(fixture.canon_yaml_path(), privacy_yaml(&format!("      capture_user_directives: true\n{bound}"))).unwrap();
         let before = fixture.git_file_count();
 
-        let output = run_canon_ingest(&fixture, &["--home", &home.path().display().to_string(), "--all-workspaces"]);
-        assert!(!output.status.success(), "bound {bound:?} must be rejected; stdout: {}", support::stdout(&output));
+        let output = run_canon_ingest(&fixture, &["--home", &home.path().display().to_string(), "--all-workspaces", "--json"]);
+        assert_eq!(output.status.code(), Some(2), "bound {bound:?} is a refused config, not a crash or a failed run; stdout: {}", support::stdout(&output));
+        let doc: Value = serde_json::from_slice(&output.stdout).expect("a refusal is one JSON document");
+        assert_eq!(doc["ok"], false, "{doc}");
+        assert_eq!(doc["error"]["code"], "CONFIG_UNREADABLE", "{doc}");
+        assert!(doc["error"]["message"].as_str().is_some_and(|m| m.contains("max_directive_chars") || m.contains("`ingest:` section")), "the error names the config key or section: {doc}");
         assert_eq!(fixture.git_file_count(), before, "bound {bound:?}: nothing may be persisted");
     }
 }
