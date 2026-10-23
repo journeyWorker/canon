@@ -1,6 +1,6 @@
 # Canon 0.28.0: one CLI grammar, generated from one spec
 
-- **Status:** PLANNED. 0.26.0 and 0.27.0 (#109, #110) have shipped; starts on owner go.
+- **Status:** APPROVED 2026-10-23 (all owner decisions taken). Implementation on branch `feat/0.28`.
 - **Base:** `main` at 0.27.0.
 - **Version:** 0.28.0 (minor). One release carries the whole grammar change set as a clean cutover: no deprecated aliases (owner decision 2026-10-22).
 - **Evidence:**

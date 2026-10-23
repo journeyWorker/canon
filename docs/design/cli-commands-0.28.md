@@ -455,9 +455,9 @@ Taken from the second review round and applied to the plan (D12) and to every ro
 | — | `skills get` against D1's verb list | `skills show <NAME>` | `skills show` |
 | — | `--fields <A,B>` | `--fields <FIELDS>`, one comma list | `status`, `context`, `query`, `export`, `finding list`, `divergence list` |
 
-## Open for the owner
+## Decided by the owner (2026-10-23)
 
-Everything the plan's rules decide is decided above, and round 2 decided O3, O4, O5, O6, O13 and O14 (next section). These are the points the rules still leave open; the table assumes each recommendation (D12), so a different answer changes the named rows only.
+Round 2 decided O3, O4, O5, O6, O13 and O14 (next section). The owner took every remaining recommendation below as decided (O1, O2, O7–O12, O15, O16); the table already applies them.
 
 | # | Question | Recommendation | Rows that change |
 | --- | --- | --- | --- |
