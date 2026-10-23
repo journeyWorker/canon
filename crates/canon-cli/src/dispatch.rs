@@ -834,7 +834,7 @@ pub fn run_begin(
             // report — `run_diff`'s own note discipline, applied to
             // the one degrade a dispatch can carry.
             if let Some(reason) = begun.tier.degrade_reason() {
-                eprintln!(
+                crate::warn_err!(
                     "canon dispatch begin: run {} was NOT persisted to its routed tier ({reason}) — the manifest at {} is its only home; `canon dispatch diff` still reads it from there",
                     begun.run_id,
                     begun.manifest_path.display()
@@ -1301,7 +1301,7 @@ pub fn run_end(repo: &Path, run_id: RunId, status: RunStatus, json: bool) -> Exi
                 crate::next::finish(repo, "dispatch end", &crate::next::Scope::Repo, false, false, &crate::json_out::untyped(serde_json::Value::Null));
             }
             if let Some(reason) = ended.tier.degrade_reason() {
-                eprintln!(
+                crate::warn_err!(
                     "canon dispatch end: the close of run {} was NOT persisted to its routed tier ({reason}) — the tier still holds whatever `dispatch begin` left there (the `running` version, or nothing if that write degraded too); the closed manifest at {} is the current record",
                     ended.run_id,
                     ended.manifest_path.display()
@@ -1920,10 +1920,15 @@ fn format_json(diff: &PlanActualDiff) -> String {
 /// fact to surface, not a rule anything broke.
 pub fn run_diff(repo: &Path, json: bool) -> ExitCode {
     let report = diff(repo);
-    for note in &report.notes {
-        eprintln!("canon dispatch diff: {note}");
+    if json {
+        let data: serde_json::Value = serde_json::from_str(&format_json(&report)).expect("the diff report is one JSON value");
+        crate::json_out::data_with_meta("dispatch diff", &crate::json_out::untyped(data), crate::json_out::warnings_meta(&report.notes.iter().map(|note| format!("canon dispatch diff: {note}")).collect::<Vec<_>>()));
+        return ExitCode::SUCCESS;
     }
-    println!("{}", if json { format_json(&report) } else { format_human(&report) });
+    for note in &report.notes {
+        crate::human_err!("canon dispatch diff: {note}");
+    }
+    println!("{}", format_human(&report));
     ExitCode::SUCCESS
 }
 

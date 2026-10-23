@@ -189,7 +189,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         crate::write_mode::DIRECT
     );
     for warning in &warnings {
-        eprintln!("canon change new: warning: {warning}");
+        crate::human_err!("canon change new: warning: {warning}");
     }
     // A shipped subject stays shipped until reopened: say how, once the
     // brief is approved (the reopen refuses an unapproved one).

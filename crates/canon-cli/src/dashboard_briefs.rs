@@ -185,9 +185,9 @@ pub fn approve(repo: &Path, body: &[u8]) -> Reply {
     }
     match crate::brief_approve::approve(repo, Some(&change), &request.by, &request.note, Some(&request.sha256)) {
         Ok(approved) => {
-            eprintln!("canon dashboard: {} approved by `{}` ({})", approved.brief, approved.approved_by, approved.digest);
+            crate::human_err!("canon dashboard: {} approved by `{}` ({})", approved.brief, approved.approved_by, approved.digest);
             let after = crate::next::after_with(repo, &crate::next::Scope::Change(approved.change.clone()), false, Vec::new());
-            let body = crate::json_out::envelope_with_next("brief approve", &crate::json_out::untyped(serde_json::to_value(&approved).unwrap_or_default()), &after, Value::Null);
+            let body = crate::json_out::envelope_with_next("brief approve", &approved, &after, Value::Null);
             Reply::ok(body)
         }
         Err(e) => {

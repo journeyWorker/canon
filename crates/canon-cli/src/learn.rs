@@ -157,7 +157,7 @@ pub fn run_promote_with_evidence(
                         if let Err(error) = demote_strategy(&strategy_store, *strategy_id, contradiction.id, &git_tier_root, demotion_policy) {
                             demotion_failure = Some(error.to_string());
                         } else {
-                            eprintln!("canon learn promote: later contradictory evidence demoted {strategy_id}");
+                            crate::warn_err!("canon learn promote: later contradictory evidence demoted {strategy_id}");
                         }
                     }
                 }
@@ -185,7 +185,7 @@ pub fn run_promote_with_evidence(
     match outcome {
         Ok(Promotion { path, warnings, .. }) => {
             for warning in &warnings {
-                eprintln!("canon learn promote: advisory: {warning}");
+                crate::human_err!("canon learn promote: advisory: {warning}");
             }
             if dry_run {
                 crate::say!(json, "[dry-run] would promote {strategy_id} -> {}", path.display());

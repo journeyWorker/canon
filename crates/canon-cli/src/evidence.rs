@@ -1072,7 +1072,7 @@ fn record_body(record: &EvidenceRecord, args: &EvidenceArgs) -> serde_json::Valu
 fn report_brief_refusals(args: &EvidenceArgs, refusals: &[BriefRefusal]) -> Result<(), CliError> {
     if refusals.is_empty() {
         if args.override_reason.is_some() {
-            eprintln!("canon evidence add: --override-reason not recorded — no unapproved brief refused this attestation");
+            crate::warn_err!("canon evidence add: --override-reason not recorded — no unapproved brief refused this attestation");
         }
         return Ok(());
     }
@@ -1082,9 +1082,9 @@ fn report_brief_refusals(args: &EvidenceArgs, refusals: &[BriefRefusal]) -> Resu
         return Err(CliError::failed(code, lines).hint(BRIEF_STOP));
     };
     for refusal in refusals {
-        eprintln!("canon evidence add: waived {}", refusal.violation.line());
+        crate::warn_err!("canon evidence add: waived {}", refusal.violation.line());
     }
-    eprintln!("canon evidence add: override recorded by `{}` for the {} brief refusal(s) above: {reason}", args.actor_id, refusals.len());
+    crate::warn_err!("canon evidence add: override recorded by `{}` for the {} brief refusal(s) above: {reason}", args.actor_id, refusals.len());
     Ok(())
 }
 

@@ -168,6 +168,31 @@ impl<R: JsonSchema> JsonSchema for Projected<R> {
 impl<R: JsonSchema + serde::Serialize> Report for Projected<R> {}
 
 static REPO: OnceLock<PathBuf> = OnceLock::new();
+static JSON_MODE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static WARNINGS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+/// Marks the process as running in JSON mode: stderr stays empty ([`human_err!`], [`warn_err!`]).
+pub fn set_json_mode(json: bool) {
+    JSON_MODE.store(json, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether the command runs with `--json`.
+pub fn json_mode() -> bool {
+    JSON_MODE.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Says a warning: on stderr in human mode; in JSON mode it waits for the
+/// document and travels in `meta.warnings`.
+pub fn warn(message: String) {
+    if json_mode() {
+        let mut warnings = WARNINGS.lock().expect("the warnings list is not poisoned");
+        if !warnings.contains(&message) {
+            warnings.push(message);
+        }
+    } else {
+        eprintln!("{message}");
+    }
+}
 
 /// Remembers the `--repo` the command was given, so `meta.context.repo` can say
 /// which repo it worked in. Called once by `main`, after the parse.
@@ -242,7 +267,13 @@ fn build_meta(command: &str, schema_version: &str, after: Option<&After>, extra:
         Value::Object(map) => map,
         _ => Map::new(),
     };
-    let warnings = extra.remove("warnings").and_then(|value| serde_json::from_value::<Vec<String>>(value).ok()).filter(|w| !w.is_empty());
+    let mut warnings = extra.remove("warnings").and_then(|value| serde_json::from_value::<Vec<String>>(value).ok()).unwrap_or_default();
+    for said in std::mem::take(&mut *WARNINGS.lock().expect("the warnings list is not poisoned")) {
+        if !warnings.contains(&said) {
+            warnings.push(said);
+        }
+    }
+    let warnings = (!warnings.is_empty()).then_some(warnings);
     let (next, next_omitted, waiting_on) = match after {
         Some(after) => (Some(after.entries()), (after.omitted > 0).then_some(after.omitted), after.waiting_on.clone()),
         None => (writes(&command).then(Vec::new), None, None),
@@ -412,5 +443,30 @@ macro_rules! say {
 macro_rules! say_raw {
     ($json:expr, $($arg:tt)*) => {
         if !$json { print!($($arg)*); }
+    };
+}
+
+/// `eprintln!` in human mode, nothing in JSON mode: `say_err!(json, "…", args)`.
+#[macro_export]
+macro_rules! say_err {
+    ($json:expr, $($arg:tt)*) => {
+        if !$json { eprintln!($($arg)*); }
+    };
+}
+
+/// Narration for a human: `eprintln!` unless the command runs in JSON mode
+/// ([`json_mode`]), where stderr stays empty and the document carries the result.
+#[macro_export]
+macro_rules! human_err {
+    ($($arg:tt)*) => {
+        if !$crate::json_out::json_mode() { eprintln!($($arg)*); }
+    };
+}
+
+/// A warning: `eprintln!` in human mode, an entry of `meta.warnings` in JSON mode.
+#[macro_export]
+macro_rules! warn_err {
+    ($($arg:tt)*) => {
+        $crate::json_out::warn(format!($($arg)*))
     };
 }

@@ -328,7 +328,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
             match partial {
                 // One document: the partial-purge manifest is `data` beside the shared `error`.
                 Some(manifest) if json_output => {
-                    eprintln!("{}", error.human("canon purge"));
+                    crate::human_err!("{}", error.human("canon purge"));
                     error.emit_with_data("canon purge", true, &crate::json_out::untyped(manifest)) as u8
                 }
                 _ => error.emit("canon purge", json_output) as u8,
@@ -423,7 +423,7 @@ pub fn run_export(
             };
             crate::next::finish_with_meta(repo, "export", &crate::next::Scope::Repo, false, true, &crate::json_out::untyped(data), page_meta);
         }
-        if out.is_some() && !json_output { eprintln!("canon export: wrote {} record(s)", rows.len()); }
+        if out.is_some() && !json_output { crate::human_err!("canon export: wrote {} record(s)", rows.len()); }
         // The manifest itself is JSON on stdout, so the human cursor line
         // goes to stderr and never breaks a pipe into a JSON parser.
         next_cursor_line = meta.human_line();
@@ -432,7 +432,7 @@ pub fn run_export(
     match result {
         Ok(()) => {
             if let Some(line) = next_cursor_line {
-                eprintln!("{line}");
+                crate::human_err!("{line}");
             }
             0
         }

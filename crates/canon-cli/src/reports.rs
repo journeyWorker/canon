@@ -50,15 +50,29 @@ pub fn schema_of<R: JsonSchema>() -> Value {
 /// A command not listed still prints its `data` through `json_out::untyped`
 /// until a later slice types it.
 pub fn report_schemas() -> Vec<ReportSchema> {
-    use crate::{adapter, brief_check, context, selftest, status};
+    use crate::{adapter, artifact_ingest, brief_approve, brief_check, context, context_pack, plans, retrieve, selftest, status, subject};
     let mut schemas: Vec<ReportSchema> = vec![
         entry::<adapter::AuthorizationResult>("adapter authorize", "AdapterAuthorizeReport"),
         entry::<adapter::ValidationSummary>("adapter validate", "AdapterValidateReport"),
         entry::<brief_check::BriefCheckReport>("brief check", "BriefCheckReport"),
         entry::<brief_check::BriefShowReport>("brief show", "BriefShowReport"),
+        entry::<brief_approve::Approved>("brief approve", "BriefApproveReport"),
         entry::<context::AuthoringSurface>("context", "ContextReport"),
+        entry::<context_pack::ContextPack>("context-pack new", "ContextPackAddReport"),
+        entry::<context_pack::ContextPack>("context-pack show", "ContextPackShowReport"),
+        entry::<context_pack::VerifyReport>("context-pack verify", "ContextPackVerifyReport"),
+        entry::<artifact_ingest::ArtifactIngestOutcome>("ingest artifacts", "IngestRecordsReport"),
+        entry::<plans::PlansOutcome>("ingest plans", "IngestPlansReport"),
+        entry::<context_pack::PromptBundleVersion>("prompt add", "PromptAddReport"),
+        entry::<context_pack::PromptBundleVersion>("prompt show", "PromptShowReport"),
+        entry::<retrieve::RetrieveReport<'static>>("retrieve", "RetrieveReport"),
         entry::<selftest::SelftestSummary>("selftest", "SelftestReport"),
         entry::<status::StatusReport>("status", "StatusReport"),
+        entry::<subject::SubjectReport<'static>>("subject adopt", "SubjectAdoptReport"),
+        entry::<subject::SubjectReport<'static>>("subject new", "SubjectNewReport"),
+        entry::<subject::SubjectReport<'static>>("subject status", "SubjectMoveReport"),
+        entry::<subject::SubjectReport<'static>>("subject status", "SubjectShowReport"),
+        entry::<subject::SubjectReport<'static>>("subject unadopt", "SubjectUnadoptReport"),
     ];
     schemas.sort_by(|a, b| a.command.cmp(b.command).then_with(|| a.name.cmp(&b.name)));
     schemas

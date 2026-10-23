@@ -634,10 +634,10 @@ pub fn run_scenario_batch(repo: &Path, source: &str, actor: &Actor, at: DateTime
 
     if !bad.is_empty() {
         for item in &bad {
-            eprintln!("{COMMAND}: line {}{}: {} — {}", item.line, item.id.as_deref().map(|id| format!(" (`{id}`)")).unwrap_or_default(), item.error.code, item.error.message);
+            crate::human_err!("{COMMAND}: line {}{}: {} — {}", item.line, item.id.as_deref().map(|id| format!(" (`{id}`)")).unwrap_or_default(), item.error.code, item.error.message);
         }
         let refusal = CliError::refused("SCAFFOLD_INVALID_ARGUMENT", format!("{} of {} line(s) invalid; nothing written", bad.len(), lines.len())).hint("fix the listed lines and run the batch again");
-        eprintln!("{}", refusal.human(COMMAND));
+        crate::human_err!("{}", refusal.human(COMMAND));
         return refusal.emit_with_data(COMMAND, json, &crate::json_out::untyped(serde_json::json!({ "items": bad.iter().map(BadLine::to_json).collect::<Vec<_>>() })));
     }
 

@@ -108,7 +108,7 @@ pub enum PlanSourceHandle {
 /// near-miss signature (e.g. the openspec dialect's root-one-level-
 /// too-high `changes`-basename hint) — `None` for every ordinary
 /// malformed entry.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct MalformedEntry {
     /// The construct's path (relative to the source root when
     /// derivable — never an absolute path leaking the host filesystem

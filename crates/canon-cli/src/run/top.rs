@@ -56,7 +56,7 @@ pub(super) fn run_query(
                 };
                 let _ = crate::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, outcome.records.len());
                 if json {
-                    println!("{}", crate::query::format_json_with_sensitive(&outcome, include_sensitive));
+                    print_paged("query", &crate::query::format_json_with_sensitive(&outcome, include_sensitive), &[]);
                 } else {
                     print!("{}", crate::query::format_human_with_sensitive(&outcome, include_sensitive));
                 }
@@ -80,16 +80,17 @@ pub(super) fn run_query(
             };
             let _ = crate::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, outcome.records.len());
             for msg in &plugin_outcome.diagnostics {
-                eprintln!("canon query --plugin {plugin_id}: {msg}");
+                crate::say_err!(json, "canon query --plugin {plugin_id}: {msg}");
             }
+            let diagnostics: Vec<String> = plugin_outcome.diagnostics.iter().map(|msg| format!("canon query --plugin {plugin_id}: {msg}")).collect();
             if plugin_outcome.projections.is_empty() {
                 if json {
-                    println!("{}", crate::query::format_json_with_sensitive(&outcome, include_sensitive));
+                    print_paged("query", &crate::query::format_json_with_sensitive(&outcome, include_sensitive), &diagnostics);
                 } else {
                     print!("{}", crate::query::format_human_with_sensitive(&outcome, include_sensitive));
                 }
             } else if json {
-                println!("{}", crate::query::format_json_with_overlay_and_sensitive(&outcome, &plugin_id, &plugin_outcome.projections, include_sensitive));
+                print_paged("query", &crate::query::format_json_with_overlay_and_sensitive(&outcome, &plugin_id, &plugin_outcome.projections, include_sensitive), &diagnostics);
             } else {
                 print!("{}", crate::query::format_human_with_overlay_and_sensitive(&outcome, &plugin_id, &plugin_outcome.projections, include_sensitive));
             }
@@ -174,8 +175,11 @@ pub(super) fn run_context(repo: &std::path::Path, json: bool, fields: Option<Vec
     let surface = crate::context::resolve_surface(&repo, crate::context::ContextOptions::default());
     if json {
         match &fields {
-            Some(requested) => println!("{}", crate::context::render_json_fields(&surface, requested)),
-            None => println!("{}", crate::context::render_json(&surface)),
+            Some(requested) => {
+                let projected = crate::paging::project(&serde_json::to_value(&surface).expect("the surface serializes"), requested);
+                crate::json_out::data("context", &crate::json_out::Projected::<crate::context::AuthoringSurface>::new(projected));
+            }
+            None => crate::json_out::data("context", &surface),
         }
     } else {
         print!("{}", crate::context::render_outline(&surface));
@@ -197,10 +201,8 @@ pub(super) fn run_retrieve(repo: &std::path::Path, role: &RoleId, regime: Option
     match crate::retrieve::run_scoped(repo, role, regime, domain, subject, k) {
         Ok(o) => {
             if json {
-                println!("{}", crate::retrieve::format_json(&o.guidance));
-                if let Some(n) = crate::retrieve::serving_note(&o) {
-                    eprintln!("{n}");
-                }
+                let warnings = crate::retrieve::serving_note(&o).map(|note| vec![note]).unwrap_or_default();
+                crate::json_out::data_with_meta("retrieve", &crate::retrieve::RetrieveReport(&o.guidance), crate::json_out::warnings_meta(&warnings));
             } else {
                 print!("{}", crate::retrieve::format_human_scoped(role, &o));
             }
@@ -267,8 +269,10 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
     };
 
     let kinds_not_read_directly = canon_report::tier_boundary::kinds_not_read_directly(&repo);
+    let mut report_warnings = Vec::new();
     if let Some(msg) = canon_report::tier_boundary::warn_line(&kinds_not_read_directly) {
-        eprintln!("canon report: WARN {msg}");
+        crate::say_err!(json, "canon report: WARN {msg}");
+        report_warnings.push(format!("canon report: WARN {msg}"));
     }
 
     if let Some(dir) = snapshot_dir {
@@ -277,7 +281,7 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
                 crate::say!(json, "canon report --snapshot: wrote {} table(s) to {}", manifest.tables.len(), dir.display());
                 if json {
                     let tables: Vec<_> = manifest.tables.iter().map(|t| serde_json::json!({ "table": t.table, "file": t.file })).collect();
-                    crate::json_out::data("report", &crate::json_out::untyped(serde_json::json!({ "mode": "snapshot", "directory": dir.display().to_string(), "tables": tables })));
+                    crate::json_out::data_with_meta("report", &crate::json_out::untyped(serde_json::json!({ "mode": "snapshot", "directory": dir.display().to_string(), "tables": tables })), crate::json_out::warnings_meta(&report_warnings));
                 }
                 ExitCode::SUCCESS
             }
@@ -292,7 +296,7 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
     if check {
         return match canon_report::check_report(&inputs, &report_path) {
             Ok(outcome) => {
-                eprintln!("{}", outcome.message(&report_path));
+                crate::say_err!(json, "{}", outcome.message(&report_path));
                 let state = match outcome {
                     canon_report::CheckOutcome::NoDrift => "fresh",
                     canon_report::CheckOutcome::Missing => "missing",
@@ -301,12 +305,12 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
                 let data = serde_json::json!({ "mode": "check", "state": state, "report": report_path.display().to_string() });
                 if outcome.exit_code() == 0 {
                     if json {
-                        crate::json_out::data("report", &crate::json_out::untyped(data));
+                        crate::json_out::data_with_meta("report", &crate::json_out::untyped(data), crate::json_out::warnings_meta(&report_warnings));
                     }
                     ExitCode::SUCCESS
                 } else {
                     let error = CliError::failed("REPORT_STALE", format!("the report is {state}")).hint("regenerate it with `canon report`");
-                    ExitCode::from(error.with_exit(outcome.exit_code()).emit_with_data("canon report --check", json, &crate::json_out::untyped(data)) as u8)
+                    ExitCode::from(error.emit_with_data("canon report --check", json, &crate::json_out::untyped(data)) as u8)
                 }
             }
             Err(err) => {
@@ -319,7 +323,7 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
         Ok(_content) => {
             crate::say!(json, "canon report: wrote {}", report_path.display());
             if json {
-                crate::json_out::data("report", &crate::json_out::untyped(serde_json::json!({ "mode": "write", "report": report_path.display().to_string() })));
+                crate::json_out::data_with_meta("report", &crate::json_out::untyped(serde_json::json!({ "mode": "write", "report": report_path.display().to_string() })), crate::json_out::warnings_meta(&report_warnings));
             }
             ExitCode::SUCCESS
         }
@@ -343,7 +347,7 @@ pub(super) fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path:
             let mut warnings = Vec::new();
             if let crate::dashboard::SnapshotState::Unavailable { reason, fix } = &bound.snapshot {
                 let warning = format!("{reason}; the panels page says so instead of showing panels; to fix it: {fix}");
-                eprintln!("canon dashboard: warning: {warning}");
+                crate::say_err!(json, "canon dashboard: warning: {warning}");
                 warnings.push(warning);
             }
             crate::say!(json, "canon dashboard: briefs    = {}", bound.briefs_url());
@@ -364,4 +368,19 @@ pub(super) fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path:
         }
         Err(err) => ExitCode::from(err.to_cli_error().emit("canon dashboard", json) as u8),
     }
+}
+
+/// Prints one rendered paged document (`{…, "meta": {page}}`, as `query` and
+/// `export` render it) as the envelope: the page state moves into `meta`, beside
+/// the command's `warnings`.
+fn print_paged(command: &str, rendered: &str, warnings: &[String]) {
+    let payload: serde_json::Value = serde_json::from_str(rendered).expect("a rendered document is JSON");
+    let (data, mut meta) = crate::json_out::split_meta(payload);
+    if !warnings.is_empty() {
+        if !meta.is_object() {
+            meta = serde_json::json!({});
+        }
+        meta["warnings"] = serde_json::json!(warnings);
+    }
+    crate::json_out::data_with_meta(command, &crate::json_out::untyped(data), meta);
 }

@@ -521,25 +521,22 @@ pub fn run_status(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &
                 }
             })
             .collect();
-        let mut meta_json = serde_json::json!({ "command": "divergence status" });
-        meta.insert_into(meta_json.as_object_mut().expect("meta is an object"));
-        let out = serde_json::json!({
-            "data": {
-                "as_of": as_of.to_rfc3339(),
-                "summary": {
-                    "open": summary.open,
-                    "resolved": summary.resolved,
-                    "still_divergent": summary.still_divergent,
-                    "deferred": summary.deferred,
-                    "resolved_invalid": summary.resolved_invalid,
-                    "accepted": summary.accepted,
-                    "total": summary.total(),
-                },
-                "scenarios": scenarios,
+        let data = serde_json::json!({
+            "as_of": as_of.to_rfc3339(),
+            "summary": {
+                "open": summary.open,
+                "resolved": summary.resolved,
+                "still_divergent": summary.still_divergent,
+                "deferred": summary.deferred,
+                "resolved_invalid": summary.resolved_invalid,
+                "accepted": summary.accepted,
+                "total": summary.total(),
             },
-            "meta": meta_json,
+            "scenarios": scenarios,
         });
-        println!("{}", serde_json::to_string_pretty(&out).expect("a JSON value always serializes"));
+        let mut page = serde_json::Map::new();
+        meta.insert_into(&mut page);
+        crate::json_out::data_with_meta("divergence status", &crate::json_out::untyped(data), serde_json::Value::Object(page));
         return 0;
     }
 

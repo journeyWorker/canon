@@ -180,6 +180,7 @@ pub fn record_context(parsed: &clap::ArgMatches) {
     if let Some(repo) = leaf.try_get_one::<PathBuf>("repo").ok().flatten() {
         crate::json_out::set_repo(repo.clone());
     }
+    crate::json_out::set_json_mode(leaf.try_get_one::<bool>("json").ok().flatten().copied().unwrap_or(false));
 }
 
 /// Whether the command line asked for `--json`, read from argv because the

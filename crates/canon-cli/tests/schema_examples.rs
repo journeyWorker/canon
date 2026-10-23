@@ -154,6 +154,24 @@ fn every_leaf_has_an_example_and_it_runs_in_a_scratch_repo() {
         argv.push("--json".into());
         let out = canon(&cwd, home.path(), &argv);
         let code = out.status.code();
+        // D3: every leaf's `--json` stdout is one envelope naming the leaf, and stderr stays empty.
+        match serde_json::from_slice::<Value>(&out.stdout) {
+            Ok(document) => {
+                if !document["ok"].is_boolean() {
+                    problems.push(format!("{leaf}: the document has no boolean `ok`: {document}"));
+                }
+                if document["meta"]["command"].as_str() != Some(leaf.as_str()) {
+                    problems.push(format!("{leaf}: meta.command is {}", document["meta"]["command"]));
+                }
+                if document["ok"].as_bool() == Some(true) && code != Some(0) || document["ok"].as_bool() == Some(false) && code == Some(0) {
+                    problems.push(format!("{leaf}: ok={} but exit {code:?}", document["ok"]));
+                }
+            }
+            Err(e) => problems.push(format!("{leaf}: stdout is not one JSON document ({e}): {}", String::from_utf8_lossy(&out.stdout))),
+        }
+        if !out.stderr.is_empty() {
+            problems.push(format!("{leaf}: stderr is not empty in JSON mode: {}", String::from_utf8_lossy(&out.stderr)));
+        }
         let needs = NEEDS_STATE.iter().find(|(name, _)| name == leaf);
         match (code, needs) {
             (Some(0), None) => {}

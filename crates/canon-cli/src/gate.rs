@@ -543,7 +543,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
             }
             crate::say!(json, "canon gate task: {task_id} flipped — {}", crate::write_mode::DIRECT);
             if let Some(warning) = canon_command_proof_warning(&task_id, &raw_records) {
-                eprintln!("{warning}");
+                crate::warn_err!("{warning}");
             }
             refresh_task_status(&repo, &task_id.change_id());
             let change = crate::next::Scope::Change(task_id.change_id().as_str().to_string());
@@ -591,8 +591,8 @@ fn canon_command_proof_warning(task_id: &TaskId, raw_records: &[RawRecord]) -> O
 fn refresh_task_status(repo: &Path, change_id: &ChangeId) {
     match crate::plans::refresh_change(repo, change_id) {
         Ok(refresh) if refresh.changes_parsed > 0 && refresh.malformed == 0 => {}
-        Ok(_) => eprintln!("canon gate task: WARN the change `{}` did not re-import cleanly; run `canon ingest plans` to see why", change_id.as_str()),
-        Err(e) => eprintln!("canon gate task: WARN the task status record was not refreshed ({e}); run `canon ingest plans` so `canon query --kind task` matches the plan"),
+        Ok(_) => crate::warn_err!("canon gate task: WARN the change `{}` did not re-import cleanly; run `canon ingest plans` to see why", change_id.as_str()),
+        Err(e) => crate::warn_err!("canon gate task: WARN the task status record was not refreshed ({e}); run `canon ingest plans` so `canon query --kind task` matches the plan"),
     }
 }
 

@@ -113,6 +113,11 @@ fi
 GUIDANCE_JSON="$(canon retrieve --role "$ROLE" --regime "$REGIME" --json 2>/dev/null || true)"
 [ -n "$GUIDANCE_JSON" ] || exit 0
 
+# canon >= 0.28 envelopes the result ({ok, data: [...], meta}); 0.27 printed the bare array.
+# `(.data? // .)` reads either, so this hook works before and after the upgrade.
+GUIDANCE_JSON="$(printf '%s' "$GUIDANCE_JSON" | jq -c '(.data? // .)' 2>/dev/null || true)"
+[ -n "$GUIDANCE_JSON" ] || exit 0
+
 COUNT="$(printf '%s' "$GUIDANCE_JSON" | jq 'length' 2>/dev/null || echo 0)"
 [ "$COUNT" -gt 0 ] 2>/dev/null || exit 0
 

@@ -1072,8 +1072,8 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
                 }
             })
             .collect();
-        let out = serde_json::json!({ "change_id": args.change_id.as_str(), "findings": rows, "meta": meta.to_json() });
-        println!("{}", serde_json::to_string_pretty(&out).expect("a JSON value always serializes"));
+        let data = serde_json::json!({ "change_id": args.change_id.as_str(), "findings": rows });
+        crate::json_out::data_with_meta("finding list", &crate::json_out::untyped(data), meta.to_json());
     } else if findings.is_empty() {
         let which = if args.open { "open findings" } else { "findings" };
         println!("canon finding list: no committed {which} on change `{}`", args.change_id);
@@ -1084,7 +1084,7 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
         }
     }
     if staged > 0 {
-        eprintln!("canon finding list: {staged} staged finding(s) on change `{}` are not listed until committed — run `canon gate promote`", args.change_id);
+        crate::say_err!(args.json, "canon finding list: {staged} staged finding(s) on change `{}` are not listed until committed — run `canon gate promote`", args.change_id);
     }
     0
 }

@@ -344,15 +344,18 @@ pub fn format_human(role: &RoleId, regime_key: &RegimeKey, guidance: &[StrategyR
     out
 }
 
-/// `--json`: the raw `Vec<StrategyRef>`, machine-readable — the exact
-/// snapshot shape a caller would embed into `Run::injected_guidance`
-/// verbatim (design decision 2), never a human-table projection of it.
-/// An empty result prints `[]`, never an omitted/null value, so a
-/// caller piping this into a manifest write always gets a well-formed
-/// JSON array.
-pub fn format_json(guidance: &[StrategyRef]) -> String {
-    serde_json::to_string_pretty(guidance).expect("Vec<StrategyRef> is always serializable")
-}
+/// `--json`'s `data`: the raw guidance items as an array, each a
+/// `StrategyRef` — the exact snapshot shape a caller would embed into
+/// `Run::injected_guidance` verbatim (design decision 2), never a
+/// human-table projection of it. An empty result is `[]`, never an
+/// omitted/null value, so a caller piping `(.data // .)` into a manifest
+/// write always gets a well-formed JSON array. The installed hook reads
+/// `(.data // .)`, so it works with the 0.27 bare array and this envelope.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(transparent)]
+pub struct RetrieveReport<'a>(pub &'a [StrategyRef]);
+
+impl crate::json_out::Report for RetrieveReport<'_> {}
 
 #[cfg(test)]
 mod tests {
@@ -434,10 +437,10 @@ mod tests {
     }
 
     #[test]
-    fn format_json_round_trips_an_empty_and_nonempty_vec() {
-        assert_eq!(serde_json::from_str::<Vec<StrategyRef>>(&format_json(&[])).unwrap(), Vec::<StrategyRef>::new());
+    fn the_json_report_is_the_array_itself() {
+        assert_eq!(serde_json::to_string(&RetrieveReport(&[])).unwrap(), "[]");
         let guidance = vec![StrategyRef::new("sid-1", "t", "c")];
-        let round_tripped: Vec<StrategyRef> = serde_json::from_str(&format_json(&guidance)).unwrap();
+        let round_tripped: Vec<StrategyRef> = serde_json::from_str(&serde_json::to_string(&RetrieveReport(&guidance)).unwrap()).unwrap();
         assert_eq!(round_tripped, guidance);
     }
 
