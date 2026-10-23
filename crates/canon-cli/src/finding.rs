@@ -321,6 +321,8 @@ use canon_store::git_tier::GitTier;
 use canon_store::partition::{content_digest12, resolve_partition};
 use canon_store::tier::{RawWrite, Tier, TierQuery};
 use chrono::Utc;
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
@@ -510,6 +512,78 @@ fn authoring_actor(actor_id: &str, role: &RoleId, session_id: Option<&SessionId>
     }
 }
 
+/// `canon finding add`: the finding staged or committed.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FindingAddReport<'a> {
+    #[serde(flatten)]
+    pub landing: crate::retry::Landing,
+    pub change_id: &'a str,
+    pub round: u32,
+    pub seq: u32,
+    pub severity: &'static str,
+    pub disposition: &'static str,
+    /// No `--introduced-by` was given: the finding names no commit that introduced it.
+    pub unsourced: bool,
+}
+
+impl crate::reports::Report for FindingAddReport<'_> {}
+
+/// `canon finding close`: the transition staged or committed, or a no-op.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FindingCloseReport<'a> {
+    /// Where the transition landed; absent on a no-op, which writes nothing.
+    #[serde(flatten)]
+    pub landing: Option<crate::retry::Landing>,
+    pub change_id: &'a str,
+    pub round: u32,
+    pub seq: u32,
+    /// The disposition it moved from; absent on a no-op.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from: Option<&'static str>,
+    pub disposition: &'static str,
+    /// `true` when the finding already had this disposition and nothing was staged.
+    pub noop: bool,
+}
+
+impl crate::reports::Report for FindingCloseReport<'_> {}
+
+/// One finding of `canon finding list`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FindingRow<'a> {
+    pub round: u32,
+    pub seq: u32,
+    pub severity: &'static str,
+    pub disposition: &'static str,
+    pub reviewer: &'a str,
+    pub summary: &'a str,
+    pub resolution_sha: Option<&'a str>,
+    pub file_ref: Option<&'a str>,
+    pub reason: Option<&'a str>,
+}
+
+/// `canon finding list`: a change's findings; paging is in `meta`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FindingListReport<'a> {
+    pub change_id: &'a str,
+    pub findings: Vec<FindingRow<'a>>,
+}
+
+impl crate::reports::Report for FindingListReport<'_> {}
+
+/// `canon finding list --fields`: each finding keeps only the requested members.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FindingListFieldsReport<'a> {
+    pub change_id: &'a str,
+    pub findings: Vec<crate::json_out::Projected<FindingRow<'static>>>,
+}
+
+impl crate::reports::Report for FindingListFieldsReport<'_> {}
+
 /// `canon finding add` (module doc). Returns the process exit code.
 ///
 /// Order matters and is not incidental: every refusal below happens
@@ -685,14 +759,16 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
                 );
             }
             if settled.exit_code() == 0 {
-                let mut record = settled.json(&receipt.location);
-                record["changeId"] = serde_json::json!(args.change_id.as_str());
-                record["round"] = serde_json::json!(args.round);
-                record["seq"] = serde_json::json!(args.seq);
-                record["severity"] = serde_json::json!(severity_slug(args.severity));
-                record["disposition"] = serde_json::json!(args.disposition.as_str());
-                record["unsourced"] = serde_json::json!(args.introduced_by.is_none());
-                crate::next::finish(&repo, "finding add", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, &crate::json_out::untyped(record));
+                let record = FindingAddReport {
+                    landing: settled.landing(&receipt.location),
+                    change_id: args.change_id.as_str(),
+                    round: args.round,
+                    seq: args.seq,
+                    severity: severity_slug(args.severity),
+                    disposition: args.disposition.as_str(),
+                    unsourced: args.introduced_by.is_none(),
+                };
+                crate::next::finish(&repo, "finding add", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, &record);
             }
             settled.exit_code()
         }
@@ -887,8 +963,8 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
             args.seq,
             args.disposition.as_str()
         );
-        let noop = serde_json::json!({ "changeId": args.change_id.as_str(), "round": args.round, "seq": args.seq, "disposition": args.disposition.as_str(), "noop": true });
-        crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), false, args.json, &crate::json_out::untyped(noop));
+        let noop = FindingCloseReport { landing: None, change_id: args.change_id.as_str(), round: args.round, seq: args.seq, from: None, disposition: args.disposition.as_str(), noop: true };
+        crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), false, args.json, &noop);
         return 0;
     }
 
@@ -958,14 +1034,16 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
                 settled.suffix()
             );
             if settled.exit_code() == 0 {
-                let mut record = settled.json(&receipt.location);
-                record["changeId"] = serde_json::json!(args.change_id.as_str());
-                record["round"] = serde_json::json!(args.round);
-                record["seq"] = serde_json::json!(args.seq);
-                record["from"] = serde_json::json!(existing.disposition().as_str());
-                record["disposition"] = serde_json::json!(args.disposition.as_str());
-                record["noop"] = serde_json::json!(false);
-                crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, &crate::json_out::untyped(record));
+                let record = FindingCloseReport {
+                    landing: Some(settled.landing(&receipt.location)),
+                    change_id: args.change_id.as_str(),
+                    round: args.round,
+                    seq: args.seq,
+                    from: Some(existing.disposition().as_str()),
+                    disposition: args.disposition.as_str(),
+                    noop: false,
+                };
+                crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, &record);
             }
             settled.exit_code()
         }
@@ -1052,28 +1130,26 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
     };
 
     if args.json {
-        let rows: Vec<serde_json::Value> = findings
-            .iter()
-            .map(|f| {
-                let row = serde_json::json!({
-                    "round": f.round,
-                    "seq": f.seq,
-                    "severity": severity_slug(f.severity),
-                    "disposition": f.disposition().as_str(),
-                    "reviewer": f.reviewer,
-                    "summary": f.summary,
-                    "resolution_sha": f.resolution_sha().map(|sha| sha.as_str()),
-                    "file_ref": f.file_ref,
-                    "reason": f.reason,
-                });
-                match &args.fields {
-                    Some(fields) => crate::paging::project(&row, fields),
-                    None => row,
-                }
-            })
-            .collect();
-        let data = serde_json::json!({ "change_id": args.change_id.as_str(), "findings": rows });
-        crate::json_out::data_with_meta("finding list", &crate::json_out::untyped(data), meta.to_json());
+        let rows = findings.iter().map(|f| FindingRow {
+            round: f.round,
+            seq: f.seq,
+            severity: severity_slug(f.severity),
+            disposition: f.disposition().as_str(),
+            reviewer: &f.reviewer,
+            summary: &f.summary,
+            resolution_sha: f.resolution_sha().map(|sha| sha.as_str()),
+            file_ref: f.file_ref.as_deref(),
+            reason: f.reason.as_deref(),
+        });
+        match &args.fields {
+            Some(fields) => {
+                let findings = rows
+                    .map(|row| crate::json_out::Projected::new(crate::paging::project(&serde_json::to_value(row).expect("a finding row serializes"), fields)))
+                    .collect();
+                crate::json_out::data_with_meta("finding list", &FindingListFieldsReport { change_id: args.change_id.as_str(), findings }, meta.to_json());
+            }
+            None => crate::json_out::data_with_meta("finding list", &FindingListReport { change_id: args.change_id.as_str(), findings: rows.collect() }, meta.to_json()),
+        }
     } else if findings.is_empty() {
         let which = if args.open { "open findings" } else { "findings" };
         println!("canon finding list: no committed {which} on change `{}`", args.change_id);
@@ -1090,7 +1166,7 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
 }
 
 /// The JSON fields of one `finding list` row, which `--fields` may name.
-const LIST_FIELDS: [&str; 9] = ["round", "seq", "severity", "disposition", "reviewer", "summary", "resolution_sha", "file_ref", "reason"];
+const LIST_FIELDS: [&str; 9] = ["round", "seq", "severity", "disposition", "reviewer", "summary", "resolutionSha", "fileRef", "reason"];
 
 /// One header row and one row per finding, columns padded to their
 /// widest cell; the summary, last, is never padded and carries the

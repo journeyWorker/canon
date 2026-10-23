@@ -29,6 +29,8 @@ use canon_store::tier::Tier;
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use chrono::{DateTime, Utc};
+use schemars::JsonSchema;
+use serde::Serialize;
 
 pub use crate::review::{parse_project_id, parse_scenario_id};
 use crate::cli_error::CliError;
@@ -88,6 +90,102 @@ fn format_candidate_lines(report: &PromoteReport, dry_run: bool) -> String {
     out
 }
 
+/// `canon divergence add`: where the divergence landed.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DivergenceAddReport {
+    #[serde(flatten)]
+    pub landing: crate::retry::Landing,
+}
+
+impl crate::reports::Report for DivergenceAddReport {}
+
+/// `canon divergence defer` and `canon divergence resolve`: the record committed.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DivergenceCommitReport {
+    /// The ledger path of the committed record.
+    pub committed: String,
+}
+
+impl crate::reports::Report for DivergenceCommitReport {}
+
+/// One scenario `canon divergence accept` accepted.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AcceptedScenario {
+    pub scenario_id: String,
+    /// The ledger path of the acceptance record.
+    pub location: String,
+}
+
+/// `canon divergence accept`: the acceptances written (all or none).
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DivergenceAcceptReport<'a> {
+    pub tracking: &'a str,
+    /// The date the acceptance lapses (`YYYY-MM-DD`); `null` without `--expiry`.
+    pub expiry: Option<String>,
+    pub accepted: Vec<AcceptedScenario>,
+}
+
+impl crate::reports::Report for DivergenceAcceptReport<'_> {}
+
+/// Per-state counts of `canon divergence list`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BurndownSummary {
+    pub open: usize,
+    pub resolved: usize,
+    pub still_divergent: usize,
+    pub deferred: usize,
+    pub resolved_invalid: usize,
+    pub accepted: usize,
+    pub total: usize,
+}
+
+/// One scenario's current state in `canon divergence list`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioRow<'a> {
+    pub project_id: &'a str,
+    pub scenario_id: &'a str,
+    /// `open`, `resolved`, `still-divergent`, `deferred`, `resolved-invalid` or `accepted`.
+    pub state: &'static str,
+    /// Why it is deferred.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<&'a str>,
+    /// When a deferral or acceptance lapses.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expiry: Option<String>,
+    /// Where an accepted gap is tracked.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tracking: Option<&'a str>,
+}
+
+/// `canon divergence list`: the current state of every divergence; paging is in `meta`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DivergenceListReport<'a> {
+    /// The instant deferred expiry was judged at (RFC 3339).
+    pub as_of: String,
+    pub summary: BurndownSummary,
+    pub scenarios: Vec<ScenarioRow<'a>>,
+}
+
+impl crate::reports::Report for DivergenceListReport<'_> {}
+
+/// `canon divergence list --fields`: each scenario keeps only the requested members.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DivergenceListFieldsReport {
+    pub as_of: String,
+    pub summary: BurndownSummary,
+    pub scenarios: Vec<crate::json_out::Projected<ScenarioRow<'static>>>,
+}
+
+impl crate::reports::Report for DivergenceListFieldsReport {}
+
 /// `canon divergence add` (module doc): writes ONE unordered staging
 /// candidate — `run_seq` is assigned later, at `promote` time. With
 /// `--promote` or `write: { promote: auto }` (0.16 D2) the same run then
@@ -136,7 +234,7 @@ pub fn run_stage(
     let outcome = crate::gate::promote_after_stage("canon divergence add", &gate_ctx.ledger_root, &location, promote, json);
     crate::say!(json, "canon divergence add: {} — {}", outcome.landed(&location), outcome.suffix());
     if json {
-        crate::json_out::data("divergence add", &crate::json_out::untyped(outcome.json(&location)));
+        crate::json_out::data("divergence add", &DivergenceAddReport { landing: outcome.landing(&location) });
     }
     outcome.exit_code()
 }
@@ -173,7 +271,7 @@ fn stage_and_promote(ledger_root: &Path, candidate: &Divergence) -> Result<std::
         Ok(target) => Ok(std::path::PathBuf::from(target)),
         Err(refusal) => {
             let _ = std::fs::remove_file(crate::gate::evidence_staging_dir(ledger_root).join(&location));
-            Err(refusal.data.and_then(|data| data["refused"][0]["message"].as_str().map(str::to_string)).unwrap_or_else(|| refusal.error.message.clone()))
+            Err(refusal.data.and_then(|data| data.refused.into_iter().next().map(|refused| refused.message)).unwrap_or_else(|| refusal.error.message.clone()))
         }
     }
 }
@@ -194,14 +292,14 @@ pub fn run_promote(repo: &Path, dry_run: bool, json: bool) -> i32 {
     match promote_only(RecordKind::Divergence, &staging, &committed, dry_run) {
         Ok(report) => {
             crate::say_raw!(json, "{}", format_promote_report(&report, dry_run));
-            let data = crate::gate::promote_json(&report, dry_run);
+            let data = crate::gate::promote_report(&report, dry_run);
             if report.is_clean() {
                 if json {
-                    crate::json_out::data("divergence promote", &crate::json_out::untyped(data));
+                    crate::json_out::data("divergence promote", &data);
                 }
                 0
             } else {
-                CliError::failed("PROMOTE_REFUSED", format!("{} staged divergence(s) refused", report.refused.len())).hint("`canon gate check` names what promotion refused; fix it, then run `canon divergence promote` (the record stays staged)").emit_with_data("canon divergence promote", json, &crate::json_out::untyped(data))
+                CliError::failed("PROMOTE_REFUSED", format!("{} staged divergence(s) refused", report.refused.len())).hint("`canon gate check` names what promotion refused; fix it, then run `canon divergence promote` (the record stays staged)").emit_with_data("canon divergence promote", json, &data)
             }
         }
         Err(e) => {
@@ -243,7 +341,7 @@ fn run_commit(
         Ok(target) => {
             crate::say!(json, "canon divergence {verb}: committed {} — {}", target.display(), crate::write_mode::PROMOTED);
             if json {
-                crate::json_out::data(&format!("divergence {verb}"), &crate::json_out::untyped(serde_json::json!({ "committed": target.display().to_string() })));
+                crate::json_out::data(&format!("divergence {verb}"), &DivergenceCommitReport { committed: target.display().to_string() });
             }
             0
         }
@@ -452,7 +550,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
     for (scenario, target) in &wrote {
         crate::say!(args.json, "canon divergence accept: {scenario} accepted as a known gap ({}) -> {} — {}", args.tracking, target.display(), crate::write_mode::PROMOTED);
     }
-    let accepted: Vec<serde_json::Value> = wrote.iter().map(|(scenario, target)| serde_json::json!({ "scenarioId": scenario, "location": target.display().to_string() })).collect();
+    let accepted: Vec<AcceptedScenario> = wrote.iter().map(|(scenario, target)| AcceptedScenario { scenario_id: scenario.to_string(), location: target.display().to_string() }).collect();
     let scope = crate::next::Scope::Scenarios(wrote.iter().map(|(scenario, _)| scenario.clone()).collect());
     crate::next::finish(
         &repo,
@@ -460,7 +558,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
         &scope,
         false,
         args.json,
-        &crate::json_out::untyped(serde_json::json!({ "tracking": args.tracking, "expiry": args.expiry.map(|e| e.format("%Y-%m-%d").to_string()), "accepted": accepted })));
+        &DivergenceAcceptReport { tracking: &args.tracking, expiry: args.expiry.map(|e| e.format("%Y-%m-%d").to_string()), accepted });
     0
 }
 
@@ -473,7 +571,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
 /// "now"; ALWAYS exits `0` — a read-only capability query over
 /// whatever is currently on the ledger, never a gate.
 /// The fields of one `divergence status` scenario row, which `--fields` may name.
-const ROW_FIELDS: [&str; 6] = ["project_id", "scenario_id", "state", "reason", "expiry", "tracking"];
+const ROW_FIELDS: [&str; 6] = ["projectId", "scenarioId", "state", "reason", "expiry", "tracking"];
 
 pub fn run_status(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &crate::paging::Page, fields: Option<&[String]>) -> i32 {
     if let Some(requested) = fields {
@@ -498,45 +596,43 @@ pub fn run_status(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &
     };
 
     if json {
-        let scenarios: Vec<serde_json::Value> = rows
-            .iter()
-            .map(|((project_id, scenario_id), state)| {
-                let mut row = serde_json::json!({ "project_id": project_id.as_str(), "scenario_id": scenario_id.as_str(), "state": state_slug(state) });
-                match state {
-                    canon_model::FoldedState::Deferred { reason, expiry } => {
-                        row["reason"] = serde_json::json!(reason);
-                        row["expiry"] = serde_json::json!(expiry.to_string());
-                    }
-                    canon_model::FoldedState::Accepted { tracking, expiry } => {
-                        row["tracking"] = serde_json::json!(tracking);
-                        if let Some(expiry) = expiry {
-                            row["expiry"] = serde_json::json!(expiry.to_string());
-                        }
-                    }
-                    _ => {}
+        let scenarios = rows.iter().map(|((project_id, scenario_id), state)| {
+            let mut row = ScenarioRow { project_id: project_id.as_str(), scenario_id: scenario_id.as_str(), state: state_slug(state), reason: None, expiry: None, tracking: None };
+            match state {
+                canon_model::FoldedState::Deferred { reason, expiry } => {
+                    row.reason = Some(reason);
+                    row.expiry = Some(expiry.to_string());
                 }
-                match fields {
-                    Some(requested) => crate::paging::project(&row, requested),
-                    None => row,
+                canon_model::FoldedState::Accepted { tracking, expiry } => {
+                    row.tracking = Some(tracking);
+                    row.expiry = expiry.map(|expiry| expiry.to_string());
                 }
-            })
-            .collect();
-        let data = serde_json::json!({
-            "as_of": as_of.to_rfc3339(),
-            "summary": {
-                "open": summary.open,
-                "resolved": summary.resolved,
-                "still_divergent": summary.still_divergent,
-                "deferred": summary.deferred,
-                "resolved_invalid": summary.resolved_invalid,
-                "accepted": summary.accepted,
-                "total": summary.total(),
-            },
-            "scenarios": scenarios,
+                _ => {}
+            }
+            row
         });
+        let summary = BurndownSummary {
+            open: summary.open,
+            resolved: summary.resolved,
+            still_divergent: summary.still_divergent,
+            deferred: summary.deferred,
+            resolved_invalid: summary.resolved_invalid,
+            accepted: summary.accepted,
+            total: summary.total(),
+        };
+        let as_of = as_of.to_rfc3339();
         let mut page = serde_json::Map::new();
         meta.insert_into(&mut page);
-        crate::json_out::data_with_meta("divergence status", &crate::json_out::untyped(data), serde_json::Value::Object(page));
+        let page = serde_json::Value::Object(page);
+        match fields {
+            Some(requested) => {
+                let scenarios = scenarios
+                    .map(|row| crate::json_out::Projected::new(crate::paging::project(&serde_json::to_value(row).expect("a scenario row serializes"), requested)))
+                    .collect();
+                crate::json_out::data_with_meta("divergence status", &DivergenceListFieldsReport { as_of, summary, scenarios }, page);
+            }
+            None => crate::json_out::data_with_meta("divergence status", &DivergenceListReport { as_of, summary, scenarios: scenarios.collect() }, page),
+        }
         return 0;
     }
 

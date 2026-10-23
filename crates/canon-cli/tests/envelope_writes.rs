@@ -131,17 +131,17 @@ fn learn_approve_json_is_the_payload_as_data_and_the_signing_is_a_human_step() {
     let out = canon(repo, &["learn", "approve", &candidate.id.to_string(), "--evaluation", "evaluation.json", "--principal", "alice", "--repo", ".", "--json"]);
     let shown = body(&out);
     assert_eq!(shown["meta"]["command"], "learn approve", "{shown}");
-    assert_eq!(shown["data"]["candidate_strategy_id"], candidate.id.to_string(), "{shown}");
-    assert!(shown["data"]["payload_hex"].as_str().is_some_and(|hex| !hex.is_empty()), "{shown}");
+    assert_eq!(shown["data"]["candidateStrategyId"], candidate.id.to_string(), "{shown}");
+    assert!(shown["data"]["payloadHex"].as_str().is_some_and(|hex| !hex.is_empty()), "{shown}");
     let step = &shown["meta"]["next"][0];
     assert_eq!(step["actor"], "human", "signing is the human's: {shown}");
     assert!(step["command"].as_str().unwrap().contains("canon learn promote"), "{shown}");
-    assert!(shown.get("payload_hex").is_none(), "the old top-level keys are gone: {shown}");
+    assert!(shown.get("payloadHex").is_none(), "the old top-level keys are gone: {shown}");
 
     // The human form stays the bare payload a signer reads.
     let human = canon(repo, &["learn", "approve", &candidate.id.to_string(), "--evaluation", "evaluation.json", "--principal", "alice", "--repo", "."]);
     let payload: Value = serde_json::from_slice(&human.stdout).expect("the payload");
-    assert!(payload["payload_hex"].is_string(), "{payload}");
+    assert!(payload["payloadHex"].is_string(), "{payload}");
 }
 
 #[test]

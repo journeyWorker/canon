@@ -26,6 +26,7 @@ use std::fs;
 use std::path::Path;
 
 use canon_model::paths;
+use schemars::JsonSchema;
 use chrono::{SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -160,6 +161,40 @@ pub fn violation(repo: &Path) -> Option<canon_gate::Violation> {
     Some(canon_gate::Violation::new(canon_gate::FailureClass::UnreviewedPromotion, "policy", format!("{}: {detail}; {REAPPROVE_HINT}", closed.label())))
 }
 
+/// `canon policy show`: the policy's digest and what its approval says.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PolicyShowReport<'a> {
+    pub policy: &'a str,
+    /// Digest of the policy file's current bytes; `null` without a readable policy.
+    pub policy_digest: Option<&'a str>,
+    pub approval: &'a str,
+    /// `none`, `approved`, `unapproved`, `changed` or `unreadable`.
+    pub state: &'a str,
+    pub approved_by: Option<&'a str>,
+    pub approved_at: Option<&'a str>,
+    /// The digest the approval covers; differs from `policyDigest` when `state` is `changed`.
+    pub approved_digest: Option<&'a str>,
+    pub note: Option<&'a str>,
+    /// Why the approval is unreadable.
+    pub detail: Option<&'a str>,
+}
+
+impl crate::reports::Report for PolicyShowReport<'_> {}
+
+/// `canon policy approve`: the approval just recorded.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PolicyApproveReport<'a> {
+    pub policy: &'a str,
+    pub policy_digest: &'a str,
+    pub approved_by: &'a str,
+    pub approved_at: &'a str,
+    pub approval: &'a str,
+}
+
+impl crate::reports::Report for PolicyApproveReport<'_> {}
+
 /// `canon policy show [--json]`: the read-back for `canon policy approve`.
 /// Exits `0` whatever the state is: it reports, the gate decides.
 pub fn run_show(repo: &Path, json: bool) -> i32 {
@@ -173,19 +208,19 @@ pub fn run_show(repo: &Path, json: bool) -> i32 {
         ApprovalState::Changed { approval, .. } => ("changed", Some(approval), None),
         ApprovalState::Unreadable { detail } => ("unreadable", None, Some(detail.as_str())),
     };
-    let data = serde_json::json!({
-        "policy": paths::POLICY_FILE,
-        "policyDigest": current,
-        "approval": paths::POLICY_APPROVAL_FILE,
-        "state": name,
-        "approvedBy": approval.map(|a| &a.approved_by),
-        "approvedAt": approval.map(|a| &a.approved_at),
-        "approvedDigest": approval.map(|a| &a.policy_digest),
-        "note": approval.and_then(|a| a.note.as_ref()),
-        "detail": detail,
-    });
     if json {
-        crate::json_out::data("policy show", &crate::json_out::untyped(data));
+        let data = PolicyShowReport {
+            policy: paths::POLICY_FILE,
+            policy_digest: current.as_deref(),
+            approval: paths::POLICY_APPROVAL_FILE,
+            state: name,
+            approved_by: approval.map(|a| a.approved_by.as_str()),
+            approved_at: approval.map(|a| a.approved_at.as_str()),
+            approved_digest: approval.map(|a| a.policy_digest.as_str()),
+            note: approval.and_then(|a| a.note.as_deref()),
+            detail,
+        };
+        crate::json_out::data("policy show", &data);
         return 0;
     }
     println!("policy: {}", paths::POLICY_FILE);
@@ -250,8 +285,8 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> i32
                 paths::POLICY_APPROVAL_FILE,
                 crate::write_mode::DIRECT
             );
-            let data = serde_json::json!({ "policy": paths::POLICY_FILE, "policyDigest": approval.policy_digest, "approvedBy": approval.approved_by, "approvedAt": approval.approved_at, "approval": paths::POLICY_APPROVAL_FILE });
-            crate::next::finish(&repo, "policy approve", &crate::next::Scope::Repo, false, json, &crate::json_out::untyped(data));
+            let data = PolicyApproveReport { policy: paths::POLICY_FILE, policy_digest: &approval.policy_digest, approved_by: &approval.approved_by, approved_at: &approval.approved_at, approval: paths::POLICY_APPROVAL_FILE };
+            crate::next::finish(&repo, "policy approve", &crate::next::Scope::Repo, false, json, &data);
             0
         }
         Err(e) => {

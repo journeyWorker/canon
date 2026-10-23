@@ -58,7 +58,8 @@ use canon_learn::{
     demote_strategy, evaluate_now, plan_promotion, promote_strategy, promote_strategy_approved, rollback_strategy_authenticated,
 };
 use chrono::Utc;
-use serde_json::json;
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
@@ -196,7 +197,7 @@ pub fn run_promote_with_evidence(
                 crate::say!(json, "promoted {strategy_id} -> {}", path.display());
             }
             if json {
-                crate::json_out::data("learn promote", &crate::json_out::untyped(json!({ "strategyId": strategy_id.to_string(), "path": path.display().to_string(), "dryRun": dry_run, "advisories": warnings.iter().map(|w| w.to_string()).collect::<Vec<_>>() })));
+                crate::json_out::data("learn promote", &StrategyPromoteReport { strategy_id: strategy_id.to_string(), path: path.display().to_string(), dry_run, advisories: warnings.iter().map(|w| w.to_string()).collect() });
             }
             ExitCode::SUCCESS
         }
@@ -214,6 +215,70 @@ fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, String> {
 
 /// Emit the exact domain-separated bytes an external SSH signer must sign.
 /// This command never reads a private key and never sets `verified`.
+/// `canon learn promote`: what was (or, with `--dry-run`, would be) promoted.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct StrategyPromoteReport {
+    pub strategy_id: String,
+    /// The git-tracked strategy file.
+    pub path: String,
+    pub dry_run: bool,
+    /// Advisory lint findings; they never change the exit code.
+    pub advisories: Vec<String>,
+}
+
+impl crate::reports::Report for StrategyPromoteReport {}
+
+/// `canon learn approve`: the bytes a human signs externally.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct StrategyApprovalPayloadReport {
+    pub schema_version: u32,
+    pub candidate_strategy_id: String,
+    pub evaluation_digest: String,
+    pub approver_identity: String,
+    pub approver_role: &'static str,
+    pub approved_at: chrono::DateTime<Utc>,
+    pub namespace: &'static str,
+    pub subject: String,
+    /// The canonical approval payload, hex-encoded; this is what gets signed.
+    pub payload_hex: String,
+    pub instructions: &'static str,
+}
+
+impl crate::reports::Report for StrategyApprovalPayloadReport {}
+
+/// `canon learn rollback`: the rollback record.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct StrategyRollbackReport {
+    pub strategy_id: String,
+    pub actor: String,
+    pub reason: String,
+    pub rolled_back_at: chrono::DateTime<Utc>,
+    pub evaluation_digest: Option<String>,
+    pub approval_digest: Option<String>,
+    pub contradicting_trajectory_id: Option<String>,
+    pub outcome_provenance: String,
+}
+
+impl crate::reports::Report for StrategyRollbackReport {}
+
+impl From<&canon_learn::RollbackRecord> for StrategyRollbackReport {
+    fn from(record: &canon_learn::RollbackRecord) -> Self {
+        Self {
+            strategy_id: record.strategy_id.to_string(),
+            actor: record.actor.clone(),
+            reason: record.reason.clone(),
+            rolled_back_at: record.rolled_back_at,
+            evaluation_digest: record.evaluation_digest.clone(),
+            approval_digest: record.approval_digest.clone(),
+            contradicting_trajectory_id: record.contradicting_trajectory_id.as_ref().map(ToString::to_string),
+            outcome_provenance: record.outcome_provenance.clone(),
+        }
+    }
+}
+
 pub fn run_approve(repo: &Path, strategy_id: &StrategyId, evaluation_path: &Path, principal: &str, json: bool) -> ExitCode {
     let repo = resolve_repo_root(repo);
     let config = match LearnConfig::from_manifest(&std::fs::read_to_string(repo.join("canon.yaml")).unwrap_or_default()) {
@@ -245,14 +310,18 @@ pub fn run_approve(repo: &Path, strategy_id: &StrategyId, evaluation_path: &Path
         "canon-learning-approval-v1", &format!("strategy:{strategy_id}"), None,
         &evaluation.digest(), None, &[], &[], principal, &approved_at,
     );
-    let response = json!({
-        "schema_version": 1, "candidate_strategy_id": strategy_id.to_string(),
-        "evaluation_digest": evaluation.digest(), "approver_identity": principal,
-        "approver_role": "human", "approved_at": approved_at,
-        "namespace": "canon-learning-approval-v1", "subject": format!("strategy:{strategy_id}"),
-        "payload_hex": payload.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
-        "instructions": "Sign payload_hex externally; put the armored detached signature in approval.signature, set signer_key to approver_identity, and run canon learn promote with --evaluation and --approval.",
-    });
+    let response = StrategyApprovalPayloadReport {
+        schema_version: 1,
+        candidate_strategy_id: strategy_id.to_string(),
+        evaluation_digest: evaluation.digest(),
+        approver_identity: principal.to_string(),
+        approver_role: "human",
+        approved_at,
+        namespace: "canon-learning-approval-v1",
+        subject: format!("strategy:{strategy_id}"),
+        payload_hex: payload.iter().map(|byte| format!("{byte:02x}")).collect(),
+        instructions: "Sign payloadHex externally; put the armored detached signature in approval.signature, set signer_key to approverIdentity, and run canon learn promote with --evaluation and --approval.",
+    };
     if json {
         // The payload is for a human's external signer, which reads `payload_hex`,
         // not a file template `learn promote` parses: it envelopes like every result.
@@ -265,7 +334,7 @@ pub fn run_approve(repo: &Path, strategy_id: &StrategyId, evaluation_path: &Path
             actor: crate::status::StepActor::Human,
             role: None,
         };
-        crate::json_out::data_with_next("learn approve", &crate::json_out::untyped(response), &crate::next::After::fixed(vec![step]));
+        crate::json_out::data_with_next("learn approve", &response, &crate::next::After::fixed(vec![step]));
     } else {
         println!("{}", serde_json::to_string_pretty(&response).expect("approval payload serializes"));
     }
@@ -314,8 +383,8 @@ pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: 
     match rollback_strategy_authenticated(&store, *strategy_id, reason, actor, contradicting, &repo.join(&config.strategies_root), &signature, approved_at) {
         Ok(record) => {
             if json {
-                let data = serde_json::to_value(&record).expect("rollback record serializes");
-                crate::next::finish(&repo, "learn rollback", &crate::next::Scope::Repo, false, true, &crate::json_out::untyped(data));
+                let data = StrategyRollbackReport::from(&record);
+                crate::next::finish(&repo, "learn rollback", &crate::next::Scope::Repo, false, true, &data);
             } else {
                 println!("{}", serde_json::to_string(&record).expect("rollback record serializes"));
             }

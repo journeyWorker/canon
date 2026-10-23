@@ -816,8 +816,8 @@
         {
           "kind": "report",
           "report": "ChangeNewReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/ChangeNewReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -1458,8 +1458,8 @@
         {
           "kind": "report",
           "report": "DemoReviewReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DemoReviewReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -1529,8 +1529,8 @@
         {
           "kind": "report",
           "report": "DemoInitReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DemoInitReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -1748,8 +1748,8 @@
         {
           "kind": "report",
           "report": "DispatchBeginReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DispatchBeginReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -1816,8 +1816,8 @@
         {
           "kind": "report",
           "report": "DispatchDiffReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DispatchDiffReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -1924,8 +1924,8 @@
         {
           "kind": "report",
           "report": "DispatchEndReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DispatchEndReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -2119,8 +2119,8 @@
         {
           "kind": "report",
           "report": "DivergenceAcceptReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DivergenceAcceptReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -2349,8 +2349,8 @@
         {
           "kind": "report",
           "report": "DivergenceAddReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DivergenceAddReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -2530,8 +2530,8 @@
         {
           "kind": "report",
           "report": "DivergenceDeferReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DivergenceDeferReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -2619,8 +2619,8 @@
         {
           "kind": "report",
           "report": "GatePromoteReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/GatePromoteReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -2790,8 +2790,8 @@
         {
           "kind": "report",
           "report": "DivergenceResolveReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DivergenceResolveReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -2925,8 +2925,8 @@
         {
           "kind": "report",
           "report": "DivergenceListReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DivergenceListReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -3334,8 +3334,8 @@
         {
           "kind": "report",
           "report": "EvidenceAddReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/EvidenceAddReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -3497,8 +3497,8 @@
           "kind": "artifact",
           "mediaType": "application/octet-stream",
           "report": "EvidenceApprovalPayloadReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/EvidenceApprovalPayloadReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -3834,8 +3834,8 @@
         {
           "kind": "report",
           "report": "EvidenceAuditReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/EvidenceAuditReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -4248,8 +4248,8 @@
         {
           "kind": "report",
           "report": "FeatureNewReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/FeatureNewReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -4549,8 +4549,8 @@
         {
           "kind": "report",
           "report": "FindingAddReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/FindingAddReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -4765,8 +4765,8 @@
         {
           "kind": "report",
           "report": "FindingCloseReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/FindingCloseReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -4907,8 +4907,8 @@
         {
           "kind": "report",
           "report": "FindingListReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/FindingListReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -5104,8 +5104,8 @@
         {
           "kind": "report",
           "report": "GateCheckReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/GateCheckReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -5227,8 +5227,8 @@
         {
           "kind": "report",
           "report": "GateInstallHooksReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/GateInstallHooksReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -5312,8 +5312,8 @@
         {
           "kind": "report",
           "report": "GatePromoteReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/GatePromoteReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -5467,8 +5467,8 @@
         {
           "kind": "report",
           "report": "TaskDoneReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/TaskDoneReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -6205,8 +6205,8 @@
           "kind": "artifact",
           "mediaType": "application/octet-stream",
           "report": "StrategyApprovalPayloadReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/StrategyApprovalPayloadReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -6340,8 +6340,8 @@
         {
           "kind": "report",
           "report": "StrategyPromoteReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/StrategyPromoteReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -6483,8 +6483,8 @@
         {
           "kind": "report",
           "report": "StrategyRollbackReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/StrategyRollbackReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -6884,8 +6884,8 @@
         {
           "kind": "report",
           "report": "PolicyApproveReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/PolicyApproveReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -6950,8 +6950,8 @@
         {
           "kind": "report",
           "report": "PolicyShowReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/PolicyShowReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -8107,8 +8107,8 @@
         {
           "kind": "report",
           "report": "ReviewChangeReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/ReviewChangeReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -8353,8 +8353,8 @@
         {
           "kind": "report",
           "report": "ReviewScenarioReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/ReviewScenarioReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -8613,8 +8613,8 @@
         {
           "kind": "report",
           "report": "ScenarioNewReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/ScenarioNewReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -11882,6 +11882,30 @@
       "title": "BriefShowReport",
       "type": "object"
     },
+    "ChangeNewReport": {
+      "$id": "urn:canon:report:ChangeNewReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon change new`: the change opened.",
+      "properties": {
+        "brief": {
+          "description": "The staged `brief.md`, relative to the repo.",
+          "type": "string"
+        },
+        "changeId": {
+          "type": "string"
+        },
+        "subjectId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "changeId",
+        "subjectId",
+        "brief"
+      ],
+      "title": "ChangeNewReport",
+      "type": "object"
+    },
     "CompletionReport": {
       "$id": "urn:canon:report:CompletionReport",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -13340,6 +13364,1436 @@
       "title": "AuthoringSurface",
       "type": "object"
     },
+    "DemoInitReport": {
+      "$id": "urn:canon:report:DemoInitReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon demo init`: the demo repo scaffolded and the commands that flip it.",
+      "properties": {
+        "next": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "scenario": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "repo",
+        "scenario",
+        "next"
+      ],
+      "title": "DemoInitReport",
+      "type": "object"
+    },
+    "DemoReviewReport": {
+      "$id": "urn:canon:report:DemoReviewReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon demo add`: the reviewer evidence recorded.",
+      "properties": {
+        "next": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "scenario": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scenario",
+        "next"
+      ],
+      "title": "DemoReviewReport",
+      "type": "object"
+    },
+    "DispatchBeginReport": {
+      "$defs": {
+        "ContextSnapshot": {
+          "description": "A snapshot of the context used to derive a run. This is nested\nprovenance metadata, not a `CanonRecord` or a new join-spine key.",
+          "properties": {
+            "capability_version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "digest": {
+              "type": "string"
+            },
+            "pack_id": {
+              "description": "Content-addressed full ContextPack manifest. The digest-only\ncapability surface above remains for backwards compatibility; this\noptional identity points replay to the immutable selected-input\nsnapshot when present.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "digest",
+            "capability_version"
+          ],
+          "type": "object"
+        },
+        "PolicySnapshot": {
+          "description": "A snapshot of the policy used to derive a run. This is nested\nprovenance metadata, not a `CanonRecord` or a new join-spine key.",
+          "properties": {
+            "digest": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "digest"
+          ],
+          "type": "object"
+        },
+        "RunLineage": {
+          "description": "Additive provenance metadata captured for a [`Run`]. Every nested\nsnapshot is copied by value so replay can identify the exact provider,\nmodel, skill, context, and policy inputs used for dispatch.",
+          "properties": {
+            "context": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ContextSnapshot"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "model": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "policy": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PolicySnapshot"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "provider": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "skill": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SkillSnapshot"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "SkillSnapshot": {
+          "description": "A snapshot of the skill that contributed to a run. This is nested\nprovenance metadata, not a `CanonRecord` or a new join-spine key.",
+          "properties": {
+            "digest": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        "StrategyRef": {
+          "description": "A full content SNAPSHOT of one retrieved strategy (S8 design D2),\nnever a live pointer: `strategy_id` names its source\n`canon-learn::StrategyItem` for provenance only — `title`/`content`\nare copied by value at the moment they were shown to an agent, so a\nlater edit or demotion of the source strategy can never retroactively\nchange what a [`Run`]'s [`Run::injected_guidance`] already recorded\n(the \"replay reproduces byte-identical run inputs\" guarantee this\ntype exists to make possible). Deliberately NOT a `CanonRecord`\nitself — it only ever lives nested inside [`Run::injected_guidance`],\nmirroring how [`crate::envelope::Actor`] composes into [`Envelope`]\nwithout being one of the twelve closed record kinds itself.",
+          "properties": {
+            "content": {
+              "type": "string"
+            },
+            "strategy_id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "strategy_id",
+            "title",
+            "content"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:DispatchBeginReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon dispatch begin`: the run opened. Binding keys are absent when unset;\n`lineage` only when the manifest records it; `tierDegraded` only when the\ntier write degraded.",
+      "properties": {
+        "injectedGuidance": {
+          "description": "The strategies injected into the run (ledger records, their own schema).",
+          "items": {
+            "$ref": "#/$defs/StrategyRef"
+          },
+          "type": "array"
+        },
+        "lineage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunLineage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "manifest": {
+          "description": "The run manifest written.",
+          "type": "string"
+        },
+        "parentRunId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runId": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tierDegraded": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "runId",
+        "manifest",
+        "injectedGuidance"
+      ],
+      "title": "DispatchBeginReport",
+      "type": "object"
+    },
+    "DispatchDiffReport": {
+      "$defs": {
+        "EdgeCounts": {
+          "description": "How many edges of the plan-vs-actual diff fell into each class.",
+          "properties": {
+            "declared-not-observed": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "observed-not-declared": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "satisfied": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "satisfied",
+            "declared-not-observed",
+            "observed-not-declared"
+          ],
+          "type": "object"
+        },
+        "EdgeEntry": {
+          "description": "One edge of the plan-vs-actual diff.",
+          "properties": {
+            "class": {
+              "description": "`satisfied`, `declared-not-observed` or `observed-not-declared`.",
+              "type": "string"
+            },
+            "from": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "from",
+            "to",
+            "class"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:DispatchDiffReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon dispatch diff`: the declared plan DAG against the observed execution graph.",
+      "properties": {
+        "counts": {
+          "$ref": "#/$defs/EdgeCounts"
+        },
+        "declared": {
+          "description": "Distinct edges the plan declares.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "edges": {
+          "description": "The union of both sides, one entry per distinct edge, in task order.",
+          "items": {
+            "$ref": "#/$defs/EdgeEntry"
+          },
+          "type": "array"
+        },
+        "notes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "observed": {
+          "description": "Distinct edges the runs' lineage shows.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "declared",
+        "observed",
+        "counts",
+        "edges",
+        "notes"
+      ],
+      "title": "DispatchDiffReport",
+      "type": "object"
+    },
+    "DispatchEndReport": {
+      "$id": "urn:canon:report:DispatchEndReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon dispatch end`: the run closed. `tierDegraded` is present only when the\ntier write degraded.",
+      "properties": {
+        "endedAt": {
+          "format": "date-time",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "manifest": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "string"
+        },
+        "status": {
+          "description": "The outcome the run was closed with (`succeeded`, `failed`, …).",
+          "type": "string"
+        },
+        "tierDegraded": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "runId",
+        "manifest",
+        "status",
+        "endedAt"
+      ],
+      "title": "DispatchEndReport",
+      "type": "object"
+    },
+    "DivergenceAcceptReport": {
+      "$defs": {
+        "AcceptedScenario": {
+          "description": "One scenario `canon divergence accept` accepted.",
+          "properties": {
+            "location": {
+              "description": "The ledger path of the acceptance record.",
+              "type": "string"
+            },
+            "scenarioId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "scenarioId",
+            "location"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:DivergenceAcceptReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon divergence accept`: the acceptances written (all or none).",
+      "properties": {
+        "accepted": {
+          "items": {
+            "$ref": "#/$defs/AcceptedScenario"
+          },
+          "type": "array"
+        },
+        "expiry": {
+          "description": "The date the acceptance lapses (`YYYY-MM-DD`); `null` without `--expiry`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tracking": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tracking",
+        "expiry",
+        "accepted"
+      ],
+      "title": "DivergenceAcceptReport",
+      "type": "object"
+    },
+    "DivergenceAddReport": {
+      "$id": "urn:canon:report:DivergenceAddReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon divergence add`: where the divergence landed.",
+      "properties": {
+        "committed": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "staged": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "staged",
+        "committed"
+      ],
+      "title": "DivergenceAddReport",
+      "type": "object"
+    },
+    "DivergenceDeferReport": {
+      "$id": "urn:canon:report:DivergenceDeferReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon divergence defer` and `canon divergence resolve`: the record committed.",
+      "properties": {
+        "committed": {
+          "description": "The ledger path of the committed record.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "committed"
+      ],
+      "title": "DivergenceCommitReport",
+      "type": "object"
+    },
+    "DivergenceListReport": {
+      "$defs": {
+        "BurndownSummary": {
+          "description": "Per-state counts of `canon divergence list`.",
+          "properties": {
+            "accepted": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "deferred": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "open": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "resolved": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "resolvedInvalid": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "stillDivergent": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "total": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "open",
+            "resolved",
+            "stillDivergent",
+            "deferred",
+            "resolvedInvalid",
+            "accepted",
+            "total"
+          ],
+          "type": "object"
+        },
+        "ScenarioRow": {
+          "description": "One scenario's current state in `canon divergence list`.",
+          "properties": {
+            "expiry": {
+              "description": "When a deferral or acceptance lapses.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "projectId": {
+              "type": "string"
+            },
+            "reason": {
+              "description": "Why it is deferred.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "scenarioId": {
+              "type": "string"
+            },
+            "state": {
+              "description": "`open`, `resolved`, `still-divergent`, `deferred`, `resolved-invalid` or `accepted`.",
+              "type": "string"
+            },
+            "tracking": {
+              "description": "Where an accepted gap is tracked.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "projectId",
+            "scenarioId",
+            "state"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:DivergenceListReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon divergence list`: the current state of every divergence; paging is in `meta`.",
+      "properties": {
+        "asOf": {
+          "description": "The instant deferred expiry was judged at (RFC 3339).",
+          "type": "string"
+        },
+        "scenarios": {
+          "items": {
+            "$ref": "#/$defs/ScenarioRow"
+          },
+          "type": "array"
+        },
+        "summary": {
+          "$ref": "#/$defs/BurndownSummary"
+        }
+      },
+      "required": [
+        "asOf",
+        "summary",
+        "scenarios"
+      ],
+      "title": "DivergenceListReport",
+      "type": "object"
+    },
+    "DivergencePromoteReport": {
+      "$defs": {
+        "PromotedEntry": {
+          "description": "One staged record `canon gate promote` committed or recovered.",
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "target": {
+              "description": "The ledger path it landed at.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "label",
+            "target"
+          ],
+          "type": "object"
+        },
+        "RefusedEntry": {
+          "description": "One staged record `canon gate promote` refused.",
+          "properties": {
+            "class": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "subject": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "class",
+            "subject",
+            "message"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:DivergencePromoteReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon gate promote`: what left staging. On exit 1 (`PROMOTE_REFUSED`) the report stays in `data`.",
+      "properties": {
+        "dryRun": {
+          "type": "boolean"
+        },
+        "promoted": {
+          "items": {
+            "$ref": "#/$defs/PromotedEntry"
+          },
+          "type": "array"
+        },
+        "recovered": {
+          "items": {
+            "$ref": "#/$defs/PromotedEntry"
+          },
+          "type": "array"
+        },
+        "refused": {
+          "items": {
+            "$ref": "#/$defs/RefusedEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "dryRun",
+        "promoted",
+        "recovered",
+        "refused"
+      ],
+      "title": "GatePromoteReport",
+      "type": "object"
+    },
+    "DivergenceResolveReport": {
+      "$id": "urn:canon:report:DivergenceResolveReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon divergence defer` and `canon divergence resolve`: the record committed.",
+      "properties": {
+        "committed": {
+          "description": "The ledger path of the committed record.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "committed"
+      ],
+      "title": "DivergenceCommitReport",
+      "type": "object"
+    },
+    "EvidenceAddReport": {
+      "$defs": {
+        "EvidenceRecordEntry": {
+          "description": "One record `canon evidence add` wrote, or found already written.",
+          "properties": {
+            "committed": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "next": {
+              "description": "The step that follows (a single-subject add).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "outcome": {
+              "description": "`verdict <verdict>` or `audit <result>`.",
+              "type": "string"
+            },
+            "staged": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "subject": {
+              "description": "The task or scenario id the record is about.",
+              "type": "string"
+            },
+            "unchanged": {
+              "description": "`true` when an identical record already existed and nothing was written.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "staged",
+            "committed",
+            "subject",
+            "outcome"
+          ],
+          "type": "object"
+        },
+        "SkippedCase": {
+          "description": "A case of `--all-scenarios` that was not recorded: its scenario is not indexed.",
+          "properties": {
+            "case": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "scenarioId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "scenarioId",
+            "case",
+            "reason"
+          ],
+          "type": "object"
+        },
+        "StaleReview": {
+          "description": "A review the new evidence makes stale, with the command that re-pins it.",
+          "properties": {
+            "repin": {
+              "type": "string"
+            },
+            "reviewer": {
+              "type": "string"
+            },
+            "scenarioId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "reviewer",
+            "scenarioId",
+            "repin"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:EvidenceAddReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon evidence add` and `canon evidence audit`: the records written.",
+      "properties": {
+        "casesWithoutScenarioId": {
+          "description": "`--all-scenarios` only: cases that carry no scenario id.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "records": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRecordEntry"
+          },
+          "type": "array"
+        },
+        "skipped": {
+          "description": "`--all-scenarios` only: cases skipped because their scenario is not indexed.",
+          "items": {
+            "$ref": "#/$defs/SkippedCase"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "staleReviews": {
+          "items": {
+            "$ref": "#/$defs/StaleReview"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "records",
+        "staleReviews"
+      ],
+      "title": "EvidenceAddReport",
+      "type": "object"
+    },
+    "EvidenceApprovalPayloadReport": {
+      "$id": "urn:canon:report:EvidenceApprovalPayloadReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon evidence approval-payload --json`: the bytes an external signer signs.",
+      "properties": {
+        "effects": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "payload": {
+          "description": "The payload as text; `null` when it is not UTF-8.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "payloadHex": {
+          "description": "The payload bytes, hex-encoded.",
+          "type": "string"
+        },
+        "surface": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "payloadHex",
+        "payload",
+        "surface",
+        "effects"
+      ],
+      "title": "EvidenceApprovalPayloadReport",
+      "type": "object"
+    },
+    "EvidenceAuditReport": {
+      "$defs": {
+        "EvidenceRecordEntry": {
+          "description": "One record `canon evidence add` wrote, or found already written.",
+          "properties": {
+            "committed": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "next": {
+              "description": "The step that follows (a single-subject add).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "outcome": {
+              "description": "`verdict <verdict>` or `audit <result>`.",
+              "type": "string"
+            },
+            "staged": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "subject": {
+              "description": "The task or scenario id the record is about.",
+              "type": "string"
+            },
+            "unchanged": {
+              "description": "`true` when an identical record already existed and nothing was written.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "staged",
+            "committed",
+            "subject",
+            "outcome"
+          ],
+          "type": "object"
+        },
+        "SkippedCase": {
+          "description": "A case of `--all-scenarios` that was not recorded: its scenario is not indexed.",
+          "properties": {
+            "case": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "scenarioId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "scenarioId",
+            "case",
+            "reason"
+          ],
+          "type": "object"
+        },
+        "StaleReview": {
+          "description": "A review the new evidence makes stale, with the command that re-pins it.",
+          "properties": {
+            "repin": {
+              "type": "string"
+            },
+            "reviewer": {
+              "type": "string"
+            },
+            "scenarioId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "reviewer",
+            "scenarioId",
+            "repin"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:EvidenceAuditReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon evidence add` and `canon evidence audit`: the records written.",
+      "properties": {
+        "casesWithoutScenarioId": {
+          "description": "`--all-scenarios` only: cases that carry no scenario id.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "records": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRecordEntry"
+          },
+          "type": "array"
+        },
+        "skipped": {
+          "description": "`--all-scenarios` only: cases skipped because their scenario is not indexed.",
+          "items": {
+            "$ref": "#/$defs/SkippedCase"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "staleReviews": {
+          "items": {
+            "$ref": "#/$defs/StaleReview"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "records",
+        "staleReviews"
+      ],
+      "title": "EvidenceAddReport",
+      "type": "object"
+    },
+    "FeatureNewReport": {
+      "$id": "urn:canon:report:FeatureNewReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon feature new`: the feature file created.",
+      "properties": {
+        "feature": {
+          "type": "string"
+        },
+        "next": {
+          "description": "The command that adds its first scenario.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "feature",
+        "next"
+      ],
+      "title": "FeatureNewReport",
+      "type": "object"
+    },
+    "FindingAddReport": {
+      "$id": "urn:canon:report:FindingAddReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon finding add`: the finding staged or committed.",
+      "properties": {
+        "changeId": {
+          "type": "string"
+        },
+        "committed": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "disposition": {
+          "type": "string"
+        },
+        "round": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "seq": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "severity": {
+          "type": "string"
+        },
+        "staged": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unsourced": {
+          "description": "No `--introduced-by` was given: the finding names no commit that introduced it.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "staged",
+        "committed",
+        "changeId",
+        "round",
+        "seq",
+        "severity",
+        "disposition",
+        "unsourced"
+      ],
+      "title": "FindingAddReport",
+      "type": "object"
+    },
+    "FindingCloseReport": {
+      "$id": "urn:canon:report:FindingCloseReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon finding close`: the transition staged or committed, or a no-op.",
+      "properties": {
+        "changeId": {
+          "type": "string"
+        },
+        "committed": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "disposition": {
+          "type": "string"
+        },
+        "from": {
+          "description": "The disposition it moved from; absent on a no-op.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "noop": {
+          "description": "`true` when the finding already had this disposition and nothing was staged.",
+          "type": "boolean"
+        },
+        "round": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "seq": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "staged": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "changeId",
+        "round",
+        "seq",
+        "disposition",
+        "noop"
+      ],
+      "title": "FindingCloseReport",
+      "type": "object"
+    },
+    "FindingListReport": {
+      "$defs": {
+        "FindingRow": {
+          "description": "One finding of `canon finding list`.",
+          "properties": {
+            "disposition": {
+              "type": "string"
+            },
+            "fileRef": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "resolutionSha": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reviewer": {
+              "type": "string"
+            },
+            "round": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "seq": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "severity": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "round",
+            "seq",
+            "severity",
+            "disposition",
+            "reviewer",
+            "summary",
+            "resolutionSha",
+            "fileRef",
+            "reason"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:FindingListReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon finding list`: a change's findings; paging is in `meta`.",
+      "properties": {
+        "changeId": {
+          "type": "string"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/FindingRow"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "changeId",
+        "findings"
+      ],
+      "title": "FindingListReport",
+      "type": "object"
+    },
+    "GateCheckReport": {
+      "$defs": {
+        "GateAdvisory": {
+          "description": "A condition `canon gate check` reports without failing on it.",
+          "properties": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "description": "`spec_coverage_off`, `policy_approval`, `evidence_binding`, `review_waivers`, `accepted_divergence`, `unmigrated_review`, `brief_overrides` or `unstored_attachments`.",
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "message",
+            "items"
+          ],
+          "type": "object"
+        },
+        "GateViolation": {
+          "description": "One violation of `canon gate check`.",
+          "properties": {
+            "class": {
+              "type": "string"
+            },
+            "line": {
+              "description": "The grep-stable wire line: `<class> <subject> — <message>`.",
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "subject": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "class",
+            "subject",
+            "message",
+            "line"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:GateCheckReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon gate check`: violations and advisories. On exit 1 the report stays in `data`.",
+      "properties": {
+        "advisories": {
+          "items": {
+            "$ref": "#/$defs/GateAdvisory"
+          },
+          "type": "array"
+        },
+        "clean": {
+          "type": "boolean"
+        },
+        "unverifiable": {
+          "description": "Present (`true`) when nothing was examined, so a vacuous pass does not read as clean.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "violations": {
+          "items": {
+            "$ref": "#/$defs/GateViolation"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "clean",
+        "violations",
+        "advisories"
+      ],
+      "title": "GateCheckReport",
+      "type": "object"
+    },
+    "GateInstallHooksReport": {
+      "$id": "urn:canon:report:GateInstallHooksReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon gate install-hooks`: whether the hooks changed.",
+      "properties": {
+        "installed": {
+          "type": "boolean"
+        },
+        "preCommitScriptWritten": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "installed",
+        "preCommitScriptWritten"
+      ],
+      "title": "GateInstallHooksReport",
+      "type": "object"
+    },
+    "GatePromoteReport": {
+      "$defs": {
+        "PromotedEntry": {
+          "description": "One staged record `canon gate promote` committed or recovered.",
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "target": {
+              "description": "The ledger path it landed at.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "label",
+            "target"
+          ],
+          "type": "object"
+        },
+        "RefusedEntry": {
+          "description": "One staged record `canon gate promote` refused.",
+          "properties": {
+            "class": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "subject": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "class",
+            "subject",
+            "message"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:GatePromoteReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon gate promote`: what left staging. On exit 1 (`PROMOTE_REFUSED`) the report stays in `data`.",
+      "properties": {
+        "dryRun": {
+          "type": "boolean"
+        },
+        "promoted": {
+          "items": {
+            "$ref": "#/$defs/PromotedEntry"
+          },
+          "type": "array"
+        },
+        "recovered": {
+          "items": {
+            "$ref": "#/$defs/PromotedEntry"
+          },
+          "type": "array"
+        },
+        "refused": {
+          "items": {
+            "$ref": "#/$defs/RefusedEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "dryRun",
+        "promoted",
+        "recovered",
+        "refused"
+      ],
+      "title": "GatePromoteReport",
+      "type": "object"
+    },
+    "GateSelftestReport": {
+      "$defs": {
+        "SelftestFailure": {
+          "description": "One fixture class of `canon gate selftest` that did not match its expected violations.",
+          "properties": {
+            "class": {
+              "type": "string"
+            },
+            "extra": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "malformedExpected": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "missing": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "class",
+            "malformedExpected",
+            "missing",
+            "extra"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:GateSelftestReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon gate selftest`: clean with the fixture count, or the failures (exit 1, kept in `data`).",
+      "properties": {
+        "clean": {
+          "type": "boolean"
+        },
+        "failures": {
+          "items": {
+            "$ref": "#/$defs/SelftestFailure"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "fixtures": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "clean"
+      ],
+      "title": "GateSelftestReport",
+      "type": "object"
+    },
     "IngestPlansReport": {
       "$defs": {
         "Actor": {
@@ -13925,6 +15379,106 @@
       "title": "ArtifactIngestOutcome",
       "type": "object"
     },
+    "PolicyApproveReport": {
+      "$id": "urn:canon:report:PolicyApproveReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon policy approve`: the approval just recorded.",
+      "properties": {
+        "approval": {
+          "type": "string"
+        },
+        "approvedAt": {
+          "type": "string"
+        },
+        "approvedBy": {
+          "type": "string"
+        },
+        "policy": {
+          "type": "string"
+        },
+        "policyDigest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "policy",
+        "policyDigest",
+        "approvedBy",
+        "approvedAt",
+        "approval"
+      ],
+      "title": "PolicyApproveReport",
+      "type": "object"
+    },
+    "PolicyShowReport": {
+      "$id": "urn:canon:report:PolicyShowReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon policy show`: the policy's digest and what its approval says.",
+      "properties": {
+        "approval": {
+          "type": "string"
+        },
+        "approvedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "approvedBy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "approvedDigest": {
+          "description": "The digest the approval covers; differs from `policyDigest` when `state` is `changed`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "detail": {
+          "description": "Why the approval is unreadable.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "policy": {
+          "type": "string"
+        },
+        "policyDigest": {
+          "description": "Digest of the policy file's current bytes; `null` without a readable policy.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "description": "`none`, `approved`, `unapproved`, `changed` or `unreadable`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "policy",
+        "policyDigest",
+        "approval",
+        "state",
+        "approvedBy",
+        "approvedAt",
+        "approvedDigest",
+        "note",
+        "detail"
+      ],
+      "title": "PolicyShowReport",
+      "type": "object"
+    },
     "PromptAddReport": {
       "$defs": {
         "ContentRef": {
@@ -14178,6 +15732,278 @@
       },
       "title": "RetrieveReport",
       "type": "array"
+    },
+    "ReviewChangeReport": {
+      "$defs": {
+        "ReviewEntry": {
+          "description": "One review `canon review scenario` or `canon review change` wrote, or found already written.",
+          "properties": {
+            "deduped": {
+              "description": "Whether an identical record was already stored (a write).",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "location": {
+              "description": "The ledger path of the review record.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "scenarioId": {
+              "description": "The scenario an unchanged repeat is about.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "unchanged": {
+              "description": "`true` when an identical review already existed and nothing was written.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "location"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:ReviewChangeReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon review scenario` and `canon review change`: the reviews written.",
+      "properties": {
+        "blobsStored": {
+          "description": "Attached files stored in the artifact store.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "reviews": {
+          "items": {
+            "$ref": "#/$defs/ReviewEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "outcome",
+        "reviews",
+        "blobsStored"
+      ],
+      "title": "ReviewReport",
+      "type": "object"
+    },
+    "ReviewScenarioReport": {
+      "$defs": {
+        "ReviewEntry": {
+          "description": "One review `canon review scenario` or `canon review change` wrote, or found already written.",
+          "properties": {
+            "deduped": {
+              "description": "Whether an identical record was already stored (a write).",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "location": {
+              "description": "The ledger path of the review record.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "scenarioId": {
+              "description": "The scenario an unchanged repeat is about.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "unchanged": {
+              "description": "`true` when an identical review already existed and nothing was written.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "location"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:ReviewScenarioReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon review scenario` and `canon review change`: the reviews written.",
+      "properties": {
+        "blobsStored": {
+          "description": "Attached files stored in the artifact store.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "reviews": {
+          "items": {
+            "$ref": "#/$defs/ReviewEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "outcome",
+        "reviews",
+        "blobsStored"
+      ],
+      "title": "ReviewReport",
+      "type": "object"
+    },
+    "ScenarioNewBatchReport": {
+      "$defs": {
+        "WrittenLine": {
+          "description": "One scenario written by `canon scenario new --from`.",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "line": {
+              "description": "The 1-based line of the input.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "id",
+            "path"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:ScenarioNewBatchReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon scenario new --from`: every scenario of the batch, written.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/WrittenLine"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "ScenarioNewBatchReport",
+      "type": "object"
+    },
+    "ScenarioNewRefusalReport": {
+      "$defs": {
+        "RefusedLine": {
+          "description": "One refused input line of `canon scenario new --from`.",
+          "properties": {
+            "error": {
+              "$ref": "#/$defs/RefusedLineError"
+            },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "line": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "line",
+            "id",
+            "error"
+          ],
+          "type": "object"
+        },
+        "RefusedLineError": {
+          "description": "Why one input line of `canon scenario new --from` was refused.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:ScenarioNewRefusalReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "The `data` of a refused `canon scenario new --from`: every refused line; nothing was written.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/RefusedLine"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "ScenarioNewRefusal",
+      "type": "object"
+    },
+    "ScenarioNewReport": {
+      "$id": "urn:canon:report:ScenarioNewReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon scenario new <tag>`: the scenario written.",
+      "properties": {
+        "feature": {
+          "description": "The feature file it was written to.",
+          "type": "string"
+        },
+        "scenarioId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scenarioId",
+        "feature"
+      ],
+      "title": "ScenarioNewReport",
+      "type": "object"
     },
     "SelftestReport": {
       "$defs": {
@@ -14832,6 +16658,146 @@
         "unowned"
       ],
       "title": "StatusReport",
+      "type": "object"
+    },
+    "StrategyApprovalPayloadReport": {
+      "$id": "urn:canon:report:StrategyApprovalPayloadReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon learn approve`: the bytes a human signs externally.",
+      "properties": {
+        "approvedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "approverIdentity": {
+          "type": "string"
+        },
+        "approverRole": {
+          "type": "string"
+        },
+        "candidateStrategyId": {
+          "type": "string"
+        },
+        "evaluationDigest": {
+          "type": "string"
+        },
+        "instructions": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "payloadHex": {
+          "description": "The canonical approval payload, hex-encoded; this is what gets signed.",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "subject": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "candidateStrategyId",
+        "evaluationDigest",
+        "approverIdentity",
+        "approverRole",
+        "approvedAt",
+        "namespace",
+        "subject",
+        "payloadHex",
+        "instructions"
+      ],
+      "title": "StrategyApprovalPayloadReport",
+      "type": "object"
+    },
+    "StrategyPromoteReport": {
+      "$id": "urn:canon:report:StrategyPromoteReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "Emit the exact domain-separated bytes an external SSH signer must sign.\nThis command never reads a private key and never sets `verified`.\n`canon learn promote`: what was (or, with `--dry-run`, would be) promoted.",
+      "properties": {
+        "advisories": {
+          "description": "Advisory lint findings; they never change the exit code.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "dryRun": {
+          "type": "boolean"
+        },
+        "path": {
+          "description": "The git-tracked strategy file.",
+          "type": "string"
+        },
+        "strategyId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "strategyId",
+        "path",
+        "dryRun",
+        "advisories"
+      ],
+      "title": "StrategyPromoteReport",
+      "type": "object"
+    },
+    "StrategyRollbackReport": {
+      "$id": "urn:canon:report:StrategyRollbackReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon learn rollback`: the rollback record.",
+      "properties": {
+        "actor": {
+          "type": "string"
+        },
+        "approvalDigest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contradictingTrajectoryId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evaluationDigest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outcomeProvenance": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "rolledBackAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "strategyId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "strategyId",
+        "actor",
+        "reason",
+        "rolledBackAt",
+        "evaluationDigest",
+        "approvalDigest",
+        "contradictingTrajectoryId",
+        "outcomeProvenance"
+      ],
+      "title": "StrategyRollbackReport",
       "type": "object"
     },
     "SubjectAdoptReport": {
@@ -16233,6 +18199,33 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "description": "`data` of the subject leaves: the Subject record, embedded verbatim (it keeps the ledger record's own schema and snake_case keys).",
       "title": "SubjectReport"
+    },
+    "TaskDoneReport": {
+      "$id": "urn:canon:report:TaskDoneReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon gate task` (`task done`): the task row flipped, or already done.",
+      "properties": {
+        "document": {
+          "description": "The task document written; absent when nothing was flipped.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "flipped": {
+          "description": "False when the row was already `[x]`.",
+          "type": "boolean"
+        },
+        "taskId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "taskId",
+        "flipped"
+      ],
+      "title": "TaskDoneReport",
+      "type": "object"
     }
   },
   "specVersion": "1"

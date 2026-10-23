@@ -37,6 +37,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use canon_ingest::{native_plan_adapter, PlanSourceHandle};
+use schemars::JsonSchema;
+use serde::Serialize;
 use canon_model::{paths, Change, ChangeId, SubjectId, SubjectStatus};
 
 use crate::cli_error::CliError;
@@ -109,6 +111,18 @@ fn stage_change(staging: &Path, slug: &ChangeId, kind: ChangeKind, title: &str, 
         .find(|change| &change.change_id == slug)
         .ok_or_else(|| format!("the written change `{}` did not parse", slug.as_str()))
 }
+
+/// `canon change new`: the change opened.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangeNewReport<'a> {
+    pub change_id: &'a str,
+    pub subject_id: &'a str,
+    /// The staged `brief.md`, relative to the repo.
+    pub brief: &'a str,
+}
+
+impl crate::reports::Report for ChangeNewReport<'_> {}
 
 /// `canon change new` (module doc). Exit `0` written + adopted, `2`
 /// refused or failed with nothing left behind.
@@ -216,7 +230,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         &crate::next::Scope::Change(slug.as_str().to_string()),
         false,
         json,
-        &crate::json_out::untyped(serde_json::json!({ "changeId": slug.as_str(), "subjectId": subject_id.as_str(), "brief": brief })),
+        &ChangeNewReport { change_id: slug.as_str(), subject_id: subject_id.as_str(), brief: &brief },
         crate::json_out::warnings_meta(&warnings),
         extra);
     0
