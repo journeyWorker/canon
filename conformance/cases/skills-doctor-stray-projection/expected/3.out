@@ -1,2 +1,3 @@
 providers: claude (from canon.yaml skills.providers)
 <repo>/.claude/skills/canon/SKILL.md — ok (claude)
+<repo>/.claude/skills/canon/scripts/canon-retrieve-pre-dispatch.sh — ok (claude)

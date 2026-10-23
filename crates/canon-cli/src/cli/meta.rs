@@ -127,6 +127,7 @@ pub fn path(cmd: &Command) -> &'static str {
             SkillsCommand::Install(_) => "skills install",
             SkillsCommand::Check(_) => "skills check",
             SkillsCommand::Doctor(_) => "skills doctor",
+            SkillsCommand::Show(_) => "skills show",
         },
         Command::Tier { action } => match action {
             TierCommand::Age(_) => "tier age",

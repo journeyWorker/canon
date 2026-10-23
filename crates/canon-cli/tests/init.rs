@@ -692,22 +692,20 @@ fn authoring_init_94_an_unknown_provider_is_refused_and_nothing_is_written() {
 /// authoring.init.95: when the skill source is missing, init still
 /// records the choice, then exits 2 naming the install to run.
 #[test]
-fn authoring_init_95_a_missing_skill_source_is_reported_with_the_retry() {
+fn authoring_init_95_a_missing_skill_source_override_is_reported_with_the_retry() {
     let tmp = tempfile::tempdir().unwrap();
     let repo = tmp.path().join("repo");
     std::fs::create_dir_all(repo.join(".pi")).unwrap();
 
     let out = init_with_source(&[], &repo, &tmp.path().join("missing"));
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
-    let err = stderr(&out);
-    assert!(err.contains("wrote `skills: { providers: [pi] }` to ./canon.yaml but did not install the canon skill: canonical skill source is missing SKILL.src.md"), "{err}");
-    assert!(err.contains("run `canon skills install` (set CANON_SKILLS_SOURCE or pass --source <dir>; it follows skills.providers)"), "{err}");
+    assert!(stderr(&out).contains("INIT_SKILL_INSTALL_FAILED"), "{}", stderr(&out));
     assert!(std::fs::read_to_string(repo.join("canon.yaml")).unwrap().ends_with("skills:\n  providers: [pi]\n"));
     assert!(projected(&repo).is_empty());
 
-    let source = skill_source(tmp.path());
-    let retry = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "install", "--skills-source"]).arg(&source).current_dir(&repo).output().unwrap();
-    assert_eq!(stdout(&retry), format!("canon v1 — installed (pi; from canon.yaml skills.providers)\n{}\n", canon_cli::skills::owned_paths_lines(&[canon_cli::skills::Provider::Pi]).join("\n")), "{}", stderr(&retry));
+    // Without the override directory the retry installs the stub the binary carries.
+    let retry = Command::new(env!("CARGO_BIN_EXE_canon")).args(["skills", "install"]).current_dir(&repo).env_remove("CANON_SKILLS_SOURCE").output().unwrap();
+    assert_eq!(retry.status.code(), Some(0), "{}", stderr(&retry));
     assert_eq!(projected(&repo), vec![".pi/skills/canon"]);
 }
 

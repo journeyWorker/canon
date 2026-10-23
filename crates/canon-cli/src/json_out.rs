@@ -185,6 +185,7 @@ impl<R: JsonSchema + serde::Serialize> Report for Projected<R> {}
 static REPO: OnceLock<PathBuf> = OnceLock::new();
 static JSON_MODE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 static WARNINGS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+static FIRST_NEXT: std::sync::Mutex<Vec<crate::status::NextStep>> = std::sync::Mutex::new(Vec::new());
 
 /// Marks the process as running in JSON mode: stderr stays empty ([`human_err!`], [`warn_err!`]).
 pub fn set_json_mode(json: bool) {
@@ -207,6 +208,14 @@ pub fn warn(message: String) {
     } else {
         eprintln!("{message}");
     }
+}
+
+/// Puts `step` first in the `meta.next` of whatever envelope this run prints, a failure's included
+/// (0.28 D9: `status`, `gate check` and `context` lead a 0.27-era repo to `canon migrate --json`).
+/// An envelope without `next` gets one; one with the limit reached drops its last step into
+/// `nextOmitted`. A plain `canon migrate` step already in the list is replaced by this one.
+pub fn prepend_next(step: crate::status::NextStep) {
+    FIRST_NEXT.lock().expect("the first-step list is not poisoned").push(step);
 }
 
 /// Remembers the `--repo` the command was given, so `meta.context.repo` can say
@@ -289,10 +298,20 @@ fn build_meta(command: &str, schema_version: &str, after: Option<&After>, extra:
         }
     }
     let warnings = (!warnings.is_empty()).then_some(warnings);
-    let (next, next_omitted, waiting_on) = match after {
+    let (mut next, mut next_omitted, waiting_on) = match after {
         Some(after) => (Some(after.entries()), (after.omitted > 0).then_some(after.omitted), after.waiting_on.clone()),
         None => (writes(&command).then(Vec::new), None, None),
     };
+    let first = std::mem::take(&mut *FIRST_NEXT.lock().expect("the first-step list is not poisoned"));
+    if !first.is_empty() {
+        let mut entries: Vec<NextEntry> = first.iter().map(NextEntry::from).collect();
+        let lead = entries.len();
+        entries.extend(next.take().unwrap_or_default().into_iter().filter(|entry| entry.command != "canon migrate"));
+        let over = entries.len().saturating_sub(crate::status::NEXT_LIMIT.max(lead));
+        entries.truncate(entries.len() - over);
+        next_omitted = (next_omitted.unwrap_or(0) + over > 0).then_some(next_omitted.unwrap_or(0) + over);
+        next = Some(entries);
+    }
     Meta {
         command,
         schema_version: schema_version.to_string(),

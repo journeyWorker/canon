@@ -397,6 +397,7 @@ pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> i32 {
         }
     }
     let repo = resolve_repo_root(repo);
+    crate::legacy::announce(&repo);
     let mut report = resolve_with_pending_index(&repo);
     report.apply_role(Role::current(None));
     // A ledger that could not be read gave the report nothing to count (D3): `unverifiable`, never a silent pass.

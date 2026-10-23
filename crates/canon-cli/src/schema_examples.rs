@@ -70,6 +70,7 @@ pub(crate) const EXAMPLES: &[(&str, &str)] = &[
     ("skills check", "canon skills check"),
     ("skills doctor", "canon skills doctor"),
     ("skills install", "canon skills install"),
+    ("skills show", "canon skills show canon --full"),
     ("status", "canon status"),
     ("subject adopt", "canon subject adopt demo --change-id add-login"),
     ("subject new", "canon subject new payments --domain dev --title Payments"),

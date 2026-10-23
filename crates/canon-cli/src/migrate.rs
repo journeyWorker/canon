@@ -167,6 +167,8 @@ struct Plan {
     left: Vec<String>,
     /// Paths it moves, checked for uncommitted changes.
     moved_paths: Vec<PathBuf>,
+    /// The 0.27-era hooks, scripts and skill projection it rewrites (0.28 D9).
+    legacy: crate::legacy::Plan,
 }
 
 impl Plan {
@@ -179,6 +181,7 @@ impl Plan {
             || self.drop_source.is_some()
             || self.providers.is_some()
             || !self.gitignore.is_empty()
+            || !self.legacy.is_empty()
     }
 }
 
@@ -189,6 +192,9 @@ impl Plan {
 pub struct MigrateReport {
     /// What the run planned, did and noted, one line each.
     pub steps: Vec<String>,
+    /// Where `--commit` copied the files it rewrites or removes, repo-relative (`.canon/migrate-backup/<timestamp>`); absent when it copied none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub backup_dir: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index_records_written: Option<usize>,
     /// The rebuild's own report when it found the corpus unclean (`MIGRATE_INDEX_FAILED`).
@@ -227,6 +233,7 @@ fn effects(repo: &Path, plan: &Plan, config_changes: bool, ledger: Vec<Effect>, 
     if !plan.gitignore.is_empty() {
         out.push(Effect::path("rewrite", ".gitignore").detail(format!("add {}", plan.gitignore.join(", "))));
     }
+    out.extend(plan.legacy.effects());
     out.extend(plan.changes.iter().chain(&plan.renames).map(|c| &c.change).chain(plan.reimport.iter().map(|(change, _)| change)).map(|change| Effect::record("reimport", change.as_str())));
     out.extend(ledger);
     if let Some(pins) = pins {
@@ -294,13 +301,37 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> i32 {
             Err(e) => log.line(format!("canon migrate: could not check the reviews against their evidence ({e}); a run that applies the plan checks them again")),
         }
         log.line(safe_plan.commit_hint(&base));
-        let report = MigrateReport { steps: log.into_lines(), index_records_written: None, index: None, plan: safe_plan };
+        let report = MigrateReport { steps: log.into_lines(), backup_dir: None, index_records_written: None, index: None, plan: safe_plan };
         if json {
             crate::json_out::data_with_next("migrate", &report, &report.plan.next_step(&base, "the plan only lists what would change; applying it takes its planDigest"));
         }
         return 0;
     }
     let safe_plan = safe_plan.committed();
+
+    // Every file the run rewrites or removes is copied first (D9), then the 0.27-era hooks, scripts and skill are rewritten.
+    let mut backed_up = plan.legacy.backed_up();
+    if config != text {
+        backed_up.push("canon.yaml".to_string());
+    }
+    if !plan.gitignore.is_empty() {
+        backed_up.push(".gitignore".to_string());
+    }
+    let backup_dir = match crate::legacy::backup(&repo, &backed_up) {
+        Ok(Some(dir)) => {
+            log.line(format!("canon migrate: backed up {} file(s) it rewrites under {}/", backed_up.len(), canon_model::paths::MIGRATE_BACKUP_DIR));
+            Some(rel(&repo, &dir))
+        }
+        Ok(None) => None,
+        Err(e) => return CliError::refused("WRITE_FAILED", format!("{e}; nothing was rewritten")).hint("check that .canon/ is writable and the disk has room, then run `canon migrate` again").emit("canon migrate", json),
+    };
+    if let Err(e) = plan.legacy.apply(&repo) {
+        return CliError::refused("MIGRATE_STOPPED", format!("{e}; running `canon migrate` again finishes the rest")).hint("fix what the message names, then run `canon migrate` again; the originals are in .canon/migrate-backup/").emit("canon migrate", json);
+    }
+    for effect in plan.legacy.effects() {
+        log.line(format!("canon migrate:{}", safety::effect_line(&effect)));
+    }
+    plan.legacy.notes().into_iter().for_each(|note| log.line(format!("canon migrate: {note}")));
 
     let applied = apply(&repo, &plan, git, &mut log);
     // The openspec source goes only once every change moved and every
@@ -362,7 +393,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> i32 {
                 .emit("canon migrate", json);
         }
     }
-    rebuild_index(&repo, log, safe_plan, json)
+    rebuild_index(&repo, log, safe_plan, backup_dir, json)
 }
 
 /// The plan for `repo` with `canon.yaml` `text`, or why it is refused.
@@ -376,6 +407,7 @@ fn plan(repo: &Path, text: &str) -> Result<Plan, String> {
         plan.providers = Some(selection.providers);
     }
     plan.gitignore = crate::init::missing_gitignore_lines(repo).into_iter().map(|(_, line)| line).collect();
+    plan.legacy = crate::legacy::plan(repo)?;
     Ok(plan)
 }
 
@@ -992,6 +1024,12 @@ fn print_plan(repo: &Path, plan: &Plan, config_changes: bool, log: &mut crate::j
     if !plan.gitignore.is_empty() {
         log.line(format!("  .gitignore: add {}", plan.gitignore.join(", ")));
     }
+    for effect in plan.legacy.effects() {
+        log.line(safety::effect_line(&effect));
+    }
+    for note in plan.legacy.notes() {
+        log.line(format!("  {note}"));
+    }
     if config_changes {
         log.line("  canon.yaml: every other byte kept");
     }
@@ -1153,7 +1191,7 @@ fn tracked_index_files(repo: &Path) -> usize {
 /// The full index rebuild (module doc). Exit `1` when a root does not
 /// sync clean: the migration stands, and `canon inventory sync` lists
 /// what to fix.
-fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Plan, json: bool) -> i32 {
+fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Plan, backup_dir: Option<String>, json: bool) -> i32 {
     match crate::inventory::run_sync(repo, None) {
         Ok(outcome) if outcome.is_clean() => {
             log.line(format!("canon migrate: rebuilt the scenario index: {} record(s) written", outcome.total_written()));
@@ -1170,14 +1208,14 @@ fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Plan,
                 }
             }
             if json {
-                crate::json_out::data("migrate", &MigrateReport { steps: log.into_lines(), index_records_written: Some(outcome.total_written()), index: None, plan });
+                crate::json_out::data("migrate", &MigrateReport { steps: log.into_lines(), backup_dir, index_records_written: Some(outcome.total_written()), index: None, plan });
             }
             0
         }
         Ok(outcome) => {
             crate::say_raw!(json, "{}", crate::inventory::format_human(&outcome));
             CliError::failed("MIGRATE_INDEX_FAILED", "the files moved, but the scenario index rebuild found the problems; fix them, then run `canon inventory sync`").hint("run `canon inventory sync` and fix what it reports")
-                .emit_with_data("canon migrate", json, &MigrateReport { steps: log.into_lines(), index_records_written: None, index: Some(serde_json::to_value(crate::inventory::format_json(&outcome)).expect("a report serializes")), plan })
+                .emit_with_data("canon migrate", json, &MigrateReport { steps: log.into_lines(), backup_dir, index_records_written: None, index: Some(serde_json::to_value(crate::inventory::format_json(&outcome)).expect("a report serializes")), plan })
         }
         Err(e) => {
             CliError::refused("MIGRATE_INDEX_FAILED", format!("the files moved, but the scenario index was not rebuilt: {e}; run `canon inventory sync`")).hint("run `canon inventory sync` and fix what it reports").emit("canon migrate", json)

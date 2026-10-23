@@ -13,27 +13,28 @@ use std::process::Command;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-type FixtureFiles = BTreeMap<&'static str, &'static [u8]>;
-
 const REGIME: &str = "dev/canon/join-spine/9c93d024b1a2";
 const SKILL_SOURCE: &[u8] =
     b"---\nname: canon\ndescription: Eval skill\nx-extra: preserved\n---\n\n# Canon Eval\n";
 const REFERENCE_TOPIC: &[u8] = b"# Topic\n";
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 const SCRIPT: &[u8] = b"#!/bin/sh\necho eval\n";
 
 fn sha256(bytes: &[u8]) -> String {
     format!("sha256:{:x}", Sha256::digest(bytes))
 }
 
-fn canonical_source_files() -> FixtureFiles {
-    BTreeMap::from([
-        ("SKILL.src.md", SKILL_SOURCE),
-        ("reference/topic.md", REFERENCE_TOPIC),
-        ("scripts/pre-dispatch.sh", SCRIPT),
-    ])
+/// The stub `SKILL.md` an install writes from `SKILL_SOURCE`'s frontmatter.
+fn stub() -> Vec<u8> {
+    canon_cli::guide::stub(std::str::from_utf8(SKILL_SOURCE).unwrap(), VERSION).into_bytes()
 }
 
-fn bundle_hash(files: &FixtureFiles) -> String {
+/// What an install bundles (the stub and the scripts, never `reference/**`), by path in the bundle.
+fn bundle_files() -> BTreeMap<&'static str, Vec<u8>> {
+    BTreeMap::from([("SKILL.src.md", stub()), ("scripts/pre-dispatch.sh", SCRIPT.to_vec())])
+}
+
+fn bundle_hash(files: &BTreeMap<&'static str, Vec<u8>>) -> String {
     let mut hasher = Sha256::new();
     for (relative, bytes) in files {
         hasher.update(relative.as_bytes());
@@ -116,21 +117,20 @@ fn skills_install_projects_omp_and_pi_with_exact_files_and_hashes() {
         .output()
         .expect("spawn canon skills install");
     assert!(first.status.success(), "stderr: {}", String::from_utf8_lossy(&first.stderr));
-    assert_eq!(String::from_utf8_lossy(&first.stdout), format!("canon v1 — installed (omp,pi)\n{}\n", canon_cli::skills::owned_paths_lines(&[canon_cli::skills::Provider::Omp, canon_cli::skills::Provider::Pi]).join("\n")));
-
-    let source_files = canonical_source_files();
-    let expected_files: BTreeMap<String, &[u8]> = [
-        (".omp/skills/canon/SKILL.md".to_string(), SKILL_SOURCE),
-        (".omp/skills/canon/reference/topic.md".to_string(), REFERENCE_TOPIC),
-        (".omp/skills/canon/scripts/pre-dispatch.sh".to_string(), SCRIPT),
-        (".pi/skills/canon/SKILL.md".to_string(), SKILL_SOURCE),
-        (".pi/skills/canon/reference/topic.md".to_string(), REFERENCE_TOPIC),
-        (".pi/skills/canon/scripts/pre-dispatch.sh".to_string(), SCRIPT),
+    let stub = stub();
+    let expected_files: BTreeMap<String, Vec<u8>> = [
+        (".omp/skills/canon/SKILL.md".to_string(), stub.clone()),
+        (".omp/skills/canon/scripts/pre-dispatch.sh".to_string(), SCRIPT.to_vec()),
+        (".pi/skills/canon/SKILL.md".to_string(), stub),
+        (".pi/skills/canon/scripts/pre-dispatch.sh".to_string(), SCRIPT.to_vec()),
     ]
     .into_iter()
     .collect();
     for (relative, expected) in &expected_files {
-        assert_eq!(std::fs::read(target.join(relative)).unwrap(), *expected, "projection bytes for {relative}");
+        assert_eq!(&std::fs::read(target.join(relative)).unwrap(), expected, "projection bytes for {relative}");
+    }
+    for provider in [".omp", ".pi"] {
+        assert!(!target.join(provider).join("skills/canon/reference").exists(), "the guide is not projected: `canon skills show` prints it");
     }
     assert!(!target.join(".claude").exists());
     assert!(!target.join(".codex").exists());
@@ -140,7 +140,8 @@ fn skills_install_projects_omp_and_pi_with_exact_files_and_hashes() {
         .expect("install manifest must be valid JSON");
     assert_eq!(manifest["version"], 1);
     assert_eq!(manifest["providers"], serde_json::json!(["omp", "pi"]));
-    assert_eq!(manifest["source_hash"], bundle_hash(&source_files));
+    assert_eq!(manifest["source_hash"], bundle_hash(&bundle_files()));
+    assert_eq!(manifest["canon_version"], VERSION);
     let files = manifest["files"].as_object().expect("manifest files map");
     assert_eq!(files.len(), expected_files.len());
     for (relative, expected) in &expected_files {
@@ -161,7 +162,16 @@ fn skills_install_projects_omp_and_pi_with_exact_files_and_hashes() {
         .output()
         .expect("spawn canon skills install");
     assert!(second.status.success(), "stderr: {}", String::from_utf8_lossy(&second.stderr));
-    assert_eq!(String::from_utf8_lossy(&second.stdout), format!("canon v1 — unchanged (omp,pi)\n{}\n", canon_cli::skills::owned_paths_lines(&[canon_cli::skills::Provider::Omp, canon_cli::skills::Provider::Pi]).join("\n")));
+    let again = Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(["skills", "install", "--json", "--skills-source"])
+        .arg(&source)
+        .args(["--repo"])
+        .arg(&target)
+        .args(["--providers", "OMP,pi"])
+        .output()
+        .expect("spawn canon skills install");
+    let again: Value = serde_json::from_slice(&again.stdout).expect("the install report is JSON");
+    assert_eq!(again["data"]["changed"], false, "a second install changes nothing");
 }
 
 #[test]

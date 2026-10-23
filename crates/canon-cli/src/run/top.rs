@@ -196,6 +196,10 @@ pub(super) fn run_context(repo: &std::path::Path, json: bool, fields: Option<Vec
         }
     }
     let repo = crate::context::resolve_repo_root(repo);
+    // `context` needs no canon.yaml: only a repo that has one can hold 0.27-era state.
+    if repo.join("canon.yaml").is_file() {
+        crate::legacy::announce(&repo);
+    }
     let surface = crate::context::resolve_surface(&repo, crate::context::ContextOptions { role });
     if json {
         match &fields {
