@@ -191,7 +191,8 @@
       "about": "Check or move the evidence artifact store (local, or an object-store tier)",
       "aliases": [],
       "children": [
-        "artifacts migrate",
+        "artifacts move",
+        "artifacts store",
         "artifacts verify"
       ],
       "command": "artifacts",
@@ -204,20 +205,21 @@
     {
       "about": "Move the local artifact blobs to an object-store tier, verify them, and remove the local copies",
       "aliases": [],
-      "command": "artifacts migrate",
+      "command": "artifacts move",
       "effect": "destructive",
       "errorCodes": [
-        "ARTIFACTS_MIGRATE_REFUSED",
+        "ARTIFACTS_MOVE_REFUSED",
         "ARTIFACTS_STORE_UNREACHABLE",
         "CONFIG_MISSING",
         "CONFIG_UNREADABLE",
+        "PLAN_CHANGED",
         "REPO_UNREADABLE",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon artifacts migrate --to cold --dry-run"
+        "canon artifacts move --tier cold"
       ],
       "exits": [
         {
@@ -231,25 +233,138 @@
       ],
       "idempotency": "replay-safe",
       "inputs": [],
-      "name": "migrate",
+      "name": "move",
       "nodeKind": "leaf",
       "operands": [],
       "options": [
         {
           "aliases": [],
           "default": [],
-          "help": "The backend to move to: the name of an `s3` tier in canon.yaml (for example `cold`)",
+          "help": "The tier to move to: the name of an `s3` tier in canon.yaml (for example `cold`)",
           "kind": "value",
-          "name": "to",
+          "name": "tier",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "BACKEND"
+          "valueName": "TIER"
         },
         {
           "aliases": [],
           "default": [],
-          "help": "Preview what would be uploaded and removed, without writing anything",
+          "help": "Act on the previewed plan; needs --plan-digest",
+          "kind": "flag",
+          "name": "commit",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--plan-digest"
+          ]
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The `planDigest` the preview printed; the run acts only if the plan recomputed now has this digest",
+          "kind": "value",
+          "name": "plan-digest",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--commit"
+          ],
+          "valueName": "DIGEST"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
+          "kind": "value",
+          "name": "repo",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Output JSON instead of the human-readable form",
+          "kind": "flag",
+          "name": "json",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "report",
+          "report": "ArtifactsMoveReport",
+          "schemaRef": "#/schemas/ArtifactsMoveReport",
+          "schemaVersion": "1.0"
+        }
+      ],
+      "path": [
+        "artifacts",
+        "move"
+      ],
+      "requiredOneOf": [],
+      "roles": [
+        "orchestrator"
+      ],
+      "supportsJson": true
+    },
+    {
+      "about": "Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/)",
+      "aliases": [],
+      "command": "artifacts store",
+      "effect": "write",
+      "effectNote": "refreshes stale scenario-index records first",
+      "errorCodes": [
+        "ARTIFACTS_STORE_FAILED",
+        "CONFIG_MISSING",
+        "CONFIG_UNREADABLE",
+        "REPO_UNREADABLE",
+        "UNKNOWN_ROLE",
+        "USAGE"
+      ],
+      "examples": [
+        "canon artifacts store"
+      ],
+      "exits": [
+        {
+          "code": 0,
+          "meaning": "success"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
+        }
+      ],
+      "idempotency": "replay-safe",
+      "inputs": [],
+      "name": "store",
+      "nodeKind": "leaf",
+      "operands": [],
+      "options": [
+        {
+          "aliases": [],
+          "default": [
+            "25"
+          ],
+          "help": "Per-file size limit for the artifact store, in MiB",
+          "kind": "value",
+          "name": "max-artifact-mib",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "MIB"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
           "kind": "flag",
           "name": "dry-run",
           "possibleValues": [],
@@ -281,14 +396,14 @@
       "outputs": [
         {
           "kind": "report",
-          "report": "ArtifactsMoveReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "report": "ArtifactsStoreReport",
+          "schemaRef": "#/schemas/ArtifactsStoreReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
         "artifacts",
-        "migrate"
+        "store"
       ],
       "requiredOneOf": [],
       "roles": [
@@ -367,8 +482,8 @@
         {
           "kind": "report",
           "report": "ArtifactsVerifyReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/ArtifactsVerifyReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -817,8 +932,8 @@
         {
           "kind": "report",
           "report": "ChangeNewReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/ChangeNewReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -1460,8 +1575,8 @@
         {
           "kind": "report",
           "report": "DemoInitReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DemoInitReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -1530,8 +1645,8 @@
         {
           "kind": "report",
           "report": "DemoReviewReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DemoReviewReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -1749,8 +1864,8 @@
         {
           "kind": "report",
           "report": "DispatchBeginReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DispatchBeginReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -1817,8 +1932,8 @@
         {
           "kind": "report",
           "report": "DispatchDiffReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DispatchDiffReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -1925,8 +2040,8 @@
         {
           "kind": "report",
           "report": "DispatchEndReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DispatchEndReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -2107,8 +2222,8 @@
         {
           "kind": "report",
           "report": "DivergenceAcceptReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DivergenceAcceptReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -2329,8 +2444,8 @@
         {
           "kind": "report",
           "report": "DivergenceAddReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DivergenceAddReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -2497,8 +2612,8 @@
         {
           "kind": "report",
           "report": "DivergenceDeferReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DivergenceDeferReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -2632,8 +2747,8 @@
         {
           "kind": "report",
           "report": "DivergenceListReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DivergenceListReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -2793,8 +2908,8 @@
         {
           "kind": "report",
           "report": "DivergenceResolveReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DivergenceResolveReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -2814,8 +2929,7 @@
       "children": [
         "evidence add",
         "evidence approval-payload",
-        "evidence audit",
-        "evidence vault"
+        "evidence audit"
       ],
       "command": "evidence",
       "name": "evidence",
@@ -3200,8 +3314,8 @@
         {
           "kind": "report",
           "report": "EvidenceAddReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/EvidenceAddReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -3363,8 +3477,8 @@
           "kind": "artifact",
           "mediaType": "application/octet-stream",
           "report": "EvidenceApprovalPayloadReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/EvidenceApprovalPayloadReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -3700,8 +3814,8 @@
         {
           "kind": "report",
           "report": "EvidenceAuditReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/EvidenceAuditReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -3711,92 +3825,6 @@
       "requiredOneOf": [],
       "roles": [
         "implementer"
-      ],
-      "supportsJson": true
-    },
-    {
-      "about": "Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/)",
-      "aliases": [],
-      "command": "evidence vault",
-      "effect": "write",
-      "effectNote": "refreshes stale scenario-index records first",
-      "errorCodes": [
-        "CONFIG_MISSING",
-        "CONFIG_UNREADABLE",
-        "EVIDENCE_VAULT_FAILED",
-        "REPO_UNREADABLE",
-        "UNKNOWN_ROLE",
-        "USAGE"
-      ],
-      "examples": [
-        "canon evidence vault"
-      ],
-      "exits": [
-        {
-          "code": 0,
-          "meaning": "success"
-        },
-        {
-          "code": 2,
-          "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
-        }
-      ],
-      "idempotency": "replay-safe",
-      "inputs": [],
-      "name": "vault",
-      "nodeKind": "leaf",
-      "operands": [],
-      "options": [
-        {
-          "aliases": [],
-          "default": [
-            "25"
-          ],
-          "help": "Per-file size limit for the artifact store, in MiB",
-          "kind": "value",
-          "name": "max-artifact-mib",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "MIB"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
-          "kind": "value",
-          "name": "repo",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "DIR"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Output JSON instead of the human-readable form",
-          "kind": "flag",
-          "name": "json",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        }
-      ],
-      "outputs": [
-        {
-          "kind": "report",
-          "report": "ArtifactsStoreReport",
-          "schemaRef": null,
-          "schemaVersion": null
-        }
-      ],
-      "path": [
-        "evidence",
-        "vault"
-      ],
-      "requiredOneOf": [],
-      "roles": [
-        "orchestrator"
       ],
       "supportsJson": true
     },
@@ -3973,6 +4001,16 @@
           "repeatable": false,
           "required": false,
           "valueName": "FIELDS"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
         }
       ],
       "outputs": [
@@ -4115,8 +4153,8 @@
         {
           "kind": "report",
           "report": "FeatureNewReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/FeatureNewReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -4403,8 +4441,8 @@
         {
           "kind": "report",
           "report": "FindingAddReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/FindingAddReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -4619,8 +4657,8 @@
         {
           "kind": "report",
           "report": "FindingCloseReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/FindingCloseReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -4956,8 +4994,8 @@
         {
           "kind": "report",
           "report": "GateCheckReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/GateCheckReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -5067,6 +5105,16 @@
         {
           "aliases": [],
           "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
@@ -5079,8 +5127,8 @@
         {
           "kind": "report",
           "report": "GateInstallHooksReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/GateInstallHooksReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -5157,7 +5205,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Preview without writing anything",
+          "help": "Validate fully and report what would be written, without writing anything",
           "kind": "flag",
           "name": "dry-run",
           "possibleValues": [],
@@ -5179,8 +5227,8 @@
         {
           "kind": "report",
           "report": "GatePromoteReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/GatePromoteReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -5194,11 +5242,11 @@
       "supportsJson": true
     },
     {
-      "about": "Import agent sessions, artifacts, and plans into canon's store",
+      "about": "Import agent sessions, records, and plans into canon's store",
       "aliases": [],
       "children": [
-        "ingest artifacts",
         "ingest plans",
+        "ingest records",
         "ingest sessions"
       ],
       "command": "ingest",
@@ -5209,9 +5257,122 @@
       ]
     },
     {
-      "about": "Import review/divergence/task/handoff artifacts and derive verdicts",
+      "about": "Import plans as Change/Task records: canon's own .canon/changes, then the configured external sources (openspec, superpowers)",
       "aliases": [],
-      "command": "ingest artifacts",
+      "command": "ingest plans",
+      "effect": "write",
+      "errorCodes": [
+        "CONFIG_MISSING",
+        "INGEST_FAILED",
+        "INGEST_SOURCE_UNUSABLE",
+        "UNKNOWN_ROLE",
+        "USAGE"
+      ],
+      "examples": [
+        "canon ingest plans"
+      ],
+      "exits": [
+        {
+          "code": 0,
+          "meaning": "ingested"
+        },
+        {
+          "code": 1,
+          "meaning": "INGEST_SOURCE_UNUSABLE: every source is unusable"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: CONFIG_MISSING, or an invalid argument"
+        }
+      ],
+      "idempotency": "replay-safe",
+      "inputs": [],
+      "name": "plans",
+      "nodeKind": "leaf",
+      "operands": [],
+      "options": [
+        {
+          "aliases": [],
+          "default": [],
+          "help": "One-shot override: import this dialect's --plan-source root (requires --plan-source)",
+          "kind": "value",
+          "name": "dialect",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--plan-source"
+          ],
+          "valueName": "DIALECT"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "One-shot override's source root (paired with --dialect)",
+          "kind": "value",
+          "name": "plan-source",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--dialect"
+          ],
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
+          "kind": "value",
+          "name": "repo",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Output JSON instead of the human-readable form",
+          "kind": "flag",
+          "name": "json",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "report",
+          "report": "IngestPlansReport",
+          "schemaRef": "#/schemas/IngestPlansReport",
+          "schemaVersion": "1.0"
+        }
+      ],
+      "path": [
+        "ingest",
+        "plans"
+      ],
+      "requiredOneOf": [],
+      "roles": [
+        "orchestrator"
+      ],
+      "supportsJson": true
+    },
+    {
+      "about": "Import review/divergence/task/handoff records and derive verdicts",
+      "aliases": [],
+      "command": "ingest records",
       "effect": "write",
       "errorCodes": [
         "CONFIG_MISSING",
@@ -5220,7 +5381,7 @@
         "USAGE"
       ],
       "examples": [
-        "canon ingest artifacts"
+        "canon ingest records"
       ],
       "exits": [
         {
@@ -5234,7 +5395,7 @@
       ],
       "idempotency": "replay-safe",
       "inputs": [],
-      "name": "artifacts",
+      "name": "records",
       "nodeKind": "leaf",
       "operands": [],
       "options": [
@@ -5275,6 +5436,16 @@
         {
           "aliases": [],
           "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
@@ -5304,104 +5475,7 @@
       ],
       "path": [
         "ingest",
-        "artifacts"
-      ],
-      "requiredOneOf": [],
-      "roles": [
-        "orchestrator"
-      ],
-      "supportsJson": true
-    },
-    {
-      "about": "Import plans as Change/Task records: canon's own .canon/changes, then the configured external sources (openspec, superpowers)",
-      "aliases": [],
-      "command": "ingest plans",
-      "effect": "write",
-      "errorCodes": [
-        "CONFIG_MISSING",
-        "INGEST_FAILED",
-        "INGEST_SOURCE_UNUSABLE",
-        "UNKNOWN_ROLE",
-        "USAGE"
-      ],
-      "examples": [
-        "canon ingest plans"
-      ],
-      "exits": [
-        {
-          "code": 0,
-          "meaning": "ingested"
-        },
-        {
-          "code": 1,
-          "meaning": "INGEST_SOURCE_UNUSABLE: every source is unusable"
-        },
-        {
-          "code": 2,
-          "meaning": "refused: CONFIG_MISSING, or an invalid argument"
-        }
-      ],
-      "idempotency": "replay-safe",
-      "inputs": [],
-      "name": "plans",
-      "nodeKind": "leaf",
-      "operands": [],
-      "options": [
-        {
-          "aliases": [],
-          "default": [],
-          "help": "One-shot override: import this dialect's --source root (requires --source)",
-          "kind": "value",
-          "name": "dialect",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "DIALECT"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "One-shot override's source root (paired with --dialect)",
-          "kind": "value",
-          "name": "source",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "SOURCE"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
-          "kind": "value",
-          "name": "repo",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "DIR"
-        },
-        {
-          "aliases": [],
-          "default": [],
-          "help": "Output JSON instead of the human-readable form",
-          "kind": "flag",
-          "name": "json",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        }
-      ],
-      "outputs": [
-        {
-          "kind": "report",
-          "report": "IngestPlansReport",
-          "schemaRef": "#/schemas/IngestPlansReport",
-          "schemaVersion": "1.0"
-        }
-      ],
-      "path": [
-        "ingest",
-        "plans"
+        "records"
       ],
       "requiredOneOf": [],
       "roles": [
@@ -5507,6 +5581,16 @@
         {
           "aliases": [],
           "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
@@ -5590,6 +5674,7 @@
         {
           "aliases": [],
           "conflictsWith": [
+            "--dry-run",
             "--language",
             "--no-agents-md",
             "--no-policy",
@@ -5677,6 +5762,19 @@
           "repeatable": false,
           "required": false,
           "valueName": "TAG"
+        },
+        {
+          "aliases": [],
+          "conflictsWith": [
+            "--check"
+          ],
+          "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
         },
         {
           "aliases": [],
@@ -5779,6 +5877,16 @@
         {
           "aliases": [],
           "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
@@ -5829,11 +5937,12 @@
         "CONFIG_UNREADABLE",
         "LEDGER_ARCHIVE_UNAVAILABLE",
         "LEDGER_COMPACT_FAILED",
+        "PLAN_CHANGED",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
-        "canon ledger compact --dry-run"
+        "canon ledger compact"
       ],
       "exits": [
         {
@@ -5854,12 +5963,29 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Report what would move and write nothing",
+          "help": "Act on the previewed plan; needs --plan-digest",
           "kind": "flag",
-          "name": "dry-run",
+          "name": "commit",
           "possibleValues": [],
           "repeatable": false,
-          "required": false
+          "required": false,
+          "requires": [
+            "--plan-digest"
+          ]
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The `planDigest` the preview printed; the run acts only if the plan recomputed now has this digest",
+          "kind": "value",
+          "name": "plan-digest",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--commit"
+          ],
+          "valueName": "DIGEST"
         },
         {
           "aliases": [],
@@ -5887,8 +6013,8 @@
         {
           "kind": "report",
           "report": "LedgerCompactReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/LedgerCompactReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -5913,6 +6039,7 @@
         "MIGRATE_REFUSED",
         "MIGRATE_STOPPED",
         "MIGRATE_UNCOMMITTED",
+        "PLAN_CHANGED",
         "UNKNOWN_ROLE",
         "USAGE",
         "WRITE_FAILED"
@@ -5954,12 +6081,29 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Print the plan and write nothing",
+          "help": "Act on the previewed plan; needs --plan-digest",
           "kind": "flag",
-          "name": "dry-run",
+          "name": "commit",
           "possibleValues": [],
           "repeatable": false,
-          "required": false
+          "required": false,
+          "requires": [
+            "--plan-digest"
+          ]
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The `planDigest` the preview printed; the run acts only if the plan recomputed now has this digest",
+          "kind": "value",
+          "name": "plan-digest",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--commit"
+          ],
+          "valueName": "DIGEST"
         },
         {
           "aliases": [],
@@ -5976,8 +6120,8 @@
         {
           "kind": "report",
           "report": "MigrateReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/MigrateReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -6071,6 +6215,16 @@
           "repeatable": false,
           "required": false,
           "valueName": "SPEC_ROOT"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
         },
         {
           "aliases": [],
@@ -6194,8 +6348,8 @@
         {
           "kind": "report",
           "report": "PolicyApproveReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/PolicyApproveReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -6260,8 +6414,8 @@
         {
           "kind": "report",
           "report": "PolicyShowReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/PolicyShowReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -6487,21 +6641,20 @@
       "supportsJson": true
     },
     {
-      "about": "Remove allowlisted records older than a cutoff: `--plan` shows the removal set and its planDigest, `--confirm <planDigest>` deletes it",
+      "about": "Remove allowlisted records older than a cutoff: the bare run previews the removal set and its planDigest, `--commit --plan-digest <DIGEST>` deletes it",
       "aliases": [],
       "command": "purge",
       "effect": "destructive",
-      "effectNote": "writes one audit line",
+      "effectNote": "a committed run writes one audit line; a preview writes nothing",
       "errorCodes": [
         "CONFIG_MISSING",
         "PLAN_CHANGED",
-        "PURGE_PLAN_REQUIRED",
         "RETENTION_PURGE_FAILED",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
       "examples": [
-        "canon purge --kind session --before 2020-01-01T00:00:00Z --plan"
+        "canon purge --kind session --before 2020-01-01T00:00:00Z"
       ],
       "exits": [
         {
@@ -6526,20 +6679,10 @@
           "kind": "value",
           "name": "kind",
           "possibleValues": [
-            "change",
-            "task",
-            "scenario",
             "session",
             "run",
             "event",
-            "handoff",
-            "review",
-            "divergence",
-            "trajectory",
-            "strategy_item",
-            "evidence",
-            "subject",
-            "finding"
+            "trajectory"
           ],
           "repeatable": false,
           "required": true,
@@ -6559,6 +6702,33 @@
         {
           "aliases": [],
           "default": [],
+          "help": "Act on the previewed plan; needs --plan-digest",
+          "kind": "flag",
+          "name": "commit",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--plan-digest"
+          ]
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The `planDigest` the preview printed; the run acts only if the plan recomputed now has this digest",
+          "kind": "value",
+          "name": "plan-digest",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--commit"
+          ],
+          "valueName": "DIGEST"
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
           "kind": "value",
           "name": "repo",
@@ -6566,33 +6736,6 @@
           "repeatable": false,
           "required": false,
           "valueName": "DIR"
-        },
-        {
-          "aliases": [],
-          "conflictsWith": [
-            "--confirm"
-          ],
-          "default": [],
-          "help": "Print the removal set and its `planDigest`; delete nothing",
-          "kind": "flag",
-          "name": "plan",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false
-        },
-        {
-          "aliases": [],
-          "conflictsWith": [
-            "--plan"
-          ],
-          "default": [],
-          "help": "Delete, but only if the plan recomputed now has this `planDigest`",
-          "kind": "value",
-          "name": "confirm",
-          "possibleValues": [],
-          "repeatable": false,
-          "required": false,
-          "valueName": "PLAN_DIGEST"
         },
         {
           "aliases": [],
@@ -6609,8 +6752,8 @@
         {
           "kind": "report",
           "report": "PurgeReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/PurgeReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -7120,8 +7263,8 @@
         {
           "kind": "report",
           "report": "ReportCheckReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/ReportCheckReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -7209,8 +7352,8 @@
         {
           "kind": "report",
           "report": "ReportSnapshotReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/ReportSnapshotReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -7589,8 +7732,8 @@
         {
           "kind": "report",
           "report": "ReviewChangeReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/ReviewChangeReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -7835,8 +7978,8 @@
         {
           "kind": "report",
           "report": "ReviewScenarioReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/ReviewScenarioReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -8095,8 +8238,8 @@
         {
           "kind": "report",
           "report": "ScenarioNewReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/ScenarioNewReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -8561,6 +8704,16 @@
         {
           "aliases": [],
           "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
@@ -8918,7 +9071,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Preview without writing anything",
+          "help": "Validate fully and report what would be written, without writing anything",
           "kind": "flag",
           "name": "dry-run",
           "possibleValues": [],
@@ -8940,8 +9093,8 @@
         {
           "kind": "report",
           "report": "StrategyPromoteReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/StrategyPromoteReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -9083,8 +9236,8 @@
         {
           "kind": "report",
           "report": "StrategyRollbackReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/StrategyRollbackReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -9179,6 +9332,16 @@
           "repeatable": false,
           "required": false,
           "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
         },
         {
           "aliases": [],
@@ -9663,6 +9826,16 @@
         {
           "aliases": [],
           "default": [],
+          "help": "Validate fully and report what would be written, without writing anything",
+          "kind": "flag",
+          "name": "dry-run",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
@@ -9786,8 +9959,8 @@
         {
           "kind": "report",
           "report": "TaskDoneReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/TaskDoneReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -9820,6 +9993,7 @@
       "effect": "destructive",
       "errorCodes": [
         "CONFIG_MISSING",
+        "PLAN_CHANGED",
         "TIER_FAILED",
         "UNKNOWN_ROLE",
         "USAGE"
@@ -9846,12 +10020,29 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Preview without writing anything",
+          "help": "Act on the previewed plan; needs --plan-digest",
           "kind": "flag",
-          "name": "dry-run",
+          "name": "commit",
           "possibleValues": [],
           "repeatable": false,
-          "required": false
+          "required": false,
+          "requires": [
+            "--plan-digest"
+          ]
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The `planDigest` the preview printed; the run acts only if the plan recomputed now has this digest",
+          "kind": "value",
+          "name": "plan-digest",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--commit"
+          ],
+          "valueName": "DIGEST"
         },
         {
           "aliases": [],
@@ -9879,8 +10070,8 @@
         {
           "kind": "report",
           "report": "TierAgeReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/TierAgeReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -10388,10 +10579,17 @@
       "retryable": false
     },
     {
-      "code": "ARTIFACTS_MIGRATE_REFUSED",
+      "code": "ARTIFACTS_MOVE_REFUSED",
       "exit": 2,
       "fix": "Target an s3 tier, restore any local blob whose content does not match its name, and replace the bad object-store copy named in the error.",
-      "meaning": "`artifacts migrate` cannot move the blobs: the target is not an s3 tier, a local blob does not match its name, or the object store holds a bad copy",
+      "meaning": "`artifacts move` cannot move the blobs: the target is not an s3 tier, a local blob does not match its name, or the object store holds a bad copy",
+      "retryable": false
+    },
+    {
+      "code": "ARTIFACTS_STORE_FAILED",
+      "exit": 2,
+      "fix": "Check that the artifact store directory is writable and has space, then run the command again.",
+      "meaning": "`artifacts store` could not write a blob",
       "retryable": false
     },
     {
@@ -10752,13 +10950,6 @@
       "retryable": true
     },
     {
-      "code": "EVIDENCE_VAULT_FAILED",
-      "exit": 2,
-      "fix": "Check that the evidence vault directory is writable and has space, then run the command again.",
-      "meaning": "the evidence vault could not write a blob",
-      "retryable": false
-    },
-    {
       "code": "FEATURE_EXISTS",
       "exit": 2,
       "fix": "Choose a different feature path or edit the existing file.",
@@ -11088,10 +11279,17 @@
       "retryable": false
     },
     {
+      "code": "NO_COMMIT",
+      "exit": 2,
+      "fix": "Run the command inside a git work tree that has at least one commit.",
+      "meaning": "a command needed a commit and the directory is not a git work tree or has no commits",
+      "retryable": false
+    },
+    {
       "code": "PLAN_CHANGED",
       "exit": 2,
       "fix": "Run the command again without --commit to preview the new plan, then act with `--commit --plan-digest <DIGEST>`.",
-      "meaning": "the data changed since the preview, so the supplied --plan-digest no longer matches; nothing was deleted",
+      "meaning": "the plan recomputed under `--commit` no longer has the `--plan-digest` the preview printed; nothing was written",
       "retryable": false
     },
     {
@@ -11162,13 +11360,6 @@
       "exit": 2,
       "fix": "Fix the prompt bundle so it parses and matches its schema.",
       "meaning": "a prompt bundle is invalid",
-      "retryable": false
-    },
-    {
-      "code": "PURGE_PLAN_REQUIRED",
-      "exit": 2,
-      "fix": "Run `canon purge` with no flags to preview the plan, then act with `--commit --plan-digest <DIGEST>`.",
-      "meaning": "`purge` deletes only a reviewed plan: a bare run previews it, and `--commit --plan-digest <DIGEST>` acts on it",
       "retryable": false
     },
     {
@@ -12802,6 +12993,246 @@
       "title": "ValidationSummary",
       "type": "object"
     },
+    "ArtifactsMoveReport": {
+      "$defs": {
+        "Effect": {
+          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "properties": {
+            "action": {
+              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Where it goes, or why, when `action` alone does not say.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "path": {
+              "description": "The file acted on, relative to the repo.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "record": {
+              "description": "The record acted on (an id, key or digest) when it is not a file.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:ArtifactsMoveReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon artifacts move`'s `data`: the plan and what the run did to the blobs.",
+      "properties": {
+        "alreadyInStore": {
+          "description": "Blobs the store already held, verified.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "backend": {
+          "description": "The tier the blobs live in after the move (`local` for the no-op).",
+          "type": "string"
+        },
+        "blobs": {
+          "description": "Blobs in the local store.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "committed": {
+          "description": "`true` once the run acted, `false` for a preview.",
+          "type": "boolean"
+        },
+        "configWritten": {
+          "type": "boolean"
+        },
+        "effects": {
+          "description": "Everything the run would do, in the order it does it.",
+          "items": {
+            "$ref": "#/$defs/Effect"
+          },
+          "type": "array"
+        },
+        "gitignoreAdded": {
+          "type": "boolean"
+        },
+        "planDigest": {
+          "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+          "type": "string"
+        },
+        "removedLocal": {
+          "description": "Local copies this run removed (0 in a preview).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "skipped": {
+          "description": "Entries of the local store that are not blobs and stay.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "uploaded": {
+          "description": "Blobs this run uploaded (0 in a preview).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "backend",
+        "blobs",
+        "uploaded",
+        "alreadyInStore",
+        "removedLocal",
+        "configWritten",
+        "gitignoreAdded",
+        "skipped",
+        "planDigest",
+        "effects",
+        "committed"
+      ],
+      "title": "ArtifactsMoveReport",
+      "type": "object"
+    },
+    "ArtifactsStoreReport": {
+      "$id": "urn:canon:report:ArtifactsStoreReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon artifacts store`: what the pass stored, or with `--dry-run` would store.",
+      "properties": {
+        "alreadyStored": {
+          "description": "Files already in the store.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "boundFiles": {
+          "description": "Files the ledger's evidence binds.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dryRun": {
+          "description": "True when `--dry-run` previewed the pass without writing.",
+          "type": "boolean"
+        },
+        "notStored": {
+          "description": "One line per file that could not be stored; their bytes are gone or over the limit.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "stored": {
+          "description": "One line per file stored (`<store path> <- <file>`).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "dryRun",
+        "boundFiles",
+        "stored",
+        "alreadyStored",
+        "notStored"
+      ],
+      "title": "ArtifactsStoreReport",
+      "type": "object"
+    },
+    "ArtifactsVerifyReport": {
+      "$defs": {
+        "VerifyProblem": {
+          "description": "One bound file `artifacts verify` found missing or altered.",
+          "properties": {
+            "blob": {
+              "description": "What the store holds: `missing`, or what it observed instead.",
+              "type": "string"
+            },
+            "detail": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "sha256": {
+              "type": "string"
+            },
+            "subject": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "subject",
+            "path",
+            "sha256",
+            "blob",
+            "detail"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:ArtifactsVerifyReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon artifacts verify`: what the check looked at and the files that failed it.",
+      "properties": {
+        "backend": {
+          "description": "`local`, or the name of the artifact store tier.",
+          "type": "string"
+        },
+        "bound": {
+          "description": "Files the ledger's evidence binds.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "full": {
+          "description": "Whether every blob was re-hashed (`--full`).",
+          "type": "boolean"
+        },
+        "problems": {
+          "items": {
+            "$ref": "#/$defs/VerifyProblem"
+          },
+          "type": "array"
+        },
+        "stored": {
+          "description": "Files whose blob is in the store.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "workingTreeOnly": {
+          "description": "Files proven by the working tree alone (local store only).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "backend",
+        "full",
+        "bound",
+        "stored",
+        "workingTreeOnly",
+        "problems"
+      ],
+      "title": "ArtifactsVerifyReport",
+      "type": "object"
+    },
     "BriefApproveReport": {
       "$id": "urn:canon:report:BriefApproveReport",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -13109,6 +13540,30 @@
         "next"
       ],
       "title": "BriefShowReport",
+      "type": "object"
+    },
+    "ChangeNewReport": {
+      "$id": "urn:canon:report:ChangeNewReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon change new`: the change opened.",
+      "properties": {
+        "brief": {
+          "description": "The staged `brief.md`, relative to the repo.",
+          "type": "string"
+        },
+        "changeId": {
+          "type": "string"
+        },
+        "subjectId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "changeId",
+        "subjectId",
+        "brief"
+      ],
+      "title": "ChangeNewReport",
       "type": "object"
     },
     "CompletionReport": {
@@ -15018,6 +15473,895 @@
       "title": "DashboardStatusReport",
       "type": "object"
     },
+    "DemoInitReport": {
+      "$id": "urn:canon:report:DemoInitReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon demo init`: the demo repo scaffolded and the commands that flip it.",
+      "properties": {
+        "next": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "scenario": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "repo",
+        "scenario",
+        "next"
+      ],
+      "title": "DemoInitReport",
+      "type": "object"
+    },
+    "DemoReviewReport": {
+      "$id": "urn:canon:report:DemoReviewReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon demo review`: the reviewer evidence recorded.",
+      "properties": {
+        "next": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "scenario": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scenario",
+        "next"
+      ],
+      "title": "DemoReviewReport",
+      "type": "object"
+    },
+    "DispatchBeginReport": {
+      "$defs": {
+        "ContextSnapshot": {
+          "description": "A snapshot of the context used to derive a run. This is nested\nprovenance metadata, not a `CanonRecord` or a new join-spine key.",
+          "properties": {
+            "capability_version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "digest": {
+              "type": "string"
+            },
+            "pack_id": {
+              "description": "Content-addressed full ContextPack manifest. The digest-only\ncapability surface above remains for backwards compatibility; this\noptional identity points replay to the immutable selected-input\nsnapshot when present.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "digest",
+            "capability_version"
+          ],
+          "type": "object"
+        },
+        "PolicySnapshot": {
+          "description": "A snapshot of the policy used to derive a run. This is nested\nprovenance metadata, not a `CanonRecord` or a new join-spine key.",
+          "properties": {
+            "digest": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "digest"
+          ],
+          "type": "object"
+        },
+        "RunLineage": {
+          "description": "Additive provenance metadata captured for a [`Run`]. Every nested\nsnapshot is copied by value so replay can identify the exact provider,\nmodel, skill, context, and policy inputs used for dispatch.",
+          "properties": {
+            "context": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ContextSnapshot"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "model": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "policy": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PolicySnapshot"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "provider": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "skill": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SkillSnapshot"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "type": "object"
+        },
+        "SkillSnapshot": {
+          "description": "A snapshot of the skill that contributed to a run. This is nested\nprovenance metadata, not a `CanonRecord` or a new join-spine key.",
+          "properties": {
+            "digest": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object"
+        },
+        "StrategyRef": {
+          "description": "A full content SNAPSHOT of one retrieved strategy (S8 design D2),\nnever a live pointer: `strategy_id` names its source\n`canon-learn::StrategyItem` for provenance only — `title`/`content`\nare copied by value at the moment they were shown to an agent, so a\nlater edit or demotion of the source strategy can never retroactively\nchange what a [`Run`]'s [`Run::injected_guidance`] already recorded\n(the \"replay reproduces byte-identical run inputs\" guarantee this\ntype exists to make possible). Deliberately NOT a `CanonRecord`\nitself — it only ever lives nested inside [`Run::injected_guidance`],\nmirroring how [`crate::envelope::Actor`] composes into [`Envelope`]\nwithout being one of the twelve closed record kinds itself.",
+          "properties": {
+            "content": {
+              "type": "string"
+            },
+            "strategy_id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "strategy_id",
+            "title",
+            "content"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:DispatchBeginReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon dispatch begin`: the run opened. Binding keys are absent when unset;\n`lineage` only when the manifest records it; `tierDegraded` only when the\ntier write degraded.",
+      "properties": {
+        "injectedGuidance": {
+          "description": "The strategies injected into the run (ledger records, their own schema).",
+          "items": {
+            "$ref": "#/$defs/StrategyRef"
+          },
+          "type": "array"
+        },
+        "lineage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunLineage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "manifest": {
+          "description": "The run manifest written.",
+          "type": "string"
+        },
+        "parentRunId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runId": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tierDegraded": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "runId",
+        "manifest",
+        "injectedGuidance"
+      ],
+      "title": "DispatchBeginReport",
+      "type": "object"
+    },
+    "DispatchDiffReport": {
+      "$defs": {
+        "EdgeCounts": {
+          "description": "How many edges of the plan-vs-actual diff fell into each class.",
+          "properties": {
+            "declared-not-observed": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "observed-not-declared": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "satisfied": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "satisfied",
+            "declared-not-observed",
+            "observed-not-declared"
+          ],
+          "type": "object"
+        },
+        "EdgeEntry": {
+          "description": "One edge of the plan-vs-actual diff.",
+          "properties": {
+            "class": {
+              "description": "`satisfied`, `declared-not-observed` or `observed-not-declared`.",
+              "type": "string"
+            },
+            "from": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "from",
+            "to",
+            "class"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:DispatchDiffReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon dispatch diff`: the declared plan DAG against the observed execution graph.",
+      "properties": {
+        "counts": {
+          "$ref": "#/$defs/EdgeCounts"
+        },
+        "declared": {
+          "description": "Distinct edges the plan declares.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "edges": {
+          "description": "The union of both sides, one entry per distinct edge, in task order.",
+          "items": {
+            "$ref": "#/$defs/EdgeEntry"
+          },
+          "type": "array"
+        },
+        "notes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "observed": {
+          "description": "Distinct edges the runs' lineage shows.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "declared",
+        "observed",
+        "counts",
+        "edges",
+        "notes"
+      ],
+      "title": "DispatchDiffReport",
+      "type": "object"
+    },
+    "DispatchEndReport": {
+      "$id": "urn:canon:report:DispatchEndReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon dispatch end`: the run closed. `tierDegraded` is present only when the\ntier write degraded.",
+      "properties": {
+        "endedAt": {
+          "format": "date-time",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "manifest": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "string"
+        },
+        "status": {
+          "description": "The outcome the run was closed with (`succeeded`, `failed`, …).",
+          "type": "string"
+        },
+        "tierDegraded": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "runId",
+        "manifest",
+        "status",
+        "endedAt"
+      ],
+      "title": "DispatchEndReport",
+      "type": "object"
+    },
+    "DivergenceAcceptReport": {
+      "$defs": {
+        "AcceptedScenario": {
+          "description": "One scenario `canon divergence accept` accepted.",
+          "properties": {
+            "location": {
+              "description": "The ledger path of the acceptance record.",
+              "type": "string"
+            },
+            "scenarioId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "scenarioId",
+            "location"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:DivergenceAcceptReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon divergence accept`: the acceptances written (all or none).",
+      "properties": {
+        "accepted": {
+          "items": {
+            "$ref": "#/$defs/AcceptedScenario"
+          },
+          "type": "array"
+        },
+        "expiry": {
+          "description": "The date the acceptance lapses (`YYYY-MM-DD`); `null` without `--expiry`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tracking": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tracking",
+        "expiry",
+        "accepted"
+      ],
+      "title": "DivergenceAcceptReport",
+      "type": "object"
+    },
+    "DivergenceAddReport": {
+      "$id": "urn:canon:report:DivergenceAddReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon divergence add`: where the divergence landed.",
+      "properties": {
+        "committed": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "staged": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "staged",
+        "committed"
+      ],
+      "title": "DivergenceAddReport",
+      "type": "object"
+    },
+    "DivergenceDeferReport": {
+      "$id": "urn:canon:report:DivergenceDeferReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon divergence defer` and `canon divergence resolve`: the record committed.",
+      "properties": {
+        "committed": {
+          "description": "The ledger path of the committed record.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "committed"
+      ],
+      "title": "DivergenceCommitReport",
+      "type": "object"
+    },
+    "DivergenceListReport": {
+      "$defs": {
+        "BurndownSummary": {
+          "description": "Per-state counts of `canon divergence list`.",
+          "properties": {
+            "accepted": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "deferred": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "open": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "resolved": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "resolvedInvalid": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "stillDivergent": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "total": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "open",
+            "resolved",
+            "stillDivergent",
+            "deferred",
+            "resolvedInvalid",
+            "accepted",
+            "total"
+          ],
+          "type": "object"
+        },
+        "ScenarioRow": {
+          "description": "One scenario's current state in `canon divergence list`.",
+          "properties": {
+            "expiry": {
+              "description": "When a deferral or acceptance lapses.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "projectId": {
+              "type": "string"
+            },
+            "reason": {
+              "description": "Why it is deferred.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "scenarioId": {
+              "type": "string"
+            },
+            "state": {
+              "description": "`open`, `resolved`, `still-divergent`, `deferred`, `resolved-invalid` or `accepted`.",
+              "type": "string"
+            },
+            "tracking": {
+              "description": "Where an accepted gap is tracked.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "projectId",
+            "scenarioId",
+            "state"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:DivergenceListReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon divergence list`: the current state of every divergence; paging is in `meta`.",
+      "properties": {
+        "asOf": {
+          "description": "The instant deferred expiry was judged at (RFC 3339).",
+          "type": "string"
+        },
+        "scenarios": {
+          "items": {
+            "$ref": "#/$defs/ScenarioRow"
+          },
+          "type": "array"
+        },
+        "summary": {
+          "$ref": "#/$defs/BurndownSummary"
+        }
+      },
+      "required": [
+        "asOf",
+        "summary",
+        "scenarios"
+      ],
+      "title": "DivergenceListReport",
+      "type": "object"
+    },
+    "DivergenceResolveReport": {
+      "$id": "urn:canon:report:DivergenceResolveReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon divergence defer` and `canon divergence resolve`: the record committed.",
+      "properties": {
+        "committed": {
+          "description": "The ledger path of the committed record.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "committed"
+      ],
+      "title": "DivergenceCommitReport",
+      "type": "object"
+    },
+    "EvidenceAddReport": {
+      "$defs": {
+        "EvidenceRecordEntry": {
+          "description": "One record `canon evidence add` wrote, or found already written.",
+          "properties": {
+            "committed": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "next": {
+              "description": "The step that follows (a single-subject add).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "outcome": {
+              "description": "`verdict <verdict>` or `audit <result>`.",
+              "type": "string"
+            },
+            "staged": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "subject": {
+              "description": "The task or scenario id the record is about.",
+              "type": "string"
+            },
+            "unchanged": {
+              "description": "`true` when an identical record already existed and nothing was written.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "staged",
+            "committed",
+            "subject",
+            "outcome"
+          ],
+          "type": "object"
+        },
+        "SkippedCase": {
+          "description": "A case of `--all-scenarios` that was not recorded: its scenario is not indexed.",
+          "properties": {
+            "case": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "scenarioId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "scenarioId",
+            "case",
+            "reason"
+          ],
+          "type": "object"
+        },
+        "StaleReview": {
+          "description": "A review the new evidence makes stale, with the command that re-pins it.",
+          "properties": {
+            "repin": {
+              "type": "string"
+            },
+            "reviewer": {
+              "type": "string"
+            },
+            "scenarioId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "reviewer",
+            "scenarioId",
+            "repin"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:EvidenceAddReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon evidence add` and `canon evidence audit`: the records written.",
+      "properties": {
+        "casesWithoutScenarioId": {
+          "description": "`--all-scenarios` only: cases that carry no scenario id.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "records": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRecordEntry"
+          },
+          "type": "array"
+        },
+        "skipped": {
+          "description": "`--all-scenarios` only: cases skipped because their scenario is not indexed.",
+          "items": {
+            "$ref": "#/$defs/SkippedCase"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "staleReviews": {
+          "items": {
+            "$ref": "#/$defs/StaleReview"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "records",
+        "staleReviews"
+      ],
+      "title": "EvidenceAddReport",
+      "type": "object"
+    },
+    "EvidenceApprovalPayloadReport": {
+      "$id": "urn:canon:report:EvidenceApprovalPayloadReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon evidence approval-payload --json`: the bytes an external signer signs.",
+      "properties": {
+        "effects": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "payload": {
+          "description": "The payload as text; `null` when it is not UTF-8.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "payloadHex": {
+          "description": "The payload bytes, hex-encoded.",
+          "type": "string"
+        },
+        "surface": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "payloadHex",
+        "payload",
+        "surface",
+        "effects"
+      ],
+      "title": "EvidenceApprovalPayloadReport",
+      "type": "object"
+    },
+    "EvidenceAuditReport": {
+      "$defs": {
+        "EvidenceRecordEntry": {
+          "description": "One record `canon evidence add` wrote, or found already written.",
+          "properties": {
+            "committed": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "next": {
+              "description": "The step that follows (a single-subject add).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "outcome": {
+              "description": "`verdict <verdict>` or `audit <result>`.",
+              "type": "string"
+            },
+            "staged": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "subject": {
+              "description": "The task or scenario id the record is about.",
+              "type": "string"
+            },
+            "unchanged": {
+              "description": "`true` when an identical record already existed and nothing was written.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "staged",
+            "committed",
+            "subject",
+            "outcome"
+          ],
+          "type": "object"
+        },
+        "SkippedCase": {
+          "description": "A case of `--all-scenarios` that was not recorded: its scenario is not indexed.",
+          "properties": {
+            "case": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "scenarioId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "scenarioId",
+            "case",
+            "reason"
+          ],
+          "type": "object"
+        },
+        "StaleReview": {
+          "description": "A review the new evidence makes stale, with the command that re-pins it.",
+          "properties": {
+            "repin": {
+              "type": "string"
+            },
+            "reviewer": {
+              "type": "string"
+            },
+            "scenarioId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "reviewer",
+            "scenarioId",
+            "repin"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:EvidenceAuditReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon evidence add` and `canon evidence audit`: the records written.",
+      "properties": {
+        "casesWithoutScenarioId": {
+          "description": "`--all-scenarios` only: cases that carry no scenario id.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "records": {
+          "items": {
+            "$ref": "#/$defs/EvidenceRecordEntry"
+          },
+          "type": "array"
+        },
+        "skipped": {
+          "description": "`--all-scenarios` only: cases skipped because their scenario is not indexed.",
+          "items": {
+            "$ref": "#/$defs/SkippedCase"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "staleReviews": {
+          "items": {
+            "$ref": "#/$defs/StaleReview"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "records",
+        "staleReviews"
+      ],
+      "title": "EvidenceAddReport",
+      "type": "object"
+    },
     "ExportReport": {
       "$defs": {
         "ExportManifest": {
@@ -15102,6 +16446,37 @@
             "contentDigests",
             "records",
             "sensitive"
+          ],
+          "type": "object"
+        },
+        "ExportPreview": {
+          "description": "What `--json --dry-run` returns: what the run would write, nothing written.",
+          "properties": {
+            "dryRun": {
+              "description": "Always true.",
+              "type": "boolean"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "output": {
+              "description": "The file `--output` names, when given.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "recordCount": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "dryRun",
+            "output",
+            "kind",
+            "recordCount"
           ],
           "type": "object"
         },
@@ -15239,15 +16614,147 @@
         },
         {
           "$ref": "#/$defs/ExportWritten"
+        },
+        {
+          "$ref": "#/$defs/ExportPreview"
         }
       ],
-      "description": "`canon export --json` (`ExportReport`): the manifest, or with `--output` the\nfile it was written to.",
+      "description": "`canon export --json` (`ExportReport`): the manifest, or with `--output` the\nfile it was written to; with `--dry-run` the preview.",
       "title": "ExportReport"
+    },
+    "FeatureNewReport": {
+      "$id": "urn:canon:report:FeatureNewReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon feature new`: the feature file created.",
+      "properties": {
+        "feature": {
+          "type": "string"
+        },
+        "next": {
+          "description": "The command that adds its first scenario.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "feature",
+        "next"
+      ],
+      "title": "FeatureNewReport",
+      "type": "object"
+    },
+    "FindingAddReport": {
+      "$id": "urn:canon:report:FindingAddReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon finding add`: the finding staged or committed.",
+      "properties": {
+        "changeId": {
+          "type": "string"
+        },
+        "committed": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "disposition": {
+          "type": "string"
+        },
+        "round": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "seq": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "severity": {
+          "type": "string"
+        },
+        "staged": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unsourced": {
+          "description": "No `--introduced-by` was given: the finding names no commit that introduced it.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "staged",
+        "committed",
+        "changeId",
+        "round",
+        "seq",
+        "severity",
+        "disposition",
+        "unsourced"
+      ],
+      "title": "FindingAddReport",
+      "type": "object"
+    },
+    "FindingCloseReport": {
+      "$id": "urn:canon:report:FindingCloseReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon finding close`: the transition staged or committed, or a no-op.",
+      "properties": {
+        "changeId": {
+          "type": "string"
+        },
+        "committed": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "disposition": {
+          "type": "string"
+        },
+        "from": {
+          "description": "The disposition it moved from; absent on a no-op.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "noop": {
+          "description": "`true` when the finding already had this disposition and nothing was staged.",
+          "type": "boolean"
+        },
+        "round": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "seq": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "staged": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "changeId",
+        "round",
+        "seq",
+        "disposition",
+        "noop"
+      ],
+      "title": "FindingCloseReport",
+      "type": "object"
     },
     "FindingListReport": {
       "$defs": {
         "FindingRow": {
-          "description": "One row of `finding list`.",
+          "description": "One finding of `canon finding list`.",
           "properties": {
             "disposition": {
               "type": "string"
@@ -15302,92 +16809,18 @@
             "reason"
           ],
           "type": "object"
-        },
-        "FindingRowView": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/FindingRow"
-            },
-            {
-              "$ref": "#/$defs/ProjectedFindingRow"
-            }
-          ]
-        },
-        "ProjectedFindingRow": {
-          "description": "A `finding list` row cut to the `--fields` asked for.",
-          "properties": {
-            "disposition": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "fileRef": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "reason": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "resolutionSha": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "reviewer": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "round": {
-              "format": "uint32",
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "seq": {
-              "format": "uint32",
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "severity": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "summary": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          "type": "object"
         }
       },
       "$id": "urn:canon:report:FindingListReport",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "`canon finding list`'s report (`FindingListReport`); the page state travels in `meta`.",
+      "description": "`canon finding list`: a change's findings; paging is in `meta`.",
       "properties": {
         "changeId": {
           "type": "string"
         },
         "findings": {
           "items": {
-            "$ref": "#/$defs/FindingRowView"
+            "$ref": "#/$defs/FindingRow"
           },
           "type": "array"
         }
@@ -15452,6 +16885,196 @@
         "violations"
       ],
       "title": "FormatReport",
+      "type": "object"
+    },
+    "GateCheckReport": {
+      "$defs": {
+        "GateAdvisory": {
+          "description": "A condition `canon gate check` reports without failing on it.",
+          "properties": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "description": "`spec_coverage_off`, `policy_approval`, `evidence_binding`, `review_waivers`, `accepted_divergence`, `unmigrated_review`, `brief_overrides` or `unstored_attachments`.",
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "message",
+            "items"
+          ],
+          "type": "object"
+        },
+        "GateViolation": {
+          "description": "One violation of `canon gate check`.",
+          "properties": {
+            "class": {
+              "type": "string"
+            },
+            "line": {
+              "description": "The grep-stable wire line: `<class> <subject> — <message>`.",
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "subject": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "class",
+            "subject",
+            "message",
+            "line"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:GateCheckReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon gate check`: violations and advisories. On exit 1 the report stays in `data`.",
+      "properties": {
+        "advisories": {
+          "items": {
+            "$ref": "#/$defs/GateAdvisory"
+          },
+          "type": "array"
+        },
+        "clean": {
+          "type": "boolean"
+        },
+        "unverifiable": {
+          "description": "Present (`true`) when nothing was examined, so a vacuous pass does not read as clean.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "violations": {
+          "items": {
+            "$ref": "#/$defs/GateViolation"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "clean",
+        "violations",
+        "advisories"
+      ],
+      "title": "GateCheckReport",
+      "type": "object"
+    },
+    "GateInstallHooksReport": {
+      "$id": "urn:canon:report:GateInstallHooksReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon gate install-hooks`: whether the hooks changed.",
+      "properties": {
+        "dryRun": {
+          "description": "True when `--dry-run` previewed the install without writing.",
+          "type": "boolean"
+        },
+        "installed": {
+          "type": "boolean"
+        },
+        "preCommitScriptWritten": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "dryRun",
+        "installed",
+        "preCommitScriptWritten"
+      ],
+      "title": "GateInstallHooksReport",
+      "type": "object"
+    },
+    "GatePromoteReport": {
+      "$defs": {
+        "PromotedEntry": {
+          "description": "One staged record `canon gate promote` committed or recovered.",
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "target": {
+              "description": "The ledger path it landed at.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "label",
+            "target"
+          ],
+          "type": "object"
+        },
+        "RefusedEntry": {
+          "description": "One staged record `canon gate promote` refused.",
+          "properties": {
+            "class": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "subject": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "class",
+            "subject",
+            "message"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:GatePromoteReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon gate promote`: what left staging. On exit 1 (`PROMOTE_REFUSED`) the report stays in `data`.",
+      "properties": {
+        "dryRun": {
+          "type": "boolean"
+        },
+        "promoted": {
+          "items": {
+            "$ref": "#/$defs/PromotedEntry"
+          },
+          "type": "array"
+        },
+        "recovered": {
+          "items": {
+            "$ref": "#/$defs/PromotedEntry"
+          },
+          "type": "array"
+        },
+        "refused": {
+          "items": {
+            "$ref": "#/$defs/RefusedEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "dryRun",
+        "promoted",
+        "recovered",
+        "refused"
+      ],
+      "title": "GatePromoteReport",
       "type": "object"
     },
     "IngestPlansReport": {
@@ -15811,6 +17434,10 @@
           "minimum": 0,
           "type": "integer"
         },
+        "dryRun": {
+          "description": "A `--dry-run` preview: nothing was persisted and no cursor moved;\nthe `*Persisted` counts are what a real pass would persist.",
+          "type": "boolean"
+        },
         "duplicateChangeId": {
           "format": "uint",
           "minimum": 0,
@@ -15849,6 +17476,7 @@
         }
       },
       "required": [
+        "dryRun",
         "sources",
         "changesPersisted",
         "tasksPersisted",
@@ -15961,7 +17589,7 @@
       },
       "$id": "urn:canon:report:IngestRecordsReport",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "One `canon ingest artifacts` pass's outcome.",
+      "description": "One `canon ingest records` pass's outcome.",
       "properties": {
         "adapters": {
           "items": {
@@ -15975,6 +17603,10 @@
             "$ref": "#/$defs/ConvergenceConflict"
           },
           "type": "array"
+        },
+        "dryRun": {
+          "description": "A `--dry-run` preview: nothing was written; the counts are what a\nreal pass would do (convergence of superseded copies is not previewed).",
+          "type": "boolean"
         },
         "strategyItemsRebuilt": {
           "description": "Sum of every regime's freshly-distilled `StrategyItem` count\n([`NamespaceConvergence::items`]) — the count that actually lands\nin `stg_strategy_items`, i.e. what makes S9's `mart_role_memory`\nnon-empty.",
@@ -16025,6 +17657,7 @@
         }
       },
       "required": [
+        "dryRun",
         "adapters",
         "verdictsDerived",
         "trajectoriesPersisted",
@@ -16104,6 +17737,10 @@
             "counts": {
               "$ref": "#/$defs/UnwrittenCounts"
             },
+            "dryRun": {
+              "description": "True when `--dry-run` previewed the pass without writing.",
+              "type": "boolean"
+            },
             "events": {
               "items": {
                 "$ref": "#/$defs/UnwrittenEvent"
@@ -16130,6 +17767,7 @@
             }
           },
           "required": [
+            "dryRun",
             "scope",
             "adapters",
             "counts",
@@ -16381,6 +18019,10 @@
             "null"
           ]
         },
+        "dryRun": {
+          "description": "True when `--dry-run` previewed the pass without writing.",
+          "type": "boolean"
+        },
         "eventsWritten": {
           "format": "uint",
           "minimum": 0,
@@ -16421,6 +18063,7 @@
         }
       },
       "required": [
+        "dryRun",
         "scope",
         "adapters",
         "sessionsNormalized",
@@ -16502,6 +18145,10 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "description": "`canon init`'s report (`InitReport`): what it did, step by step.",
       "properties": {
+        "dryRun": {
+          "description": "True when `--dry-run` previewed the run without writing.",
+          "type": "boolean"
+        },
         "steps": {
           "items": {
             "$ref": "#/$defs/InitStep"
@@ -16510,6 +18157,7 @@
         }
       },
       "required": [
+        "dryRun",
         "steps"
       ],
       "title": "InitReport",
@@ -16606,6 +18254,10 @@
         "clean": {
           "type": "boolean"
         },
+        "dryRun": {
+          "description": "True when `--dry-run` previewed the run without writing.",
+          "type": "boolean"
+        },
         "roots": {
           "items": {
             "$ref": "#/$defs/InventoryRootReport"
@@ -16619,11 +18271,249 @@
         }
       },
       "required": [
+        "dryRun",
         "clean",
         "totalWritten",
         "roots"
       ],
       "title": "InventorySyncReport",
+      "type": "object"
+    },
+    "LedgerCompactReport": {
+      "$defs": {
+        "Effect": {
+          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "properties": {
+            "action": {
+              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Where it goes, or why, when `action` alone does not say.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "path": {
+              "description": "The file acted on, relative to the repo.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "record": {
+              "description": "The record acted on (an id, key or digest) when it is not a file.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "type": "object"
+        },
+        "LedgerKindRow": {
+          "description": "One kind's row in a compaction report.",
+          "properties": {
+            "bytes": {
+              "description": "Total bytes of the superseded files.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "files": {
+              "description": "Files in the ledger before the move.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "live": {
+              "description": "Files that stay.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "moved": {
+              "description": "Files moved (0 in a preview).",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "superseded": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "kind",
+            "files",
+            "live",
+            "superseded",
+            "moved",
+            "bytes"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:LedgerCompactReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon ledger compact`'s `data`: the plan and what each kind held and moved.",
+      "properties": {
+        "archive": {
+          "description": "The archive directory, relative to the repo.",
+          "type": "string"
+        },
+        "bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "committed": {
+          "description": "`true` once the run acted, `false` for a preview.",
+          "type": "boolean"
+        },
+        "effects": {
+          "description": "Everything the run would do, in the order it does it.",
+          "items": {
+            "$ref": "#/$defs/Effect"
+          },
+          "type": "array"
+        },
+        "files": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kinds": {
+          "items": {
+            "$ref": "#/$defs/LedgerKindRow"
+          },
+          "type": "array"
+        },
+        "live": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "moved": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "planDigest": {
+          "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+          "type": "string"
+        },
+        "superseded": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "archive",
+        "kinds",
+        "files",
+        "live",
+        "superseded",
+        "moved",
+        "bytes",
+        "planDigest",
+        "effects",
+        "committed"
+      ],
+      "title": "LedgerCompactReport",
+      "type": "object"
+    },
+    "MigrateReport": {
+      "$defs": {
+        "Effect": {
+          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "properties": {
+            "action": {
+              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Where it goes, or why, when `action` alone does not say.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "path": {
+              "description": "The file acted on, relative to the repo.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "record": {
+              "description": "The record acted on (an id, key or digest) when it is not a file.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:MigrateReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon migrate`'s `data`: the plan, the steps it printed and, once it\nrebuilt the scenario index, how many records that wrote.",
+      "properties": {
+        "committed": {
+          "description": "`true` once the run acted, `false` for a preview.",
+          "type": "boolean"
+        },
+        "effects": {
+          "description": "Everything the run would do, in the order it does it.",
+          "items": {
+            "$ref": "#/$defs/Effect"
+          },
+          "type": "array"
+        },
+        "index": {
+          "description": "The rebuild's own report when it found the corpus unclean (`MIGRATE_INDEX_FAILED`)."
+        },
+        "indexRecordsWritten": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "planDigest": {
+          "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+          "type": "string"
+        },
+        "steps": {
+          "description": "What the run planned, did and noted, one line each.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "steps",
+        "planDigest",
+        "effects",
+        "committed"
+      ],
+      "title": "MigrateReport",
       "type": "object"
     },
     "PluginSyncReport": {
@@ -16686,6 +18576,10 @@
           "minimum": 0,
           "type": "integer"
         },
+        "dryRun": {
+          "description": "True when `--dry-run` previewed the run without writing.",
+          "type": "boolean"
+        },
         "pluginId": {
           "type": "string"
         },
@@ -16703,12 +18597,113 @@
       },
       "required": [
         "pluginId",
+        "dryRun",
         "clean",
         "written",
         "deduped",
         "roots"
       ],
       "title": "PluginSyncReport",
+      "type": "object"
+    },
+    "PolicyApproveReport": {
+      "$id": "urn:canon:report:PolicyApproveReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon policy approve`: the approval just recorded.",
+      "properties": {
+        "approval": {
+          "type": "string"
+        },
+        "approvedAt": {
+          "type": "string"
+        },
+        "approvedBy": {
+          "type": "string"
+        },
+        "policy": {
+          "type": "string"
+        },
+        "policyDigest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "policy",
+        "policyDigest",
+        "approvedBy",
+        "approvedAt",
+        "approval"
+      ],
+      "title": "PolicyApproveReport",
+      "type": "object"
+    },
+    "PolicyShowReport": {
+      "$id": "urn:canon:report:PolicyShowReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon policy show`: the policy's digest and what its approval says.",
+      "properties": {
+        "approval": {
+          "type": "string"
+        },
+        "approvedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "approvedBy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "approvedDigest": {
+          "description": "The digest the approval covers; differs from `policyDigest` when `state` is `changed`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "detail": {
+          "description": "Why the approval is unreadable.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "policy": {
+          "type": "string"
+        },
+        "policyDigest": {
+          "description": "Digest of the policy file's current bytes; `null` without a readable policy.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "description": "`none`, `approved`, `unapproved`, `changed` or `unreadable`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "policy",
+        "policyDigest",
+        "approval",
+        "state",
+        "approvedBy",
+        "approvedAt",
+        "approvedDigest",
+        "note",
+        "detail"
+      ],
+      "title": "PolicyShowReport",
       "type": "object"
     },
     "PromptAddReport": {
@@ -16933,6 +18928,160 @@
       "title": "PromptBundleVersion",
       "type": "object"
     },
+    "PurgeReport": {
+      "$defs": {
+        "Effect": {
+          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "properties": {
+            "action": {
+              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Where it goes, or why, when `action` alone does not say.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "path": {
+              "description": "The file acted on, relative to the repo.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "record": {
+              "description": "The record acted on (an id, key or digest) when it is not a file.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "type": "object"
+        },
+        "PurgeLearnStore": {
+          "description": "The learn store's counts in a `trajectory` purge report.",
+          "properties": {
+            "backend": {
+              "type": "string"
+            },
+            "deleted": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "matched": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "backend",
+            "matched",
+            "deleted"
+          ],
+          "type": "object"
+        },
+        "PurgeRung": {
+          "description": "One rung's counts in a purge report.",
+          "properties": {
+            "backend": {
+              "type": "string"
+            },
+            "deleted": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "matched": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "rung": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "rung",
+            "backend",
+            "matched",
+            "deleted"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:PurgeReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon purge`'s `data`: the plan (`planDigest`, `effects[]`, `committed`)\nand what each rung matched and deleted.",
+      "properties": {
+        "before": {
+          "type": "string"
+        },
+        "committed": {
+          "description": "`true` once the run acted, `false` for a preview.",
+          "type": "boolean"
+        },
+        "effects": {
+          "description": "Everything the run would do, in the order it does it.",
+          "items": {
+            "$ref": "#/$defs/Effect"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "learnStore": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PurgeLearnStore"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "planDigest": {
+          "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+          "type": "string"
+        },
+        "rungs": {
+          "items": {
+            "$ref": "#/$defs/PurgeRung"
+          },
+          "type": "array"
+        },
+        "sourceScope": {
+          "type": "string"
+        },
+        "unavailable": {
+          "description": "Rungs the plan could not reach.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "before",
+        "sourceScope",
+        "rungs",
+        "unavailable",
+        "planDigest",
+        "effects",
+        "committed"
+      ],
+      "title": "PurgeReport",
+      "type": "object"
+    },
     "QueryReport": {
       "$defs": {
         "LedgerRecord": {
@@ -17046,20 +19195,15 @@
     "ReportBuildReport": {
       "$id": "urn:canon:report:ReportBuildReport",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "`canon report` (write mode): where the report was written (`ReportBuildReport`).",
+      "description": "`canon report build`: where the report was written (`ReportBuildReport`).",
       "properties": {
-        "mode": {
-          "description": "Always `write`.",
-          "type": "string"
-        },
-        "report": {
-          "description": "The report file.",
+        "path": {
+          "description": "The report file written.",
           "type": "string"
         }
       },
       "required": [
-        "mode",
-        "report"
+        "path"
       ],
       "title": "ReportBuildReport",
       "type": "object"
@@ -17067,13 +19211,10 @@
     "ReportCheckReport": {
       "$id": "urn:canon:report:ReportCheckReport",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "`canon report --check`: whether the report file is current (`ReportCheckReport`).",
+      "description": "`canon report check`: whether the report file is current (`ReportCheckReport`).",
       "properties": {
-        "mode": {
-          "description": "Always `check`.",
-          "type": "string"
-        },
-        "report": {
+        "path": {
+          "description": "The report file compared.",
           "type": "string"
         },
         "state": {
@@ -17082,9 +19223,8 @@
         }
       },
       "required": [
-        "mode",
         "state",
-        "report"
+        "path"
       ],
       "title": "ReportCheckReport",
       "type": "object"
@@ -17110,13 +19250,9 @@
       },
       "$id": "urn:canon:report:ReportSnapshotReport",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "`canon report --snapshot <dir>`: the tables written (`ReportSnapshotReport`).",
+      "description": "`canon report snapshot <dir>`: the tables written (`ReportSnapshotReport`).",
       "properties": {
         "directory": {
-          "type": "string"
-        },
-        "mode": {
-          "description": "Always `snapshot`.",
           "type": "string"
         },
         "tables": {
@@ -17127,7 +19263,6 @@
         }
       },
       "required": [
-        "mode",
         "directory",
         "tables"
       ],
@@ -17165,6 +19300,278 @@
       },
       "title": "RetrieveReport",
       "type": "array"
+    },
+    "ReviewChangeReport": {
+      "$defs": {
+        "ReviewEntry": {
+          "description": "One review `canon review scenario` or `canon review change` wrote, or found already written.",
+          "properties": {
+            "deduped": {
+              "description": "Whether an identical record was already stored (a write).",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "location": {
+              "description": "The ledger path of the review record.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "scenarioId": {
+              "description": "The scenario an unchanged repeat is about.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "unchanged": {
+              "description": "`true` when an identical review already existed and nothing was written.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "location"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:ReviewChangeReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon review scenario` and `canon review change`: the reviews written.",
+      "properties": {
+        "blobsStored": {
+          "description": "Attached files stored in the artifact store.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "reviews": {
+          "items": {
+            "$ref": "#/$defs/ReviewEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "outcome",
+        "reviews",
+        "blobsStored"
+      ],
+      "title": "ReviewReport",
+      "type": "object"
+    },
+    "ReviewScenarioReport": {
+      "$defs": {
+        "ReviewEntry": {
+          "description": "One review `canon review scenario` or `canon review change` wrote, or found already written.",
+          "properties": {
+            "deduped": {
+              "description": "Whether an identical record was already stored (a write).",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "location": {
+              "description": "The ledger path of the review record.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "scenarioId": {
+              "description": "The scenario an unchanged repeat is about.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "unchanged": {
+              "description": "`true` when an identical review already existed and nothing was written.",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "location"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:ReviewScenarioReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon review scenario` and `canon review change`: the reviews written.",
+      "properties": {
+        "blobsStored": {
+          "description": "Attached files stored in the artifact store.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "reviews": {
+          "items": {
+            "$ref": "#/$defs/ReviewEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "outcome",
+        "reviews",
+        "blobsStored"
+      ],
+      "title": "ReviewReport",
+      "type": "object"
+    },
+    "ScenarioNewBatchReport": {
+      "$defs": {
+        "WrittenLine": {
+          "description": "One scenario written by `canon scenario new --from`.",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "line": {
+              "description": "The 1-based line of the input.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "id",
+            "path"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:ScenarioNewBatchReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon scenario new --from`: every scenario of the batch, written.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/WrittenLine"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "ScenarioNewBatchReport",
+      "type": "object"
+    },
+    "ScenarioNewRefusalReport": {
+      "$defs": {
+        "RefusedLine": {
+          "description": "One refused input line of `canon scenario new --from`.",
+          "properties": {
+            "error": {
+              "$ref": "#/$defs/RefusedLineError"
+            },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "line": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "line",
+            "id",
+            "error"
+          ],
+          "type": "object"
+        },
+        "RefusedLineError": {
+          "description": "Why one input line of `canon scenario new --from` was refused.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "field": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hint": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:ScenarioNewRefusalReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "The `data` of a refused `canon scenario new --from`: every refused line; nothing was written.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/RefusedLine"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "ScenarioNewRefusal",
+      "type": "object"
+    },
+    "ScenarioNewReport": {
+      "$id": "urn:canon:report:ScenarioNewReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon scenario new <tag>`: the scenario written.",
+      "properties": {
+        "feature": {
+          "description": "The feature file it was written to.",
+          "type": "string"
+        },
+        "scenarioId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scenarioId",
+        "feature"
+      ],
+      "title": "ScenarioNewReport",
+      "type": "object"
     },
     "SchemaReport": {
       "$defs": {
@@ -17210,6 +19617,18 @@
             }
           ]
         },
+        "ErrorEntry": {
+          "description": "`canon schema --error <CODE>`: the one registry row.",
+          "properties": {
+            "error": {
+              "$ref": "#/$defs/ErrorRow"
+            }
+          },
+          "required": [
+            "error"
+          ],
+          "type": "object"
+        },
         "ErrorList": {
           "description": "`canon schema --errors`: every error code.",
           "properties": {
@@ -17236,6 +19655,10 @@
               "format": "int32",
               "type": "integer"
             },
+            "fix": {
+              "description": "One sentence telling the caller what to do about the code.",
+              "type": "string"
+            },
             "meaning": {
               "type": "string"
             },
@@ -17248,7 +19671,8 @@
             "code",
             "meaning",
             "exit",
-            "retryable"
+            "retryable",
+            "fix"
           ],
           "type": "object"
         },
@@ -17715,6 +20139,9 @@
         },
         {
           "$ref": "#/$defs/ErrorList"
+        },
+        {
+          "$ref": "#/$defs/ErrorEntry"
         }
       ],
       "description": "`canon schema`'s report (`SchemaReport`): the command listing, one command's\nnode of the generated spec, or the error registry.",
@@ -17943,6 +20370,10 @@
                 "null"
               ]
             },
+            "dryRun": {
+              "description": "True when `--dry-run` previewed the run without writing.",
+              "type": "boolean"
+            },
             "kept": {
               "items": {
                 "$ref": "#/$defs/KeptEntry"
@@ -17972,6 +20403,7 @@
             }
           },
           "required": [
+            "dryRun",
             "providers",
             "selection",
             "changed",
@@ -18031,6 +20463,10 @@
         "LegacyInstall": {
           "description": "What the legacy install (a source without `SKILL.src.md`) reports.",
           "properties": {
+            "dryRun": {
+              "description": "True when `--dry-run` previewed the run without writing.",
+              "type": "boolean"
+            },
             "skills": {
               "items": {
                 "$ref": "#/$defs/InstalledSkillEntry"
@@ -18039,6 +20475,7 @@
             }
           },
           "required": [
+            "dryRun",
             "skills"
           ],
           "type": "object"
@@ -18708,6 +21145,91 @@
         "instructions"
       ],
       "title": "StrategyApprovalPayloadReport",
+      "type": "object"
+    },
+    "StrategyPromoteReport": {
+      "$id": "urn:canon:report:StrategyPromoteReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon strategy promote`: what was (or, with `--dry-run`, would be) promoted.",
+      "properties": {
+        "advisories": {
+          "description": "Advisory lint findings; they never change the exit code.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "dryRun": {
+          "type": "boolean"
+        },
+        "path": {
+          "description": "The git-tracked strategy file.",
+          "type": "string"
+        },
+        "strategyId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "strategyId",
+        "path",
+        "dryRun",
+        "advisories"
+      ],
+      "title": "StrategyPromoteReport",
+      "type": "object"
+    },
+    "StrategyRollbackReport": {
+      "$id": "urn:canon:report:StrategyRollbackReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon strategy rollback`: the rollback record.",
+      "properties": {
+        "actor": {
+          "type": "string"
+        },
+        "approvalDigest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contradictingTrajectoryId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evaluationDigest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outcomeProvenance": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "rolledBackAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "strategyId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "strategyId",
+        "actor",
+        "reason",
+        "rolledBackAt",
+        "evaluationDigest",
+        "approvalDigest",
+        "contradictingTrajectoryId",
+        "outcomeProvenance"
+      ],
+      "title": "StrategyRollbackReport",
       "type": "object"
     },
     "SubjectAdoptReport": {
@@ -20109,6 +22631,148 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "description": "`data` of the subject leaves: the Subject record, embedded verbatim (it keeps the ledger record's own schema and snake_case keys).",
       "title": "SubjectReport"
+    },
+    "TaskDoneReport": {
+      "$id": "urn:canon:report:TaskDoneReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon task done`: the task row flipped, or already done.",
+      "properties": {
+        "document": {
+          "description": "The task document written; absent when nothing was flipped.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "flipped": {
+          "description": "False when the row was already `[x]`.",
+          "type": "boolean"
+        },
+        "taskId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "taskId",
+        "flipped"
+      ],
+      "title": "TaskDoneReport",
+      "type": "object"
+    },
+    "TierAgeReport": {
+      "$defs": {
+        "Effect": {
+          "description": "One thing a destructive run would do (or did): the `action`, and the file\n(`path`, repo-relative) or record (`record`) it acts on.",
+          "properties": {
+            "action": {
+              "description": "What happens, e.g. `delete`, `move`, `upload`, `rewrite`, `remove`.",
+              "type": "string"
+            },
+            "detail": {
+              "description": "Where it goes, or why, when `action` alone does not say.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "path": {
+              "description": "The file acted on, relative to the repo.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "record": {
+              "description": "The record acted on (an id, key or digest) when it is not a file.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "type": "object"
+        },
+        "TierAgeRule": {
+          "description": "One `aging:` rule in `canon tier age`'s report.",
+          "properties": {
+            "after": {
+              "description": "The rule's threshold (`30d`).",
+              "type": "string"
+            },
+            "alreadyAged": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "candidates": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "destination": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "moved": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "source",
+            "destination",
+            "after",
+            "candidates",
+            "moved",
+            "alreadyAged"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:TierAgeReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon tier age`'s `data`: the plan and one entry per `aging:` rule.",
+      "properties": {
+        "committed": {
+          "description": "`true` once the run acted, `false` for a preview.",
+          "type": "boolean"
+        },
+        "effects": {
+          "description": "Everything the run would do, in the order it does it.",
+          "items": {
+            "$ref": "#/$defs/Effect"
+          },
+          "type": "array"
+        },
+        "planDigest": {
+          "description": "sha256 (hex) of the plan's `effects`; `--commit --plan-digest` must repeat it.",
+          "type": "string"
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/TierAgeRule"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "rules",
+        "planDigest",
+        "effects",
+        "committed"
+      ],
+      "title": "TierAgeReport",
+      "type": "object"
     }
   },
   "specVersion": "1"
