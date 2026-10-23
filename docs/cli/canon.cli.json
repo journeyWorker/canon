@@ -594,7 +594,7 @@
       "effect": "write",
       "errorCodes": [
         "APPROVAL_INCOMPLETE",
-        "BRIEF_HAS_BLOCKERS",
+        "BRIEF_APPROVE_REFUSED",
         "BRIEF_NOT_FOUND",
         "BRIEF_UNAPPROVABLE",
         "BRIEF_UNREADABLE",
@@ -628,7 +628,7 @@
         },
         {
           "code": 1,
-          "meaning": "failed: BRIEF_HAS_BLOCKERS, BRIEF_WRITE_FAILED, INPUT_ELEMENT_FAILED"
+          "meaning": "failed: BRIEF_WRITE_FAILED, INPUT_ELEMENT_FAILED"
         },
         {
           "code": 2,
@@ -1618,8 +1618,8 @@
       "effectNote": "regenerates .canon/dashboard-snapshot; POST /api/briefs/approve rewrites a brief",
       "errorCodes": [
         "APPROVAL_INCOMPLETE",
+        "BRIEF_APPROVE_REFUSED",
         "BRIEF_CHANGED_SINCE_PAGE_LOAD",
-        "BRIEF_HAS_BLOCKERS",
         "BRIEF_NOT_FOUND",
         "BRIEF_UNAPPROVABLE",
         "DASHBOARD_BAD_REQUEST",
@@ -1652,7 +1652,7 @@
         },
         {
           "code": 1,
-          "meaning": "failed: BRIEF_HAS_BLOCKERS, DASHBOARD_FAILED, DASHBOARD_NOT_BUILT, DASHBOARD_PORT_IN_USE, INPUT_ELEMENT_FAILED"
+          "meaning": "failed: DASHBOARD_FAILED, DASHBOARD_NOT_BUILT, DASHBOARD_PORT_IN_USE, INPUT_ELEMENT_FAILED"
         },
         {
           "code": 2,
@@ -12797,10 +12797,17 @@
       "retryable": false
     },
     {
+      "code": "BRIEF_APPROVE_REFUSED",
+      "exit": 2,
+      "fix": "Resolve every blocker finding the brief has (see `canon brief check`), then ask the human to approve.",
+      "meaning": "`brief approve` was refused because the brief has blocker findings; nothing was written",
+      "retryable": false
+    },
+    {
       "code": "BRIEF_HAS_BLOCKERS",
       "exit": 1,
-      "fix": "Resolve every blocker finding in the brief (see `canon brief check`), then approve it.",
-      "meaning": "the brief has blocker findings, so it cannot be approved yet",
+      "fix": "Resolve every blocker finding in data.findings, then run `canon brief check` again.",
+      "meaning": "`brief check` found blocker findings; data.findings names each",
       "retryable": false
     },
     {
