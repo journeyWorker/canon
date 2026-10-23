@@ -26,7 +26,7 @@ const EMIT_WINDOW: usize = 6;
 
 /// Files that are not error sites: the registry and the generated table, and
 /// `context.rs`, whose one code (`CONFIG_MISSING`, built by `require_config`)
-/// is emitted by `main.rs` for every command that needs canon state (see
+/// is emitted by `run::entry` for every command that needs canon state (see
 /// [`needs_config_leaves`]).
 const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs", "context.rs"];
 
@@ -41,7 +41,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("brief.rs", &["evidence add"]),
     ("brief_approve.rs", &["brief approve"]),
     // `check` is shared by `brief check` and `brief approve`.
-    ("brief_check.rs", &["brief check", "brief approve"]),
+    ("brief_check.rs", &["brief check", "brief approve", "brief show"]),
     ("change.rs", &["change new"]),
     ("context_pack.rs", &["context-pack", "prompt"]),
     // The server's refusals (`to_cli_error`, the request guards) and the briefs page's.
@@ -62,6 +62,16 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("ledger.rs", &["ledger compact"]),
     // Every code is next to its emit.
     ("main.rs", &[]),
+    ("run/mod.rs", &[]),
+    ("run/entry.rs", &[]),
+    ("run/divergence.rs", &[]),
+    ("run/top.rs", &[]),
+    ("run/adapter.rs", &[]),
+    ("run/ingest.rs", &[]),
+    ("run/inventory.rs", &[]),
+    ("run/plugin.rs", &[]),
+    ("run/skills.rs", &[]),
+    ("run/tier.rs", &[]),
     ("migrate.rs", &["migrate"]),
     ("policy_approval.rs", &["brief approve", "policy approve"]),
     ("paging.rs", &["query", "finding list", "divergence status", "export"]),
@@ -127,7 +137,7 @@ fn leaves_under(prefix: &str) -> Vec<&'static str> {
     found
 }
 
-/// The leaves `main.rs` refuses with `CONFIG_MISSING` when no `canon.yaml` is
+/// The leaves `run::entry` refuses with `CONFIG_MISSING` when no `canon.yaml` is
 /// found: those with a `--repo` option that are not in
 /// `canon_cli::context::CONFIG_EXEMPT`. A leaf's options come from its own
 /// `canon schema` output, so a new `--repo` option is picked up by itself.
@@ -151,11 +161,14 @@ fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
     let codes: Vec<&'static str> = all_codes().iter().map(|(c, _)| *c).filter(|c| !GLOBAL.contains(c)).collect();
     let defaults: BTreeMap<&str, &[&str]> = FILE_DEFAULTS.iter().copied().collect();
     let mut problems = Vec::new();
-    let mut files: Vec<PathBuf> = fs::read_dir(src_dir()).expect("read src").map(|e| e.expect("dir entry").path()).filter(|p| p.extension().is_some_and(|e| e == "rs")).collect();
+    let mut files: Vec<PathBuf> = ["", "run"]
+        .iter()
+        .flat_map(|dir| fs::read_dir(src_dir().join(dir)).expect("read src").map(|e| e.expect("dir entry").path()).filter(|p| p.extension().is_some_and(|e| e == "rs")).collect::<Vec<_>>())
+        .collect();
     files.sort();
     let mut promoters = BTreeSet::new();
     for file in files {
-        let name = file.file_name().expect("file name").to_str().expect("utf-8 name").to_string();
+        let name = file.strip_prefix(src_dir()).expect("under src").to_str().expect("utf-8 name").to_string();
         if IGNORED.contains(&name.as_str()) {
             continue;
         }

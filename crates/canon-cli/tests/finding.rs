@@ -984,13 +984,13 @@ fn no_shipped_finding_help_or_doc_asserts_a_hand_typed_count() {
     // and correcting only the string a user sees would leave the next
     // author copying it back out of the source.
     let module_doc = include_str!("../src/finding.rs");
-    let cli_surface = include_str!("../src/main.rs");
+    let cli_surface = concat!(include_str!("../src/cli/mod.rs"), include_str!("../src/cli/top.rs"), include_str!("../src/cli/finding.rs"), include_str!("../src/cli/review.rs"));
 
     for (where_, text) in [
         ("`canon finding add --help`", add_help.as_str()),
         ("`canon finding --help`", finding_help.as_str()),
         ("crates/canon-cli/src/finding.rs", module_doc),
-        ("crates/canon-cli/src/main.rs", cli_surface),
+        ("crates/canon-cli/src/cli", cli_surface),
     ] {
         if let Some(phrase) = shipped_verbatim(text) {
             panic!("{where_} asserts a hand-typed count via {phrase:?}");

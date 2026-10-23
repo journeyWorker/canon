@@ -119,8 +119,8 @@ fn authoring_brief_check_01_a_brief_is_judged_in_the_language_it_is_written_in()
     assert_eq!((code, report["language"].as_str()), (0, Some("ko")), "advisories never fail the check");
     assert!(!hits(&report, "prose.ko-ending").is_empty() && !hits(&report, "prose.colloquial").is_empty(), "{report}");
 
-    // Bare `canon brief` reads the same resolution.
-    assert!(stdout(&run(dir.path(), &["brief"])).contains("polish"));
+    // `canon brief show` reads the same resolution.
+    assert!(stdout(&run(dir.path(), &["brief", "show"])).contains("polish"));
 }
 
 /// authoring.brief-check.02: a configured `language:` decides; when the

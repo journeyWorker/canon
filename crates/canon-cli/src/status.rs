@@ -1447,7 +1447,7 @@ pub fn render(report: &StatusReport) -> String {
                 let _ = writeln!(out, "      {names} {verb}: not yet part of the subject's scope (brief not approved and no scenario tagged `@flow:<change>.*`); reopen, evidence and ship read the newest approved or tagged change");
             }
             if let Some(counts) = s.brief.as_ref().and_then(|b| b.findings) {
-                let _ = writeln!(out, "      brief check: {} blocker(s), {} advisory(ies); `canon brief` names the next step", counts.blockers, counts.advisories);
+                let _ = writeln!(out, "      brief check: {} blocker(s), {} advisory(ies); `canon brief show` names the next step", counts.blockers, counts.advisories);
             }
             for step in &s.flow {
                 let _ = writeln!(out, "      flow {}{}", step.id, if step.gaps.is_empty() { String::new() } else { format!(" — {}", step.gaps.join(", ")) });

@@ -143,6 +143,61 @@ pub fn find(root: &Command, args: &[String]) -> Option<Removed> {
     None
 }
 
+/// A group 0.27 ran without a subcommand, now a usage error that names the leaf
+/// that took its place: `(group path, replacement path)`.
+const BARE_GROUPS: &[(&str, &str)] = &[("brief", "brief show")];
+
+/// A group invoked bare that used to run, and the leaf that replaced it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BareGroup {
+    /// The group path, e.g. `brief`.
+    pub command: &'static str,
+    /// The leaf to run instead, e.g. `brief show`.
+    pub replacement: &'static str,
+}
+
+impl BareGroup {
+    /// The usage error's message.
+    pub fn message(&self) -> String {
+        format!("`canon {}` is a group and takes a subcommand", self.command)
+    }
+
+    /// The usage error's hint: the leaf that does what the bare group did.
+    pub fn hint(&self) -> String {
+        format!("use `canon {}`", self.replacement)
+    }
+}
+
+/// The bare group `args` (argv without the program name) stops at, when it is
+/// one of [`BARE_GROUPS`]; read against the clap tree `root`. Options with a
+/// value are skipped, and nothing after `--` is read.
+pub fn bare_group(root: &Command, args: &[String]) -> Option<BareGroup> {
+    let mut root = root.clone();
+    root.build();
+    let mut cmd = &root;
+    let mut path: Vec<&str> = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        let token = args[i].as_str();
+        if token == "--" {
+            break;
+        }
+        if let Some(rest) = token.strip_prefix("--") {
+            if !rest.contains('=') && cmd.get_arguments().any(|a| a.get_long() == Some(rest) && a.get_action().takes_values()) {
+                i += 1;
+            }
+        } else if token.starts_with('-') {
+            // short flags carry no operand this walk needs
+        } else if let Some(sub) = cmd.find_subcommand(token) {
+            path.push(sub.get_name());
+            cmd = sub;
+        }
+        i += 1;
+    }
+    let here = path.join(" ");
+    BARE_GROUPS.iter().find(|(group, _)| *group == here).map(|(command, replacement)| BareGroup { command, replacement })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

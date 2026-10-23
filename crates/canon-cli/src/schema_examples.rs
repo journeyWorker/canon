@@ -17,6 +17,7 @@ pub(crate) const EXAMPLES: &[(&str, &str)] = &[
     ("artifacts verify", "canon artifacts verify"),
     ("brief approve", "canon brief approve --by alice --note \"approved as written\""),
     ("brief check", "canon brief check"),
+    ("brief show", "canon brief show"),
     ("change new", "canon change new add-search --subject-id demo --title \"Add search\""),
     ("context", "canon context"),
     ("context-pack new", "canon context-pack new --manifest .canon/context-manifest.json"),

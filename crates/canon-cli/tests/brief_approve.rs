@@ -1,6 +1,6 @@
 //! Integration tests for `canon brief approve` (0.19 D3, #46): the approval
 //! is bound to the brief's bytes, and every reader (status, `evidence add`,
-//! bare `canon brief`) refuses a brief changed after it. Against the
+//! `canon brief show`) refuses a brief changed after it. Against the
 //! actually-built `canon` binary.
 
 use std::path::Path;
@@ -106,7 +106,7 @@ fn approving_binds_the_brief_and_any_later_edit_is_refused_until_reapproved() {
     assert!(status_text(repo).contains("brief: approved in .canon/changes/add-login/brief.md"), "{}", status_text(repo));
     let attest = run(repo, &ATTEST);
     assert!(attest.status.success(), "{}", stderr(&attest));
-    let json: Value = serde_json::from_str(&stdout(&run(repo, &["brief", "--json"]))).unwrap();
+    let json: Value = serde_json::from_str(&stdout(&run(repo, &["brief", "show", "--json"]))).unwrap();
     assert_eq!((json["state"].as_str(), json["next"].as_array().unwrap().len()), (Some("approved"), 0), "{json}");
 
     // One word changes: the approval no longer covers this text.
@@ -116,7 +116,7 @@ fn approving_binds_the_brief_and_any_later_edit_is_refused_until_reapproved() {
     let attest = run(repo, &ATTEST);
     assert_eq!(attest.status.code(), Some(1), "{}", stderr(&attest));
     assert!(stderr(&attest).contains("BRIEF_CHANGED_SINCE_APPROVAL") && stderr(&attest).contains("canon brief approve --change-id add-login"), "{}", stderr(&attest));
-    let json: Value = serde_json::from_str(&stdout(&run(repo, &["brief", "--json"]))).unwrap();
+    let json: Value = serde_json::from_str(&stdout(&run(repo, &["brief", "show", "--json"]))).unwrap();
     assert_eq!((json["state"].as_str(), json["next"][0]["step"].as_str()), (Some("changed-since-approval"), Some("approve")), "{json}");
 
     // A new human answer re-approves; the old line is replaced, not stacked.

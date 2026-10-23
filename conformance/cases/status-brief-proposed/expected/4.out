@@ -10,7 +10,7 @@ subjects (1):
   proposed (1):
     cart: 0 scenarios, 0 evidenced, 0 reviewed, 0 open blockers
       brief: not approved (.canon/changes/cart-v1/brief.md has no `Approved:` line)
-      brief check: 7 blocker(s), 0 advisory(ies); `canon brief` names the next step
+      brief check: 7 blocker(s), 0 advisory(ies); `canon brief show` names the next step
 
 unowned: none
 

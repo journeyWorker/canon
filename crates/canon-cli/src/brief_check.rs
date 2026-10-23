@@ -1,4 +1,4 @@
-//! `canon brief check` and bare `canon brief` (0.19 D2): a read-only
+//! `canon brief check` and `canon brief show` (0.19 D2): a read-only
 //! checker for a change's PRD brief ([`crate::brief_template`]).
 //!
 //! # Findings
@@ -83,7 +83,7 @@
 //! counts as soon as it is written. `canon status` joins the same index
 //! to each scenario's evidence and review state.
 //!
-//! # `canon brief`
+//! # `canon brief show`
 //! Prints the brief's state and the next one to three steps (`shape`,
 //! `clarify`, `harden`, `align`, `polish`, `approve`), derived from the
 //! findings. It never edits.
@@ -1923,8 +1923,8 @@ pub fn status_report(repo: &Path, change: &ChangeId, building: bool) -> Option<(
 
 // ───────────────────────────── commands ─────────────────────────────
 
-fn fail(json: bool, error: &CliError) -> i32 {
-    error.emit("canon brief", json)
+fn fail(command: &str, json: bool, error: &CliError) -> i32 {
+    error.emit(command, json)
 }
 
 #[derive(Serialize)]
@@ -1949,7 +1949,7 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let checked = match check(&repo, change) {
         Ok(checked) => checked,
-        Err(e) => return fail(json, &e),
+        Err(e) => return fail("canon brief check", json, &e),
     };
     let ev = &checked.evaluation;
     let counts = ev.counts();
@@ -2004,7 +2004,7 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
     }
 }
 
-/// One next step of bare `canon brief`.
+/// One next step of `canon brief show`.
 #[derive(Debug, Serialize)]
 struct Step {
     step: &'static str,
@@ -2063,12 +2063,12 @@ struct NextJson<'a> {
     next: Vec<Step>,
 }
 
-/// Bare `canon brief [--change-id <slug>] [--json]`: state and next steps.
+/// `canon brief show [<change>] [--json]`: state and next steps.
 pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let checked = match check(&repo, change) {
         Ok(checked) => checked,
-        Err(e) => return fail(json, &e),
+        Err(e) => return fail("canon brief show", json, &e),
     };
     let ev = &checked.evaluation;
     let counts = ev.counts();
@@ -2087,7 +2087,7 @@ pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
         let document = serde_json::to_value(&body).unwrap_or_default();
         println!("{}", serde_json::to_string_pretty(&document).unwrap_or_default());
     } else {
-        println!("canon brief: {} — {state} ({} blocker(s), {} advisory(ies))", checked.brief, counts.blockers, counts.advisories);
+        println!("canon brief show: {} — {state} ({} blocker(s), {} advisory(ies))", checked.brief, counts.blockers, counts.advisories);
         if next.is_empty() {
             println!("  next: nothing — the brief is approved and clean");
         }

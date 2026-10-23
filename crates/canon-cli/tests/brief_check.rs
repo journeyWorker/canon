@@ -1,4 +1,4 @@
-//! Integration tests for `canon brief check` and bare `canon brief` (0.19
+//! Integration tests for `canon brief check` and `canon brief show` (0.19
 //! D2), the PRD brief `canon change new` writes (D1) and `language:` (D6),
 //! against the actually-built `canon` binary.
 
@@ -340,22 +340,22 @@ fn operational_errors_carry_a_string_code_and_exit_1() {
 }
 
 #[test]
-fn bare_brief_names_the_next_steps_from_the_findings_and_never_edits() {
+fn brief_show_names_the_next_steps_from_the_findings_and_never_edits() {
     let dir = repo_with_change(None);
     let before = std::fs::read(brief_path(dir.path())).unwrap();
-    let out = run(dir.path(), &["brief"]);
+    let out = run(dir.path(), &["brief", "show"]);
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(stdout(&out).contains("next 1: shape"), "{}", stdout(&out));
-    assert_eq!(std::fs::read(brief_path(dir.path())).unwrap(), before, "bare `canon brief` never edits");
+    assert_eq!(std::fs::read(brief_path(dir.path())).unwrap(), before, "`canon brief show` never edits");
 
     let questions = en_brief("").replace("None.\n", "Should guests keep their cart?\n");
     std::fs::write(brief_path(dir.path()), questions).unwrap();
-    let json: Value = serde_json::from_str(&stdout(&run(dir.path(), &["brief", "--json"]))).unwrap();
+    let json: Value = serde_json::from_str(&stdout(&run(dir.path(), &["brief", "show", "--json"]))).unwrap();
     let steps: Vec<&str> = json["next"].as_array().unwrap().iter().map(|s| s["step"].as_str().unwrap()).collect();
     assert_eq!(steps, vec!["clarify", "approve"], "{json}");
 
     std::fs::write(brief_path(dir.path()), en_brief("Approved: Ana 2026-10-14 — \"go\"\n")).unwrap();
-    let json: Value = serde_json::from_str(&stdout(&run(dir.path(), &["brief", "--json"]))).unwrap();
+    let json: Value = serde_json::from_str(&stdout(&run(dir.path(), &["brief", "show", "--json"]))).unwrap();
     assert_eq!((json["state"].as_str(), json["next"].as_array().unwrap().len()), (Some("approved"), 0), "{json}");
 }
 

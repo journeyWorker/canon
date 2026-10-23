@@ -5,7 +5,8 @@
 //! defaults) is read from clap, never restated, so it cannot drift from what
 //! the parser accepts. What clap does not know — whether a command reads,
 //! writes or destroys, and what its exit codes mean — lives in one table,
-//! [`META`], with one row per leaf command. [`check_metadata`] reports every
+//! [`META`], with one row per leaf command; [`crate::cli::meta::meta`] picks the
+//! row of a parsed command by an exhaustive `match`. [`check_metadata`] reports every
 //! leaf without a row and every row clap has no leaf for; the binary's test
 //! suite fails on either, so the table cannot drift from clap.
 //!
@@ -121,6 +122,7 @@ pub const META: &[CommandMeta] = &[
     row_exits("artifacts migrate", Write, &[exit(0, "migrated, already migrated, or a dry run: nothing to do is success"), exit(2, "refused: the target is not an s3 tier, a blob does not match its name, the store is unreachable, or a write failed; nothing is removed until every blob verified")], &[O]),
     row_exits("artifacts verify", Read, &[exit(0, "every bound file is stored (or, local store only, still proven by the working tree)"), exit(1, "a bound file is missing from the store or altered: data.problems names each"), exit(2, "refused: canon.yaml cannot be read or the store cannot be used or reached; an unreachable store is never a pass")], &[O]),
     row("brief approve", Write, HUMAN),
+    row_exits("brief show", Read, &[exit(0, "shown: the state and the next one to three steps"), exit(1, "operational error, with a stable error code"), exit(2, "refused: no live change and none named (NO_BRIEF), no such change, or no canon.yaml at --repo (CONFIG_MISSING)")], &[P, R]),
     row_exits("brief check", Read, &[exit(0, "clean (advisories allowed)"), exit(1, "operational error, with a stable error code"), exit(2, "blocker findings, or no canon.yaml at --repo (CONFIG_MISSING)")], &[P, R]),
     row_exits("change new", Write, REFUSES, &[P]),
     row_exits("context", Read, &[exit(0, "always: it describes what can be authored and never gates; an unreadable canon.yaml or policy degrades to the built-in surface, with the reason in policy.diagnostics")], EVERYONE),
@@ -407,7 +409,7 @@ pub fn check_examples(root: &Command) -> Vec<String> {
     problems
 }
 
-fn meta_for(path: &str) -> Option<&'static CommandMeta> {
+pub fn meta_for(path: &str) -> Option<&'static CommandMeta> {
     META.iter().find(|m| m.path == path)
 }
 
