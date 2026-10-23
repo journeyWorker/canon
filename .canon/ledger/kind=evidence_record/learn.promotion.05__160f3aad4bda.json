@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-1"
+  },
+  "at": "2026-10-23T12:31:40.024957933Z",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test strategy_promote pending_trajectories_never_corroborate_a_promotion"
+  },
+  "evidence_note": {
+    "summary": "strategy_promote pending_trajectories_never_corroborate_a_promotion: 1 passed, 0 failed, 9 filtered out @ 2c0fb497"
+  },
+  "evidence_sha": "2c0fb4972782486f9ee8a638db56be81405f3bda",
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 14,
+  "scenario_id": "learn.promotion.05",
+  "schema": 1,
+  "staging_id": "e01b45fa2de3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
