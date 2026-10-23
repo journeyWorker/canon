@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-2"
+  },
+  "at": "2026-10-23T15:09:06.668966812Z",
+  "change_id": "canon-0-28",
+  "code_tree": "7c7d06847373654dafedac3630eedcda014eea0e",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/run/skills.rs:170-183",
+  "kind": "finding",
+  "reviewed_sha": "7e95cd1df901a7bcf04861ca597da3414ed794ad",
+  "reviewer": "canon-reviewer-028",
+  "round": 2,
+  "schema": 1,
+  "seq": 7,
+  "severity": "should_fix",
+  "summary": "Spec fidelity pass (docs): the cli-commands-0.28.md row for `skills doctor` says 'always exit 0', but doctor exits 2 SKILLS_INVALID_ARGUMENT on an unknown provider or malformed skills section and 1 SKILLS_FAILED on an IO failure or a missing --skills-source (observed with --skills-source on a missing dir); schema lists exits 0/1/2. D4 also classes a file that does not exist as exit 2. Align the doc row (and the missing-source exit) with D4",
+  "worktree_dirty": false
+}

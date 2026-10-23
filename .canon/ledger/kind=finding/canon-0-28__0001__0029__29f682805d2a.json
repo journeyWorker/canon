@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-2"
+  },
+  "at": "2026-10-23T15:08:17.378131020Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "rejected",
+  "file_ref": "crates/canon-cli/src/review.rs",
+  "kind": "finding",
+  "reason": "T14 names meta.next argv, which stays empty for a template step; command is documented as a template when argv is empty",
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "schema": 1,
+  "seq": 29,
+  "severity": "note",
+  "summary": "Standards pass: after review scenario, meta.next[].command carries unfilled placeholders (--actor-id <reviewer> --session-id <review-session> --original-spec-ref \"<feature file>\") with an empty argv; T14 says a generated command never contains an unfilled placeholder: either fill them or state that a command with empty argv is a template",
+  "worktree_dirty": false
+}

@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-2"
+  },
+  "at": "2026-10-23T15:06:41.544032892Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/reverify.rs:455-500",
+  "kind": "finding",
+  "resolution_code_tree": "7c7d06847373654dafedac3630eedcda014eea0e",
+  "resolution_sha": "7e95cd1df901a7bcf04861ca597da3414ed794ad",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "scenario_ids": [
+    "gate.check.97"
+  ],
+  "schema": 1,
+  "seq": 6,
+  "severity": "should_fix",
+  "summary": "Standards pass: gate.check.97's Then 'evidence for B recorded after the close does not clear it' is only in gate_check_97_evidence_for_another_scenario_does_not_reverify_a_scoped_finding, which the bound filter (the full first test name) does not run; filter `gate_check_97` would run both",
+  "worktree_dirty": false
+}
