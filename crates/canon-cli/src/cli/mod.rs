@@ -211,7 +211,7 @@ pub enum Command {
         action: ArtifactsCommand,
     },
     /// Record one code-review finding as a durable record
-    #[command(after_help = "Examples:\n  canon finding add --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --severity blocker --disposition open --actor-id review-voice \\\n      --summary 'a release metric is asserted, never computed'\n  canon finding close s43-findings-are-records --round 1 --seq 1 \\\n      --disposition fixed --resolution-sha $(git rev-parse HEAD)\n\nThe loop:\n  canon finding add ...     Record a Finding\n  canon finding close ...   Record its disposition TRANSITION, once fixed\nEach is promoted in the same run under `write: { promote: auto }`, which\n`canon init` writes. Under `write.promote: manual` (no `write:` key), run\n`canon gate promote` after each to commit it.\n\nThe committed finding STAYS when it is closed: the ledger is append-only and\nthe pair IS the history. Every reader folds by natural key to the latest\nversion, so the finding is still counted once.\n\nRECORDED OBSERVATION, NOT PROOF — canon never verifies that the defect\nexisted, that it was fixed, or that --introduced-by is the true cause.\nSee `canon finding add --help` for exactly what it does and does not establish.")]
+    #[command(after_help = "Examples:\n  canon finding add --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --severity blocker --disposition open --actor-id review-voice \\\n      --summary 'a release metric is asserted, never computed'\n  canon finding close s43-findings-are-records --round 1 --seq 1 \\\n      --disposition fixed --resolution-rev $(git rev-parse HEAD)\n\nThe loop:\n  canon finding add ...     Record a Finding\n  canon finding close ...   Record its disposition TRANSITION, once fixed\nEach is promoted in the same run under `write: { promote: auto }`, which\n`canon init` writes. Under `write.promote: manual` (no `write:` key), run\n`canon gate promote` after each to commit it.\n\nThe committed finding STAYS when it is closed: the ledger is append-only and\nthe pair IS the history. Every reader folds by natural key to the latest\nversion, so the finding is still counted once.\n\nRECORDED OBSERVATION, NOT PROOF — canon never verifies that the defect\nexisted, that it was fixed, or that --introduced-rev is the true cause.\nSee `canon finding add --help` for exactly what it does and does not establish.")]
     Finding {
         #[command(subcommand)]
         action: FindingCommand,
@@ -339,6 +339,17 @@ pub struct SafetyArgs {
     /// The `planDigest` the preview printed; the run acts only if the plan recomputed now has this digest
     #[arg(long, value_name = "DIGEST", requires = "commit")]
     pub plan_digest: Option<String>,
+}
+
+/// `--rev <REV>`, declared once and flattened into every leaf that records the
+/// commit a record is about (0.28 D7b): any git revision, resolved to the full
+/// sha. The default `HEAD` stands for the working tree as it is now, so
+/// uncommitted code is recorded (`codeTree`, `worktreeDirty`), never refused.
+#[derive(clap::Args, Clone, Debug)]
+pub struct RevArgs {
+    /// The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)
+    #[arg(long, value_name = "REV", default_value = crate::git_rev::DEFAULT_REV)]
+    pub rev: String,
 }
 
 /// `--repo <DIR>`, declared once and flattened into every leaf that reads a

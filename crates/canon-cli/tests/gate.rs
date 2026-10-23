@@ -37,6 +37,15 @@ fn write_evidence(ledger_root: &Path, task_id: &str, role: &str, verdict: Eviden
 }
 
 /// The smallest `canon.yaml` a repo needs for `canon gate check` to run in it: without one the gate refuses (`CONFIG_MISSING`).
+/// Makes `repo` a git work tree with one commit, which every revision-bound
+/// write needs.
+fn git_seed(repo: &Path) {
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["commit", "-q", "--allow-empty", "-m", "x"]] {
+        let out = Command::new("git").args(args).current_dir(repo).output().expect("spawn git");
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    }
+}
+
 fn write_canon_yaml(dir: &Path) {
     std::fs::write(dir.join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap();
 }
@@ -982,6 +991,7 @@ fn gate_selftest_exits_zero_against_the_shipped_fixture_corpus() {
 /// consumer's would be, provenance comments and all.
 fn repo_with_spec_corpus() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
+    git_seed(dir.path());
     std::fs::write(
         dir.path().join("canon.yaml"),
         "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  scenario: local\n  subject: local\n  divergence: local\n  evidence_record: local\nspecs:\n  roots:\n    - id: core\n      root: specs\n",
@@ -1177,9 +1187,10 @@ fn evidence_add_with_a_report_refuses_a_failed_case_and_binds_a_passing_one() {
     let failing = r#"<testsuites><testsuite name="login"><testcase classname="login" name="core.login.01 signs in"><failure message="boom"/></testcase></testsuite></testsuites>"#;
     std::fs::write(dir.path().join("junit.xml"), failing).unwrap();
 
-    let refused = run_canon(&scenario_add_args(&["--report", "junit:junit.xml"]), dir.path());
+    let refused = run_canon(&scenario_add_args(&["--report", "junit:junit.xml", "--verdict", "faithful", "--json"]), dir.path());
     assert_eq!(refused.status.code(), Some(1), "stdout: {}\nstderr: {}", stdout(&refused), stderr(&refused));
-    assert!(stderr(&refused).contains("records case `core.login.01 signs in` as failed"), "stderr: {}", stderr(&refused));
+    let error: serde_json::Value = serde_json::from_str(stdout(&refused).lines().last().unwrap()).unwrap();
+    assert_eq!(error["error"]["code"], "EVIDENCE_REPORT_CONTRADICTION", "{error}");
     assert_eq!(evidence_files(&ledger_root), Vec::<PathBuf>::new(), "a refused add stages nothing");
 
     let passing = r#"<testsuites><testsuite name="login"><testcase classname="login" name="core.login.01 signs in"/></testsuite></testsuites>"#;
@@ -1239,6 +1250,7 @@ fn evidence_add_with_an_artifact_binds_path_and_digest_and_refuses_an_outside_fi
 #[test]
 fn evidence_add_still_accepts_a_task_keyed_record() {
     let dir = tempfile::tempdir().unwrap();
+    git_seed(dir.path());
     // `canon evidence add --task` admits the id through the PLAN
     // corpus (`dispatch::validate_task_binding`), which has no compat
     // default — a configured source is required, unlike `canon gate

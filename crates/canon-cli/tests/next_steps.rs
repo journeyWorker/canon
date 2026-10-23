@@ -12,6 +12,15 @@ use std::process::{Command, Output};
 use serde_json::Value;
 use tempfile::TempDir;
 
+/// Makes `repo` a git work tree with one commit, which every revision-bound
+/// write needs.
+fn git_seed(repo: &Path) {
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["commit", "-q", "--allow-empty", "-m", "x"]] {
+        let out = Command::new("git").args(args).current_dir(repo).output().expect("spawn git");
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    }
+}
+
 fn canon(repo: &Path, args: &[&str], role: Option<&str>) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
     command.args(args).current_dir(repo).env("CANON_ACTOR", "agent-a").env_remove("CANON_ROLE");
@@ -61,6 +70,7 @@ fn brief() -> String {
 fn repo_with_change() -> (TempDir, Value) {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
+    git_seed(repo);
     ok(repo, &["init", "--providers", "none", "--json"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo", "--json"]);
     let created = ok(repo, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login", "--json"]);
@@ -153,7 +163,7 @@ fn writes_name_the_step_status_names_for_the_subject_they_touched() {
 
     let review = ok(
         repo,
-        &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "rev", "--session-id", "s2", "--role", "reviewer", "--pin", "0123456789abcdef0123456789abcdef01234567", "--original-spec-ref", "login.feature", "--json"],
+        &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "rev", "--session-id", "s2", "--role", "reviewer", "--original-spec-ref", "login.feature", "--json"],
     );
     assert_eq!(meta_next(&review)[0], status_step(repo, "demo"), "review add");
 }

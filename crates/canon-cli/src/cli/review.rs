@@ -43,9 +43,8 @@ pub struct ReviewOptions {
     /// The reviewer's id (recorded as the review's author and as its reviewer; line breaks refused)
     #[arg(long)]
     pub actor_id: String,
-    /// The commit the review was made at (pinned on the record)
-    #[arg(long)]
-    pub pin: String,
+    #[command(flatten)]
+    pub rev: crate::cli::RevArgs,
     /// Provenance ref (mutually exclusive with --original-spec-ref; exactly one required)
     #[arg(long)]
     pub upstream_ref: Option<String>,

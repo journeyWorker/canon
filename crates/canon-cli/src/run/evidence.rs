@@ -17,7 +17,7 @@ fn project_for(repo: &Path, given: Option<ProjectId>, command: &str, json: bool)
 pub fn run(cmd: EvidenceCommand) -> ExitCode {
     match cmd {
         EvidenceCommand::ApprovalPayload(EvidenceApprovalPayloadArgs {
-            task_id, project_id, scenario_id, run_id, artifact_sha, surface_ref,
+            task_id, project_id, scenario_id, run_id, rev, surface_ref,
             approver, approval_at, repo, json,
         }) => {
             let project_id = match (&scenario_id, project_id) {
@@ -27,10 +27,14 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
                 },
                 (None, given) => given,
             };
+            let commit = match crate::git_rev::bind(&repo, &rev.rev) {
+                Ok(commit) => commit,
+                Err(error) => return ExitCode::from(error.emit("canon evidence approval-payload", json) as u8),
+            };
             ExitCode::from(crate::evidence::run_approval_payload(
                 &repo,
                 &crate::evidence::ApprovalPayloadArgs {
-                    task_id, scenario_id, project_id, run_id, artifact_sha,
+                    task_id, scenario_id, project_id, run_id, artifact_sha: commit.sha,
                     surface_ref, approval_by: approver, approval_at, json,
                 },
             ) as u8)
@@ -53,7 +57,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
             approval_role,
             signature_file,
             approval_at,
-            artifact_sha,
+            rev,
             artifacts,
             reports,
             report_cases,
@@ -86,6 +90,10 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
                 Ok(role) => role,
                 Err(code) => return code,
             };
+            let commit = match crate::git_rev::bind(&repo, &rev.rev) {
+                Ok(commit) => commit,
+                Err(error) => return ExitCode::from(error.emit("canon evidence add", json) as u8),
+            };
             crate::inventory::refresh_stale_index(&repo, "canon evidence add");
             ExitCode::from(
                 crate::evidence::run_add(
@@ -108,7 +116,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
                         approval_role,
                         approval_signature_file: signature_file,
                         approval_at,
-                        artifact_sha,
+                        commit,
                         artifacts,
                         reports,
                         report_cases,
@@ -135,7 +143,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
             actor_id,
             role,
             session_id,
-            artifact_sha,
+            rev,
             artifacts,
             reports,
             report_cases,
@@ -156,6 +164,10 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
             let role = match record_role(role, "canon evidence audit", json) {
                 Ok(role) => role,
                 Err(code) => return code,
+            };
+            let commit = match crate::git_rev::bind(&repo, &rev.rev) {
+                Ok(commit) => commit,
+                Err(error) => return ExitCode::from(error.emit("canon evidence audit", json) as u8),
             };
             crate::inventory::refresh_stale_index(&repo, "canon evidence audit");
             ExitCode::from(
@@ -179,7 +191,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
                         approval_role: None,
                         approval_signature_file: None,
                         approval_at: None,
-                        artifact_sha,
+                        commit,
                         artifacts,
                         reports,
                         report_cases,

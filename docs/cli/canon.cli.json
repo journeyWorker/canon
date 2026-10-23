@@ -2244,6 +2244,7 @@
         "CONFIG_UNREADABLE",
         "DIVERGENCE_ACCEPT_REFUSED",
         "DIVERGENCE_INVALID_ARGUMENT",
+        "NO_COMMIT",
         "PROMOTE_FAILED",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
@@ -2251,7 +2252,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon divergence add auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --actor-id alice --role reviewer"
+        "canon divergence add auth.login.01 --actor-id alice --role reviewer"
       ],
       "exits": [
         {
@@ -2295,14 +2296,16 @@
         },
         {
           "aliases": [],
-          "default": [],
-          "help": null,
+          "default": [
+            "HEAD"
+          ],
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
           "kind": "value",
-          "name": "sha",
+          "name": "rev",
           "possibleValues": [],
           "repeatable": false,
-          "required": true,
-          "valueName": "SHA"
+          "required": false,
+          "valueName": "REV"
         },
         {
           "aliases": [],
@@ -2470,13 +2473,14 @@
         "DIVERGENCE_ACCEPT_REFUSED",
         "DIVERGENCE_INVALID_ARGUMENT",
         "DIVERGENCE_REFUSED",
+        "NO_COMMIT",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon divergence defer auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --actor-id alice --reason \"waiting on the vendor\" --expiry 2030-01-01T00:00:00Z --role reviewer"
+        "canon divergence defer auth.login.01 --actor-id alice --reason \"waiting on the vendor\" --expiry 2030-01-01T00:00:00Z --role reviewer"
       ],
       "exits": [
         {
@@ -2520,14 +2524,16 @@
         },
         {
           "aliases": [],
-          "default": [],
-          "help": null,
+          "default": [
+            "HEAD"
+          ],
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
           "kind": "value",
-          "name": "sha",
+          "name": "rev",
           "possibleValues": [],
           "repeatable": false,
-          "required": true,
-          "valueName": "SHA"
+          "required": false,
+          "valueName": "REV"
         },
         {
           "aliases": [],
@@ -2775,13 +2781,14 @@
         "DIVERGENCE_ACCEPT_REFUSED",
         "DIVERGENCE_INVALID_ARGUMENT",
         "DIVERGENCE_REFUSED",
+        "NO_COMMIT",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon divergence resolve auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --actor-id alice --role reviewer"
+        "canon divergence resolve auth.login.01 --actor-id alice --role reviewer"
       ],
       "exits": [
         {
@@ -2825,14 +2832,16 @@
         },
         {
           "aliases": [],
-          "default": [],
-          "help": null,
+          "default": [
+            "HEAD"
+          ],
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
           "kind": "value",
-          "name": "sha",
+          "name": "rev",
           "possibleValues": [],
           "repeatable": false,
-          "required": true,
-          "valueName": "SHA"
+          "required": false,
+          "valueName": "REV"
         },
         {
           "aliases": [],
@@ -2959,6 +2968,7 @@
         "EVIDENCE_REPORT_CONTRADICTION",
         "EVIDENCE_STORE_FAILED",
         "GATE_TASK_EVIDENCE_INVALID",
+        "NO_COMMIT",
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "REPO_UNREADABLE",
@@ -3038,7 +3048,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "faithful / not-applicable / divergent; Default faithful; with --all-scenarios, each record's verdict is derived from its own cases unless this is given",
+          "help": "faithful / not-applicable / divergent. Given a --report and no --verdict, the verdict is derived from the bound cases (any failed: divergent; a skipped case and none failed: not-applicable; else faithful), one record at a time with --all-scenarios; with no report the default is faithful. An explicit faithful over a failed or skipped case is refused",
           "kind": "value",
           "name": "verdict",
           "possibleValues": [
@@ -3186,14 +3196,16 @@
         },
         {
           "aliases": [],
-          "default": [],
-          "help": "Exact Git SHA bound by the evidence and any approval",
+          "default": [
+            "HEAD"
+          ],
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
           "kind": "value",
-          "name": "artifact-sha",
+          "name": "rev",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "ARTIFACT_SHA"
+          "valueName": "REV"
         },
         {
           "aliases": [],
@@ -3338,13 +3350,14 @@
         "CONFIG_UNREADABLE",
         "EVIDENCE_INVALID_ARGUMENT",
         "EVIDENCE_REFUSED",
+        "NO_COMMIT",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon evidence approval-payload --scenario-id auth.login.01 --project-id root --artifact-sha 0123456789abcdef0123456789abcdef01234567 --approver alice --approval-at 2030-01-01T00:00:00Z"
+        "canon evidence approval-payload --scenario-id auth.login.01 --project-id root --approver alice --approval-at 2030-01-01T00:00:00Z"
       ],
       "exits": [
         {
@@ -3408,14 +3421,16 @@
         },
         {
           "aliases": [],
-          "default": [],
-          "help": null,
+          "default": [
+            "HEAD"
+          ],
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
           "kind": "value",
-          "name": "artifact-sha",
+          "name": "rev",
           "possibleValues": [],
           "repeatable": false,
-          "required": true,
-          "valueName": "ARTIFACT_SHA"
+          "required": false,
+          "valueName": "REV"
         },
         {
           "aliases": [],
@@ -3511,6 +3526,7 @@
         "EVIDENCE_REPORT_CONTRADICTION",
         "EVIDENCE_STORE_FAILED",
         "GATE_TASK_EVIDENCE_INVALID",
+        "NO_COMMIT",
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "REPO_UNREADABLE",
@@ -3648,14 +3664,16 @@
         },
         {
           "aliases": [],
-          "default": [],
-          "help": "Exact Git SHA bound by the evidence",
+          "default": [
+            "HEAD"
+          ],
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
           "kind": "value",
-          "name": "artifact-sha",
+          "name": "rev",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "ARTIFACT_SHA"
+          "valueName": "REV"
         },
         {
           "aliases": [],
@@ -4192,11 +4210,10 @@
         "CONFIG_MISSING",
         "CONFIG_UNREADABLE",
         "FINDING_INVALID_ARGUMENT",
-        "FINDING_RESOLUTION_SHA_REQUIRED",
-        "FINDING_RESOLUTION_SHA_UNEXPECTED",
+        "FINDING_RESOLUTION_REV_UNEXPECTED",
         "FINDING_SEQ_OCCUPIED",
         "FINDING_UNKNOWN_SCENARIO",
-        "FINDING_UNRESOLVABLE_COMMIT",
+        "NO_COMMIT",
         "PROMOTE_FAILED",
         "REPO_UNREADABLE",
         "UNKNOWN_ROLE",
@@ -4275,7 +4292,7 @@
           "default": [
             "open"
           ],
-          "help": "open / fixed / rejected / deferred (fixed requires --resolution-sha, and only fixed may carry one)",
+          "help": "open / fixed / rejected / deferred (fixed records --resolution-rev, default HEAD, and only fixed may carry one)",
           "kind": "value",
           "name": "disposition",
           "possibleValues": [
@@ -4312,36 +4329,38 @@
         },
         {
           "aliases": [],
-          "default": [],
-          "help": "The commit whose state this round reviewed. Omit when the round reviewed an uncommitted working tree — canon never infers one. A full or short sha; a short one is resolved through git to the full sha. Must name a COMMIT object this repo holds (existence only; never its message or diff)",
+          "default": [
+            "HEAD"
+          ],
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
           "kind": "value",
-          "name": "reviewed-sha",
+          "name": "rev",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "REVIEWED_SHA"
+          "valueName": "REV"
         },
         {
           "aliases": [],
           "default": [],
-          "help": "The commit that closed it. Required by, and permitted only with, --disposition fixed. A full or short sha (resolved through git). Must name a COMMIT object this repo holds (existence only; never its message or diff)",
+          "help": "The commit that closed it, any git revision (resolved to the full sha, with the code tree it saw). Permitted only with --disposition fixed, where it defaults to HEAD. Existence only; canon never reads the commit's message or diff",
           "kind": "value",
-          "name": "resolution-sha",
+          "name": "resolution-rev",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "RESOLUTION_SHA"
+          "valueName": "REV"
         },
         {
           "aliases": [],
           "default": [],
-          "help": "The SOURCED introducing commit. Leave unset when it is not known — never guess (see --help). A full or short sha (resolved through git). Must name a COMMIT object this repo holds (existence only; never its message or diff)",
+          "help": "The SOURCED introducing commit, any git revision (resolved to the full sha). No default: leave it unset when it is not known, never guess (see --help). Existence only; canon never reads the commit's message or diff",
           "kind": "value",
-          "name": "introduced-by",
+          "name": "introduced-rev",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "INTRODUCED_BY"
+          "valueName": "REV"
         },
         {
           "aliases": [],
@@ -4466,10 +4485,9 @@
         "FINDING_INVALID_ARGUMENT",
         "FINDING_NOT_FOUND",
         "FINDING_REASON_REQUIRED",
-        "FINDING_RESOLUTION_SHA_REQUIRED",
-        "FINDING_RESOLUTION_SHA_UNEXPECTED",
+        "FINDING_RESOLUTION_REV_UNEXPECTED",
         "FINDING_STAGED",
-        "FINDING_UNRESOLVABLE_COMMIT",
+        "NO_COMMIT",
         "PROMOTE_FAILED",
         "REPO_UNREADABLE",
         "UNKNOWN_ROLE",
@@ -4533,7 +4551,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Where it lands: fixed / rejected / deferred / open (reopening is a real transition). fixed requires --resolution-sha, and only fixed may carry one",
+          "help": "Where it lands: fixed / rejected / deferred / open (reopening is a real transition). fixed records --resolution-rev, default HEAD, and only fixed may carry one",
           "kind": "value",
           "name": "disposition",
           "possibleValues": [
@@ -4549,13 +4567,13 @@
         {
           "aliases": [],
           "default": [],
-          "help": "The commit that closed it. Required by, and permitted only with, --disposition fixed. A full or short sha (resolved through git). Must name a COMMIT object this repo holds",
+          "help": "The commit that closed it, any git revision (resolved to the full sha, with the code tree it saw). Permitted only with --disposition fixed, where it defaults to HEAD. Existence only; canon never reads the commit's message or diff",
           "kind": "value",
-          "name": "resolution-sha",
+          "name": "resolution-rev",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "RESOLUTION_SHA"
+          "valueName": "REV"
         },
         {
           "aliases": [],
@@ -7513,6 +7531,7 @@
       "errorCodes": [
         "CONFIG_MISSING",
         "CONFIG_UNREADABLE",
+        "NO_COMMIT",
         "REVIEW_ARTIFACT_REFUSED",
         "REVIEW_INVALID_ARGUMENT",
         "REVIEW_SCENARIO_NOT_INDEXED",
@@ -7522,7 +7541,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon review change add-login --actor-id alice --pin abc123 --role reviewer --original-spec-ref docs/prd.md"
+        "canon review change add-login --actor-id alice --role reviewer --original-spec-ref docs/prd.md"
       ],
       "exits": [
         {
@@ -7577,14 +7596,16 @@
         },
         {
           "aliases": [],
-          "default": [],
-          "help": "The commit the review was made at (pinned on the record)",
+          "default": [
+            "HEAD"
+          ],
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
           "kind": "value",
-          "name": "pin",
+          "name": "rev",
           "possibleValues": [],
           "repeatable": false,
-          "required": true,
-          "valueName": "PIN"
+          "required": false,
+          "valueName": "REV"
         },
         {
           "aliases": [],
@@ -7760,6 +7781,7 @@
       "errorCodes": [
         "CONFIG_MISSING",
         "CONFIG_UNREADABLE",
+        "NO_COMMIT",
         "REVIEW_ARTIFACT_REFUSED",
         "REVIEW_INVALID_ARGUMENT",
         "REVIEW_SCENARIO_NOT_INDEXED",
@@ -7769,7 +7791,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon review scenario auth.login.01 --actor-id alice --pin abc123 --role reviewer --original-spec-ref docs/prd.md"
+        "canon review scenario auth.login.01 --actor-id alice --role reviewer --original-spec-ref docs/prd.md"
       ],
       "exits": [
         {
@@ -7823,14 +7845,16 @@
         },
         {
           "aliases": [],
-          "default": [],
-          "help": "The commit the review was made at (pinned on the record)",
+          "default": [
+            "HEAD"
+          ],
+          "help": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
           "kind": "value",
-          "name": "pin",
+          "name": "rev",
           "possibleValues": [],
           "repeatable": false,
-          "required": true,
-          "valueName": "PIN"
+          "required": false,
+          "valueName": "REV"
         },
         {
           "aliases": [],
@@ -10985,17 +11009,10 @@
       "retryable": false
     },
     {
-      "code": "FINDING_RESOLUTION_SHA_REQUIRED",
+      "code": "FINDING_RESOLUTION_REV_UNEXPECTED",
       "exit": 2,
-      "fix": "Pass --resolution-sha with the commit that fixed the finding.",
-      "meaning": "a fixed finding needs --resolution-sha",
-      "retryable": false
-    },
-    {
-      "code": "FINDING_RESOLUTION_SHA_UNEXPECTED",
-      "exit": 2,
-      "fix": "Drop --resolution-sha, or close the finding as fixed.",
-      "meaning": "--resolution-sha was given with a disposition other than fixed",
+      "fix": "Drop --resolution-rev, or close the finding as fixed.",
+      "meaning": "--resolution-rev was given with a disposition other than fixed",
       "retryable": false
     },
     {
@@ -11017,13 +11034,6 @@
       "exit": 2,
       "fix": "Pass a --scenario-id that the scenario index knows; run `canon inventory sync` if the scenario is new.",
       "meaning": "--scenario-id names a scenario the index does not know",
-      "retryable": false
-    },
-    {
-      "code": "FINDING_UNRESOLVABLE_COMMIT",
-      "exit": 2,
-      "fix": "Pass a commit reference that exists in this repository.",
-      "meaning": "a commit reference names no commit in this repository",
       "retryable": false
     },
     {
@@ -16109,6 +16119,24 @@
           ],
           "type": "object"
         },
+        "Override": {
+          "description": "A refusal that `--override-reason` waived (0.28 D12): the error code the\ncommand would have refused with, and the reason given. Listed in\n`data.overrides[]` of every command that accepts the option, and recorded\non the record the waiver let through.",
+          "properties": {
+            "code": {
+              "description": "The code of the waived refusal (`BRIEF_UNAPPROVED`, `SUBJECT_GATE_VIOLATION`, …).",
+              "type": "string"
+            },
+            "reason": {
+              "description": "The reason the caller gave, verbatim.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "reason"
+          ],
+          "type": "object"
+        },
         "SkippedCase": {
           "description": "A case of `--all-scenarios` that was not recorded: its scenario is not indexed.",
           "properties": {
@@ -16163,6 +16191,13 @@
             "null"
           ]
         },
+        "overrides": {
+          "description": "The refusals `--override-reason` waived for these records (D12); empty when nothing was waived.",
+          "items": {
+            "$ref": "#/$defs/Override"
+          },
+          "type": "array"
+        },
         "records": {
           "items": {
             "$ref": "#/$defs/EvidenceRecordEntry"
@@ -16188,7 +16223,8 @@
       },
       "required": [
         "records",
-        "staleReviews"
+        "staleReviews",
+        "overrides"
       ],
       "title": "EvidenceAddReport",
       "type": "object"
@@ -16279,6 +16315,24 @@
           ],
           "type": "object"
         },
+        "Override": {
+          "description": "A refusal that `--override-reason` waived (0.28 D12): the error code the\ncommand would have refused with, and the reason given. Listed in\n`data.overrides[]` of every command that accepts the option, and recorded\non the record the waiver let through.",
+          "properties": {
+            "code": {
+              "description": "The code of the waived refusal (`BRIEF_UNAPPROVED`, `SUBJECT_GATE_VIOLATION`, …).",
+              "type": "string"
+            },
+            "reason": {
+              "description": "The reason the caller gave, verbatim.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "reason"
+          ],
+          "type": "object"
+        },
         "SkippedCase": {
           "description": "A case of `--all-scenarios` that was not recorded: its scenario is not indexed.",
           "properties": {
@@ -16333,6 +16387,13 @@
             "null"
           ]
         },
+        "overrides": {
+          "description": "The refusals `--override-reason` waived for these records (D12); empty when nothing was waived.",
+          "items": {
+            "$ref": "#/$defs/Override"
+          },
+          "type": "array"
+        },
         "records": {
           "items": {
             "$ref": "#/$defs/EvidenceRecordEntry"
@@ -16358,7 +16419,8 @@
       },
       "required": [
         "records",
-        "staleReviews"
+        "staleReviews",
+        "overrides"
       ],
       "title": "EvidenceAddReport",
       "type": "object"
@@ -16680,7 +16742,7 @@
           ]
         },
         "unsourced": {
-          "description": "No `--introduced-by` was given: the finding names no commit that introduced it.",
+          "description": "No `--introduced-rev` was given: the finding names no commit that introduced it.",
           "type": "boolean"
         }
       },
@@ -21557,6 +21619,24 @@
           "description": "openspec change slug: kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), the directory name under `openspec/changes/` — joins: change ↔ tasks ↔ specs",
           "type": "string"
         },
+        "Override": {
+          "description": "A refusal that `--override-reason` waived (0.28 D12): the error code the\ncommand would have refused with, and the reason given. Listed in\n`data.overrides[]` of every command that accepts the option, and recorded\non the record the waiver let through.",
+          "properties": {
+            "code": {
+              "description": "The code of the waived refusal (`BRIEF_UNAPPROVED`, `SUBJECT_GATE_VIOLATION`, …).",
+              "type": "string"
+            },
+            "reason": {
+              "description": "The reason the caller gave, verbatim.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "reason"
+          ],
+          "type": "object"
+        },
         "RecordKind": {
           "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
           "enum": [
@@ -21663,97 +21743,6 @@
           ],
           "type": "object"
         },
-        "Subject": {
-          "description": "A subject (join-spine `subject_id` row: subject ↔ change ↔ scenario)\n— the durable product/management unit a team plans, designs, builds,\nand measures across many changes (s36, the reviewed 13th kind). A\nby-id kind like [`Change`]: flat Hive partition, no mandatory\n`scenario_id`. `domain` is a validated-shape-only kebab slug (see\n[`deserialize_domain_slug`] — the closed vocabulary lives in\n`canon/vocab`, not here); `owner_role` names the accountable role;\n`change_ids` accumulates as plan changes are adopted\n(additive-empty by default, so a freshly-authored subject with no\nlinks yet is still a valid, minimal record). One change may be listed\nby several subjects (0.18 D4); the change's own\n[`Change::subject_ids`] lists each of them, and readers join a\nsubject to its changes from both sides.\n\nThe scenario side of the join lives on [`Scenario::subject_id`], set\nby `canon inventory sync` from each scenario's `@subject:<id>` tag —\nthe spec corpus is the one place that link is authored. A subject\ncarries no copy of it: a second, separately-written list is exactly\nwhat drifted (never populated, so every reader saw zero scenarios and\nthe ship gate passed on an empty set). Records written before that\nlist was removed still deserialize; the stale key is ignored.",
-          "properties": {
-            "actor": {
-              "$ref": "#/$defs/Actor"
-            },
-            "at": {
-              "format": "date-time",
-              "type": "string"
-            },
-            "change_ids": {
-              "items": {
-                "$ref": "#/$defs/ChangeId"
-              },
-              "type": "array"
-            },
-            "domain": {
-              "type": "string"
-            },
-            "kind": {
-              "$ref": "#/$defs/RecordKind"
-            },
-            "owner_role": {
-              "$ref": "#/$defs/RoleId"
-            },
-            "reopen": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/Reopen"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject status <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nstatus` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
-            },
-            "schema": {
-              "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
-              "format": "uint32",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "status": {
-              "$ref": "#/$defs/SubjectStatus"
-            },
-            "status_override": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/StatusOverride"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject status --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject status` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
-            },
-            "status_reason": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/StatusReason"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "The note an operator gave the transition that wrote this record\n(`canon subject status <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject status` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
-            },
-            "subject_id": {
-              "$ref": "#/$defs/SubjectId"
-            },
-            "summary": {
-              "type": "string"
-            },
-            "title": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "schema",
-            "kind",
-            "at",
-            "actor",
-            "subject_id",
-            "title",
-            "summary",
-            "domain",
-            "status",
-            "owner_role"
-          ],
-          "type": "object"
-        },
         "SubjectId": {
           "description": "subject slug: kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), the durable product-unit identifier — joins: subject ↔ change ↔ scenario",
           "type": "string"
@@ -21788,10 +21777,105 @@
         }
       },
       "$id": "urn:canon:report:SubjectMoveReport",
-      "$ref": "#/$defs/Subject",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "`data` of the subject leaves: the Subject record, embedded verbatim (it keeps the ledger record's own schema and snake_case keys).",
-      "title": "SubjectReport"
+      "description": "`data` of `subject move`: the Subject record, plus the refusals `--override-reason` waived (D12).",
+      "properties": {
+        "actor": {
+          "$ref": "#/$defs/Actor"
+        },
+        "at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "change_ids": {
+          "items": {
+            "$ref": "#/$defs/ChangeId"
+          },
+          "type": "array"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/RecordKind"
+        },
+        "overrides": {
+          "description": "The refusals this move waived under `--override-reason`; empty when nothing was waived. The record's `status_override` lists each waived violation.",
+          "items": {
+            "$ref": "#/$defs/Override"
+          },
+          "type": "array"
+        },
+        "owner_role": {
+          "$ref": "#/$defs/RoleId"
+        },
+        "reopen": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Reopen"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject status <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nstatus` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
+        },
+        "schema": {
+          "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/SubjectStatus"
+        },
+        "status_override": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StatusOverride"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject status --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject status` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
+        },
+        "status_reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StatusReason"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The note an operator gave the transition that wrote this record\n(`canon subject status <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject status` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
+        },
+        "subject_id": {
+          "$ref": "#/$defs/SubjectId"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "kind",
+        "at",
+        "actor",
+        "subject_id",
+        "title",
+        "summary",
+        "domain",
+        "status",
+        "owner_role",
+        "overrides"
+      ],
+      "title": "SubjectMoveReport",
+      "type": "object"
     },
     "SubjectNewReport": {
       "$defs": {

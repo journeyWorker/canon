@@ -8,8 +8,6 @@ use std::process::{Command, Output};
 use serde_json::Value;
 use tempfile::TempDir;
 
-const SHA: &str = "0123456789abcdef0123456789abcdef01234567";
-
 fn run(dir: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(dir).env("CANON_ACTOR", "contract-d5").output().expect("spawn canon binary")
 }
@@ -33,7 +31,18 @@ fn repo() -> TempDir {
     ok(r, &["feature", "new", "auth.login", "--title", "Login"]);
     ok(r, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--feature", ".canon/specs/kind=feature/area=auth/login.feature"]);
     ok(r, &["inventory", "sync"]);
+    // Revision-binding commands need a work tree with a commit.
+    git(r, &["init", "-q", "-b", "main"]);
+    git(r, &["config", "user.name", "t"]);
+    git(r, &["config", "user.email", "t@example.com"]);
+    git(r, &["add", "-A"]);
+    git(r, &["commit", "-q", "-m", "x"]);
     dir
+}
+
+fn git(dir: &Path, args: &[&str]) {
+    let out = Command::new("git").arg("-C").arg(dir).args(args).output().expect("git must be on PATH for this test");
+    assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
 }
 
 fn keys(value: &Value) -> Vec<String> {
@@ -83,7 +92,7 @@ fn context_keeps_only_the_named_sections() {
 #[test]
 fn divergence_status_projects_each_scenario_row() {
     let dir = repo();
-    ok(dir.path(), &["divergence", "add", "auth.login.01", "--project-id", "root", "--sha", SHA, "--actor-id", "alice", "--role", "reviewer"]);
+    ok(dir.path(), &["divergence", "add", "auth.login.01", "--project-id", "root", "--actor-id", "alice", "--role", "reviewer"]);
     let all = body(&run(dir.path(), &["divergence", "list", "--json"]));
     assert!(all["data"]["scenarios"][0].as_object().unwrap().len() >= 3, "{all}");
     let out = run(dir.path(), &["divergence", "list", "--json", "--fields", "scenarioId,state"]);
@@ -176,8 +185,8 @@ fn input_validation_refusals_name_the_field_and_the_accepted_values() {
     let e = error_of(dir.path(), &["query", "--kind", "evidence", "--domain", "dev"]);
     assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("QUERY_INVALID_ARGUMENT"), Some("--domain")));
 
-    let e = error_of(dir.path(), &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "fixed"]);
-    assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("FINDING_RESOLUTION_SHA_REQUIRED"), Some("--resolution-sha")));
+    let e = error_of(dir.path(), &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design", "--resolution-rev", "HEAD"]);
+    assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("FINDING_RESOLUTION_REV_UNEXPECTED"), Some("--resolution-rev")));
 
     let regime = String::from_utf8(run(dir.path(), &["regime", "show", "--role-segment", "implementer", "--repo-name", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
     let e = error_of(dir.path(), &["dispatch", "begin", "--role", "reviewer", "--regime", &regime]);
@@ -242,7 +251,7 @@ fn evidence_added_again_after_a_review_is_deliberate_and_is_written() {
     // that evidence (and stales the review), so it is never read as a retry.
     let dir = repo();
     assert!(evidence(dir.path(), &[]).status.success());
-    ok(dir.path(), &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "alice", "--pin", "abc123", "--role", "reviewer", "--original-spec-ref", "docs/prd.md"]);
+    ok(dir.path(), &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "alice", "--role", "reviewer", "--original-spec-ref", "docs/prd.md"]);
     let again = evidence(dir.path(), &[]);
     assert!(again.status.success());
     assert!(body(&again)["meta"].get("unchanged").is_none(), "{}", String::from_utf8_lossy(&again.stdout));
@@ -252,24 +261,25 @@ fn evidence_added_again_after_a_review_is_deliberate_and_is_written() {
     assert_eq!(files_under(dir.path(), "evidence_record"), 2);
 }
 
-fn review(dir: &Path, pin: &str) -> Output {
-    run(dir, &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "alice", "--pin", pin, "--role", "reviewer", "--original-spec-ref", "docs/prd.md", "--json"])
+fn review(dir: &Path, rev: &str) -> Output {
+    run(dir, &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "alice", "--rev", rev, "--role", "reviewer", "--original-spec-ref", "docs/prd.md", "--json"])
 }
 
 #[test]
 fn repeating_review_add_returns_the_existing_review_and_writes_nothing() {
     let dir = repo();
-    let first = review(dir.path(), "abc123");
+    let first = review(dir.path(), "HEAD");
     assert!(first.status.success(), "{}", String::from_utf8_lossy(&first.stderr));
     assert_eq!(files_under(dir.path(), "review"), 1);
 
-    let again = body(&review(dir.path(), "abc123"));
+    let again = body(&review(dir.path(), "HEAD"));
     assert_eq!(again["meta"]["unchanged"], true, "{again}");
     assert_eq!(again["data"]["reviews"][0]["location"], body(&first)["data"]["reviews"][0]["location"]);
     assert_eq!(files_under(dir.path(), "review"), 1);
 
-    // A new pin is a new review.
-    let other = body(&review(dir.path(), "def456"));
+    // A different commit is a new review.
+    git(dir.path(), &["commit", "-q", "--allow-empty", "-m", "next"]);
+    let other = body(&review(dir.path(), "HEAD"));
     assert!(other["meta"].get("unchanged").is_none(), "{other}");
     assert_eq!(files_under(dir.path(), "review"), 2);
 }

@@ -32,8 +32,18 @@ routing:
 /// Evidence, failure cases and an independent review, all required.
 const FULL_POLICY: &str = "spec_coverage:\n  require_evidence: true\n  require_cases: [failure]\n  require_review: {}\n";
 
+/// Makes `repo` a git work tree with one commit, which every revision-bound
+/// write needs.
+fn git_seed(repo: &Path) {
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["commit", "-q", "--allow-empty", "-m", "x"]] {
+        let out = Command::new("git").args(args).current_dir(repo).output().expect("spawn git");
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    }
+}
+
 fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
+    git_seed(dir.path());
     std::fs::write(dir.path().join("canon.yaml"), CANON_YAML).unwrap();
     dir
 }
@@ -342,7 +352,7 @@ fn status_counts_stale_and_unsigned_reviews() {
             dir.path(),
             &[
                 "review", "scenario", scenario, "--project-id", "demo", "--actor-id", "reviewer-2", "--role", "reviewer",
-                "--session-id", "sess-review", "--pin", "p1", "--original-spec-ref", "specs/demo.feature", "--review-outcome", outcome,
+                "--session-id", "sess-review", "--original-spec-ref", "specs/demo.feature", "--review-outcome", outcome,
             ],
         );
         assert!(out.status.success(), "{}", stderr(&out));
@@ -403,8 +413,8 @@ fn status_next_names_the_command_for_each_gap() {
         [
             "canon scenario new world.demo.03 --title \"<what happens on this path>\" --subject-id demo-subject --case failure --actor-id <unit>",
             "canon evidence add --scenario-id world.demo.02 --project-id demo --class test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
-            "canon finding close c-demo-subject --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
-            "canon review scenario world.demo.01 --project-id demo --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"",
+            "canon finding close c-demo-subject --round 1 --seq 1 --disposition fixed --actor-id <unit> --session-id <session>",
+            "canon review scenario world.demo.01 --project-id demo --actor-id <reviewer> --session-id <review-session> --role reviewer --original-spec-ref \"<feature file>\"",
             "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id empty-subject --case happy --actor-id <unit>",
         ]
     );

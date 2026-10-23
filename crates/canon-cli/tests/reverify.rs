@@ -32,8 +32,18 @@ routing:
 
 const REQUIRE_REVIEW: &str = "spec_coverage:\n  require_evidence: true\n  require_review: {}\n";
 
+/// Makes `repo` a git work tree with one commit, which every revision-bound
+/// write needs.
+fn git_seed(repo: &Path) {
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["commit", "-q", "--allow-empty", "-m", "x"]] {
+        let out = Command::new("git").args(args).current_dir(repo).output().expect("spawn git");
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    }
+}
+
 fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
+    git_seed(dir.path());
     std::fs::write(dir.path().join("canon.yaml"), CANON_YAML).unwrap();
     std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
     std::fs::write(dir.path().join(".canon/policy.yaml"), REQUIRE_REVIEW).unwrap();
@@ -98,7 +108,7 @@ fn review_add(repo: &Path, scenario: &str) {
     let out = run(
         repo,
         &[
-            "review", "scenario", scenario, "--project-id", "demo", "--pin", "pin-sha", "--original-spec-ref", "specs/demo.feature", "--actor-id",
+            "review", "scenario", scenario, "--project-id", "demo", "--original-spec-ref", "specs/demo.feature", "--actor-id",
             "reviewer-2", "--role", "reviewer",
         ],
     );
@@ -112,7 +122,7 @@ fn change_review(repo: &Path, change: &str) -> Output {
     run(
         repo,
         &[
-            "review", "change", change, "--project-id", "demo", "--pin", "pin-sha", "--original-spec-ref", ".canon/changes/brief.md", "--actor-id",
+            "review", "change", change, "--project-id", "demo", "--original-spec-ref", ".canon/changes/brief.md", "--actor-id",
             "reviewer-3", "--role", "reviewer",
         ],
     )
@@ -192,7 +202,7 @@ fn a_fixed_blocker_keeps_blocking_until_the_suite_is_evidenced_again_and_reviewe
     let err = stderr(&out);
     assert!(err.contains("open-blocker c-demo#1.1"), "{err}");
     assert!(err.contains("closed `fixed` but not re-verified") && err.contains("`world.demo.01`") && err.contains("`world.demo.02`"), "{err}");
-    assert!(err.contains("hint: ") && err.contains("canon evidence add --project-id") && err.contains("--all-scenarios") && err.contains("stays current"), "{err}");
+    assert!(err.contains("hint: ") && err.contains("canon evidence add --all-scenarios") && err.contains("stays current"), "{err}");
     assert_eq!(subject_json(r)["status"], "verifying");
     let gate = run(r, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(1), "gate check reports the same: {}", stdout(&gate));
@@ -344,7 +354,7 @@ fn a_chore_review_goes_stale_when_the_brief_changes_and_a_feature_change_is_refu
     let refused = change_review(r, "c-demo");
     assert_eq!(refused.status.code(), Some(2), "{}", stderr(&refused));
     let reviews = |r: &Path| std::fs::read_dir(r.join(".canon/ledger/kind=review")).map(|d| d.count()).unwrap_or(0);
-    let json = run(r, &["review", "change", "c-demo", "--project-id", "demo", "--pin", "pin-sha", "--original-spec-ref", ".canon/changes/brief.md", "--actor-id", "reviewer-3", "--role", "reviewer", "--json"]);
+    let json = run(r, &["review", "change", "c-demo", "--project-id", "demo", "--original-spec-ref", ".canon/changes/brief.md", "--actor-id", "reviewer-3", "--role", "reviewer", "--json"]);
     assert_eq!(json.status.code(), Some(2));
     assert!(stdout(&json).contains("REVIEW_INVALID_ARGUMENT"), "{}", stdout(&json));
     let before = reviews(r);
@@ -507,22 +517,6 @@ fn gate_check_98_a_fixed_blocker_naming_no_scenario_still_asks_every_evidenced_s
     assert!(ship(r).status.success());
 }
 
-fn git(r: &Path, args: &[&str]) -> String {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(r)
-        .args(["-c", "commit.gpgsign=false"])
-        .args(args)
-        .env("GIT_AUTHOR_NAME", "a")
-        .env("GIT_AUTHOR_EMAIL", "a@a")
-        .env("GIT_COMMITTER_NAME", "a")
-        .env("GIT_COMMITTER_EMAIL", "a@a")
-        .output()
-        .expect("git on PATH");
-    assert!(out.status.success(), "git {args:?}: {}", stderr(&out));
-    stdout(&out).trim().to_string()
-}
-
 /// #87 through the CLI: `finding add --scenario-id` names the scenario, the
 /// close inherits it (it takes no list of its own), and the ship refusal
 /// then names that scenario only.
@@ -531,10 +525,6 @@ fn finding_close_81_inherits_the_scenarios_the_finding_names() {
     let dir = repo();
     let r = dir.path();
     two_scenarios(r);
-    git(r, &["init", "-q"]);
-    git(r, &["add", "canon.yaml"]);
-    git(r, &["commit", "-q", "-m", "initial"]);
-    let head = git(r, &["rev-parse", "HEAD"]);
 
     let add = run(
         r,
@@ -544,7 +534,7 @@ fn finding_close_81_inherits_the_scenarios_the_finding_names() {
         ],
     );
     assert!(add.status.success(), "stderr: {}", stderr(&add));
-    let close = run(r, &["finding", "close", "c-demo", "--round", "1", "--seq", "1", "--disposition", "fixed", "--resolution-sha", &head, "--promote"]);
+    let close = run(r, &["finding", "close", "c-demo", "--round", "1", "--seq", "1", "--disposition", "fixed", "--promote"]);
     assert!(close.status.success(), "stderr: {}", stderr(&close));
 
     let listed = run(r, &["query", "--kind", "finding", "--json"]);
@@ -622,7 +612,7 @@ fn gate_check_99_a_scoped_refusal_names_a_command_for_each_spec_root() {
         seed_other(scenario, ago(300));
         let out = run(
             r,
-            &["review", "scenario", scenario, "--project-id", "other", "--pin", "pin-sha", "--original-spec-ref", "specs/other.feature", "--actor-id", "reviewer-2", "--role", "reviewer"],
+            &["review", "scenario", scenario, "--project-id", "other", "--original-spec-ref", "specs/other.feature", "--actor-id", "reviewer-2", "--role", "reviewer"],
         );
         assert!(out.status.success(), "review add: {}", stderr(&out));
     }

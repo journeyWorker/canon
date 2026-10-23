@@ -1,6 +1,6 @@
 //! `canon divergence` — the clap tree of the group.
 
-use canon_model::{ProjectId, RoleId, ScenarioId, Sha};
+use canon_model::{ProjectId, RoleId, ScenarioId};
 use chrono::{DateTime, Utc};
 use clap::{Args, Subcommand};
 use super::PromoteArgs;
@@ -14,8 +14,8 @@ pub struct DivergenceAddArgs {
     /// Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root
     #[arg(long, value_parser = crate::review::parse_project_id)]
     pub project_id: Option<ProjectId>,
-    #[arg(long, value_parser = crate::divergence::parse_sha)]
-    pub sha: Sha,
+    #[command(flatten)]
+    pub rev: crate::cli::RevArgs,
     /// The divergence state to record (deferred needs --reason and --expiry)
     #[arg(long, value_name = "STATE", default_value = "open", value_parser = clap::builder::PossibleValuesParser::new(["open", "still-divergent", "resolved", "deferred"]))]
     pub state: String,
@@ -64,8 +64,8 @@ pub struct DivergenceResolveArgs {
     /// Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root
     #[arg(long, value_parser = crate::review::parse_project_id)]
     pub project_id: Option<ProjectId>,
-    #[arg(long, value_parser = crate::divergence::parse_sha)]
-    pub sha: Sha,
+    #[command(flatten)]
+    pub rev: crate::cli::RevArgs,
     #[arg(long, default_value_t = 1)]
     pub round: u32,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
@@ -91,8 +91,8 @@ pub struct DivergenceDeferArgs {
     /// Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root
     #[arg(long, value_parser = crate::review::parse_project_id)]
     pub project_id: Option<ProjectId>,
-    #[arg(long, value_parser = crate::divergence::parse_sha)]
-    pub sha: Sha,
+    #[command(flatten)]
+    pub rev: crate::cli::RevArgs,
     #[arg(long, default_value_t = 1)]
     pub round: u32,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)

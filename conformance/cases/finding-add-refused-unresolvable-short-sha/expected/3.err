@@ -1,3 +1,0 @@
-error: invalid value 'abc' for '--reviewed-sha <REVIEWED_SHA>': `abc` is not a commit sha: expected 4 to 40 lowercase hex characters (a full sha, or a short one git resolves in this repository)
-
-For more information, try '--help'.

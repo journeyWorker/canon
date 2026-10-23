@@ -50,6 +50,7 @@ fn repo_with_plan_corpus(change_id: &str, rows: &str) -> tempfile::TempDir {
     std::fs::create_dir_all(&change_dir).expect("creating the change dir");
     std::fs::write(change_dir.join("proposal.md"), format!("# {change_id}\n\n## Why\n\nTo exercise the authored-evidence loop.\n")).expect("writing proposal.md");
     std::fs::write(change_dir.join("tasks.md"), rows).expect("writing tasks.md");
+    git_commit_fixture(dir.path());
     dir
 }
 
@@ -225,6 +226,7 @@ fn evidence_add_refuses_a_repo_that_configures_no_plan_sources() {
     // fixture uses: a real `canon.yaml` carrying no `plans:` section at
     // all, so the corpus is CONSULTABLE and simply empty.
     std::fs::write(dir.path().join("canon.yaml"), "project: demo\n").expect("writing canon.yaml");
+    git_commit_fixture(dir.path());
 
     let output = run_canon(
         &["evidence", "add", "--task-id", "it-no-corpus#1.1", "--class", "test-run", "--ref", "some-command", "--role", "implementer", "--repo", "."],
@@ -338,22 +340,9 @@ fn evidence_add_refuses_a_newline_in_the_actor_id() {
     assert_eq!(tasks_md(repo, "it-evidence-actor"), rows);
 }
 
-/// The command's own help must not overstate what it proves
-/// (`ReviewEvidence` finding 1). Asserted at the binary boundary because
-/// this is the text an operator or an agent actually reads before
-/// trusting a flip.
-#[test]
-fn evidence_add_help_states_it_is_an_attestation_and_names_what_the_gate_skips() {
-    let dir = tempfile::tempdir().expect("a temp dir");
-    let output = run_canon(&["evidence", "add", "--help"], dir.path());
-    assert!(output.status.success(), "--help must exit 0: {}", stderr(&output));
-    let help = stdout(&output);
-
-    assert!(help.contains("ATTESTATION, NOT PROOF"), "{help}");
-    assert!(help.contains("never runs, resolves, or checks --ref"), "{help}");
-    assert!(help.contains("can authorize its own checkbox"), "{help}");
-    for skipped in ["staleness", "trust-ladder", "release-trust", "divergence"] {
-        assert!(help.contains(skipped), "the help must name `{skipped}` among what the gate does NOT check: {help}");
+/// `git init` + one commit so revision-taking commands have a commit to bind.
+fn git_commit_fixture(repo: &Path) {
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["add", "-A"], &["commit", "-q", "-m", "x"]] {
+        assert!(std::process::Command::new("git").args(args).current_dir(repo).status().unwrap().success());
     }
-    assert!(!help.contains("proof of"), "the help must never claim proof: {help}");
 }

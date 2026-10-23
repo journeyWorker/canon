@@ -15,6 +15,13 @@
       "description": "The change under review — the finding's scope, the first\ncomponent of its natural key, and its join onto the existing\nspine (finding → change → task).",
       "$ref": "#/$defs/ChangeId"
     },
+    "code_tree": {
+      "description": "The git tree id of the code the round reviewed (0.28 D7b): the\nworking tree for the default `HEAD`, the commit's own code for an\nexplicit `--rev`. Absent on a finding written before 0.28; a close\ncopies it.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "disposition": {
       "description": "PRIVATE, with [`Finding::disposition`] the reader (type doc):\nhalf of the biconditional, and a `pub` half is a one-line route\naround every constructor that upholds it.",
       "$ref": "#/$defs/FindingDisposition"
@@ -47,6 +54,13 @@
         "null"
       ]
     },
+    "resolution_code_tree": {
+      "description": "The code tree at the resolution commit, set with `resolution_sha` by a\n`fixed` close (0.28 D7b).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "resolution_sha": {
       "description": "The commit that closed it — see this type's doc: present iff\n`disposition` is [`FindingDisposition::Fixed`]. PRIVATE for the\nsame reason `disposition` is, and read through\n[`Finding::resolution_sha`].",
       "anyOf": [
@@ -56,6 +70,13 @@
         {
           "type": "null"
         }
+      ]
+    },
+    "resolution_worktree_dirty": {
+      "description": "Whether the working tree differed from `HEAD`'s when the finding was\nclosed `fixed` (0.28 D7b).",
+      "type": [
+        "boolean",
+        "null"
       ]
     },
     "reviewed_sha": {
@@ -104,6 +125,13 @@
     "summary": {
       "description": "One line of what the finding IS, in the reviewer's own words.",
       "type": "string"
+    },
+    "worktree_dirty": {
+      "description": "Whether the working tree's code differed from `HEAD`'s when the round\nwas raised (0.28 D7b).",
+      "type": [
+        "boolean",
+        "null"
+      ]
     }
   },
   "required": [

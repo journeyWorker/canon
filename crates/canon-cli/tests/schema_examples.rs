@@ -23,7 +23,6 @@ const NEEDS_STATE: &[(&str, &str)] = &[
     ("context-pack show", "a context pack made by `context-pack add`"),
     ("context-pack verify", "a context pack made by `context-pack add`"),
     ("divergence accept", "a scenario whose latest evidence is divergent, attested by another actor and session"),
-    ("evidence approval-payload", "a git commit to bind: --artifact-sha must name a commit of the repo"),
     ("dispatch end", "a run opened by `dispatch begin`, whose run id this one closes"),
     ("gate check", "a repo that passes the gate: the scratch repo has unattested scenarios, which exit 1 by contract"),
     ("task done", "a plan corpus with the task row"),
@@ -54,6 +53,10 @@ fn ok(dir: &Path, home: &Path, args: &[&str]) {
 fn fixture(home: &Path) -> TempDir {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["commit", "-q", "--allow-empty", "-m", "x"]] {
+        let out = Command::new("git").args(args).current_dir(repo).output().expect("spawn git");
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    }
     ok(repo, home, &["init", "--providers", "none"]);
     ok(repo, home, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(repo, home, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);

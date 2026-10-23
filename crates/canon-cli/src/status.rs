@@ -556,6 +556,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
         warnings.push(note);
     }
     warnings.extend(crate::brief::override_lines(&ctx));
+    warnings.extend(crate::subject::override_lines(&ctx));
 
     let joins = Joins { verdicts: latest_verdicts(&ctx), blockers: open_blockers(&ctx) };
     let subjects = latest_subjects(&ctx);
@@ -1276,12 +1277,9 @@ fn subject_steps(
         // A fixed blocker or an approved chore asks for the whole suite
         // again (0.22 D2); the re-review follows the new evidence.
         if let Some(gap) = summary.reverify.first() {
-            next.push(NextStep {
-                actor: StepActor::Agent,
-                role: Some(Role::Implementer),
-                command: gap.command(),
-                why: gap.why(id),
-            });
+            for command in gap.commands() {
+                next.push(NextStep { actor: StepActor::Agent, role: Some(Role::Implementer), command, why: gap.why(id) });
+            }
         }
                 if let Some(first) = counted.iter().find(|s| joins.verdict_state(s).1 && !canon_gate::acceptance::is_accepted(ctx, s)) {
             next.push(NextStep {
@@ -1302,7 +1300,7 @@ fn subject_steps(
             actor: StepActor::Agent,
             role: Some(Role::Reviewer),
             command: format!(
-                "canon finding close {} --round {} --seq {} --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
+                "canon finding close {} --round {} --seq {} --disposition fixed --actor-id <unit> --session-id <session>",
                 blocker.change_id.as_str(),
                 blocker.round,
                 blocker.seq
@@ -1316,7 +1314,7 @@ fn subject_steps(
             actor: StepActor::Agent,
             role: Some(Role::Reviewer),
             command: format!(
-                "canon review change {} --project-id <root> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<brief>\"",
+                "canon review change {} --project-id <root> --actor-id <reviewer> --session-id <review-session> --role reviewer --original-spec-ref \"<brief>\"",
                 change.as_str()
             ),
             why: format!("{id}: {why}"),
@@ -1330,7 +1328,7 @@ fn subject_steps(
                 actor: StepActor::Agent,
                 role: Some(Role::Reviewer),
                 command: format!(
-                    "canon review scenario {1} --project-id {0} --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"",
+                    "canon review scenario {1} --project-id {0} --actor-id <reviewer> --session-id <review-session> --role reviewer --original-spec-ref \"<feature file>\"",
                     first.project_id.as_str(),
                     first.scenario_id.as_str()
                 ),

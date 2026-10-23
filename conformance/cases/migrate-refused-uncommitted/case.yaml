@@ -1,4 +1,5 @@
 description: "0.17 D6: `canon migrate` refuses while a path it would move has uncommitted changes (here the whole 0.16 corpus is untracked): the bare run and a `--commit` run both exit 2 naming each path and asking to commit or stash, nothing moves, and the gate still refuses the pre-0.17 root"
+commit: false
 steps:
   - args: [migrate]
     exit: 2

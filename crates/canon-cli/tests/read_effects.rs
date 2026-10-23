@@ -104,6 +104,7 @@ fn fixture(home: &Path) -> TempDir {
     let feature = ".canon/specs/kind=feature/area=auth/login.feature";
     ok(repo, home, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--feature", feature]);
     ok(repo, home, &["inventory", "sync"]);
+    git(repo, &["-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "base"]);
     ok(
         repo,
         home,
@@ -112,7 +113,7 @@ fn fixture(home: &Path) -> TempDir {
     ok(
         repo,
         home,
-        &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "alice", "--pin", "abc123", "--role", "reviewer", "--session-id", "s2", "--original-spec-ref", "docs/prd.md"],
+        &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "alice", "--role", "reviewer", "--session-id", "s2", "--original-spec-ref", "docs/prd.md"],
     );
     ok(repo, home, &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "bob", "--summary", "Naming nit"]);
     ok(repo, home, &["gate", "promote"]);

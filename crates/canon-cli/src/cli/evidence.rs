@@ -27,8 +27,8 @@ pub struct EvidenceApprovalPayloadArgs {
     pub scenario_id: Option<ScenarioId>,
     #[arg(long, value_parser = crate::dispatch::parse_run_id)]
     pub run_id: Option<RunId>,
-    #[arg(long, value_parser = crate::divergence::parse_sha)]
-    pub artifact_sha: canon_model::Sha,
+    #[command(flatten)]
+    pub rev: crate::cli::RevArgs,
     #[arg(long = "surface-ref", value_parser = crate::evidence::parse_surface_ref)]
     pub surface_ref: Vec<String>,
     /// Who approved (the human whose detached signature the payload is for)
@@ -58,7 +58,7 @@ pub struct EvidenceAddArgs {
     /// The reference a reader can resolve: a command line, commit sha, or report path (default: the --report paths, comma-separated, when one is given). NEVER run or resolved by canon
     #[arg(long = "ref", value_name = "REF", required_unless_present = "reports")]
     pub evidence_ref: Option<String>,
-    /// faithful / not-applicable / divergent; Default faithful; with --all-scenarios, each record's verdict is derived from its own cases unless this is given
+    /// faithful / not-applicable / divergent. Given a --report and no --verdict, the verdict is derived from the bound cases (any failed: divergent; a skipped case and none failed: not-applicable; else faithful), one record at a time with --all-scenarios; with no report the default is faithful. An explicit faithful over a failed or skipped case is refused
     #[arg(long, value_parser = crate::evidence::verdict_parser())]
     pub verdict: Option<EvidenceVerdict>,
     /// One-line note, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers; line breaks refused)
@@ -97,9 +97,8 @@ pub struct EvidenceAddArgs {
     /// Timestamp (RFC3339 or YYYY-MM-DD) included in the signed approval payload.
     #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::normalize)]
     pub approval_at: Option<String>,
-    /// Exact Git SHA bound by the evidence and any approval.
-    #[arg(long, value_parser = crate::divergence::parse_sha)]
-    pub artifact_sha: Option<canon_model::Sha>,
+    #[command(flatten)]
+    pub rev: crate::cli::RevArgs,
     /// EXPERIMENTAL: bind any file (trace, screenshots, agent QA log, report) by sha256; repeatable; must be inside the repo; with --all-scenarios only as <scenario-id>=<path>, bound to that scenario's record alone
     #[arg(long = "artifact", value_name = "PATH")]
     pub artifacts: Vec<PathBuf>,
@@ -158,9 +157,8 @@ pub struct EvidenceAuditArgs {
     /// The attesting session (recorded as actor.session_id)
     #[arg(long, value_parser = crate::review::parse_session_id)]
     pub session_id: Option<canon_model::SessionId>,
-    /// Exact Git SHA bound by the evidence.
-    #[arg(long, value_parser = crate::divergence::parse_sha)]
-    pub artifact_sha: Option<canon_model::Sha>,
+    #[command(flatten)]
+    pub rev: crate::cli::RevArgs,
     /// EXPERIMENTAL: bind any file (trace, log, report) by sha256; repeatable; must be inside the repo
     #[arg(long = "artifact", value_name = "PATH")]
     pub artifacts: Vec<PathBuf>,

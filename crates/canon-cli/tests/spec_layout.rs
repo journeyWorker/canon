@@ -40,6 +40,7 @@ fn git(repo: &Path, args: &[&str]) -> Output {
 fn init_repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     assert!(git(dir.path(), &["init", "-q"]).status.success());
+    assert!(git(dir.path(), &["commit", "-q", "--allow-empty", "-m", "x"]).status.success());
     ok(dir.path(), &["init", "--repo", ".", "--no-policy"]);
     dir
 }

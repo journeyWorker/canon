@@ -28,13 +28,10 @@ const EMIT_WINDOW: usize = 6;
 /// `context.rs`, whose one code (`CONFIG_MISSING`, built by `require_config`)
 /// is emitted by `run::entry` for every command that needs canon state (see
 /// [`needs_config_leaves`]).
-const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs", "context.rs", "git_rev.rs"];
+const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs", "context.rs"];
 
-/// Codes registered ahead of the commands that emit them. `git_rev.rs` builds
-/// `NO_COMMIT` for the commands that take `--rev` (D7b); until they are wired,
-/// no command emits it. The slice that wires `--rev` empties this list and
-/// removes `git_rev.rs` from [`IGNORED`].
-const AWAITING_WIRING: &[&str] = &["NO_COMMIT"];
+/// Codes registered ahead of the commands that emit them (none: every code is emitted).
+const AWAITING_WIRING: &[&str] = &[];
 
 /// For each source file, the command prefixes that get a code the file builds
 /// without an `emit("canon …")` next to it: helpers, `to_cli_error`
@@ -60,6 +57,8 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("divergence.rs", &["divergence"]),
     ("evidence.rs", &["evidence add", "evidence audit"]),
     ("finding.rs", &["finding add", "finding close"]),
+    // `NO_COMMIT`: `git_rev::bind` refuses the leaves that take a commit option (`--rev`, `--resolution-rev`, `--introduced-rev`).
+    ("git_rev.rs", &["review scenario", "review change", "divergence add", "divergence resolve", "divergence defer", "evidence add", "evidence audit", "evidence approval-payload", "finding add", "finding close"]),
     // The typed-atom errors `canon evidence add` reports with `task done`'s grading;
     // `promote_after_stage`'s command comes from its caller.
     ("gate.rs", &["task done", "evidence add", "evidence audit"]),

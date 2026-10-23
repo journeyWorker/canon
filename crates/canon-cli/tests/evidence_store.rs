@@ -42,6 +42,7 @@ fn setup(plan: bool) -> tempfile::TempDir {
     let repo = dir.path();
     assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
+    commit_all(repo);
     if plan {
         let change = repo.join(".canon/changes/cats");
         std::fs::create_dir_all(&change).unwrap();
@@ -272,7 +273,7 @@ fn every_report_case_carrying_the_scenario_id_is_bound_and_any_failure_refuses_f
         r#"<testsuite><testcase name="game.run.01: hp hits zero"/><testcase name="game.run.01: result screen shows"><failure/></testcase><testcase name="hud_survives_restart"/></testsuite>"#,
     )
     .unwrap();
-    let refused = attest(repo, &["--report", "junit:reports/junit.xml", "--report-case", "hud_survives_restart"]);
+    let refused = attest(repo, &["--report", "junit:reports/junit.xml", "--report-case", "hud_survives_restart", "--verdict", "faithful"]);
     assert_eq!(refused.status.code(), Some(1), "{}", text(&refused));
     assert!(text(&refused).contains("game.run.01: result screen shows` as failed"), "{}", text(&refused));
     assert_eq!(committed_records(repo).len(), 1, "a refused faithful claim stages nothing");
@@ -311,7 +312,7 @@ fn a_case_that_mentions_another_scenario_id_binds_only_to_its_own() {
     let cases: Vec<String> = committed_records(repo)[0]["attachments"].as_array().unwrap().iter().map(|a| a["case"].as_str().unwrap().to_string()).collect();
     assert_eq!(cases, ["game.run.01: hp hits zero"]);
 
-    let named = attest(repo, &["--report", "junit:reports/junit.xml", "--report-case", "game.run.02: restarting resets hp as in game.run.01"]);
+    let named = attest(repo, &["--report", "junit:reports/junit.xml", "--report-case", "game.run.02: restarting resets hp as in game.run.01", "--verdict", "faithful"]);
     assert_eq!(named.status.code(), Some(1), "a case named with --report-case is bound, and its failure refuses faithful: {}", text(&named));
 }
 
@@ -382,5 +383,12 @@ fn a_task_and_scenario_keyed_record_missing_a_required_role_fails_its_scenario_c
     let out = text(&red);
     for cell in ["cats#1", "game.run.01"] {
         assert!(out.contains(&format!("uncovered-cell {cell} — policy-required cell 'reviewer'")), "the {cell} cell is judged: {out}");
+    }
+}
+
+/// Commit the fixture so revision-taking commands have a commit to bind.
+fn commit_all(repo: &std::path::Path) {
+    for args in [&["config", "user.name", "t"][..], &["config", "user.email", "t@example.com"], &["add", "-A"], &["commit", "-q", "-m", "x"]] {
+        assert!(std::process::Command::new("git").args(args).current_dir(repo).status().unwrap().success());
     }
 }

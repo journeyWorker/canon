@@ -10,6 +10,15 @@ use std::process::{Command, Output};
 use serde_json::Value;
 use tempfile::TempDir;
 
+/// Makes `repo` a git work tree with one commit, which every revision-bound
+/// write needs.
+fn git_seed(repo: &Path) {
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["commit", "-q", "--allow-empty", "-m", "x"]] {
+        let out = Command::new("git").args(args).current_dir(repo).output().expect("spawn git");
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    }
+}
+
 fn run(repo: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).output().expect("spawn canon binary")
 }
@@ -30,6 +39,7 @@ fn stderr(o: &Output) -> String {
 /// A `canon init` repo with one subject, `auth`.
 fn inited_repo_with_subject() -> TempDir {
     let dir = TempDir::new().unwrap();
+    git_seed(dir.path());
     let init = run(dir.path(), &["init"]);
     assert!(init.status.success(), "{}", stderr(&init));
     let subject = run(dir.path(), &["subject", "new", "auth", "--domain", "dev", "--title", "Auth"]);

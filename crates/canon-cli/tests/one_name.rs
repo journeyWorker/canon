@@ -189,6 +189,7 @@ fn repo_with_change() -> tempfile::TempDir {
         let out = canon_in(dir.path(), args);
         assert!(out.status.success(), "canon {args:?}: {}{}", stdout(&out), stderr(&out));
     }
+    git(dir.path(), &["-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "x"]);
     dir
 }
 

@@ -72,6 +72,11 @@ const PARENT_HELP_MARKER: &str = "Usage: canon finding [OPTIONS] <COMMAND>";
 fn repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("a temp dir");
     std::fs::write(dir.path().join("canon.yaml"), "routing:\n  finding: local\n").expect("writing canon.yaml");
+    // Every finding command binds a git revision, so the fixture is a
+    // work tree with one commit.
+    git(dir.path(), &["init", "-q", "-b", "main"]);
+    git(dir.path(), &["add", "-A"]);
+    git(dir.path(), &["commit", "-q", "-m", "initial"]);
     dir
 }
 
@@ -115,13 +120,13 @@ fn add(repo: &Path, extra: &[&str]) -> Output {
 /// staging drained, committed body correct — so a step that silently
 /// no-ops cannot be masked by the next one succeeding.
 ///
-/// The `--reviewed-sha`-less case is deliberate and load-bearing: round
-/// 8 of v0.4.0 reviewed an uncommitted working tree, so a kind that
-/// required a reviewed commit could not have recorded a third of the
-/// backfill this change exists to produce.
+/// The `--rev`-less case is deliberate and load-bearing: the round
+/// binds HEAD and the working tree as it stands, so a round that
+/// reviewed uncommitted code is recorded with its code tree rather than
+/// refused.
 #[test]
 fn the_two_command_loop_commits_a_finding_nobody_hand_wrote() {
-    let dir = repo();
+    let (dir, head) = git_repo();
     let repo = dir.path();
 
     let added = add(
@@ -148,10 +153,13 @@ fn the_two_command_loop_commits_a_finding_nobody_hand_wrote() {
     assert_eq!(body["reviewer"], "review-voice", "{body}");
     assert_eq!(body["summary"], "round 8 reviewed an uncommitted worktree", "{body}");
 
-    // An absent optional is ABSENT, never an explicit `null` — a `null`
-    // fails `Finding`'s own deserialize, so a record written that way
-    // would be unreadable by every consumer.
-    for absent in ["reviewed_sha", "resolution_sha", "introduced_by", "file_ref"] {
+    // The reviewed commit is always recorded now; the optionals stay ABSENT,
+    // never an explicit `null` — a `null` fails `Finding`'s own
+    // deserialize, so a record written that way would be unreadable.
+    assert_eq!(body["reviewed_sha"], head.as_str(), "{body}");
+    assert!(body["code_tree"].is_string(), "{body}");
+    assert!(body["worktree_dirty"].is_boolean(), "{body}");
+    for absent in ["resolution_sha", "introduced_by", "file_ref"] {
         assert!(body.get(absent).is_none(), "`{absent}` must be omitted, never null: {body}");
     }
 
@@ -201,13 +209,12 @@ fn finding_add_refuses_a_session_id_outside_the_grammar() {
     assert!(staged_findings(dir.path()).is_empty(), "a refused add writes nothing");
 }
 
-/// D6 (F12): `--introduced-by` names the commit that introduced a
-/// defect, so `self` (who FOUND it) is a usage error that points at the
-/// flag that records the finder.
+/// `--introduced-rev` names the commit that introduced a defect, so
+/// `self` (who FOUND it) is not a revision and is refused.
 #[test]
-fn finding_add_refuses_introduced_by_self() {
+fn finding_add_refuses_introduced_rev_self() {
     let dir = repo();
-    let out = add(dir.path(), &["--round", "1", "--seq", "1", "--actor-id", "impl-agent", "--summary", "s", "--introduced-by", "self"]);
+    let out = add(dir.path(), &["--round", "1", "--seq", "1", "--actor-id", "impl-agent", "--summary", "s", "--introduced-rev", "self"]);
     assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     assert!(staged_findings(dir.path()).is_empty(), "a refused add writes nothing");
 }
@@ -220,9 +227,11 @@ fn finding_add_refuses_introduced_by_self() {
 fn a_fixed_and_sourced_finding_round_trips_every_optional_through_promotion() {
     let dir = repo();
     let repo = dir.path();
-    let resolution = "a".repeat(40);
-    let introduced = "b".repeat(40);
-    let reviewed = "c".repeat(40);
+    git(repo, &["commit", "-q", "--allow-empty", "-m", "second"]);
+    git(repo, &["commit", "-q", "--allow-empty", "-m", "third"]);
+    let resolution = git(repo, &["rev-parse", "HEAD"]);
+    let introduced = git(repo, &["rev-parse", "HEAD~1"]);
+    let reviewed = git(repo, &["rev-parse", "HEAD~2"]);
 
     let added = add(
         repo,
@@ -233,11 +242,11 @@ fn a_fixed_and_sourced_finding_round_trips_every_optional_through_promotion() {
             "1",
             "--disposition",
             "fixed",
-            "--resolution-sha",
+            "--resolution-rev",
             &resolution,
-            "--introduced-by",
+            "--introduced-rev",
             &introduced,
-            "--reviewed-sha",
+            "--rev",
             &reviewed,
             "--file-ref",
             "crates/canon-cli/src/finding.rs:120-134",
@@ -262,71 +271,31 @@ fn a_fixed_and_sourced_finding_round_trips_every_optional_through_promotion() {
     assert_eq!(committed["file_ref"], "crates/canon-cli/src/finding.rs:120-134", "{committed}");
 }
 
-/// Task 2.2, first half: `fixed` naming no closing commit. Graded `2`
-/// (a fixable invocation), naming BOTH flags, and staging nothing.
+/// `fixed` with no `--resolution-rev` resolves HEAD.
 #[test]
-fn finding_add_refuses_fixed_with_no_resolution_sha() {
-    let dir = repo();
+fn finding_add_fixed_defaults_the_resolution_to_head() {
+    let (dir, head) = git_repo();
     let repo = dir.path();
 
     let output = add(repo, &["--round", "1", "--seq", "1", "--disposition", "fixed", "--actor-id", "r", "--summary", "s"]);
-    assert_eq!(output.status.code(), Some(2), "stdout: {}", stdout(&output));
-    let err = stderr(&output);
-    assert!(err.contains("--disposition fixed"), "the refusal must name the disposition: {err}");
-    assert!(err.contains("--resolution-sha"), "and the missing flag: {err}");
-    assert!(staged_findings(repo).is_empty(), "a refused add must stage nothing");
+    assert_eq!(output.status.code(), Some(0), "stderr: {}", stderr(&output));
+    let staged = body_at(&staged_findings(repo)[0]);
+    assert_eq!(staged["resolution_sha"], head.as_str(), "{staged}");
 }
 
-/// Task 2.2, second half — over EVERY non-`fixed` disposition, not just
-/// `open`. `Finding::rejected`/`deferred` CLEAR `resolution_sha`, so a
-/// CLI that only refused the `open` case would silently drop a sha the
-/// caller supplied on the other two.
+/// A resolution revision is refused on EVERY non-`fixed` disposition,
+/// not just `open`: `Finding::rejected`/`deferred` clear the resolution,
+/// so a CLI that only refused `open` would silently drop it.
 #[test]
-fn finding_add_refuses_a_resolution_sha_on_every_non_fixed_disposition() {
-    let resolution = "a".repeat(40);
+fn finding_add_refuses_a_resolution_rev_on_every_non_fixed_disposition() {
     for disposition in ["open", "rejected", "deferred"] {
         let dir = repo();
         let repo = dir.path();
 
-        let output = add(repo, &["--round", "1", "--seq", "1", "--disposition", disposition, "--resolution-sha", &resolution, "--actor-id", "r", "--summary", "s"]);
-        assert_eq!(output.status.code(), Some(2), "{disposition} accepted a resolution sha; stdout: {}", stdout(&output));
-        let err = stderr(&output);
-        assert!(err.contains("--resolution-sha"), "the refusal must name the flag: {err}");
-        assert!(err.contains(disposition), "and the disposition it conflicts with: {err}");
+        let output = add(repo, &["--round", "1", "--seq", "1", "--disposition", disposition, "--resolution-rev", "HEAD", "--actor-id", "r", "--summary", "s"]);
+        assert_eq!(output.status.code(), Some(2), "{disposition} accepted a resolution rev; stdout: {}", stdout(&output));
         assert!(staged_findings(repo).is_empty(), "{disposition}: a refused add must stage nothing");
     }
-}
-
-/// Task 2.2, third: a malformed SHA, on each of the three sha-shaped
-/// flags. Refused by clap's `value_parser` — so it is impossible for
-/// one to reach `run_add` at all — naming the flag, the value, and the
-/// grammar it failed. Since 0.15 a short sha is well-formed (it is
-/// resolved through git, below), so "malformed" means not hex, upper
-/// case, or shorter than git's 4-character floor.
-#[test]
-fn finding_add_refuses_a_malformed_sha_naming_the_flag_and_the_grammar() {
-    for (flag, value) in [("--reviewed-sha", "not-a-sha"), ("--introduced-by", "DEADBEEF"), ("--reviewed-sha", "abc")] {
-        let dir = repo();
-        let repo = dir.path();
-
-        let output = add(repo, &["--round", "1", "--seq", "1", "--actor-id", "r", "--summary", "s", flag, value]);
-        assert_eq!(output.status.code(), Some(2), "{flag}; stdout: {}", stdout(&output));
-        let err = stderr(&output);
-        assert!(err.contains(flag), "the refusal must name the flag: {err}");
-        assert!(err.contains(value), "and the offending value: {err}");
-        assert!(err.contains("4 to 40 lowercase hex"), "and the grammar it failed: {err}");
-        assert!(staged_findings(repo).is_empty(), "a refused add must stage nothing");
-    }
-
-    // `--resolution-sha` needs a coherent disposition to get past the
-    // pairing check, so its malformed-value refusal is exercised on the
-    // one invocation that would otherwise succeed.
-    let dir = repo();
-    let repo = dir.path();
-    let output = add(repo, &["--round", "1", "--seq", "1", "--disposition", "fixed", "--resolution-sha", "NOTASHA", "--actor-id", "r", "--summary", "s"]);
-    assert_eq!(output.status.code(), Some(2), "stdout: {}", stdout(&output));
-    assert!(stderr(&output).contains("--resolution-sha"), "{}", stderr(&output));
-    assert!(staged_findings(repo).is_empty());
 }
 
 /// Runs `git` in `repo` with a fixed identity and clock and no commit
@@ -350,26 +319,22 @@ fn git(repo: &Path, args: &[&str]) -> String {
     stdout(&out).trim().to_string()
 }
 
-/// [`repo`] as a git work tree with one commit; returns its full sha.
+/// [`repo`] plus its full commit sha.
 fn git_repo() -> (tempfile::TempDir, String) {
     let dir = repo();
-    git(dir.path(), &["init", "-q"]);
-    git(dir.path(), &["add", "canon.yaml"]);
-    git(dir.path(), &["commit", "-q", "-m", "initial"]);
     let head = git(dir.path(), &["rev-parse", "HEAD"]);
     (dir, head)
 }
 
-/// 0.15 D6 (dogfood eval 2 G8): every sha-shaped flag takes a short sha
-/// and the record stores the full one git resolves it to — on `finding
-/// add` and on `finding close` alike.
+/// Every revision flag takes any git revision (here a short sha) and
+/// the record stores the full sha — on `finding add` and `finding close`.
 #[test]
-fn a_short_sha_is_resolved_to_the_full_commit_on_add_and_close() {
+fn a_short_revision_is_resolved_to_the_full_commit_on_add_and_close() {
     let (dir, head) = git_repo();
     let repo = dir.path();
     let short = &head[..7];
 
-    let added = add(repo, &["--round", "1", "--seq", "1", "--actor-id", "r", "--summary", "s", "--reviewed-sha", short, "--introduced-by", short]);
+    let added = add(repo, &["--round", "1", "--seq", "1", "--actor-id", "r", "--summary", "s", "--rev", short, "--introduced-rev", short]);
     assert_eq!(added.status.code(), Some(0), "stderr: {}", stderr(&added));
     let staged = body_at(&staged_findings(repo)[0]);
     assert_eq!(staged["reviewed_sha"], head.as_str(), "the full sha is stored, never the abbreviation: {staged}");
@@ -377,93 +342,18 @@ fn a_short_sha_is_resolved_to_the_full_commit_on_add_and_close() {
     assert!(run_canon(&["gate", "promote"], repo).status.success());
 
     let closed = run_canon(
-        &["finding", "close", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "fixed", "--resolution-sha", short],
+        &["finding", "close", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "fixed", "--resolution-rev", short],
         repo,
     );
     assert_eq!(closed.status.code(), Some(0), "stderr: {}", stderr(&closed));
     let transition = body_at(&staged_findings(repo)[0]);
     assert_eq!(transition["resolution_sha"], head.as_str(), "{transition}");
 
-    let fixed = add(repo, &["--round", "1", "--seq", "2", "--disposition", "fixed", "--resolution-sha", short, "--actor-id", "r", "--summary", "s"]);
+    let fixed = add(repo, &["--round", "1", "--seq", "2", "--disposition", "fixed", "--resolution-rev", short, "--actor-id", "r", "--summary", "s"]);
     assert_eq!(fixed.status.code(), Some(0), "stderr: {}", stderr(&fixed));
     let staged_fixed = staged_findings(repo).iter().map(|path| body_at(path)).find(|body| body["seq"] == 2).expect("the fixed finding is staged");
     assert_eq!(staged_fixed["resolution_sha"], head.as_str(), "the full 40-character sha is stored: {staged_fixed}");
     assert_eq!(head.len(), 40);
-}
-
-/// A short sha that names no commit here is refused (`2`) by flag name,
-/// on add and on close, and nothing is staged.
-#[test]
-fn an_unknown_short_sha_is_refused() {
-    let (dir, head) = git_repo();
-    let repo = dir.path();
-    let unknown = if head.starts_with("abcdef0") { "abcdef1" } else { "abcdef0" };
-
-    let out = add(repo, &["--round", "1", "--seq", "1", "--actor-id", "r", "--summary", "s", "--reviewed-sha", unknown]);
-    assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
-    let err = stderr(&out);
-    assert!(err.contains("--reviewed-sha") && err.contains(unknown) && err.contains("names no commit"), "{err}");
-    assert!(staged_findings(repo).is_empty());
-
-    assert!(add(repo, &["--round", "1", "--seq", "1", "--actor-id", "r", "--summary", "s"]).status.success());
-    assert!(run_canon(&["gate", "promote"], repo).status.success());
-    let closed = run_canon(
-        &["finding", "close", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "fixed", "--resolution-sha", unknown],
-        repo,
-    );
-    assert_eq!(closed.status.code(), Some(2), "stdout: {}", stdout(&closed));
-    assert!(stderr(&closed).contains("--resolution-sha") && stderr(&closed).contains("cannot be resolved"), "{}", stderr(&closed));
-    assert!(staged_findings(repo).is_empty());
-}
-
-/// A short sha more than one commit starts with is refused rather than
-/// guessed. The two commits are fixed by content, identity and clock,
-/// so they share the prefix `9ea8` on every machine; the premise is
-/// asserted rather than assumed.
-#[test]
-fn an_ambiguous_short_sha_is_refused() {
-    let (dir, _head) = git_repo();
-    let repo = dir.path();
-    let tree = git(repo, &["mktree"]);
-    let first = git(repo, &["commit-tree", &tree, "-m", "c79"]);
-    let second = git(repo, &["commit-tree", &tree, "-m", "c218"]);
-    assert!(first.starts_with("9ea8") && second.starts_with("9ea8"), "the fixture must collide on 9ea8: {first} {second}");
-
-    let out = add(repo, &["--round", "1", "--seq", "1", "--actor-id", "r", "--summary", "s", "--reviewed-sha", "9ea8"]);
-    assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
-    let err = stderr(&out);
-    assert!(err.contains("ambiguous") && err.contains("--reviewed-sha") && err.contains("9ea8"), "names the flag and the value: {err}");
-    assert!(staged_findings(repo).is_empty());
-
-    let longer = add(repo, &["--round", "1", "--seq", "1", "--actor-id", "r", "--summary", "s", "--reviewed-sha", &first[..8]]);
-    assert_eq!(longer.status.code(), Some(0), "more characters resolve it: {}", stderr(&longer));
-}
-
-/// The commit-only contract holds for a short sha too: an annotated
-/// tag's own id resolves only by peeling the tag, and is refused.
-#[test]
-fn a_short_sha_of_an_annotated_tag_is_refused() {
-    let (dir, _head) = git_repo();
-    let repo = dir.path();
-    git(repo, &["tag", "-a", "v-review", "-m", "an annotated tag", "HEAD"]);
-    let tag = git(repo, &["rev-parse", "v-review"]);
-
-    let out = add(repo, &["--round", "1", "--seq", "1", "--actor-id", "r", "--summary", "s", "--reviewed-sha", &tag[..10]]);
-    assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
-    let err = stderr(&out);
-    assert!(err.contains("peeling") && err.contains("--reviewed-sha") && err.contains(&tag[..10]), "names the flag and the value: {err}");
-    assert!(staged_findings(repo).is_empty());
-}
-
-/// Outside a git work tree a short sha cannot mean anything, so it is
-/// refused — unlike a full sha, whose existence check is skipped there.
-#[test]
-fn a_short_sha_outside_a_git_work_tree_is_refused() {
-    let dir = repo();
-    let out = add(dir.path(), &["--round", "1", "--seq", "1", "--actor-id", "r", "--summary", "s", "--reviewed-sha", "deadbeef"]);
-    assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
-    assert!(stderr(&out).contains("not a git repository"), "{}", stderr(&out));
-    assert!(staged_findings(dir.path()).is_empty());
 }
 
 /// Task 2.1, at the boundary the equivalent vector was actually
@@ -1475,7 +1365,7 @@ fn finding_list_05_shows_the_reason_in_the_table_and_in_json() {
     }
     assert!(run_canon(&["gate", "promote"], repo).status.success());
     assert!(close(repo, &["--disposition", "rejected", "--reason", "works as designed"]).status.success());
-    let fixed = run_canon(&["finding", "close", CHANGE, "--round", "1", "--seq", "2", "--disposition", "fixed", "--resolution-sha", &head], repo);
+    let fixed = run_canon(&["finding", "close", CHANGE, "--round", "1", "--seq", "2", "--disposition", "fixed", "--resolution-rev", &head], repo);
     assert!(fixed.status.success(), "{}", stderr(&fixed));
     assert!(run_canon(&["gate", "promote"], repo).status.success());
 
@@ -1495,9 +1385,9 @@ fn finding_close_84_fixed_takes_a_reason_but_does_not_need_one() {
         assert!(add(repo, &["--round", "1", "--seq", seq, "--actor-id", "r", "--summary", "s"]).status.success());
     }
     assert!(run_canon(&["gate", "promote"], repo).status.success());
-    let bare = close(repo, &["--disposition", "fixed", "--resolution-sha", &head]);
+    let bare = close(repo, &["--disposition", "fixed", "--resolution-rev", &head]);
     assert!(bare.status.success(), "{}", stderr(&bare));
-    let with = run_canon(&["finding", "close", CHANGE, "--round", "1", "--seq", "2", "--disposition", "fixed", "--resolution-sha", &head, "--reason", "guard added"], repo);
+    let with = run_canon(&["finding", "close", CHANGE, "--round", "1", "--seq", "2", "--disposition", "fixed", "--resolution-rev", &head, "--reason", "guard added"], repo);
     assert!(with.status.success(), "{}", stderr(&with));
     let mut staged: Vec<_> = staged_findings(repo).iter().map(|p| body_at(p)).collect();
     staged.sort_by_key(|b| b["seq"].as_u64());
@@ -1513,7 +1403,7 @@ fn finding_close_85_a_blank_or_multi_line_reason_is_refused() {
     let repo = dir.path();
     committed_open(repo);
     for reason in ["", "   ", "line one\nline two"] {
-        for disposition in [&["--disposition", "rejected"][..], &["--disposition", "fixed", "--resolution-sha", head.as_str()][..]] {
+        for disposition in [&["--disposition", "rejected"][..], &["--disposition", "fixed", "--resolution-rev", head.as_str()][..]] {
             let mut args = disposition.to_vec();
             args.extend(["--reason", reason, "--json"]);
             let out = close(repo, &args);
@@ -1531,7 +1421,7 @@ fn finding_close_85_a_blank_or_multi_line_reason_is_refused() {
 fn finding_close_02_a_close_adds_only_the_disposition_resolution_sha_reason_actor_and_time() {
     let (dir, head) = git_repo();
     let repo = dir.path();
-    let added = add(repo, &["--round", "1", "--seq", "1", "--actor-id", "r", "--summary", "needs a guard", "--file-ref", "src/a.rs:1-2", "--introduced-by", &head, "--reviewed-sha", &head]);
+    let added = add(repo, &["--round", "1", "--seq", "1", "--actor-id", "r", "--summary", "needs a guard", "--file-ref", "src/a.rs:1-2", "--introduced-rev", &head, "--rev", &head]);
     assert!(added.status.success(), "{}", stderr(&added));
     assert!(run_canon(&["gate", "promote"], repo).status.success());
     let previous = body_at(&committed_findings(repo).remove(0));
@@ -1616,7 +1506,7 @@ fn finding_close_87_an_old_record_without_reason_is_untouched_by_reading_listing
     let table = stdout(&run_canon(&["finding", "list", "--change-id", CHANGE], repo));
     assert!(!table.contains("[reason"), "{table}");
 
-    assert!(close(repo, &["--disposition", "fixed", "--resolution-sha", &head]).status.success());
+    assert!(close(repo, &["--disposition", "fixed", "--resolution-rev", &head]).status.success());
     assert!(run_canon(&["gate", "promote"], repo).status.success());
     assert_eq!(std::fs::read(&path).unwrap_or_else(|_| std::fs::read(repo.join(".canon/archive").join(path.strip_prefix(repo.join(".canon/ledger")).unwrap())).unwrap()), before, "the untouched record's bytes are unchanged");
 }

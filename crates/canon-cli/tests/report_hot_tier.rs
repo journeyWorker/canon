@@ -34,7 +34,9 @@ fn ok(output: Output, what: &str) -> Output {
 fn fresh_repo_with_tasks() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
-    assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["commit", "-q", "--allow-empty", "-m", "x"]] {
+        assert!(Command::new("git").args(args).current_dir(repo).status().unwrap().success());
+    }
     ok(run_canon(&["init", "--no-agents-md", "--no-policy"], repo), "init");
     ok(run_canon(&["subject", "new", "auth", "--domain", "dev", "--title", "Auth"], repo), "subject new");
     ok(run_canon(&["change", "new", "add-login", "--subject-id", "auth", "--title", "Add login"], repo), "change new");
