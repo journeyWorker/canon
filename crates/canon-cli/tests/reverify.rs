@@ -92,13 +92,13 @@ fn seed_evidence(repo: &Path, scenario: &str, at: DateTime<Utc>) {
     ledger(repo).write(&record).unwrap();
 }
 
-/// `canon review add` for `scenario`: pinned to the evidence and spec as
+/// `canon review scenario` for `scenario`: pinned to the evidence and spec as
 /// they are now, so newer evidence makes it stale (0.15 D1).
 fn review_add(repo: &Path, scenario: &str) {
     let out = run(
         repo,
         &[
-            "review", "add", "--project-id", "demo", "--scenario-id", scenario, "--reviewer", "reviewer-2", "--pin", "pin-sha", "--original-spec-ref", "specs/demo.feature", "--actor-id",
+            "review", "scenario", scenario, "--project-id", "demo", "--pin", "pin-sha", "--original-spec-ref", "specs/demo.feature", "--actor-id",
             "reviewer-2", "--role", "reviewer",
         ],
     );
@@ -107,12 +107,12 @@ fn review_add(repo: &Path, scenario: &str) {
 
 /// A blocker on `c-demo`: raised at `raised`, and when `fixed` is given,
 /// closed `fixed` at that time (a second record of the same natural key).
-/// `canon review add --change-id`: the chore's change-level review.
+/// `canon review change`: the chore's change-level review.
 fn change_review(repo: &Path, change: &str) -> Output {
     run(
         repo,
         &[
-            "review", "add", "--project-id", "demo", "--change-id", change, "--reviewer", "reviewer-3", "--pin", "pin-sha", "--original-spec-ref", ".canon/changes/brief.md", "--actor-id",
+            "review", "change", change, "--project-id", "demo", "--pin", "pin-sha", "--original-spec-ref", ".canon/changes/brief.md", "--actor-id",
             "reviewer-3", "--role", "reviewer",
         ],
     )
@@ -275,7 +275,7 @@ fn an_approved_chore_on_a_shipped_subject_needs_the_suite_again_then_a_change_re
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("chore change `bump-client` approved") && err.contains("`world.demo.01`"), "{err}");
-    assert!(err.contains("hint: ") && err.contains("--all-scenarios") && err.contains("canon review add --change-id"), "{err}");
+    assert!(err.contains("hint: ") && err.contains("--all-scenarios"), "{err}");
     assert_eq!(subject_json(r)["status"], "verifying");
 
     // The suite again, same verdict: the scenario review stays current, and
@@ -288,7 +288,7 @@ fn an_approved_chore_on_a_shipped_subject_needs_the_suite_again_then_a_change_re
     assert!(err.contains("no review of change `bump-client`") && !err.contains("unreviewed-promotion world.demo.01"), "{err}");
     let next = status_steps(r);
     assert!(
-        next[0]["command"].as_str().unwrap().starts_with("canon review add") && next[0]["command"].as_str().unwrap().contains("--change-id bump-client"),
+        next[0]["command"].as_str().unwrap().starts_with("canon review change bump-client"),
         "the change review follows: {next:?}"
     );
 
@@ -343,9 +343,14 @@ fn a_chore_review_goes_stale_when_the_brief_changes_and_a_feature_change_is_refu
 
     let refused = change_review(r, "c-demo");
     assert_eq!(refused.status.code(), Some(2), "{}", stderr(&refused));
-    assert!(stderr(&refused).contains("is not a chore"), "{}", stderr(&refused));
+    let reviews = |r: &Path| std::fs::read_dir(r.join(".canon/ledger/kind=review")).map(|d| d.count()).unwrap_or(0);
+    let json = run(r, &["review", "change", "c-demo", "--project-id", "demo", "--pin", "pin-sha", "--original-spec-ref", ".canon/changes/brief.md", "--actor-id", "reviewer-3", "--role", "reviewer", "--json"]);
+    assert_eq!(json.status.code(), Some(2));
+    assert!(stdout(&json).contains("REVIEW_INVALID_ARGUMENT"), "{}", stdout(&json));
+    let before = reviews(r);
 
     assert!(change_review(r, "bump-client").status.success());
+    assert_eq!(reviews(r), before + 1, "a chore gets exactly one review");
     write_brief(r, "bump-client", &format!("{}\nAlso bump the lockfile.\n", chore_brief(ago(100))));
     let out = ship(r);
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
@@ -539,7 +544,7 @@ fn finding_close_81_inherits_the_scenarios_the_finding_names() {
         ],
     );
     assert!(add.status.success(), "stderr: {}", stderr(&add));
-    let close = run(r, &["finding", "close", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--disposition", "fixed", "--resolution-sha", &head, "--promote"]);
+    let close = run(r, &["finding", "close", "c-demo", "--round", "1", "--seq", "1", "--disposition", "fixed", "--resolution-sha", &head, "--promote"]);
     assert!(close.status.success(), "stderr: {}", stderr(&close));
 
     let listed = run(r, &["query", "--kind", "finding", "--json"]);
@@ -617,7 +622,7 @@ fn gate_check_99_a_scoped_refusal_names_a_command_for_each_spec_root() {
         seed_other(scenario, ago(300));
         let out = run(
             r,
-            &["review", "add", "--project-id", "other", "--scenario-id", scenario, "--reviewer", "reviewer-2", "--pin", "pin-sha", "--original-spec-ref", "specs/other.feature", "--actor-id", "reviewer-2", "--role", "reviewer"],
+            &["review", "scenario", scenario, "--project-id", "other", "--pin", "pin-sha", "--original-spec-ref", "specs/other.feature", "--actor-id", "reviewer-2", "--role", "reviewer"],
         );
         assert!(out.status.success(), "review add: {}", stderr(&out));
     }

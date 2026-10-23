@@ -54,6 +54,9 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
         (("dispatch end", "status"), "succeeded"),
         (("subject new", "id"), "demo-two"),
         (("subject status", "id"), "demo"),
+        (("evidence audit", "audit-result"), "confirmed"),
+        (("subject adopt", "subject-id"), "demo"),
+        (("subject unadopt", "subject-id"), "demo"),
     ]);
     if let Some(value) = by_command.get(&(command, name)) {
         return value.to_string();
@@ -70,10 +73,12 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
         "id" => "sha256:00",
         "role" => "reviewer",
         "regime" => regime,
-        "run-id" => ULID,
+        "run-id" | "run_id" => ULID,
+        "bundle" => "demo@v1",
+        "evaluator-digest" => SHA,
         "status" => "ok",
         "project-id" => "app-a",
-        "scenario-id" => "auth.login.01",
+        "scenario-id" | "scenario_id" | "scenario_ids" => "auth.login.01",
         "sha" | "artifact-sha" => SHA,
         "pin" => "abc123",
         "expiry" | "approved-at" | "approval-at" | "before" => "2030-01-01T00:00:00Z",
@@ -102,7 +107,7 @@ fn extra_args(command: &str, scratch: &Path) -> Vec<String> {
         "init" => vec!["--repo".into(), path("fresh"), "--providers".into(), "none".into()],
         "demo init" => vec!["--repo".into(), path("demo")],
         // `--role` is optional in the schema (a declared role supplies it), but the sweep declares none.
-        "divergence accept" | "evidence add" | "review add" => vec!["--role".into(), "reviewer".into()],
+        "divergence accept" | "evidence add" | "evidence audit" | "review scenario" | "review change" => vec!["--role".into(), "reviewer".into()],
         "ingest sessions" => vec!["--home".into(), path("home")],
         "skills install" | "skills check" | "skills doctor" => vec!["--target".into(), path("skills-target"), "--source".into(), path("no-skills-source")],
         _ => Vec::new(),

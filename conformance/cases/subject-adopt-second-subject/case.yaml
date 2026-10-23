@@ -8,9 +8,9 @@ steps:
     exit: 0
   - args: [change, new, refactor-core, --subject-id, perception, --title, Refactor core]
     exit: 0
-  - args: [subject, adopt, refactor-core, --subject-id, editing]
+  - args: [subject, adopt, editing, --change-id, refactor-core]
     exit: 0
-  - args: [subject, adopt, refactor-core, --subject-id, editing]
+  - args: [subject, adopt, editing, --change-id, refactor-core]
     exit: 0
   - args: [query, --kind, subject, --json]
     exit: 0

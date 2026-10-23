@@ -1,2 +1,2 @@
-canon brief check: BRIEF_HAS_BLOCKERS — 7 blocker(s) in .canon/changes/add-login/brief.md
-hint: fix each blocker in `findings`, then run `canon brief check` again
+canon brief check: USAGE — --change-id was removed in 0.28.0
+hint: the change is the operand: `canon brief check [<CHANGE_ID>]`

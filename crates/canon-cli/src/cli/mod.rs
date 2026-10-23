@@ -90,7 +90,7 @@ Learn more:
   inspect the target without deleting user files."
 )]
 pub struct Cli {
-    /// The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` lists the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `review add` defaults to it
+    /// The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` lists the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` defaults to it
     #[arg(long = "as", global = true, value_enum, value_name = "ROLE")]
     pub declared_role: Option<crate::role::Role>,
     #[command(subcommand)]
@@ -138,7 +138,7 @@ pub enum Command {
     /// Register and select versioned prompt bundles
     #[command(
         disable_version_flag = true,
-        after_help = "Examples:\n  canon prompt add --name reviewer --version v1 --manifest .canon/reviewer.json\n  canon prompt show --name reviewer --version v1 --json"
+        after_help = "Examples:\n  canon prompt add reviewer@v1 --manifest .canon/reviewer.json\n  canon prompt show reviewer@v1 --json"
     )]
     Prompt {
         #[command(subcommand)]
@@ -170,7 +170,7 @@ pub enum Command {
         action: ChangeCommand,
     },
     /// Check a change's brief (PRD format) and see the next steps; never edits
-    #[command(after_help = "Examples:\n  canon brief show                     State and the next one to three steps\n  canon brief check                    Findings; exit 0 clean, 2 blockers, 1 error\n  canon brief check --change-id add-login --json\n\nThe brief is the PRD `canon change new` writes: sections are found by their\n`<!-- canon:section <key> role=… -->` marker, never by heading text. Blockers\n(structure) are a missing or out-of-order section, a duplicate flow id, step\ndetail that does not match the flow ids, leftover placeholders, and, once the\nsubject is building, a flow step with no scenario or no failure scenario.\nAdvisories (prose) apply to normative sections, Intent and Questions, in the\nlanguage each is written in (`language:` in canon.yaml overrides); only en and\nko have rule lists.\nWaive one rule in one section with\n  <!-- canon:waive <rule-id> <section-key> \"<reason>\" -->\nA brief without markers (written before 0.19) checks as `brief.legacy`, an\nadvisory. Without --change-id, the repo's only live change is checked.")]
+    #[command(after_help = "Examples:\n  canon brief show                     State and the next one to three steps\n  canon brief check                    Findings; exit 0 clean, 2 blockers, 1 error\n  canon brief check add-login --json\n\nThe brief is the PRD `canon change new` writes: sections are found by their\n`<!-- canon:section <key> role=… -->` marker, never by heading text. Blockers\n(structure) are a missing or out-of-order section, a duplicate flow id, step\ndetail that does not match the flow ids, leftover placeholders, and, once the\nsubject is building, a flow step with no scenario or no failure scenario.\nAdvisories (prose) apply to normative sections, Intent and Questions, in the\nlanguage each is written in (`language:` in canon.yaml overrides); only en and\nko have rule lists.\nWaive one rule in one section with\n  <!-- canon:waive <rule-id> <section-key> \"<reason>\" -->\nA brief without markers (written before 0.19) checks as `brief.legacy`, an\nadvisory. Without --change-id, the repo's only live change is checked.")]
     Brief {
         #[command(subcommand)]
         action: BriefCommand,
@@ -199,7 +199,7 @@ pub enum Command {
         action: ArtifactsCommand,
     },
     /// Record one code-review finding as a durable record
-    #[command(after_help = "Examples:\n  canon finding add --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --severity blocker --disposition open --reviewer review-voice \\\n      --summary 'a release metric is asserted, never computed'\n  canon finding close --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --disposition fixed --resolution-sha $(git rev-parse HEAD)\n\nThe loop:\n  canon finding add ...     Record a Finding\n  canon finding close ...   Record its disposition TRANSITION, once fixed\nEach is promoted in the same run under `write: { promote: auto }`, which\n`canon init` writes. Under `write.promote: manual` (no `write:` key), run\n`canon gate promote` after each to commit it.\n\nThe committed finding STAYS when it is closed: the ledger is append-only and\nthe pair IS the history. Every reader folds by natural key to the latest\nversion, so the finding is still counted once.\n\nRECORDED OBSERVATION, NOT PROOF — canon never verifies that the defect\nexisted, that it was fixed, or that --introduced-by is the true cause.\nSee `canon finding add --help` for exactly what it does and does not establish.")]
+    #[command(after_help = "Examples:\n  canon finding add --change-id s43-findings-are-records --round 1 --seq 1 \\\n      --severity blocker --disposition open --reviewer review-voice \\\n      --summary 'a release metric is asserted, never computed'\n  canon finding close s43-findings-are-records --round 1 --seq 1 \\\n      --disposition fixed --resolution-sha $(git rev-parse HEAD)\n\nThe loop:\n  canon finding add ...     Record a Finding\n  canon finding close ...   Record its disposition TRANSITION, once fixed\nEach is promoted in the same run under `write: { promote: auto }`, which\n`canon init` writes. Under `write.promote: manual` (no `write:` key), run\n`canon gate promote` after each to commit it.\n\nThe committed finding STAYS when it is closed: the ledger is append-only and\nthe pair IS the history. Every reader folds by natural key to the latest\nversion, so the finding is still counted once.\n\nRECORDED OBSERVATION, NOT PROOF — canon never verifies that the defect\nexisted, that it was fixed, or that --introduced-by is the true cause.\nSee `canon finding add --help` for exactly what it does and does not establish.")]
     Finding {
         #[command(subcommand)]
         action: FindingCommand,

@@ -65,7 +65,8 @@ fn repo_with_briefs() -> TempDir {
     }
     std::fs::write(brief_path(repo, "ready"), clean_brief("Ready change")).unwrap();
     std::fs::write(brief_path(repo, "settled"), clean_brief("Settled change")).unwrap();
-    ok(repo, &["brief", "approve", "--change-id", "settled", "--by", "Ana", "--note", "Go."]);
+    ok(repo, &["brief", "approve",
+                "settled", "--by", "Ana", "--note", "Go."]);
     let archived = repo.join(".canon/changes/archive/archived");
     std::fs::create_dir_all(&archived).unwrap();
     std::fs::write(archived.join("brief.md"), clean_brief("Archived change")).unwrap();
@@ -292,7 +293,8 @@ fn report_dashboard_06_approving_from_the_page_equals_canon_brief_approve() {
     assert_eq!(reply.code, 200, "{}", reply.body);
     let page = reply.json();
 
-    let cli = canon(twin.path(), &["brief", "approve", "--change-id", "ready", "--by", "Ana", "--note", "Ship it.", "--json"]);
+    let cli = canon(twin.path(), &["brief", "approve",
+                "ready", "--by", "Ana", "--note", "Ship it.", "--json"]);
     assert!(cli.status.success(), "{}", String::from_utf8_lossy(&cli.stderr));
     let cli: Value = serde_json::from_slice(&cli.stdout).unwrap();
 

@@ -444,7 +444,7 @@ pub fn review_gap(ctx: &GateContext, scenario: &Scenario, distinct_actor: bool) 
     if reviews.is_empty() {
         return gap(
             ReviewGapKind::Missing,
-            "no review record for this scenario; spec_coverage.require_review wants an independent review (`canon review add`) once its subject is claimed done".to_string(),
+            "no review record for this scenario; spec_coverage.require_review wants an independent review (`canon review scenario`, or `canon review change` for a chore) once its subject is claimed done".to_string(),
         );
     }
     let now = current_checks(ctx, scenario);
@@ -516,7 +516,7 @@ pub fn review_gap(ctx: &GateContext, scenario: &Scenario, distinct_actor: bool) 
             };
             parts.push(format!("stale review by {}: {changed} since the review", who(&|d| !d.unmigrated)));
         }
-        return gap(ReviewGapKind::Stale, format!("{}; a review counts only while what it saw is current — review it again (`canon review add`)", parts.join("; ")));
+        return gap(ReviewGapKind::Stale, format!("{}; a review counts only while what it saw is current — review it again (`canon review scenario`, or `canon review change` for a chore)", parts.join("; ")));
     }
 
     let outcomes = unsigned.iter().map(|r| format!("`{}` {}", r.reviewer, r.outcome.as_str())).collect::<Vec<_>>().join(", ");

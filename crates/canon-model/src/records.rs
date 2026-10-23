@@ -834,7 +834,7 @@ pub enum ProvenanceRef {
 /// optional and absent when unset, so a review written before 0.15
 /// reserializes byte-identically:
 /// - `pins` (D1): the scenario's source digest and its latest evidence
-///   records at review time. `canon review add` computes them; a pinned
+///   records at review time. `canon review scenario` computes them; a pinned
 ///   review only counts while both still match the corpus.
 /// - `outcome` (D4): `signed` (the default, and what every pre-0.15
 ///   review is), `indeterminate` or `unavailable`. Only `signed` is an
@@ -855,7 +855,7 @@ pub struct Review {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scenario_id: Option<ScenarioId>,
     /// The change reviewed, on a change-level review (0.23): a chore's
-    /// sign-off, recorded by `canon review add --change-id`. Absent on a
+    /// sign-off, recorded by `canon review change`. Absent on a
     /// scenario review.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub change_id: Option<ChangeId>,
@@ -1395,7 +1395,7 @@ impl AuditResult {
 }
 
 /// An external evaluator's re-audit of a scenario (0.15 D3), carried on
-/// an [`EvidenceRecord`] written by `canon evidence add --kind audit`.
+/// an [`EvidenceRecord`] written by `canon evidence audit`.
 /// Canon never generates or runs the audit; it records which evaluator
 /// ran (id, version, and the sha256 of the evaluator itself) and what it
 /// concluded. A record carrying this is an AUDITED outcome and is folded

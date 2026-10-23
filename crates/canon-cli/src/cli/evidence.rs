@@ -104,7 +104,7 @@ pub struct EvidenceAddArgs {
     /// The reference a reader can resolve: a command line, commit sha, or report path. NEVER run or resolved by canon
     #[arg(long = "ref", value_name = "REF")]
     pub evidence_ref: String,
-    /// faithful / not-applicable / divergent; refused with --kind audit, whose verdict follows --audit-result. Default faithful; with --all-scenarios, each record's verdict is derived from its own cases unless this is given
+    /// faithful / not-applicable / divergent; Default faithful; with --all-scenarios, each record's verdict is derived from its own cases unless this is given
     #[arg(long, value_parser = crate::evidence::verdict_parser())]
     pub verdict: Option<EvidenceVerdict>,
     /// One-line note, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers; line breaks refused)

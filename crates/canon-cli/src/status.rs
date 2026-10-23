@@ -49,7 +49,7 @@
 //! and no `Approved:` line in the canon `brief.md` (the brief is
 //! enforced) gets the one `human` step status ever emits once `canon brief
 //! check` has no blocker left for it (0.22 D4); while it has some, the
-//! subject's step is the planner's `canon brief check --change-id <slug>`,
+//! subject's step is the planner's `canon brief check <slug>`,
 //! `N blocker(s): write the brief`. With no blocker but advisories left
 //! (0.26 D4), a planner step to polish the brief
 //! (`reference/brief-polish.md`) and re-run `canon brief check` comes

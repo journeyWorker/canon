@@ -1,14 +1,14 @@
 description: "0.15 D1/D4: `canon review add` refuses a scenario with no record (exit 2, nothing written); under `require_review: {scope: []}` an `--outcome indeterminate` review with the reviewer runtime is recorded (exit 0) but is a gap, never an approval: `canon gate check` exits 1 with `unreviewed-promotion` naming the indeterminate review and `canon subject status <id> --to verifying` refuses (exit 1); the same reviewer's later signed review supersedes it, so the transition exits 0 and the gate is clean; `canon query --kind review --json` shows both records with their outcome, runtime and pins"
 steps:
-  - args: [review, add, --project-id, root, --scenario-id, cart.add.99, --reviewer, reviewer-2, --pin, r1, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --session-id, sess-review]
+  - args: [review, scenario, cart.add.99, --project-id, root, --pin, r1, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --session-id, sess-review]
     exit: 2
-  - args: [review, add, --project-id, root, --scenario-id, cart.add.01, --reviewer, reviewer-2, --pin, r1, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --session-id, sess-review, --outcome, indeterminate, --reviewer-provider, openai, --reviewer-model, gpt-x, --reviewer-harness, codex]
+  - args: [review, scenario, cart.add.01, --project-id, root, --pin, r1, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --session-id, sess-review, --review-outcome, indeterminate, --reviewer-provider, openai, --reviewer-model, gpt-x, --reviewer-harness, codex]
     exit: 0
   - args: [gate, check]
     exit: 1
   - args: [subject, status, cart, --to, verifying]
     exit: 1
-  - args: [review, add, --project-id, root, --scenario-id, cart.add.01, --reviewer, reviewer-2, --pin, r2, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --session-id, sess-review]
+  - args: [review, scenario, cart.add.01, --project-id, root, --pin, r2, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --session-id, sess-review]
     exit: 0
   - args: [subject, status, cart, --to, verifying]
     exit: 0

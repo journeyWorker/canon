@@ -367,7 +367,7 @@
       ]
     },
     "EvidenceAudit": {
-      "description": "An external evaluator's re-audit of a scenario (0.15 D3), carried on\nan [`EvidenceRecord`] written by `canon evidence add --kind audit`.\nCanon never generates or runs the audit; it records which evaluator\nran (id, version, and the sha256 of the evaluator itself) and what it\nconcluded. A record carrying this is an AUDITED outcome and is folded\napart from declared evidence: it never becomes a scenario's latest\ndeclared verdict.",
+      "description": "An external evaluator's re-audit of a scenario (0.15 D3), carried on\nan [`EvidenceRecord`] written by `canon evidence audit`.\nCanon never generates or runs the audit; it records which evaluator\nran (id, version, and the sha256 of the evaluator itself) and what it\nconcluded. A record carrying this is an AUDITED outcome and is folded\napart from declared evidence: it never becomes a scenario's latest\ndeclared verdict.",
       "type": "object",
       "properties": {
         "evaluator_digest": {

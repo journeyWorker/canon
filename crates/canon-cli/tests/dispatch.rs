@@ -60,7 +60,7 @@ fn a_consumer_reads_the_run_id_from_data_and_closes_that_run() {
     let run_id = begun["run_id"].as_str().expect("`.data.run_id` is the run id a hook closes later").to_string();
 
     let output = Command::new(env!("CARGO_BIN_EXE_canon"))
-        .args(["dispatch", "end", "--run-id", &run_id, "--status", "succeeded", "--json", "--repo"])
+        .args(["dispatch", "end", &run_id, "--status", "succeeded", "--json", "--repo"])
         .arg(dir.path())
         .output()
         .expect("spawn canon dispatch end");

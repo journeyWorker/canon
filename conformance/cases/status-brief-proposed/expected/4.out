@@ -16,4 +16,4 @@ unowned: none
 
 next:
   # cart: 7 blocker(s): write the brief in .canon/changes/cart-v1/brief.md until `canon brief check` is clean; only then does the human answer it
-  canon brief check --change-id cart-v1
+  canon brief check cart-v1

@@ -57,7 +57,7 @@
 //!   a missing one means "the bound bytes are gone".
 //!
 //! # Review artifacts (0.16 D5, 0.18 D5)
-//! `canon review add --artifact` stores what the reviewer looked at
+//! `canon review scenario --artifact` stores what the reviewer looked at
 //! through the same [`StoreLock`] and records `{path, sha256}` on the
 //! review. The check covers every CURRENT in-effect review
 //! ([`crate::review_gate::current_reviews`]): the latest per
@@ -866,7 +866,7 @@ impl GateCheck for ArtifactStoreCheck {
                         file.sha256,
                         blob.as_str(),
                         tree.as_str(),
-                        remedy(&blob, &store, "look again and re-record the review with `canon review add --artifact <path>`")
+                        remedy(&blob, &store, "look again and re-record the review with `canon review scenario <SCENARIO_ID> --artifact <path>` (or `canon review change <CHANGE_ID> --artifact <path>`)")
                     ),
                 };
                 Violation::new(FailureClass::StaleEvidence, file.subject, detail)

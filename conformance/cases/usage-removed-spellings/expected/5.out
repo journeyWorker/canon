@@ -1,1 +1,1 @@
-{"error":{"code":"USAGE","expected":["--change-id"],"field":"--change","hint":"--change was renamed --change-id in 0.24.0; use --change-id","message":"--change was removed in 0.25.0","retryable":false}}
+{"error":{"code":"USAGE","field":"--change","hint":"the change is the operand: `canon brief check [<CHANGE_ID>]`","message":"--change was removed in 0.28.0","retryable":false}}

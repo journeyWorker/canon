@@ -333,8 +333,8 @@ fn status_counts_stale_and_unsigned_reviews() {
         let out = run(
             dir.path(),
             &[
-                "review", "add", "--project-id", "demo", "--scenario-id", scenario, "--reviewer", "reviewer-2", "--actor-id", "reviewer-2", "--role", "reviewer",
-                "--session-id", "sess-review", "--pin", "p1", "--original-spec-ref", "specs/demo.feature", "--outcome", outcome,
+                "review", "scenario", scenario, "--project-id", "demo", "--actor-id", "reviewer-2", "--role", "reviewer",
+                "--session-id", "sess-review", "--pin", "p1", "--original-spec-ref", "specs/demo.feature", "--review-outcome", outcome,
             ],
         );
         assert!(out.status.success(), "{}", stderr(&out));
@@ -350,7 +350,7 @@ fn status_counts_stale_and_unsigned_reviews() {
     let s = subject(&report, "demo-subject");
     assert_eq!((s["reviewed"].as_u64(), s["staleReviews"].as_u64(), s["unsignedReviews"].as_u64()), (Some(0), Some(1), Some(1)), "{s}");
     assert_eq!(report["warnings"], serde_json::json!([UNAPPROVED.strip_prefix("warning: ").unwrap()]), "pinned reviews draw no legacy warning: {report}");
-    let why = report["next"].as_array().unwrap().iter().find(|n| n["command"].as_str().unwrap().starts_with("canon review add")).expect("a review step")["why"].as_str().unwrap().to_string();
+    let why = report["next"].as_array().unwrap().iter().find(|n| n["command"].as_str().unwrap().starts_with("canon review scenario")).expect("a review step")["why"].as_str().unwrap().to_string();
     assert!(
         why.contains("2 of 2 scenario(s) lack a qualifying review (1 with a stale review (spec or evidence changed since it was reviewed); 1 with only indeterminate or unavailable reviews)"),
         "{why}"
@@ -395,8 +395,8 @@ fn status_next_names_the_command_for_each_gap() {
         [
             "canon scenario new world.demo.03 --title \"<what happens on this path>\" --subject-id demo-subject --case failure --actor-id <unit>",
             "canon evidence add --scenario-id world.demo.02 --project-id demo --kind test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
-            "canon finding close --change-id c-demo-subject --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
-            "canon review add --project-id demo --scenario-id world.demo.01 --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"",
+            "canon finding close c-demo-subject --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
+            "canon review scenario world.demo.01 --project-id demo --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"",
             "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id empty-subject --case happy --actor-id <unit>",
         ]
     );
@@ -651,7 +651,7 @@ fn context_status_61_an_unapproved_brief_is_the_only_human_step_and_blocks_the_m
     let whys: Vec<&str> = report["next"].as_array().unwrap().iter().filter(|n| n["actor"] == "human").map(|n| n["why"].as_str().unwrap()).collect();
     assert!(whys[0].contains(".canon/changes/c-demo-subject/brief.md"), "{}", whys[0]);
     for why in &whys {
-        assert!(why.contains("`canon brief approve --change-id ") && why.contains("--by <the human> --note"), "{why}");
+        assert!(why.contains("`canon brief approve ") && why.contains("--by <the human> --note"), "{why}");
         assert!(why.contains("`canon evidence add` refuses the scenarios tagged `@flow:c-demo-subject.*` and `c-demo-subject`'s tasks"), "{why}");
     }
     let demo = subject(&report, "demo-subject");
@@ -840,7 +840,7 @@ fn context_status_64_an_external_change_is_answered_in_a_canon_brief_that_points
     assert!(
         why.contains(".canon/changes/c-live/brief.md does not exist yet")
             && why.contains("create .canon/changes/c-live/brief.md holding a `Source: plans/changes/c-live/proposal.md` line")
-            && why.contains("`canon brief approve --change-id c-live --by <the human> --note"),
+            && why.contains("`canon brief approve c-live --by <the human> --note"),
         "{why}"
     );
     let text = stdout(&run(dir.path(), &["status"]));

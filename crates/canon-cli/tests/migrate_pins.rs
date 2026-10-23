@@ -210,7 +210,7 @@ fn migrate_pins_02_a_legacy_review_of_a_changed_scenario_stays_stale() {
     ok(
         repo,
         &[
-            "review", "add", "--project-id", "root", "--scenario-id", "cart.add.02", "--reviewer", "reviewer-2", "--pin", "r2", "--upstream-ref", "docs/plan.md#re-review",
+            "review", "scenario", "cart.add.02", "--project-id", "root", "--pin", "r2", "--upstream-ref", "docs/plan.md#re-review",
             "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review",
         ],
     );

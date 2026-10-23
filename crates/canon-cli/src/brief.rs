@@ -547,7 +547,7 @@ pub fn adoption_warning(repo: &Path, subject: &Subject, change: &ChangeId) -> Op
         .filter(|brief| brief.enforced)?;
     let (change, subject_id) = (change.as_str(), subject.subject_id.as_str());
     Some(format!(
-        "subject `{subject_id}` is {} and change `{change}` is not approved ({}): the subject's existing scenarios keep accepting evidence, and while no scenario is tagged `@flow:{change}.*` it can still be reopened and shipped for its approved scope; once a scenario is tagged `@flow:{change}.*`, those scenarios wait for the approval and `{subject_id}` cannot ship until the brief is approved; to take the adoption back run `canon subject unadopt {change} --subject-id {subject_id}`",
+        "subject `{subject_id}` is {} and change `{change}` is not approved ({}): the subject's existing scenarios keep accepting evidence, and while no scenario is tagged `@flow:{change}.*` it can still be reopened and shipped for its approved scope; once a scenario is tagged `@flow:{change}.*`, those scenarios wait for the approval and `{subject_id}` cannot ship until the brief is approved; to take the adoption back run `canon subject unadopt {subject_id} --change-id {change}`",
         serde_json::to_value(subject.status).ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default(),
         brief.unanswered()
     ))

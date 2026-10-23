@@ -176,7 +176,7 @@ fn session_ids_on_add_and_close_land_on_each_records_actor() {
     assert!(run_canon(&["gate", "promote"], repo).status.success());
 
     let closed = run_canon(
-        &["finding", "close", "--change-id", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design", "--session-id", "sess-close"],
+        &["finding", "close", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design", "--session-id", "sess-close"],
         repo,
     );
     assert!(closed.status.success(), "stderr: {}", stderr(&closed));
@@ -378,7 +378,7 @@ fn a_short_sha_is_resolved_to_the_full_commit_on_add_and_close() {
     assert!(run_canon(&["gate", "promote"], repo).status.success());
 
     let closed = run_canon(
-        &["finding", "close", "--change-id", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "fixed", "--resolution-sha", short],
+        &["finding", "close", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "fixed", "--resolution-sha", short],
         repo,
     );
     assert_eq!(closed.status.code(), Some(0), "stderr: {}", stderr(&closed));
@@ -409,7 +409,7 @@ fn an_unknown_short_sha_is_refused() {
     assert!(add(repo, &["--round", "1", "--seq", "1", "--reviewer", "r", "--summary", "s"]).status.success());
     assert!(run_canon(&["gate", "promote"], repo).status.success());
     let closed = run_canon(
-        &["finding", "close", "--change-id", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "fixed", "--resolution-sha", unknown],
+        &["finding", "close", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "fixed", "--resolution-sha", unknown],
         repo,
     );
     assert_eq!(closed.status.code(), Some(2), "stdout: {}", stdout(&closed));
@@ -1312,9 +1312,9 @@ fn listed_repo() -> tempfile::TempDir {
     raise("other-change", "note", "1", "1", "rev-c", "elsewhere");
     raise("closed-only", "blocker", "1", "1", "rev-d", "fixed long ago");
     assert!(run_canon(&["gate", "promote"], repo).status.success());
-    let closed = run_canon(&["finding", "close", "--change-id", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"], repo);
+    let closed = run_canon(&["finding", "close", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"], repo);
     assert!(closed.status.success(), "{}", stderr(&closed));
-    let closed = run_canon(&["finding", "close", "--change-id", "closed-only", "--round", "1", "--seq", "1", "--disposition", "deferred", "--reason", "by design"], repo);
+    let closed = run_canon(&["finding", "close", "closed-only", "--round", "1", "--seq", "1", "--disposition", "deferred", "--reason", "by design"], repo);
     assert!(closed.status.success(), "{}", stderr(&closed));
     assert!(run_canon(&["gate", "promote"], repo).status.success());
     assert!(add(repo, &["--round", "2", "--seq", "1", "--reviewer", "rev-a", "--summary", "still staged"]).status.success());
@@ -1408,7 +1408,7 @@ fn committed_open(repo: &Path) {
 }
 
 fn close(repo: &Path, extra: &[&str]) -> Output {
-    let mut args = vec!["finding", "close", "--change-id", CHANGE, "--round", "1", "--seq", "1"];
+    let mut args = vec!["finding", "close", CHANGE, "--round", "1", "--seq", "1"];
     args.extend_from_slice(extra);
     run_canon(&args, repo)
 }
@@ -1473,7 +1473,7 @@ fn finding_list_05_shows_the_reason_in_the_table_and_in_json() {
     }
     assert!(run_canon(&["gate", "promote"], repo).status.success());
     assert!(close(repo, &["--disposition", "rejected", "--reason", "works as designed"]).status.success());
-    let fixed = run_canon(&["finding", "close", "--change-id", CHANGE, "--round", "1", "--seq", "2", "--disposition", "fixed", "--resolution-sha", &head], repo);
+    let fixed = run_canon(&["finding", "close", CHANGE, "--round", "1", "--seq", "2", "--disposition", "fixed", "--resolution-sha", &head], repo);
     assert!(fixed.status.success(), "{}", stderr(&fixed));
     assert!(run_canon(&["gate", "promote"], repo).status.success());
 
@@ -1495,7 +1495,7 @@ fn finding_close_84_fixed_takes_a_reason_but_does_not_need_one() {
     assert!(run_canon(&["gate", "promote"], repo).status.success());
     let bare = close(repo, &["--disposition", "fixed", "--resolution-sha", &head]);
     assert!(bare.status.success(), "{}", stderr(&bare));
-    let with = run_canon(&["finding", "close", "--change-id", CHANGE, "--round", "1", "--seq", "2", "--disposition", "fixed", "--resolution-sha", &head, "--reason", "guard added"], repo);
+    let with = run_canon(&["finding", "close", CHANGE, "--round", "1", "--seq", "2", "--disposition", "fixed", "--resolution-sha", &head, "--reason", "guard added"], repo);
     assert!(with.status.success(), "{}", stderr(&with));
     let mut staged: Vec<_> = staged_findings(repo).iter().map(|p| body_at(p)).collect();
     staged.sort_by_key(|b| b["seq"].as_u64());

@@ -171,7 +171,7 @@ fn evidence_add_105_an_approval_payload_is_not_issued_for_an_unknown_project_id(
     assert!(stdout(&out).contains("canon-approval-v1"), "{}", stdout(&out));
 }
 
-/// review.add.92: `review add` with an unknown project id writes no review
+/// review scenario: it with an unknown project id writes no review
 /// and names the configured root.
 #[test]
 fn review_add_92_an_unknown_project_id_is_refused_and_writes_no_review() {
@@ -181,7 +181,7 @@ fn review_add_92_an_unknown_project_id_is_refused_and_writes_no_review() {
     let review = |project: &str| {
         canon(
             r,
-            &["review", "add", "--project-id", project, "--scenario-id", "cart.add.01", "--reviewer", "reviewer-2", "--pin", "p1", "--original-spec-ref", "specs/cart.md", "--actor-id", "reviewer-2", "--role", "reviewer", "--json"],
+            &["review", "scenario", "cart.add.01", "--project-id", project, "--pin", "p1", "--original-spec-ref", "specs/cart.md", "--actor-id", "reviewer-2", "--role", "reviewer", "--json"],
         )
     };
 
@@ -202,7 +202,7 @@ fn divergence_lifecycle_10_an_unknown_project_id_is_refused_by_every_writing_div
     let dir = repo(&["game"]);
     let r = dir.path();
     let before = written(r);
-    let common = ["--project-id", "root", "--scenario-id", "cart.add.01", "--reviewer", "reviewer-2", "--role", "reviewer", "--actor-id", "reviewer-2", "--json"];
+    let common = ["cart.add.01", "--project-id", "root", "--reviewer", "reviewer-2", "--role", "reviewer", "--actor-id", "reviewer-2", "--json"];
     let with = |verb: &str, extra: &[&str]| {
         let mut args = vec!["divergence", verb];
         args.extend_from_slice(&common);
@@ -245,4 +245,41 @@ fn authoring_scaffold_14_an_explicit_feature_file_still_refuses_an_unknown_proje
     let out = scaffold("game");
     assert!(out.status.success(), "{}{}", stdout(&out), stderr(&out));
     assert_ne!(std::fs::read(&feature).unwrap(), before);
+}
+
+/// With one configured root `--project-id` can be left out; with several the
+/// leaf refuses, names the roots and writes nothing.
+#[test]
+fn project_id_is_optional_with_one_spec_root_and_required_with_several() {
+    let review = |r: &Path| {
+        canon(r, &["review", "scenario", "cart.add.01", "--pin", "p1", "--original-spec-ref", "specs/cart.md", "--actor-id", "reviewer-2", "--role", "reviewer", "--json"])
+    };
+    let audit = |r: &Path| {
+        canon(
+            r,
+            &[
+                "evidence", "audit", "cart.add.01", "--ref", "x", "--evaluator-id", "e", "--evaluator-version", "1", "--evaluator-digest",
+                "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0", "--audit-result", "confirmed", "--actor-id", "a", "--role", "auditor", "--json",
+            ],
+        )
+    };
+    let add = |r: &Path| canon(r, &["evidence", "add", "--scenario-id", "cart.add.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent", "--json"]);
+
+    let one = repo(&["game"]);
+    let r = one.path();
+    for (name, run) in [("evidence add", &add as &dyn Fn(&Path) -> Output), ("evidence audit", &audit), ("review scenario", &review)] {
+        let before = written(r);
+        let out = run(r);
+        assert!(out.status.success(), "{name}: {}{}", stdout(&out), stderr(&out));
+        assert_ne!(written(r), before, "{name} wrote a record");
+    }
+
+    let two = repo(&["game", "ui"]);
+    let r = two.path();
+    let before = written(r);
+    for (name, run) in [("evidence add", &add as &dyn Fn(&Path) -> Output), ("evidence audit", &audit), ("review scenario", &review)] {
+        let out = run(r);
+        assert_eq!(out.status.code(), Some(2), "{name}: {}{}", stdout(&out), stderr(&out));
+        assert_eq!(written(r), before, "{name} wrote nothing");
+    }
 }

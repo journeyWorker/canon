@@ -1,4 +1,4 @@
-//! `canon brief approve --change-id <slug> --by <human> --note "<words>"`
+//! `canon brief approve <slug> --by <human> --note "<words>"`
 //! (0.19 D3, #46): the one call that records a human's answer to a brief.
 //!
 //! It writes `Approved: <who> <when> — "<words>" (brief sha256:<digest>)`

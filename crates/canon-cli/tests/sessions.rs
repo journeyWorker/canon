@@ -82,7 +82,7 @@ fn session_ids_land_on_evidence_and_review_actors() {
     assert_eq!(records[0]["actor"], serde_json::json!({"agent_id": "impl-unit-1", "role": "implementer", "session_id": "sess-impl"}));
 
     ok(repo, &[
-        "review", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--reviewer", "reviewer-2", "--pin", "r1", "--original-spec-ref",
+        "review", "scenario", "game.run.01", "--project-id", "root", "--pin", "r1", "--original-spec-ref",
         "specs/x.feature", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review",
     ]);
     let reviews = committed(repo, "review");
@@ -108,7 +108,7 @@ fn a_session_id_outside_the_grammar_is_refused_and_nothing_is_written() {
         let review = canon(
             repo,
             &[
-                "review", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--reviewer", "r", "--pin", "p", "--original-spec-ref", "s", "--role",
+                "review", "scenario", "game.run.01", "--project-id", "root", "--actor-id", "r", "--pin", "p", "--original-spec-ref", "s", "--role",
                 "reviewer", "--session-id", bad,
             ],
         );
@@ -143,7 +143,7 @@ fn every_write_command_says_whether_it_staged_or_wrote_directly() {
     direct(&["scenario", "new", "game.run.01", "--title", "A run ends at zero health", "--case", "failure"]);
     ok(repo, &["inventory", "sync"]);
     direct(&["subject", "new", "runs", "--domain", "dev", "--title", "Runs"]);
-    direct(&["subject", "adopt", "cats", "--subject-id", "runs"]);
+    direct(&["subject", "adopt", "runs", "--change-id", "cats"]);
     direct(&["subject", "status", "runs", "--to", "specced"]);
     direct(&["change", "new", "runs-boss", "--subject-id", "runs", "--title", "A boss wave"]);
 
@@ -154,19 +154,19 @@ fn every_write_command_says_whether_it_staged_or_wrote_directly() {
     staged(&["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run smoke 2", "--role", "implementer"], PROMOTED);
     staged(&["finding", "add", "--change-id", "cats", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "r", "--summary", "s", "--no-promote"], STAGED);
     ok(repo, &["gate", "promote"]);
-    staged(&["finding", "close", "--change-id", "cats", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"], PROMOTED);
+    staged(&["finding", "close", "cats", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"], PROMOTED);
     assert!(records_under(repo, "_staging").is_empty(), "nothing is left to promote");
 
     direct(&[
-        "review", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--reviewer", "r", "--pin", "p", "--original-spec-ref", "specs/x.feature",
+        "review", "scenario", "game.run.01", "--project-id", "root", "--actor-id", "r", "--pin", "p", "--original-spec-ref", "specs/x.feature",
         "--role", "reviewer",
     ]);
 
     let sha = "a".repeat(40);
     staged(
-        &["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--no-promote"],
+        &["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--no-promote"],
         "— run `canon gate promote` to commit it",
     );
-    staged(&["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--round", "2", "--reviewer", "r", "--role", "reviewer"], PROMOTED);
-    staged(&["divergence", "resolve", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--round", "3", "--reviewer", "r", "--role", "reviewer"], PROMOTED);
+    staged(&["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--round", "2", "--reviewer", "r", "--role", "reviewer"], PROMOTED);
+    staged(&["divergence", "resolve", "game.run.01", "--project-id", "root", "--sha", &sha, "--round", "3", "--reviewer", "r", "--role", "reviewer"], PROMOTED);
 }

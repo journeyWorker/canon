@@ -83,7 +83,7 @@ fn context_keeps_only_the_named_sections() {
 #[test]
 fn divergence_status_projects_each_scenario_row() {
     let dir = repo();
-    ok(dir.path(), &["divergence", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--sha", SHA, "--reviewer", "alice", "--role", "reviewer"]);
+    ok(dir.path(), &["divergence", "add", "auth.login.01", "--project-id", "root", "--sha", SHA, "--reviewer", "alice", "--role", "reviewer"]);
     let all = body(&run(dir.path(), &["divergence", "status", "--json"]));
     assert!(all["data"]["scenarios"][0].as_object().unwrap().len() >= 3, "{all}");
     let out = run(dir.path(), &["divergence", "status", "--json", "--fields", "scenario_id,state"]);
@@ -136,7 +136,7 @@ fn usage_errors_name_the_argument_and_its_possible_values() {
     assert_eq!(e["field"], "--severity");
     assert_eq!(strings(&e["expected"]), ["blocker", "should-fix", "note"]);
 
-    let e = error_of(dir.path(), &["finding", "close", "--change-id", "add-login", "--round", "1", "--seq", "1", "--disposition", "nope"]);
+    let e = error_of(dir.path(), &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "nope"]);
     assert_eq!(e["field"], "--disposition");
     assert_eq!(strings(&e["expected"]), ["open", "fixed", "rejected", "deferred"]);
 
@@ -176,7 +176,7 @@ fn input_validation_refusals_name_the_field_and_the_accepted_values() {
     let e = error_of(dir.path(), &["query", "--kind", "evidence", "--domain", "dev"]);
     assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("QUERY_INVALID_ARGUMENT"), Some("--domain")));
 
-    let e = error_of(dir.path(), &["finding", "close", "--change-id", "add-login", "--round", "1", "--seq", "1", "--disposition", "fixed"]);
+    let e = error_of(dir.path(), &["finding", "close", "add-login", "--round", "1", "--seq", "1", "--disposition", "fixed"]);
     assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("FINDING_RESOLUTION_SHA_REQUIRED"), Some("--resolution-sha")));
 
     let regime = String::from_utf8(run(dir.path(), &["regime-key", "--role", "implementer", "--repo", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
@@ -242,7 +242,7 @@ fn evidence_added_again_after_a_review_is_deliberate_and_is_written() {
     // that evidence (and stales the review), so it is never read as a retry.
     let dir = repo();
     assert!(evidence(dir.path(), &[]).status.success());
-    ok(dir.path(), &["review", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--reviewer", "alice", "--pin", "abc123", "--role", "reviewer", "--original-spec-ref", "docs/prd.md"]);
+    ok(dir.path(), &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "alice", "--pin", "abc123", "--role", "reviewer", "--original-spec-ref", "docs/prd.md"]);
     let again = evidence(dir.path(), &[]);
     assert!(again.status.success());
     assert!(body(&again)["meta"].get("unchanged").is_none(), "{}", String::from_utf8_lossy(&again.stdout));
@@ -253,7 +253,7 @@ fn evidence_added_again_after_a_review_is_deliberate_and_is_written() {
 }
 
 fn review(dir: &Path, pin: &str) -> Output {
-    run(dir, &["review", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--reviewer", "alice", "--pin", pin, "--role", "reviewer", "--original-spec-ref", "docs/prd.md", "--json"])
+    run(dir, &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "alice", "--pin", pin, "--role", "reviewer", "--original-spec-ref", "docs/prd.md", "--json"])
 }
 
 #[test]

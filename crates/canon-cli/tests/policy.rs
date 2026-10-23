@@ -166,7 +166,7 @@ fn init_names_the_approval_command_for_its_starter_policy() {
     assert_eq!(init.status.code(), Some(0), "stderr: {}", stderr(&init));
     assert!(stdout(&init).contains("canon policy approve --by <who>"), "{}", stdout(&init));
     let agents = std::fs::read_to_string(dir.path().join("AGENTS.md")).unwrap();
-    assert!(agents.contains("canon brief approve --change-id <slug> --by <the human> --note"), "{agents}");
+    assert!(agents.contains("canon brief approve <slug> --by <the human> --note"), "{agents}");
 }
 
 /// The approval is authored and must reach git: neither the
