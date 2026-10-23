@@ -5,10 +5,12 @@
 //! tool, or enforces the declared capabilities. A provider sandbox must enforce
 //! `capabilities` before execution.
 
+use crate::json_out::Report;
 use std::fs;
 use std::path::Path;
 
 use chrono::{DateTime, FixedOffset};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -16,7 +18,7 @@ use serde_json::{Map, Value};
 pub const PROTOCOL_VERSION: u32 = 1;
 
 /// A response's terminal state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum AdapterStatus {
     Succeeded,
@@ -25,7 +27,7 @@ pub enum AdapterStatus {
 }
 
 /// Declared provider capabilities. These are records, not enforcement.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AdapterCapabilities {
     pub filesystem: FilesystemCapability,
@@ -33,7 +35,7 @@ pub struct AdapterCapabilities {
     pub secrets: SecretsCapability,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum FilesystemCapability {
     ReadOnly,
@@ -41,7 +43,7 @@ pub enum FilesystemCapability {
     None,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum NetworkCapability {
     None,
@@ -49,7 +51,7 @@ pub enum NetworkCapability {
     Full,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum SecretsCapability {
     None,
@@ -67,7 +69,7 @@ pub struct EvidenceRef {
 }
 
 /// Telemetry associated with one adapter response.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AdapterTelemetry {
     pub started_at: String,
@@ -308,7 +310,8 @@ pub fn parse_response<T: AsRef<[u8]>>(input: T) -> Result<AdapterResponse, Adapt
 
 /// A redacted, normalized summary safe for CLI output. Extension payloads are
 /// intentionally absent; only their sorted key names are exposed.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ValidationSummary {
     pub protocol_version: u32,
     pub run_id: String,
@@ -318,9 +321,36 @@ pub struct ValidationSummary {
     pub status: AdapterStatus,
     pub capabilities: AdapterCapabilities,
     pub evidence_count: usize,
-    pub telemetry: AdapterTelemetry,
+    pub telemetry: TelemetrySummary,
     pub extension_keys: Vec<String>,
     pub context_join_verified: Option<bool>,
+}
+
+impl Report for ValidationSummary {}
+
+/// [`AdapterTelemetry`] as the report states it (camelCase keys; the response itself is snake_case).
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TelemetrySummary {
+    pub started_at: String,
+    pub ended_at: String,
+    pub tool_calls: Option<u64>,
+    pub retries: Option<u64>,
+    pub tokens: Option<u64>,
+    pub cost_usd: Option<f64>,
+}
+
+impl From<&AdapterTelemetry> for TelemetrySummary {
+    fn from(telemetry: &AdapterTelemetry) -> Self {
+        Self {
+            started_at: telemetry.started_at.clone(),
+            ended_at: telemetry.ended_at.clone(),
+            tool_calls: telemetry.tool_calls,
+            retries: telemetry.retries,
+            tokens: telemetry.tokens,
+            cost_usd: telemetry.cost_usd,
+        }
+    }
 }
 
 impl ValidationSummary {
@@ -336,7 +366,7 @@ impl ValidationSummary {
             status: response.status,
             capabilities: response.capabilities.clone(),
             evidence_count: response.evidence_refs.len(),
-            telemetry: response.telemetry.clone(),
+            telemetry: TelemetrySummary::from(&response.telemetry),
             extension_keys,
             context_join_verified: None,
         }
@@ -366,7 +396,8 @@ pub enum CapabilityLevel {
     Direct,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct AuthorizationResult {
     pub execution_authorized: bool,
     pub execution_performed: bool,
@@ -374,6 +405,8 @@ pub struct AuthorizationResult {
     pub reasons: Vec<String>,
     pub capabilities: AdapterCapabilities,
 }
+
+impl Report for AuthorizationResult {}
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]

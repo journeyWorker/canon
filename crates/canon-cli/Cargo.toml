@@ -28,6 +28,9 @@ chrono = { version = "0.4.45" }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# Typed reports (`Report: Serialize + JsonSchema`) and the debug-build validation of every emitted JSON document (T7).
+schemars = { version = "1.2.1", features = ["chrono04", "uuid1"] }
+jsonschema = { version = "0.47.0", default-features = false }
 # JUnit XML test reports (`canon evidence add --report junit:<path>`).
 # Already in the lockfile transitively; a pure-Rust pull parser.
 quick-xml = "0.40"

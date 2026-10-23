@@ -101,8 +101,7 @@ pub fn run_demo_init(repo: &Path, json: bool) -> i32 {
     if json {
         crate::json_out::data(
             "demo init",
-            serde_json::json!({ "repo": repo.display().to_string(), "scenario": DEMO_SCENARIO, "next": ["canon gate check", "canon demo add", "canon gate check"] }),
-        );
+            &crate::json_out::untyped(serde_json::json!({ "repo": repo.display().to_string(), "scenario": DEMO_SCENARIO, "next": ["canon gate check", "canon demo add", "canon gate check"] })));
     }
     0
 }
@@ -128,7 +127,7 @@ pub fn run_demo_add(repo: &Path, json: bool) -> i32 {
     crate::say!(json, "");
     crate::say!(json, "      canon gate check      # GREEN: clean");
     if json {
-        crate::json_out::data("demo add", serde_json::json!({ "scenario": DEMO_SCENARIO, "next": ["canon gate check"] }));
+        crate::json_out::data("demo add", &crate::json_out::untyped(serde_json::json!({ "scenario": DEMO_SCENARIO, "next": ["canon gate check"] })));
     }
     0
 }

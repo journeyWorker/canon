@@ -28,7 +28,7 @@ fn five_trajectories() -> Fixture {
 }
 
 fn rewards(page: &Value) -> Vec<f64> {
-    page["records"].as_array().unwrap().iter().map(|r| r["reward"].as_f64().unwrap()).collect()
+    page["data"]["records"].as_array().unwrap().iter().map(|r| r["reward"].as_f64().unwrap()).collect()
 }
 
 #[test]
@@ -49,7 +49,7 @@ fn paging_with_next_cursor_yields_exactly_the_all_set_in_order() {
         }
         let page = json(&fixture.run_canon(&args));
         pages += 1;
-        assert_eq!(page["meta"]["returned"], page["records"].as_array().unwrap().len());
+        assert_eq!(page["meta"]["returned"], page["data"]["records"].as_array().unwrap().len());
         assert_eq!(page["meta"]["total"], 5);
         paged.extend(rewards(&page));
         match page["meta"]["nextCursor"].as_str() {
@@ -105,7 +105,7 @@ fn fields_projects_records_and_an_unknown_field_is_refused() {
     let fixture = five_trajectories();
     let out = fixture.run_canon(&["query", "--kind", "trajectory", "--json", "--all", "--fields", "reward,at"]);
     assert!(out.status.success(), "{}", stderr(&out));
-    for record in json(&out)["records"].as_array().unwrap() {
+    for record in json(&out)["data"]["records"].as_array().unwrap() {
         let keys: Vec<&str> = record.as_object().unwrap().keys().map(String::as_str).collect();
         assert_eq!(keys, vec!["at", "reward"], "only the requested fields");
     }

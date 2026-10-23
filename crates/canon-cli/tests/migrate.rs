@@ -189,7 +189,7 @@ fn query(repo: &Path, kind: &str) -> Vec<serde_json::Value> {
     let out = ok(repo, &["query", "--kind", kind, "--json"]);
     let start = out.find('{').unwrap();
     let payload: serde_json::Value = serde_json::Deserializer::from_str(&out[start..]).into_iter().next().unwrap().unwrap();
-    payload["records"].as_array().unwrap().clone()
+    payload["data"]["records"].as_array().unwrap().clone()
 }
 
 /// authoring.migrate.01: `--dry-run` prints the whole plan and writes

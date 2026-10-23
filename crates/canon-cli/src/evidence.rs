@@ -628,8 +628,7 @@ pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> i32 {
             let hex: String = payload.iter().map(|byte| format!("{byte:02x}")).collect();
             crate::json_out::data(
                 "evidence approval-payload",
-                serde_json::json!({ "payloadHex": hex, "payload": String::from_utf8(payload).ok(), "surface": surface, "effects": effects }),
-            );
+                &crate::json_out::untyped(serde_json::json!({ "payloadHex": hex, "payload": String::from_utf8(payload).ok(), "surface": surface, "effects": effects })));
             0
         }
         Ok((payload, _, _)) => match std::io::stdout().lock().write_all(&payload) {
@@ -970,7 +969,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             entry["subject"] = serde_json::json!(subject);
             entry["outcome"] = serde_json::json!(outcome);
             entry["next"] = serde_json::json!(next);
-            crate::json_out::data_with_meta("evidence add", serde_json::json!({ "records": [entry], "staleReviews": [] }), serde_json::json!({ "unchanged": true }));
+            crate::json_out::data_with_meta("evidence add", &crate::json_out::untyped(serde_json::json!({ "records": [entry], "staleReviews": [] })), serde_json::json!({ "unchanged": true }));
         }
         return 0;
     }
@@ -1008,7 +1007,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
                     None => crate::next::Scope::Scenarios(vec![subject.clone()]),
                 };
                 let staged = matches!(settled, crate::gate::StagedOutcome::Staged);
-                crate::next::finish(&repo, "evidence add", &scope, staged, args.json, serde_json::json!({ "records": [record], "staleReviews": stale }));
+                crate::next::finish(&repo, "evidence add", &scope, staged, args.json, &crate::json_out::untyped(serde_json::json!({ "records": [record], "staleReviews": stale })));
             }
             settled.exit_code()
         }
@@ -1073,7 +1072,7 @@ fn record_body(record: &EvidenceRecord, args: &EvidenceArgs) -> serde_json::Valu
 fn report_brief_refusals(args: &EvidenceArgs, refusals: &[BriefRefusal]) -> Result<(), CliError> {
     if refusals.is_empty() {
         if args.override_reason.is_some() {
-            eprintln!("canon evidence add: --override-reason not recorded — no unapproved brief refused this attestation");
+            crate::warn_err!("canon evidence add: --override-reason not recorded — no unapproved brief refused this attestation");
         }
         return Ok(());
     }
@@ -1083,9 +1082,9 @@ fn report_brief_refusals(args: &EvidenceArgs, refusals: &[BriefRefusal]) -> Resu
         return Err(CliError::failed(code, lines).hint(BRIEF_STOP));
     };
     for refusal in refusals {
-        eprintln!("canon evidence add: waived {}", refusal.violation.line());
+        crate::warn_err!("canon evidence add: waived {}", refusal.violation.line());
     }
-    eprintln!("canon evidence add: override recorded by `{}` for the {} brief refusal(s) above: {reason}", args.actor_id, refusals.len());
+    crate::warn_err!("canon evidence add: override recorded by `{}` for the {} brief refusal(s) above: {reason}", args.actor_id, refusals.len());
     Ok(())
 }
 
@@ -1271,9 +1270,8 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         if args.json {
             crate::json_out::data_with_meta(
                 "evidence add",
-                serde_json::json!({ "records": unchanged, "skipped": [], "casesWithoutScenarioId": batch.without_id, "staleReviews": [] }),
-                serde_json::json!({ "unchanged": true }),
-            );
+                &crate::json_out::untyped(serde_json::json!({ "records": unchanged, "skipped": [], "casesWithoutScenarioId": batch.without_id, "staleReviews": [] })),
+                serde_json::json!({ "unchanged": true }));
         }
         return 0;
     }
@@ -1320,7 +1318,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
     }
     let stale = print_stale_reviews(repo, &stale_reviews, promote, json);
     let scope = crate::next::Scope::Scenarios(scenario_ids.iter().map(|id| id.as_str().to_string()).collect());
-    crate::next::finish(repo, "evidence add", &scope, !promote, json, serde_json::json!({ "records": written, "skipped": skipped, "casesWithoutScenarioId": batch.without_id, "staleReviews": stale }));
+    crate::next::finish(repo, "evidence add", &scope, !promote, json, &crate::json_out::untyped(serde_json::json!({ "records": written, "skipped": skipped, "casesWithoutScenarioId": batch.without_id, "staleReviews": stale })));
     0
 }
 
@@ -1657,8 +1655,7 @@ pub fn run_vault(repo: &Path, max_artifact_mib: u64, json: bool) -> i32 {
     if json {
         crate::json_out::data(
             "evidence vault",
-            serde_json::json!({ "boundFiles": files.len(), "stored": stored, "alreadyStored": already, "notStored": missing }),
-        );
+            &crate::json_out::untyped(serde_json::json!({ "boundFiles": files.len(), "stored": stored, "alreadyStored": already, "notStored": missing })));
     }
     0
 }

@@ -165,24 +165,44 @@ pub fn run() -> SelftestReport {
     SelftestReport { suites }
 }
 
+/// `canon selftest --json`: one entry per suite.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SelftestSummary {
+    /// Every suite is clean.
+    pub clean: bool,
+    pub suites: Vec<SuiteSummary>,
+}
+
+/// One suite's outcome in [`SelftestSummary`].
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SuiteSummary {
+    pub name: String,
+    pub clean: bool,
+    /// Fixture checks that cleared.
+    pub passed: usize,
+    /// One line per failing check; empty when the suite is clean.
+    pub failures: Vec<String>,
+}
+
+impl crate::json_out::Report for SelftestSummary {}
+
 /// `canon selftest`'s CLI entry: `0` when every suite is clean, `1` on
 /// any failure. `--json` emits a machine-readable per-suite summary.
 pub fn run_selftest(json: bool) -> ExitCode {
     let report = run();
     if json {
-        let suites: Vec<serde_json::Value> = report
-            .suites
-            .iter()
-            .map(|s| serde_json::json!({ "name": s.name, "clean": s.is_clean(), "passed": s.passed, "failures": s.failures }))
-            .collect();
-        let mut summary = serde_json::json!({ "clean": report.is_clean(), "suites": suites });
+        let summary = SelftestSummary {
+            clean: report.is_clean(),
+            suites: report.suites.iter().map(|s| SuiteSummary { name: s.name.to_string(), clean: s.is_clean(), passed: s.passed, failures: s.failures.clone() }).collect(),
+        };
         if !report.is_clean() {
-            // The failure keeps this command's own shape and gains the shared `error`.
-            let error = crate::cli_error::CliError::failed("SELFTEST_FAILED", "a selftest suite did not pass against its fixtures").hint("the fixtures that differ are listed above; this is a canon defect, so report it with the output");
-            eprintln!("{}", error.human("canon selftest"));
-            summary["error"] = error.to_json()["error"].clone();
+            // The failure keeps the summary in `data`.
+            let error = crate::cli_error::CliError::failed("SELFTEST_FAILED", "a selftest suite did not pass against its fixtures").hint("the failing fixtures are listed in `data.suites[].failures`; this is a canon defect, so report it with the output");
+            return ExitCode::from(error.emit_with_data("canon selftest", true, &summary) as u8);
         }
-        println!("{}", serde_json::to_string_pretty(&summary).expect("selftest summary is always serializable"));
+        crate::json_out::data("selftest", &summary);
     } else {
         print!("{}", report.format_human());
     }

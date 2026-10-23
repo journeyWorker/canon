@@ -490,7 +490,7 @@ pub fn run_scenario_new(repo: &Path, spec: &ScenarioSpec, actor: &Actor, at: Dat
     crate::say!(json, "canon scenario new: wrote `@{}` to {} — {}", tag.as_str(), feature_path.display(), crate::write_mode::DIRECT);
     crate::say!(json, "canon scenario new: {PROVENANCE_NOTE}");
     let scope = crate::next::Scope::Scenarios(vec![tag.as_str().to_string()]);
-    crate::next::finish_with_meta(&repo_root, "scenario new", &scope, false, json, serde_json::json!({ "scenarioId": tag.as_str(), "feature": feature_path.display().to_string() }), provenance_meta());
+    crate::next::finish_with_meta(&repo_root, "scenario new", &scope, false, json, &crate::json_out::untyped(serde_json::json!({ "scenarioId": tag.as_str(), "feature": feature_path.display().to_string() })), provenance_meta());
     0
 }
 
@@ -634,11 +634,11 @@ pub fn run_scenario_batch(repo: &Path, source: &str, actor: &Actor, at: DateTime
 
     if !bad.is_empty() {
         for item in &bad {
-            eprintln!("{COMMAND}: line {}{}: {} — {}", item.line, item.id.as_deref().map(|id| format!(" (`{id}`)")).unwrap_or_default(), item.error.code, item.error.message);
+            crate::human_err!("{COMMAND}: line {}{}: {} — {}", item.line, item.id.as_deref().map(|id| format!(" (`{id}`)")).unwrap_or_default(), item.error.code, item.error.message);
         }
         let refusal = CliError::refused("SCAFFOLD_INVALID_ARGUMENT", format!("{} of {} line(s) invalid; nothing written", bad.len(), lines.len())).hint("fix the listed lines and run the batch again");
-        eprintln!("{}", refusal.human(COMMAND));
-        return refusal.emit_with_data(COMMAND, json, serde_json::json!({ "items": bad.iter().map(BadLine::to_json).collect::<Vec<_>>() }));
+        crate::human_err!("{}", refusal.human(COMMAND));
+        return refusal.emit_with_data(COMMAND, json, &crate::json_out::untyped(serde_json::json!({ "items": bad.iter().map(BadLine::to_json).collect::<Vec<_>>() })));
     }
 
     let mut pending = Vec::new();
@@ -657,7 +657,7 @@ pub fn run_scenario_batch(repo: &Path, source: &str, actor: &Actor, at: DateTime
     }
     crate::say!(json, "{COMMAND}: wrote {} scenario(s) — {}", items.len(), crate::write_mode::DIRECT);
     crate::say!(json, "{COMMAND}: {PROVENANCE_NOTE}");
-    crate::next::finish_with_meta(&repo_root, "scenario new", &crate::next::Scope::Scenarios(ids), false, json, serde_json::json!({ "items": items }), provenance_meta());
+    crate::next::finish_with_meta(&repo_root, "scenario new", &crate::next::Scope::Scenarios(ids), false, json, &crate::json_out::untyped(serde_json::json!({ "items": items })), provenance_meta());
     0
 }
 
@@ -752,7 +752,7 @@ pub fn run_feature_new(
                         actor: crate::status::StepActor::Agent,
                         role: Some(crate::role::Role::Planner),
                     };
-                    crate::json_out::data_with_next("feature new", serde_json::json!({ "feature": feature_path.display().to_string(), "next": next }), &crate::next::After::fixed(vec![step]));
+                    crate::json_out::data_with_next("feature new", &crate::json_out::untyped(serde_json::json!({ "feature": feature_path.display().to_string(), "next": next })), &crate::next::After::fixed(vec![step]));
                 }
                 0
             }

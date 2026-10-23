@@ -17,7 +17,7 @@ fn run_context_pack_new(args: ContextPackNewArgs) -> ExitCode {
     match crate::context_pack::create_from_manifest(&repo, &manifest) {
         Ok(pack) => {
             if json {
-                crate::json_out::data("context-pack new", serde_json::to_value(&pack).expect("context pack is serializable"));
+                crate::json_out::data("context-pack new", &pack);
             } else {
                 println!("{}", pack.id);
             }
@@ -34,7 +34,7 @@ fn run_context_pack_show(repo: &std::path::Path, id: &str, json: bool) -> ExitCo
     match crate::context_pack::show(&repo, id) {
         Ok(pack) => {
             if json {
-                println!("{}", serde_json::to_string_pretty(&pack).expect("context pack is serializable"));
+                crate::json_out::data("context-pack show", &pack);
             } else {
                 println!("{}", pack.id);
             }
@@ -51,7 +51,7 @@ fn run_context_pack_verify(repo: &std::path::Path, id: &str, json: bool) -> Exit
     match crate::context_pack::verify(&repo, id) {
         Ok(()) => {
             if json {
-                println!("{}", serde_json::json!({ "id": id, "verified": true }));
+                crate::json_out::data("context-pack verify", &crate::context_pack::VerifyReport { id: id.to_string(), verified: true });
             } else {
                 println!("context pack {id} verified");
             }

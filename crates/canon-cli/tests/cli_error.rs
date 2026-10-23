@@ -33,9 +33,10 @@ fn json_error(out: &Output) -> Value {
     let body: Value = serde_json::from_str(&stdout(out)).unwrap_or_else(|e| panic!("stdout is not JSON ({e}): {}", stdout(out)));
     let error = body.get("error").unwrap_or_else(|| panic!("no `error` object: {body}")).clone();
     let keys: BTreeSet<&str> = error.as_object().expect("error is an object").keys().map(String::as_str).collect();
-    // `field` and `expected` appear only on a refusal about one argument.
-    let required = BTreeSet::from(["code", "message", "hint", "retryable"]);
-    assert!(required.is_subset(&keys) && keys.is_subset(&BTreeSet::from(["code", "message", "hint", "retryable", "field", "expected"])), "{error}");
+    // `field`, `expected` and `received` appear only on a refusal about one argument.
+    let required = BTreeSet::from(["code", "message", "hint", "retryable", "suggestions"]);
+    assert!(required.is_subset(&keys) && keys.is_subset(&BTreeSet::from(["code", "message", "hint", "retryable", "suggestions", "field", "expected", "received"])), "{error}");
+    assert!(error["suggestions"].is_array(), "{error}");
     assert!(error.get("expected").is_none() || error.get("field").is_some(), "`expected` always comes with `field`: {error}");
     assert!(error["code"].is_string() && error["message"].is_string() && error["retryable"].is_boolean(), "{error}");
     assert!(error["hint"].is_null() || error["hint"].is_string(), "{error}");
@@ -158,11 +159,13 @@ fn json_failures_from_a_command_with_its_own_flag_carry_code_message_hint_and_re
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     let error = json_error(&out);
     assert_eq!((error["code"].as_str(), error["retryable"].as_bool()), (Some("APPROVAL_INCOMPLETE"), Some(false)), "{error}");
-    assert_eq!(human_code(&out), "APPROVAL_INCOMPLETE", "stderr says the same thing: {}", stderr(&out));
+    assert!(stderr(&out).is_empty(), "JSON mode writes nothing to stderr: {}", stderr(&out));
+    let human = run(repo, &["brief", "approve", "--by", "Ana", "--note", " "]);
+    assert_eq!(human_code(&human), "APPROVAL_INCOMPLETE", "human mode says the same thing on stderr: {}", stderr(&human));
 
-    // An operational failure (not a refusal) keeps exit 1.
+    // Exits come from the registry: a missing brief is exit 2.
     let out = run(repo, &["brief", "check", "--change-id", "no-such-change", "--json"]);
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     assert_eq!(json_error(&out)["code"], "BRIEF_NOT_FOUND");
 
     let out = run(repo, &["subject", "status", "no-such-subject", "--to", "specced", "--json"]);
@@ -216,11 +219,11 @@ fn constructed_codes() -> BTreeSet<String> {
 #[test]
 fn the_code_registry_is_unique_sorted_and_matches_the_codes_the_sources_construct() {
     let registry = canon_cli::cli_error::all_codes();
-    let codes: Vec<&str> = registry.iter().map(|(code, _)| *code).collect();
+    let codes: Vec<&str> = registry.iter().map(|info| info.code).collect();
     let unique: BTreeSet<&str> = codes.iter().copied().collect();
     assert_eq!(unique.len(), codes.len(), "a code is registered twice");
     assert!(codes.windows(2).all(|w| w[0] < w[1]), "the registry is sorted by code");
-    assert!(registry.iter().all(|(code, meaning)| !meaning.trim().is_empty() && code.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')), "every code is SCREAMING_SNAKE with a meaning");
+    assert!(registry.iter().all(|info| !info.meaning.trim().is_empty() && info.code.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')), "every code is SCREAMING_SNAKE with a meaning");
 
     let constructed = constructed_codes();
     let unregistered: Vec<_> = constructed.iter().filter(|c| !unique.contains(c.as_str())).collect();
@@ -231,4 +234,44 @@ fn the_code_registry_is_unique_sorted_and_matches_the_codes_the_sources_construc
     let text: String = sources().into_iter().filter(|(name, _)| name != "cli_error.rs").map(|(_, t)| t).collect();
     let dead: Vec<_> = codes.iter().filter(|c| !text.contains(&format!("\"{c}\"")) && !text.contains(&format!("({c})"))).collect();
     assert!(dead.is_empty(), "registered but never used: {dead:?}");
+}
+
+#[test]
+fn every_code_declares_its_exit_and_retryability_and_the_d4_families_map_to_two() {
+    for info in canon_cli::cli_error::all_codes() {
+        assert!(matches!(info.exit, 1 | 2), "{} declares exit {} (only 1 and 2 are errors)", info.code, info.exit);
+        assert!(!info.meaning.trim().is_empty(), "{} has no meaning", info.code);
+        if info.code.ends_with("_NOT_FOUND") || info.code.ends_with("_UNREADABLE") || info.code.ends_with("_INVALID_ARGUMENT") {
+            assert_eq!(info.exit, 2, "{} names a missing, unreadable or invalid input, so it is a refusal (exit 2)", info.code);
+        }
+    }
+    let exit_of = |code: &str| canon_cli::cli_error::code_info(code).unwrap_or_else(|| panic!("{code} is not registered")).exit;
+    assert_eq!(exit_of("BRIEF_HAS_BLOCKERS"), 1, "blockers are a finding");
+    assert_eq!(exit_of("GATE_VIOLATIONS"), 1);
+    assert_eq!(exit_of("CONFIG_MISSING"), 2);
+    assert_eq!(exit_of("USAGE"), 2);
+    assert!(canon_cli::cli_error::code_info("DISPATCH_END_IN_PROGRESS").unwrap().retryable, "a concurrent close is the retryable case");
+    assert!(!canon_cli::cli_error::code_info("USAGE").unwrap().retryable);
+}
+
+#[test]
+fn a_cli_error_takes_its_exit_and_retryability_from_the_registry() {
+    use canon_cli::cli_error::CliError;
+    assert_eq!(CliError::refused("BRIEF_NOT_FOUND", "x").exit, 2);
+    assert_eq!(CliError::failed("BRIEF_NOT_FOUND", "x").exit, 2, "the constructor does not choose the exit");
+    assert_eq!(CliError::failed("GATE_VIOLATIONS", "x").exit, 1);
+    assert!(CliError::refused("DISPATCH_END_IN_PROGRESS", "x").retryable);
+}
+
+#[test]
+fn a_received_value_is_redacted_when_it_looks_like_a_secret() {
+    use canon_cli::cli_error::redact;
+    assert_eq!(redact(Some("--api-token"), "abc"), "<redacted>");
+    assert_eq!(redact(None, "CANON_SECRET=hunter2"), "CANON_SECRET=<redacted>");
+    assert_eq!(redact(None, "ghp_0123456789abcdef"), "<redacted>");
+    assert_eq!(redact(None, "Ab3dEf6hIj9kLm2nOp5qRs8tUv1"), "<redacted>");
+    assert_eq!(redact(Some("--kind"), "evidence"), "evidence");
+    let digest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    assert_eq!(redact(Some("--plan-digest"), digest), digest, "a digest is not a secret");
+    assert_eq!(redact(Some("--signature-file"), "approval.sig"), "approval.sig");
 }

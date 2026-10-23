@@ -142,8 +142,10 @@ use canon_store::cursor::{file_digest, CursorStore, SourceCursor};
 use canon_store::policy::{PolicyError, TierPolicy};
 use canon_store::registry::TierRegistry;
 use canon_store::tier::StoreError;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::json_out::Report;
 use crate::context::resolve_repo_root;
 use crate::tiers::TierCliError;
 
@@ -223,7 +225,8 @@ impl PlanSource {
 /// One configured source's contribution to a pass (human + `--json`
 /// output, task 3.5: "per-source counts + drop diagnostics + malformed
 /// tallies").
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct PlanSourceSummary {
     pub dialect: String,
     pub root: String,
@@ -268,7 +271,8 @@ pub struct PlanSourceSummary {
 /// process level". Never flagged for a legitimately empty/fresh source
 /// (`malformed == 0`) or a partial success (`persisted > 0`) — see
 /// [`run`]'s own flagging logic.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct NonCleanSource {
     pub dialect: String,
     pub root: String,
@@ -276,7 +280,8 @@ pub struct NonCleanSource {
 }
 
 /// One `canon ingest plans` pass's outcome.
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct PlansOutcome {
     pub sources: Vec<PlanSourceSummary>,
     pub changes_persisted: usize,
@@ -295,6 +300,8 @@ pub struct PlansOutcome {
     /// non-empty. Empty for an ordinary clean/partial-success pass.
     pub non_clean_sources: Vec<NonCleanSource>,
 }
+
+impl Report for PlansOutcome {}
 
 /// `canon.yaml`'s top-level `plans:` section — see module doc.
 #[derive(Debug, Default, Deserialize)]

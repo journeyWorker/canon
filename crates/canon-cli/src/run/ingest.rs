@@ -28,9 +28,8 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
     loop {
         match crate::ingest::run(canon_yaml, &home, true, full, all_workspaces) {
             Ok(outcome) if json => {
-                // One document per pass (one per poll under `--watch`); the human summary goes to stderr.
-                eprint!("{}", crate::ingest::format_human(&outcome));
-                crate::json_out::data("ingest sessions", crate::ingest::summary_json(&outcome));
+                // One document per pass (one per poll under `--watch`); the human summary is for human mode.
+                crate::json_out::data("ingest sessions", &crate::json_out::untyped(crate::ingest::summary_json(&outcome)));
             }
             Ok(outcome) => {
                 print!("{}", crate::ingest::format_human(&outcome));
@@ -74,7 +73,7 @@ fn run_ingest_artifacts(repo: &std::path::Path, watch: bool, interval_secs: u64,
         match crate::artifact_ingest::run(repo, run_id) {
             Ok(outcome) => {
                 if json {
-                    crate::next::finish(repo, "ingest artifacts", &crate::next::Scope::Repo, false, true, serde_json::from_str(&crate::artifact_ingest::format_json(&outcome)).expect("the outcome is one JSON value"));
+                    crate::next::finish(repo, "ingest artifacts", &crate::next::Scope::Repo, false, true, &outcome);
                 } else {
                     print!("{}", crate::artifact_ingest::format_human(&outcome));
                 }
@@ -114,12 +113,11 @@ fn run_ingest_plans(repo: &std::path::Path, dialect: Option<&str>, source: Optio
     match crate::plans::run(repo, dialect, source) {
         Ok(outcome) => {
             if json {
-                let body: serde_json::Value = serde_json::from_str(&crate::plans::format_json(&outcome)).expect("plans JSON is one value");
                 if outcome.non_clean_sources.is_empty() {
-                    crate::next::finish(repo, "ingest plans", &crate::next::Scope::Repo, false, true, body);
+                    crate::next::finish(repo, "ingest plans", &crate::next::Scope::Repo, false, true, &outcome);
                 } else {
                     // The failure keeps the outcome as `data` beside the shared `error`.
-                    CliError::failed("INGEST_SOURCE_UNUSABLE", "a plan source was malformed and persisted nothing").hint("fix the malformed plan source named in the output, then run `canon ingest plans` again").emit_with_data("canon ingest plans", true, body);
+                    CliError::failed("INGEST_SOURCE_UNUSABLE", "a plan source was malformed and persisted nothing").hint("fix the malformed plan source named in the output, then run `canon ingest plans` again").emit_with_data("canon ingest plans", true, &outcome);
                 }
             } else {
                 print!("{}", crate::plans::format_human(&outcome));
@@ -128,7 +126,8 @@ fn run_ingest_plans(repo: &std::path::Path, dialect: Option<&str>, source: Optio
                 }
             }
             for flagged in &outcome.non_clean_sources {
-                eprintln!(
+                crate::say_err!(
+                    json,
                     "canon ingest plans: WARN {} ({}): {} malformed construct(s), 0 persisted -- this source's pass produced nothing usable; see the named malformed entries above (or in --json) for path + reason + hint, a `root:` misconfiguration is a likely cause",
                     flagged.dialect, flagged.root, flagged.malformed
                 );

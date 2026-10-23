@@ -119,7 +119,7 @@ fn query_count(repo: &Path, kind: &str, history: bool) -> usize {
     }
     let o = canon(repo, &args);
     assert!(o.status.success(), "{}", out(&o));
-    json(&o)["count"].as_u64().unwrap_or_else(|| panic!("no count: {}", out(&o))) as usize
+    json(&o)["data"]["count"].as_u64().unwrap_or_else(|| panic!("no count: {}", out(&o))) as usize
 }
 
 /// `status --json` without the fields that change from one run to the next.

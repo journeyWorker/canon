@@ -16,6 +16,7 @@
 //! vocabulary) is dropped for the same
 //! reason — no canon directive semantics-flag vocabulary exists.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::manifest::types::{AttrDecl, Literal, Type};
@@ -30,7 +31,7 @@ pub struct EnumsFile {
     pub enums: std::collections::BTreeMap<String, Vec<String>>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct DirectiveDecl {
     pub name: String,
     pub attrs: Vec<AttrDecl>,

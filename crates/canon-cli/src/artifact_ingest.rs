@@ -362,8 +362,10 @@ use canon_store::policy::{BackendConfig, Rung, TierPolicy};
 use canon_store::registry::TierRegistry;
 use canon_store::tier::{StoreError, TierQuery};
 use chrono::{DateTime, Utc};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::json_out::Report;
 use crate::context::resolve_repo_root;
 use crate::dispatch::DispatchError;
 use crate::tiers::{self, TierCliError};
@@ -465,7 +467,8 @@ pub enum ArtifactIngestError {
 /// visible, distinct outcome (module doc's "documented seam"), never
 /// collapsed into the same zero-events shape an unconfigured
 /// `Path`-source adapter reports.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ArtifactAdapterSummary {
     pub adapter_id: &'static str,
     /// `"path"` | `"records"` (mirrors [`ArtifactSourceKind`]).
@@ -484,7 +487,8 @@ pub struct ArtifactAdapterSummary {
 }
 
 /// One regime-keyed trajectory this pass persisted.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct PersistedTrajectory {
     pub regime_key: String,
     pub verdict_count: usize,
@@ -509,7 +513,8 @@ pub struct PersistedTrajectory {
 /// `query_by_regime_key` — which is the whole point: the alternative
 /// this replaced silently deleted the loser and changed what the gate
 /// saw.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ConvergenceConflict {
     /// The namespace both rows sit under.
     pub regime_key: String,
@@ -528,7 +533,8 @@ pub struct ConvergenceConflict {
 }
 
 /// One `canon ingest artifacts` pass's outcome.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ArtifactIngestOutcome {
     pub adapters: Vec<ArtifactAdapterSummary>,
     pub verdicts_derived: usize,
@@ -609,6 +615,8 @@ pub struct ArtifactIngestOutcome {
     /// never an error.
     pub trajectories_left_pending: usize,
 }
+
+impl Report for ArtifactIngestOutcome {}
 
 #[derive(Debug, Clone, Default, Deserialize)]
 struct ArtifactsSectionManifest {

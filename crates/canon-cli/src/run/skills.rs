@@ -23,7 +23,7 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
                 }
                 if json {
                     let skills: Vec<_> = report.installed.iter().map(|s| serde_json::json!({ "name": s.name, "version": s.version, "changed": s.changed })).collect();
-                    crate::json_out::data("skills install", serde_json::json!({ "skills": skills }));
+                    crate::json_out::data("skills install", &crate::json_out::untyped(serde_json::json!({ "skills": skills })));
                 }
                 ExitCode::SUCCESS
             }
@@ -59,7 +59,7 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
             if json {
                 crate::json_out::data(
                     "skills install",
-                    serde_json::json!({
+                    &crate::json_out::untyped(serde_json::json!({
                         "providers": report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>(),
                         "selection": selection.describe(),
                         "changed": report.changed,
@@ -67,8 +67,7 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
                         "pruned": report.pruned.iter().map(|o| serde_json::json!({ "path": o.path.display().to_string(), "provider": o.provider.as_str(), "reason": o.reason() })).collect::<Vec<_>>(),
                         "kept": report.kept.iter().map(|o| serde_json::json!({ "path": o.path.display().to_string(), "provider": o.provider.as_str(), "reason": o.reason(), "hint": o.by_hand() })).collect::<Vec<_>>(),
                         "ownedPaths": owned,
-                    }),
-                );
+                    })));
             }
             ExitCode::SUCCESS
         }
@@ -102,7 +101,7 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
             });
             if clean {
                 if json {
-                    crate::json_out::data("skills check", data);
+                    crate::json_out::data("skills check", &crate::json_out::untyped(data));
                 }
                 ExitCode::SUCCESS
             } else {
@@ -110,7 +109,7 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
                 let by_hand: Vec<String> = report.orphans.iter().filter(|o| o.modified).map(|o| o.path.display().to_string()).collect();
                 let hint = if by_hand.is_empty() { format!("run `{fix}`") } else { format!("run `{fix}`, which prunes the orphans whose bytes still match the install lock; it keeps the modified ones ({}), so remove those by hand", by_hand.join(", ")) };
                 let orphaned = if report.orphans.is_empty() { String::new() } else { format!("; orphaned (no longer shipped by the bundle): {}", report.orphans.iter().map(|o| o.path.display().to_string()).collect::<Vec<_>>().join(", ")) };
-                ExitCode::from(CliError::failed("SKILLS_DRIFT", format!("an installed skill is missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version{orphaned}")).hint(hint).emit_with_data("canon skills check", json, data) as u8)
+                ExitCode::from(CliError::failed("SKILLS_DRIFT", format!("an installed skill is missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version{orphaned}")).hint(hint).emit_with_data("canon skills check", json, &crate::json_out::untyped(data)) as u8)
             }
         }
         Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).hint("check that the target directory is writable; `canon skills doctor` diagnoses the installation").emit("canon skills check", json) as u8) }
@@ -123,7 +122,7 @@ fn run_skills_doctor(source: Option<&std::path::Path>, target: &std::path::Path,
         Ok(lines) => {
             for line in &lines { crate::say!(json, "{line}"); }
             if json {
-                crate::json_out::data("skills doctor", serde_json::json!({ "lines": lines }));
+                crate::json_out::data("skills doctor", &crate::json_out::untyped(serde_json::json!({ "lines": lines })));
             }
             ExitCode::SUCCESS
         }

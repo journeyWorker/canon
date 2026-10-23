@@ -115,8 +115,10 @@ use canon_gate::{latest_verdicts, CellKey, GateContext, GateCtx, LedgerEntry, Po
 use canon_model::{AuditResult, ChangeId, EvidenceVerdict, Finding, ProjectId, RecordKind, Scenario, Subject, SubjectStatus};
 use canon_policy::SchemaRegistry;
 use chrono::Utc;
+use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::json_out::Report;
 use crate::context::{resolve_repo_root, spec_coverage_surface, SpecCoverageSurface};
 use crate::brief::BriefStatus;
 use crate::role::Role;
@@ -140,7 +142,7 @@ const DISPLAY_ORDER: [SubjectStatus; 6] =
 const NEXT_ORDER: [SubjectStatus; 5] = [SubjectStatus::Verifying, SubjectStatus::Building, SubjectStatus::Specced, SubjectStatus::Proposed, SubjectStatus::Shipped];
 
 /// The whole report, in the order it prints.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StatusReport {
     pub status_version: u32,
@@ -157,13 +159,19 @@ pub struct StatusReport {
     /// `require_audit` is off and no latest audit is refuted.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audits: Option<AuditSummary>,
+    /// The next steps, role-filtered: carried in `meta.next` (with `nextOmitted` and `waitingOn`), not in `data`.
+    #[serde(skip)]
+    #[schemars(skip)]
     pub next: Vec<NextStep>,
     /// How many further `next` entries the rules produced past
-    /// [`NEXT_LIMIT`].
+    /// [`NEXT_LIMIT`]: `meta.nextOmitted`.
+    #[serde(skip)]
+    #[schemars(skip)]
     pub next_omitted: usize,
     /// With a declared role: how many steps each other owner holds
-    /// (`human` for the steps only the human takes). Absent without one.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// (`human` for the steps only the human takes): `meta.waitingOn`.
+    #[serde(skip)]
+    #[schemars(skip)]
     pub waiting_on: Option<BTreeMap<String, usize>>,
     /// Every step the rules produced, before the limit and the role
     /// filter: what [`crate::next`] scopes a write's `meta.next` from.
@@ -180,8 +188,10 @@ pub struct StatusReport {
     pub change_subjects: BTreeMap<String, Vec<String>>,
 }
 
+impl Report for StatusReport {}
+
 /// Where audits stand (0.15 D3).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AuditSummary {
     /// In-scope scenarios `spec_coverage.require_audit` sampled (0 when
@@ -197,7 +207,7 @@ pub struct AuditSummary {
     pub refuted: Vec<AuditEntry>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AuditEntry {
     pub scenario: String,
@@ -209,7 +219,7 @@ pub struct AuditEntry {
     pub evaluator: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct PolicyStatus {
     /// Whether `.canon/policy.yaml` exists.
     pub present: bool,
@@ -222,7 +232,7 @@ pub struct PolicyStatus {
     pub level: Option<&'static str>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SubjectSummary {
     pub id: String,
@@ -291,7 +301,7 @@ pub struct SubjectSummary {
 }
 
 /// One flow step of the brief and what covers it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FlowStep {
     /// `F1`.
@@ -305,7 +315,7 @@ pub struct FlowStep {
 
 /// One scenario covering a flow step, with the evidence and review state
 /// the gate reads for it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FlowScenarioState {
     pub id: String,
@@ -320,7 +330,7 @@ pub struct FlowScenarioState {
     pub review: &'static str,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MissingCase {
     /// The `specs.roots[]` id the surface lives under.
@@ -344,7 +354,7 @@ pub struct NextStep {
 
 /// Who carries out a `next` step (0.16 D1). The only `human` step is
 /// getting a brief approved.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum StepActor {
     Agent,
@@ -385,13 +395,17 @@ pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> i32 {
     let mut report = resolve_with_pending_index(&repo);
     report.apply_role(Role::current(None));
     if json {
-        let shown = match fields {
-            Some(requested) => serde_json::to_value(&report).and_then(|v| serde_json::to_string_pretty(&crate::paging::project(&v, requested))),
-            None => serde_json::to_string_pretty(&report),
-        };
-        match shown {
-            Ok(text) => println!("{text}"),
-            Err(e) => return crate::cli_error::CliError::failed("SERIALIZE_FAILED", format!("failed to serialize status: {e}")).hint("this is a canon bug: report it together with the command line that produced it").emit("canon status", true),
+        let after = crate::next::After::of_status(&report);
+        let warnings = crate::json_out::warnings_meta(&report.warnings);
+        match fields {
+            Some(requested) => {
+                let projected = serde_json::to_value(&report).map(|v| crate::paging::project(&v, requested));
+                match projected {
+                    Ok(value) => crate::json_out::data_with_next_and_meta("status", &crate::json_out::Projected::<StatusReport>::new(value), &after, warnings),
+                    Err(e) => return crate::cli_error::CliError::failed("SERIALIZE_FAILED", format!("failed to serialize status: {e}")).hint("this is a canon bug: report it together with the command line that produced it").emit("canon status", true),
+                }
+            }
+            None => crate::json_out::data_with_next_and_meta("status", &report, &after, warnings),
         }
     } else {
         print!("{}", render(&report));
@@ -435,7 +449,7 @@ pub fn split_by_role(steps: Vec<NextStep>, role: Role) -> (Vec<NextStep>, BTreeM
 
 /// The top-level fields of the `--json` report, which `--fields` may name.
 /// `audits` is omitted from a report that has none.
-const REPORT_FIELDS: [&str; 10] = ["statusVersion", "canonVersion", "policy", "warnings", "subjects", "unowned", "audits", "next", "nextOmitted", "waitingOn"];
+const REPORT_FIELDS: [&str; 7] = ["statusVersion", "canonVersion", "policy", "warnings", "subjects", "unowned", "audits"];
 
 /// Build the report for an already-resolved repo root. The caller has
 /// refreshed a stale scenario index (a writer that reports does, first);

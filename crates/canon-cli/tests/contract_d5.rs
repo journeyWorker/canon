@@ -54,11 +54,11 @@ fn files_under(dir: &Path, kind: &str) -> usize {
 #[test]
 fn status_keeps_only_the_named_fields_and_refuses_an_unknown_one() {
     let dir = repo();
-    let out = run(dir.path(), &["status", "--json", "--fields", "subjects,next"]);
+    let out = run(dir.path(), &["status", "--json", "--fields", "subjects,policy"]);
     assert!(out.status.success());
-    let mut got = keys(&body(&out));
+    let mut got = keys(&body(&out)["data"]);
     got.sort();
-    assert_eq!(got, ["next", "subjects"]);
+    assert_eq!(got, ["policy", "subjects"]);
 
     let out = run(dir.path(), &["status", "--json", "--fields", "subjects,nope"]);
     assert_eq!(out.status.code(), Some(2));
@@ -73,7 +73,7 @@ fn context_keeps_only_the_named_sections() {
     let dir = repo();
     let out = run(dir.path(), &["context", "--json", "--fields", "kinds,enums"]);
     assert!(out.status.success());
-    let mut got = keys(&body(&out));
+    let mut got = keys(&body(&out)["data"]);
     got.sort();
     assert_eq!(got, ["enums", "kinds"]);
     let out = run(dir.path(), &["context", "--json", "--fields", "nope"]);
@@ -148,10 +148,10 @@ fn usage_errors_name_the_argument_and_its_possible_values() {
     assert_eq!(e["field"], "--verdict");
     assert_eq!(strings(&e["expected"]), ["faithful", "not-applicable", "divergent"]);
 
-    // No set to offer for an unknown flag: only the field.
+    // An unknown flag names itself and offers the flags the command does take.
     let e = error_of(dir.path(), &["status", "--bogus"]);
-    assert_eq!(e["field"], "--bogus");
-    assert!(e.get("expected").is_none(), "{e}");
+    assert_eq!((e["code"].as_str(), e["field"].as_str(), e["received"].as_str()), (Some("USAGE"), Some("--bogus"), Some("--bogus")));
+    assert!(strings(&e["expected"]).contains(&"--json"), "{e}");
 }
 
 #[test]
@@ -282,7 +282,7 @@ fn context_exits_zero_even_when_canon_yaml_is_unreadable_and_says_so() {
     std::fs::write(dir.path().join("canon.yaml"), "tiers: [broken\n").unwrap();
     let out = run(dir.path(), &["context", "--json"]);
     assert_eq!(out.status.code(), Some(0));
-    assert!(body(&out)["policy"].is_object(), "the surface is still described");
+    assert!(body(&out)["data"]["policy"].is_object(), "the surface is still described");
 }
 
 #[test]
@@ -306,7 +306,7 @@ fn dispatch_diff_exits_zero_whatever_it_finds() {
     let dir = repo();
     let out = run(dir.path(), &["dispatch", "diff", "--json"]);
     assert_eq!(out.status.code(), Some(0));
-    assert!(body(&out)["counts"].is_object());
+    assert!(body(&out)["data"]["counts"].is_object());
 }
 
 #[test]

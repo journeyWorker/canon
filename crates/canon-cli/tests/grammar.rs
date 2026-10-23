@@ -235,7 +235,8 @@ fn an_unknown_canon_role_is_refused_with_unknown_role() {
     let out = canon_with(dir.path(), &["schema", "--json"], &[("CANON_ROLE", "janitor")]);
     assert_eq!(out.status.code(), Some(2), "{}{}", stdout(&out), stderr(&out));
     assert_eq!(json_of(&out)["error"]["code"], "UNKNOWN_ROLE");
-    assert!(stderr(&out).contains("UNKNOWN_ROLE") && stderr(&out).contains("janitor"), "{}", stderr(&out));
+    assert!(json_of(&out)["error"]["message"].as_str().unwrap().contains("janitor"), "{}", stdout(&out));
+    assert!(stderr(&out).is_empty(), "--json writes nothing to stderr: {}", stderr(&out));
 
     let human = canon_with(dir.path(), &["status"], &[("CANON_ROLE", "janitor")]);
     assert_eq!(human.status.code(), Some(2));
@@ -260,7 +261,7 @@ fn record_role_defaults_to_the_declared_implementer_or_reviewer() {
     let undeclared = evidence_without_role(repo, &[]);
     assert_eq!(undeclared.status.code(), Some(2), "{}", stderr(&undeclared));
     assert_eq!(json_of(&undeclared)["error"]["code"], "USAGE");
-    assert!(stderr(&undeclared).contains("--role"), "{}", stderr(&undeclared));
+    assert!(json_of(&undeclared)["error"].to_string().contains("--role"), "{}", stdout(&undeclared));
 
     let planner = evidence_without_role(repo, &[("CANON_ROLE", "planner")]);
     assert_eq!(planner.status.code(), Some(2), "a planner records no evidence by default: {}", stderr(&planner));

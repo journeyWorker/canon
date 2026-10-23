@@ -12,9 +12,11 @@ use std::process::Command;
 
 use canon_model::records::StrategyRef;
 use canon_store::write_atomic;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::json_out::Report;
 use crate::cli_error::CliError;
 
 pub const CONTEXT_PACK_FORMAT_VERSION: u32 = 1;
@@ -75,7 +77,7 @@ fn digest(bytes: &[u8]) -> String {
     format!("sha256:{:x}", Sha256::digest(bytes))
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ContentRef {
     pub digest: String,
@@ -83,7 +85,7 @@ pub struct ContentRef {
     pub replayable: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FileSnapshot {
     pub path: String,
@@ -92,7 +94,7 @@ pub struct FileSnapshot {
     pub content: ContentRef,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RepoIdentity {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -101,7 +103,7 @@ pub struct RepoIdentity {
     pub state_digest: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkRefs {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -110,7 +112,7 @@ pub struct WorkRefs {
     pub task_ref: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PromptSnapshot {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -123,7 +125,7 @@ pub struct PromptSnapshot {
     pub output_schema: Option<FileSnapshot>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolSnapshot {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -193,7 +195,7 @@ impl ContextPackSpec {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextPack {
     pub format_version: u32,
@@ -227,7 +229,9 @@ pub struct ContextPack {
     pub non_replayable: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+impl Report for ContextPack {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PromptBundleVersion {
     pub name: String,
@@ -235,6 +239,8 @@ pub struct PromptBundleVersion {
     pub digest: String,
     pub prompts: PromptSnapshot,
 }
+
+impl Report for PromptBundleVersion {}
 
 /// Register a prompt bundle version by copying only its explicitly selected
 /// files into the same immutable content registry used by ContextPack.
@@ -589,6 +595,18 @@ fn scan_sensitive_bytes(bytes: &[u8], label: &str) -> Result<(), ContextPackErro
     }
     Ok(())
 }
+
+/// `canon context-pack verify --json`'s `data`.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifyReport {
+    /// The pack id that was checked.
+    pub id: String,
+    /// Always `true`: a pack that fails verification is the `CONTEXT_PACK_TAMPERED` error.
+    pub verified: bool,
+}
+
+impl Report for VerifyReport {}
 
 #[cfg(test)]
 mod tests {

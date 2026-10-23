@@ -52,7 +52,7 @@ impl Reply {
     }
 
     pub fn error(status: u16, error: &CliError) -> Self {
-        Reply { status, body: error.to_json() }
+        Reply { status, body: error.envelope("dashboard briefs") }
     }
 }
 
@@ -157,7 +157,7 @@ pub fn list(repo: &Path) -> Reply {
             "approvable": blocking.is_empty(),
         }));
     }
-    Reply::ok(crate::json_out::envelope("dashboard briefs", json!({ "briefs": briefs, "unreadable": unreadable })))
+    Reply::ok(crate::json_out::envelope("dashboard briefs", &crate::json_out::untyped(json!({ "briefs": briefs, "unreadable": unreadable }))))
 }
 
 /// The `POST /api/briefs/approve` body.
@@ -185,9 +185,9 @@ pub fn approve(repo: &Path, body: &[u8]) -> Reply {
     }
     match crate::brief_approve::approve(repo, Some(&change), &request.by, &request.note, Some(&request.sha256)) {
         Ok(approved) => {
-            eprintln!("canon dashboard: {} approved by `{}` ({})", approved.brief, approved.approved_by, approved.digest);
+            crate::human_err!("canon dashboard: {} approved by `{}` ({})", approved.brief, approved.approved_by, approved.digest);
             let after = crate::next::after_with(repo, &crate::next::Scope::Change(approved.change.clone()), false, Vec::new());
-            let body = crate::json_out::envelope_with_next("brief approve", serde_json::to_value(&approved).unwrap_or_default(), &after, Value::Null);
+            let body = crate::json_out::envelope_with_next("brief approve", &approved, &after, Value::Null);
             Reply::ok(body)
         }
         Err(e) => {

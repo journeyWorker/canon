@@ -86,7 +86,7 @@ fn query_scenarios_with_plugin(dir: &Path) -> Vec<Value> {
     let out = run_canon(&["query", "--kind", "scenario", "--canon-yaml", "canon.yaml", "--plugin", "porting", "--json"], dir);
     assert!(out.status.success(), "canon query --plugin porting failed: {}", stderr(&out));
     let json: Value = serde_json::from_str(&stdout(&out)).unwrap_or_else(|e| panic!("query --json didn't parse: {e}\n{}", stdout(&out)));
-    json["records"].as_array().cloned().unwrap_or_default()
+    json["data"]["records"].as_array().cloned().unwrap_or_default()
 }
 
 fn scenario_record<'a>(records: &'a [Value], scenario_id: &str) -> &'a Value {

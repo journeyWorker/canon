@@ -136,7 +136,7 @@ pub fn run_stage(
     let outcome = crate::gate::promote_after_stage("canon divergence add", &gate_ctx.ledger_root, &location, promote, json);
     crate::say!(json, "canon divergence add: {} — {}", outcome.landed(&location), outcome.suffix());
     if json {
-        crate::json_out::data("divergence add", outcome.json(&location));
+        crate::json_out::data("divergence add", &crate::json_out::untyped(outcome.json(&location)));
     }
     outcome.exit_code()
 }
@@ -197,11 +197,11 @@ pub fn run_promote(repo: &Path, dry_run: bool, json: bool) -> i32 {
             let data = crate::gate::promote_json(&report, dry_run);
             if report.is_clean() {
                 if json {
-                    crate::json_out::data("divergence promote", data);
+                    crate::json_out::data("divergence promote", &crate::json_out::untyped(data));
                 }
                 0
             } else {
-                CliError::failed("PROMOTE_REFUSED", format!("{} staged divergence(s) refused", report.refused.len())).hint("`canon gate check` names what promotion refused; fix it, then run `canon divergence promote` (the record stays staged)").emit_with_data("canon divergence promote", json, data)
+                CliError::failed("PROMOTE_REFUSED", format!("{} staged divergence(s) refused", report.refused.len())).hint("`canon gate check` names what promotion refused; fix it, then run `canon divergence promote` (the record stays staged)").emit_with_data("canon divergence promote", json, &crate::json_out::untyped(data))
             }
         }
         Err(e) => {
@@ -243,7 +243,7 @@ fn run_commit(
         Ok(target) => {
             crate::say!(json, "canon divergence {verb}: committed {} — {}", target.display(), crate::write_mode::PROMOTED);
             if json {
-                crate::json_out::data(&format!("divergence {verb}"), serde_json::json!({ "committed": target.display().to_string() }));
+                crate::json_out::data(&format!("divergence {verb}"), &crate::json_out::untyped(serde_json::json!({ "committed": target.display().to_string() })));
             }
             0
         }
@@ -460,8 +460,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
         &scope,
         false,
         args.json,
-        serde_json::json!({ "tracking": args.tracking, "expiry": args.expiry.map(|e| e.format("%Y-%m-%d").to_string()), "accepted": accepted }),
-    );
+        &crate::json_out::untyped(serde_json::json!({ "tracking": args.tracking, "expiry": args.expiry.map(|e| e.format("%Y-%m-%d").to_string()), "accepted": accepted })));
     0
 }
 
@@ -522,25 +521,22 @@ pub fn run_status(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &
                 }
             })
             .collect();
-        let mut meta_json = serde_json::json!({ "command": "divergence status" });
-        meta.insert_into(meta_json.as_object_mut().expect("meta is an object"));
-        let out = serde_json::json!({
-            "data": {
-                "as_of": as_of.to_rfc3339(),
-                "summary": {
-                    "open": summary.open,
-                    "resolved": summary.resolved,
-                    "still_divergent": summary.still_divergent,
-                    "deferred": summary.deferred,
-                    "resolved_invalid": summary.resolved_invalid,
-                    "accepted": summary.accepted,
-                    "total": summary.total(),
-                },
-                "scenarios": scenarios,
+        let data = serde_json::json!({
+            "as_of": as_of.to_rfc3339(),
+            "summary": {
+                "open": summary.open,
+                "resolved": summary.resolved,
+                "still_divergent": summary.still_divergent,
+                "deferred": summary.deferred,
+                "resolved_invalid": summary.resolved_invalid,
+                "accepted": summary.accepted,
+                "total": summary.total(),
             },
-            "meta": meta_json,
+            "scenarios": scenarios,
         });
-        println!("{}", serde_json::to_string_pretty(&out).expect("a JSON value always serializes"));
+        let mut page = serde_json::Map::new();
+        meta.insert_into(&mut page);
+        crate::json_out::data_with_meta("divergence status", &crate::json_out::untyped(data), serde_json::Value::Object(page));
         return 0;
     }
 

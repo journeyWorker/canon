@@ -109,7 +109,7 @@ pub fn run_compact(repo: &Path, dry_run: bool, json: bool) -> i32 {
         crate::say!(json, "{line}");
     }
     if json {
-        crate::json_out::data("ledger compact", data(&repo, dry_run, &kinds));
+        crate::json_out::data("ledger compact", &crate::json_out::untyped(data(&repo, dry_run, &kinds)));
     }
     0
 }
@@ -134,6 +134,6 @@ pub fn migrate_lines(repo: &Path, dry_run: bool) -> Result<Vec<String>, CliError
 /// append; it never turns the writer's own error into a different one.
 pub(crate) fn restore_after_rollback(ledger_root: &Path, kind: canon_model::RecordKind) {
     if let Err(e) = GitTier::new(ledger_root).restore_unsuperseded(kind) {
-        eprintln!("canon: rolled back, but could not restore the archived {} version(s) the rolled-back records had replaced ({e}); copy them back from the archive beside the ledger", kind.as_str());
+        crate::warn_err!("canon: rolled back, but could not restore the archived {} version(s) the rolled-back records had replaced ({e}); copy them back from the archive beside the ledger", kind.as_str());
     }
 }

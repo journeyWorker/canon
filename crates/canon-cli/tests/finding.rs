@@ -1370,21 +1370,25 @@ fn finding_list_json_carries_the_same_rows() {
     let out = run_canon(&["finding", "list", "--change-id", "s43-findings-are-records", "--json"], dir.path());
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     let json: serde_json::Value = serde_json::from_str(&stdout(&out)).expect("stdout is one JSON document");
+    assert_eq!(json["ok"], true, "{json}");
+    assert_eq!(json["meta"]["returned"], 2);
+    assert_eq!(json["meta"]["total"], 2);
+    assert_eq!(json["meta"]["hasMore"], false);
+    assert!(json["meta"]["nextCursor"].is_null());
     assert_eq!(
-        json,
+        json["data"],
         serde_json::json!({
             "change_id": "s43-findings-are-records",
             "findings": [
                 {"round": 1, "seq": 1, "severity": "blocker", "disposition": "rejected", "reviewer": "rev-a", "summary": "teardown races HMR", "resolution_sha": null, "file_ref": null, "reason": "by design"},
                 {"round": 1, "seq": 2, "severity": "should-fix", "disposition": "open", "reviewer": "rev-b", "summary": "the count was typed by hand", "resolution_sha": null, "file_ref": null, "reason": null},
-            ],
-            "meta": {"returned": 2, "total": 2, "hasMore": false, "nextCursor": null}
+            ]
         })
     );
     let open = run_canon(&["finding", "list", "--change-id", "s43-findings-are-records", "--open", "--json"], dir.path());
     let json: serde_json::Value = serde_json::from_str(&stdout(&open)).unwrap();
-    assert_eq!(json["findings"].as_array().unwrap().len(), 1, "{json}");
-    assert_eq!(json["findings"][0]["seq"], 2, "{json}");
+    assert_eq!(json["data"]["findings"].as_array().unwrap().len(), 1, "{json}");
+    assert_eq!(json["data"]["findings"][0]["seq"], 2, "{json}");
 }
 
 /// finding.list.04: a change id outside the grammar is refused by clap,
@@ -1456,10 +1460,10 @@ fn finding_close_83_a_reason_is_recorded_on_the_closing_version() {
     let table = run_canon(&["finding", "list", "--change-id", CHANGE], repo);
     assert!(stdout(&table).contains("deferred") && stdout(&table).contains("needs a guard [reason: next release]"), "{}", stdout(&table));
     let listed: serde_json::Value = serde_json::from_str(&stdout(&run_canon(&["finding", "list", "--change-id", CHANGE, "--json"], repo))).unwrap();
-    assert_eq!(listed["findings"][0]["reason"], "next release", "{listed}");
+    assert_eq!(listed["data"]["findings"][0]["reason"], "next release", "{listed}");
     let kept: serde_json::Value =
         serde_json::from_str(&stdout(&run_canon(&["finding", "list", "--change-id", CHANGE, "--json", "--fields", "disposition,reason"], repo))).unwrap();
-    assert_eq!(kept["findings"][0]["reason"], "next release", "{kept}");
+    assert_eq!(kept["data"]["findings"][0]["reason"], "next release", "{kept}");
 }
 
 /// finding.list.05: the table appends the reason to the summary and the
@@ -1480,8 +1484,8 @@ fn finding_list_05_shows_the_reason_in_the_table_and_in_json() {
     let table = stdout(&run_canon(&["finding", "list", "--change-id", CHANGE], repo));
     assert!(table.contains("finding 1 [reason: works as designed]\n") && table.contains("finding 2\n"), "{table}");
     let json: serde_json::Value = serde_json::from_str(&stdout(&run_canon(&["finding", "list", "--change-id", CHANGE, "--json"], repo))).unwrap();
-    assert_eq!(json["findings"][0]["reason"], "works as designed");
-    assert!(json["findings"][1]["reason"].is_null(), "{json}");
+    assert_eq!(json["data"]["findings"][0]["reason"], "works as designed");
+    assert!(json["data"]["findings"][1]["reason"].is_null(), "{json}");
 }
 
 /// finding.close.84: fixed closes with or without a reason.
@@ -1610,7 +1614,7 @@ fn finding_close_87_an_old_record_without_reason_is_untouched_by_reading_listing
     assert!(!String::from_utf8_lossy(&before).contains("reason"));
 
     let listed: serde_json::Value = serde_json::from_str(&stdout(&run_canon(&["finding", "list", "--change-id", CHANGE, "--json"], repo))).unwrap();
-    assert!(listed["findings"][0]["reason"].is_null(), "{listed}");
+    assert!(listed["data"]["findings"][0]["reason"].is_null(), "{listed}");
     let table = stdout(&run_canon(&["finding", "list", "--change-id", CHANGE], repo));
     assert!(!table.contains("[reason"), "{table}");
 

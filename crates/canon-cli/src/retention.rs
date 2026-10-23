@@ -290,7 +290,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
         if !json_output {
             print_human(&value, &summary);
         } else if confirmed {
-            crate::next::finish(repo, "purge", &crate::next::Scope::Repo, false, true, value);
+            crate::next::finish(repo, "purge", &crate::next::Scope::Repo, false, true, &crate::json_out::untyped(value));
         } else {
             // A plan deletes nothing: the one step is the human's review, then the confirm.
             let step = crate::status::NextStep {
@@ -299,7 +299,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
                 actor: crate::status::StepActor::Human,
                 role: None,
             };
-            crate::json_out::data_with_next("purge", value, &crate::next::After::fixed(vec![step]));
+            crate::json_out::data_with_next("purge", &crate::json_out::untyped(value), &crate::next::After::fixed(vec![step]));
         }
         Ok(())
     })();
@@ -328,8 +328,8 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
             match partial {
                 // One document: the partial-purge manifest is `data` beside the shared `error`.
                 Some(manifest) if json_output => {
-                    eprintln!("{}", error.human("canon purge"));
-                    error.emit_with_data("canon purge", true, manifest) as u8
+                    crate::human_err!("{}", error.human("canon purge"));
+                    error.emit_with_data("canon purge", true, &crate::json_out::untyped(manifest)) as u8
                 }
                 _ => error.emit("canon purge", json_output) as u8,
             }
@@ -421,9 +421,9 @@ pub fn run_export(
                 Some(path) => json!({ "out": path.display().to_string(), "kind": kind.as_str(), "recordCount": rows.len() }),
                 None => manifest,
             };
-            crate::next::finish_with_meta(repo, "export", &crate::next::Scope::Repo, false, true, data, page_meta);
+            crate::next::finish_with_meta(repo, "export", &crate::next::Scope::Repo, false, true, &crate::json_out::untyped(data), page_meta);
         }
-        if out.is_some() && !json_output { eprintln!("canon export: wrote {} record(s)", rows.len()); }
+        if out.is_some() && !json_output { crate::human_err!("canon export: wrote {} record(s)", rows.len()); }
         // The manifest itself is JSON on stdout, so the human cursor line
         // goes to stderr and never breaks a pipe into a JSON parser.
         next_cursor_line = meta.human_line();
@@ -432,7 +432,7 @@ pub fn run_export(
     match result {
         Ok(()) => {
             if let Some(line) = next_cursor_line {
-                eprintln!("{line}");
+                crate::human_err!("{line}");
             }
             0
         }

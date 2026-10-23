@@ -195,7 +195,7 @@ fn inventory_sync_49_the_pre_0_17_layout_fails_the_gate_closed_and_status_names_
         assert!(records.iter().all(|r| r.get("removed").is_none()), "a refused root writes no tombstone: {records:?}");
 
         let report: serde_json::Value = serde_json::from_slice(&ok(repo, &["status", "--json"]).stdout).unwrap();
-        let next = report["next"].as_array().unwrap();
+        let next = report["meta"]["next"].as_array().unwrap();
         assert_eq!(next.len(), 1, "{report}");
         assert_eq!(next[0]["command"], "canon migrate");
         assert!(next[0]["why"].as_str().unwrap().contains("spec root(s) `root`"), "{report}");

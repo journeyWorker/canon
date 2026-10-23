@@ -72,7 +72,8 @@ fn context_json_is_byte_stable_and_has_the_public_capability_shape() {
     assert!(second.status.success(), "stderr: {}", String::from_utf8_lossy(&second.stderr));
     assert_eq!(first.stdout, second.stdout, "unchanged context input must produce byte-identical JSON");
 
-    let surface: Value = serde_json::from_slice(&first.stdout).expect("context --json must be valid JSON");
+    let envelope: Value = serde_json::from_slice(&first.stdout).expect("context --json must be valid JSON");
+    let surface = envelope["data"].clone();
     let object = surface.as_object().expect("context JSON must be an object");
     let mut keys: Vec<_> = object.keys().map(String::as_str).collect();
     keys.sort_unstable();

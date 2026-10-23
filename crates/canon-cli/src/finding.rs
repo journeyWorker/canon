@@ -692,7 +692,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
                 record["severity"] = serde_json::json!(severity_slug(args.severity));
                 record["disposition"] = serde_json::json!(args.disposition.as_str());
                 record["unsourced"] = serde_json::json!(args.introduced_by.is_none());
-                crate::next::finish(&repo, "finding add", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, record);
+                crate::next::finish(&repo, "finding add", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, &crate::json_out::untyped(record));
             }
             settled.exit_code()
         }
@@ -888,7 +888,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
             args.disposition.as_str()
         );
         let noop = serde_json::json!({ "changeId": args.change_id.as_str(), "round": args.round, "seq": args.seq, "disposition": args.disposition.as_str(), "noop": true });
-        crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), false, args.json, noop);
+        crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), false, args.json, &crate::json_out::untyped(noop));
         return 0;
     }
 
@@ -965,7 +965,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
                 record["from"] = serde_json::json!(existing.disposition().as_str());
                 record["disposition"] = serde_json::json!(args.disposition.as_str());
                 record["noop"] = serde_json::json!(false);
-                crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, record);
+                crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, &crate::json_out::untyped(record));
             }
             settled.exit_code()
         }
@@ -1072,8 +1072,8 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
                 }
             })
             .collect();
-        let out = serde_json::json!({ "change_id": args.change_id.as_str(), "findings": rows, "meta": meta.to_json() });
-        println!("{}", serde_json::to_string_pretty(&out).expect("a JSON value always serializes"));
+        let data = serde_json::json!({ "change_id": args.change_id.as_str(), "findings": rows });
+        crate::json_out::data_with_meta("finding list", &crate::json_out::untyped(data), meta.to_json());
     } else if findings.is_empty() {
         let which = if args.open { "open findings" } else { "findings" };
         println!("canon finding list: no committed {which} on change `{}`", args.change_id);
@@ -1084,7 +1084,7 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
         }
     }
     if staged > 0 {
-        eprintln!("canon finding list: {staged} staged finding(s) on change `{}` are not listed until committed — run `canon gate promote`", args.change_id);
+        crate::say_err!(args.json, "canon finding list: {staged} staged finding(s) on change `{}` are not listed until committed — run `canon gate promote`", args.change_id);
     }
     0
 }

@@ -1022,7 +1022,7 @@ fn skills_install_55_a_malformed_skills_section_fails_loud() {
 
         let check = Command::new(env!("CARGO_BIN_EXE_canon")).args(["init", "--check-config", "--repo"]).arg(&target).output().unwrap();
         let out = String::from_utf8_lossy(&check.stdout);
-        assert_eq!(check.status.code(), Some(1), "{out}");
+        assert_eq!(check.status.code(), Some(2), "{out}");
         assert!(out.lines().any(|line| line.starts_with("[FAIL] skills: ") && line.contains(needle)), "{out}");
     }
 }
@@ -1214,8 +1214,6 @@ fn skills_install_59_install_prunes_a_dropped_file_whose_bytes_match_the_lock() 
     }
     assert_eq!(json["data"]["kept"], serde_json::json!([]), "{json}");
     assert_eq!(json["data"]["changed"], true);
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(stderr.contains("pruned: ") && stderr.contains("old.md (claude) — the bundle no longer ships it; its bytes still match the install lock"), "{stderr}");
 
     assert!(!retired.exists(), "the directory the deletion left empty is removed");
     let projection = target.join(CLAUDE_PROJECTION);
@@ -1252,8 +1250,6 @@ fn skills_install_60_install_keeps_a_dropped_file_whose_bytes_changed_and_report
     let pruned = json["data"]["pruned"].as_array().unwrap();
     assert_eq!(pruned.len(), 1, "the unmodified sibling is still pruned: {json}");
     assert!(pruned[0]["path"].as_str().unwrap().ends_with("older.md"));
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(stderr.contains(&format!("kept: {path} (claude) — the bundle no longer ships it; its bytes differ from the install lock")) && stderr.contains("remove it by hand with"), "{stderr}");
 
     assert_eq!(fs::read_to_string(retired.join("old.md")).unwrap(), "# old, with my own notes\n", "the edited file is kept byte for byte");
     assert!(!retired.join("older.md").exists());

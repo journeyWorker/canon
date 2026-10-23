@@ -292,19 +292,24 @@ fn report_subject_warning(
         println!("{human}");
     }
     for warning in warnings {
-        eprintln!("canon subject {verb}: warning: {warning}");
+        crate::human_err!("canon subject {verb}: warning: {warning}");
     }
-    let record = serde_json::to_value(subject).unwrap_or_default();
     crate::next::finish_with_meta(
         repo,
         &format!("subject {verb}"),
         &crate::next::Scope::Subject(subject.subject_id.as_str().to_string()),
         false,
         json,
-        record,
-        crate::json_out::warnings_meta(warnings),
-    );
+        &SubjectReport(subject),
+        crate::json_out::warnings_meta(warnings));
 }
+
+/// `data` of the subject leaves: the Subject record, embedded verbatim (it keeps the ledger record's own schema and snake_case keys).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(transparent)]
+pub struct SubjectReport<'a>(pub &'a Subject);
+
+impl crate::json_out::Report for SubjectReport<'_> {}
 
 /// The `domain` enum name `canon.core` declares and a consumer repo
 /// extends — the SAME key `canon context` renders under `vocab.enums`.
@@ -888,7 +893,7 @@ pub fn run_status(
         }
         if readable {
             if let Some(note) = canon_gate::review_gate::unmigrated_review_note(ctx) {
-                eprintln!("canon subject status: advisory: {note}");
+                crate::warn_err!("canon subject status: advisory: {note}");
             }
         }
     }
@@ -948,17 +953,17 @@ pub fn run_status(
                 .emit("canon subject status", json);
         };
         for v in &waivable {
-            eprintln!("canon subject status: waived {}", v.line());
+            crate::warn_err!("canon subject status: waived {}", v.line());
         }
         let waived: std::collections::BTreeSet<WaivedViolation> =
             waivable.iter().map(|v| WaivedViolation { class: v.class.as_str().to_string(), subject: v.subject.clone() }).collect();
         let count = waived.len();
         subject.status_override = Some(StatusOverride { to: target, reason: reason.to_string(), waived: waived.into_iter().collect(), actor: Actor::new_unattributed(actor_id) });
-        eprintln!(
+        crate::warn_err!(
             "canon subject status: override recorded by `{actor_id}` for the {count} violation(s) above: {reason}; a gap that appears later is not covered"
         );
     } else if override_reason.is_some() {
-        eprintln!("canon subject status: --override-reason not recorded — no review check refused this transition");
+        crate::warn_err!("canon subject status: --override-reason not recorded — no review check refused this transition");
     }
     if let (true, Some(reason)) = (reopens, reason) {
         let change = changes.last().cloned();
@@ -966,7 +971,7 @@ pub fn run_status(
             Some(change) => format!("keep the follow-up in its approved change `{}`", change.as_str()),
             None => "keep the follow-up in its change".to_string(),
         };
-        eprintln!(
+        crate::warn_err!(
             "canon subject status: reopened `{}` from shipped, recorded by `{actor_id}`: {reason}; {into}, then scenario, evidence and review; shipping again runs every guard",
             subject_id.as_str()
         );
@@ -1013,7 +1018,7 @@ pub fn run_show(repo: &Path, subject_id: &SubjectId, override_reason: Option<&st
         Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject status", json),
     };
     if json {
-        crate::json_out::data("subject status", serde_json::to_value(&subject).expect("subject serializes"));
+        crate::json_out::data("subject status", &SubjectReport(&subject));
     } else {
         println!("canon subject status: {} ({}, {}) — {}", subject.subject_id.as_str(), subject.domain, status_str(subject.status), subject.title);
         if !subject.summary.is_empty() {
@@ -1040,21 +1045,21 @@ fn report_review_guard(policy: &PolicyResolution, from: SubjectStatus, to: Subje
     let rr: &RequireReview = match &policy.spec_coverage {
         Some(SpecCoverage::Active { require_review: Some(rr), .. }) => rr,
         Some(SpecCoverage::Invalid { .. }) => {
-            eprintln!("canon subject status: review guard skipped — policy.yaml's `spec_coverage` section is invalid, so whether review is required cannot be read; `canon gate check` reports why");
+            crate::warn_err!("canon subject status: review guard skipped — policy.yaml's `spec_coverage` section is invalid, so whether review is required cannot be read; `canon gate check` reports why");
             return;
         }
         _ => return,
     };
     let scope = if rr.scope.is_empty() { "every status".to_string() } else { rr.scope.iter().map(|s| status_str(*s)).collect::<Vec<_>>().join(", ") };
-    eprintln!("canon subject status: review guard for {} → {} (spec_coverage.require_review, scope: {scope})", status_str(from), status_str(to));
+    crate::human_err!("canon subject status: review guard for {} → {} (spec_coverage.require_review, scope: {scope})", status_str(from), status_str(to));
     if from == SubjectStatus::Shipped && to == SubjectStatus::Verifying {
-        eprintln!("canon subject status:   skipped unreviewed-promotion — a reopen moves the subject back to fix its gaps; shipping again runs it");
-        eprintln!("canon subject status:   skipped open-blocker — a reopen moves the subject back to fix its gaps; shipping again runs it");
+        crate::human_err!("canon subject status:   skipped unreviewed-promotion — a reopen moves the subject back to fix its gaps; shipping again runs it");
+        crate::human_err!("canon subject status:   skipped open-blocker — a reopen moves the subject back to fix its gaps; shipping again runs it");
         return;
     }
     if !rr.covers(to) {
-        eprintln!("canon subject status:   skipped unreviewed-promotion — `{}` is not in require_review.scope", status_str(to));
-        eprintln!("canon subject status:   skipped open-blocker — `{}` is not in require_review.scope", status_str(to));
+        crate::human_err!("canon subject status:   skipped unreviewed-promotion — `{}` is not in require_review.scope", status_str(to));
+        crate::human_err!("canon subject status:   skipped open-blocker — `{}` is not in require_review.scope", status_str(to));
         return;
     }
     let rule = if rr.distinct_actor {
@@ -1062,11 +1067,11 @@ fn report_review_guard(policy: &PolicyResolution, from: SubjectStatus, to: Subje
     } else {
         "a signed review, current with the spec and evidence it pinned"
     };
-    eprintln!("canon subject status:   ran unreviewed-promotion — every owned scenario needs {rule}");
+    crate::human_err!("canon subject status:   ran unreviewed-promotion — every owned scenario needs {rule}");
     if rr.block_on_findings {
-        eprintln!("canon subject status:   ran open-blocker — {changes} adopted change(s) checked for open blocker findings");
+        crate::human_err!("canon subject status:   ran open-blocker — {changes} adopted change(s) checked for open blocker findings");
     } else {
-        eprintln!("canon subject status:   skipped open-blocker — require_review.block_on_findings is false");
+        crate::human_err!("canon subject status:   skipped open-blocker — require_review.block_on_findings is false");
     }
 }
 
@@ -1257,7 +1262,7 @@ fn brief_gap(repo: &Path, subject: &Subject, changes: &[ChangeId], transition: &
             (None, Some(change)) => format!("its newest adopted change `{change}` has no brief (no {}/{change}/brief.md, no openspec proposal.md)", canon_model::paths::CHANGES_DIR),
             (None, None) => format!("{id} adopts no change"),
         };
-        eprintln!("canon subject status: advisory: {id}'s brief is not approved — {why}, so there is no brief to answer and {verb} is not refused");
+        crate::warn_err!("canon subject status: advisory: {id}'s brief is not approved — {why}, so there is no brief to answer and {verb} is not refused");
         return None;
     }
     Some(Violation::new(

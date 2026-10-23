@@ -16,7 +16,7 @@ fn run_prompt_add(args: PromptAddArgs) -> ExitCode {
     match crate::context_pack::register_prompt_bundle_from_manifest(&repo, &name, &version, &manifest) {
         Ok(bundle) => {
             if json {
-                crate::json_out::data("prompt add", serde_json::to_value(&bundle).expect("prompt bundle is serializable"));
+                crate::json_out::data("prompt add", &bundle);
             } else {
                 println!("prompt bundle {}@{} registered ({})", bundle.name, bundle.version, bundle.digest);
             }
@@ -33,7 +33,7 @@ fn run_prompt_show(repo: &std::path::Path, name: &str, version: &str, json: bool
     match crate::context_pack::select_prompt_bundle(&repo, name, version) {
         Ok(bundle) => {
             if json {
-                println!("{}", serde_json::to_string_pretty(&bundle).expect("prompt bundle is serializable"));
+                crate::json_out::data("prompt show", &bundle);
             } else {
                 println!("prompt bundle {}@{} ({})", bundle.name, bundle.version, bundle.digest);
             }

@@ -360,6 +360,6 @@ fn check_config_reports_the_artifacts_block() {
 
     let bad = new_repo(Some("artifact_store:\n  backend: warm\n"));
     let out = bad.canon(&["init", "--check-config", "--repo", "."]);
-    assert_eq!(out.status.code(), Some(1), "{}", text(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(text(&out).contains("[FAIL] artifact_store:") && text(&out).contains("neither `local` nor the name of a tier"), "{}", text(&out));
 }

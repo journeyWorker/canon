@@ -93,18 +93,20 @@ use std::path::{Path, PathBuf};
 
 use canon_ingest::markdown::{fence_of, field};
 use canon_model::{paths, ChangeId, SubjectStatus};
+use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::json_out::Report;
 use crate::brief_template::{canonical_role, heading_of, marker, ChangeKind, Role, CHORE_CATEGORIES};
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 use crate::language::{Language, Resolved, Shipped, Tally};
 
-/// Exit code for blocker findings (mirrors `canon change new`'s refusal).
-const EXIT_BLOCKERS: i32 = 2;
+/// Exit code for blocker findings (D4: a finding is exit 1).
+const EXIT_BLOCKERS: i32 = crate::cli_error::EXIT_FAILED;
 
 /// A finding's severity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
     Blocker,
@@ -162,7 +164,7 @@ fn severity_of(rule: &str) -> Option<Severity> {
 }
 
 /// One finding.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct Finding {
     pub rule: String,
     pub severity: Severity,
@@ -186,7 +188,7 @@ struct Hit {
 
 /// One waiver comment, with the severity of the rule it waives and
 /// whether it matched a finding.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct Waiver {
     pub rule: String,
     pub section: String,
@@ -201,7 +203,7 @@ pub struct Waiver {
 }
 
 /// The finding counts `canon status` shows.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct Counts {
     pub blockers: usize,
     pub advisories: usize,
@@ -1703,7 +1705,7 @@ pub fn prose_tally(text: &str) -> Tally {
 // ───────────────────────────── loading ─────────────────────────────
 
 /// The phase the flow-coverage rules need.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Phase {
     /// The brief is not approved yet, or no adopting subject is
@@ -1927,9 +1929,10 @@ fn fail(command: &str, json: bool, error: &CliError) -> i32 {
     error.emit(command, json)
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-struct CheckJson<'a> {
+/// The `brief check` report: the verdict over one change brief.
+pub struct BriefCheckReport<'a> {
     change: &'a str,
     brief: &'a str,
     language: &'a str,
@@ -1944,6 +1947,8 @@ struct CheckJson<'a> {
     waivers: &'a [Waiver],
 }
 
+impl Report for BriefCheckReport<'_> {}
+
 /// `canon brief check [--change-id <slug>] [--json]`.
 pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
@@ -1954,7 +1959,7 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
     let ev = &checked.evaluation;
     let counts = ev.counts();
     if json {
-        let body = CheckJson {
+        let body = BriefCheckReport {
             change: checked.change.as_str(),
             brief: &checked.brief,
             language: &checked.language.tag,
@@ -1967,18 +1972,12 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
             findings: &ev.findings,
             waivers: &ev.waivers,
         };
-        match serde_json::to_value(&body) {
-            Ok(mut value) => {
-                if counts.blockers > 0 {
-                    // One document: the findings keep their fields and gain the shared `error`.
-                    let error = CliError::refused("BRIEF_HAS_BLOCKERS", format!("{} blocker(s) in {}", counts.blockers, checked.brief)).hint("fix each blocker in `findings`, then run `canon brief check` again");
-                    eprintln!("{}", error.human("canon brief check"));
-                    value["error"] = error.to_json()["error"].clone();
-                }
-                println!("{}", serde_json::to_string_pretty(&value).expect("a JSON value always serializes"));
-            }
-            Err(e) => return CliError::failed("SERIALIZE_FAILED", e.to_string()).hint("this is a canon bug: report it together with the command line that produced it").emit("canon brief check", true),
+        if counts.blockers > 0 {
+            // The failure keeps the report in `data`.
+            let error = CliError::refused("BRIEF_HAS_BLOCKERS", format!("{} blocker(s) in {}", counts.blockers, checked.brief)).hint("fix each blocker in `findings`, then run `canon brief check` again");
+            return error.emit_with_data("canon brief check", true, &body);
         }
+        crate::json_out::data("brief check", &body);
     } else {
         println!("canon brief check: {} — {} blocker(s), {} advisory(ies)", checked.brief, counts.blockers, counts.advisories);
         println!("  language: {}", checked.resolved().describe());
@@ -2005,8 +2004,8 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
 }
 
 /// One next step of `canon brief show`.
-#[derive(Debug, Serialize)]
-struct Step {
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Step {
     step: &'static str,
     why: String,
 }
@@ -2053,15 +2052,18 @@ fn next_steps(ev: &Evaluation) -> Vec<Step> {
     steps
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-struct NextJson<'a> {
+/// The `brief show` report: the brief's state and the next steps.
+pub struct BriefShowReport<'a> {
     change: &'a str,
     brief: &'a str,
     state: &'static str,
     counts: Counts,
     next: Vec<Step>,
 }
+
+impl Report for BriefShowReport<'_> {}
 
 /// `canon brief show [<change>] [--json]`: state and next steps.
 pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
@@ -2083,9 +2085,8 @@ pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
     };
     let next = next_steps(ev);
     if json {
-        let body = NextJson { change: checked.change.as_str(), brief: &checked.brief, state, counts, next };
-        let document = serde_json::to_value(&body).unwrap_or_default();
-        println!("{}", serde_json::to_string_pretty(&document).unwrap_or_default());
+        let body = BriefShowReport { change: checked.change.as_str(), brief: &checked.brief, state, counts, next };
+        crate::json_out::data("brief show", &body);
     } else {
         println!("canon brief show: {} — {state} ({} blocker(s), {} advisory(ies))", checked.brief, counts.blockers, counts.advisories);
         if next.is_empty() {

@@ -228,7 +228,7 @@ fn context_capability_16_a_removed_flag_spelling_is_refused_with_the_flag_that_r
     }
     let canonical = canon_in(repo, &["brief", "check", "--change-id", "add-login", "--json"]);
     let report: Value = serde_json::from_slice(&canonical.stdout).expect("one JSON document");
-    assert_eq!(report["change"], "add-login", "{report}");
+    assert_eq!(report["data"]["change"], "add-login", "{report}");
     assert!(report["meta"].get("deprecated").is_none(), "{report}");
 
     // Every removed flag, on a command that renamed it.

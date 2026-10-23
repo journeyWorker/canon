@@ -246,10 +246,10 @@ fn a_refuted_audit_is_false_success_until_a_newer_audit_confirms() {
     assert!(!out.contains("uncovered-cell"), "the declared verdict is still faithful — the audit sits beside it: {out}");
 
     let report = status_json(repo);
-    let run = report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "run").unwrap();
+    let run = report["data"]["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "run").unwrap();
     assert_eq!((run["evidenced"].as_u64(), run["divergent"].as_u64()), (Some(1), Some(0)), "an audit never becomes the declared verdict: {report}");
-    assert_eq!(report["audits"]["refuted"][0]["scenario"], "game.run.01", "{report}");
-    assert!(report["next"].as_array().unwrap().iter().any(|n| n["command"].as_str().unwrap().contains("--kind audit --scenario-id game.run.01")), "{report}");
+    assert_eq!(report["data"]["audits"]["refuted"][0]["scenario"], "game.run.01", "{report}");
+    assert!(report["meta"]["next"].as_array().unwrap().iter().any(|n| n["command"].as_str().unwrap().contains("--kind audit --scenario-id game.run.01")), "{report}");
 
     let ship = canon(repo, &["subject", "status", "run", "--to", "shipped", "--actor-id", "lead"]);
     assert_eq!(ship.status.code(), Some(1), "{}", text(&ship));
@@ -322,10 +322,10 @@ fn require_audit_samples_deterministically_and_owes_until_confirmed() {
     assert!(!expected.is_empty() && expected.len() < ids.len(), "the fixed seed splits the corpus: {expected:?}");
 
     let report = status_json(repo);
-    let owed: Vec<String> = report["audits"]["owed"].as_array().unwrap().iter().map(|e| e["scenario"].as_str().unwrap().to_string()).collect();
+    let owed: Vec<String> = report["data"]["audits"]["owed"].as_array().unwrap().iter().map(|e| e["scenario"].as_str().unwrap().to_string()).collect();
     assert_eq!(owed, expected, "{report}");
-    assert_eq!(report["audits"]["sampled"].as_u64(), Some(expected.len() as u64));
-    assert_eq!(report["policy"]["spec_coverage"]["require_audit"], serde_json::json!({"rate": 0.5, "seed": "canon-0.15", "scope": []}));
+    assert_eq!(report["data"]["audits"]["sampled"].as_u64(), Some(expected.len() as u64));
+    assert_eq!(report["data"]["policy"]["spec_coverage"]["require_audit"], serde_json::json!({"rate": 0.5, "seed": "canon-0.15", "scope": []}));
 
     let gate = canon(repo, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(1));
@@ -345,8 +345,8 @@ fn require_audit_samples_deterministically_and_owes_until_confirmed() {
     }
     ok(repo, &["gate", "check"]);
     let report = status_json(repo);
-    assert_eq!(report["audits"]["confirmed"].as_u64(), Some(expected.len() as u64), "{report}");
-    assert!(report["audits"]["owed"].as_array().unwrap().is_empty());
+    assert_eq!(report["data"]["audits"]["confirmed"].as_u64(), Some(expected.len() as u64), "{report}");
+    assert!(report["data"]["audits"]["owed"].as_array().unwrap().is_empty());
 }
 
 /// gate.check.63: `scope` defaults to `[verifying, shipped]`, and `rate`

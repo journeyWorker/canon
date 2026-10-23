@@ -56,8 +56,10 @@ use canon_gate::{PolicyField, PolicyResolution, RiskTierRule, SpecCoverage};
 use canon_model::SubjectStatus;
 use canon_policy::SchemaRegistry;
 use canon_vocab::CapabilitySnapshot;
+use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::json_out::Report;
 use crate::cli_error::CliError;
 
 /// The authoring-surface CAPABILITY version — `canon context`'s own
@@ -90,7 +92,7 @@ pub struct ContextOptions {}
 /// design D3's `partition: LayoutDescriptor`, built from
 /// [`RecordKind::partition_template`]/[`RecordKind::is_area_scoped`] (S1's
 /// own registry — never a second, hand-written layout table).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct PartitionLayout {
     /// The path template, e.g. `kind={kind}/{id}.json` or
     /// `kind={kind}/area={area}/{id}.json`.
@@ -101,7 +103,7 @@ pub struct PartitionLayout {
 
 /// One record kind's authoring shape: the fields an agent must supply, the
 /// partition it lands in, and its current schema version.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct KindSurface {
     /// This kind's CURRENT format generation, read straight from
     /// [`canon_model::RecordKind::schema_version`] — never a
@@ -121,19 +123,19 @@ pub struct KindSurface {
 /// a CEL predicate's source (never its evaluated result — [`resolve_surface`]
 /// has no specific artifact to evaluate against, only the repo's resolved
 /// policy shape, matching invariant 1's "describes what CAN be authored").
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PolicyFieldSurface {
     Flat { value: serde_json::Value },
     Cel { expression: String },
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct StalenessSurface {
     pub max_commits_behind: PolicyFieldSurface,
     pub surface_scoped: PolicyFieldSurface,
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct RiskTierSurface {
     pub rank: u32,
     pub paths: Vec<String>,
@@ -145,7 +147,7 @@ pub struct RiskTierSurface {
 /// `policy.yaml`. `scope` is the resolved status list (the default
 /// `[verifying, shipped]` when the key is omitted); empty means every
 /// scenario.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct RequireReviewSurface {
     pub scope: Vec<String>,
     pub distinct_actor: bool,
@@ -156,7 +158,7 @@ pub struct RequireReviewSurface {
 /// `policy.yaml` (0.15 D3). `scope` is the resolved status list (the
 /// default `[verifying, shipped]` when the key is omitted); empty means
 /// every scenario.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct RequireAuditSurface {
     pub rate: serde_json::Number,
     pub seed: String,
@@ -164,7 +166,7 @@ pub struct RequireAuditSurface {
 }
 
 /// The same requirement in the camelCase `review` section.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ReviewRequirementSurface {
     pub scope: Vec<String>,
@@ -175,7 +177,7 @@ pub struct ReviewRequirementSurface {
 /// `spec_coverage`, keyed like `policy.yaml`. Serialized untagged: an
 /// active section is its fields; a present-but-unusable one is
 /// `{"invalid": "<detail>"}`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(untagged)]
 pub enum SpecCoverageSurface {
     Active {
@@ -196,7 +198,7 @@ pub enum SpecCoverageSurface {
 /// `experimental.evidence_binding`, keyed like `policy.yaml` (`case`,
 /// `lane`, `scope`; each empty means unfiltered). Untagged like
 /// [`SpecCoverageSurface`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(untagged)]
 pub enum EvidenceBindingSurface {
     Active { mode: &'static str, strength: &'static str, case: Vec<String>, lane: Vec<String>, scope: Vec<String> },
@@ -208,7 +210,7 @@ pub enum EvidenceBindingSurface {
 /// via [`PolicyFieldSurface`] — one Rust field per `PolicyResolution` field,
 /// so the mapping between "what the gate resolved" and "what context shows"
 /// stays traceable by name, never a re-derived shape.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct PolicySurface {
     pub trust_required: BTreeMap<String, PolicyFieldSurface>,
     pub trust_sample: BTreeMap<String, PolicyFieldSurface>,
@@ -243,7 +245,7 @@ pub struct PolicySurface {
 /// no `--profile` flag of its own yet; a future one would thread straight
 /// through `resolve_surface`'s existing `(repo, opts)` shape without
 /// touching this struct.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct VocabularySurface {
     /// The resolved directive/enum/evidence-kind index a typed task-atom
@@ -271,7 +273,7 @@ pub struct VocabularySurface {
 /// `bindings::bindings_for`"), so this can never disagree with what a
 /// `policy.yaml` CEL expression is actually checked against — invariant 2,
 /// extended to the CEL surface.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct CelSurface {
     /// `record.<field>` → that field's statically-resolved `CelType`,
     /// rendered via `CelType`'s own `Display` (`BindingSet::field_names()`
@@ -290,7 +292,7 @@ pub struct CelSurface {
 /// review` accept, and whether this repo requires review before a
 /// subject is claimed done. Static vocabulary plus the resolved policy;
 /// never a corpus read (invariant 1).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ReviewSurface {
     /// `canon finding add --severity` values, in blocking order.
@@ -309,7 +311,7 @@ pub struct ReviewSurface {
 /// know BEFORE writing a canon artifact against this repo. Every map is a
 /// `BTreeMap`; every array is sorted or built from an already-sorted
 /// source (invariant 3).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthoringSurface {
     pub capability_version: u32,
@@ -343,6 +345,8 @@ pub struct AuthoringSurface {
     #[serde(skip)]
     pub policy_warning: Option<String>,
 }
+
+impl Report for AuthoringSurface {}
 
 /// `--repo <dir>` root resolution (design D7, task 1.4): a bare `canon
 /// context` (`--repo` omitted — clap's `default_value = "."`) or an

@@ -118,7 +118,7 @@ fn every_leaf_command_answers_json_with_one_document_and_a_coded_error() {
     assert!(leaves.len() > 60, "{leaves:?}");
 
     let regime = String::from_utf8(run(repo.path(), &["regime-key", "--role", "reviewer", "--repo", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
-    let registry: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|(code, _)| *code).collect();
+    let registry: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
     let skipped: Vec<&str> = SKIPPED.iter().map(|(command, _)| *command).collect();
     let mut problems = Vec::new();
     let mut usage = Vec::new();
@@ -216,7 +216,7 @@ fn a_clean_gate_is_data_with_exit_zero() {
     let body: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(body["data"]["clean"], true);
     assert_eq!(body["data"]["violations"].as_array().unwrap().len(), 0);
-    assert_eq!(body["meta"], serde_json::json!({ "command": "gate check" }));
+    assert_eq!(body["meta"]["command"], "gate check");
 }
 
 #[test]
@@ -227,7 +227,9 @@ fn progress_and_refresh_notices_stay_off_stdout_in_json_mode() {
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     let body: Value = serde_json::from_slice(&out.stdout).expect("one document");
     assert_eq!(body["data"]["scenarioId"], "auth.login.02");
-    assert!(String::from_utf8_lossy(&out.stderr).contains("wrote `@auth.login.02`"), "the human line moved to stderr");
+    assert!(out.stderr.is_empty(), "JSON mode writes nothing to stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let human = run(repo.path(), &["scenario", "new", "auth.login.03", "--title", "Sign off", "--feature", ".canon/specs/kind=feature/area=auth/login.feature"]);
+    assert!(String::from_utf8_lossy(&human.stdout).contains("wrote `@auth.login.03`") || String::from_utf8_lossy(&human.stderr).contains("wrote `@auth.login.03`"), "human mode still narrates");
 
     let out = run(repo.path(), &["inventory", "sync", "--json"]);
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));

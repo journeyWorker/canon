@@ -25,13 +25,13 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
             crate::say_raw!(json, "{}", crate::inventory::format_human(&outcome));
             let data = crate::inventory::format_json(&outcome);
             if outcome.is_clean() {
-                crate::next::finish(repo, "inventory sync", &crate::next::Scope::Repo, false, json, data);
+                crate::next::finish(repo, "inventory sync", &crate::next::Scope::Repo, false, json, &crate::json_out::untyped(data));
                 ExitCode::SUCCESS
             } else {
                 let missing_provenance = outcome.roots.iter().flat_map(|root| &root.violations).any(|v| v.class == canon_fmt::FmtFailureClass::MissingProvenance);
                 let hint = with_provenance_fix("data.roots names each violation; fix them, then run `canon inventory sync` again", missing_provenance);
                 let error = CliError::failed("INVENTORY_ABORTED", "a spec root was aborted on violations or duplicate scenarios; nothing was written for it").hint(hint);
-                ExitCode::from(error.emit_with_data("canon inventory sync", json, data) as u8)
+                ExitCode::from(error.emit_with_data("canon inventory sync", json, &crate::json_out::untyped(data)) as u8)
             }
         }
         Err(err) => {

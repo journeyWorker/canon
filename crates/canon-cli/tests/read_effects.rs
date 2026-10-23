@@ -299,7 +299,9 @@ fn dispatch_diff_answers_from_an_empty_hot_tier_without_creating_the_file() {
     let (changed, _, _, out) = run_on_copy(base.path(), home.path(), &argv);
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     assert!(changed.is_empty(), "no hot.db, no WAL sidecar: {changed:?}");
-    let body: Value = serde_json::from_slice(&out.stdout).unwrap();
+    let doc: Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(doc["ok"], true, "{doc}");
+    let body = doc["data"].clone();
     assert_eq!(body["declared"], 0, "{body}");
     assert_eq!(body["notes"].as_array().map(Vec::len), Some(0), "an absent hot tier is an empty one, not a note: {body}");
 }

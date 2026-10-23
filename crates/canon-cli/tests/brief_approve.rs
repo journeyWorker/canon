@@ -84,7 +84,7 @@ fn a_scope_changed_mid_build_is_reapproved_before_its_scenarios_exist() {
     let text = std::fs::read_to_string(brief_path(repo)).unwrap();
     std::fs::write(brief_path(repo), text.replace("thirty seconds", "sixty seconds")).unwrap();
     let check: Value = serde_json::from_slice(&run(repo, &["brief", "check", "--json"]).stdout).unwrap();
-    let rules: Vec<&str> = check["findings"].as_array().unwrap().iter().filter_map(|f| f["rule"].as_str()).collect();
+    let rules: Vec<&str> = check["data"]["findings"].as_array().unwrap().iter().filter_map(|f| f["rule"].as_str()).collect();
     assert!(rules.contains(&"brief.flow-uncovered"), "building with no tagged scenario: {rules:?}");
 
     let out = approve(repo, "Ana", "Sixty seconds, go.");
@@ -107,7 +107,7 @@ fn approving_binds_the_brief_and_any_later_edit_is_refused_until_reapproved() {
     let attest = run(repo, &ATTEST);
     assert!(attest.status.success(), "{}", stderr(&attest));
     let json: Value = serde_json::from_str(&stdout(&run(repo, &["brief", "show", "--json"]))).unwrap();
-    assert_eq!((json["state"].as_str(), json["next"].as_array().unwrap().len()), (Some("approved"), 0), "{json}");
+    assert_eq!((json["data"]["state"].as_str(), json["data"]["next"].as_array().unwrap().len()), (Some("approved"), 0), "{json}");
 
     // One word changes: the approval no longer covers this text.
     std::fs::write(brief_path(repo), brief.replace("Social sign-in.", "Social sign-in, later.")).unwrap();
@@ -117,7 +117,7 @@ fn approving_binds_the_brief_and_any_later_edit_is_refused_until_reapproved() {
     assert_eq!(attest.status.code(), Some(1), "{}", stderr(&attest));
     assert!(stderr(&attest).contains("BRIEF_CHANGED_SINCE_APPROVAL") && stderr(&attest).contains("canon brief approve --change-id add-login"), "{}", stderr(&attest));
     let json: Value = serde_json::from_str(&stdout(&run(repo, &["brief", "show", "--json"]))).unwrap();
-    assert_eq!((json["state"].as_str(), json["next"][0]["step"].as_str()), (Some("changed-since-approval"), Some("approve")), "{json}");
+    assert_eq!((json["data"]["state"].as_str(), json["data"]["next"][0]["step"].as_str()), (Some("changed-since-approval"), Some("approve")), "{json}");
 
     // A new human answer re-approves; the old line is replaced, not stacked.
     ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Fine with the later note"]);

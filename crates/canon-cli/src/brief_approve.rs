@@ -19,9 +19,11 @@ use std::path::Path;
 
 use canon_model::ChangeId;
 use chrono::Utc;
+use schemars::JsonSchema;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+use crate::json_out::Report;
 use crate::brief::brief_digest;
 use crate::brief_check::{check, Severity};
 use crate::cli_error::CliError;
@@ -46,7 +48,7 @@ pub fn approved_text(text: &str, by: &str, when: &str, note: &str) -> Result<Str
 }
 
 /// What one approval recorded: the `brief approve --json` data.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Approved {
     pub change: String,
@@ -55,6 +57,8 @@ pub struct Approved {
     pub approved_by: String,
     pub policy_approved: bool,
 }
+
+impl Report for Approved {}
 
 /// The next step for each code [`approve`] refuses with.
 fn hint_for(code: &str) -> &'static str {
@@ -151,6 +155,6 @@ pub fn run_approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str,
         let policy = if approved.policy_approved { "; policy approval recorded too" } else { "; no policy file, so no policy approval" };
         println!("canon brief approve: {} approved by `{}` ({}){policy}", approved.brief, approved.approved_by, approved.digest);
     }
-    crate::next::finish(&repo, "brief approve", &crate::next::Scope::Change(approved.change.clone()), false, json, serde_json::to_value(&approved).unwrap_or_default());
+    crate::next::finish(&repo, "brief approve", &crate::next::Scope::Change(approved.change.clone()), false, json, &approved);
     0
 }

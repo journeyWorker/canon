@@ -1046,13 +1046,13 @@ pub fn refresh_stale_index(repo: &Path, command: &str) {
     let Ok(roots) = ctx.spec_roots(None) else { return };
     let (old, roots) = split_pre_0_17(&ctx.repo, roots);
     for (_, detail) in &old {
-        eprintln!("{command}: {detail}; its scenario index is NOT refreshed");
+        crate::warn_err!("{command}: {detail}; its scenario index is NOT refreshed");
     }
     let tier = GitTier::new(&ctx.ledger_root);
     let checked = |tier: &GitTier| match stale_roots(tier, &roots) {
         Ok(stale) => Some(stale),
         Err(e) => {
-            eprintln!("{command}: could not check the scenario index for staleness: {e}");
+            crate::warn_err!("{command}: could not check the scenario index for staleness: {e}");
             None
         }
     };
@@ -1063,7 +1063,7 @@ pub fn refresh_stale_index(repo: &Path, command: &str) {
     let _lock = match lock_index(&ctx.repo) {
         Ok(lock) => lock,
         Err(e) => {
-            eprintln!("{command}: the scenario index is stale but was not refreshed: {e}");
+            crate::warn_err!("{command}: the scenario index is stale but was not refreshed: {e}");
             return;
         }
     };
@@ -1111,7 +1111,7 @@ pub fn refresh_stale_index(repo: &Path, command: &str) {
     if diagnostics > 0 || !refused.is_empty() {
         line.push_str(" — `canon inventory sync` lists them");
     }
-    eprintln!("{line}");
+    crate::warn_err!("{line}");
 }
 
 /// A configured spec root every grading reader must refuse: its scenario

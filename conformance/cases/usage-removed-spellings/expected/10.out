@@ -1,13 +1,1 @@
-{
-  "count": 0,
-  "kind": "review",
-  "meta": {
-    "hasMore": false,
-    "nextCursor": null,
-    "returned": 0,
-    "total": 0
-  },
-  "records": [],
-  "since": null,
-  "violations": 0
-}
+{"ok":true,"data":{"count":0,"kind":"review","records":[],"since":null,"violations":0},"meta":{"command":"query","schemaVersion":"1.0","canonVersion":"0.27.0","context":{"role":null,"actor":"canon","repo":"."},"hasMore":false,"nextCursor":null,"returned":0,"total":0}}

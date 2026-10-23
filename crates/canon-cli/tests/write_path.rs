@@ -185,7 +185,7 @@ fn a_malformed_write_section_or_both_flags_are_refused_before_anything_is_staged
     assert_eq!(staged(repo), 0);
 
     let check = canon(repo, &["init", "--check-config", "--repo", "."]);
-    assert_eq!(check.status.code(), Some(1));
+    assert_eq!(check.status.code(), Some(2), "CONFIG_UNREADABLE exits 2");
     assert!(stdout(&check).contains("[FAIL] write:"), "{}", stdout(&check));
 
     std::fs::write(repo.join("canon.yaml"), &yaml).unwrap();
@@ -295,7 +295,7 @@ fn a_writer_refreshes_a_stale_index_once_and_a_reader_never_does() {
     let out = ok(repo, &["status", "--json"]);
     assert!(!stderr(&out).contains("scenario index"), "a read command prints no refresh line: {}", stderr(&out));
     assert!(scenario_records(repo).is_empty(), "status writes no index record");
-    let report: serde_json::Value = serde_json::from_slice(&out.stdout).expect("stdout stays JSON");
+    let report: serde_json::Value = serde_json::from_slice::<serde_json::Value>(&out.stdout).expect("stdout stays JSON")["data"].clone();
     let runs = report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "runs").unwrap();
     assert_eq!(runs["scenarios"], 1, "status counts the scenario the index does not hold yet: {report}");
     let gate = ok(repo, &["gate", "check"]);
@@ -519,9 +519,10 @@ fn inventory_sync_47_an_unrefreshable_root_fails_the_gate_the_ship_guard_and_sta
     let ship = canon(repo, &["subject", "status", "demo", "--to", "shipped", "--actor-id", "lead"]);
     assert_eq!(ship.status.code(), Some(1), "{}", stderr(&ship));
     assert!(stderr(&ship).contains("uncovered-cell root — verifying → shipped: the scenario index for spec root `root` is stale"), "{}", stderr(&ship));
-    let report: serde_json::Value = serde_json::from_slice(&ok(repo, &["status", "--json"]).stdout).unwrap();
+    let doc: serde_json::Value = serde_json::from_slice(&ok(repo, &["status", "--json"]).stdout).unwrap();
+    let report = &doc["data"];
     assert_eq!(report["subjects"][0]["status"], "verifying", "a refused ship leaves the subject: {report}");
-    let next = report["next"].as_array().unwrap();
+    let next = doc["meta"]["next"].as_array().unwrap();
     assert_eq!(next.len(), 1, "the sync is the only step: {report}");
     assert_eq!(next[0]["command"], "canon inventory sync");
     assert!(next[0]["why"].as_str().unwrap().contains("spec root(s) `root`"), "{report}");

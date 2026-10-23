@@ -52,7 +52,8 @@ fn write_brief(repo: &Path, text: &str) {
 fn check(repo: &Path) -> (i32, Value) {
     let out = run(repo, &["brief", "check", "--json"]);
     let json: Value = serde_json::from_str(&stdout(&out)).unwrap_or_else(|e| panic!("not json ({e}): {}", stdout(&out)));
-    (out.status.code().unwrap(), json)
+    // The report rides in `data`, also when blockers fail the envelope.
+    (out.status.code().unwrap(), json["data"].clone())
 }
 
 /// The report of `text` judged in a repo with `lang` configured (or not).
@@ -232,7 +233,7 @@ fn authoring_brief_check_04_other_cjk_scripts_are_named_and_get_no_prose_rules()
     let dir = repo_with_change(None);
     write_brief(dir.path(), &swap(&ja, "<!-- canon:section out-of-scope role=context -->\n", ""));
     let (code, report) = check(dir.path());
-    assert_eq!(code, 2, "{report}");
+    assert_eq!(code, 1, "{report}");
     assert_eq!(report["language"], "ja");
     assert!(rules(&report).contains(&"brief.section-missing".to_string()), "{report}");
     assert!(stdout(&run(dir.path(), &["brief", "check"])).contains("language: ja (detected)"));

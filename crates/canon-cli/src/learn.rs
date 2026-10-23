@@ -157,7 +157,7 @@ pub fn run_promote_with_evidence(
                         if let Err(error) = demote_strategy(&strategy_store, *strategy_id, contradiction.id, &git_tier_root, demotion_policy) {
                             demotion_failure = Some(error.to_string());
                         } else {
-                            eprintln!("canon learn promote: later contradictory evidence demoted {strategy_id}");
+                            crate::warn_err!("canon learn promote: later contradictory evidence demoted {strategy_id}");
                         }
                     }
                 }
@@ -185,7 +185,7 @@ pub fn run_promote_with_evidence(
     match outcome {
         Ok(Promotion { path, warnings, .. }) => {
             for warning in &warnings {
-                eprintln!("canon learn promote: advisory: {warning}");
+                crate::human_err!("canon learn promote: advisory: {warning}");
             }
             if dry_run {
                 crate::say!(json, "[dry-run] would promote {strategy_id} -> {}", path.display());
@@ -196,7 +196,7 @@ pub fn run_promote_with_evidence(
                 crate::say!(json, "promoted {strategy_id} -> {}", path.display());
             }
             if json {
-                crate::json_out::data("learn promote", json!({ "strategyId": strategy_id.to_string(), "path": path.display().to_string(), "dryRun": dry_run, "advisories": warnings.iter().map(|w| w.to_string()).collect::<Vec<_>>() }));
+                crate::json_out::data("learn promote", &crate::json_out::untyped(json!({ "strategyId": strategy_id.to_string(), "path": path.display().to_string(), "dryRun": dry_run, "advisories": warnings.iter().map(|w| w.to_string()).collect::<Vec<_>>() })));
             }
             ExitCode::SUCCESS
         }
@@ -265,7 +265,7 @@ pub fn run_approve(repo: &Path, strategy_id: &StrategyId, evaluation_path: &Path
             actor: crate::status::StepActor::Human,
             role: None,
         };
-        crate::json_out::data_with_next("learn approve", response, &crate::next::After::fixed(vec![step]));
+        crate::json_out::data_with_next("learn approve", &crate::json_out::untyped(response), &crate::next::After::fixed(vec![step]));
     } else {
         println!("{}", serde_json::to_string_pretty(&response).expect("approval payload serializes"));
     }
@@ -315,7 +315,7 @@ pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: 
         Ok(record) => {
             if json {
                 let data = serde_json::to_value(&record).expect("rollback record serializes");
-                crate::next::finish(&repo, "learn rollback", &crate::next::Scope::Repo, false, true, data);
+                crate::next::finish(&repo, "learn rollback", &crate::next::Scope::Repo, false, true, &crate::json_out::untyped(data));
             } else {
                 println!("{}", serde_json::to_string(&record).expect("rollback record serializes"));
             }

@@ -1,1 +1,1 @@
-{"error":{"code":"USAGE","expected":["--change-id"],"field":"--change","hint":"--change was renamed --change-id in 0.24.0; use --change-id","message":"--change was removed in 0.25.0","retryable":false}}
+{"ok":false,"error":{"code":"USAGE","message":"--change was removed in 0.25.0","field":"--change","expected":["--change-id"],"suggestions":[],"hint":"--change was renamed --change-id in 0.24.0; use --change-id","retryable":false},"meta":{"command":"brief check","schemaVersion":"1.0","canonVersion":"0.27.0","context":{"role":null,"actor":"canon","repo":"."}}}

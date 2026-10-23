@@ -155,14 +155,14 @@ fn chore_brief(approved: DateTime<Utc>) -> String {
 fn subject_json(repo: &Path) -> Value {
     let out = run(repo, &["query", "--kind", "subject", "--json"]);
     assert!(out.status.success(), "{}", stderr(&out));
-    serde_json::from_str::<Value>(&stdout(&out)).unwrap()["records"][0].clone()
+    serde_json::from_str::<Value>(&stdout(&out)).unwrap()["data"]["records"][0].clone()
 }
 
 fn status_steps(repo: &Path) -> Vec<Value> {
     let out = run(repo, &["status", "--json"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let report: Value = serde_json::from_str(&stdout(&out)).unwrap();
-    report["next"].as_array().unwrap().iter().filter(|s| s["why"].as_str().unwrap_or("").starts_with("demo-subject")).cloned().collect()
+    report["meta"]["next"].as_array().unwrap().iter().filter(|s| s["why"].as_str().unwrap_or("").starts_with("demo-subject")).cloned().collect()
 }
 
 fn ship(repo: &Path) -> Output {
@@ -544,7 +544,7 @@ fn finding_close_81_inherits_the_scenarios_the_finding_names() {
 
     let listed = run(r, &["query", "--kind", "finding", "--json"]);
     let records: Value = serde_json::from_str(&stdout(&listed)).unwrap();
-    let fixed: Vec<&Value> = records["records"].as_array().unwrap().iter().filter(|f| f["disposition"] == "fixed").collect();
+    let fixed: Vec<&Value> = records["data"]["records"].as_array().unwrap().iter().filter(|f| f["disposition"] == "fixed").collect();
     assert_eq!(fixed.len(), 1, "{records}");
     assert_eq!(fixed[0]["scenario_ids"], serde_json::json!(["world.demo.01"]), "named once, inherited by the close: {}", fixed[0]);
 
@@ -593,7 +593,7 @@ fn finding_add_32_records_the_scenarios_it_names_once_each() {
     }
     let listed = run(r, &["query", "--kind", "finding", "--json"]);
     let records: Value = serde_json::from_str(&stdout(&listed)).unwrap();
-    let by_seq = |seq: u64| records["records"].as_array().unwrap().iter().find(|f| f["seq"] == seq).unwrap().clone();
+    let by_seq = |seq: u64| records["data"]["records"].as_array().unwrap().iter().find(|f| f["seq"] == seq).unwrap().clone();
     assert_eq!(by_seq(1)["scenario_ids"], serde_json::json!(["world.demo.02", "world.demo.01"]), "{records}");
     assert!(by_seq(2).get("scenario_ids").is_none(), "a finding naming none carries no field: {records}");
 }
