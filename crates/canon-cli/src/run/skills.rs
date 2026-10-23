@@ -9,13 +9,14 @@ pub fn run(cmd: SkillsCommand) -> ExitCode {
         SkillsCommand::Install(SkillsInstallArgs { skills_source, repo, providers, dry_run, json }) => run_skills_install(skills_source.as_deref(), &repo, providers.as_deref(), dry_run.dry_run, json),
         SkillsCommand::Check(SkillsCheckArgs { skills_source, repo, providers, json }) => run_skills_check(skills_source.as_deref(), &repo, providers.as_deref(), json),
         SkillsCommand::Doctor(SkillsDoctorArgs { skills_source, repo, providers, json }) => run_skills_doctor(skills_source.as_deref(), &repo, providers.as_deref(), json),
+        SkillsCommand::Show(SkillsShowArgs { name, full, json }) => run_skills_show(&name, full, json),
     }
 }
 
 fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>, dry_run: bool, json: bool) -> ExitCode {
     let source = crate::skills::resolve_source(source);
-    if !source.join("SKILL.src.md").is_file() {
-        return match crate::skills::install(&source, target, dry_run) {
+    if let Some(dir) = source.as_deref().filter(|dir| !dir.join("SKILL.src.md").is_file()) {
+        return match crate::skills::install(dir, target, dry_run) {
             Ok(report) => {
                 for skill in &report.installed {
                     let status = match (skill.changed, dry_run) {
@@ -34,7 +35,7 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
             Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).hint("check that the target directory is writable; `canon skills doctor` diagnoses the installation").emit("canon skills install", json) as u8) }
         };
     }
-    match crate::skills::install_canonical(&source, target, providers, dry_run) {
+    match crate::skills::install_canonical(source.as_deref(), target, providers, dry_run) {
         Ok(report) => {
             let selection = crate::skills::ProviderSelection { providers: report.providers.clone(), origin: report.origin };
             let status = match (report.changed, dry_run) {
@@ -89,7 +90,7 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
 
 fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>, json: bool) -> ExitCode {
     let source = crate::skills::resolve_source(source);
-    match crate::skills::check(&source, target, providers) {
+    match crate::skills::check(source.as_deref(), target, providers) {
         Ok(report) => {
             let selection = crate::skills::ProviderSelection { providers: report.providers.clone(), origin: report.origin };
             if report.origin != crate::skills::ProviderOrigin::Flag {
@@ -132,7 +133,7 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
 
 fn run_skills_doctor(source: Option<&std::path::Path>, target: &std::path::Path, providers: Option<&str>, json: bool) -> ExitCode {
     let source = crate::skills::resolve_source(source);
-    match crate::skills::doctor(&source, target, providers) {
+    match crate::skills::doctor(source.as_deref(), target, providers) {
         Ok(lines) => {
             for line in &lines { crate::say!(json, "{line}"); }
             if json {
@@ -142,4 +143,20 @@ fn run_skills_doctor(source: Option<&std::path::Path>, target: &std::path::Path,
         }
         Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).hint("check that the target directory is writable; `canon skills doctor` diagnoses the installation").emit("canon skills doctor", json) as u8) }
     }
+}
+
+/// `canon skills show <NAME> [--full]`: the guide built into the binary, as markdown on stdout, or enveloped under `--json`.
+fn run_skills_show(name: &str, full: bool, json: bool) -> ExitCode {
+    let markdown: std::borrow::Cow<'static, str> = if full && name == crate::guide::CORE {
+        crate::guide::full().into()
+    } else {
+        // clap admits only the embedded names (`possibleValues`).
+        crate::guide::guide(name).expect("clap admits only embedded guide names").into()
+    };
+    if json {
+        crate::json_out::data("skills show", &crate::skills::SkillsShowReport { name: name.to_string(), version: crate::skills::CANON_VERSION, markdown });
+    } else {
+        print!("{markdown}");
+    }
+    ExitCode::SUCCESS
 }

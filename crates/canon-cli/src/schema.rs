@@ -189,6 +189,7 @@ pub const META: &[CommandMeta] = &[
     row_exits("skills check", Read, &[exit(0, "clean"), exit(1, "drift (SKILLS_DRIFT)"), exit(2, "refused: an invalid argument")], &[O]),
     row_exits("skills doctor", Read, &[exit(0, "always: diagnostics only")], &[O]),
     row_exits("skills install", Write, REFUSABLE, &[O]),
+    row_exits("skills show", Read, REFUSABLE_NO_REPO, EVERYONE),
     row_exits("status", Read, &[exit(0, "success, whatever it finds"), exit(1, "unverifiable: nothing was examined"), exit(2, "refused: CONFIG_MISSING, or UNKNOWN_FIELD")], EVERYONE),
     row_exits("subject adopt", Write, REFUSABLE, &[P, O]),
     row_exits("subject new", Write, REFUSABLE, &[P, O]),

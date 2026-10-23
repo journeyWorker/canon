@@ -10,6 +10,7 @@ owned-paths: canon writes these; exclude them from formatters and linters:
   .canon/ingest/**
   .canon/learn/**
   .canon/ledger/**
+  .canon/migrate-backup/**
   .canon/plugins/**
   .canon/policy.approval.json
   .canon/r2/**

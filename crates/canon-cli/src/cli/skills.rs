@@ -11,11 +11,13 @@ pub enum SkillsCommand {
     Check(SkillsCheckArgs),
     /// Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a provider that is not selected, and other skills whose description claims build work; reports only, never edits.
     Doctor(SkillsDoctorArgs),
+    /// Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here.
+    Show(SkillsShowArgs),
 }
 
 #[derive(Args)]
 pub struct SkillsInstallArgs {
-    /// Source directory; defaults to CANON_SKILLS_SOURCE or canon/skills.
+    /// Developer override: read SKILL.src.md's frontmatter and scripts/ from this directory instead of the text built into the binary; defaults to CANON_SKILLS_SOURCE, else the built-in text.
     #[arg(long)]
     pub skills_source: Option<PathBuf>,
     #[command(flatten)]
@@ -58,6 +60,19 @@ pub struct SkillsDoctorArgs {
     #[arg(long)]
     pub providers: Option<String>,
     /// Output JSON instead of the human-readable form
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Args)]
+pub struct SkillsShowArgs {
+    /// The guide to print: `canon` (the core guide) or a reference such as `role-implementer`.
+    #[arg(value_name = "NAME", value_parser = clap::builder::PossibleValuesParser::new(crate::guide::names()))]
+    pub name: String,
+    /// With `canon`: append every reference after the core guide. Any other name is a complete guide already, so the flag changes nothing there.
+    #[arg(long)]
+    pub full: bool,
+    /// Output JSON instead of the markdown
     #[arg(long)]
     pub json: bool,
 }

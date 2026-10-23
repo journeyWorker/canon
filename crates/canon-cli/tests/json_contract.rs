@@ -58,6 +58,7 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
         (("evidence audit", "audit-result"), "confirmed"),
         (("subject adopt", "subject-id"), "demo"),
         (("subject unadopt", "subject-id"), "demo"),
+        (("skills show", "name"), "canon"),
     ]);
     if let Some(value) = by_command.get(&(command, name)) {
         return value.to_string();

@@ -1,6 +1,5 @@
-providers: claude
-stale: <repo>/.canon/skills/.install-lock.json
-orphan: <repo>/.claude/skills/canon/reference/retired.md (claude) — the install lock lists it, but this canon's bundle no longer ships it; its bytes still match the install lock; run `canon skills install --providers=claude`, which removes it
+canon v1 — installed (claude)
+pruned: <repo>/.claude/skills/canon/reference/retired.md (claude) — the bundle no longer ships it; its bytes still match the install lock
 owned-paths: canon writes these; exclude them from formatters and linters:
   .claude/skills/canon/**
   .canon/REPORT.md
@@ -12,6 +11,7 @@ owned-paths: canon writes these; exclude them from formatters and linters:
   .canon/ingest/**
   .canon/learn/**
   .canon/ledger/**
+  .canon/migrate-backup/**
   .canon/plugins/**
   .canon/policy.approval.json
   .canon/r2/**

@@ -128,6 +128,7 @@ pub fn report_schemas() -> Vec<ReportSchema> {
         entry::<crate::skills::SkillsCheckReport>("skills check", "SkillsCheckReport"),
         entry::<crate::skills::SkillsDoctorReport<'static>>("skills doctor", "SkillsDoctorReport"),
         entry::<crate::skills::SkillsInstallReport<'static>>("skills install", "SkillsInstallReport"),
+        entry::<crate::skills::SkillsShowReport>("skills show", "SkillsShowReport"),
     ];
     schemas.sort_by(|a, b| a.command.cmp(b.command).then_with(|| a.name.cmp(&b.name)));
     schemas

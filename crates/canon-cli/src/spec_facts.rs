@@ -177,6 +177,7 @@ pub const FACTS: &[LeafFacts] = &[
     leaf("skills check").out(&[report("SkillsCheckReport")]),
     leaf("skills doctor").out(&[report("SkillsDoctorReport")]),
     leaf("skills install").idem(ReplaySafe).out(&[report("SkillsInstallReport")]),
+    leaf("skills show").out(&[artifact("text/markdown", "SkillsShowReport")]).operands(&[operand("name", "A guide built into the binary: `canon`, or the stem of a reference file such as `role-implementer`")]),
     leaf("status").out(&[report("StatusReport")]),
     leaf("subject adopt").idem(ReplaySafe).out(&[report("SubjectAdoptReport")]),
     leaf("subject new").idem(Once).out(&[report("SubjectNewReport")]),

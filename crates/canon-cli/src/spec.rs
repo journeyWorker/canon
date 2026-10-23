@@ -62,7 +62,7 @@ const ENV_VARS: &[EnvVar] = &[
     EnvVar { name: "CANON_S3_ENDPOINT", about: "Endpoint of an s3 tier's object store (required in a release build)" },
     EnvVar { name: "CANON_S3_REGION", about: "Region of an s3 tier's object store (default `us-east-1`)" },
     EnvVar { name: "CANON_S3_SECRET_KEY", about: "Secret key of an s3 tier's object store (required in a release build)" },
-    EnvVar { name: "CANON_SKILLS_SOURCE", about: "The directory `skills install|check|doctor` read the canon skills from, when `--source` is not given (default `canon/skills`)" },
+    EnvVar { name: "CANON_SKILLS_SOURCE", about: "Developer override: a directory `skills install|check|doctor` read `SKILL.src.md` and `scripts/` from, when `--skills-source` is not given (default: the text built into the binary)" },
 ];
 
 /// Variables canon reads or sets that are not a user's to set: a build input,

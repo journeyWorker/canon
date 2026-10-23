@@ -6028,7 +6028,7 @@
       "supportsJson": true
     },
     {
-      "about": "Bring a repo from an earlier canon up to date: the 0.17 layout (specs, changes, approvals, skills, .gitignore), the 0.23 latest-only ledger (superseded versions to .canon/archive) and 0.23 review pins",
+      "about": "Bring a repo from an earlier canon up to date: the 0.17 layout (specs, changes, approvals, skills, .gitignore), the 0.28 hooks, scripts and skill stub (backed up under .canon/migrate-backup/), the 0.23 latest-only ledger (superseded versions to .canon/archive) and 0.23 review pins",
       "aliases": [],
       "command": "migrate",
       "effect": "destructive",
@@ -8449,7 +8449,8 @@
       "children": [
         "skills check",
         "skills doctor",
-        "skills install"
+        "skills install",
+        "skills show"
       ],
       "command": "skills",
       "name": "skills",
@@ -8671,7 +8672,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Source directory; defaults to CANON_SKILLS_SOURCE or canon/skills",
+          "help": "Developer override: read SKILL.src.md's frontmatter and scripts/ from this directory instead of the text built into the binary; defaults to CANON_SKILLS_SOURCE, else the built-in text",
           "kind": "value",
           "name": "skills-source",
           "possibleValues": [],
@@ -8736,6 +8737,117 @@
       ],
       "requiredOneOf": [],
       "roles": [
+        "orchestrator"
+      ],
+      "supportsJson": true
+    },
+    {
+      "about": "Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here",
+      "aliases": [],
+      "command": "skills show",
+      "effect": "read",
+      "errorCodes": [
+        "UNKNOWN_ROLE",
+        "USAGE"
+      ],
+      "examples": [
+        "canon skills show canon --full"
+      ],
+      "exits": [
+        {
+          "code": 0,
+          "meaning": "success"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: an argument or input that is missing, unreadable or invalid; nothing is written"
+        }
+      ],
+      "inputs": [],
+      "name": "show",
+      "nodeKind": "leaf",
+      "operands": [
+        {
+          "arity": {
+            "max": 1,
+            "min": 1
+          },
+          "description": "A guide built into the binary: `canon`, or the stem of a reference file such as `role-implementer`",
+          "kind": "NAME",
+          "name": "name",
+          "possibleValues": [
+            "canon",
+            "brief-align",
+            "brief-clarify",
+            "brief-harden",
+            "brief-polish",
+            "brief-shape",
+            "canon-artifact-ingest",
+            "canon-authoring",
+            "canon-context",
+            "canon-fmt",
+            "canon-gate",
+            "canon-inventory",
+            "canon-learn",
+            "canon-plan-import",
+            "canon-plugins",
+            "canon-policy",
+            "canon-report-dashboard",
+            "canon-retrieve",
+            "canon-review",
+            "canon-session-ingest",
+            "canon-storage",
+            "canon-subject",
+            "canon-vocab",
+            "role-implementer",
+            "role-orchestrator",
+            "role-planner",
+            "role-reviewer"
+          ],
+          "repeatable": false,
+          "required": true
+        }
+      ],
+      "options": [
+        {
+          "aliases": [],
+          "default": [],
+          "help": "With `canon`: append every reference after the core guide. Any other name is a complete guide already, so the flag changes nothing there",
+          "kind": "flag",
+          "name": "full",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Output JSON instead of the markdown",
+          "kind": "flag",
+          "name": "json",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "artifact",
+          "mediaType": "text/markdown",
+          "report": "SkillsShowReport",
+          "schemaRef": "#/schemas/SkillsShowReport",
+          "schemaVersion": "1.0"
+        }
+      ],
+      "path": [
+        "skills",
+        "show"
+      ],
+      "requiredOneOf": [],
+      "roles": [
+        "planner",
+        "implementer",
+        "reviewer",
         "orchestrator"
       ],
       "supportsJson": true
@@ -10123,7 +10235,7 @@
       "name": "CANON_S3_SECRET_KEY"
     },
     {
-      "about": "The directory `skills install|check|doctor` read the canon skills from, when `--source` is not given (default `canon/skills`)",
+      "about": "Developer override: a directory `skills install|check|doctor` read `SKILL.src.md` and `scripts/` from, when `--skills-source` is not given (default: the text built into the binary)",
       "name": "CANON_SKILLS_SOURCE"
     }
   ],
@@ -18474,6 +18586,13 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "description": "`canon migrate`'s `data`: the plan, the steps it printed and, once it\nrebuilt the scenario index, how many records that wrote.",
       "properties": {
+        "backupDir": {
+          "description": "Where `--commit` copied the files it rewrites or removes, repo-relative (`.canon/migrate-backup/<timestamp>`); absent when it copied none.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "committed": {
           "description": "`true` once the run acted, `false` for a preview.",
           "type": "boolean"
@@ -20514,6 +20633,31 @@
       ],
       "description": "`canon skills install`'s report (`SkillsInstallReport`): the bundle install,\nor the legacy one for a source without `SKILL.src.md`.",
       "title": "SkillsInstallReport"
+    },
+    "SkillsShowReport": {
+      "$id": "urn:canon:report:SkillsShowReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`--json` of `canon skills show`: the guide `name` names, as this canon embeds it.",
+      "properties": {
+        "markdown": {
+          "description": "The guide's markdown, as `canon skills show` prints it.",
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "description": "The canon version the guide is embedded in.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "markdown"
+      ],
+      "title": "SkillsShowReport",
+      "type": "object"
     },
     "StatusReport": {
       "$defs": {

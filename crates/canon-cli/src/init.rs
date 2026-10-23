@@ -28,7 +28,8 @@
 //! terminal, it asks with the detected harnesses (`.claude`, `.codex`,
 //! `.omp`, `.pi` directories) checked; otherwise it takes the detected
 //! ones. The answer is written as `canon.yaml` `skills.providers` and the
-//! skill is installed from the default skill source, as `canon skills
+//! skill is installed (the stub written from the text built into the
+//! binary, with no `canon/skills` tree in the repo), as `canon skills
 //! install` does. With no terminal, no flag and nothing detected, it
 //! records nothing, installs nothing and says how to choose.
 //! `--check` validates `skills:` through
@@ -262,13 +263,13 @@ const AGENTS_BLOCK: &str = "\
 ## Canon
 
 Features in this repo are managed with canon. Start with `canon status`,
-and read the canon skill (`canon skills install`) before you change a
+and run `canon skills show canon` for the full guide before you change a
 feature.
 
 Unsure of a command or its flags: `canon schema <command> --json`. Pass
 `--json` and read `error.code` and `error.hint` when a command fails.
 
-Roles: if you were spawned as one (planner, implementer, reviewer, orchestrator), set `CANON_ROLE` (or pass `--as`) and load only `reference/role-<role>.md` from the canon skill; with no role, follow `canon status`.
+Roles: if you were spawned as one (planner, implementer, reviewer, orchestrator), set `CANON_ROLE` (or pass `--as`) and run `canon skills show role-<role>` for what the role does; with no role, follow `canon status`.
 
 The loop:
 
@@ -552,7 +553,7 @@ fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkill
     let source = skills::resolve_source(None);
     // A preview has not written `skills.providers` yet, so it names the choice.
     let names = chosen.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(",");
-    match skills::install_canonical(&source, repo, dry_run.then_some(names.as_str()), dry_run) {
+    match skills::install_canonical(source.as_deref(), repo, dry_run.then_some(names.as_str()), dry_run) {
         Ok(report) => {
             let dirs = report
                 .providers
@@ -573,7 +574,7 @@ fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkill
                     canon_yaml_path.display()
                 ),
             )
-            .hint(format!("once the skill source is available, run `canon skills install` (set {} or pass --source <dir>; it follows skills.providers)", skills::CANONICAL_SOURCE_ENV))
+            .hint(format!("once the skill source is available, run `canon skills install` (the override {} names a directory without a SKILL.src.md; unset it, or pass --skills-source <dir>; it follows skills.providers)", skills::CANONICAL_SOURCE_ENV))
             .emit("canon init", log.json))
         }
     }

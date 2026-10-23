@@ -146,6 +146,7 @@ impl crate::reports::Report for GateCheckReport<'_> {}
 /// engaged) and runs it over the resolved repo's `GateContext`.
 pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
+    crate::legacy::announce(&repo);
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {

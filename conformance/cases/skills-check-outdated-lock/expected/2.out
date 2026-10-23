@@ -1,4 +1,7 @@
 providers: claude
+stale: <repo>/.claude/skills/canon/SKILL.md (claude)
+missing: <repo>/.claude/skills/canon/scripts/canon-retrieve-pre-dispatch.sh (claude)
+stale: <repo>/.canon/skills/.install-lock.json
 outdated: <repo>/.canon/skills/.install-lock.json installed by canon 0.13.1, this canon is 0.27.0 — run `canon skills install --providers=claude`
 owned-paths: canon writes these; exclude them from formatters and linters:
   .claude/skills/canon/**
@@ -11,6 +14,7 @@ owned-paths: canon writes these; exclude them from formatters and linters:
   .canon/ingest/**
   .canon/learn/**
   .canon/ledger/**
+  .canon/migrate-backup/**
   .canon/plugins/**
   .canon/policy.approval.json
   .canon/r2/**
