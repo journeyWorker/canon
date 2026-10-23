@@ -301,9 +301,8 @@ fn report_subject_warning(
         &crate::next::Scope::Subject(subject.subject_id.as_str().to_string()),
         false,
         json,
-        record,
-        crate::json_out::warnings_meta(warnings),
-    );
+        &crate::json_out::untyped(record),
+        crate::json_out::warnings_meta(warnings));
 }
 
 /// The `domain` enum name `canon.core` declares and a consumer repo
@@ -1013,7 +1012,7 @@ pub fn run_show(repo: &Path, subject_id: &SubjectId, override_reason: Option<&st
         Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject status", json),
     };
     if json {
-        crate::json_out::data("subject status", serde_json::to_value(&subject).expect("subject serializes"));
+        crate::json_out::data("subject status", &crate::json_out::untyped(serde_json::to_value(&subject).expect("subject serializes")));
     } else {
         println!("canon subject status: {} ({}, {}) — {}", subject.subject_id.as_str(), subject.domain, status_str(subject.status), subject.title);
         if !subject.summary.is_empty() {

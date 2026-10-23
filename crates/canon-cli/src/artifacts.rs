@@ -114,13 +114,13 @@ pub fn run_verify(repo: &Path, full: bool, json: bool) -> i32 {
     });
     if problems.is_empty() {
         if json {
-            crate::json_out::data("artifacts verify", data);
+            crate::json_out::data("artifacts verify", &crate::json_out::untyped(data));
         }
         return 0;
     }
     CliError::failed("ARTIFACTS_VERIFY_FAILED", format!("{} bound file(s) are missing from the artifact store or altered", problems.len()))
         .hint("re-upload a file the working tree still holds with `canon evidence vault`, or re-run and re-attest it with `canon evidence add`; see data.problems")
-        .emit_with_data("canon artifacts verify", json, data)
+        .emit_with_data("canon artifacts verify", json, &crate::json_out::untyped(data))
 }
 
 /// One blob in the local store.
@@ -210,7 +210,7 @@ pub fn run_migrate(repo: &Path, to: &str, dry_run: bool, json: bool) -> i32 {
         if matches!(current.backend, ArtifactsBackend::Local) {
             crate::say!(json, "{CMD}: the artifact store is already local; nothing to move");
             if json {
-                crate::json_out::data("artifacts migrate", serde_json::json!({ "backend": "local", "dryRun": dry_run, "blobs": 0, "uploaded": 0, "alreadyInStore": 0, "removedLocal": 0, "configWritten": false, "gitignoreAdded": false, "skipped": [] }));
+                crate::json_out::data("artifacts migrate", &crate::json_out::untyped(serde_json::json!({ "backend": "local", "dryRun": dry_run, "blobs": 0, "uploaded": 0, "alreadyInStore": 0, "removedLocal": 0, "configWritten": false, "gitignoreAdded": false, "skipped": [] })));
             }
             return 0;
         }
@@ -382,10 +382,10 @@ pub fn run_migrate(repo: &Path, to: &str, dry_run: bool, json: bool) -> i32 {
     });
     if dry_run {
         if json {
-            crate::json_out::data("artifacts migrate", data);
+            crate::json_out::data("artifacts migrate", &crate::json_out::untyped(data));
         }
     } else {
-        crate::next::finish(&repo, "artifacts migrate", &crate::next::Scope::Repo, false, json, data);
+        crate::next::finish(&repo, "artifacts migrate", &crate::next::Scope::Repo, false, json, &crate::json_out::untyped(data));
     }
     0
 }

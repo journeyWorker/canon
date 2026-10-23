@@ -16,7 +16,7 @@ fn run_tier_age(repo: &std::path::Path, canon_yaml: Option<&std::path::Path>, dr
         Ok(reports) => {
             crate::say_raw!(json, "{}", crate::tier::format_report(&reports, dry_run));
             if json {
-                crate::json_out::data("tier age", crate::tier::format_json(&reports, dry_run));
+                crate::json_out::data("tier age", &crate::json_out::untyped(crate::tier::format_json(&reports, dry_run)));
             }
             ExitCode::SUCCESS
         }

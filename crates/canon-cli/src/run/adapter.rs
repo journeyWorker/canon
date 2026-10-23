@@ -29,12 +29,7 @@ fn run_adapter_validate(response: &std::path::Path, repo: Option<&std::path::Pat
     }
 
     if json {
-        match serde_json::to_string_pretty(&summary) {
-            Ok(output) => println!("{output}"),
-            Err(error) => {
-                return ExitCode::from(CliError::failed("SERIALIZE_FAILED", format!("cannot render summary: {error}")).hint("this is a canon bug: report it together with the command line that produced it").emit("canon adapter validate", json) as u8);
-            }
-        }
+        crate::json_out::data("adapter validate", &summary);
     } else {
         println!("adapter response: valid");
         println!("  protocol_version: {}", summary.protocol_version);
@@ -64,15 +59,11 @@ fn run_adapter_authorize(response: &std::path::Path, repo: &std::path::Path, jso
         }
     };
     if json && result.execution_authorized {
-        println!("{}", serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".into()));
+        crate::json_out::data("adapter authorize", &result);
     } else if json {
-        // One document: the result keeps its own fields and gains the shared `error`.
+        // The failure keeps the result in `data`.
         let error = CliError::failed("ADAPTER_EXECUTION_NOT_AUTHORIZED", "execution_not_authorized").hint("declare the capability in .canon/policy.yaml and approve it with `canon policy approve --by <name>`, or drop it from the response");
-        eprintln!("{}", error.human("canon adapter authorize"));
-        let mut body = serde_json::to_value(&result).unwrap_or_else(|_| serde_json::json!({}));
-        body["error"] = error.to_json()["error"].clone();
-        println!("{}", serde_json::to_string_pretty(&body).unwrap_or_else(|_| "{}".into()));
-        return ExitCode::from(error.exit as u8);
+        return ExitCode::from(error.emit_with_data("canon adapter authorize", true, &result) as u8);
     } else {
         println!("execution_authorized: {}", result.execution_authorized);
         println!("execution_performed: false");

@@ -383,7 +383,7 @@ fn handle_connection(stream: TcpStream, server: &Server) {
     match (head.method.as_str(), head.path.as_str()) {
         ("GET", "/api/status") => {
             let data = json!({ "snapshot": server.snapshot.to_json(), "app": { "source": if matches!(server.app, AppSource::Embedded(_)) { "embedded" } else { "directory" } } });
-            let body = crate::json_out::envelope("dashboard status", data);
+            let body = crate::json_out::envelope("dashboard status", &crate::json_out::untyped(data));
             write_reply(&mut stream, &Reply { status: 200, body });
         }
         ("GET", "/api/briefs") => write_reply(&mut stream, &crate::dashboard_briefs::list(&server.repo)),

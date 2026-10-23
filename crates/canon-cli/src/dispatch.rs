@@ -328,7 +328,7 @@ impl DispatchError {
         if let Self::RoleRegimeMismatch { regime_role, .. } = self {
             error = error.field("--role").expected([regime_role.clone()]);
         }
-        if matches!(self, Self::EndInProgress { .. }) { error.retryable() } else { error }
+        error
     }
 }
 
@@ -813,7 +813,7 @@ pub fn run_begin(
                 if let Some(reason) = begun.tier.degrade_reason() {
                     summary.insert("tier_degraded".to_string(), serde_json::json!(reason));
                 }
-                crate::next::finish(repo, "dispatch begin", &crate::next::Scope::Repo, false, true, serde_json::Value::Object(summary));
+                crate::next::finish(repo, "dispatch begin", &crate::next::Scope::Repo, false, true, &crate::json_out::untyped(serde_json::Value::Object(summary)));
             } else {
                 println!(
                     "dispatch {} begun for {} — recorded {} guidance item(s) -> {}",
@@ -828,7 +828,7 @@ pub fn run_begin(
                 if let Some(parent) = begun.run.parent_run_id {
                     println!("  dispatched by run {parent}");
                 }
-                crate::next::finish(repo, "dispatch begin", &crate::next::Scope::Repo, false, false, serde_json::Value::Null);
+                crate::next::finish(repo, "dispatch begin", &crate::next::Scope::Repo, false, false, &crate::json_out::untyped(serde_json::Value::Null));
             }
             // stderr in BOTH render modes, so stdout stays a clean
             // report — `run_diff`'s own note discipline, applied to
@@ -1295,10 +1295,10 @@ pub fn run_end(repo: &Path, run_id: RunId, status: RunStatus, json: bool) -> Exi
                 if let Some(reason) = ended.tier.degrade_reason() {
                     summary.insert("tier_degraded".to_string(), serde_json::json!(reason));
                 }
-                crate::next::finish(repo, "dispatch end", &crate::next::Scope::Repo, false, true, serde_json::Value::Object(summary));
+                crate::next::finish(repo, "dispatch end", &crate::next::Scope::Repo, false, true, &crate::json_out::untyped(serde_json::Value::Object(summary)));
             } else {
                 println!("dispatch {} ended `{}` -> {}", ended.run_id, status_slug(ended.run.status), ended.manifest_path.display());
-                crate::next::finish(repo, "dispatch end", &crate::next::Scope::Repo, false, false, serde_json::Value::Null);
+                crate::next::finish(repo, "dispatch end", &crate::next::Scope::Repo, false, false, &crate::json_out::untyped(serde_json::Value::Null));
             }
             if let Some(reason) = ended.tier.degrade_reason() {
                 eprintln!(

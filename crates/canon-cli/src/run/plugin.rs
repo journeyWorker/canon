@@ -25,12 +25,12 @@ fn run_plugin_sync(repo: &std::path::Path, plugin_id: &str, spec_root: Option<&s
             let data = crate::plugin_sync::format_json(&outcome);
             if outcome.is_clean() {
                 if json {
-                    crate::json_out::data("plugin sync", data);
+                    crate::json_out::data("plugin sync", &crate::json_out::untyped(data));
                 }
                 ExitCode::SUCCESS
             } else {
                 let error = CliError::failed("PLUGIN_SYNC_ERRORS", "some candidates could not be written").hint("data.roots names each error");
-                ExitCode::from(error.emit_with_data("canon plugin sync", json, data) as u8)
+                ExitCode::from(error.emit_with_data("canon plugin sync", json, &crate::json_out::untyped(data)) as u8)
             }
         }
         Err(err) => {

@@ -692,7 +692,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
                 record["severity"] = serde_json::json!(severity_slug(args.severity));
                 record["disposition"] = serde_json::json!(args.disposition.as_str());
                 record["unsourced"] = serde_json::json!(args.introduced_by.is_none());
-                crate::next::finish(&repo, "finding add", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, record);
+                crate::next::finish(&repo, "finding add", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, &crate::json_out::untyped(record));
             }
             settled.exit_code()
         }
@@ -888,7 +888,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
             args.disposition.as_str()
         );
         let noop = serde_json::json!({ "changeId": args.change_id.as_str(), "round": args.round, "seq": args.seq, "disposition": args.disposition.as_str(), "noop": true });
-        crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), false, args.json, noop);
+        crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), false, args.json, &crate::json_out::untyped(noop));
         return 0;
     }
 
@@ -965,7 +965,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
                 record["from"] = serde_json::json!(existing.disposition().as_str());
                 record["disposition"] = serde_json::json!(args.disposition.as_str());
                 record["noop"] = serde_json::json!(false);
-                crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, record);
+                crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, &crate::json_out::untyped(record));
             }
             settled.exit_code()
         }

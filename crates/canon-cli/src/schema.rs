@@ -549,7 +549,7 @@ pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool, all: boo
             let role = if all { None } else { Role::current(None) };
             let commands = list_entries(root, &under, role, all);
             if json {
-                crate::json_out::data("schema", serde_json::to_value(ListSchema { role, commands }).expect("schema serializes"));
+                crate::json_out::data("schema", &crate::json_out::untyped(serde_json::to_value(ListSchema { role, commands }).expect("schema serializes")));
             } else {
                 let width = commands.iter().map(|c| c.command.len()).max().unwrap_or(0);
                 for c in &commands {
@@ -561,7 +561,7 @@ pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool, all: boo
         Resolved::Leaf(path, cmd) => {
             let schema = command_schema(&path, cmd);
             if json {
-                crate::json_out::data("schema", serde_json::to_value(&schema).expect("schema serializes"));
+                crate::json_out::data("schema", &crate::json_out::untyped(serde_json::to_value(&schema).expect("schema serializes")));
             } else {
                 print_human(&schema);
             }
@@ -574,13 +574,15 @@ pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool, all: boo
 struct ErrorEntry {
     code: &'static str,
     meaning: &'static str,
+    exit: i32,
+    retryable: bool,
 }
 
 /// `canon schema --errors`: the whole registry, sorted by code.
 fn print_errors(json: bool) {
-    let entries: Vec<ErrorEntry> = crate::cli_error::all_codes().iter().map(|(code, meaning)| ErrorEntry { code, meaning }).collect();
+    let entries: Vec<ErrorEntry> = crate::cli_error::all_codes().iter().map(|info| ErrorEntry { code: info.code, meaning: info.meaning, exit: info.exit, retryable: info.retryable }).collect();
     if json {
-        crate::json_out::data("schema", serde_json::json!({ "errors": entries }));
+        crate::json_out::data("schema", &crate::json_out::untyped(serde_json::json!({ "errors": entries })));
     } else {
         let width = entries.iter().map(|e| e.code.len()).max().unwrap_or(0);
         for e in &entries {

@@ -158,7 +158,7 @@ fn needs_config_leaves() -> Vec<&'static str> {
 
 fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
     let mut table: BTreeMap<&'static str, BTreeSet<&'static str>> = META.iter().map(|m| (m.path, GLOBAL.iter().copied().collect())).collect();
-    let codes: Vec<&'static str> = all_codes().iter().map(|(c, _)| *c).filter(|c| !GLOBAL.contains(c)).collect();
+    let codes: Vec<&'static str> = all_codes().iter().map(|info| info.code).filter(|c| !GLOBAL.contains(c)).collect();
     let defaults: BTreeMap<&str, &[&str]> = FILE_DEFAULTS.iter().copied().collect();
     let mut problems = Vec::new();
     let mut files: Vec<PathBuf> = ["", "run"]
@@ -264,6 +264,6 @@ fn the_schema_error_codes_are_the_codes_the_sources_emit() {
 fn every_registered_code_is_emitted_by_some_command() {
     let table = derive();
     let emitted: BTreeSet<&str> = table.values().flatten().copied().collect();
-    let orphans: Vec<&str> = all_codes().iter().map(|(c, _)| *c).filter(|c| !emitted.contains(c)).collect();
+    let orphans: Vec<&str> = all_codes().iter().map(|info| info.code).filter(|c| !emitted.contains(c)).collect();
     assert!(orphans.is_empty(), "registered but attributed to no command: {orphans:?}");
 }

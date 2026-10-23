@@ -109,7 +109,7 @@ pub fn run_compact(repo: &Path, dry_run: bool, json: bool) -> i32 {
         crate::say!(json, "{line}");
     }
     if json {
-        crate::json_out::data("ledger compact", data(&repo, dry_run, &kinds));
+        crate::json_out::data("ledger compact", &crate::json_out::untyped(data(&repo, dry_run, &kinds)));
     }
     0
 }

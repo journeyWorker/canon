@@ -216,11 +216,11 @@ fn constructed_codes() -> BTreeSet<String> {
 #[test]
 fn the_code_registry_is_unique_sorted_and_matches_the_codes_the_sources_construct() {
     let registry = canon_cli::cli_error::all_codes();
-    let codes: Vec<&str> = registry.iter().map(|(code, _)| *code).collect();
+    let codes: Vec<&str> = registry.iter().map(|info| info.code).collect();
     let unique: BTreeSet<&str> = codes.iter().copied().collect();
     assert_eq!(unique.len(), codes.len(), "a code is registered twice");
     assert!(codes.windows(2).all(|w| w[0] < w[1]), "the registry is sorted by code");
-    assert!(registry.iter().all(|(code, meaning)| !meaning.trim().is_empty() && code.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')), "every code is SCREAMING_SNAKE with a meaning");
+    assert!(registry.iter().all(|info| !info.meaning.trim().is_empty() && info.code.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')), "every code is SCREAMING_SNAKE with a meaning");
 
     let constructed = constructed_codes();
     let unregistered: Vec<_> = constructed.iter().filter(|c| !unique.contains(c.as_str())).collect();
@@ -231,4 +231,44 @@ fn the_code_registry_is_unique_sorted_and_matches_the_codes_the_sources_construc
     let text: String = sources().into_iter().filter(|(name, _)| name != "cli_error.rs").map(|(_, t)| t).collect();
     let dead: Vec<_> = codes.iter().filter(|c| !text.contains(&format!("\"{c}\"")) && !text.contains(&format!("({c})"))).collect();
     assert!(dead.is_empty(), "registered but never used: {dead:?}");
+}
+
+#[test]
+fn every_code_declares_its_exit_and_retryability_and_the_d4_families_map_to_two() {
+    for info in canon_cli::cli_error::all_codes() {
+        assert!(matches!(info.exit, 1 | 2), "{} declares exit {} (only 1 and 2 are errors)", info.code, info.exit);
+        assert!(!info.meaning.trim().is_empty(), "{} has no meaning", info.code);
+        if info.code.ends_with("_NOT_FOUND") || info.code.ends_with("_UNREADABLE") || info.code.ends_with("_INVALID_ARGUMENT") {
+            assert_eq!(info.exit, 2, "{} names a missing, unreadable or invalid input, so it is a refusal (exit 2)", info.code);
+        }
+    }
+    let exit_of = |code: &str| canon_cli::cli_error::code_info(code).unwrap_or_else(|| panic!("{code} is not registered")).exit;
+    assert_eq!(exit_of("BRIEF_HAS_BLOCKERS"), 1, "blockers are a finding");
+    assert_eq!(exit_of("GATE_VIOLATIONS"), 1);
+    assert_eq!(exit_of("CONFIG_MISSING"), 2);
+    assert_eq!(exit_of("USAGE"), 2);
+    assert!(canon_cli::cli_error::code_info("DISPATCH_END_IN_PROGRESS").unwrap().retryable, "a concurrent close is the retryable case");
+    assert!(!canon_cli::cli_error::code_info("USAGE").unwrap().retryable);
+}
+
+#[test]
+fn a_cli_error_takes_its_exit_and_retryability_from_the_registry() {
+    use canon_cli::cli_error::CliError;
+    assert_eq!(CliError::refused("BRIEF_NOT_FOUND", "x").exit, 2);
+    assert_eq!(CliError::failed("BRIEF_NOT_FOUND", "x").exit, 2, "the constructor does not choose the exit");
+    assert_eq!(CliError::failed("GATE_VIOLATIONS", "x").exit, 1);
+    assert!(CliError::refused("DISPATCH_END_IN_PROGRESS", "x").retryable);
+}
+
+#[test]
+fn a_received_value_is_redacted_when_it_looks_like_a_secret() {
+    use canon_cli::cli_error::redact;
+    assert_eq!(redact(Some("--api-token"), "abc"), "<redacted>");
+    assert_eq!(redact(None, "CANON_SECRET=hunter2"), "CANON_SECRET=<redacted>");
+    assert_eq!(redact(None, "ghp_0123456789abcdef"), "<redacted>");
+    assert_eq!(redact(None, "Ab3dEf6hIj9kLm2nOp5qRs8tUv1"), "<redacted>");
+    assert_eq!(redact(Some("--kind"), "evidence"), "evidence");
+    let digest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    assert_eq!(redact(Some("--plan-digest"), digest), digest, "a digest is not a secret");
+    assert_eq!(redact(Some("--signature-file"), "approval.sig"), "approval.sig");
 }

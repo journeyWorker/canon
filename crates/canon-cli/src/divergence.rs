@@ -136,7 +136,7 @@ pub fn run_stage(
     let outcome = crate::gate::promote_after_stage("canon divergence add", &gate_ctx.ledger_root, &location, promote, json);
     crate::say!(json, "canon divergence add: {} — {}", outcome.landed(&location), outcome.suffix());
     if json {
-        crate::json_out::data("divergence add", outcome.json(&location));
+        crate::json_out::data("divergence add", &crate::json_out::untyped(outcome.json(&location)));
     }
     outcome.exit_code()
 }
@@ -197,11 +197,11 @@ pub fn run_promote(repo: &Path, dry_run: bool, json: bool) -> i32 {
             let data = crate::gate::promote_json(&report, dry_run);
             if report.is_clean() {
                 if json {
-                    crate::json_out::data("divergence promote", data);
+                    crate::json_out::data("divergence promote", &crate::json_out::untyped(data));
                 }
                 0
             } else {
-                CliError::failed("PROMOTE_REFUSED", format!("{} staged divergence(s) refused", report.refused.len())).hint("`canon gate check` names what promotion refused; fix it, then run `canon divergence promote` (the record stays staged)").emit_with_data("canon divergence promote", json, data)
+                CliError::failed("PROMOTE_REFUSED", format!("{} staged divergence(s) refused", report.refused.len())).hint("`canon gate check` names what promotion refused; fix it, then run `canon divergence promote` (the record stays staged)").emit_with_data("canon divergence promote", json, &crate::json_out::untyped(data))
             }
         }
         Err(e) => {
@@ -243,7 +243,7 @@ fn run_commit(
         Ok(target) => {
             crate::say!(json, "canon divergence {verb}: committed {} — {}", target.display(), crate::write_mode::PROMOTED);
             if json {
-                crate::json_out::data(&format!("divergence {verb}"), serde_json::json!({ "committed": target.display().to_string() }));
+                crate::json_out::data(&format!("divergence {verb}"), &crate::json_out::untyped(serde_json::json!({ "committed": target.display().to_string() })));
             }
             0
         }
@@ -460,8 +460,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
         &scope,
         false,
         args.json,
-        serde_json::json!({ "tracking": args.tracking, "expiry": args.expiry.map(|e| e.format("%Y-%m-%d").to_string()), "accepted": accepted }),
-    );
+        &crate::json_out::untyped(serde_json::json!({ "tracking": args.tracking, "expiry": args.expiry.map(|e| e.format("%Y-%m-%d").to_string()), "accepted": accepted })));
     0
 }
 

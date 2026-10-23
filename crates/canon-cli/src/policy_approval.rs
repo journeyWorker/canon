@@ -185,7 +185,7 @@ pub fn run_show(repo: &Path, json: bool) -> i32 {
         "detail": detail,
     });
     if json {
-        crate::json_out::data("policy show", data);
+        crate::json_out::data("policy show", &crate::json_out::untyped(data));
         return 0;
     }
     println!("policy: {}", paths::POLICY_FILE);
@@ -251,7 +251,7 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> i32
                 crate::write_mode::DIRECT
             );
             let data = serde_json::json!({ "policy": paths::POLICY_FILE, "policyDigest": approval.policy_digest, "approvedBy": approval.approved_by, "approvedAt": approval.approved_at, "approval": paths::POLICY_APPROVAL_FILE });
-            crate::next::finish(&repo, "policy approve", &crate::next::Scope::Repo, false, json, data);
+            crate::next::finish(&repo, "policy approve", &crate::next::Scope::Repo, false, json, &crate::json_out::untyped(data));
             0
         }
         Err(e) => {

@@ -134,14 +134,14 @@ pub(super) fn run_fmt(root: &std::path::Path, repo: Option<&std::path::Path>, js
     let data = crate::fmt::format_json(&report);
     if report.is_clean() {
         if json {
-            crate::json_out::data("format", data);
+            crate::json_out::data("format", &crate::json_out::untyped(data));
         }
         ExitCode::SUCCESS
     } else {
         let missing_provenance = report.violations.iter().any(|v| v.class == canon_fmt::FmtFailureClass::MissingProvenance);
         let hint = with_provenance_fix("fix each violation named in data.violations, then run `canon format` again", missing_provenance);
         let error = CliError::failed("FORMAT_VIOLATIONS", format!("{} violation(s) in {} checked file(s)", report.violations.len(), report.files_checked)).hint(hint);
-        ExitCode::from(error.emit_with_data("canon format", json, data) as u8)
+        ExitCode::from(error.emit_with_data("canon format", json, &crate::json_out::untyped(data)) as u8)
     }
 }
 
@@ -225,7 +225,7 @@ pub(super) fn run_regime_key(role: &str, repo: &str, area: &str, hash: &str, jso
     match RegimeKey::parse(regime_key(role, repo, area, hash)) {
         Ok(valid) => {
             if json {
-                crate::json_out::data("regime-key", serde_json::json!({ "regimeKey": valid.as_str() }));
+                crate::json_out::data("regime-key", &crate::json_out::untyped(serde_json::json!({ "regimeKey": valid.as_str() })));
             } else {
                 println!("{}", valid.as_str());
             }
@@ -277,7 +277,7 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
                 crate::say!(json, "canon report --snapshot: wrote {} table(s) to {}", manifest.tables.len(), dir.display());
                 if json {
                     let tables: Vec<_> = manifest.tables.iter().map(|t| serde_json::json!({ "table": t.table, "file": t.file })).collect();
-                    crate::json_out::data("report", serde_json::json!({ "mode": "snapshot", "directory": dir.display().to_string(), "tables": tables }));
+                    crate::json_out::data("report", &crate::json_out::untyped(serde_json::json!({ "mode": "snapshot", "directory": dir.display().to_string(), "tables": tables })));
                 }
                 ExitCode::SUCCESS
             }
@@ -301,12 +301,12 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
                 let data = serde_json::json!({ "mode": "check", "state": state, "report": report_path.display().to_string() });
                 if outcome.exit_code() == 0 {
                     if json {
-                        crate::json_out::data("report", data);
+                        crate::json_out::data("report", &crate::json_out::untyped(data));
                     }
                     ExitCode::SUCCESS
                 } else {
                     let error = CliError::failed("REPORT_STALE", format!("the report is {state}")).hint("regenerate it with `canon report`");
-                    ExitCode::from(error.with_exit(outcome.exit_code()).emit_with_data("canon report --check", json, data) as u8)
+                    ExitCode::from(error.with_exit(outcome.exit_code()).emit_with_data("canon report --check", json, &crate::json_out::untyped(data)) as u8)
                 }
             }
             Err(err) => {
@@ -319,7 +319,7 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
         Ok(_content) => {
             crate::say!(json, "canon report: wrote {}", report_path.display());
             if json {
-                crate::json_out::data("report", serde_json::json!({ "mode": "write", "report": report_path.display().to_string() }));
+                crate::json_out::data("report", &crate::json_out::untyped(serde_json::json!({ "mode": "write", "report": report_path.display().to_string() })));
             }
             ExitCode::SUCCESS
         }
@@ -357,7 +357,7 @@ pub(super) fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path:
                     "snapshot": bound.snapshot_dir.display().to_string(),
                     "snapshotAvailable": bound.snapshot == crate::dashboard::SnapshotState::Ready,
                 });
-                crate::json_out::data_with_meta("dashboard", data, serde_json::json!({ "warnings": warnings }));
+                crate::json_out::data_with_meta("dashboard", &crate::json_out::untyped(data), serde_json::json!({ "warnings": warnings }));
             }
             bound.serve_forever();
             ExitCode::SUCCESS
