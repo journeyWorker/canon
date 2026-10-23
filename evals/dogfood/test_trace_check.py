@@ -326,6 +326,30 @@ class SyntheticTranscriptTests(unittest.TestCase):
         self.assertEqual({s["id"]: s["parent"] for s in report["sessions"]}, {"root": None, "child": "root"})
         self.assertEqual(report["reviewer_sessions"], ["child"])
 
+    def test_a_command_less_envelope_is_attributed_to_the_call_that_produced_it(self):
+        # `head -c` cut the document before `meta.command`, and the call took its options from `$A`.
+        cut = '{"ok":false,"error":{"code":"USAGE","message":"unexpected argument \'--actor-id\' found","field":"--actor-id","expected":["--repo","--release","--json"],"received'
+        command = ('A="--as reviewer --json --actor-id r-1 --session-id s-1"\n'
+                   'canon finding add --change-id c --round 1 --seq 1 --severity note $A --summary x\n'
+                   'canon gate check $A | head -c 160\n'
+                   'canon status --json | head -c 50')
+        report = self.run_calls((command, '{"ok":true,"data":{}}\n' + cut))
+        items = report["wrong_shape_calls"]["items"]
+        self.assertEqual([(i["command"].split(" --as")[0], i["code"]) for i in items], [("canon gate check", "USAGE")])
+
+    def test_a_command_named_in_the_message_attributes_a_cut_envelope(self):
+        cut = '{"ok":false,"error":{"code":"UNKNOWN_FIELD","message":"`canon query` has no field `key`","field":"--fields","expected":["actor","at'
+        report = self.run_calls(("canon gate check --json | head -c 100\ncanon query --kind evidence --fields key --json | head -c 300", '{"ok":true}\n' + cut))
+        self.assertEqual([i["command"].split(" --")[0] for i in report["wrong_shape_calls"]["items"]], ["canon query"])
+
+    def test_an_ambiguous_cut_envelope_lists_the_candidate_commands(self):
+        cut = '{"ok":false,"error":{"code":"USAGE","message":"boom","field":"--x","expected":["--a'
+        report = self.run_calls(("canon status --json | head -c 10; canon query --kind run --json | head -c 10", cut))
+        [item] = report["wrong_shape_calls"]["items"]
+        self.assertIn("canon status", item["command"])
+        self.assertIn("canon query", item["command"])
+        self.assertNotIn("<unseen>", item["command"])
+
 
 if __name__ == "__main__":
     unittest.main()

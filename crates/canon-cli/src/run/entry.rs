@@ -65,6 +65,8 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
     let children: Vec<String> = node.get_subcommands().filter(|c| !c.is_hide_set() && c.get_name() != "help").map(|c| c.get_name().to_string()).collect();
     let mut usage = CliError::refused("USAGE", message);
     let mut suggested: Vec<String> = Vec::new();
+    // For an unknown option: what the leaf does take, and why an attribution flag cannot apply to a read leaf.
+    let mut unknown_option: Option<String> = None;
     match error.kind() {
         ErrorKind::InvalidSubcommand => {
             let word = string(ContextKind::InvalidSubcommand).unwrap_or_default();
@@ -77,6 +79,7 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
             if arg.starts_with("--") {
                 suggested = crate::suggest::options(root, &path, &arg);
                 usage = usage.expected(crate::suggest::long_options(node));
+                unknown_option = Some(arg.clone());
             }
             usage = usage.field(arg.clone()).received(arg);
         }
@@ -101,10 +104,18 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
     }
     let joined = path.join(" ");
     let example = |path: &str| crate::schema::example_for(path);
-    let hint = match (suggested.first().and_then(|s| s.strip_prefix("canon ")).and_then(example), example(&joined), first_leaf_example(root, &path)) {
+    let mut hint = match (suggested.first().and_then(|s| s.strip_prefix("canon ")).and_then(example), example(&joined), first_leaf_example(root, &path)) {
         (Some(example), _, _) | (None, Some(example), _) | (None, None, Some(example)) => format!("a working call: {example}; `{}` lists every argument", format!("canon schema {joined}").trim_end()),
         _ => "run `canon schema` to list the commands".to_string(),
     };
+    if let (Some(arg), true) = (&unknown_option, node.get_subcommands().next().is_none()) {
+        let takes = crate::suggest::long_options(node).join(" ");
+        hint.push_str(&format!("; `canon {joined}` takes only: {takes} (and the global --as)"));
+        let read = crate::schema::META.iter().any(|row| row.path == joined && row.effect == crate::schema::Effect::Read);
+        if read && matches!(arg.as_str(), "--actor-id" | "--session-id" | "--role") {
+            hint.push_str(&format!("; `canon {joined}` is a read leaf: it records nothing, so the attribution flags (--actor-id, --session-id, --role) do not apply to it"));
+        }
+    }
     (joined, usage.hint(hint))
 }
 

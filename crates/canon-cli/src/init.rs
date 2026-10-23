@@ -292,7 +292,7 @@ Inside an approved scope, never stop for a human: fixes, follow-ups and review r
 /// blocks, with `end` before the line's newline. `Err` when the text
 /// ends inside an unclosed fence: a block appended there would land in
 /// the fence and never be found again.
-fn marker_lines(text: &str) -> Result<(Vec<(usize, usize)>, Vec<(usize, usize)>), String> {
+pub(crate) fn marker_lines(text: &str) -> Result<(Vec<(usize, usize)>, Vec<(usize, usize)>), String> {
     let (mut begins, mut ends) = (Vec::new(), Vec::new());
     let mut open_fence: Option<(char, usize)> = None;
     let mut offset = 0;
@@ -326,7 +326,7 @@ fn marker_lines(text: &str) -> Result<(Vec<(usize, usize)>, Vec<(usize, usize)>)
 /// than guessed at, before anything is written. Bytes outside the
 /// markers are never changed, and merging the result again is a
 /// byte-identical no-op.
-fn merge_agents_md(existing: Option<&str>) -> Result<String, String> {
+pub(crate) fn merge_agents_md(existing: Option<&str>) -> Result<String, String> {
     let Some(text) = existing else {
         return Ok(format!("{AGENTS_BLOCK}\n"));
     };
