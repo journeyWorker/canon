@@ -24436,7 +24436,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject status <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nstatus` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
+              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject move <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nmove` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
             },
             "schema": {
               "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
@@ -24456,7 +24456,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject status --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject status` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
+              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject move --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject move` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
             },
             "status_reason": {
               "anyOf": [
@@ -24467,7 +24467,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The note an operator gave the transition that wrote this record\n(`canon subject status <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject status` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
+              "description": "The note an operator gave the transition that wrote this record\n(`canon subject move <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject move` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
             },
             "subject_id": {
               "$ref": "#/$defs/SubjectId"
@@ -24859,7 +24859,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject status <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nstatus` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
+              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject move <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nmove` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
             },
             "schema": {
               "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
@@ -24879,7 +24879,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject status --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject status` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
+              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject move --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject move` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
             },
             "status_reason": {
               "anyOf": [
@@ -24890,7 +24890,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The note an operator gave the transition that wrote this record\n(`canon subject status <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject status` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
+              "description": "The note an operator gave the transition that wrote this record\n(`canon subject move <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject move` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
             },
             "subject_id": {
               "$ref": "#/$defs/SubjectId"
@@ -25282,7 +25282,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject status <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nstatus` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
+              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject move <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nmove` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
             },
             "schema": {
               "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
@@ -25302,7 +25302,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject status --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject status` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
+              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject move --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject move` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
             },
             "status_reason": {
               "anyOf": [
@@ -25313,7 +25313,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The note an operator gave the transition that wrote this record\n(`canon subject status <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject status` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
+              "description": "The note an operator gave the transition that wrote this record\n(`canon subject move <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject move` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
             },
             "subject_id": {
               "$ref": "#/$defs/SubjectId"
@@ -25705,7 +25705,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject status <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nstatus` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
+              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject move <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nmove` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
             },
             "schema": {
               "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
@@ -25725,7 +25725,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject status --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject status` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
+              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject move --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject move` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
             },
             "status_reason": {
               "anyOf": [
@@ -25736,7 +25736,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The note an operator gave the transition that wrote this record\n(`canon subject status <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject status` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
+              "description": "The note an operator gave the transition that wrote this record\n(`canon subject move <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject move` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
             },
             "subject_id": {
               "$ref": "#/$defs/SubjectId"
@@ -36583,7 +36583,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject status <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nstatus` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
+              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject move <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nmove` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
             },
             "schema": {
               "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
@@ -36603,7 +36603,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject status --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject status` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
+              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject move --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject move` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
             },
             "status_reason": {
               "anyOf": [
@@ -36614,7 +36614,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The note an operator gave the transition that wrote this record\n(`canon subject status <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject status` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
+              "description": "The note an operator gave the transition that wrote this record\n(`canon subject move <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject move` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
             },
             "subject_id": {
               "$ref": "#/$defs/SubjectId"
@@ -36980,7 +36980,7 @@
               "type": "null"
             }
           ],
-          "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject status <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nstatus` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
+          "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject move <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nmove` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
         },
         "schema": {
           "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
@@ -37000,7 +37000,7 @@
               "type": "null"
             }
           ],
-          "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject status --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject status` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
+          "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject move --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject move` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
         },
         "status_reason": {
           "anyOf": [
@@ -37011,7 +37011,7 @@
               "type": "null"
             }
           ],
-          "description": "The note an operator gave the transition that wrote this record\n(`canon subject status <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject status` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
+          "description": "The note an operator gave the transition that wrote this record\n(`canon subject move <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject move` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
         },
         "subject_id": {
           "$ref": "#/$defs/SubjectId"
@@ -37286,7 +37286,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject status <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nstatus` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
+              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject move <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nmove` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
             },
             "schema": {
               "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
@@ -37306,7 +37306,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject status --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject status` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
+              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject move --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject move` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
             },
             "status_reason": {
               "anyOf": [
@@ -37317,7 +37317,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The note an operator gave the transition that wrote this record\n(`canon subject status <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject status` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
+              "description": "The note an operator gave the transition that wrote this record\n(`canon subject move <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject move` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
             },
             "subject_id": {
               "$ref": "#/$defs/SubjectId"
@@ -37566,7 +37566,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject status <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nstatus` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
+              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject move <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nmove` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
             },
             "schema": {
               "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
@@ -37586,7 +37586,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject status --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject status` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
+              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject move --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject move` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
             },
             "status_reason": {
               "anyOf": [
@@ -37597,7 +37597,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The note an operator gave the transition that wrote this record\n(`canon subject status <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject status` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
+              "description": "The note an operator gave the transition that wrote this record\n(`canon subject move <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject move` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
             },
             "subject_id": {
               "$ref": "#/$defs/SubjectId"
@@ -37882,7 +37882,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject status <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nstatus` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
+              "description": "Who reopened this subject from `shipped` to `verifying`, and why\n(0.18 D3, `canon subject move <id> --to verifying --reason`). Set\nonly on the record that reopens; every other `canon subject\nmove` write clears it, like [`Self::status_override`]. Skipped\nwhen absent, so every other subject stays byte-identical."
             },
             "schema": {
               "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
@@ -37902,7 +37902,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject status --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject status` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
+              "description": "The accountable waiver this record's status transition was let\nthrough under, when `spec_coverage.require_review` refused it and\nthe operator passed `canon subject move --override-reason`.\nSkipped when absent, so every subject written without one stays\nbyte-identical on the wire. Each `canon subject move` write\nclears it and sets it again only when it waives something, so a\nwaiver never outlives the status it was granted for."
             },
             "status_reason": {
               "anyOf": [
@@ -37913,7 +37913,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The note an operator gave the transition that wrote this record\n(`canon subject status <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject status` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
+              "description": "The note an operator gave the transition that wrote this record\n(`canon subject move <id> --to <state> --reason`, 0.21.1), on\nany transition; a reopen records it here too, next to\n[`Self::reopen`]. Every `canon subject move` write clears it\nand sets it again only when given a `--reason`. Skipped when\nabsent, so every other subject stays byte-identical."
             },
             "subject_id": {
               "$ref": "#/$defs/SubjectId"
