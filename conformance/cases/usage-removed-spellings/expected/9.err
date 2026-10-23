@@ -1,2 +1,0 @@
-canon purge: USAGE — --kind session_record was removed in 0.25.0
-hint: --kind session_record was renamed --kind session in 0.24.0; use --kind session

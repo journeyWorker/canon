@@ -1,2 +1,0 @@
-canon brief check: USAGE — --change was removed in 0.25.0
-hint: --change was renamed --change-id in 0.24.0; use --change-id
