@@ -78,8 +78,12 @@ impl Removed {
                 _ => None,
             };
         }
+        // No value was typed, so there is no operand to fill in: the leaf says it, with the row's note.
+        let Some(operand) = operand else {
+            return Removed { command: command.clone(), used: used.clone(), replacement: leaf.to_string(), note: row.note, field: used, since: row.since };
+        };
         let mut words: Vec<String> = leaf.split(' ').map(str::to_string).collect();
-        words.extend(operand.map(|value| shell_word(&value)));
+        words.push(shell_word(&operand));
         words.extend(args.iter().zip(&taken).filter(|(_, taken)| !**taken).map(|(arg, _)| shell_word(arg)));
         Removed { command, used: used.clone(), replacement: words.join(" "), note: row.note, field: used, since: row.since }
     }

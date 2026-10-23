@@ -12783,6 +12783,13 @@
       "retryable": false
     },
     {
+      "code": "BRIEF_APPROVE_REFUSED",
+      "exit": 2,
+      "fix": "Resolve every blocker finding the brief has (see `canon brief check`), then ask the human to approve.",
+      "meaning": "`brief approve` was refused because the brief has blocker findings; nothing was written",
+      "retryable": false
+    },
+    {
       "code": "BRIEF_CHANGED_SINCE_APPROVAL",
       "exit": 1,
       "fix": "Review the edited brief and have the human run `canon brief approve` again.",
@@ -12794,13 +12801,6 @@
       "exit": 2,
       "fix": "Reload the dashboard page to see the current brief, then approve it again.",
       "meaning": "the dashboard was asked to approve a brief whose file differs from the copy the page showed the human; nothing was recorded",
-      "retryable": false
-    },
-    {
-      "code": "BRIEF_APPROVE_REFUSED",
-      "exit": 2,
-      "fix": "Resolve every blocker finding the brief has (see `canon brief check`), then ask the human to approve.",
-      "meaning": "`brief approve` was refused because the brief has blocker findings; nothing was written",
       "retryable": false
     },
     {
