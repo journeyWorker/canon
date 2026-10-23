@@ -370,7 +370,8 @@ report's `schemaVersion` starts at `"1.0"`.
   blockers, exit `2`; `BRIEF_HAS_BLOCKERS` is now `brief check` only, exit `1`), and the
   `INPUT_*` family (`INPUT_INVALID`, `INPUT_INVALID_TYPE`, `INPUT_UNKNOWN_FIELD`,
   `INPUT_CONFLICT`, `INPUT_UNREADABLE`, `INPUT_TOO_LARGE`, `INPUT_STDIN_CONFLICT`,
-  `INPUT_STDIN_TTY`, `INPUT_BATCH_UNSUPPORTED`, `INPUT_ELEMENT_FAILED`).
+  `INPUT_STDIN_TTY`, `INPUT_BATCH_UNSUPPORTED`, `INPUT_ELEMENT_FAILED`),
+  `SKILLS_INVALID_ARGUMENT` and `CONFIG_CHECK_FAILED`.
 - Exit changes: `brief check` with blockers exits `1` (was `2`); every
   `*_NOT_FOUND`, `*_UNREADABLE` and `*_INVALID_ARGUMENT` exits `2`;
   `init --check` of a malformed config exits `2`; `task done` on an unknown task
@@ -402,24 +403,47 @@ Where the 0.28 implementation departs from the plan or the per-leaf table:
 - `divergence accept` defaults `--role` to `reviewer`.
 - `--role` stays an open slug (owner decision 2026-10-23): policies may require
   custom roles; an unknown role is a warning with a suggestion, not a refusal.
+- `--session-id` is added beside `--actor-id` on `subject new`, `subject move`,
+  `scenario new`, `feature new`, `dispatch begin` and `divergence add`, `defer`
+  and `resolve` (evals 15b and 15c).
+- `init --check` with a failing section exits `1` with `CONFIG_CHECK_FAILED`.
+- `skills doctor` exits `0` per diagnosis, `2` on refusal, `1` on an IO failure.
+- `--fields` matches a field in camelCase or snake_case.
 - Batch variants exist for 41 write leaves; the destructive leaves and the
   `dashboard` stream refuse a batch (`INPUT_BATCH_UNSUPPORTED`).
 - `evidence approval-payload` and `strategy approval-payload` declare
   replay-safe although they only read.
 - `canon context`'s `policy.*` keys mirror `policy.yaml` (snake_case).
 - Extra error codes beyond the plan: `INPUT_UNREADABLE`, `INPUT_ELEMENT_FAILED`,
-  `HUMAN_ONLY`, `UNKNOWN_ERROR_CODE`, `UNVERIFIABLE`, `BRIEF_APPROVE_REFUSED`.
+  `HUMAN_ONLY`, `UNKNOWN_ERROR_CODE`, `UNVERIFIABLE`, `BRIEF_APPROVE_REFUSED`,
+  `SKILLS_INVALID_ARGUMENT`, `CONFIG_CHECK_FAILED`.
 - `skills show --full` prints the core guide followed by every reference, each
   after a rule and a comment naming its file.
 
 **Acceptance.**
 
-- Workspace: TODO (test counts, filled in at release).
+- Workspace: 2920 tests passed, 0 failed (`cargo test --workspace`, last full
+  run). Closes #111, #116 and #117.
 - Doc lint (`tests/docs_lint.rs`): every `canon` command in the skill, the
   website, the AGENTS block, the error hints and `meta.next` parses against the
   clap tree.
-- canon's own corpus: TODO.
-- Dogfood eval: TODO (wrong-shape calls, trace-check result, agent runs).
+- canon's own corpus: 153 changed and 59 new scenarios (plus the round 1 and
+  round 2 additions), with evidence by `canon-impl-028` (sessions 1 to 3). An
+  independent review by `canon-reviewer-028` in a separate session re-ran
+  every bound command and ran mutation checks: round 1 raised 29 findings (18
+  mutations survived), round 2 raised 9. Final review round and gate result:
+  TODO(lead).
+- Dogfood eval ([eval 15](docs/research/2026-10-23-dogfood-eval-15.md)): a
+  copy of `examples/platformer` at the 0.27 state, an `omp -p --auto-approve`
+  agent with Korean prompts and orchestrated roles, six runs (15, 15b to
+  15e). Probes (`--help` plus `canon schema`) stayed at or below eval 12 in
+  every run from 15b on (0.08 per new scenario in the last). Wrong-shape calls
+  fell from 5 to 2, but not stably: the last run's two are
+  `canon migrate --dry-run` (a spelling the removed-flag hint answered in one
+  call) and a `skills check` chained after it. One human-only bypass attempt
+  in the first run; none after the guide named it. The defects the runs found
+  (role Commands blocks, stale-guide warning, `--fields` case, `--session-id`,
+  AGENTS.md refresh by `migrate`) are fixed in this release.
 
 ## 0.27.0 release
 
