@@ -320,7 +320,7 @@ Feature: evidence add
     Given a canon.yaml whose write section says promote always
     When a staged write runs
     Then it is refused with exit 2 naming the write section and nothing is staged
-    And init --check reports the write section as failed
+    And init --check exits 1 reporting the write section as failed
     And --promote together with --no-promote is a usage error with exit 2
 
   # canon: {"schema":1,"at":"2026-10-11T15:01:53Z","actor":{"agent_id":"canon"}}

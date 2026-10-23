@@ -279,7 +279,7 @@ Feature: context capability
 
   # canon: {"schema":1,"at":"2026-10-23T11:48:38Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
   @subject:context-capability
-  @case:failure
+  @case:happy
   @context.capability.28
   Scenario: The drift check compares the checked-in spec with the spec the CLI generates, byte for byte
     Given the checked-in command spec and the spec the CLI generates
@@ -449,9 +449,9 @@ Feature: context capability
   @subject:context-capability
   @case:failure
   @context.capability.44
-  Scenario: An unknown CANON_ROLE value is refused with UNKNOWN_ROLE, except where a command never consults it
+  Scenario: An unknown CANON_ROLE value is refused with UNKNOWN_ROLE by status, while schema and context are never failed by it
     Given CANON_ROLE set to a value that is not a role
     When canon status runs, and canon schema and canon context run, and canon status runs with --as naming a valid role
     Then status exits 2 with UNKNOWN_ROLE, naming the value, and with stderr empty under --json
-    And schema and context still run, because they never consult the variable
+    And schema and context still exit 0, never filtered or failed by the variable, and context names the value in meta.warnings
     And the flag wins over the variable, and an unknown --as value is a usage error

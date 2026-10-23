@@ -257,7 +257,8 @@ Feature: skills install
     When canon skills install, check and doctor run with no provider named
     Then each is refused with exit 2 (SKILLS_INVALID_ARGUMENT), naming the expected shape or the unknown provider
     And nothing is projected and canon.yaml is byte-identical
-    And canon init --check reports the skills section as FAIL with the same reason
+    And a --skills-source directory that does not exist is refused the same way, exit 2 naming the option
+    And canon init --check exits 1 reporting the skills section as FAIL with the same reason
 
   # canon: {"schema":1,"at":"2026-10-12T14:00:00Z","actor":{"agent_id":"canon"}}
   @subject:skills-install
