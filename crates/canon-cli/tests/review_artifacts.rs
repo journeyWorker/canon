@@ -175,7 +175,7 @@ fn an_unbindable_review_artifact_is_refused_and_nothing_is_written() {
     let big = vec![b'x'; 1024 * 1024 + 1];
     std::fs::write(repo.join("reports/big.webm"), &big).unwrap();
     // The store already holds one blob, so "unchanged" is not just "absent".
-    ok(repo, &["evidence", "add", "--scenario-id", "game.title.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run e2e", "--role", "implementer", "--artifact", "reports/hud.webm"]);
+    ok(repo, &["evidence", "add", "--scenario-id", "game.title.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run e2e", "--role", "implementer", "--artifact", "reports/hud.webm"]);
     let before = store_snapshot(repo);
     assert_eq!(before.len(), 1, "{before:?}");
 
@@ -242,7 +242,7 @@ fn a_stale_review_superseded_by_another_reviewers_newer_review_is_not_checked() 
     ok(
         repo,
         &[
-            "evidence", "add", "--scenario-id", "game.title.01", "--project-id", "root", "--kind", "test-run", "--ref", "vitest", "--role", "implementer", "--actor-id", "impl",
+            "evidence", "add", "--scenario-id", "game.title.01", "--project-id", "root", "--class", "test-run", "--ref", "vitest", "--role", "implementer", "--actor-id", "impl",
             "--promote",
         ],
     );

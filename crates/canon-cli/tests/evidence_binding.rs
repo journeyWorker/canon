@@ -39,7 +39,7 @@ fn attest(repo: &Path, extra: &[&str]) -> Output {
         "cart.add.01",
         "--project-id",
         "root",
-        "--kind",
+        "--class",
         "test-run",
         "--ref",
         "cargo nextest run",

@@ -249,8 +249,8 @@ fn flow_coverage_blocks_once_the_brief_is_approved_and_the_subject_is_building()
     std::fs::write(brief_path(dir.path()), en_brief("")).unwrap();
     assert_eq!(check(dir.path(), &[]).0, 0, "before building, no coverage rule applies");
 
-    ok(dir.path(), &["subject", "status", "demo", "--to", "specced"]);
-    ok(dir.path(), &["subject", "status", "demo", "--to", "building"]);
+    ok(dir.path(), &["subject", "move", "demo", "--to", "specced"]);
+    ok(dir.path(), &["subject", "move", "demo", "--to", "building"]);
     // A new scope on a subject already past `building` (dogfood eval 7):
     // its scenarios come after the approval, so none is due yet.
     let (code, report) = check(dir.path(), &[]);
@@ -291,8 +291,8 @@ fn scenario_new_flow_tags_the_step_and_status_lists_per_step_coverage() {
     let repo = dir.path();
     std::fs::write(brief_path(repo), en_brief(APPROVED)).unwrap();
     assert!(!repo.join(".canon/changes/add-login/tasks.md").exists(), "change new writes no tasks.md");
-    ok(repo, &["subject", "status", "demo", "--to", "specced"]);
-    ok(repo, &["subject", "status", "demo", "--to", "building"]);
+    ok(repo, &["subject", "move", "demo", "--to", "specced"]);
+    ok(repo, &["subject", "move", "demo", "--to", "building"]);
 
     let refused = run(repo, &["scenario", "new", "world.login.01", "--title", "x", "--subject-id", "demo", "--flow", "F9"]);
     assert_eq!(refused.status.code(), Some(2), "{}", stderr(&refused));
@@ -370,11 +370,11 @@ fn init_language_is_validated_recorded_and_checked() {
     assert!(!dir.path().join("canon.yaml").exists(), "nothing is written on a refused tag");
 
     ok(dir.path(), &["init", "--providers", "none", "--language", "ko"]);
-    let out = run(dir.path(), &["init", "--check-config"]);
+    let out = run(dir.path(), &["init", "--check"]);
     assert!(stdout(&out).contains("[PASS] language (ko)"), "{}", stdout(&out));
 
     std::fs::write(dir.path().join("canon.yaml"), std::fs::read_to_string(dir.path().join("canon.yaml")).unwrap().replace("language: ko", "language: 한국어")).unwrap();
-    let out = run(dir.path(), &["init", "--check-config"]);
+    let out = run(dir.path(), &["init", "--check"]);
     assert_eq!(out.status.code(), Some(2));
     assert!(stdout(&out).contains("[FAIL] language"), "{}", stdout(&out));
 }
@@ -399,7 +399,7 @@ fn chore_brief(category: &str) -> String {
 #[test]
 fn a_chore_brief_is_written_and_judged_by_the_chore_rule_set() {
     let dir = repo_with_change(Some("ko"));
-    ok(dir.path(), &["change", "new", "bump-client", "--subject-id", "demo", "--kind", "chore", "--title", "클라이언트 올리기"]);
+    ok(dir.path(), &["change", "new", "bump-client", "--subject-id", "demo", "--change-kind", "chore", "--title", "클라이언트 올리기"]);
     let path = dir.path().join(".canon/changes/bump-client/brief.md");
     let brief = std::fs::read_to_string(&path).unwrap();
     assert!(brief.contains("<!-- canon:kind chore -->") && brief.contains("## 불변 조건") && brief.contains("## 분류"), "{brief}");
@@ -429,11 +429,11 @@ fn a_chore_brief_is_written_and_judged_by_the_chore_rule_set() {
     assert!(code == 1 && rules(&report).contains(&"brief.chore-empty".to_string()), "{report}");
 
     std::fs::write(&path, format!("{}\n{APPROVED}", chore_brief("infra"))).unwrap();
-    ok(dir.path(), &["subject", "status", "demo", "--to", "specced"]);
-    ok(dir.path(), &["subject", "status", "demo", "--to", "building"]);
+    ok(dir.path(), &["subject", "move", "demo", "--to", "specced"]);
+    ok(dir.path(), &["subject", "move", "demo", "--to", "building"]);
     let (code, report) = check(dir.path(), &["bump-client"]);
     assert_eq!((code, report["phase"].as_str(), rules(&report)), (0, Some("building"), Vec::<String>::new()), "a chore has no flow to cover: {report}");
 
-    let out = run(dir.path(), &["change", "new", "x", "--subject-id", "demo", "--kind", "epic", "--title", "x"]);
+    let out = run(dir.path(), &["change", "new", "x", "--subject-id", "demo", "--change-kind", "epic", "--title", "x"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
 }

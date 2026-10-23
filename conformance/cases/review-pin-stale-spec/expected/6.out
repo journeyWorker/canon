@@ -4,7 +4,7 @@ policy: .canon/policy.yaml
   require_cases: <none>
   require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true
   level: custom
-warning: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+warning: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --approver <who>`
 
 subjects (1):
   verifying (1):
@@ -15,4 +15,4 @@ unowned: none
 
 next:
   # cart: every scenario is evidenced and reviewed, with no blocker or case gap, and no brief is written to approve; ship it yourself unless the brief says the human ships
-  canon subject status cart --to shipped --actor-id <unit>
+  canon subject move cart --to shipped --actor-id <unit>

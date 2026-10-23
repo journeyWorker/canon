@@ -63,7 +63,7 @@ impl Repo {
     }
 
     fn attest(&self, extra: &[&str]) -> Output {
-        let mut args = vec!["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run smoke", "--role", "implementer"];
+        let mut args = vec!["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke", "--role", "implementer"];
         args.extend_from_slice(extra);
         let out = self.canon(&args);
         if out.status.success() {
@@ -219,7 +219,7 @@ fn an_unreachable_or_unattachable_store_refuses_with_a_hint_and_never_passes() {
     // A write refuses and records nothing.
     std::fs::write(repo.path().join("reports/other.json"), br#"{"other":1}"#).unwrap();
     let before = std::fs::read_dir(repo.path().join(".canon/ledger/kind=evidence_record")).unwrap().count();
-    let mut args = vec!["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "x", "--role", "implementer", "--artifact", "reports/other.json"];
+    let mut args = vec!["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "x", "--role", "implementer", "--artifact", "reports/other.json"];
     args.push("--json");
     let add = repo.canon_s3(&args, &env);
     assert_eq!(add.status.code(), Some(2), "{}", text(&add));
@@ -352,14 +352,14 @@ fn migrate_refuses_a_target_that_is_not_an_s3_tier_and_never_rewrites_a_block_it
 #[test]
 fn check_config_reports_the_artifacts_block() {
     let good = new_repo(Some(ARTIFACTS_COLD));
-    let out = good.canon(&["init", "--check-config", "--repo", "."]);
+    let out = good.canon(&["init", "--check", "--repo", "."]);
     assert!(out.status.success() && text(&out).contains("[PASS] artifact_store (backend: cold, prefix: artifacts/)"), "{}", text(&out));
 
     let none = new_repo(None);
-    assert!(!text(&none.canon(&["init", "--check-config", "--repo", "."])).contains("artifacts"), "an absent block is the local default and says nothing");
+    assert!(!text(&none.canon(&["init", "--check", "--repo", "."])).contains("artifacts"), "an absent block is the local default and says nothing");
 
     let bad = new_repo(Some("artifact_store:\n  backend: warm\n"));
-    let out = bad.canon(&["init", "--check-config", "--repo", "."]);
+    let out = bad.canon(&["init", "--check", "--repo", "."]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(text(&out).contains("[FAIL] artifact_store:") && text(&out).contains("neither `local` nor the name of a tier"), "{}", text(&out));
 }

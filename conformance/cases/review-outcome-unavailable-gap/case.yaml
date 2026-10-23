@@ -4,5 +4,5 @@ steps:
     exit: 0
   - args: [gate, check]
     exit: 1
-  - args: [subject, status, cart, --to, verifying]
+  - args: [subject, move, cart, --to, verifying]
     exit: 1

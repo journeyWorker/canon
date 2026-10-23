@@ -102,10 +102,10 @@ fn a_task_flip_keeps_the_changes_adopted_subject() {
     let brief = std::fs::read_to_string(&brief_path).unwrap();
     std::fs::write(&brief_path, format!("{brief}\nApproved: Journey 2026-10-12 — \"go\"\n")).unwrap();
 
-    let evidence = run(repo, &["evidence", "add", "--task", "add-login#1", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl"]);
+    let evidence = run(repo, &["evidence", "add", "--task-id", "add-login#1", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl"]);
     assert!(evidence.status.success(), "{}", stderr(&evidence));
     assert!(run(repo, &["gate", "promote"]).status.success());
-    let flip = run(repo, &["gate", "task", "add-login#1"]);
+    let flip = run(repo, &["task", "done", "add-login#1"]);
     assert!(flip.status.success(), "{}{}", stdout(&flip), stderr(&flip));
     assert!(!stderr(&flip).contains("WARN"), "the re-import is clean: {}", stderr(&flip));
     assert!(std::fs::read_to_string(&tasks_path).unwrap().contains("- [x] 1 Write the failure-path scenarios"), "canon's own tasks.md row flips");
@@ -373,9 +373,9 @@ fn subject_lifecycle_33_a_change_adopted_by_a_second_subject_belongs_to_both_and
     }
     for id in ["perception", "editing"] {
         for state in ["specced", "building"] {
-            assert!(run(repo, &["subject", "status", id, "--to", state]).status.success());
+            assert!(run(repo, &["subject", "move", id, "--to", state]).status.success());
         }
-        let out = run(repo, &["subject", "status", id, "--to", "verifying"]);
+        let out = run(repo, &["subject", "move", id, "--to", "verifying"]);
         assert_eq!(out.status.code(), Some(1), "{id}: {}", stderr(&out));
         assert!(
             stderr(&out).contains("open-blocker refactor-core#1.1 — building → verifying: open blocker finding by `reviewer-2`"),

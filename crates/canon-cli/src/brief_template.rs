@@ -156,8 +156,8 @@ fn heading_and_hint(language: Shipped, key: &str) -> (&'static str, &'static str
 /// The approval comment, in `language`.
 fn approval_comment(language: Shipped) -> &'static str {
     match language {
-        Shipped::En => "<!-- Once the human answers, and only from that answer, record it with: canon brief approve --by <who> --note \"<their words>\" -->",
-        Shipped::Ko => "<!-- 사람이 답한 뒤, 그 답에서만, 다음으로 기록한다: canon brief approve --by <누가> --note \"<그 사람의 말>\" -->",
+        Shipped::En => "<!-- Once the human answers, and only from that answer, record it with: canon brief approve --approver <who> --note \"<their words>\" -->",
+        Shipped::Ko => "<!-- 사람이 답한 뒤, 그 답에서만, 다음으로 기록한다: canon brief approve --approver <누가> --note \"<그 사람의 말>\" -->",
     }
 }
 

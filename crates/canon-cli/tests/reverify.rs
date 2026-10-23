@@ -166,7 +166,7 @@ fn status_steps(repo: &Path) -> Vec<Value> {
 }
 
 fn ship(repo: &Path) -> Output {
-    run(repo, &["subject", "status", "demo-subject", "--to", "shipped"])
+    run(repo, &["subject", "move", "demo-subject", "--to", "shipped"])
 }
 
 /// #72: a blocker closed `fixed` keeps the ship refused until the suite
@@ -262,9 +262,9 @@ fn an_approved_chore_on_a_shipped_subject_needs_the_suite_again_then_a_change_re
     assert_eq!(gate.status.code(), Some(1), "{}", stdout(&gate));
     assert!(stdout(&gate).contains("chore change `bump-client` approved") && stdout(&gate).contains("--all-scenarios"), "{}", stdout(&gate));
     let steps = status_steps(r);
-    assert!(steps[0]["command"].as_str().unwrap().starts_with("canon subject status demo-subject --to verifying --reason"), "red shipped subject: reopen first: {steps:?}");
+    assert!(steps[0]["command"].as_str().unwrap().starts_with("canon subject move demo-subject --to verifying --reason"), "red shipped subject: reopen first: {steps:?}");
 
-    let out = run(r, &["subject", "status", "demo-subject", "--to", "verifying", "--reason", "chore bump-client", "--json"]);
+    let out = run(r, &["subject", "move", "demo-subject", "--to", "verifying", "--reason", "chore bump-client", "--json"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let reopened: Value = serde_json::from_str(&stdout(&out)).unwrap();
     let next = reopened["meta"]["next"].as_array().unwrap();
@@ -403,13 +403,13 @@ fn change_new_on_a_shipped_subject_names_the_reopen() {
     let dir = repo();
     let r = dir.path();
     seed_subject(r, SubjectStatus::Shipped, &[], ago(250));
-    let reopen = "canon subject status demo-subject --to verifying --reason";
+    let reopen = "canon subject move demo-subject --to verifying --reason";
 
-    let out = run(r, &["change", "new", "bump-client", "--subject-id", "demo-subject", "--kind", "chore", "--title", "Bump the client"]);
+    let out = run(r, &["change", "new", "bump-client", "--subject-id", "demo-subject", "--change-kind", "chore", "--title", "Bump the client"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert!(stdout(&out).contains("subject `demo-subject` is shipped and stays so until reopened") && stdout(&out).contains(reopen), "{}", stdout(&out));
 
-    let out = run(r, &["change", "new", "bump-again", "--subject-id", "demo-subject", "--kind", "chore", "--title", "Bump again", "--json"]);
+    let out = run(r, &["change", "new", "bump-again", "--subject-id", "demo-subject", "--change-kind", "chore", "--title", "Bump again", "--json"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let value: Value = serde_json::from_str(&stdout(&out)).unwrap();
     let next = value["meta"]["next"].as_array().unwrap();
@@ -418,7 +418,7 @@ fn change_new_on_a_shipped_subject_names_the_reopen() {
     // A subject that is not shipped gets no reopen step.
     let dir = repo();
     seed_subject(dir.path(), SubjectStatus::Building, &[], ago(250));
-    let out = run(dir.path(), &["change", "new", "bump-client", "--subject-id", "demo-subject", "--kind", "chore", "--title", "Bump the client", "--json"]);
+    let out = run(dir.path(), &["change", "new", "bump-client", "--subject-id", "demo-subject", "--change-kind", "chore", "--title", "Bump the client", "--json"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert!(!stdout(&out).contains("--to verifying"), "{}", stdout(&out));
 }
@@ -539,7 +539,7 @@ fn finding_close_81_inherits_the_scenarios_the_finding_names() {
     let add = run(
         r,
         &[
-            "finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--reviewer", "reviewer-2", "--summary", "double click", "--scenario-id", "world.demo.01",
+            "finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--actor-id", "reviewer-2", "--summary", "double click", "--scenario-id", "world.demo.01",
             "--scenario-id", "world.demo.01", "--promote",
         ],
     );
@@ -571,7 +571,7 @@ fn finding_add_33_refuses_a_scenario_id_the_index_does_not_know() {
     two_scenarios(r);
     let out = run(
         r,
-        &["finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--reviewer", "r", "--summary", "s", "--scenario-id", "world.demo.99", "--json"],
+        &["finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--actor-id", "r", "--summary", "s", "--scenario-id", "world.demo.99", "--json"],
     );
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     let body: Value = serde_json::from_str(&stdout(&out)).unwrap();
@@ -589,7 +589,7 @@ fn finding_add_32_records_the_scenarios_it_names_once_each() {
     let dir = repo();
     let r = dir.path();
     two_scenarios(r);
-    let base = ["finding", "add", "--change-id", "c-demo", "--round", "1", "--reviewer", "r", "--summary", "s", "--severity", "should-fix", "--promote"];
+    let base = ["finding", "add", "--change-id", "c-demo", "--round", "1", "--actor-id", "r", "--summary", "s", "--severity", "should-fix", "--promote"];
     let named = [&base[..], &["--seq", "1", "--scenario-id", "world.demo.02", "--scenario-id", "world.demo.01", "--scenario-id", "world.demo.02"]].concat();
     let plain = [&base[..], &["--seq", "2"]].concat();
     for args in [named, plain] {

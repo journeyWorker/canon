@@ -2,7 +2,7 @@ description: "`canon status` names `canon subject status <id> --to shipped` for 
 steps:
   - args: [status]
     exit: 0
-  - args: [subject, status, checkout, --to, shipped]
+  - args: [subject, move, checkout, --to, shipped]
     exit: 0
   - args: [status, --json]
     exit: 0

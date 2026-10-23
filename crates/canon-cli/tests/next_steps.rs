@@ -134,20 +134,20 @@ fn writes_name_the_step_status_names_for_the_subject_they_touched() {
     assert_eq!(step["actor"], "human");
     assert!(step["role"].is_null());
 
-    let approved = ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
+    let approved = ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go.", "--json"]);
     assert_eq!(meta_next(&approved)[0], status_step(repo, "demo"), "brief approve");
     assert_eq!(meta_next(&approved)[0]["actor"], "agent");
 
     let scenario = ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject-id", "demo", "--case", "happy", "--flow", "F1", "--json"]);
     assert_eq!(meta_next(&scenario)[0], status_step(repo, "demo"), "scenario new");
 
-    let moved = ok(repo, &["subject", "status", "demo", "--to", "specced", "--json"]);
+    let moved = ok(repo, &["subject", "move", "demo", "--to", "specced", "--json"]);
     assert_eq!(meta_next(&moved)[0], status_step(repo, "demo"), "subject status");
 
-    ok(repo, &["subject", "status", "demo", "--to", "building", "--json"]);
+    ok(repo, &["subject", "move", "demo", "--to", "building", "--json"]);
     let evidence = ok(
         repo,
-        &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--kind", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--promote", "--json"],
+        &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--class", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--promote", "--json"],
     );
     assert_eq!(meta_next(&evidence)[0], status_step(repo, "demo"), "evidence add");
 
@@ -162,11 +162,11 @@ fn writes_name_the_step_status_names_for_the_subject_they_touched() {
 fn a_staged_write_names_the_promote_that_makes_it_count() {
     let (dir, _) = repo_with_change();
     let repo = dir.path();
-    ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
+    ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go.", "--json"]);
     ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject-id", "demo", "--case", "happy", "--flow", "F1", "--json"]);
     let staged = ok(
         repo,
-        &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--kind", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--no-promote", "--json"],
+        &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--class", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--no-promote", "--json"],
     );
     let steps = meta_next(&staged);
     assert_eq!(steps.len(), 1, "{steps:?}");
@@ -177,7 +177,7 @@ fn a_staged_write_names_the_promote_that_makes_it_count() {
 fn human_mode_ends_with_one_next_line_and_a_count_of_the_rest() {
     let (dir, _) = repo_with_change();
     let repo = dir.path();
-    let out = canon(repo, &["brief", "approve", "--by", "Ana", "--note", "Go."], None);
+    let out = canon(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go."], None);
     assert!(out.status.success());
     let text = String::from_utf8_lossy(&out.stdout);
     let last = text.lines().last().unwrap();
@@ -190,7 +190,7 @@ fn one_scenario_goes_from_its_brief_to_shipped_on_meta_next_alone() {
     let (dir, created) = repo_with_change();
     let repo = dir.path();
     // The human answers; everything after that is the next step each write names.
-    let mut last = ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
+    let mut last = ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go.", "--json"]);
     let _ = created;
     let mut ran = vec!["canon brief approve --by Ana --note Go.".to_string()];
     for _ in 0..24 {
@@ -225,14 +225,14 @@ fn one_scenario_goes_from_its_brief_to_shipped_on_meta_next_alone() {
 fn two_roles_waiting() -> TempDir {
     let (dir, _) = repo_with_change();
     let repo = dir.path();
-    ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
+    ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go.", "--json"]);
     ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject-id", "demo", "--case", "happy", "--flow", "F1", "--json"]);
     ok(repo, &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject-id", "demo", "--case", "failure", "--flow", "F1", "--json"]);
-    ok(repo, &["subject", "status", "demo", "--to", "specced", "--json"]);
-    ok(repo, &["subject", "status", "demo", "--to", "building", "--json"]);
+    ok(repo, &["subject", "move", "demo", "--to", "specced", "--json"]);
+    ok(repo, &["subject", "move", "demo", "--to", "building", "--json"]);
     ok(
         repo,
-        &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--kind", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--promote", "--json"],
+        &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--class", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--promote", "--json"],
     );
     dir
 }
@@ -283,7 +283,7 @@ fn a_flow_step_with_only_a_happy_scenario_is_asked_for_its_failure_case_with_its
     let (dir, _) = repo_with_change();
     let repo = dir.path();
     std::fs::write(repo.join(".canon/changes/add-login/brief.md"), brief_with_two_flows()).unwrap();
-    ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
+    ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go.", "--json"]);
     ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject-id", "demo", "--case", "happy", "--flow", "F1", "--json"]);
     ok(repo, &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject-id", "demo", "--case", "failure", "--flow", "F1", "--json"]);
 
@@ -360,7 +360,7 @@ fn context_status_83_no_advisories_keeps_the_human_stop_and_approve_ignores_advi
 
     std::fs::write(repo.join(".canon/changes/add-login/brief.md"), brief_with_an_advisory()).unwrap();
     assert_eq!(status_steps(repo, "demo").len(), 2);
-    let approved = ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
+    let approved = ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go.", "--json"]);
     assert_eq!(meta_next(&approved)[0]["actor"], "agent");
     assert!(status_steps(repo, "demo").iter().all(|s| !s["command"].as_str().unwrap().contains("brief-polish")), "an approved brief is not polished");
 }

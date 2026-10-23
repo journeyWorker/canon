@@ -25,7 +25,7 @@ def text(content):
 
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
-RENAMED = re.compile(r"(--[\w-]+(?: \S+)?) was renamed (--[\w-]+(?: \S+)?) in [\d.]+; use ")
+RENAMED = re.compile(r"(?:--[\w-]+(?: \S+)?) was (?:renamed (?:--[\w-]+(?: \S+)?)|removed) in [\d.]+; use ")
 
 
 def error_code(output):
@@ -588,7 +588,7 @@ def analyze(inputs, question_turns=()):
         for call in session["calls"]:
             turns[call["turn"]]["calls"].append(call)
         implements = any(w["code"] for w in session["writes"])
-        reviews = any(c["verb"] == "review" and c["action"] == "add" and not c["help"] for c in session["calls"])
+        reviews = any(c["verb"] == "review" and c["action"] in ("scenario", "change") and not c["help"] for c in session["calls"])
         if implements:
             implementers.append(sid)
         if reviews:

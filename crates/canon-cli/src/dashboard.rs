@@ -5,7 +5,7 @@
 //! serves the briefs page's two endpoints ([`crate::dashboard_briefs`]).
 //! This module never re-implements snapshot/report generation (design D1) —
 //! it calls straight into [`canon_report::snapshot`], the exact library
-//! entry point [`crate::report`]'s `canon report --snapshot` arm wires.
+//! entry point [`crate::report`]'s `canon report snapshot` arm wires.
 //!
 //! # Where the app comes from ([`resolve_app`])
 //! 1. `<repo>/packages/dashboard/dist` when `<repo>/packages/dashboard/
@@ -117,7 +117,7 @@ impl DashboardError {
     /// The refusal `canon dashboard` prints for this failure.
     pub fn to_cli_error(&self) -> CliError {
         match self {
-            DashboardError::Config(_) => CliError::refused("DASHBOARD_CONFIG_INVALID", self.to_string()).hint("fix the dashboard settings in canon.yaml (`canon init --check-config` reports what is wrong)"),
+            DashboardError::Config(_) => CliError::refused("DASHBOARD_CONFIG_INVALID", self.to_string()).hint("fix the dashboard settings in canon.yaml (`canon init --check` reports what is wrong)"),
             DashboardError::NotBuilt(_) => CliError::failed("DASHBOARD_NOT_BUILT", self.to_string())
                 .hint("install the release build (`bun add -g @journeykit/canon`), which carries the app; or, in a canon checkout, build it (`bun install --frozen-lockfile && bun run --cwd packages/dashboard build`) and run `canon dashboard` from that checkout"),
             DashboardError::RepoMissing(_) => CliError::refused("REPO_UNREADABLE", self.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root"),
@@ -165,7 +165,7 @@ fn ensure_snapshot(inputs: &canon_report::ReportInputs, dir: &Path, explicit: bo
         Err(e) => {
             let fix = match e {
                 canon_report::ReportError::DuckDbMissing => "install DuckDB (https://duckdb.org/docs/installation) so the `duckdb` command is on PATH, then run `canon dashboard` again".to_string(),
-                _ => "run `canon report --snapshot <dir>` to see the full error, fix it, then run `canon dashboard` again".to_string(),
+                _ => "run `canon report snapshot <dir>` to see the full error, fix it, then run `canon dashboard` again".to_string(),
             };
             SnapshotState::Unavailable { reason: format!("the snapshot could not be generated: {e}"), fix }
         }

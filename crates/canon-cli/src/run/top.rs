@@ -135,7 +135,7 @@ pub(super) fn run_fmt(dir: Option<&std::path::Path>, repo: &crate::cli::RepoArgs
             let roots = match crate::inventory::load_spec_roots(&repo.join("canon.yaml")) {
                 Ok(roots) => roots,
                 Err(err) => {
-                    let error = CliError::refused("CONFIG_UNREADABLE", err.to_string()).hint("fix `specs.roots` in canon.yaml (`canon init --check-config` reports what is wrong), or pass the corpus directory: `canon format <DIR>`");
+                    let error = CliError::refused("CONFIG_UNREADABLE", err.to_string()).hint("fix `specs.roots` in canon.yaml (`canon init --check` reports what is wrong), or pass the corpus directory: `canon format <DIR>`");
                     return ExitCode::from(error.emit("canon format", json) as u8);
                 }
             };
@@ -171,7 +171,7 @@ pub(super) fn run_fmt(dir: Option<&std::path::Path>, repo: &crate::cli::RepoArgs
 }
 
 /// `canon init [--repo <dir>] [--no-agents-md] [--policy <level> | --no-policy]` / `canon
-/// init --check-config` (s19 P4, `crate::init`'s module doc):
+/// init --check` (s19 P4, `crate::init`'s module doc):
 /// `check_config: false` scaffolds a fresh repo, or on an existing
 /// `canon.yaml` refreshes only the AGENTS.md block (see
 /// `crate::init::run_init` for the exit codes); `check_config: true`
@@ -233,12 +233,12 @@ pub(super) fn run_retrieve(repo: &std::path::Path, role: &RoleId, regime: Option
             ExitCode::SUCCESS
         }
         Err(e) => {
-            ExitCode::from(CliError::refused("RETRIEVE_FAILED", e.to_string()).hint("check --role and --regime (`canon regime-key` prints a valid key) and that the ledger is readable").emit("canon retrieve", json) as u8)
+            ExitCode::from(CliError::refused("RETRIEVE_FAILED", e.to_string()).hint("check --role and --regime (`canon regime show` prints a valid key) and that the ledger is readable").emit("canon retrieve", json) as u8)
         }
     }
 }
 
-/// `canon regime-key` (S8 `s8-retrieve-before-task` whole-branch-review
+/// `canon regime show` (S8 `s8-retrieve-before-task` whole-branch-review
 /// fix): serialize + VALIDATE one canonical `regime_key` so shell hooks
 /// route through the identical `canon_model::ids::regime_key`
 /// normalizer the Rust write path uses, never a second derivation
@@ -247,18 +247,18 @@ pub(super) fn run_retrieve(repo: &std::path::Path, role: &RoleId, regime: Option
 /// can still produce — see its doc) reports to stderr and exits `2`
 /// with nothing on stdout, so the hook's own `|| exit 0` degrades it to
 /// a silent no-op rather than passing a malformed `--regime` on.
-pub(super) fn run_regime_key(role: &str, repo: &str, area: &str, hash: &str, json: bool) -> ExitCode {
+pub(super) fn run_regime_show(role: &str, repo: &str, area: &str, hash: &str, json: bool) -> ExitCode {
     match RegimeKey::parse(regime_key(role, repo, area, hash)) {
         Ok(valid) => {
             if json {
-                crate::json_out::data("regime-key", &crate::json_out::untyped(serde_json::json!({ "regimeKey": valid.as_str() })));
+                crate::json_out::data("regime show", &crate::json_out::untyped(serde_json::json!({ "regimeKey": valid.as_str() })));
             } else {
                 println!("{}", valid.as_str());
             }
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(CliError::refused("REGIME_KEY_INVALID", err.to_string()).hint("a regime key is <role>/<repo>/<area>/<hash>; `canon regime-key --help` lists the inputs").emit("canon regime-key", json) as u8)
+            ExitCode::from(CliError::refused("REGIME_KEY_INVALID", err.to_string()).hint("a regime key is <role>/<repo>/<area>/<hash>; `canon regime show --help` lists the inputs").emit("canon regime show", json) as u8)
         }
     }
 }
@@ -282,13 +282,20 @@ pub(super) fn run_regime_key(role: &str, repo: &str, area: &str, hash: &str, jso
 /// section reads, so the two can never disagree; silent for a repo
 /// with nothing routed to a backend that is not read directly.
 pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Option<&std::path::Path>, json: bool) -> ExitCode {
+    let command = if check {
+        "canon report check"
+    } else if snapshot_dir.is_some() {
+        "canon report snapshot"
+    } else {
+        "canon report build"
+    };
     // A present but unusable `canon.yaml` is a usage error (exit 2),
     // the same refusal `canon gate check` makes — never a report of
     // the default ledger.
     let (repo, inputs) = match crate::report::resolve_inputs(repo) {
         Ok(resolved) => resolved,
         Err(err) => {
-            return ExitCode::from(CliError::refused("CONFIG_UNREADABLE", err.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon report", json) as u8);
+            return ExitCode::from(CliError::refused("CONFIG_UNREADABLE", err.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(command, json) as u8);
         }
     };
 
@@ -302,15 +309,15 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
     if let Some(dir) = snapshot_dir {
         return match canon_report::snapshot(&inputs, dir) {
             Ok(manifest) => {
-                crate::say!(json, "canon report --snapshot: wrote {} table(s) to {}", manifest.tables.len(), dir.display());
+                crate::say!(json, "canon report snapshot: wrote {} table(s) to {}", manifest.tables.len(), dir.display());
                 if json {
                     let tables: Vec<_> = manifest.tables.iter().map(|t| serde_json::json!({ "table": t.table, "file": t.file })).collect();
-                    crate::json_out::data_with_meta("report", &crate::json_out::untyped(serde_json::json!({ "mode": "snapshot", "directory": dir.display().to_string(), "tables": tables })), crate::json_out::warnings_meta(&report_warnings));
+                    crate::json_out::data_with_meta("report snapshot", &crate::json_out::untyped(serde_json::json!({ "directory": dir.display().to_string(), "tables": tables })), crate::json_out::warnings_meta(&report_warnings));
                 }
                 ExitCode::SUCCESS
             }
             Err(err) => {
-                ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).hint("check that the ledger is readable (`canon gate check` shows its state), then run the command again").emit("canon report --snapshot", json) as u8)
+                ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).hint("check that the ledger is readable (`canon gate check` shows its state), then run the command again").emit("canon report snapshot", json) as u8)
             }
         };
     }
@@ -326,33 +333,33 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
                     canon_report::CheckOutcome::Missing => "missing",
                     canon_report::CheckOutcome::Drift => "drift",
                 };
-                let data = serde_json::json!({ "mode": "check", "state": state, "report": report_path.display().to_string() });
+                let data = serde_json::json!({ "state": state, "path": report_path.display().to_string() });
                 if outcome.exit_code() == 0 {
                     if json {
-                        crate::json_out::data_with_meta("report", &crate::json_out::untyped(data), crate::json_out::warnings_meta(&report_warnings));
+                        crate::json_out::data_with_meta("report check", &crate::json_out::untyped(data), crate::json_out::warnings_meta(&report_warnings));
                     }
                     ExitCode::SUCCESS
                 } else {
-                    let error = CliError::failed("REPORT_STALE", format!("the report is {state}")).hint("regenerate it with `canon report`");
-                    ExitCode::from(error.emit_with_data("canon report --check", json, &crate::json_out::untyped(data)) as u8)
+                    let error = CliError::failed("REPORT_STALE", format!("the report is {state}")).hint("regenerate it with `canon report build`");
+                    ExitCode::from(error.emit_with_data("canon report check", json, &crate::json_out::untyped(data)) as u8)
                 }
             }
             Err(err) => {
-                ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).hint("check that the ledger is readable (`canon gate check` shows its state), then run the command again").emit("canon report --check", json) as u8)
+                ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).hint("check that the ledger is readable (`canon gate check` shows its state), then run the command again").emit("canon report check", json) as u8)
             }
         };
     }
 
     match canon_report::write_report(&inputs, &report_path) {
         Ok(_content) => {
-            crate::say!(json, "canon report: wrote {}", report_path.display());
+            crate::say!(json, "canon report build: wrote {}", report_path.display());
             if json {
-                crate::json_out::data_with_meta("report", &crate::json_out::untyped(serde_json::json!({ "mode": "write", "report": report_path.display().to_string() })), crate::json_out::warnings_meta(&report_warnings));
+                crate::json_out::data_with_meta("report build", &crate::json_out::untyped(serde_json::json!({ "path": report_path.display().to_string() })), crate::json_out::warnings_meta(&report_warnings));
             }
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).hint("check that the ledger is readable (`canon gate check` shows its state), then run the command again").emit("canon report", json) as u8)
+            ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).hint("check that the ledger is readable (`canon gate check` shows its state), then run the command again").emit("canon report build", json) as u8)
         }
     }
 }

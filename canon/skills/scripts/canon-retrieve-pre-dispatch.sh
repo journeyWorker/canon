@@ -106,11 +106,11 @@ if [ -z "$REGIME" ]; then
   # it still equals the assembled key's leading segment). Malformed
   # segments make `canon regime-key` exit nonzero -> `|| true` -> empty
   # REGIME -> the silent no-op just below.
-  REGIME="$(canon regime-key --role "$ROLE" --repo-name "$REPO_RAW" --area "$AREA_RAW" --hash "$HASH" 2>/dev/null || true)"
+  REGIME="$(canon regime show --role-segment "$ROLE" --repo-name "$REPO_RAW" --area "$AREA_RAW" --hash "$HASH" 2>/dev/null || true)"
   [ -n "$REGIME" ] || exit 0
 fi
 
-GUIDANCE_JSON="$(canon retrieve --role "$ROLE" --regime "$REGIME" --json 2>/dev/null || true)"
+GUIDANCE_JSON="$(canon retrieve --for-role "$ROLE" --regime "$REGIME" --json 2>/dev/null || true)"
 [ -n "$GUIDANCE_JSON" ] || exit 0
 
 # canon >= 0.28 envelopes the result ({ok, data: [...], meta}); 0.27 printed the bare array.

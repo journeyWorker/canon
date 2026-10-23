@@ -6,11 +6,11 @@ steps:
     exit: 0
   - args: [gate, check]
     exit: 1
-  - args: [subject, status, cart, --to, verifying]
+  - args: [subject, move, cart, --to, verifying]
     exit: 1
   - args: [review, scenario, cart.add.01, --project-id, root, --pin, r2, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --session-id, sess-review]
     exit: 0
-  - args: [subject, status, cart, --to, verifying]
+  - args: [subject, move, cart, --to, verifying]
     exit: 0
   - args: [gate, check]
     exit: 0

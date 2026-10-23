@@ -1,2 +1,2 @@
 canon evidence add: CONFIG_UNREADABLE — canon.yaml `write:` section is malformed (expected `write: { promote: auto | manual }`): unknown variant `always`, expected `auto` or `manual`
-hint: fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again
+hint: fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again

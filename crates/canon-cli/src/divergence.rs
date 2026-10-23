@@ -1,4 +1,4 @@
-//! `canon divergence {stage,promote,resolve,defer,accept}` (s15 P3b,
+//! `canon divergence {add,resolve,defer,accept,list}` (s15 P3b,
 //! native-verdict-lifecycle spec, design D10): the ONLY producer of
 //! `canon_model::Divergence` records — without it, `canon-gate`'s
 //! divergence fold (`canon_model::fold_to_current_state`) has no
@@ -14,8 +14,8 @@
 //! - `add` stages a candidate of ANY status. With `--promote` (or `write:
 //!   { promote: auto }`) the same run promotes that one record;
 //!   `--no-promote` keeps it staged.
-//! - `promote` promotes every currently-staged divergence
-//!   (`canon_gate::promote_only`); `canon gate promote` drains them too.
+//! - `canon gate promote --kind divergence` promotes every currently-staged
+//!   divergence (`canon_gate::promote_only`).
 //! - `resolve`/`defer`/`accept` stage their record and promote it in the
 //!   same run: they have no staged-only mode, because the gate must see the
 //!   resolution or acceptance the moment the command succeeds.
@@ -23,7 +23,7 @@
 use std::path::Path;
 
 use canon_gate::promote::UNASSIGNED_RUN_SEQ;
-use canon_gate::{promote_only, GateCtx, PromoteReport};
+use canon_gate::GateCtx;
 use canon_model::{Actor, Divergence, DivergenceStatus, Envelope, ProjectId, RecordKind, RoleId, ScenarioId, SessionId, Sha, TotalOrder};
 use canon_store::tier::Tier;
 use canon_policy::SchemaRegistry;
@@ -39,14 +39,13 @@ pub fn parse_sha(s: &str) -> Result<Sha, String> {
     Sha::parse(s).map_err(|e| e.to_string())
 }
 
-/// `--expiry`'s `clap` value parser — an RFC3339/ISO-8601 timestamp
-/// (`canon_cli::query::parse_since`'s identical grammar, a distinct
-/// function so the error message names `--expiry`, not `--since`).
+/// `--expiry`'s and `--as-of`'s `clap` value parser: the shared `<TIMESTAMP>`
+/// grammar (RFC3339 or `YYYY-MM-DD`).
 pub fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, String> {
-    DateTime::parse_from_rfc3339(s).map(|dt| dt.with_timezone(&Utc)).map_err(|e| format!("invalid timestamp `{s}`: {e}"))
+    crate::timestamp::parse(s)
 }
 
-/// `canon divergence add --status <status>`'s status-string ->
+/// `canon divergence add --state <state>`'s state-string ->
 /// `DivergenceStatus` builder (module doc: `stage` accepts ANY
 /// status, not only `Open`). `--reason`/`--expiry` are REQUIRED
 /// together only when `status == "deferred"` — an `Err` here is a
@@ -57,35 +56,12 @@ pub fn parse_status(status: &str, reason: Option<&str>, expiry: Option<DateTime<
         "still-divergent" => Ok(DivergenceStatus::StillDivergent),
         "resolved" => Ok(DivergenceStatus::Resolved),
         "deferred" => {
-            let reason = reason.ok_or("`--status deferred` requires `--reason`")?;
-            let expiry = expiry.ok_or("`--status deferred` requires `--expiry`")?;
+            let reason = reason.ok_or("`--state deferred` requires `--reason`")?;
+            let expiry = expiry.ok_or("`--state deferred` requires `--expiry`")?;
             Ok(DivergenceStatus::Deferred { reason: reason.to_string(), expiry })
         }
-        other => Err(format!("unknown --status `{other}` (expected one of: open, still-divergent, resolved, deferred)")),
+        other => Err(format!("unknown --state `{other}` (expected one of: open, still-divergent, resolved, deferred)")),
     }
-}
-
-fn format_promote_report(report: &PromoteReport, dry_run: bool) -> String {
-    let mut out = format_candidate_lines(report, dry_run);
-    if report.promoted.is_empty() && report.refused.is_empty() {
-        out.push_str("canon divergence promote: nothing staged\n");
-    }
-    out
-}
-
-/// One line per candidate in `report` — [`format_promote_report`]'s
-/// body, and the whole of what `stage --promote` prints for its one
-/// candidate.
-fn format_candidate_lines(report: &PromoteReport, dry_run: bool) -> String {
-    let verb = if dry_run { "would promote" } else { "promoted" };
-    let mut out = String::new();
-    for p in &report.promoted {
-        out.push_str(&format!("{verb} {} -> {}\n", p.label(), p.target.display()));
-    }
-    for r in &report.refused {
-        out.push_str(&format!("refused: {}\n", r.violation.line()));
-    }
-    out
 }
 
 /// `canon divergence add` (module doc): writes ONE unordered staging
@@ -116,13 +92,13 @@ pub fn run_stage(
     let promote = match crate::write_mode::should_promote(&repo, promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon divergence add", json);
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence add", json);
         }
     };
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon divergence add", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence add", json);
         }
     };
     let candidate = candidate(project_id, scenario_id, sha, status, round, reviewer, detail, Actor::new(actor_id, role.clone()), Utc::now());
@@ -178,38 +154,6 @@ fn stage_and_promote(ledger_root: &Path, candidate: &Divergence) -> Result<std::
     }
 }
 
-/// `canon divergence promote [--dry-run]` (module doc): batch-promotes
-/// every currently-staged candidate.
-pub fn run_promote(repo: &Path, dry_run: bool, json: bool) -> i32 {
-    let repo = resolve_repo_root(repo);
-    let gate_ctx = match GateCtx::from_repo(&repo) {
-        Ok(ctx) => ctx,
-        Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon divergence promote", json);
-        }
-    };
-    let staging = GitTier::new(crate::gate::evidence_staging_dir(&gate_ctx.ledger_root));
-    let committed = GitTier::new(&gate_ctx.ledger_root);
-
-    match promote_only(RecordKind::Divergence, &staging, &committed, dry_run) {
-        Ok(report) => {
-            crate::say_raw!(json, "{}", format_promote_report(&report, dry_run));
-            let data = crate::gate::promote_json(&report, dry_run);
-            if report.is_clean() {
-                if json {
-                    crate::json_out::data("divergence promote", &crate::json_out::untyped(data));
-                }
-                0
-            } else {
-                CliError::failed("PROMOTE_REFUSED", format!("{} staged divergence(s) refused", report.refused.len())).hint("`canon gate check` names what promotion refused; fix it, then run `canon divergence promote` (the record stays staged)").emit_with_data("canon divergence promote", json, &crate::json_out::untyped(data))
-            }
-        }
-        Err(e) => {
-            CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon divergence promote", json)
-        }
-    }
-}
-
 /// Shared `resolve`/`defer` path (module doc): build one
 /// divergence with `status`, stage it and promote that one record.
 #[allow(clippy::too_many_arguments)]
@@ -234,7 +178,7 @@ fn run_commit(
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit(&format!("canon divergence {verb}"), json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&format!("canon divergence {verb}"), json);
         }
     };
     let candidate = candidate(project_id, scenario_id, sha, status, round, reviewer, detail, Actor::new(actor_id, role.clone()), Utc::now());
@@ -248,7 +192,7 @@ fn run_commit(
             0
         }
         Err(message) => {
-            CliError::failed("DIVERGENCE_REFUSED", message).hint("`canon divergence status` lists the scenario's divergences and their state; fix what the message names, then run the command again").emit(&format!("canon divergence {verb}"), json)
+            CliError::failed("DIVERGENCE_REFUSED", message).hint("`canon divergence list` lists the scenario's divergences and their state; fix what the message names, then run the command again").emit(&format!("canon divergence {verb}"), json)
         }
     }
 }
@@ -301,17 +245,6 @@ pub fn run_defer(
         role,
         json,
     )
-}
-
-/// `--expiry`'s `clap` value parser for `divergence accept`: a calendar
-/// date, `YYYY-MM-DD`, read as that day's start in UTC (the acceptance
-/// stops holding when the date begins); an RFC3339 timestamp is also taken
-/// as given, like `divergence defer --expiry`.
-pub fn parse_expiry_date(s: &str) -> Result<DateTime<Utc>, String> {
-    match chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d") {
-        Ok(date) => Ok(date.and_hms_opt(0, 0, 0).expect("midnight exists").and_utc()),
-        Err(_) => parse_timestamp(s).map_err(|_| format!("invalid expiry `{s}`: want a date, YYYY-MM-DD")),
-    }
 }
 
 /// `canon divergence accept`'s arguments.
@@ -374,7 +307,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
     }
     let context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| canon_gate::GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(context) => context,
-        Err(e) => return CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml (`canon init --check-config` names the problem), then run `canon divergence accept` again").emit(CMD, args.json),
+        Err(e) => return CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml (`canon init --check` names the problem), then run `canon divergence accept` again").emit(CMD, args.json),
     };
     let indexed = canon_gate::spec_coverage::latest_scenarios(&context);
     let mut scenarios = Vec::new();
@@ -464,7 +397,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
     0
 }
 
-/// `canon divergence status [--as-of <timestamp>]` (task 4.5): the S9
+/// `canon divergence list [--as-of <timestamp>]` (task 4.5): the S9
 /// divergence burn-down's CURRENT-STATE view, over
 /// `canon_report::divergence::{current_states, summarize}` — the
 /// consumer of `canon_model::fold_to_current_state` this crate wires
@@ -472,29 +405,29 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
 /// with `mart_review_burndown`'s per-day TREND). `as_of` defaults to
 /// "now"; ALWAYS exits `0` — a read-only capability query over
 /// whatever is currently on the ledger, never a gate.
-/// The fields of one `divergence status` scenario row, which `--fields` may name.
+/// The fields of one `divergence list` scenario row, which `--fields` may name.
 const ROW_FIELDS: [&str; 6] = ["project_id", "scenario_id", "state", "reason", "expiry", "tracking"];
 
-pub fn run_status(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &crate::paging::Page, fields: Option<&[String]>) -> i32 {
+pub fn run_list(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &crate::paging::Page, fields: Option<&[String]>) -> i32 {
     if let Some(requested) = fields {
-        if let Err(e) = crate::paging::check_known("canon divergence status", requested, &ROW_FIELDS) {
-            return e.emit("canon divergence status", json);
+        if let Err(e) = crate::paging::check_known("canon divergence list", requested, &ROW_FIELDS) {
+            return e.emit("canon divergence list", json);
         }
     }
     let repo = resolve_repo_root(repo);
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon divergence status", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence list", json);
         }
     };
     let as_of = as_of.unwrap_or_else(Utc::now);
 
     let states = canon_report::divergence::current_states(&gate_ctx.ledger_root, as_of);
     let summary = canon_report::divergence::summarize(&states);
-    let (rows, meta) = match crate::paging::paginate("divergence status", states.into_iter().collect::<Vec<_>>(), |((project_id, scenario_id), _)| format!("{project_id}/{scenario_id}"), page) {
+    let (rows, meta) = match crate::paging::paginate("divergence list", states.into_iter().collect::<Vec<_>>(), |((project_id, scenario_id), _)| format!("{project_id}/{scenario_id}"), page) {
         Ok(paged) => paged,
-        Err(e) => return e.emit("canon divergence status", json),
+        Err(e) => return e.emit("canon divergence list", json),
     };
 
     if json {
@@ -536,12 +469,12 @@ pub fn run_status(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &
         });
         let mut page = serde_json::Map::new();
         meta.insert_into(&mut page);
-        crate::json_out::data_with_meta("divergence status", &crate::json_out::untyped(data), serde_json::Value::Object(page));
+        crate::json_out::data_with_meta("divergence list", &crate::json_out::untyped(data), serde_json::Value::Object(page));
         return 0;
     }
 
     println!(
-        "canon divergence status (as of {as_of}): open={} resolved={} still-divergent={} deferred={} resolved-invalid={} accepted={} (total={})",
+        "canon divergence list (as of {as_of}): open={} resolved={} still-divergent={} deferred={} resolved-invalid={} accepted={} (total={})",
         summary.open,
         summary.resolved,
         summary.still_divergent,
@@ -614,7 +547,7 @@ mod tests {
         assert_eq!(run_stage(dir.path(), &project_id, &scenario_id_a, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default(), false), 0);
         assert_eq!(run_stage(dir.path(), &project_id, &scenario_id_b, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default(), false), 0);
 
-        let code = run_promote(dir.path(), false, false);
+        let code = crate::gate::run_promote(dir.path(), Some(RecordKind::Divergence), false, false);
         assert_eq!(code, 0);
 
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
@@ -651,7 +584,7 @@ mod tests {
 
         assert_eq!(run_stage(dir.path(), &project_id, &scenario_id, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default(), false), 0);
 
-        let code = run_promote(dir.path(), false, false);
+        let code = crate::gate::run_promote(dir.path(), Some(RecordKind::Divergence), false, false);
         assert_eq!(code, 1, "a refusal reports a non-zero (but not usage-error) exit code");
 
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
@@ -724,7 +657,7 @@ mod tests {
         assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, false), 0);
 
         // Read-only capability query — always exits 0.
-        assert_eq!(run_status(dir.path(), None, false, &crate::paging::Page::first_page(), None), 0);
+        assert_eq!(run_list(dir.path(), None, false, &crate::paging::Page::first_page(), None), 0);
 
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let states = canon_report::divergence::current_states(&gate_ctx.ledger_root, Utc::now());
@@ -734,7 +667,7 @@ mod tests {
     /// divergence.lifecycle.08 against a real ledger: a committed
     /// resolution against sha `a` reads back as resolved-invalid once the
     /// scenario's live evidence binding names sha `b`, and neither
-    /// `canon divergence status` nor the fold rewrites the persisted
+    /// `canon divergence list` nor the fold rewrites the persisted
     /// resolved record — the downgrade is derived at read time.
     #[test]
     fn a_moved_live_binding_reads_resolved_invalid_without_rewriting_the_resolution() {
@@ -754,7 +687,7 @@ mod tests {
         let persisted_before = files_with_bytes(&divergence_dir);
         assert_eq!(persisted_before.len(), 1, "exactly the one committed resolution");
 
-        assert_eq!(run_status(dir.path(), None, false, &crate::paging::Page::first_page(), None), 0);
+        assert_eq!(run_list(dir.path(), None, false, &crate::paging::Page::first_page(), None), 0);
         let states = canon_report::divergence::current_states(&gate_ctx.ledger_root, Utc::now());
         assert_eq!(states.get(&(project_id, scenario_id)), Some(&canon_model::FoldedState::ResolvedInvalid));
 

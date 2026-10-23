@@ -78,7 +78,7 @@ fn run_adapter_authorize(response: &std::path::Path, repo: &std::path::Path, jso
         crate::json_out::data("adapter authorize", &result);
     } else if json {
         // The failure keeps the result in `data`.
-        let error = CliError::failed("ADAPTER_EXECUTION_NOT_AUTHORIZED", "execution_not_authorized").hint("declare the capability in .canon/policy.yaml and approve it with `canon policy approve --by <name>`, or drop it from the response");
+        let error = CliError::failed("ADAPTER_EXECUTION_NOT_AUTHORIZED", "execution_not_authorized").hint("declare the capability in .canon/policy.yaml and approve it with `canon policy approve --approver <name>`, or drop it from the response");
         return ExitCode::from(error.emit_with_data("canon adapter authorize", true, &result) as u8);
     } else {
         println!("execution_authorized: {}", result.execution_authorized);
@@ -89,7 +89,7 @@ fn run_adapter_authorize(response: &std::path::Path, repo: &std::path::Path, jso
     if result.execution_authorized {
         ExitCode::SUCCESS
     } else {
-        ExitCode::from(CliError::failed("ADAPTER_EXECUTION_NOT_AUTHORIZED", "execution_not_authorized").hint("declare the capability in .canon/policy.yaml and approve it with `canon policy approve --by <name>`, or drop it from the response").emit("canon adapter authorize", false) as u8)
+        ExitCode::from(CliError::failed("ADAPTER_EXECUTION_NOT_AUTHORIZED", "execution_not_authorized").hint("declare the capability in .canon/policy.yaml and approve it with `canon policy approve --approver <name>`, or drop it from the response").emit("canon adapter authorize", false) as u8)
     }
 }
 

@@ -32,7 +32,7 @@ use crate::context::resolve_repo_root;
 /// outcome, in kind order. `Err` is the refusal or failure to report.
 pub fn compact(repo: &Path, dry_run: bool) -> Result<Vec<KindCompaction>, CliError> {
     let ctx = GateCtx::from_repo(repo).map_err(|e| {
-        CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again")
+        CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again")
     })?;
     let tier = GitTier::new(&ctx.ledger_root);
     if tier.archive_root().is_none() {

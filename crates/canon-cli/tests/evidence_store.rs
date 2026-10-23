@@ -72,7 +72,7 @@ fn approve_brief(repo: &Path, subject: &str) {
 }
 
 fn attest(repo: &Path, extra: &[&str]) -> Output {
-    let mut args = vec!["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run smoke", "--role", "implementer"];
+    let mut args = vec!["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke", "--role", "implementer"];
     args.extend_from_slice(extra);
     let out = canon(repo, &args);
     if out.status.success() {
@@ -330,11 +330,11 @@ fn a_flipped_row_aggregates_every_record_and_the_task_store_agrees() {
     assert_eq!(task_records(repo)["data"]["records"][0]["status"], "open");
 
     for (verdict, summary) in [("faithful", "1 vitest case"), ("not-applicable", "9 vitest cases and 2 smoke checks")] {
-        ok(repo, &["evidence", "add", "--task", "cats#1", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--verdict", verdict, "--summary", summary]);
+        ok(repo, &["evidence", "add", "--task-id", "cats#1", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--verdict", verdict, "--summary", summary]);
         ok(repo, &["gate", "promote"]);
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
-    ok(repo, &["gate", "task", "cats#1"]);
+    ok(repo, &["task", "done", "cats#1"]);
     let tasks = std::fs::read_to_string(repo.join(".canon/changes/cats/tasks.md")).unwrap();
     assert!(
         tasks.contains("- [x] 1 Ship the run — ✅ 2 evidence records (1 faithful, 1 not-applicable); latest: 9 vitest cases and 2 smoke checks"),
@@ -353,15 +353,15 @@ fn a_task_and_scenario_keyed_record_ships_its_scenario_and_still_flips_its_task(
     ok(repo, &["subject", "new", "cat-run", "--domain", "game", "--title", "Cat run"]);
     scenario(repo, "game.run.01", Some("cat-run"));
     for state in ["specced", "building", "verifying"] {
-        ok(repo, &["subject", "status", "cat-run", "--to", state]);
+        ok(repo, &["subject", "move", "cat-run", "--to", state]);
     }
-    ok(repo, &["evidence", "add", "--task", "cats#1", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm test", "--role", "implementer"]);
+    ok(repo, &["evidence", "add", "--task-id", "cats#1", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm test", "--role", "implementer"]);
     ok(repo, &["gate", "promote"]);
 
     approve_brief(repo, "cat-run");
-    let shipped = canon(repo, &["subject", "status", "cat-run", "--to", "shipped"]);
+    let shipped = canon(repo, &["subject", "move", "cat-run", "--to", "shipped"]);
     assert!(shipped.status.success(), "the scenario cell has the record's faithful verdict: {}", text(&shipped));
-    ok(repo, &["gate", "task", "cats#1"]);
+    ok(repo, &["task", "done", "cats#1"]);
     assert!(std::fs::read_to_string(repo.join(".canon/changes/cats/tasks.md")).unwrap().contains("- [x] 1 Ship the run"));
 }
 
@@ -373,7 +373,7 @@ fn a_task_and_scenario_keyed_record_missing_a_required_role_fails_its_scenario_c
     let dir = setup(true);
     let repo = dir.path();
     scenario(repo, "game.run.01", None);
-    ok(repo, &["evidence", "add", "--task", "cats#1", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm test", "--role", "implementer"]);
+    ok(repo, &["evidence", "add", "--task-id", "cats#1", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm test", "--role", "implementer"]);
     ok(repo, &["gate", "promote"]);
     std::fs::write(repo.join(".canon/policy.yaml"), "risk_routing:\n  reviewer: true\n").unwrap();
 

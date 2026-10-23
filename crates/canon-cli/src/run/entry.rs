@@ -30,27 +30,12 @@ pub fn set_sigpipe(_default: bool) {}
 /// caller that asked for JSON gets JSON on stdout.
 pub fn usage_error(error: &clap::Error) -> ExitCode {
     let json = argv_wants_json();
-    // A spelling 0.24 deprecated and 0.25 removed: the refusal names its replacement (0.25 D6).
-    // A leaf whose primary object moved into operand position, or that split (0.28).
-    if error.use_stderr() {
-        let args: Vec<String> = std::env::args().skip(1).collect();
-        if let Some(shape) = crate::removed::find_shape(&crate::cli::command(), &args) {
-            let command = format!("canon {}", shape.command);
-            return ExitCode::from(CliError::refused("USAGE", shape.message()).hint(shape.hint).field(shape.used.clone()).emit(command.trim(), json) as u8);
-        }
-    }
+    // A removed spelling (the "Removed in 0.28" table): the refusal names its replacement.
     if error.use_stderr() {
         let args: Vec<String> = std::env::args().skip(1).collect();
         if let Some(removed) = crate::removed::find(&crate::cli::command(), &args) {
             let command = format!("canon {}", removed.command);
             return ExitCode::from(CliError::refused("USAGE", removed.message()).hint(removed.hint()).field(removed.field.clone()).expected([removed.replacement.clone()]).emit(command.trim(), json) as u8);
-        }
-    }
-    if error.use_stderr() {
-        let args: Vec<String> = std::env::args().skip(1).collect();
-        if let Some(bare) = crate::removed::bare_group(&crate::cli::command(), &args) {
-            let command = format!("canon {}", bare.command);
-            return ExitCode::from(CliError::refused("USAGE", bare.message()).hint(bare.hint()).field(bare.command).expected([format!("canon {}", bare.replacement)]).emit(&command, json) as u8);
         }
     }
     if !json || !error.use_stderr() {

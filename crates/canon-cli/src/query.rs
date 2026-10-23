@@ -92,11 +92,6 @@ pub fn kind_parser() -> impl clap::builder::TypedValueParser<Value = RecordKind>
     crate::cli_error::closed_set(visible.collect::<Vec<_>>(), parse_kind)
 }
 
-/// `--since`'s `clap` value parser — an RFC3339/ISO-8601 timestamp.
-pub fn parse_since(s: &str) -> Result<DateTime<Utc>, String> {
-    DateTime::parse_from_rfc3339(s).map(|dt| dt.with_timezone(&Utc)).map_err(|e| format!("invalid --since timestamp `{s}`: {e}"))
-}
-
 /// `--change-id`'s `clap` value parser — grammar-level `ChangeId::parse`
 /// only; KIND-gating (whether `--change-id` even applies to the queried
 /// `--kind`) happens in [`validate_scope`], not here, so a malformed
@@ -273,7 +268,7 @@ fn fold_pg_routed_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
 /// other kind.
 ///
 /// - `subject` (s36 `subject-domain-loop`): `canon subject adopt` /
-///   `canon subject status` append links / flip state at a bumped
+///   `canon subject move` append links / flip state at a bumped
 ///   envelope `at`.
 /// - `finding` (s46): `canon finding close` appends the disposition
 ///   TRANSITION of an already-committed finding — the second version

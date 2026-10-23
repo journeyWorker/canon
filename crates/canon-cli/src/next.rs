@@ -138,7 +138,7 @@ pub struct After {
 
 /// Steps that block every subject, so a scoped list keeps them.
 fn blocks_everything(step: &NextStep) -> bool {
-    matches!(step.command.as_str(), "canon init" | "canon init --check-config" | "canon migrate" | "canon inventory sync" | "canon gate check")
+    matches!(step.command.as_str(), "canon init" | "canon init --check" | "canon migrate" | "canon inventory sync" | "canon gate check")
 }
 
 /// The report's steps narrowed to `scope`.

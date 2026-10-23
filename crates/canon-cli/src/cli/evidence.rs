@@ -5,48 +5,6 @@ use clap::{Args, Subcommand};
 use std::path::PathBuf;
 use super::PromoteArgs;
 
-/// The flags of `context-pack new`.
-#[derive(clap::Args)]
-pub struct ContextPackNewArgs {
-    /// Repository-relative input manifest
-    #[arg(long)]
-    pub manifest: PathBuf,
-    #[command(flatten)]
-    pub repo: crate::cli::RepoArgs,
-    /// Output the complete pack manifest as JSON
-    #[arg(long)]
-    pub json: bool,
-}
-
-/// The flags of `prompt add`.
-#[derive(clap::Args)]
-pub struct PromptAddArgs {
-    /// Bundle name
-    #[arg(long)]
-    pub name: String,
-    /// Bundle version
-    #[arg(long)]
-    pub version: String,
-    /// Repository-relative input manifest
-    #[arg(long)]
-    pub manifest: PathBuf,
-    #[command(flatten)]
-    pub repo: crate::cli::RepoArgs,
-    /// Output the complete bundle manifest as JSON
-    #[arg(long)]
-    pub json: bool,
-}
-
-/// The flags of `demo add`.
-#[derive(clap::Args)]
-pub struct DemoAddArgs {
-    #[command(flatten)]
-    pub repo: crate::cli::RepoArgs,
-    /// Output JSON instead of the human-readable form
-    #[arg(long)]
-    pub json: bool,
-}
-
 #[derive(Subcommand)]
 pub enum EvidenceCommand {
     /// Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1`
@@ -65,7 +23,7 @@ pub enum EvidenceCommand {
 #[derive(Args)]
 pub struct EvidenceApprovalPayloadArgs {
     #[arg(long, value_parser = crate::dispatch::parse_task_id)]
-    pub task: Option<TaskId>,
+    pub task_id: Option<TaskId>,
     #[arg(long, value_parser = crate::review::parse_project_id)]
     pub project_id: Option<ProjectId>,
     #[arg(long, value_parser = crate::review::parse_scenario_id)]
@@ -76,9 +34,11 @@ pub struct EvidenceApprovalPayloadArgs {
     pub artifact_sha: canon_model::Sha,
     #[arg(long = "surface-ref", value_parser = crate::evidence::parse_surface_ref)]
     pub surface_ref: Vec<String>,
+    /// Who approved (the human whose detached signature the payload is for)
     #[arg(long)]
-    pub approval_by: String,
-    #[arg(long)]
+    pub approver: String,
+    /// The approval time that is signed into the payload: RFC3339, or YYYY-MM-DD (UTC midnight)
+    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::normalize)]
     pub approval_at: String,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -91,16 +51,16 @@ pub struct EvidenceApprovalPayloadArgs {
 pub struct EvidenceAddArgs {
     /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given
     #[arg(long, value_parser = crate::dispatch::parse_task_id)]
-    pub task: Option<TaskId>,
+    pub task_id: Option<TaskId>,
     /// Spec corpus id for --scenario-id (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (UNKNOWN_SPEC_ROOT) before anything is written
     #[arg(long, value_parser = crate::review::parse_project_id)]
     pub project_id: Option<ProjectId>,
-    /// What CLASS of evidence is attested to (test-run, review, ...) — the `evidence.kind` companion. `audit` is refused: an external evaluator's re-audit is `canon evidence audit`
-    #[arg(long)]
-    pub kind: String,
-    /// The reference a reader can resolve: a command line, commit sha, or report path. NEVER run or resolved by canon
-    #[arg(long = "ref", value_name = "REF")]
-    pub evidence_ref: String,
+    /// What CLASS of evidence is attested to (test-run, review, ...); default `test-run` when a --report is given. `audit` is refused: an external evaluator's re-audit is `canon evidence audit`
+    #[arg(long, value_name = "CLASS", required_unless_present = "reports")]
+    pub class: Option<String>,
+    /// The reference a reader can resolve: a command line, commit sha, or report path (default: the --report paths, comma-separated, when one is given). NEVER run or resolved by canon
+    #[arg(long = "ref", value_name = "REF", required_unless_present = "reports")]
+    pub evidence_ref: Option<String>,
     /// faithful / not-applicable / divergent; Default faithful; with --all-scenarios, each record's verdict is derived from its own cases unless this is given
     #[arg(long, value_parser = crate::evidence::verdict_parser())]
     pub verdict: Option<EvidenceVerdict>,
@@ -122,7 +82,7 @@ pub struct EvidenceAddArgs {
     /// The attesting actor's id (recorded as the attestation's author; line breaks refused)
     #[arg(long, default_value = "canon")]
     pub actor_id: String,
-    /// The attesting role; `canon gate promote` derives its run_seq partition key from it. Required unless the declared role (--as / CANON_ROLE) is implementer or reviewer, which it then defaults to
+    /// The attesting role; `canon gate promote` derives its run_seq partition key from it. Default: the declared role (--as / CANON_ROLE); required when none is declared
     #[arg(long, value_parser = crate::retrieve::parse_role)]
     pub role: Option<RoleId>,
     /// The attesting session (recorded as actor.session_id). Under require_review.distinct_actor a review from this session does not count
@@ -130,15 +90,15 @@ pub struct EvidenceAddArgs {
     pub session_id: Option<canon_model::SessionId>,
     /// Human approval identity; authentication comes only from the detached signature.
     #[arg(long)]
-    pub approval_by: Option<String>,
+    pub approver: Option<String>,
     /// Approval role; only human is eligible for risk approval.
     #[arg(long, value_parser = crate::retrieve::parse_role)]
     pub approval_role: Option<RoleId>,
     /// Armored SSH detached signature file. Canon never signs on the user's behalf.
     #[arg(long)]
-    pub approval_signature_file: Option<PathBuf>,
-    /// RFC3339 timestamp included in the signed approval payload.
-    #[arg(long)]
+    pub signature_file: Option<PathBuf>,
+    /// Timestamp (RFC3339 or YYYY-MM-DD) included in the signed approval payload.
+    #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::normalize)]
     pub approval_at: Option<String>,
     /// Exact Git SHA bound by the evidence and any approval.
     #[arg(long, value_parser = crate::divergence::parse_sha)]
@@ -206,7 +166,7 @@ pub struct EvidenceAuditArgs {
     /// The attesting actor's id (recorded as the attestation's author; line breaks refused)
     #[arg(long, default_value = "canon")]
     pub actor_id: String,
-    /// The attesting role; `canon gate promote` derives its run_seq partition key from it. Required unless the declared role (--as / CANON_ROLE) is implementer or reviewer, which it then defaults to
+    /// The attesting role; `canon gate promote` derives its run_seq partition key from it. Default: the declared role (--as / CANON_ROLE); required when none is declared
     #[arg(long, value_parser = crate::retrieve::parse_role)]
     pub role: Option<RoleId>,
     /// The attesting session (recorded as actor.session_id)

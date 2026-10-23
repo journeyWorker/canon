@@ -4,13 +4,13 @@ policy: .canon/policy.yaml
   require_cases: <none>
   require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true
   level: custom
-warning: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+warning: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --approver <who>`
 
 subjects (1):
   building (1):
     cart: 1 scenarios, 1 evidenced, 1 reviewed, 1 open blockers
       brief: approved in .canon/changes/c-cart/brief.md — Journey 2026-10-08 — "approved, go ahead"
-      advisory: that approval has no digest, so it does not follow the brief's text; re-approve with `canon brief approve c-cart --by <the human> --note "<their words>"` to bind it
+      advisory: that approval has no digest, so it does not follow the brief's text; re-approve with `canon brief approve c-cart --approver <the human> --note "<their words>"` to bind it
 
 unowned: none
 

@@ -3,50 +3,7 @@
 use canon_model::{ProjectId, RoleId, ScenarioId, Sha};
 use chrono::{DateTime, Utc};
 use clap::{Args, Subcommand};
-use std::path::PathBuf;
 use super::PromoteArgs;
-
-/// The flags of `context-pack new`.
-#[derive(clap::Args)]
-pub struct ContextPackNewArgs {
-    /// Repository-relative input manifest
-    #[arg(long)]
-    pub manifest: PathBuf,
-    #[command(flatten)]
-    pub repo: crate::cli::RepoArgs,
-    /// Output the complete pack manifest as JSON
-    #[arg(long)]
-    pub json: bool,
-}
-
-/// The flags of `prompt add`.
-#[derive(clap::Args)]
-pub struct PromptAddArgs {
-    /// Bundle name
-    #[arg(long)]
-    pub name: String,
-    /// Bundle version
-    #[arg(long)]
-    pub version: String,
-    /// Repository-relative input manifest
-    #[arg(long)]
-    pub manifest: PathBuf,
-    #[command(flatten)]
-    pub repo: crate::cli::RepoArgs,
-    /// Output the complete bundle manifest as JSON
-    #[arg(long)]
-    pub json: bool,
-}
-
-/// The flags of `demo add`.
-#[derive(clap::Args)]
-pub struct DemoAddArgs {
-    #[command(flatten)]
-    pub repo: crate::cli::RepoArgs,
-    /// Output JSON instead of the human-readable form
-    #[arg(long)]
-    pub json: bool,
-}
 
 /// The flags of `divergence add`.
 #[derive(clap::Args)]
@@ -59,23 +16,23 @@ pub struct DivergenceAddArgs {
     pub project_id: Option<ProjectId>,
     #[arg(long, value_parser = crate::divergence::parse_sha)]
     pub sha: Sha,
-    /// open / still-divergent / resolved / deferred (deferred needs --reason/--expiry)
-    #[arg(long, default_value = "open")]
-    pub status: String,
+    /// The divergence state to record (deferred needs --reason and --expiry)
+    #[arg(long, value_name = "STATE", default_value = "open", value_parser = clap::builder::PossibleValuesParser::new(["open", "still-divergent", "resolved", "deferred"]))]
+    pub state: String,
     #[arg(long)]
     pub reason: Option<String>,
     #[arg(long, value_parser = crate::divergence::parse_timestamp)]
     pub expiry: Option<DateTime<Utc>>,
     #[arg(long, default_value_t = 1)]
     pub round: u32,
+    /// The reviewer recording this (recorded as the divergence's reviewer and actor)
     #[arg(long)]
-    pub reviewer: String,
+    pub actor_id: String,
     #[arg(long, default_value = "")]
     pub detail: String,
-    #[arg(long, default_value = "canon")]
-    pub actor_id: String,
+    /// The role this record is attributed to (default: the role declared with --as / CANON_ROLE)
     #[arg(long, value_parser = crate::retrieve::parse_role)]
-    pub role: RoleId,
+    pub role: Option<RoleId>,
     #[command(flatten)]
     pub promote: PromoteArgs,
     #[command(flatten)]
@@ -87,30 +44,16 @@ pub struct DivergenceAddArgs {
 
 #[derive(Subcommand)]
 pub enum DivergenceCliCommand {
-    /// Add a divergence candidate, staged with no run_seq yet (commit it with `canon divergence promote`, or in the same run with --promote / `write: { promote: auto }`)
+    /// Add a divergence candidate, staged with no run_seq yet (commit it with `canon gate promote --kind divergence`, or in the same run with --promote / `write: { promote: auto }`)
     Add(DivergenceAddArgs),
-    /// Promote all staged candidates, assigning run_seq
-    Promote(DivergencePromoteArgs),
     /// Directly record a resolved divergence
     Resolve(DivergenceResolveArgs),
     /// Directly record a deferred divergence (requires --reason/--expiry)
     Defer(DivergenceDeferArgs),
     /// Accept a divergent scenario as a tracked known gap (a reviewer step): its latest evidence must be divergent and not the accepting actor's or session's. The acceptance pins that evidence, so new evidence ends it, and lapses at --expiry; until then the ship guard counts the cell as covered while `status` and `gate check` list it as `accepted-divergence`
     Accept(DivergenceAcceptArgs),
-    /// Show the current divergence burn-down state
-    Status(DivergenceStatusArgs),
-}
-
-#[derive(Args)]
-pub struct DivergencePromoteArgs {
-    #[command(flatten)]
-    pub repo: crate::cli::RepoArgs,
-    /// Preview without writing anything
-    #[arg(long)]
-    pub dry_run: bool,
-    /// Output JSON instead of the human-readable form
-    #[arg(long)]
-    pub json: bool,
+    /// List the current divergence burn-down state
+    List(DivergenceListArgs),
 }
 
 #[derive(Args)]
@@ -125,14 +68,14 @@ pub struct DivergenceResolveArgs {
     pub sha: Sha,
     #[arg(long, default_value_t = 1)]
     pub round: u32,
+    /// The reviewer recording this (recorded as the divergence's reviewer and actor)
     #[arg(long)]
-    pub reviewer: String,
+    pub actor_id: String,
     #[arg(long, default_value = "")]
     pub detail: String,
-    #[arg(long, default_value = "canon")]
-    pub actor_id: String,
+    /// The role this record is attributed to (default: the role declared with --as / CANON_ROLE)
     #[arg(long, value_parser = crate::retrieve::parse_role)]
-    pub role: RoleId,
+    pub role: Option<RoleId>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
@@ -152,16 +95,16 @@ pub struct DivergenceDeferArgs {
     pub sha: Sha,
     #[arg(long, default_value_t = 1)]
     pub round: u32,
+    /// The reviewer recording this (recorded as the divergence's reviewer and actor)
     #[arg(long)]
-    pub reviewer: String,
+    pub actor_id: String,
     #[arg(long)]
     pub reason: String,
     #[arg(long, value_parser = crate::divergence::parse_timestamp)]
     pub expiry: DateTime<Utc>,
-    #[arg(long, default_value = "canon")]
-    pub actor_id: String,
+    /// The role this record is attributed to (default: the role declared with --as / CANON_ROLE)
     #[arg(long, value_parser = crate::retrieve::parse_role)]
-    pub role: RoleId,
+    pub role: Option<RoleId>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
@@ -184,14 +127,12 @@ pub struct DivergenceAcceptArgs {
     #[arg(long)]
     pub tracking: String,
     /// The date (YYYY-MM-DD, UTC) the acceptance stops holding; none means it holds until new evidence
-    #[arg(long, value_parser = crate::divergence::parse_expiry_date)]
+    #[arg(long, value_parser = crate::divergence::parse_timestamp)]
     pub expiry: Option<DateTime<Utc>>,
+    /// The reviewer recording this (recorded as the divergence's reviewer and actor)
     #[arg(long)]
-    pub reviewer: String,
-    /// The invoking actor's id
-    #[arg(long, default_value = "canon")]
     pub actor_id: String,
-    /// Must be reviewer. Required unless the declared role (--as / CANON_ROLE) is reviewer, which it then defaults to
+    /// Must be reviewer (default: the declared role, --as / CANON_ROLE; required when none is declared)
     #[arg(long, value_parser = crate::retrieve::parse_role)]
     pub role: Option<RoleId>,
     /// The accepting session (recorded as actor.session_id); it must not be one that attested the scenario's evidence
@@ -205,7 +146,7 @@ pub struct DivergenceAcceptArgs {
 }
 
 #[derive(Args)]
-pub struct DivergenceStatusArgs {
+pub struct DivergenceListArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Governs Deferred expiry; defaults to now
@@ -217,6 +158,6 @@ pub struct DivergenceStatusArgs {
     #[command(flatten)]
     pub page: crate::paging::PageFlags,
     /// With --json, keep only these scenario fields (comma-separated): project_id, scenario_id, state, reason, expiry, tracking; an unknown field is refused
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
     pub fields: Option<Vec<String>>,
 }

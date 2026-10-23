@@ -2,5 +2,5 @@ description: "`canon policy approve` in a repo with no .canon/policy.yaml is ref
 steps:
   - args: [init, --no-agents-md, --no-policy]
     exit: 0
-  - args: [policy, approve, --by, alice]
+  - args: [policy, approve, --approver, alice]
     exit: 2

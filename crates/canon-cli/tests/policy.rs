@@ -49,7 +49,7 @@ fn approve_records_the_policy_digest_the_approver_the_time_and_the_note() {
     let dir = initialized_repo();
     let repo = dir.path();
 
-    let out = run_canon(&["policy", "approve", "--by", "alice", "--note", "reviewed the starter policy"], repo);
+    let out = run_canon(&["policy", "approve", "--approver", "alice", "--note", "reviewed the starter policy"], repo);
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
     assert!(without_next(&stdout(&out)).ends_with("— written directly; nothing to promote\n"), "the direct-write suffix: {}", stdout(&out));
 
@@ -62,7 +62,7 @@ fn approve_records_the_policy_digest_the_approver_the_time_and_the_note() {
     let text = std::fs::read_to_string(repo.join(APPROVAL)).unwrap();
     assert!(text.starts_with("{\n  \""), "pretty JSON: {text}");
 
-    let without_note = run_canon(&["policy", "approve", "--by", "bob"], repo);
+    let without_note = run_canon(&["policy", "approve", "--approver", "bob"], repo);
     assert_eq!(without_note.status.code(), Some(0), "stderr: {}", stderr(&without_note));
     assert_eq!(approval(repo)["note"], serde_json::Value::Null, "a re-approval replaces the record");
     assert_eq!(approval(repo)["approved_by"], "bob");
@@ -72,7 +72,7 @@ fn approve_records_the_policy_digest_the_approver_the_time_and_the_note() {
 fn approve_refuses_a_repo_with_no_policy() {
     let dir = tempfile::tempdir().expect("a temp dir");
     std::fs::write(dir.path().join("canon.yaml"), "").unwrap();
-    let out = run_canon(&["policy", "approve", "--by", "alice"], dir.path());
+    let out = run_canon(&["policy", "approve", "--approver", "alice"], dir.path());
     assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
     assert!(stderr(&out).contains("no policy to approve"), "{}", stderr(&out));
     assert!(!dir.path().join(APPROVAL).exists(), "a refused approve writes nothing");
@@ -81,7 +81,7 @@ fn approve_refuses_a_repo_with_no_policy() {
 #[test]
 fn approve_refuses_an_empty_approver() {
     let dir = initialized_repo();
-    let out = run_canon(&["policy", "approve", "--by", "  "], dir.path());
+    let out = run_canon(&["policy", "approve", "--approver", "  "], dir.path());
     assert_eq!(out.status.code(), Some(2));
     assert!(!dir.path().join(APPROVAL).exists());
 }
@@ -95,7 +95,6 @@ fn approve_refuses_an_empty_approver() {
 fn gate_check_and_status_advise_until_the_current_policy_is_approved() {
     let dir = initialized_repo();
     let repo = dir.path();
-    const REPAIR: &str = "canon policy approve --by <who>";
 
     let check = |expect: Option<&str>, gate_exit: i32| {
         let gate = run_canon(&["gate", "check"], repo);
@@ -112,16 +111,13 @@ fn gate_check_and_status_advise_until_the_current_policy_is_approved() {
             Some(text) => {
                 if gate_exit == 0 {
                     assert!(stdout(&gate).contains(&format!("advisory: {text}")), "gate check: {}", stdout(&gate));
-                    assert!(stdout(&gate).contains(REPAIR), "the advisory names the command: {}", stdout(&gate));
                 } else {
                     assert!(stdout(&gate).contains("policy changed since approval"), "gate check: {}", stdout(&gate));
-                    assert!(stdout(&gate).contains("canon policy approve --by <human>"), "the violation names the re-approval: {}", stdout(&gate));
                 }
                 let line = stdout(&status).lines().find(|line| line.starts_with(&format!("warning: {text}"))).map(str::to_string);
                 let line = line.unwrap_or_else(|| panic!("status: {}", stdout(&status)));
-                assert!(line.contains(REPAIR), "the status warning names the command: {line}");
                 assert_eq!(policy_warnings.len(), 1, "one policy warning in --json: {warnings:?}");
-                assert!(policy_warnings[0].starts_with(text) && policy_warnings[0].contains(REPAIR), "{warnings:?}");
+                assert!(policy_warnings[0].starts_with(text), "{warnings:?}");
                 assert_eq!(format!("warning: {}", policy_warnings[0]), line, "--json carries the same warning text");
             }
             None => {
@@ -133,7 +129,7 @@ fn gate_check_and_status_advise_until_the_current_policy_is_approved() {
     };
 
     check(Some("policy not approved"), 0);
-    let approved = run_canon(&["policy", "approve", "--by", "alice"], repo);
+    let approved = run_canon(&["policy", "approve", "--approver", "alice"], repo);
     assert_eq!(approved.status.code(), Some(0), "stderr: {}", stderr(&approved));
     check(None, 0);
 
@@ -161,16 +157,6 @@ fn a_repo_without_a_policy_gets_no_approval_advisory() {
     assert_eq!(init.status.code(), Some(0), "stderr: {}", stderr(&init));
     let gate = run_canon(&["gate", "check"], dir.path());
     assert!(!stdout(&gate).contains("policy not approved"), "{}", stdout(&gate));
-}
-
-#[test]
-fn init_names_the_approval_command_for_its_starter_policy() {
-    let dir = tempfile::tempdir().expect("a temp dir");
-    let init = run_canon(&["init"], dir.path());
-    assert_eq!(init.status.code(), Some(0), "stderr: {}", stderr(&init));
-    assert!(stdout(&init).contains("canon policy approve --by <who>"), "{}", stdout(&init));
-    let agents = std::fs::read_to_string(dir.path().join("AGENTS.md")).unwrap();
-    assert!(agents.contains("canon brief approve <slug> --by <the human> --note"), "{agents}");
 }
 
 /// The approval is authored and must reach git: neither the

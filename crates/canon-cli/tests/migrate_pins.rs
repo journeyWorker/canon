@@ -79,7 +79,7 @@ fn gate(repo: &Path, exit: i32) -> String {
 }
 
 fn attest(repo: &Path, id: &str) {
-    ok(repo, &["evidence", "add", "--scenario-id", id, "--project-id", "root", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
+    ok(repo, &["evidence", "add", "--scenario-id", id, "--project-id", "root", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
     ok(repo, &["gate", "promote"]);
 }
 
@@ -357,7 +357,7 @@ fn migrate_pins_07_a_moved_root_is_searched_at_its_former_path_and_only_for_its_
     .unwrap();
     commit_file(repo, &format!("b/{old}"), BASE, "project b");
     for project in ["a", "b"] {
-        ok(repo, &["evidence", "add", "--scenario-id", "cart.add.01", "--project-id", project, "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
+        ok(repo, &["evidence", "add", "--scenario-id", "cart.add.01", "--project-id", project, "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
         let legacy = serde_json::json!({
             "schema": 1,
             "kind": "review",

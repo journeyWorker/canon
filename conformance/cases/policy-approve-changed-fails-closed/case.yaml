@@ -4,7 +4,7 @@ steps:
     exit: 1
   - args: [status]
     exit: 0
-  - args: [policy, approve, --by, bob, --note, re-approved after the require_evidence change]
+  - args: [policy, approve, --approver, bob, --note, re-approved after the require_evidence change]
     exit: 0
   - args: [gate, check]
     exit: 1

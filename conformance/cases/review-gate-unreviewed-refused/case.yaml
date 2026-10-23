@@ -2,5 +2,5 @@ description: "With `spec_coverage.require_review: {}`, `canon gate check` exits 
 steps:
   - args: [gate, check]
     exit: 1
-  - args: [subject, status, wishlist, --to, verifying]
+  - args: [subject, move, wishlist, --to, verifying]
     exit: 1

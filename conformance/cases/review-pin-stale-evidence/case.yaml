@@ -2,13 +2,13 @@ description: "0.15 D1: a pinned review stops counting once its scenario's eviden
 steps:
   - args: [review, scenario, cart.add.01, --project-id, root, --pin, r1, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --session-id, sess-review]
     exit: 0
-  - args: [subject, status, cart, --to, verifying]
+  - args: [subject, move, cart, --to, verifying]
     exit: 0
-  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, cargo test cart_add, --role, implementer, --actor-id, impl-agent, --session-id, sess-impl, --verdict, not-applicable, --summary, case skipped in this run]
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --class, test-run, --ref, cargo test cart_add, --role, implementer, --actor-id, impl-agent, --session-id, sess-impl, --verdict, not-applicable, --summary, case skipped in this run]
     exit: 0
   - args: [gate, promote]
     exit: 0
   - args: [gate, check]
     exit: 1
-  - args: [subject, status, cart, --to, shipped]
+  - args: [subject, move, cart, --to, shipped]
     exit: 1

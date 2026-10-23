@@ -17,8 +17,8 @@ fn project_for(repo: &Path, given: Option<ProjectId>, command: &str, json: bool)
 pub fn run(cmd: EvidenceCommand) -> ExitCode {
     match cmd {
         EvidenceCommand::ApprovalPayload(EvidenceApprovalPayloadArgs {
-            task, project_id, scenario_id, run_id, artifact_sha, surface_ref,
-            approval_by, approval_at, repo, json,
+            task_id, project_id, scenario_id, run_id, artifact_sha, surface_ref,
+            approver, approval_at, repo, json,
         }) => {
             let project_id = match (&scenario_id, project_id) {
                 (Some(_), given) => match project_for(&repo, given, "canon evidence approval-payload", json) {
@@ -30,15 +30,15 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
             ExitCode::from(crate::evidence::run_approval_payload(
                 &repo,
                 &crate::evidence::ApprovalPayloadArgs {
-                    task_id: task, scenario_id, project_id, run_id, artifact_sha,
-                    surface_ref, approval_by, approval_at, json,
+                    task_id, scenario_id, project_id, run_id, artifact_sha,
+                    surface_ref, approval_by: approver, approval_at, json,
                 },
             ) as u8)
         }
         EvidenceCommand::Add(EvidenceAddArgs {
-            task,
+            task_id,
             project_id,
-            kind,
+            class,
             evidence_ref,
             verdict,
             summary,
@@ -49,9 +49,9 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
             actor_id,
             role,
             session_id,
-            approval_by,
+            approver,
             approval_role,
-            approval_signature_file,
+            signature_file,
             approval_at,
             artifact_sha,
             artifacts,
@@ -64,10 +64,12 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
             repo,
             json,
         }) => {
+            let kind = class.unwrap_or_else(|| "test-run".to_string());
+            let evidence_ref = evidence_ref.unwrap_or_else(|| reports.iter().map(|(_, path)| path.display().to_string()).collect::<Vec<_>>().join(","));
             if kind == crate::evidence::AUDIT_KIND {
                 return ExitCode::from(
-                    CliError::refused("EVIDENCE_INVALID_ARGUMENT", "`--kind audit` is not an `evidence add` class: an external evaluator's re-audit is its own command")
-                        .field("--kind")
+                    CliError::refused("EVIDENCE_INVALID_ARGUMENT", "`--class audit` is not an `evidence add` class: an external evaluator's re-audit is its own command")
+                        .field("--class")
                         .hint("use `canon evidence audit <SCENARIO_ID> --ref <REF> --evaluator-id <ID> --evaluator-version <TEXT> --evaluator-digest <SHA256> --audit-result <confirmed|refuted|indeterminate>`")
                         .emit("canon evidence add", json) as u8,
                 );
@@ -89,7 +91,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
                 crate::evidence::run_add(
                     &repo,
                     &crate::evidence::EvidenceArgs {
-                        task_id: task,
+                        task_id,
                         project_id,
                         kind,
                         evidence_ref,
@@ -102,9 +104,9 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
                         actor_id,
                         role,
                         session_id,
-                        approval_by,
+                        approval_by: approver,
                         approval_role,
-                        approval_signature_file,
+                        approval_signature_file: signature_file,
                         approval_at,
                         artifact_sha,
                         artifacts,

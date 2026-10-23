@@ -151,7 +151,7 @@ fn open_strategy_store(repo: &Path) -> ParquetStrategyStore {
 /// from the `<area>` value itself, exactly as the shipped pre-dispatch
 /// hook does — so a Rust-assembled candidate lands on the IDENTICAL
 /// `<role>/<repo>/<area>/<hash>` directory a shell-assembled `canon
-/// regime-key --area <a> --hash "$(printf %s <a> | sha256sum | cut
+/// regime show --area <a> --hash "$(printf %s <a> | sha256sum | cut
 /// -c1-12)"` would. `<area>` here is already a kebab slug (a `<domain>`
 /// and `<subject_id>`, both kebab) — a fixed point of `regime_key`'s own
 /// segment canonicalizer — so hashing the raw `<area>` and the

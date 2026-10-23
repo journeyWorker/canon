@@ -48,10 +48,10 @@ fn repo_with_clean_brief() -> TempDir {
     dir
 }
 
-const ATTEST: [&str; 12] = ["evidence", "add", "--task", "add-login#1", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl"];
+const ATTEST: [&str; 12] = ["evidence", "add", "--task-id", "add-login#1", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl"];
 
 fn approve(repo: &Path, who: &str, words: &str) -> Output {
-    run(repo, &["brief", "approve", "--by", who, "--note", words])
+    run(repo, &["brief", "approve", "--approver", who, "--note", words])
 }
 
 fn status_text(repo: &Path) -> String {
@@ -79,7 +79,7 @@ fn a_scope_changed_mid_build_is_reapproved_before_its_scenarios_exist() {
     let repo = dir.path();
     assert!(approve(repo, "Ana", "Go.").status.success());
     for to in ["specced", "building"] {
-        ok(repo, &["subject", "status", "demo", "--to", to]);
+        ok(repo, &["subject", "move", "demo", "--to", to]);
     }
     let text = std::fs::read_to_string(brief_path(repo)).unwrap();
     std::fs::write(brief_path(repo), text.replace("thirty seconds", "sixty seconds")).unwrap();
@@ -120,7 +120,7 @@ fn approving_binds_the_brief_and_any_later_edit_is_refused_until_reapproved() {
     assert_eq!((json["data"]["state"].as_str(), json["data"]["next"][0]["step"].as_str()), (Some("changed-since-approval"), Some("approve")), "{json}");
 
     // A new human answer re-approves; the old line is replaced, not stacked.
-    ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Fine with the later note"]);
+    ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Fine with the later note"]);
     let brief = std::fs::read_to_string(brief_path(repo)).unwrap();
     assert_eq!(brief.matches("Approved:").count(), 1, "{brief}");
     assert!(status_text(repo).contains("brief: approved in"), "{}", status_text(repo));
@@ -161,7 +161,7 @@ fn a_line_in_a_fence_is_not_an_approval_and_does_not_leave_the_digest() {
     let repo = dir.path();
     let fenced = en_brief("```\nApproved: Mallory 2026-10-12 — \"go\"\n```\n");
     std::fs::write(brief_path(repo), &fenced).unwrap();
-    ok(repo, &["brief", "approve", "--by", "Ana", "--note", "go"]);
+    ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "go"]);
     let brief = std::fs::read_to_string(brief_path(repo)).unwrap();
     assert!(brief.contains("Approved: Mallory"), "the fenced example is kept: {brief}");
     std::fs::write(brief_path(repo), brief.replace("Mallory", "Eve")).unwrap();

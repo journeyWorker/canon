@@ -46,7 +46,7 @@
 //! a walk of the whole root: `canon init` writes `root: .`, and a
 //! source rooted at a JS repository must not read `node_modules` on
 //! every pass (0.14 acceptance rerun G1, where it cost ~10 s per
-//! `canon gate task`). The importer's OWN repo-local write surface (the
+//! `canon task done`). The importer's OWN repo-local write surface (the
 //! git ledger root under `tiers.git.root`, and the `<repo>/.canon/
 //! ingest` cursor tree) is still excluded by a canonicalized
 //! `starts_with` check computed once per run, so a dialect whose input
@@ -55,7 +55,7 @@
 //! / `touch` that doesn't change bytes never reaches parse. A source
 //! is (re-)parsed as a COMPLETE set whenever anything in it changed —
 //! never partially, so a multi-file change dir is never re-derived
-//! from a partial read. `canon gate task` re-imports only the change it
+//! from a partial read. `canon task done` re-imports only the change it
 //! flipped ([`refresh_change`]) and leaves the cursor alone.
 //!
 //! # Adoption survives a re-import (0.14 acceptance rerun G9)
@@ -187,7 +187,7 @@ impl From<TierCliError> for PlansError {
 /// `plans.sources[]` or the `--dialect`/`--source` one-shot override —
 /// the driver treats both identically from here on. `pub(crate)`
 /// accessors let `crate::gate` (s35 `gate-plan-dialect-seam`) resolve a
-/// `canon gate task` flip through the SAME configured plan sources
+/// `canon task done` flip through the SAME configured plan sources
 /// `canon ingest plans` reads, rather than a second hardcoded path.
 pub(crate) struct PlanSource {
     pub(crate) dialect: String,
@@ -545,7 +545,7 @@ fn persist_candidates(store: &TierRegistry, adoptions: &mut Adoptions, changes: 
 /// `canon subject adopt`), read from the latest change records the
 /// first time an import has a change to persist (0.14 acceptance rerun
 /// G9). A plan document never names its subjects, so without this every
-/// re-import (a `canon gate task` flip, a ticked checkbox) appended a
+/// re-import (a `canon task done` flip, a ticked checkbox) appended a
 /// newer change version with no subject that superseded the adoption in
 /// every folded read.
 #[derive(Default)]
@@ -591,7 +591,7 @@ pub(crate) struct ChangeRefresh {
 }
 
 /// Re-import ONE change, `change_id`, from the configured plan sources:
-/// `canon gate task`'s refresh after a flip (0.14 D5). Each source in
+/// `canon task done`'s refresh after a flip (0.14 D5). Each source in
 /// config order reads only that change ([`PlanAdapter::parse_change`]),
 /// the first source carrying it owns it ([`admit_source_candidates`],
 /// exactly as in [`run`]), and its candidates persist exactly as [`run`]
@@ -792,13 +792,13 @@ fn plans_section_present(canon_yaml_path: &Path) -> bool {
     serde_yaml::from_str::<serde_yaml::Value>(&text).is_ok_and(|doc| doc.get("plans").is_some())
 }
 
-/// The plan sources `canon gate task` resolves a flip through (s35
+/// The plan sources `canon task done` resolves a flip through (s35
 /// `gate-plan-dialect-seam`, design "Compat default"): canon's own
 /// `.canon/changes/` first when it exists, then `canon.yaml`'s `plans:`
 /// sources exactly like `canon ingest plans`
 /// ([`load_plan_sources_from_config`]) — but where that command treats
 /// an ABSENT `plans:` section as zero configured sources (a clean no-op
-/// scan), `canon gate task` instead falls back to the documented compat
+/// scan), `canon task done` instead falls back to the documented compat
 /// default `[{ dialect: openspec, root: <repo> }]` so every consumer
 /// that worked before s35 (a repo with no `plans:` section, whose
 /// `tasks.md` lives at `<repo>/openspec/changes/<change_id>/`) keeps
@@ -811,7 +811,7 @@ fn plans_section_present(canon_yaml_path: &Path) -> bool {
 /// repo that writes `plans:\n  sources: []` — which is exactly what
 /// `canon init` scaffolds — has configured its external plans and
 /// declared there are none, so synthesizing an openspec source under it
-/// would make `canon gate task` report `consulted: openspec @ <repo>`
+/// would make `canon task done` report `consulted: openspec @ <repo>`
 /// against a dialect the operator never named. That is the same
 /// misleading shape `crate::dispatch`'s `--task` validation already
 /// refuses via `DispatchError::NoPlanSources`; the two commands agree.

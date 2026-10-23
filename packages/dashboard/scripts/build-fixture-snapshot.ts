@@ -7,7 +7,7 @@
 // only on @duckdb/duckdb-wasm).
 //
 // manifest.json's shape mirrors the S9 SHARED SNAPSHOT CONTRACT
-// `canon report --snapshot` produces (design.md D3): `generated_at`,
+// `canon report snapshot` produces (design.md D3): `generated_at`,
 // `source_git_sha`, `source_digest`, `tables: [{table, file}]`. Unlike a
 // real snapshot, this fixture's `source_git_sha`/`generated_at` are fixed,
 // clearly-synthetic placeholders (not tied to any real commit or wall

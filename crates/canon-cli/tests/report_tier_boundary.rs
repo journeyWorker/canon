@@ -40,7 +40,7 @@ fn multi_tier_repo_emits_a_warn_line_matching_the_reports_own_note() {
         "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  task: hot\n  session: hot\n  event: hot\n  change: local\n",
     );
 
-    let output = run_canon(&["report", "--repo", "."], dir.path());
+    let output = run_canon(&["report", "build", "--repo", "."], dir.path());
 
     assert!(output.status.success(), "canon report must still exit 0; stderr: {}", stderr(&output));
     let err = stderr(&output);
@@ -69,7 +69,7 @@ fn git_only_repo_emits_no_warn_line() {
     // No canon.yaml at all — the existing fixture-corpus default every
     // other test in this crate already uses.
 
-    let output = run_canon(&["report", "--repo", "."], dir.path());
+    let output = run_canon(&["report", "build", "--repo", "."], dir.path());
 
     assert!(output.status.success(), "stderr: {}", stderr(&output));
     assert!(!stderr(&output).contains("WARN"), "a git-only repo must emit no WARN line: {}", stderr(&output));

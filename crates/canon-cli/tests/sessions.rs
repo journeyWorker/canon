@@ -72,7 +72,7 @@ fn session_ids_land_on_evidence_and_review_actors() {
     ok(repo, &["inventory", "sync"]);
 
     let evidence = [
-        "evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run smoke", "--role", "implementer",
+        "evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke", "--role", "implementer",
         "--actor-id", "impl-unit-1", "--session-id", "sess-impl",
     ];
     ok(repo, &evidence);
@@ -103,7 +103,7 @@ fn a_session_id_outside_the_grammar_is_refused_and_nothing_is_written() {
     for bad in ["sess\timpl", " sess-impl", ""] {
         let evidence = canon(
             repo,
-            &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "r", "--role", "implementer", "--session-id", bad],
+            &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "r", "--role", "implementer", "--session-id", bad],
         );
         let review = canon(
             repo,
@@ -144,15 +144,15 @@ fn every_write_command_says_whether_it_staged_or_wrote_directly() {
     ok(repo, &["inventory", "sync"]);
     direct(&["subject", "new", "runs", "--domain", "dev", "--title", "Runs"]);
     direct(&["subject", "adopt", "runs", "--change-id", "cats"]);
-    direct(&["subject", "status", "runs", "--to", "specced"]);
+    direct(&["subject", "move", "runs", "--to", "specced"]);
     direct(&["change", "new", "runs-boss", "--subject-id", "runs", "--title", "A boss wave"]);
 
     staged(
-        &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run smoke", "--role", "implementer", "--no-promote"],
+        &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke", "--role", "implementer", "--no-promote"],
         STAGED,
     );
-    staged(&["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run smoke 2", "--role", "implementer"], PROMOTED);
-    staged(&["finding", "add", "--change-id", "cats", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "r", "--summary", "s", "--no-promote"], STAGED);
+    staged(&["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke 2", "--role", "implementer"], PROMOTED);
+    staged(&["finding", "add", "--change-id", "cats", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "r", "--summary", "s", "--no-promote"], STAGED);
     ok(repo, &["gate", "promote"]);
     staged(&["finding", "close", "cats", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"], PROMOTED);
     assert!(records_under(repo, "_staging").is_empty(), "nothing is left to promote");
@@ -164,9 +164,9 @@ fn every_write_command_says_whether_it_staged_or_wrote_directly() {
 
     let sha = "a".repeat(40);
     staged(
-        &["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--no-promote"],
+        &["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--actor-id", "r", "--role", "reviewer", "--no-promote"],
         "— run `canon gate promote` to commit it",
     );
-    staged(&["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--round", "2", "--reviewer", "r", "--role", "reviewer"], PROMOTED);
-    staged(&["divergence", "resolve", "game.run.01", "--project-id", "root", "--sha", &sha, "--round", "3", "--reviewer", "r", "--role", "reviewer"], PROMOTED);
+    staged(&["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--round", "2", "--actor-id", "r", "--role", "reviewer"], PROMOTED);
+    staged(&["divergence", "resolve", "game.run.01", "--project-id", "root", "--sha", &sha, "--round", "3", "--actor-id", "r", "--role", "reviewer"], PROMOTED);
 }

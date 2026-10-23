@@ -16,12 +16,12 @@ pub fn path(cmd: &Command) -> &'static str {
         },
         Command::Demo { action } => match action {
             DemoCommand::Init(_) => "demo init",
-            DemoCommand::Add(_) => "demo add",
+            DemoCommand::Review(_) => "demo review",
         },
         Command::Status(_) => "status",
         Command::Context(_) => "context",
         Command::ContextPack { action } => match action {
-            ContextPackCommand::New(_) => "context-pack new",
+            ContextPackCommand::Add(_) => "context-pack add",
             ContextPackCommand::Show(_) => "context-pack show",
             ContextPackCommand::Verify(_) => "context-pack verify",
         },
@@ -44,7 +44,8 @@ pub fn path(cmd: &Command) -> &'static str {
             SubjectCommand::New(_) => "subject new",
             SubjectCommand::Adopt(_) => "subject adopt",
             SubjectCommand::Unadopt(_) => "subject unadopt",
-            SubjectCommand::Status(_) => "subject status",
+            SubjectCommand::Show(_) => "subject show",
+            SubjectCommand::Move(_) => "subject move",
         },
         Command::Change { action } => match action {
             ChangeCommand::New(_) => "change new",
@@ -59,10 +60,11 @@ pub fn path(cmd: &Command) -> &'static str {
         },
         Command::Gate { action } => match action {
             GateCommand::Check(_) => "gate check",
-            GateCommand::Task(_) => "gate task",
             GateCommand::Promote(_) => "gate promote",
             GateCommand::InstallHooks(_) => "gate install-hooks",
-            GateCommand::Selftest(_) => "gate selftest",
+        },
+        Command::Task { action } => match action {
+            TaskCommand::Done(_) => "task done",
         },
         Command::Evidence { action } => match action {
             EvidenceCommand::ApprovalPayload(_) => "evidence approval-payload",
@@ -85,11 +87,10 @@ pub fn path(cmd: &Command) -> &'static str {
         },
         Command::Divergence { action } => match action {
             DivergenceCliCommand::Add(_) => "divergence add",
-            DivergenceCliCommand::Promote(_) => "divergence promote",
             DivergenceCliCommand::Resolve(_) => "divergence resolve",
             DivergenceCliCommand::Defer(_) => "divergence defer",
             DivergenceCliCommand::Accept(_) => "divergence accept",
-            DivergenceCliCommand::Status(_) => "divergence status",
+            DivergenceCliCommand::List(_) => "divergence list",
         },
         Command::Ingest { action } => match action {
             IngestCommand::Sessions(_) => "ingest sessions",
@@ -97,21 +98,27 @@ pub fn path(cmd: &Command) -> &'static str {
             IngestCommand::Plans(_) => "ingest plans",
         },
         Command::Retrieve(_) => "retrieve",
-        Command::Learn { action } => match action {
-            LearnCommand::Promote(_) => "learn promote",
-            LearnCommand::Approve(_) => "learn approve",
-            LearnCommand::Rollback(_) => "learn rollback",
+        Command::Strategy { action } => match action {
+            StrategyCommand::Promote(_) => "strategy promote",
+            StrategyCommand::ApprovalPayload(_) => "strategy approval-payload",
+            StrategyCommand::Rollback(_) => "strategy rollback",
         },
         Command::Dispatch { action } => match action {
             DispatchCommand::Begin(_) => "dispatch begin",
             DispatchCommand::End(_) => "dispatch end",
             DispatchCommand::Diff(_) => "dispatch diff",
         },
-        Command::RegimeKey(_) => "regime-key",
+        Command::Regime { action } => match action {
+            RegimeCommand::Show(_) => "regime show",
+        },
         Command::Query(_) => "query",
         Command::Export(_) => "export",
         Command::Purge(_) => "purge",
-        Command::Report(_) => "report",
+        Command::Report { action } => match action {
+            ReportCommand::Build(_) => "report build",
+            ReportCommand::Check(_) => "report check",
+            ReportCommand::Snapshot(_) => "report snapshot",
+        },
         Command::Dashboard(_) => "dashboard",
         Command::Plugin { action } => match action {
             PluginCommand::Sync(_) => "plugin sync",

@@ -13,7 +13,7 @@ pub struct InitArgs {
     pub repo: PathBuf,
     /// Validate an existing canon.yaml instead of writing one
     #[arg(long, conflicts_with_all = ["no_agents_md", "no_policy", "policy", "providers", "language"])]
-    pub check_config: bool,
+    pub check: bool,
     /// Do not write or refresh the canon block in AGENTS.md
     #[arg(long)]
     pub no_agents_md: bool,
@@ -54,7 +54,7 @@ pub struct StatusArgs {
     #[arg(long)]
     pub json: bool,
     /// With --json, keep only these top-level report fields (comma-separated); an unknown field is refused
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
     pub fields: Option<Vec<String>>,
 }
 
@@ -66,7 +66,7 @@ pub struct ContextArgs {
     #[arg(long)]
     pub json: bool,
     /// With --json, keep only these top-level surface sections (comma-separated); an unknown field is refused
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
     pub fields: Option<Vec<String>>,
 }
 
@@ -85,8 +85,8 @@ pub struct FormatArgs {
 #[derive(Args)]
 pub struct RetrieveArgs {
     /// Role scope; with --regime must equal its leading segment
-    #[arg(long, value_parser = crate::retrieve::parse_role)]
-    pub role: RoleId,
+    #[arg(long = "for-role", value_name = "ROLE", value_parser = crate::retrieve::parse_role)]
+    pub for_role: RoleId,
     /// Full regime key (<role>/<repo>/<area>/<hash>); mutually exclusive with --domain/--subject-id
     #[arg(long, value_parser = crate::retrieve::parse_regime)]
     pub regime: Option<RegimeKey>,
@@ -96,30 +96,11 @@ pub struct RetrieveArgs {
     /// Narrow --domain to one subject_id; requires --domain, mutually exclusive with --regime
     #[arg(long, value_parser = crate::retrieve::parse_subject)]
     pub subject_id: Option<SubjectId>,
-    /// Top-k cap (default: canon's DEFAULT_K)
-    #[arg(short, long)]
-    pub k: Option<usize>,
+    /// Cap on the guidance items returned (default: 5)
+    #[arg(long, value_name = "N")]
+    pub limit: Option<usize>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
-    /// Output JSON instead of the human-readable form
-    #[arg(long)]
-    pub json: bool,
-}
-
-#[derive(Args)]
-pub struct RegimeKeyArgs {
-    /// The <role> segment (canonicalized)
-    #[arg(long)]
-    pub role: String,
-    /// The <repo> segment (canonicalized)
-    #[arg(long = "repo-name", value_name = "NAME")]
-    pub repo_name: String,
-    /// The <area> segment (canonicalized)
-    #[arg(long)]
-    pub area: String,
-    /// The <hash> segment (6-64-char lowercase hex; passed through, never re-hashed)
-    #[arg(long)]
-    pub hash: String,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -131,7 +112,7 @@ pub struct QueryArgs {
     #[arg(long, value_parser = crate::query::kind_parser())]
     pub kind: RecordKind,
     /// Only records with at >= <since> (RFC3339/ISO-8601)
-    #[arg(long, value_parser = crate::query::parse_since)]
+    #[arg(long, value_parser = crate::timestamp::parse)]
     pub since: Option<DateTime<Utc>>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -140,9 +121,9 @@ pub struct QueryArgs {
     pub json: bool,
     /// Project a plugin's overlay fields onto each record (fail-soft)
     #[arg(long)]
-    pub plugin: Option<String>,
+    pub plugin_id: Option<String>,
     /// Every version of the kind, the ledger's and the archive's, oldest first, instead of the current records
-    #[arg(long, conflicts_with = "plugin")]
+    #[arg(long, conflicts_with = "plugin_id")]
     pub history: bool,
     /// Scope --kind change/task to one ChangeId (other kinds exit 2)
     #[arg(long, value_parser = crate::query::parse_change_id)]
@@ -160,7 +141,7 @@ pub struct QueryArgs {
     #[command(flatten)]
     pub page: crate::paging::PageFlags,
     /// With --json, keep only these top-level record fields (comma-separated); an unknown field is refused
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
     pub fields: Option<Vec<String>>,
 }
 
@@ -168,12 +149,12 @@ pub struct QueryArgs {
 pub struct ExportArgs {
     #[arg(long, value_parser = crate::query::kind_parser())]
     pub kind: RecordKind,
-    #[arg(long, value_parser = crate::query::parse_since)]
+    #[arg(long, value_parser = crate::timestamp::parse)]
     pub before: Option<DateTime<Utc>>,
-    #[arg(long, value_parser = crate::query::parse_since)]
+    #[arg(long, value_parser = crate::timestamp::parse)]
     pub after: Option<DateTime<Utc>>,
-    #[arg(long)]
-    pub out: Option<PathBuf>,
+    #[arg(short = 'o', long = "output", value_name = "FILE")]
+    pub output: Option<PathBuf>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     #[arg(long)]
@@ -183,7 +164,7 @@ pub struct ExportArgs {
     #[command(flatten)]
     pub page: crate::paging::PageFlags,
     /// Keep only these fields of each exported record (comma-separated): kind, at, id, digest; an unknown field is refused
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
     pub fields: Option<Vec<String>>,
 }
 
@@ -191,7 +172,7 @@ pub struct ExportArgs {
 pub struct PurgeArgs {
     #[arg(long, value_parser = crate::query::kind_parser())]
     pub kind: RecordKind,
-    #[arg(long, value_parser = crate::query::parse_since)]
+    #[arg(long, value_parser = crate::timestamp::parse)]
     pub before: DateTime<Utc>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -201,21 +182,6 @@ pub struct PurgeArgs {
     /// Delete, but only if the plan recomputed now has this `planDigest`
     #[arg(long, value_name = "PLAN_DIGEST")]
     pub confirm: Option<String>,
-    #[arg(long)]
-    pub json: bool,
-}
-
-#[derive(Args)]
-pub struct ReportArgs {
-    #[command(flatten)]
-    pub repo: crate::cli::RepoArgs,
-    /// Byte-diff against .canon/REPORT.md (0 clean, 1 drift); --snapshot wins if both given
-    #[arg(long)]
-    pub check: bool,
-    /// Export panel marts to <dir>/*.parquet + manifest.json instead
-    #[arg(long)]
-    pub snapshot: Option<PathBuf>,
-    /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
 }
@@ -237,6 +203,9 @@ pub struct DashboardArgs {
 
 #[derive(Args)]
 pub struct SelftestArgs {
+    /// Run only this suite (default: every suite)
+    #[arg(long, value_name = "NAME", value_parser = clap::builder::PossibleValuesParser::new(crate::selftest::SUITE_NAMES.iter().copied()))]
+    pub suite: Option<String>,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -250,11 +219,11 @@ pub struct SchemaArgs {
     #[arg(long)]
     pub json: bool,
     /// Print every error code any command can emit, with its meaning, instead of a command
-    #[arg(long, conflicts_with = "path")]
+    #[arg(long, conflicts_with_all = ["path", "error"])]
     pub errors: bool,
-    /// List every command instead of only the declared role's
-    #[arg(long)]
-    pub all: bool,
+    /// Show one error code: its meaning, exit, retryable and fix (an unknown code exits 2)
+    #[arg(long, value_name = "CODE", conflicts_with = "path")]
+    pub error: Option<String>,
 }
 
 /// The shells `canon completion` writes a script for.

@@ -67,7 +67,7 @@ fn reviewed_repo() -> tempfile::TempDir {
     std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_review:\n    scope: []\n").unwrap();
     write_feature(repo, BASE);
     for id in ["cart.add.01", "cart.add.02"] {
-        ok(repo, &["evidence", "add", "--scenario-id", id, "--project-id", "root", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
+        ok(repo, &["evidence", "add", "--scenario-id", id, "--project-id", "root", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
     }
     ok(repo, &["gate", "promote"]);
     assert!(gate(repo, 1).contains("unreviewed-promotion cart.add.01 — no review record"), "require_review covers these scenarios");
@@ -131,7 +131,7 @@ fn record_suite(repo: &Path, report: &str) {
     ok(
         repo,
         &[
-            "evidence", "add", "--project-id", "root", "--all-scenarios", "--report", "junit:reports/junit.xml", "--kind", "test-run", "--ref", "npm test", "--role", "implementer",
+            "evidence", "add", "--project-id", "root", "--all-scenarios", "--report", "junit:reports/junit.xml", "--class", "test-run", "--ref", "npm test", "--role", "implementer",
             "--actor-id", "impl-agent",
         ],
     );
@@ -206,7 +206,7 @@ fn review_add_32_a_changed_verdict_stales_the_review() {
     ok(
         repo,
         &[
-            "evidence", "add", "--project-id", "root", "--scenario-id", "cart.add.02", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent",
+            "evidence", "add", "--project-id", "root", "--scenario-id", "cart.add.02", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent",
             "--verdict", "divergent", "--summary", "the count is off by one",
         ],
     );

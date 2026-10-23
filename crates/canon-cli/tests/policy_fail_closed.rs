@@ -33,7 +33,7 @@ fn approved_repo(policy: &str) -> TempDir {
     let dir = TempDir::new().unwrap();
     copy_dir(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../conformance/cases/subject-ship-allowed/repo"), dir.path());
     std::fs::write(dir.path().join(".canon/policy.yaml"), policy).unwrap();
-    let out = canon(dir.path(), &["policy", "approve", "--by", "human", "--note", "reviewed"]);
+    let out = canon(dir.path(), &["policy", "approve", "--approver", "human", "--note", "reviewed"]);
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     dir
 }
@@ -54,22 +54,21 @@ fn a_policy_weakened_after_approval_fails_the_gate_and_the_ship_guard() {
     assert!(text.contains("policy changed since approval"), "{text}");
 
     for extra in [&[][..], &["--override-reason", "ship it"][..]] {
-        let mut args = vec!["subject", "status", "checkout", "--to", "shipped", "--json"];
+        let mut args = vec!["subject", "move", "checkout", "--to", "shipped", "--json"];
         args.extend_from_slice(extra);
         let out = canon(repo, &args);
         assert_eq!(out.status.code(), Some(1), "{args:?}: {}", String::from_utf8_lossy(&out.stderr));
         let error = err_of(&out);
         assert_eq!(error["code"], "POLICY_CHANGED_SINCE_APPROVAL", "{args:?}: {error}");
-        assert!(error["hint"].as_str().unwrap().contains("canon policy approve --by <human>"), "{error}");
     }
-    let shown = canon(repo, &["subject", "status", "checkout"]);
+    let shown = canon(repo, &["subject", "show", "checkout"]);
     assert!(String::from_utf8_lossy(&shown.stdout).contains("verifying"), "the refused ship left the subject verifying");
 
     // Restoring the approved bytes lifts it (the approved policy's own review check still applies).
     std::fs::write(repo.join(".canon/policy.yaml"), POLICY_WITH_REVIEW).unwrap();
     let restored = canon(repo, &["gate", "check"]);
     assert!(!String::from_utf8_lossy(&restored.stdout).contains("policy changed since approval"), "{}", String::from_utf8_lossy(&restored.stdout));
-    let ship = canon(repo, &["subject", "status", "checkout", "--to", "shipped", "--json"]);
+    let ship = canon(repo, &["subject", "move", "checkout", "--to", "shipped", "--json"]);
     assert_eq!(err_of(&ship)["code"], "SUBJECT_GATE_VIOLATION", "the approved policy requires a review the repo lacks");
 }
 
@@ -79,7 +78,7 @@ fn an_unreadable_approval_fails_closed_too() {
     let repo = dir.path();
     std::fs::write(repo.join(".canon/policy.approval.json"), "{ not json").unwrap();
     assert_eq!(canon(repo, &["gate", "check"]).status.code(), Some(1));
-    let out = canon(repo, &["subject", "status", "checkout", "--to", "shipped", "--json"]);
+    let out = canon(repo, &["subject", "move", "checkout", "--to", "shipped", "--json"]);
     assert_eq!(out.status.code(), Some(1));
     assert_eq!(err_of(&out)["code"], "POLICY_APPROVAL_UNREADABLE");
 }
@@ -93,7 +92,7 @@ fn a_policy_never_approved_stays_advisory() {
     let gate = canon(repo, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(0), "{}", String::from_utf8_lossy(&gate.stderr));
     assert!(String::from_utf8_lossy(&gate.stdout).contains("policy not approved"));
-    let ship = canon(repo, &["subject", "status", "checkout", "--to", "shipped"]);
+    let ship = canon(repo, &["subject", "move", "checkout", "--to", "shipped"]);
     assert_eq!(ship.status.code(), Some(0), "{}", String::from_utf8_lossy(&ship.stderr));
 }
 

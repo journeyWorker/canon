@@ -1,5 +1,5 @@
 canon init: wrote ./canon.yaml
-canon init: wrote ./.canon/policy.yaml — a human reviews it and approves it with `canon policy approve --by <who>`: the gate grades the work against it, and `canon status` and `canon gate check` say so until it is approved
+canon init: wrote ./.canon/policy.yaml — a human reviews it and approves it with `canon policy approve --approver <who>`: the gate grades the work against it, and `canon status` and `canon gate check` say so until it is approved
 canon init: wrote the canon block in ./AGENTS.md
 canon init: skills.providers is [] — no canon skill installed; change it with `canon skills install --providers=<list>`
 next: canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> — no subject exists yet; a subject is the unit status, review and shipping track

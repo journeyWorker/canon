@@ -3,50 +3,7 @@
 use canon_model::{ChangeId, RoleId, ScenarioId};
 use clap::{Args, Subcommand};
 use crate::finding::CommitArg;
-use std::path::PathBuf;
 use super::PromoteArgs;
-
-/// The flags of `context-pack new`.
-#[derive(clap::Args)]
-pub struct ContextPackNewArgs {
-    /// Repository-relative input manifest
-    #[arg(long)]
-    pub manifest: PathBuf,
-    #[command(flatten)]
-    pub repo: crate::cli::RepoArgs,
-    /// Output the complete pack manifest as JSON
-    #[arg(long)]
-    pub json: bool,
-}
-
-/// The flags of `prompt add`.
-#[derive(clap::Args)]
-pub struct PromptAddArgs {
-    /// Bundle name
-    #[arg(long)]
-    pub name: String,
-    /// Bundle version
-    #[arg(long)]
-    pub version: String,
-    /// Repository-relative input manifest
-    #[arg(long)]
-    pub manifest: PathBuf,
-    #[command(flatten)]
-    pub repo: crate::cli::RepoArgs,
-    /// Output the complete bundle manifest as JSON
-    #[arg(long)]
-    pub json: bool,
-}
-
-/// The flags of `demo add`.
-#[derive(clap::Args)]
-pub struct DemoAddArgs {
-    #[command(flatten)]
-    pub repo: crate::cli::RepoArgs,
-    /// Output JSON instead of the human-readable form
-    #[arg(long)]
-    pub json: bool,
-}
 
 #[derive(Subcommand)]
 pub enum FindingCommand {
@@ -77,9 +34,9 @@ pub struct FindingAddArgs {
     /// open / fixed / rejected / deferred (fixed requires --resolution-sha, and only fixed may carry one)
     #[arg(long, default_value = "open", value_parser = crate::finding::disposition_parser())]
     pub disposition: canon_model::FindingDisposition,
-    /// Who raised it (line breaks refused)
+    /// The reviewer who raised it, recorded as the finding's reviewer and author (line breaks refused)
     #[arg(long)]
-    pub reviewer: String,
+    pub actor_id: String,
     /// One line of what the finding IS, in the reviewer's own words. NEVER checked against the code (line breaks refused)
     #[arg(long)]
     pub summary: String,
@@ -98,9 +55,6 @@ pub struct FindingAddArgs {
     /// A scenario this finding is about (repeatable). After a `fixed` close, fresh evidence for these scenarios alone re-verifies the fix; with none named, every evidenced scenario of the subject does. Each must be a scenario the index knows; a close inherits the list
     #[arg(long = "scenario-id", value_parser = crate::review::parse_scenario_id)]
     pub scenario_ids: Vec<ScenarioId>,
-    /// The authoring actor's id (recorded as the record's author; line breaks refused)
-    #[arg(long, default_value = "canon")]
-    pub actor_id: String,
     /// Attribution only — unlike `canon evidence add`, no partition key derives from it
     #[arg(long, default_value = "reviewer", value_parser = crate::retrieve::parse_role)]
     pub role: RoleId,
@@ -170,6 +124,6 @@ pub struct FindingListArgs {
     #[command(flatten)]
     pub page: crate::paging::PageFlags,
     /// With --json, keep only these finding fields (comma-separated): round, seq, severity, disposition, reviewer, summary, resolution_sha, file_ref
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
     pub fields: Option<Vec<String>>,
 }

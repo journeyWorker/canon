@@ -1,2 +1,2 @@
-canon divergence add: UNKNOWN_SPEC_ROOT — `--project-id root` names no spec root configured in canon.yaml (`specs.roots[]`: game); nothing was written
-hint: the only spec root canon.yaml configures is `game`; pass `--project-id game`
+canon divergence add: USAGE — --status was removed in 0.28.0
+hint: --status was removed in 0.28.0; use `--state`

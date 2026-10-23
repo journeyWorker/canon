@@ -90,7 +90,6 @@ fn accept(repo: &Path, overrides: &[(&str, &str)]) -> Output {
         ("--project-id", "demo"),
         ("--reason", "the engine drops the event"),
         ("--tracking", TRACKING),
-        ("--reviewer", "reviewer-2"),
         ("--role", "reviewer"),
         ("--actor-id", "reviewer-2"),
         ("--session-id", "review-session"),
@@ -115,7 +114,7 @@ fn accept(repo: &Path, overrides: &[(&str, &str)]) -> Output {
 }
 
 fn ship(repo: &Path) -> Output {
-    canon(repo, &["subject", "status", "demo-subject", "--to", "shipped"])
+    canon(repo, &["subject", "move", "demo-subject", "--to", "shipped"])
 }
 
 fn accepted_line(expires: &str) -> String {
@@ -126,7 +125,7 @@ fn accepted_line(expires: &str) -> String {
 #[test]
 fn a_divergent_verdict_blocks_shipping_and_the_hint_names_both_ways_out() {
     let dir = repo();
-    let json = canon(dir.path(), &["subject", "status", "demo-subject", "--to", "shipped", "--json"]);
+    let json = canon(dir.path(), &["subject", "move", "demo-subject", "--to", "shipped", "--json"]);
     assert_eq!(json.status.code(), Some(1), "{}", out(&json));
     let body: Value = serde_json::from_slice(&json.stdout).expect("JSON error on stdout");
     assert_eq!(body["error"]["code"], "SUBJECT_GATE_VIOLATION");
@@ -186,9 +185,6 @@ fn acceptance_from_the_evidence_actor_or_session_is_refused() {
     assert_eq!(same_actor.status.code(), Some(2), "{}", out(&same_actor));
     assert!(out(&same_actor).contains("`impl-agent` attested"), "{}", out(&same_actor));
 
-    let same_reviewer = accept(repo, &[("--reviewer", "impl-agent")]);
-    assert_eq!(same_reviewer.status.code(), Some(2), "{}", out(&same_reviewer));
-
     assert_eq!(ship(repo).status.code(), Some(1), "nothing was accepted, so the gap still blocks");
 }
 
@@ -238,14 +234,14 @@ fn refusals_name_the_missing_condition_and_a_batch_writes_nothing() {
     assert_eq!(empty.status.code(), Some(2), "{}", out(&empty));
     assert!(out(&empty).contains("--tracking is empty"), "{}", out(&empty));
 
-    let implementer = canon(repo, &["divergence", "accept", SCENARIO, "--project-id", "demo", "--reason", "r", "--tracking", TRACKING, "--reviewer", "r2", "--role", "implementer"]);
+    let implementer = canon(repo, &["divergence", "accept", SCENARIO, "--project-id", "demo", "--reason", "r", "--tracking", TRACKING, "--actor-id", "r2", "--role", "implementer"]);
     assert_eq!(implementer.status.code(), Some(2), "{}", out(&implementer));
     assert!(out(&implementer).contains("reviewer step"), "{}", out(&implementer));
 
     let unknown = accept(repo, &[("--scenario-id", "world.demo.99")]);
     assert_eq!(unknown.status.code(), Some(2), "{}", out(&unknown));
     assert!(out(&unknown).contains("world.demo.99"), "{}", out(&unknown));
-    assert!(out(&canon(repo, &["divergence", "status"])).contains("accepted=0"), "the unknown scenario refused the whole batch");
+    assert!(out(&canon(repo, &["divergence", "list"])).contains("accepted=0"), "the unknown scenario refused the whole batch");
 
     attest(repo, EvidenceVerdict::Faithful);
     let faithful = accept(repo, &[]);
@@ -258,7 +254,7 @@ fn refusals_name_the_missing_condition_and_a_batch_writes_nothing() {
 fn divergence_status_counts_the_acceptance() {
     let dir = repo();
     assert!(accept(dir.path(), &[("--expiry", "2999-01-01")]).status.success());
-    let status = canon(dir.path(), &["divergence", "status", "--json"]);
+    let status = canon(dir.path(), &["divergence", "list", "--json"]);
     let body: Value = serde_json::from_slice(&status.stdout).unwrap();
     assert_eq!(body["data"]["summary"]["accepted"], 1, "{body}");
     assert_eq!(body["data"]["scenarios"][0]["state"], "accepted", "{body}");

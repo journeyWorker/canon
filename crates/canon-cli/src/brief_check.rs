@@ -657,7 +657,7 @@ fn chore_rules(out: &mut Out, secs: &[Section]) {
             Some(&section.key),
             section.marker_line,
             format!("a chore brief has no `{}` section", section.key),
-            "a chore adds no flow, detail or acceptance; work that changes behavior is a feature change (`canon change new` without `--kind chore`)".to_string(),
+            "a chore adds no flow, detail or acceptance; work that changes behavior is a feature change (`canon change new` without `--change-kind chore`)".to_string(),
         );
     }
     if let Some(category) = secs.iter().find(|s| s.key == "category") {
@@ -1803,10 +1803,10 @@ pub fn check(repo: &Path, requested: Option<&ChangeId>) -> Result<Checked, CliEr
 /// Judges `text`, the brief of `change` read from `path`: [`check`] for a
 /// caller that has already read the file and must judge those same bytes.
 pub fn check_text(repo: &Path, change: ChangeId, path: &Path, text: &str) -> Result<Checked, CliError> {
-    let resolved = crate::language::for_brief(repo, text).map_err(|e| CliError::failed("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again"))?;
+    let resolved = crate::language::for_brief(repo, text).map_err(|e| CliError::failed("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again"))?;
     let phase = phase_of(repo, &change, text);
     let flows = match phase {
-        Phase::Building if !is_chore(text) => Some(flow_scenarios(repo, &change).map_err(|e| CliError::failed("SPEC_ROOTS_UNREADABLE", format!("cannot read the scenarios the flow steps point at: {e}")).hint("fix `specs.roots` in canon.yaml (`canon init --check-config` reports what is wrong), then run the command again"))?),
+        Phase::Building if !is_chore(text) => Some(flow_scenarios(repo, &change).map_err(|e| CliError::failed("SPEC_ROOTS_UNREADABLE", format!("cannot read the scenarios the flow steps point at: {e}")).hint("fix `specs.roots` in canon.yaml (`canon init --check` reports what is wrong), then run the command again"))?),
         _ => None,
     };
     let evaluation = evaluate(text, &resolved, flows.as_ref());
@@ -2016,7 +2016,7 @@ fn approve_step(ev: &Evaluation, fresh: &str) -> Step {
     let why = if matches!(ev.approval, crate::brief::Approval::Changed { .. }) {
         format!("the brief changed after its approval ({}); the human answers the changed brief and `canon brief approve` records it", crate::brief::CHANGED_CODE)
     } else {
-        format!("{fresh}; `canon brief approve --by <the human> --note \"<their words>\"` records it")
+        format!("{fresh}; `canon brief approve --approver <the human> --note \"<their words>\"` records it")
     };
     Step { step: "approve", why }
 }

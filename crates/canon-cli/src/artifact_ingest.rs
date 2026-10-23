@@ -190,7 +190,7 @@
 //! still disagree about them.
 //!
 //! Deleting on the derivation key alone would therefore destroy real
-//! evidence, not an old rendering. `canon learn promote` reads exactly
+//! evidence, not an old rendering. `canon strategy promote` reads exactly
 //! these fields off `query_by_regime_key`'s rows — `OccurrencePromotionGate`
 //! folds `verdict_record.outcome` (one `Failure` resets its success
 //! streak) and `CrnPromotionGate` folds `verdict_record.reward` — so
@@ -486,7 +486,7 @@ pub struct ArtifactAdapterSummary {
     pub unavailable_reason: Option<String>,
 }
 
-/// One regime-keyed trajectory this pass persisted.
+/// One regime showed trajectory this pass persisted.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistedTrajectory {
@@ -509,7 +509,7 @@ pub struct PersistedTrajectory {
 /// finding 1.
 ///
 /// A report, never a resolution. Both rows stay exactly as they are, so
-/// `canon learn promote` keeps reading the contradiction off
+/// `canon strategy promote` keeps reading the contradiction off
 /// `query_by_regime_key` — which is the whole point: the alternative
 /// this replaced silently deleted the loser and changed what the gate
 /// saw.
@@ -581,7 +581,7 @@ pub struct ArtifactIngestOutcome {
     /// every ordinary upgrade: the losing copies a pre-s38 pass appended
     /// were never marked and never attributed, so they claim nothing.
     /// A non-empty entry means two stored rows disagree about a fact
-    /// `canon learn promote` reads (module doc), and the disagreement is
+    /// `canon strategy promote` reads (module doc), and the disagreement is
     /// STANDING — it is re-reported every pass until an operator removes
     /// the row they judge wrong, because this driver will not pick for
     /// them.
@@ -1184,7 +1184,7 @@ fn trajectory_derivation_key(regime_key: &RegimeKey, verdicts: &[VerdictRow]) ->
     content_digest(&serde_json::json!({"regime_key": regime_key.as_str(), "verdicts": verdict_rows_json(verdicts)}))
 }
 
-/// The FULL identity of one regime-keyed trajectory — the identity
+/// The FULL identity of one regime showed trajectory — the identity
 /// shape version, `regime_key`, the ordered `VerdictRow` contents, and
 /// the RENDERED `task`/`context` — reusing the SAME [`content_digest`]
 /// primitive [`regime_hash`] already uses (not a new hashing scheme).
@@ -2512,7 +2512,7 @@ pub fn run(repo: &Path, run_id: Option<&RunId>) -> Result<ArtifactIngestOutcome,
     let mut trajectories_skipped_unregistered_role = 0usize;
     let mut trajectories_skipped_duplicate = 0usize;
     let mut trajectories_converged_deleted = 0usize;
-    // `by_regime` is a `BTreeMap`, so this accumulates in regime-key
+    // `by_regime` is a `BTreeMap`, so this accumulates in regime show
     // order, and each regime's own contribution is already sorted by the
     // kept row's id (`plan_raw_convergence`) — the whole list is
     // data-ordered, and two passes over one unchanged store print
@@ -2694,7 +2694,7 @@ pub fn format_json(outcome: &ArtifactIngestOutcome) -> String {
 /// 7.4). Wraps this driver's pure write-identity invariants —
 /// `regime_hash` (12-hex, deterministic, sensitive to the whole
 /// `event_identity` including its project half) and
-/// `trajectory_content_digest` (deterministic, regime-key-sensitive,
+/// `trajectory_content_digest` (deterministic, regime show-sensitive,
 /// verdict-content-and-order-sensitive, and rendered-text-sensitive) —
 /// as in-memory checks over synthetic keys/verdicts. No filesystem or
 /// network read, side-effect-free against the real repo.
@@ -2742,7 +2742,7 @@ pub fn selftest() -> Result<usize, Vec<String>> {
     {
         passed += 1;
     } else {
-        failures.push("trajectory-digest-determinism: not deterministic or not regime-key-sensitive".to_string());
+        failures.push("trajectory-digest-determinism: not deterministic or not regime show-sensitive".to_string());
     }
 
     let content_differs = trajectory_content_digest(&key, &guard, "t", "c") != trajectory_content_digest(&key, &strat, "t", "c");
@@ -4351,7 +4351,7 @@ mod tests {
         // BLOCKER regression (s42 re-review, `ReviewRuns` finding 1).
         // `verdict_record` is written back AFTER derivation, so two rows
         // sharing a derivation key can carry OPPOSITE outcomes. Deleting
-        // the loser removed the contradiction `canon learn promote`
+        // the loser removed the contradiction `canon strategy promote`
         // refuses on — `OccurrencePromotionGate` resets its success
         // streak on one `Failure` — turning a refusal into a promotion.
         let dir = tempfile::tempdir().unwrap();

@@ -53,7 +53,7 @@
 //! its transcript. Neither is verification.
 //!
 //! # A defect the author found in its own work
-//! Record it like any other: `--reviewer` and `--actor-id` name the
+//! Record it like any other: `--actor-id` and `--actor-id` name the
 //! author itself. Nothing refuses a finding whose reviewer is also the
 //! change's implementer or evidence actor, and none should: hiding a
 //! defect because nobody else saw it is exactly how a review round looks
@@ -61,7 +61,7 @@
 //! `require_review.block_on_findings` like one a reviewer raised.
 //! `--introduced-by` is not where "the author found it" goes: it names
 //! the commit that introduced the defect, so `--introduced-by self` is
-//! refused with a pointer to `--reviewer`.
+//! refused with a pointer to `--actor-id`.
 //!
 //! # `--introduced-by` must be SOURCED, and unset is the CORRECT answer
 //! This is the decision the CLI is where a user makes, so it is where
@@ -202,7 +202,7 @@
 //! JSON, and one such loop read the wrong file.
 //!
 //! # Line breaks are refused, not escaped
-//! `--summary`, `--reviewer`, `--file-ref` and `--actor-id` are the
+//! `--summary`, `--actor-id`, `--file-ref` and `--actor-id` are the
 //! free-text fields of this record — the ones with no grammar
 //! constraining them — and they are what a rendered finding row is
 //! built from. A row is ONE line, so a line separator in any of them
@@ -422,7 +422,7 @@ pub fn parse_commit(s: &str) -> Result<CommitArg, String> {
 /// is refused with a pointer to the flag that records who found it.
 pub fn parse_introduced_by(s: &str) -> Result<CommitArg, String> {
     if s == "self" {
-        return Err("--introduced-by names the COMMIT that introduced the defect, not who found it; to record a defect you found in your own work, set --reviewer (and --actor-id) to your own id, and leave --introduced-by unset unless that commit is sourced".to_string());
+        return Err("--introduced-by names the COMMIT that introduced the defect, not who found it; to record a defect you found in your own work, set --actor-id (and --actor-id) to your own id, and leave --introduced-by unset unless that commit is sourced".to_string());
     }
     parse_commit(s)
 }
@@ -528,7 +528,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon finding add", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding add", args.json);
         }
     };
 
@@ -538,7 +538,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
         )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").emit("canon finding add", args.json);
     }
 
-    for (flag, value) in [("--reviewer", args.reviewer.as_str()), ("--summary", args.summary.as_str())] {
+    for (flag, value) in [("--actor-id", args.reviewer.as_str()), ("--summary", args.summary.as_str())] {
         if value.trim().is_empty() {
             return CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} must be non-empty; a finding with no {} is a row that records nothing", &flag[2..])).hint("`canon schema finding add` lists the accepted arguments and their forms").emit("canon finding add", args.json);
         }
@@ -552,7 +552,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     // safe to put in a row.
     for (flag, value) in [
         ("--summary", Some(args.summary.as_str())),
-        ("--reviewer", Some(args.reviewer.as_str())),
+        ("--actor-id", Some(args.reviewer.as_str())),
         ("--file-ref", args.file_ref.as_deref()),
         ("--actor-id", Some(args.actor_id.as_str())),
     ] {
@@ -642,7 +642,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon finding add", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding add", args.json);
         }
     };
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
@@ -776,7 +776,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon finding close", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding close", args.json);
         }
     };
 
@@ -835,7 +835,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon finding close", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding close", args.json);
         }
     };
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
@@ -1025,7 +1025,7 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon finding list", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding list", args.json);
         }
     };
     let read = current_findings(&GitTier::new(&ledger_root), &args.change_id)
@@ -1217,7 +1217,7 @@ fn occupied_by(natural_key: &str, staging: &GitTier, committed: &GitTier) -> Res
 /// be evidenced. Matched by id across spec roots, as the finding keys it.
 fn check_scenarios_exist(repo: &Path, ids: &[ScenarioId]) -> Result<(), CliError> {
     let unreadable = |e: String| {
-        CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again")
+        CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again")
     };
     let ctx = GateCtx::from_repo(repo).map_err(|e| unreadable(e.to_string()))?;
     let context = canon_gate::GateContext::load(ctx, &canon_policy::SchemaRegistry::load(), Utc::now()).map_err(|e| unreadable(e.to_string()))?;

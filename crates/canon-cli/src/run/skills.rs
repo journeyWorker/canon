@@ -6,9 +6,9 @@ use std::process::ExitCode;
 
 pub fn run(cmd: SkillsCommand) -> ExitCode {
     match cmd {
-        SkillsCommand::Install(SkillsInstallArgs { source, repo, providers, json }) => run_skills_install(source.as_deref(), &repo, providers.as_deref(), json),
-        SkillsCommand::Check(SkillsCheckArgs { source, repo, providers, json }) => run_skills_check(source.as_deref(), &repo, providers.as_deref(), json),
-        SkillsCommand::Doctor(SkillsDoctorArgs { source, repo, providers, json }) => run_skills_doctor(source.as_deref(), &repo, providers.as_deref(), json),
+        SkillsCommand::Install(SkillsInstallArgs { skills_source, repo, providers, json }) => run_skills_install(skills_source.as_deref(), &repo, providers.as_deref(), json),
+        SkillsCommand::Check(SkillsCheckArgs { skills_source, repo, providers, json }) => run_skills_check(skills_source.as_deref(), &repo, providers.as_deref(), json),
+        SkillsCommand::Doctor(SkillsDoctorArgs { skills_source, repo, providers, json }) => run_skills_doctor(skills_source.as_deref(), &repo, providers.as_deref(), json),
     }
 }
 

@@ -12,7 +12,7 @@ import { renderTable, type ColumnDef } from "../render-table";
 // of RAW `Divergence.status` events, so the running column is a running
 // `opened - resolved` EVENT count — a divergence opened and resolved on
 // different days moves it twice, and nothing re-reads the divergence's
-// state today. `canon divergence status` is the current-state surface.
+// state today. `canon divergence list` is the current-state surface.
 // The markdown report's Review burn-down panel
 // (`crates/canon-report/src/render.rs`) already carries that caveat;
 // this surface reads the same mart and now carries it too.
@@ -36,7 +36,7 @@ const QUERY = `
  * DOES answer "what is open now".
  */
 export const NOTE =
-  "A per-day trend over raw `Divergence.status` events, so `divergence_open_running_total` is a running `opened - resolved` event count, NOT the number open now. For current state per scenario, run `canon divergence status`.";
+  "A per-day trend over raw `Divergence.status` events, so `divergence_open_running_total` is a running `opened - resolved` event count, NOT the number open now. For current state per scenario, run `canon divergence list`.";
 
 export const COLUMNS: ColumnDef[] = [
   { key: "day", label: "Day" },
@@ -57,7 +57,7 @@ export const COLUMNS: ColumnDef[] = [
     key: "divergence_open_running_total",
     label: "Running opened − resolved (event count)",
     description:
-      "Running sum of (opened - resolved) over raw Divergence.status events, oldest day through this one. NOT the number open now: run `canon divergence status` for current state per scenario.",
+      "Running sum of (opened - resolved) over raw Divergence.status events, oldest day through this one. NOT the number open now: run `canon divergence list` for current state per scenario.",
   },
 ];
 

@@ -46,14 +46,15 @@ fn scratch_repo() -> TempDir {
 /// The value a required argument gets: by command first, then by name.
 fn value_for(command: &str, name: &str, regime: &str) -> String {
     let by_command: BTreeMap<(&str, &str), &str> = BTreeMap::from([
-        (("evidence add", "kind"), "test-run"),
-        (("export", "kind"), "evidence"),
+                (("export", "kind"), "evidence"),
         (("query", "kind"), "evidence"),
         (("purge", "kind"), "evidence"),
         (("change new", "slug"), "another-change"),
-        (("dispatch end", "status"), "succeeded"),
+        (("dispatch end", "run-outcome"), "succeeded"),
         (("subject new", "id"), "demo-two"),
-        (("subject status", "id"), "demo"),
+        (("subject show", "id"), "demo"),
+        (("subject move", "id"), "demo"),
+        (("subject move", "to"), "specced"),
         (("evidence audit", "audit-result"), "confirmed"),
         (("subject adopt", "subject-id"), "demo"),
         (("subject unadopt", "subject-id"), "demo"),
@@ -64,7 +65,7 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
     match name {
         "repo" => ".",
         "response" => "response.json",
-        "by" | "approval-by" | "principal" | "actor-id" | "reviewer" => "alice",
+        "approver" | "actor-id" => "alice",
         "note" | "summary" | "reason" | "title" | "name" => "text",
         "slug" | "change-id" | "change_id" => "add-login",
         "subject-id" => "demo",
@@ -108,9 +109,10 @@ fn extra_args(command: &str, scratch: &Path) -> Vec<String> {
         "init" => vec!["--repo".into(), path("fresh"), "--providers".into(), "none".into()],
         "demo init" => vec!["--repo".into(), path("demo")],
         // `--role` is optional in the schema (a declared role supplies it), but the sweep declares none.
-        "divergence accept" | "evidence add" | "evidence audit" | "review scenario" | "review change" => vec!["--role".into(), "reviewer".into()],
+        "divergence accept" | "divergence add" | "divergence defer" | "divergence resolve" | "dispatch begin" | "evidence audit" | "review scenario" | "review change" => vec!["--role".into(), "reviewer".into()],
+        "evidence add" => vec!["--role".into(), "reviewer".into(), "--class".into(), "test-run".into(), "--ref".into(), "npm test".into()],
         "ingest sessions" => vec!["--home".into(), path("home")],
-        "skills install" | "skills check" | "skills doctor" => vec!["--repo".into(), path("skills-target"), "--source".into(), path("no-skills-source")],
+        "skills install" | "skills check" | "skills doctor" => vec!["--repo".into(), path("skills-target"), "--skills-source".into(), path("no-skills-source")],
         _ => Vec::new(),
     }
 }
@@ -123,7 +125,7 @@ fn every_leaf_command_answers_json_with_one_document_and_a_coded_error() {
     let leaves: Vec<String> = listing["data"]["commands"].as_array().unwrap().iter().map(|c| c["command"].as_str().unwrap().to_string()).collect();
     assert!(leaves.len() > 60, "{leaves:?}");
 
-    let regime = String::from_utf8(run(repo.path(), &["regime-key", "--role", "reviewer", "--repo-name", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
+    let regime = String::from_utf8(run(repo.path(), &["regime", "show", "--role-segment", "reviewer", "--repo-name", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
     let registry: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
     let skipped: Vec<&str> = SKIPPED.iter().map(|(command, _)| *command).collect();
     let mut problems = Vec::new();

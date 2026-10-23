@@ -56,7 +56,7 @@ impl Gap {
     /// first scenario's own command (`evidence add` takes one scenario; the
     /// next follows once it is evidenced).
     pub fn command(&self) -> String {
-        let tail = "--report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --actor-id <unit> --session-id <session> --ref \"<test command>\"";
+        let tail = "--report <junit|cucumber|swift-testing>:<path> --class test-run --role implementer --actor-id <unit> --session-id <session> --ref \"<test command>\"";
         match self.scoped.then(|| self.scenarios.first()).flatten() {
             Some((project, id)) => format!("canon evidence add --project-id {project} --scenario-id {id} {tail}"),
             None => format!("canon evidence add --project-id {} --all-scenarios {tail}", self.project()),
@@ -226,7 +226,7 @@ pub fn hint(violations: &[&Violation]) -> Option<String> {
         return None;
     }
     if reverify.iter().all(|v| is_scoped_reverify(v)) {
-        return Some("record evidence again for the scenarios named, one command each: `canon evidence add --project-id <root> --scenario-id <id> --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" --actor-id <unit> --session-id <session>`; the rest of the suite needs nothing; reviews stay current while a scenario's verdict and checks are unchanged, then ship".to_string());
+        return Some("record evidence again for the scenarios named, one command each: `canon evidence add --project-id <root> --scenario-id <id> --report <junit|cucumber|swift-testing>:<path> --class test-run --role implementer --ref \"<test command>\" --actor-id <unit> --session-id <session>`; the rest of the suite needs nothing; reviews stay current while a scenario's verdict and checks are unchanged, then ship".to_string());
     }
-    Some("record the suite again for the scenarios named: `canon evidence add --project-id <root> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" --actor-id <unit> --session-id <session>`; reviews stay current while a scenario's verdict and checks are unchanged; a chore also needs its change-level review (`canon review change <slug>`), then ship".to_string())
+    Some("record the suite again for the scenarios named: `canon evidence add --project-id <root> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --class test-run --role implementer --ref \"<test command>\" --actor-id <unit> --session-id <session>`; reviews stay current while a scenario's verdict and checks are unchanged; a chore also needs its change-level review (`canon review change <slug>`), then ship".to_string())
 }
