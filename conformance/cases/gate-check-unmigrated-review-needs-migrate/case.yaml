@@ -6,7 +6,7 @@ steps:
     exit: 0
   - args: [migrate]
     exit: 0
-  - args: [migrate, --commit, --plan-digest, "5e5478780e8ad216d3616cc4c45c80d244690cded7bba5d4e373bda3c1fa942a"]
+  - args: [migrate, --commit, --plan-digest, "61d8c89680b1d127db0fea07155929be1bd0298690a1ad6a3fe49072223058b1"]
     exit: 0
   - args: [subject, move, cart, --to, verifying]
     exit: 0

@@ -209,7 +209,7 @@ impl Report for MigrateReport {}
 
 /// What `plan` and the ledger and review steps would do, as plan effects
 /// (`canon.yaml` is one `rewrite`; the files it moves are listed one by one).
-fn effects(repo: &Path, plan: &Plan, config_changes: bool, ledger: Vec<Effect>, pins: Option<&migrate_pins::Report>) -> Vec<Effect> {
+fn effects(repo: &Path, plan: &Plan, config_changes: bool, ledger: Vec<Effect>, pins: Option<&migrate_pins::Report>, index_changes: bool) -> Vec<Effect> {
     let mut out = Vec::new();
     for root in &plan.roots {
         if let Some(from) = &root.from {
@@ -243,8 +243,22 @@ fn effects(repo: &Path, plan: &Plan, config_changes: bool, ledger: Vec<Effect>, 
             out.push(Effect::record("pin", "reviews").detail(format!("{reviews} review(s), {} acceptance(s)", pins.acceptances)));
         }
     }
-    out.push(Effect::record("rebuild", "scenario index"));
+    if index_changes {
+        out.push(Effect::record("rebuild", "scenario index"));
+    }
     out
+}
+
+/// Whether the index rebuild has anything to do: the plan moves a spec root or
+/// a change (the rebuild then reads another corpus), or a full sync of the
+/// repo as it is now would write a record or find the corpus unclean. A
+/// repo that is migrated and indexed has nothing to rebuild.
+fn index_changes(repo: &Path, plan: &Plan) -> bool {
+    !plan.roots.is_empty()
+        || !plan.changes.is_empty()
+        || !plan.renames.is_empty()
+        || !plan.reimport.is_empty()
+        || crate::inventory::preview_sync(repo, None).map_or(true, |outcome| !outcome.is_clean() || outcome.total_written() > 0)
 }
 
 /// `canon migrate [--commit --plan-digest D]` (module doc). The bare run
@@ -279,7 +293,8 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> i32 {
         }
     }
 
-    print_plan(&repo, &plan, config != text, &mut log);
+    let index_changes = index_changes(&repo, &plan);
+    print_plan(&repo, &plan, config != text, index_changes, &mut log);
     // The read-only steps after the file moves: the compaction and the review pins.
     let ledger_lines = match crate::ledger::migrate_lines(&repo, true) {
         Ok(lines) => lines,
@@ -290,7 +305,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> i32 {
         Err(e) => return e.emit("canon migrate", json),
     };
     let pins = migrate_pins::run(&repo, false);
-    let safe_plan = safety::Plan::new(effects(&repo, &plan, config != text, ledger_effects, pins.as_ref().ok()));
+    let safe_plan = safety::Plan::new(effects(&repo, &plan, config != text, ledger_effects, pins.as_ref().ok(), index_changes));
     let commit = match safe_plan.gate(mode, &base) {
         Ok(commit) => commit,
         Err(e) => return e.emit("canon migrate", json),
@@ -976,10 +991,12 @@ fn rel(repo: &Path, path: &Path) -> String {
     path.strip_prefix(repo).unwrap_or(path).display().to_string()
 }
 
-fn print_plan(repo: &Path, plan: &Plan, config_changes: bool, log: &mut crate::json_out::Log) {
+fn print_plan(repo: &Path, plan: &Plan, config_changes: bool, index_changes: bool, log: &mut crate::json_out::Log) {
     if !plan.changes_files() && plan.left.is_empty() {
         log.line("canon migrate: nothing to migrate; the repo is on the 0.17 layout");
-        log.line("canon migrate: plan: rebuild the scenario index (full sync)");
+        if index_changes {
+            log.line("canon migrate: plan: rebuild the scenario index (full sync)");
+        }
         return;
     }
     log.line("canon migrate: plan:");
@@ -1034,7 +1051,9 @@ fn print_plan(repo: &Path, plan: &Plan, config_changes: bool, log: &mut crate::j
     if config_changes {
         log.line("  canon.yaml: every other byte kept");
     }
-    log.line("  rebuild the scenario index (full sync)");
+    if index_changes {
+        log.line("  rebuild the scenario index (full sync)");
+    }
     for left in &plan.left {
         log.line(format!("  left: {left}"));
     }

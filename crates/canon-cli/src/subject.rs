@@ -114,7 +114,7 @@ use canon_gate::review_gate::{
 use canon_gate::spec_coverage::{case_gaps, subject_change_ids, subject_scenarios};
 use canon_gate::{latest_verdicts, FailureClass, GateContext, GateCtx, LedgerEntry, PolicyResolution, RequireReview, SpecCoverage, Violation};
 use canon_model::{
-    Actor, Change, ChangeId, Envelope, EvidenceVerdict, RawRecord, RecordKind, Reopen, RoleId, StatusOverride, StatusReason, Subject, SubjectId,
+    Change, ChangeId, Envelope, EvidenceVerdict, RawRecord, RecordKind, Reopen, RoleId, StatusOverride, StatusReason, Subject, SubjectId,
     SubjectStatus, WaivedViolation,
 };
 use canon_policy::SchemaRegistry;
@@ -475,7 +475,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
         }
     }
 
-    let envelope = Envelope::new(1, RecordKind::Subject, Utc::now(), Actor::new(actor_id, owner_role.clone()));
+    let envelope = Envelope::new(1, RecordKind::Subject, Utc::now(), crate::role::attributed(actor_id, Some(owner_role)));
     let subject = Subject::new(envelope, subject_id.clone(), title, summary, domain, SubjectStatus::Proposed, owner_role.clone());
 
     match registry.persist(&subject) {
@@ -1050,7 +1050,7 @@ pub fn run_move(
         let waived: std::collections::BTreeSet<WaivedViolation> =
             waivable.iter().map(|v| WaivedViolation { class: v.class.as_str().to_string(), subject: v.subject.clone() }).collect();
         let count = waived.len();
-        subject.status_override = Some(StatusOverride { to: target, reason: reason.to_string(), waived: waived.into_iter().collect(), actor: Actor::new_unattributed(actor_id) });
+        subject.status_override = Some(StatusOverride { to: target, reason: reason.to_string(), waived: waived.into_iter().collect(), actor: crate::role::attributed(actor_id, None) });
         crate::warn_err!(
             "canon subject move: override recorded by `{actor_id}` for the {count} violation(s) above: {reason}; a gap that appears later is not covered"
         );
@@ -1067,10 +1067,10 @@ pub fn run_move(
             "canon subject move: reopened `{}` from shipped, recorded by `{actor_id}`: {reason}; {into}, then scenario, evidence and review; shipping again runs every guard",
             subject_id.as_str()
         );
-        subject.reopen = Some(Reopen { reason: reason.to_string(), change, actor: Actor::new_unattributed(actor_id) });
+        subject.reopen = Some(Reopen { reason: reason.to_string(), change, actor: crate::role::attributed(actor_id, None) });
     }
     if let Some(reason) = reason {
-        subject.status_reason = Some(StatusReason { reason: reason.to_string(), actor: Actor::new_unattributed(actor_id) });
+        subject.status_reason = Some(StatusReason { reason: reason.to_string(), actor: crate::role::attributed(actor_id, None) });
     }
 
     subject.status = target;
