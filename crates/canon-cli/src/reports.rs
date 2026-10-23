@@ -21,6 +21,19 @@ pub trait Report: serde::Serialize + JsonSchema {
     const SCHEMA_VERSION: &'static str = "1.0";
 }
 
+/// A refusal that `--override-reason` waived (0.28 D12): the error code the
+/// command would have refused with, and the reason given. Listed in
+/// `data.overrides[]` of every command that accepts the option, and recorded
+/// on the record the waiver let through.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Override {
+    /// The code of the waived refusal (`BRIEF_UNAPPROVED`, `SUBJECT_GATE_VIOLATION`, …).
+    pub code: String,
+    /// The reason the caller gave, verbatim.
+    pub reason: String,
+}
+
 /// One typed report in the generated spec.
 #[derive(Debug, Clone)]
 pub struct ReportSchema {
@@ -106,7 +119,7 @@ pub fn report_schemas() -> Vec<ReportSchema> {
         entry::<status::StatusReport>("status", "StatusReport"),
         entry::<subject::SubjectReport<'static>>("subject adopt", "SubjectAdoptReport"),
         entry::<subject::SubjectReport<'static>>("subject new", "SubjectNewReport"),
-        entry::<subject::SubjectReport<'static>>("subject move", "SubjectMoveReport"),
+        entry::<subject::SubjectMoveReport<'static>>("subject move", "SubjectMoveReport"),
         entry::<subject::SubjectReport<'static>>("subject show", "SubjectShowReport"),
         entry::<subject::SubjectReport<'static>>("subject unadopt", "SubjectUnadoptReport"),
         entry::<crate::dashboard::DashboardReport>("dashboard", "DashboardReport"),

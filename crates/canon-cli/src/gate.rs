@@ -166,6 +166,9 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
         }
     };
 
+    // The code as it stands (D7b): the staleness check compares each record's code tree with it, not commits.
+    gate_context.code_tree = crate::git_rev::code_tree(&repo, None).ok().map(|c| c.tree);
+
     // A stale scenario index is graded as the refresh would leave it, in memory: a read command writes nothing.
     crate::inventory::overlay_stale_index(&mut gate_context);
     let checks = canon_gate::check_set(release);

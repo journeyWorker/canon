@@ -56,6 +56,8 @@ fn repo_with_scenario() -> tempfile::TempDir {
     git(dir.path(), &["init", "-q"]);
     ok(dir.path(), &["init", "--repo", ".", "--no-policy", "--providers", "none"]);
     ok(dir.path(), &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure"]);
+    git(dir.path(), &["add", "-A"]);
+    git(dir.path(), &["commit", "-q", "-m", "seed"]);
     dir
 }
 
@@ -102,8 +104,7 @@ fn the_new_forms_run_without_any_deprecation_marker() {
     ok(dir.path(), &["prompt", "add", "reviewer@v2", "--manifest", "manifest.json", "--json"]);
 
     let scenario = repo_with_scenario();
-    let sha = "a".repeat(40);
-    ok(scenario.path(), &["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--round", "2", "--actor-id", "r", "--role", "reviewer", "--json"]);
+    ok(scenario.path(), &["divergence", "add", "game.run.01", "--project-id", "root", "--round", "2", "--actor-id", "r", "--role", "reviewer", "--json"]);
 
     let tmp = tempfile::tempdir().unwrap();
     let demo = tmp.path().join("demo");

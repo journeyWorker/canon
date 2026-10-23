@@ -50,6 +50,13 @@
         }
       ]
     },
+    "code_tree": {
+      "description": "The git tree id of the code the writing command saw (0.28 D7b):\nthe working tree for the default `HEAD`, the commit's own code for\nan explicit rev; `.canon/`, spec roots and `code.exclude` are not\npart of it. Absent on a record written before 0.28.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "evidence_sha": {
       "anyOf": [
         {
@@ -147,6 +154,13 @@
     },
     "verdict": {
       "$ref": "#/$defs/EvidenceVerdict"
+    },
+    "worktree_dirty": {
+      "description": "Whether the working tree's code differed from `HEAD`'s when this was\nwritten (0.28 D7b). Absent on a record written before 0.28.",
+      "type": [
+        "boolean",
+        "null"
+      ]
     }
   },
   "required": [

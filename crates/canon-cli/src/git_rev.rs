@@ -40,7 +40,8 @@ pub struct CodeTree {
 const DEFAULT_EXCLUDE: [&str; 2] = ["docs/**", "*.md"];
 const NO_COMMIT_HINT: &str = "run the command inside a git work tree that has at least one commit (`git init` and `git commit`)";
 
-fn no_commit(message: impl Into<String>) -> CliError {
+/// The `NO_COMMIT` refusal with its hint.
+pub fn no_commit(message: impl Into<String>) -> CliError {
     CliError::refused("NO_COMMIT", message).hint(NO_COMMIT_HINT)
 }
 
@@ -73,6 +74,36 @@ fn text(out: std::process::Output) -> String {
 pub fn resolve_rev(repo: &Path, rev: &str) -> Result<String, CliError> {
     let spec = format!("{rev}^{{commit}}");
     git(repo, None, &["rev-parse", "--verify", "--quiet", &spec], None).map(text).map_err(|why| no_commit(format!("`{rev}` names no commit in this directory{}", if why.is_empty() { String::new() } else { format!(": {why}") })))
+}
+
+/// The revision every commit option defaults to.
+pub const DEFAULT_REV: &str = "HEAD";
+
+/// What a record that is "about a commit" stores: the full sha of the
+/// revision and the code it saw.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Bound {
+    /// The full sha of the revision.
+    pub sha: canon_model::Sha,
+    /// The git tree id of the code the command saw.
+    pub code_tree: String,
+    /// The working tree's code differs from `HEAD`'s.
+    pub worktree_dirty: bool,
+}
+
+/// Resolve a commit option (`--rev`, `--resolution-rev`, `--introduced-rev`).
+///
+/// The default [`DEFAULT_REV`] stands for the working tree as it is now:
+/// `codeTree` is the working tree's, and `worktreeDirty` says whether it
+/// differs from `HEAD`. Any other value names a commit, whose own code tree is
+/// recorded (`worktreeDirty` false). Uncommitted code is recorded, never
+/// refused; outside a git work tree, in a repo with no commit, or for a
+/// revision git does not know the answer is `NO_COMMIT`.
+pub fn bind(repo: &Path, rev: &str) -> Result<Bound, CliError> {
+    let sha = resolve_rev(repo, rev)?;
+    let sha = canon_model::Sha::parse(&sha).map_err(|e| no_commit(format!("`{rev}` resolves to `{sha}`, which is not a 40-digit sha: {e}")))?;
+    let CodeTree { tree, dirty } = code_tree(repo, (rev != DEFAULT_REV).then_some(rev))?;
+    Ok(Bound { sha, code_tree: tree, worktree_dirty: dirty })
 }
 
 /// The `code.exclude` globs of `<repo>/canon.yaml` ([`DEFAULT_EXCLUDE`] when

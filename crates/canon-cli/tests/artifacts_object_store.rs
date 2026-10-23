@@ -105,6 +105,7 @@ fn new_repo(artifacts: Option<&str>) -> Repo {
     let repo = Repo { dir: tempfile::tempdir().unwrap(), store: tempfile::tempdir().unwrap() };
     assert!(Command::new("git").args(["init", "-q"]).current_dir(repo.path()).status().unwrap().success());
     repo.ok(&["init", "--repo", ".", "--no-policy"]);
+    commit_all(repo.path());
     let yaml = repo.canon_yaml();
     let marker = "  # cold:\n  #   backend: s3\n  #   bucket_env: CANON_R2_BUCKET\n  #   prefix: \"canon/\"\n";
     assert!(yaml.contains(marker), "the skeleton's commented cold tier moved:\n{yaml}");
@@ -391,4 +392,11 @@ fn check_config_reports_the_artifacts_block() {
     let out = bad.canon(&["init", "--check", "--repo", "."]);
     assert_eq!(out.status.code(), Some(2), "{}", text(&out));
     assert!(text(&out).contains("[FAIL] artifact_store:") && text(&out).contains("neither `local` nor the name of a tier"), "{}", text(&out));
+}
+
+/// Commit the fixture so revision-taking commands have a commit to bind.
+fn commit_all(repo: &std::path::Path) {
+    for args in [&["config", "user.name", "t"][..], &["config", "user.email", "t@example.com"], &["add", "-A"], &["commit", "-q", "-m", "x"]] {
+        assert!(std::process::Command::new("git").args(args).current_dir(repo).status().unwrap().success());
+    }
 }

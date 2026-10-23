@@ -1,0 +1,8 @@
+description: "`canon finding add --rev` resolves any git revision through git; one that names no commit in the repository is refused (exit 2, NO_COMMIT) and nothing is written, whether it looks like a short sha or a branch name"
+steps:
+  - args: [init, --no-agents-md, --no-policy]
+    exit: 0
+  - args: [finding, add, --change-id, c-cart, --round, "1", --seq, "1", --severity, note, --actor-id, impl-agent, --summary, a defect, --rev, abcdef0]
+    exit: 2
+  - args: [finding, add, --change-id, c-cart, --round, "1", --seq, "1", --severity, note, --actor-id, impl-agent, --summary, a defect, --rev, no-such-branch]
+    exit: 2

@@ -39,6 +39,7 @@ fn setup() -> tempfile::TempDir {
     let repo = dir.path();
     assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
+    commit_all(repo);
     dir
 }
 
@@ -409,5 +410,12 @@ fn evidence_audit_derives_the_verdict_from_the_result() {
         assert_eq!(rec["audit"]["evaluator_digest"], DIGEST, "{rec}");
         assert_eq!(rec["scenario_id"], "game.run.01", "{rec}");
         assert_eq!(rec["project_id"], "root", "{rec}");
+    }
+}
+
+/// Commit the fixture so revision-taking commands have a commit to bind.
+fn commit_all(repo: &std::path::Path) {
+    for args in [&["config", "user.name", "t"][..], &["config", "user.email", "t@example.com"], &["add", "-A"], &["commit", "-q", "-m", "x"]] {
+        assert!(std::process::Command::new("git").args(args).current_dir(repo).status().unwrap().success());
     }
 }

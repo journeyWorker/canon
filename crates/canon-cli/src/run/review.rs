@@ -18,7 +18,7 @@ fn run_review(command: &str, scenario_ids: Vec<ScenarioId>, change: Option<Chang
     let ReviewOptions {
         project_id,
         actor_id,
-        pin,
+        rev,
         upstream_ref,
         original_spec_ref,
         role,
@@ -49,7 +49,7 @@ fn run_review(command: &str, scenario_ids: Vec<ScenarioId>, change: Option<Chang
             scenario_ids,
             change,
             reviewer: actor_id.clone(),
-            pin,
+            rev: rev.rev,
             upstream_ref,
             original_spec_ref,
             actor_id,

@@ -241,7 +241,7 @@ pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclud
                 continue;
             }
             let names: Vec<&str> = holding.iter().map(|s| s.subject_id.as_str()).collect();
-            let violation = fixed_blocker_violation(&fixed, &names, &unmet.into_iter().collect::<Vec<_>>());
+            let violation = fixed_blocker_violation(ctx, &fixed, &names, &unmet.into_iter().collect::<Vec<_>>());
             let waived: Option<(&Subject, &StatusOverride)> = holding
                 .iter()
                 .map(|s| waiver_for(s.subject_id.as_str(), &violation).map(|w| (*s, w)))
@@ -280,7 +280,7 @@ pub fn subject_guard(ctx: &GateContext, require_review: &RequireReview, exclude_
         for fixed in fixed_blockers(ctx).into_iter().filter(|f| changes.contains(&f.finding.change_id)) {
             let unmet: Vec<(&str, &str)> = fixed.unmet(ctx, subject_id).into_iter().map(|s| (s.project_id.as_str(), s.scenario_id.as_str())).collect();
             if !unmet.is_empty() {
-                violations.push(fixed_blocker_violation(&fixed, &[subject_id.as_str()], &unmet));
+                violations.push(fixed_blocker_violation(ctx, &fixed, &[subject_id.as_str()], &unmet));
             }
         }
     }
@@ -544,7 +544,7 @@ fn open_blocker_violation(finding: &Finding, subjects: &[&str]) -> Violation {
         FailureClass::OpenBlocker,
         format!("{}#{}.{}", finding.change_id.as_str(), finding.round, finding.seq),
         format!(
-            "open blocker finding by `{}` on change `{}` (subject {subjects}): {}; fix it and `canon finding close --disposition fixed --resolution-sha <sha>`, or close it as rejected or deferred",
+            "open blocker finding by `{}` on change `{}` (subject {subjects}): {}; fix it and `canon finding close <change> --round <n> --seq <n> --disposition fixed`, or close it as rejected or deferred",
             finding.reviewer,
             finding.change_id.as_str(),
             finding.summary
@@ -593,16 +593,71 @@ pub fn fixed_blockers(ctx: &GateContext) -> Vec<FixedBlocker<'_>> {
         .collect()
 }
 
+/// The report files `scenario` of spec root `project` bound to its latest
+/// evidence, as `<format>:<path>` words (`junit:reports/a.xml`), sorted, each
+/// once. Empty when that evidence bound no report.
+fn latest_report_words(ctx: &GateContext, project: &str, scenario: &str) -> BTreeSet<String> {
+    let evidence: Vec<&canon_model::EvidenceRecord> = ctx
+        .evidence
+        .iter()
+        .filter(|e| e.scenario_id.as_ref().is_some_and(|id| id.as_str() == scenario) && e.project_id.as_ref().is_none_or(|p| p.as_str() == project))
+        .collect();
+    let Some(latest) = crate::freshness::latest_evidence(&evidence) else { return BTreeSet::new() };
+    latest
+        .attachments
+        .iter()
+        .filter_map(|a| {
+            let format = serde_json::to_value(a.format?).ok()?;
+            Some(format!("{}:{}", format.as_str()?, a.path))
+        })
+        .collect()
+}
+
+/// The ONE batch command that records the suite again (0.28 D11): `canon
+/// evidence add --all-scenarios` with a `--report` for every report file bound
+/// to the latest evidence of `scenarios` (`(project_id, scenario_id)` pairs),
+/// as the roles a re-verification runs under. Never a per-scenario loop.
+/// `--project-id` is added only when the repo has several spec roots
+/// (`multi_root`), where it is required, and then once per root that has
+/// evidenced scenarios: one command each, in root order. A root whose
+/// evidence bound no report has no command (the caller says to pass its
+/// `--report`s).
+pub fn batch_commands(ctx: &GateContext, scenarios: &[(&str, &str)], multi_root: bool) -> Vec<String> {
+    let mut roots: Vec<(&str, BTreeSet<String>)> = Vec::new();
+    for (project, scenario) in scenarios {
+        let words = latest_report_words(ctx, project, scenario);
+        match roots.iter_mut().find(|(p, _)| p == project) {
+            Some((_, all)) => all.extend(words),
+            None => roots.push((project, words)),
+        }
+    }
+    roots
+        .into_iter()
+        .filter(|(_, reports)| !reports.is_empty())
+        .map(|(project, reports)| {
+            let mut command = String::from("canon evidence add --all-scenarios");
+            if multi_root {
+                command.push_str(&format!(" --project-id {project}"));
+            }
+            for word in reports {
+                command.push_str(&format!(" --report {}", crate::audit::shell_quote(&word)));
+            }
+            command.push_str(" --role implementer");
+            command
+        })
+        .collect()
+}
+
 /// What a re-verification refusal says, ending in the command that
-/// clears it. `scenarios` are `(project_id, scenario_id)` pairs.
-pub fn reverify_remedy(scenarios: &[(&str, &str)]) -> String {
-    let mut projects: Vec<&str> = scenarios.iter().map(|(project, _)| *project).collect();
-    projects.dedup();
-    let project = projects.first().copied().unwrap_or("<root>");
-    let more = if projects.len() > 1 { format!(" (once per spec root: {})", projects.join(", ")) } else { String::new() };
-    format!(
-        "record the evidence again with `canon evidence add --project-id {project} --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" …`{more}; a scenario review stays current when the verdict and the checks are the same, and a changed verdict or check stales it"
-    )
+/// clears it ([`batch_commands`]). `scenarios` are `(project_id, scenario_id)` pairs.
+pub fn reverify_remedy(ctx: &GateContext, scenarios: &[(&str, &str)], multi_root: bool) -> String {
+    let commands = batch_commands(ctx, scenarios, multi_root);
+    let how = match commands.as_slice() {
+        [] => "record the evidence again with `canon evidence add --all-scenarios` and one --report for each test report of the suite (junit:, cucumber: or swift-testing: followed by its path; add --project-id when the repo has several spec roots)".to_string(),
+        [one] => format!("record the evidence again with `{one}`"),
+        many => format!("record the evidence again, once per spec root: {}", many.iter().map(|c| format!("`{c}`")).collect::<Vec<_>>().join("; ")),
+    };
+    format!("{how}; a scenario review stays current when the verdict and the checks are the same, and a changed verdict or check stales it")
 }
 
 /// The re-verification remedy of a finding that names its scenarios: the
@@ -624,7 +679,7 @@ pub fn scoped_reverify_remedy(scenarios: &[(&str, &str)]) -> String {
         .iter()
         .map(|(project, ids)| {
             let ids = ids.iter().map(|id| format!("`{id}`")).collect::<Vec<_>>().join(", ");
-            format!("`canon evidence add --project-id {project} --scenario-id <id> --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" …` for each of {ids}")
+            format!("`canon evidence add --project-id {project} --scenario-id <id> --report <junit|cucumber|swift-testing>:<path> --role implementer` for each of {ids}")
         })
         .collect::<Vec<_>>()
         .join("; and ");
@@ -640,6 +695,12 @@ pub fn reverify_scenarios(scenarios: &[(&str, &str)]) -> String {
         0 => shown,
         more => format!("{shown}, … {more} more"),
     }
+}
+
+/// How many spec roots the indexed scenarios come from: the gate does not read
+/// `canon.yaml`, so this stands in for "the repo has several spec roots".
+fn distinct_projects(ctx: &GateContext) -> usize {
+    ctx.scenarios.iter().map(|s| s.project_id.as_str()).collect::<BTreeSet<_>>().len()
 }
 
 /// Whether `violation` is a re-verification refusal ([`reverify_remedy`]),
@@ -658,7 +719,7 @@ const SCOPED_MARK: &str = "the scenarios the finding names";
 
 const REVERIFY_MARK: &str = "no evidence recorded after";
 
-fn fixed_blocker_violation(fixed: &FixedBlocker<'_>, subjects: &[&str], unmet: &[(&str, &str)]) -> Violation {
+fn fixed_blocker_violation(ctx: &GateContext, fixed: &FixedBlocker<'_>, subjects: &[&str], unmet: &[(&str, &str)]) -> Violation {
     let finding = fixed.finding;
     let subjects = subjects.iter().map(|s| format!("`{s}`")).collect::<Vec<_>>().join(", ");
     Violation::new(
@@ -671,7 +732,7 @@ fn fixed_blocker_violation(fixed: &FixedBlocker<'_>, subjects: &[&str], unmet: &
             unmet.len(),
             reverify_scenarios(unmet),
             fixed.closed.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-            if fixed.is_scoped() { scoped_reverify_remedy(unmet) } else { reverify_remedy(unmet) }
+            if fixed.is_scoped() { scoped_reverify_remedy(unmet) } else { reverify_remedy(ctx, unmet, distinct_projects(ctx) > 1) }
         ),
     )
 }

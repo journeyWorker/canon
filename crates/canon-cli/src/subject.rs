@@ -300,6 +300,9 @@ fn report_subject_warning(
     if dry_run {
         // A preview marks itself: the subject as it would stand, plus `dryRun`.
         crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &SubjectPreviewReport { subject, dry_run: true }, crate::json_out::warnings_meta(warnings));
+    } else if verb == "move" {
+        let overrides = subject.status_override.iter().map(|waiver| crate::reports::Override { code: "SUBJECT_GATE_VIOLATION".to_string(), reason: waiver.reason.clone() }).collect();
+        crate::next::finish_with_meta(repo, "subject move", &scope, false, json, &SubjectMoveReport { subject, overrides }, crate::json_out::warnings_meta(warnings));
     } else {
         crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &SubjectReport(subject), crate::json_out::warnings_meta(warnings));
     }
@@ -311,6 +314,45 @@ fn report_subject_warning(
 pub struct SubjectReport<'a>(pub &'a Subject);
 
 impl crate::json_out::Report for SubjectReport<'_> {}
+
+/// One line per subject that stands in its status under a waiver (D12):
+/// who waived which refusals, when, and why. `canon status` lists them as
+/// warnings for the human; they never fail anything.
+pub fn override_lines(ctx: &GateContext) -> Vec<String> {
+    let mut lines: Vec<(chrono::DateTime<Utc>, String)> = canon_gate::spec_coverage::latest_subjects(ctx)
+        .into_iter()
+        .filter_map(|subject| {
+            let waiver = subject.status_override.as_ref().filter(|w| w.to == subject.status)?;
+            let waived = waiver.waived.iter().map(|w| format!("{} {}", w.class, w.subject)).collect::<Vec<_>>().join(", ");
+            Some((
+                subject.envelope.at,
+                format!(
+                    "subject {} was moved to {} by `{}` at {} past {} refusal(s) ({waived}) (override: {})",
+                    subject.subject_id.as_str(),
+                    status_str(subject.status),
+                    waiver.actor.agent_id,
+                    subject.envelope.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+                    waiver.waived.len(),
+                    waiver.reason
+                ),
+            ))
+        })
+        .collect();
+    lines.sort();
+    lines.into_iter().map(|(_, line)| line).collect()
+}
+
+/// `data` of `subject move`: the Subject record, plus the refusals `--override-reason` waived (D12).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SubjectMoveReport<'a> {
+    #[serde(flatten)]
+    pub subject: &'a Subject,
+    /// The refusals this move waived under `--override-reason`; empty when nothing was waived. The record's `status_override` lists each waived violation.
+    pub overrides: Vec<crate::reports::Override>,
+}
+
+impl crate::json_out::Report for SubjectMoveReport<'_> {}
 
 /// `data` of a subject leaf under `--dry-run`: the Subject as it would stand, plus `dryRun`.
 #[derive(serde::Serialize, schemars::JsonSchema)]
@@ -947,7 +989,7 @@ pub fn run_move(
 
     if !blocking.is_empty() {
         let lines = blocking.iter().chain(&waivable).map(Violation::line).collect::<Vec<_>>().join("\n");
-        let mut hints: Vec<String> = crate::reverify::hint(&blocking.iter().chain(&waivable).collect::<Vec<_>>()).into_iter().collect();
+        let mut hints: Vec<String> = crate::reverify::hint(&repo, gate_context.as_ref(), &subject, &blocking.iter().chain(&waivable).collect::<Vec<_>>()).into_iter().collect();
         if let Some(ctx) = &gate_context {
             let divergent = divergent_cells(ctx, subject_id, &blocking);
             if !divergent.is_empty() {
@@ -973,18 +1015,22 @@ pub fn run_move(
     if !waivable.is_empty() {
         let Some(reason) = override_reason else {
             let lines = waivable.iter().map(Violation::line).collect::<Vec<_>>().join("\n");
-            let mut fixes = Vec::new();
+            let mut fixes: Vec<String> = Vec::new();
             if review_gaps && !waivable.iter().all(canon_gate::review_gate::is_reverify) {
-                fixes.push("record an independent review (`canon review scenario`) and close blocker findings");
+                fixes.push("record an independent review (`canon review scenario`) and close blocker findings".to_string());
             }
             if brief_gap.is_some() {
-                fixes.push("get the human's answer to the brief and record it with `canon brief approve`");
+                fixes.push("get the human's answer to the brief and record it with `canon brief approve`".to_string());
             }
             let reverify: Vec<&Violation> = waivable.iter().filter(|v| canon_gate::review_gate::is_reverify(v)).collect();
             if reverify.iter().any(|v| !canon_gate::review_gate::is_scoped_reverify(v)) {
-                fixes.push("record the suite again with `canon evidence add --project-id <root> --all-scenarios --report <format>:<path> …` for the scenarios named (a review stays current while the verdicts and checks are the same)");
+                let commands = gate_context.as_ref().map(|ctx| crate::reverify::batch_commands_of(&repo, ctx, &subject)).unwrap_or_default();
+                fixes.push(match commands.as_slice() {
+                    [] => "record the suite again with `canon evidence add --all-scenarios` and a --report for each test report of the suite (a review stays current while the verdicts and checks are the same)".to_string(),
+                    many => format!("record the suite again for the scenarios named with {} (a review stays current while the verdicts and checks are the same)", many.iter().map(|c| format!("`{c}`")).collect::<Vec<_>>().join("; ")),
+                });
             } else if !reverify.is_empty() {
-                fixes.push("record evidence again for the scenarios named with `canon evidence add --project-id <root> --scenario-id <id> --report <format>:<path> …`, one each (a review stays current while the verdicts and checks are the same)");
+                fixes.push("record evidence again for the scenarios named with `canon evidence add --project-id <root> --scenario-id <id> --report <junit|cucumber|swift-testing>:<path> --role implementer`, one each (a review stays current while the verdicts and checks are the same)".to_string());
             }
             return CliError::failed("SUBJECT_GATE_VIOLATION", lines)
                 .with_exit(EXIT_GATED)

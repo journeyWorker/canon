@@ -9,6 +9,15 @@ fn canon(repo: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").current_dir(repo).output().expect("spawn canon")
 }
 
+/// Makes `repo` a git work tree with one commit, which every revision-bound
+/// write needs.
+fn git_seed(repo: &Path) {
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["commit", "-q", "--allow-empty", "-m", "x"]] {
+        let out = Command::new("git").args(args).current_dir(repo).output().expect("spawn git");
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    }
+}
+
 fn text(output: &Output) -> String {
     format!("{}{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr))
 }
@@ -26,7 +35,7 @@ fn ok(repo: &Path, args: &[&str]) -> String {
 fn setup() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
-    assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
+    git_seed(repo);
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
     let change = repo.join(".canon/changes/cats");
     std::fs::create_dir_all(&change).unwrap();
@@ -82,7 +91,7 @@ fn session_ids_land_on_evidence_and_review_actors() {
     assert_eq!(records[0]["actor"], serde_json::json!({"agent_id": "impl-unit-1", "role": "implementer", "session_id": "sess-impl"}));
 
     ok(repo, &[
-        "review", "scenario", "game.run.01", "--project-id", "root", "--pin", "r1", "--original-spec-ref",
+        "review", "scenario", "game.run.01", "--project-id", "root", "--original-spec-ref",
         "specs/x.feature", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review",
     ]);
     let reviews = committed(repo, "review");
@@ -108,7 +117,7 @@ fn a_session_id_outside_the_grammar_is_refused_and_nothing_is_written() {
         let review = canon(
             repo,
             &[
-                "review", "scenario", "game.run.01", "--project-id", "root", "--actor-id", "r", "--pin", "p", "--original-spec-ref", "s", "--role",
+                "review", "scenario", "game.run.01", "--project-id", "root", "--actor-id", "r", "--original-spec-ref", "s", "--role",
                 "reviewer", "--session-id", bad,
             ],
         );
@@ -158,15 +167,14 @@ fn every_write_command_says_whether_it_staged_or_wrote_directly() {
     assert!(records_under(repo, "_staging").is_empty(), "nothing is left to promote");
 
     direct(&[
-        "review", "scenario", "game.run.01", "--project-id", "root", "--actor-id", "r", "--pin", "p", "--original-spec-ref", "specs/x.feature",
+        "review", "scenario", "game.run.01", "--project-id", "root", "--actor-id", "r", "--original-spec-ref", "specs/x.feature",
         "--role", "reviewer",
     ]);
 
-    let sha = "a".repeat(40);
     staged(
-        &["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--actor-id", "r", "--role", "reviewer", "--no-promote"],
+        &["divergence", "add", "game.run.01", "--project-id", "root", "--actor-id", "r", "--role", "reviewer", "--no-promote"],
         "— run `canon gate promote` to commit it",
     );
-    staged(&["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--round", "2", "--actor-id", "r", "--role", "reviewer"], PROMOTED);
-    staged(&["divergence", "resolve", "game.run.01", "--project-id", "root", "--sha", &sha, "--round", "3", "--actor-id", "r", "--role", "reviewer"], PROMOTED);
+    staged(&["divergence", "add", "game.run.01", "--project-id", "root", "--round", "2", "--actor-id", "r", "--role", "reviewer"], PROMOTED);
+    staged(&["divergence", "resolve", "game.run.01", "--project-id", "root", "--round", "3", "--actor-id", "r", "--role", "reviewer"], PROMOTED);
 }

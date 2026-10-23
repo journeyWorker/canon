@@ -45,6 +45,7 @@ fn git(repo: &Path, args: &[&str]) -> String {
 fn init_repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     git(dir.path(), &["init", "-q"]);
+    git(dir.path(), &["commit", "-q", "--allow-empty", "-m", "x"]);
     ok(dir.path(), &["init", "--repo", ".", "--no-policy"]);
     dir
 }
@@ -153,8 +154,7 @@ fn auto_promotes_every_staged_write_and_no_promote_keeps_one_staged() {
     ok(repo, &evidence("game.run.01"));
     ok(repo, &["finding", "add", "--change-id", "c-run", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "r", "--summary", "s"]);
     ok(repo, &["finding", "close", "c-run", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"]);
-    let sha = "a".repeat(40);
-    ok(repo, &["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--actor-id", "r", "--role", "reviewer"]);
+    ok(repo, &["divergence", "add", "game.run.01", "--project-id", "root", "--actor-id", "r", "--role", "reviewer"]);
     assert_eq!(staged(repo), 0, "nothing waits for a promote");
     assert_eq!((committed(repo, "evidence_record"), committed(repo, "finding"), committed(repo, "divergence")), (1, 2, 1));
 
@@ -215,9 +215,8 @@ fn a_promote_on_write_commits_only_its_own_record() {
     assert!(text.starts_with("canon evidence add: wrote kind=evidence_record/") && text.contains(PROMOTED), "{text}");
     assert_eq!((staged(repo), committed(repo, "evidence_record")), (1, 1), "the other author's record is still staged");
 
-    let sha = "a".repeat(40);
     let stage = |actor: &str, extra: &[&str]| {
-        let mut args = vec!["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--role", "reviewer", "--actor-id", actor];
+        let mut args = vec!["divergence", "add", "game.run.01", "--project-id", "root", "--role", "reviewer", "--actor-id", actor];
         args.extend_from_slice(extra);
         ok(repo, &args)
     };
@@ -243,12 +242,11 @@ fn evidence_add_67_a_promoted_write_names_only_its_committed_record() {
     let dir = init_repo();
     let repo = dir.path();
     ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure"]);
-    let sha = "a".repeat(40);
     let writes: [(&str, Vec<&str>); 4] = [
         ("canon evidence add", evidence("game.run.01")),
         ("canon finding add", vec!["finding", "add", "--change-id", "c-run", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "r", "--summary", "s"]),
         ("canon finding close", vec!["finding", "close", "c-run", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"]),
-        ("canon divergence add", vec!["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--actor-id", "r", "--role", "reviewer"]),
+        ("canon divergence add", vec!["divergence", "add", "game.run.01", "--project-id", "root", "--actor-id", "r", "--role", "reviewer"]),
     ];
     for (command, args) in writes {
         let text = stdout(&ok(repo, &args));
@@ -265,7 +263,7 @@ fn evidence_add_67_a_promoted_write_names_only_its_committed_record() {
     let kept: [(&str, Vec<&str>, &str); 3] = [
         ("canon evidence add", with(evidence("game.run.01"), &["--summary", "attested again", "--no-promote"]), STAGED),
         ("canon finding add", vec!["finding", "add", "--change-id", "c-run", "--round", "1", "--seq", "2", "--severity", "note", "--actor-id", "r", "--summary", "s", "--no-promote"], STAGED),
-        ("canon divergence add", vec!["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--actor-id", "r", "--role", "reviewer", "--no-promote"], STAGED),
+        ("canon divergence add", vec!["divergence", "add", "game.run.01", "--project-id", "root", "--actor-id", "r", "--role", "reviewer", "--no-promote"], STAGED),
     ];
     for (command, args, suffix) in kept {
         let text = stdout(&ok(repo, &args));
@@ -352,7 +350,7 @@ fn review_add_and_subject_status_need_no_sync_step() {
     ok(repo, &["subject", "new", "runs", "--domain", "dev", "--title", "Runs", "--actor-id", "lead"]);
     ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure", "--subject-id", "runs"]);
     let review = ok(repo, &[
-        "review", "scenario", "game.run.01", "--project-id", "root", "--pin", "p", "--original-spec-ref", "specs/x.feature",
+        "review", "scenario", "game.run.01", "--project-id", "root", "--original-spec-ref", "specs/x.feature",
         "--role", "reviewer", "--actor-id", "rev",
     ]);
     assert!(stderr(&review).contains("canon review scenario: refreshed the scenario index"), "{}", stderr(&review));

@@ -51,6 +51,7 @@ fn shop_repo(subject_tag: &str) -> tempfile::TempDir {
     let repo = dir.path();
     assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
+    commit_all(repo);
     let path = repo.join(FEATURE);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(path, feature(subject_tag)).unwrap();
@@ -528,7 +529,7 @@ fn evidence_add_99_new_screenshot_bytes_keep_a_review_current() {
     assert!(attest_all(repo, "junit:reports/junit.xml", &[]).status.success());
     ok(
         repo,
-        &["review", "scenario", "shop.cart.01", "--project-id", "root", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--pin", "r1", "--upstream-ref", "tests/cart.rs#shop_cart_01"],
+        &["review", "scenario", "shop.cart.01", "--project-id", "root", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--upstream-ref", "tests/cart.rs#shop_cart_01"],
     );
     let git = |args: &[&str]| {
         let out = Command::new("git").args(args).current_dir(repo).env("GIT_AUTHOR_NAME", "t").env("GIT_AUTHOR_EMAIL", "t@t").env("GIT_COMMITTER_NAME", "t").env("GIT_COMMITTER_EMAIL", "t@t").output().unwrap();
@@ -559,7 +560,7 @@ fn evidence_add_84_a_task_report_without_a_scenario_binds_every_case() {
     write(repo, ".canon/changes/c-demo/tasks.md", "## 1. Build\n\n- [ ] 1.1 Build the demo\n");
     write(repo, "reports/failing.xml", r#"<testsuite><testcase name="helper adds"/><testcase name="helper removes"><failure/></testcase></testsuite>"#);
     write(repo, "reports/passing.xml", r#"<testsuite><testcase name="helper adds"/><testcase name="helper removes"/></testsuite>"#);
-    let task = |report: &str| canon(repo, &["evidence", "add", "--task-id", "c-demo#1.1", "--report", report, "--class", "test-run", "--ref", "npm test", "--role", "implementer"]);
+    let task = |report: &str| canon(repo, &["evidence", "add", "--task-id", "c-demo#1.1", "--report", report, "--verdict", "faithful", "--class", "test-run", "--ref", "npm test", "--role", "implementer"]);
 
     let out = task("junit:reports/failing.xml");
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
@@ -648,7 +649,7 @@ fn evidence_add_86_a_write_that_stales_a_pinned_review_names_the_re_pin() {
     assert!(attest("shop.cart.01").status.success());
     ok(
         repo,
-        &["review", "scenario", "shop.cart.01", "--project-id", "root", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--pin", "r1", "--upstream-ref", "tests/cart.rs#shop_cart_01"],
+        &["review", "scenario", "shop.cart.01", "--project-id", "root", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--upstream-ref", "tests/cart.rs#shop_cart_01"],
     );
     let git = |args: &[&str]| {
         let out = Command::new("git").args(args).current_dir(repo).env("GIT_AUTHOR_NAME", "t").env("GIT_AUTHOR_EMAIL", "t@t").env("GIT_COMMITTER_NAME", "t").env("GIT_COMMITTER_EMAIL", "t@t").output().unwrap();
@@ -657,7 +658,6 @@ fn evidence_add_86_a_write_that_stales_a_pinned_review_names_the_re_pin() {
     };
     git(&["add", "-A"]);
     git(&["commit", "-q", "-m", "reviewed"]);
-    let head = git(&["rev-parse", "HEAD"]);
     let gate = |repo: &Path| stdout(&canon(repo, &["gate", "check"]));
     assert!(!gate(repo).contains("unreviewed-promotion shop.cart.01"), "the review is current");
 
@@ -670,7 +670,7 @@ fn evidence_add_86_a_write_that_stales_a_pinned_review_names_the_re_pin() {
     let out = canon(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent", "--verdict", "not-applicable", "--summary", "skipped in this run"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let expected = format!(
-        "canon evidence add: review by `reviewer-2` of shop.cart.01 is now stale (this record's verdict or checks differ from what it saw); re-pin it: canon review scenario shop.cart.01 --project-id root --actor-id reviewer-2 --role reviewer --pin {head} --session-id sess-review --upstream-ref 'tests/cart.rs#shop_cart_01'"
+        "canon evidence add: review by `reviewer-2` of shop.cart.01 is now stale (this record's verdict or checks differ from what it saw); re-pin it: canon review scenario shop.cart.01 --project-id root --actor-id reviewer-2 --role reviewer --session-id sess-review --upstream-ref 'tests/cart.rs#shop_cart_01'"
     );
     let text = stdout(&out);
     let line = text.lines().find(|l| l.contains("is now stale")).unwrap_or_else(|| panic!("no stale-review line: {text}"));
@@ -695,7 +695,7 @@ fn evidence_add_86_a_write_that_stales_a_pinned_review_names_the_re_pin() {
 fn review_args<'a>(ids: &[&'a str], extra: &[&'a str]) -> Vec<&'a str> {
     let mut args = vec!["review", "scenario"];
     args.extend_from_slice(ids);
-    args.extend(["--project-id", "root", "--actor-id", "reviewer-2", "--role", "reviewer", "--pin", "r1", "--original-spec-ref", FEATURE]);
+    args.extend(["--project-id", "root", "--actor-id", "reviewer-2", "--role", "reviewer", "--original-spec-ref", FEATURE]);
     args.extend_from_slice(extra);
     args
 }
@@ -713,7 +713,7 @@ fn review_scenario_one_invocation_signs_off_several_scenarios() {
     let mut ids: Vec<&str> = written.iter().map(|r| r["scenario_id"].as_str().unwrap()).collect();
     ids.sort();
     assert_eq!(ids, ["shop.cart.01", "shop.cart.02", "shop.cart.03"]);
-    assert!(written.iter().all(|r| r["reviewer"] == "reviewer-2" && r["pin"] == "r1" && r["artifacts"][0]["path"] == "shot.png"), "{written:?}");
+    assert!(written.iter().all(|r| r["reviewer"] == "reviewer-2" && r["pin"] == written[0]["pin"] && r["artifacts"][0]["path"] == "shot.png"), "{written:?}");
     let digests: std::collections::BTreeSet<&str> = written.iter().map(|r| r["pins"]["scenario_digest"].as_str().unwrap()).collect();
     assert_eq!(digests.len(), 3, "each review pins its own scenario");
     assert_eq!(stored_blobs(repo), 1, "the artifact is stored once");
@@ -732,4 +732,11 @@ fn review_scenario_a_batch_with_an_unindexed_scenario_writes_nothing() {
     let none = canon(repo, &review_args(&[], &[]));
     assert_eq!(none.status.code(), Some(2));
     assert!(reviews(repo).is_empty());
+}
+
+/// Commit the fixture so revision-taking commands have a commit to bind.
+fn commit_all(repo: &std::path::Path) {
+    for args in [&["config", "user.name", "t"][..], &["config", "user.email", "t@example.com"], &["add", "-A"], &["commit", "-q", "-m", "x"]] {
+        assert!(std::process::Command::new("git").args(args).current_dir(repo).status().unwrap().success());
+    }
 }

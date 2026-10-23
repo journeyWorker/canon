@@ -36,8 +36,18 @@ routing:
   evidence_record: local
 ";
 
+/// Makes `repo` a git work tree with one commit, which every revision-bound
+/// write needs.
+fn git_seed(repo: &Path) {
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["commit", "-q", "--allow-empty", "-m", "x"]] {
+        let out = Command::new("git").args(args).current_dir(repo).output().expect("spawn git");
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    }
+}
+
 fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
+    git_seed(dir.path());
     std::fs::write(dir.path().join("canon.yaml"), CANON_YAML).unwrap();
     dir
 }
@@ -521,15 +531,12 @@ fn seed_attested_subject_in_session(repo: &Path, session: Option<&str>) {
 
 /// `canon review add` for `world.demo.01` by `actor`, from `session`.
 fn review_via_cli(repo: &Path, actor: &str, session: Option<&str>) -> Output {
-    let pin = format!("pin-{actor}-{}", session.unwrap_or("none"));
     let mut args = vec![
         "review",
         "scenario",
         "world.demo.01",
         "--project-id",
         "demo",
-        "--pin",
-        pin.as_str(),
         "--original-spec-ref",
         "specs/demo.feature",
         "--actor-id",
@@ -924,7 +931,7 @@ fn review_add_refuses_an_unsynced_scenario_and_names_inventory_sync() {
     let out = run(
         dir.path(),
         &[
-            "review", "scenario", "world.demo.99", "--project-id", "demo", "--pin", "p1", "--original-spec-ref",
+            "review", "scenario", "world.demo.99", "--project-id", "demo", "--original-spec-ref",
             "specs/demo.feature", "--actor-id", "reviewer-2", "--role", "reviewer",
         ],
     );
@@ -946,7 +953,7 @@ fn an_unavailable_review_is_a_gap_at_the_gate_and_the_status_guard() {
     let out = run(
         dir.path(),
         &[
-            "review", "scenario", "world.demo.01", "--project-id", "demo", "--pin", "p1", "--original-spec-ref",
+            "review", "scenario", "world.demo.01", "--project-id", "demo", "--original-spec-ref",
             "specs/demo.feature", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--review-outcome", "unavailable",
         ],
     );

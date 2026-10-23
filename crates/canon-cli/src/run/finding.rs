@@ -12,9 +12,9 @@ pub fn run(cmd: FindingCommand) -> ExitCode {
             severity,
             disposition,
             summary,
-            reviewed_sha,
-            resolution_sha,
-            introduced_by,
+            rev,
+            resolution_rev,
+            introduced_rev,
             file_ref,
             scenario_ids,
             actor_id,
@@ -27,15 +27,15 @@ pub fn run(cmd: FindingCommand) -> ExitCode {
             &repo,
             &crate::finding::FindingArgs {
                 change_id,
-                reviewed_sha,
+                rev: rev.rev,
                 round,
                 seq,
                 severity,
                 disposition,
                 reviewer: actor_id.clone(),
                 summary,
-                resolution_sha,
-                introduced_by,
+                resolution_rev,
+                introduced_rev,
                 file_ref,
                 scenario_ids,
                 actor_id,
@@ -45,10 +45,10 @@ pub fn run(cmd: FindingCommand) -> ExitCode {
                 json,
             },
         ) as u8),
-        FindingCommand::Close(FindingCloseArgs { change_id, round, seq, disposition, resolution_sha, reason, actor_id, role, session_id, promote, repo, json }) => {
+        FindingCommand::Close(FindingCloseArgs { change_id, round, seq, disposition, resolution_rev, reason, actor_id, role, session_id, promote, repo, json }) => {
             ExitCode::from(crate::finding::run_close(
                 &repo,
-                &crate::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_sha, reason, actor_id, role, session_id, promote: promote.flag(), json },
+                &crate::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_rev, reason, actor_id, role, session_id, promote: promote.flag(), json },
             ) as u8)
         }
         FindingCommand::List(FindingListArgs { change_id, open, json, repo, page, fields }) => {

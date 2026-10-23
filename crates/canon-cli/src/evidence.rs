@@ -44,8 +44,9 @@
 //!   normalized surface/effects, actor, and timestamp. `CANON_ACTOR` and the
 //!   persisted `verified` display bit are never authentication.
 //! - `--surface-ref` records an explicitly bound path or `effect:<slug>`.
-//!   Risk approvals additionally require `--artifact-sha`, `--approval-at`,
-//!   and an externally produced `--signature-file`; canon never signs
+//!   Risk approvals additionally require `--approval-at` and an externally
+//!   produced `--signature-file`, bound to the commit `--rev` names (HEAD by
+//!   default, recorded as `evidence_sha`); canon never signs
 //!   or reads private keys.
 //!
 //! Making the underlying evidence verifiable is a DIFFERENT change: canon
@@ -431,8 +432,10 @@ pub struct EvidenceArgs {
     pub approval_signature_file: Option<PathBuf>,
     /// RFC3339 timestamp covered by the external signature.
     pub approval_at: Option<String>,
-    /// Exact Git artifact SHA bound by an approval and persisted on the record.
-    pub artifact_sha: Option<Sha>,
+    /// The commit the evidence is about (`--rev`, resolved by the caller): its
+    /// sha is persisted as `evidence_sha` and bound by an approval, with the
+    /// code tree the command saw (0.28 D7b).
+    pub commit: crate::git_rev::Bound,
     /// Experimental evidence binding: files bound by sha256
     /// ([`crate::evidence_attach`]). Never executed.
     pub artifacts: Vec<PathBuf>,
@@ -690,6 +693,8 @@ pub struct EvidenceAddReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cases_without_scenario_id: Option<usize>,
     pub stale_reviews: Vec<StaleReview>,
+    /// The refusals `--override-reason` waived for these records (D12); empty when nothing was waived.
+    pub overrides: Vec<crate::reports::Override>,
 }
 
 impl crate::reports::Report for EvidenceAddReport {}
@@ -772,9 +777,11 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             return CliError::refused("EVIDENCE_INVALID_ARGUMENT", error.to_string()).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
         }
     };
-    let verdict = match &audit {
-        Some(audit) => audit_verdict(audit.result),
-        None => args.verdict.unwrap_or(EvidenceVerdict::Faithful),
+    // An audit's result is a claim; so is `--verdict`. With neither, a bound
+    // report decides (`evidence_attach::bind`, #117).
+    let claimed = match &audit {
+        Some(audit) => Some(audit_verdict(audit.result)),
+        None => args.verdict,
     };
     if let Some(reason) = &args.override_reason {
         if reason.trim().is_empty() || first_row_line_break(reason).is_some() {
@@ -795,23 +802,22 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             || args.approval_role.is_none()
             || args.approval_signature_file.is_none()
             || args.approval_at.is_none()
-            || args.artifact_sha.is_none()
         {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "authenticated approval requires --approver, --approval-role human, --signature-file, --approval-at, and --artifact-sha").hint("pass --approver, --approval-role human, --signature-file, --approval-at and --artifact-sha together; `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
+            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "authenticated approval requires --approver, --approval-role human, --signature-file and --approval-at").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
         let approver = args.approval_by.as_deref().unwrap_or_default();
         if approver.trim().is_empty() || approver.trim() != approver || approver.chars().any(|ch| matches!(ch, '\n' | '\r')) {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "approval identity must be a non-empty trimmed single-line value").hint("pass --approver, --approval-role human, --signature-file, --approval-at and --artifact-sha together; `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
+            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "approval identity must be a non-empty trimmed single-line value").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
         if args.approval_role.as_ref().map_or(true, |role| role.as_str() != "human") {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "only the human approval role can satisfy risk approval").hint("pass --approver, --approval-role human, --signature-file, --approval-at and --artifact-sha together; `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
+            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "only the human approval role can satisfy risk approval").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
         if args.approval_at.as_deref().and_then(|value| value.parse::<DateTime<Utc>>().ok()).is_none() {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "--approval-at must be an RFC3339 timestamp").hint("pass --approver, --approval-role human, --signature-file, --approval-at and --artifact-sha together; `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
+            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "--approval-at must be an RFC3339 timestamp").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
         let signature_path = args.approval_signature_file.as_ref().unwrap();
         if !signature_path.is_file() {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("detached signature file does not exist: {}", signature_path.display())).hint("pass --approver, --approval-role human, --signature-file, --approval-at and --artifact-sha together; `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
+            return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("detached signature file does not exist: {}", signature_path.display())).hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
     }
     if args.summary.is_none() && args.command_result.is_some() {
@@ -928,7 +934,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         // 0.18 D1: a task's report with no scenario to match binds all
         // of it, so a faithful verdict needs every case to pass.
         all_cases: args.task_id.is_some() && args.scenario_id.is_none() && args.report_cases.is_empty(),
-        verdict,
+        verdict: claimed,
         max_bytes: args.max_artifact_mib.saturating_mul(canon_gate::artifact_store::MIB),
     }) {
         Ok(bound) => bound,
@@ -937,6 +943,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         }
     };
 
+    let verdict = bound.verdict;
     let ledger_root = gate_context.ctx.ledger_root.clone();
 
     let at = Utc::now();
@@ -951,7 +958,9 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         args.run_id.clone(),
         verdict,
     )
-    .with_attachments(bound.attachments.clone());
+    .with_attachments(bound.attachments.clone())
+    .with_evidence_sha(args.commit.sha.clone())
+    .with_code(&args.commit.code_tree, args.commit.worktree_dirty);
     if let Some(brief_override) = brief_override {
         record = record.with_brief_override(brief_override);
     }
@@ -965,14 +974,11 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     if let Some(project_id) = &args.project_id {
         record = record.with_project_id(project_id.clone());
     }
-    if let Some(artifact_sha) = &args.artifact_sha {
-        record = record.with_evidence_sha(artifact_sha.clone());
-    }
     if approval_requested {
         let approver = args.approval_by.as_ref().unwrap();
         let role = args.approval_role.as_ref().unwrap();
         let approval_at = args.approval_at.as_ref().unwrap().parse::<DateTime<Utc>>().unwrap();
-        let artifact_sha = args.artifact_sha.as_ref().unwrap();
+        let artifact_sha = &args.commit.sha;
         let subject = args.task_id.as_ref().map(ToString::to_string).or_else(|| args.scenario_id.as_ref().map(ToString::to_string)).unwrap();
         let (payload, surface, effects) = match approval_binding(&repo, &ApprovalPayloadArgs {
             task_id: args.task_id.clone(),
@@ -1046,7 +1052,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         crate::say!(args.json, "canon evidence add: unchanged — an identical record for {subject} ({outcome}) is already {}; nothing written", existing.describe());
         if args.json {
             let entry = EvidenceRecordEntry { landing: existing.landing(), subject: subject.clone(), outcome: outcome.clone(), next: Some(next.clone()), unchanged: None };
-            crate::json_out::data_with_meta(args.command(), &EvidenceAddReport { records: vec![entry], skipped: None, cases_without_scenario_id: None, stale_reviews: Vec::new() }, serde_json::json!({ "unchanged": true }));
+            crate::json_out::data_with_meta(args.command(), &EvidenceAddReport { records: vec![entry], skipped: None, cases_without_scenario_id: None, stale_reviews: Vec::new(), overrides: overrides_of(args, &refusals) }, serde_json::json!({ "unchanged": true }));
         }
         return 0;
     }
@@ -1073,7 +1079,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             // one would send an operator to a command that cannot apply.
             let settled = crate::gate::promote_after_stage(&args.full(), &ledger_root, &receipt.location, promote, args.json);
             crate::say!(args.json, "canon evidence add: {} for {} ({outcome}) — {}, {}", settled.landed(&receipt.location), subject, settled.suffix(), next);
-            let stale = print_stale_reviews(&repo, &stale_reviews, matches!(settled, crate::gate::StagedOutcome::Promoted { .. }), args.json);
+            let stale = print_stale_reviews(&stale_reviews, matches!(settled, crate::gate::StagedOutcome::Promoted { .. }), args.json);
             if settled.exit_code() == 0 {
                 let record = EvidenceRecordEntry { landing: settled.landing(&receipt.location), subject: subject.clone(), outcome: outcome.clone(), next: Some(next.clone()), unchanged: None };
                 let scope = match &args.task_id {
@@ -1081,7 +1087,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
                     None => crate::next::Scope::Scenarios(vec![subject.clone()]),
                 };
                 let staged = matches!(settled, crate::gate::StagedOutcome::Staged);
-                crate::next::finish(&repo, args.command(), &scope, staged, args.json, &EvidenceAddReport { records: vec![record], skipped: None, cases_without_scenario_id: None, stale_reviews: stale });
+                crate::next::finish(&repo, args.command(), &scope, staged, args.json, &EvidenceAddReport { records: vec![record], skipped: None, cases_without_scenario_id: None, stale_reviews: stale, overrides: overrides_of(args, &refusals) });
             }
             settled.exit_code()
         }
@@ -1160,6 +1166,20 @@ fn report_brief_refusals(args: &EvidenceArgs, refusals: &[BriefRefusal]) -> Resu
     }
     crate::warn_err!("canon evidence add: override recorded by `{}` for the {} brief refusal(s) above: {reason}", args.actor_id, refusals.len());
     Ok(())
+}
+
+/// The refusals `--override-reason` waived, as the report echoes them
+/// (`data.overrides[]`): one entry per distinct refusal code.
+fn overrides_of(args: &EvidenceArgs, refusals: &[BriefRefusal]) -> Vec<crate::reports::Override> {
+    let Some(reason) = args.override_reason.as_ref() else { return Vec::new() };
+    let mut out: Vec<crate::reports::Override> = Vec::new();
+    for refusal in refusals {
+        let code = if refusal.changed { crate::brief::CHANGED_CODE } else { "BRIEF_UNAPPROVED" };
+        if !out.iter().any(|o| o.code == code) {
+            out.push(crate::reports::Override { code: code.to_string(), reason: reason.clone() });
+        }
+    }
+    out
 }
 
 /// The [`BriefOverride`] a record carries for the brief `refusals` it
@@ -1306,15 +1326,14 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         .map(|((binding, id), refusals)| {
             let mut record = EvidenceRecord::new(Envelope::current(RecordKind::EvidenceRecord, at, actor.clone()), None, Some(id.clone()), args.run_id.clone(), binding.verdict)
                 .with_attachments(binding.attachments.clone())
-                .with_project_id(project_id.clone());
+                .with_project_id(project_id.clone())
+                .with_evidence_sha(args.commit.sha.clone())
+                .with_code(&args.commit.code_tree, args.commit.worktree_dirty);
             if let Some(brief_override) = brief_override_of(args, refusals) {
                 record = record.with_brief_override(brief_override);
             }
             if !args.surface_ref.is_empty() {
                 record = record.with_surface_ref(normalized_strings(&args.surface_ref));
-            }
-            if let Some(artifact_sha) = &args.artifact_sha {
-                record = record.with_evidence_sha(artifact_sha.clone());
             }
             record
         })
@@ -1340,7 +1359,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         if args.json {
             crate::json_out::data_with_meta(
                 "evidence add",
-                &EvidenceAddReport { records: unchanged, skipped: Some(Vec::new()), cases_without_scenario_id: Some(batch.without_id), stale_reviews: Vec::new() },
+                &EvidenceAddReport { records: unchanged, skipped: Some(Vec::new()), cases_without_scenario_id: Some(batch.without_id), stale_reviews: Vec::new(), overrides: overrides_of(args, &refusals.concat()) },
                 serde_json::json!({ "unchanged": true }));
         }
         return 0;
@@ -1383,9 +1402,9 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
     if batch.without_id > 0 {
         crate::say!(json, "canon evidence add: skipped {} case(s) that carry no scenario id", batch.without_id);
     }
-    let stale = print_stale_reviews(repo, &stale_reviews, promote, json);
+    let stale = print_stale_reviews(&stale_reviews, promote, json);
     let scope = crate::next::Scope::Scenarios(scenario_ids.iter().map(|id| id.as_str().to_string()).collect());
-    crate::next::finish(repo, "evidence add", &scope, !promote, json, &EvidenceAddReport { records: written, skipped: Some(skipped), cases_without_scenario_id: Some(batch.without_id), stale_reviews: stale });
+    crate::next::finish(repo, "evidence add", &scope, !promote, json, &EvidenceAddReport { records: written, skipped: Some(skipped), cases_without_scenario_id: Some(batch.without_id), stale_reviews: stale, overrides: overrides_of(args, &refusals.concat()) });
     0
 }
 
@@ -1533,19 +1552,17 @@ fn stale_review_notices(ctx: &mut GateContext, written: &[EvidenceRecord]) -> Ve
 /// One line per review `stale` names (0.18 D2): the reviewer, the
 /// scenario, and the `canon review scenario` that re-pins it — the same
 /// reviewer, actor, role, session, provenance ref, runtime labels and
-/// artifacts, pinned at
-/// `HEAD` (`<sha>` when the repository has no commit). A record still
-/// staged makes the review stale once it is promoted.
-fn print_stale_reviews(repo: &Path, stale: &[Review], promoted: bool, json: bool) -> Vec<StaleReview> {
+/// artifacts, at the default `--rev` (`HEAD`). A record still staged makes
+/// the review stale once it is promoted.
+fn print_stale_reviews(stale: &[Review], promoted: bool, json: bool) -> Vec<StaleReview> {
     if stale.is_empty() {
         return Vec::new();
     }
-    let pin = head_sha(repo).unwrap_or_else(|| "<sha>".to_string());
     let when = if promoted { "is now stale" } else { "goes stale once this evidence is promoted" };
     stale
         .iter()
         .map(|review| {
-            let repin = repin_command(review, &pin);
+            let repin = repin_command(review);
             crate::say!(
                 json,
                 "canon evidence add: review by `{}` of {} {when} (this record's verdict or checks differ from what it saw); re-pin it: {repin}",
@@ -1557,8 +1574,8 @@ fn print_stale_reviews(repo: &Path, stale: &[Review], promoted: bool, json: bool
         .collect()
 }
 
-/// `canon review scenario` re-pinning `review` at `pin`, as one shell line.
-fn repin_command(review: &Review, pin: &str) -> String {
+/// `canon review scenario` re-pinning `review` at `HEAD`, as one shell line.
+fn repin_command(review: &Review) -> String {
     use canon_gate::audit::shell_quote;
 
     let role = review.envelope.actor.role.as_ref().map_or("reviewer", |r| r.as_str());
@@ -1568,7 +1585,6 @@ fn repin_command(review: &Review, pin: &str) -> String {
         format!("--project-id {}", shell_quote(review.project_id.as_str())),
         format!("--actor-id {}", shell_quote(&review.envelope.actor.agent_id)),
         format!("--role {}", shell_quote(role)),
-        format!("--pin {}", if pin == "<sha>" { pin.to_string() } else { shell_quote(pin) }),
     ];
     if let Some(session) = &review.envelope.actor.session_id {
         words.push(format!("--session-id {}", shell_quote(session.as_str())));
@@ -1588,13 +1604,6 @@ fn repin_command(review: &Review, pin: &str) -> String {
     }
     words.extend(review.artifacts.iter().map(|a| format!("--artifact {}", shell_quote(&a.path))));
     words.join(" ")
-}
-
-/// The full sha of `HEAD`, or `None` when the repository has no commit.
-fn head_sha(repo: &Path) -> Option<String> {
-    let out = std::process::Command::new("git").arg("-C").arg(repo).args(["rev-parse", "--verify", "--quiet", "HEAD"]).output().ok()?;
-    let sha = String::from_utf8(out.stdout).ok()?.trim().to_string();
-    (out.status.success() && !sha.is_empty()).then_some(sha)
 }
 
 /// `canon artifacts store` (0.14 D4): store the bytes for committed
@@ -1807,8 +1816,8 @@ mod tests {
             approval_by: None,
             approval_role: None,
             approval_signature_file: None,
+            commit: crate::git_rev::Bound { sha: canon_model::Sha::parse("a".repeat(40)).expect("a literal sha"), code_tree: "t".repeat(40), worktree_dirty: false },
             approval_at: None,
-            artifact_sha: None,
             artifacts: Vec::new(),
             reports: Vec::new(),
             report_cases: Vec::new(),

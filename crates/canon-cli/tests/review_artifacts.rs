@@ -40,6 +40,7 @@ fn setup() -> tempfile::TempDir {
     let repo = dir.path();
     assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
+    commit_all(repo);
     ok(repo, &["scenario", "new", "game.title.01", "--title", "The title screen shows the cat", "--case", "happy"]);
     ok(repo, &["inventory", "sync"]);
     std::fs::create_dir_all(repo.join("reports")).unwrap();
@@ -53,7 +54,7 @@ const HUD: &[u8] = b"webm recording of the HUD";
 
 fn review(repo: &Path, reviewer: &str, extra: &[&str]) -> Output {
     let mut args = vec![
-        "review", "scenario", "game.title.01", "--project-id", "root", "--pin", "r1", "--original-spec-ref", "specs/title.feature", "--actor-id",
+        "review", "scenario", "game.title.01", "--project-id", "root", "--original-spec-ref", "specs/title.feature", "--actor-id",
         reviewer, "--role", "reviewer",
     ];
     args.extend_from_slice(extra);
@@ -269,4 +270,11 @@ fn a_stale_review_superseded_by_another_reviewers_newer_review_is_not_checked() 
     let out = text(&gate);
     assert!(out.contains("stale-evidence game.title.01 — review by `reviewer-4`") && out.contains("`reports/hud.webm`"), "{out}");
     assert!(!out.contains("review by `reviewer-2`"), "{out}");
+}
+
+/// Commit the fixture so revision-taking commands have a commit to bind.
+fn commit_all(repo: &std::path::Path) {
+    for args in [&["config", "user.name", "t"][..], &["config", "user.email", "t@example.com"], &["add", "-A"], &["commit", "-q", "-m", "x"]] {
+        assert!(std::process::Command::new("git").args(args).current_dir(repo).status().unwrap().success());
+    }
 }

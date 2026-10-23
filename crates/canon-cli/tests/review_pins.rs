@@ -63,6 +63,7 @@ fn reviewed_repo() -> tempfile::TempDir {
     let repo = dir.path();
     assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
+    commit_all(repo);
     std::fs::create_dir_all(repo.join(".canon")).unwrap();
     std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_review:\n    scope: []\n").unwrap();
     write_feature(repo, BASE);
@@ -75,7 +76,7 @@ fn reviewed_repo() -> tempfile::TempDir {
         let out = ok(
             repo,
             &[
-                "review", "scenario", id, "--project-id", "root", "--pin", "r1", "--original-spec-ref", FEATURE, "--actor-id",
+                "review", "scenario", id, "--project-id", "root", "--original-spec-ref", FEATURE, "--actor-id",
                 "reviewer-2", "--role", "reviewer", "--session-id", "sess-review",
             ],
         );
@@ -154,6 +155,7 @@ fn reviewed_against_a_report() -> tempfile::TempDir {
     let repo = dir.path();
     assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
+    commit_all(repo);
     std::fs::create_dir_all(repo.join(".canon")).unwrap();
     std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_review:\n    scope: []\n").unwrap();
     write_feature(repo, BASE);
@@ -162,7 +164,7 @@ fn reviewed_against_a_report() -> tempfile::TempDir {
         ok(
             repo,
             &[
-                "review", "scenario", id, "--project-id", "root", "--pin", "r1", "--original-spec-ref", FEATURE, "--actor-id", "reviewer-2",
+                "review", "scenario", id, "--project-id", "root", "--original-spec-ref", FEATURE, "--actor-id", "reviewer-2",
                 "--role", "reviewer", "--session-id", "sess-review",
             ],
         );
@@ -214,4 +216,11 @@ fn review_add_32_a_changed_verdict_stales_the_review() {
     let out = gate(repo, 1);
     assert!(out.contains("unreviewed-promotion cart.add.02 — stale review by `reviewer-2`: its evidence changed"), "{out}");
     assert!(!out.contains("unreviewed-promotion cart.add.01"), "{out}");
+}
+
+/// Commit the fixture so revision-taking commands have a commit to bind.
+fn commit_all(repo: &std::path::Path) {
+    for args in [&["config", "user.name", "t"][..], &["config", "user.email", "t@example.com"], &["add", "-A"], &["commit", "-q", "-m", "x"]] {
+        assert!(std::process::Command::new("git").args(args).current_dir(repo).status().unwrap().success());
+    }
 }

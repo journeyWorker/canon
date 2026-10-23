@@ -12,7 +12,6 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 const FEATURE_REL: &str = "kind=feature/area=cart/add.feature";
-const SHA: &str = "0123456789012345678901234567890123456789";
 
 const FEATURE: &str = "Feature: cart add
   # canon: {\"schema\":1,\"at\":\"2026-10-12T00:00:00Z\",\"actor\":{\"agent_id\":\"canon\"}}
@@ -157,9 +156,8 @@ fn evidence_add_104_the_refusal_lists_every_configured_spec_root() {
 fn evidence_add_105_an_approval_payload_is_not_issued_for_an_unknown_project_id() {
     let dir = repo(&["game"]);
     let r = dir.path();
-    let sha = String::from_utf8(Command::new("git").args(["rev-parse", "HEAD"]).current_dir(r).output().unwrap().stdout).unwrap().trim().to_string();
     let payload = |project: &str| {
-        canon(r, &["evidence", "approval-payload", "--project-id", project, "--scenario-id", "cart.add.01", "--artifact-sha", &sha, "--approver", "ana", "--approval-at", "2026-10-12T00:00:00Z", "--json"])
+        canon(r, &["evidence", "approval-payload", "--project-id", project, "--scenario-id", "cart.add.01", "--approver", "ana", "--approval-at", "2026-10-12T00:00:00Z", "--json"])
     };
 
     let out = payload("root");
@@ -181,7 +179,7 @@ fn review_add_92_an_unknown_project_id_is_refused_and_writes_no_review() {
     let review = |project: &str| {
         canon(
             r,
-            &["review", "scenario", "cart.add.01", "--project-id", project, "--pin", "p1", "--original-spec-ref", "specs/cart.md", "--actor-id", "reviewer-2", "--role", "reviewer", "--json"],
+            &["review", "scenario", "cart.add.01", "--project-id", project, "--original-spec-ref", "specs/cart.md", "--actor-id", "reviewer-2", "--role", "reviewer", "--json"],
         )
     };
 
@@ -211,9 +209,9 @@ fn divergence_lifecycle_10_an_unknown_project_id_is_refused_by_every_writing_div
     };
 
     for (verb, extra) in [
-        ("add", vec!["--sha", SHA]),
-        ("resolve", vec!["--sha", SHA]),
-        ("defer", vec!["--sha", SHA, "--reason", "later", "--expiry", "2999-01-01T00:00:00Z"]),
+        ("add", vec![]),
+        ("resolve", vec![]),
+        ("defer", vec!["--reason", "later", "--expiry", "2999-01-01T00:00:00Z"]),
         ("accept", vec!["--reason", "known gap", "--tracking", "https://example.com/issues/1"]),
     ] {
         let error = refusal(&with(verb, &extra));
@@ -252,7 +250,7 @@ fn authoring_scaffold_14_an_explicit_feature_file_still_refuses_an_unknown_proje
 #[test]
 fn project_id_is_optional_with_one_spec_root_and_required_with_several() {
     let review = |r: &Path| {
-        canon(r, &["review", "scenario", "cart.add.01", "--pin", "p1", "--original-spec-ref", "specs/cart.md", "--actor-id", "reviewer-2", "--role", "reviewer", "--json"])
+        canon(r, &["review", "scenario", "cart.add.01", "--original-spec-ref", "specs/cart.md", "--actor-id", "reviewer-2", "--role", "reviewer", "--json"])
     };
     let audit = |r: &Path| {
         canon(

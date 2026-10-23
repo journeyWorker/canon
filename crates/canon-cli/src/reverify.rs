@@ -11,16 +11,24 @@
 //!   [`crate::brief::approved_at`]); this half needs the change's
 //!   `brief.md`, so it is read here, from the repo.
 //!
+//! A chore approval asks only where the code changed (0.28 D11, #116): a
+//! scenario whose latest evidence was recorded on the current code tree
+//! (`git_rev::code_tree`) needs no new evidence, so a docs-only chore needs
+//! its change-level review alone.
+//!
 //! New evidence stales a pinned review, so the re-review follows with no
-//! rule of its own. Every refusal names the scenarios and the batch
-//! `canon evidence add --project-id <root> --all-scenarios --report …`.
+//! rule of its own. Every refusal names the scenarios and leads with ONE batch
+//! command, [`canon_gate::review_gate::batch_commands`]: `canon evidence add
+//! --all-scenarios --report junit:a.xml --report junit:b.xml --role
+//! implementer`, built from the report paths bound to the subject's latest
+//! evidence.
 
 use std::path::Path;
 
+use canon_gate::freshness::scenarios_without_evidence_after_on_code;
 use canon_gate::review_gate::{
-    active_require_review, change_review_gap, fixed_blockers, is_reverify, is_scoped_reverify, reverify_remedy, reverify_scenarios, scoped_reverify_remedy,
+    active_require_review, batch_commands, change_review_gap, fixed_blockers, is_reverify, is_scoped_reverify, reverify_remedy, reverify_scenarios, scoped_reverify_remedy,
 };
-use canon_gate::freshness::scenarios_without_evidence_after;
 use canon_gate::spec_coverage::subject_change_ids;
 use canon_gate::{FailureClass, GateContext, Violation};
 use canon_model::{ChangeId, SpecDigest, Subject, SubjectStatus};
@@ -39,6 +47,14 @@ pub struct Gap {
     /// need evidence, one `canon evidence add --scenario-id` each; the
     /// rest of the suite is not asked for.
     pub scoped: bool,
+    /// The batch command(s) that clear a whole-suite gap: one `canon evidence
+    /// add --all-scenarios --report …` (one per spec root when the repo has
+    /// several), built from the reports the scenarios' latest evidence bound.
+    /// Empty when that evidence bound no report, and for a scoped gap.
+    pub commands: Vec<String>,
+    /// The chore change whose approval triggered the gap, when it is a chore.
+    pub chore: Option<ChangeId>,
+    remedy: String,
 }
 
 impl Gap {
@@ -46,21 +62,36 @@ impl Gap {
         self.scenarios.iter().map(|(project, id)| (project.as_str(), id.as_str())).collect()
     }
 
-    /// The `canon evidence add` step this gap names: the batch for the
-    /// whole suite, the per-scenario command for a scoped finding.
-    pub fn remedy(&self) -> String {
-        if self.scoped { scoped_reverify_remedy(&self.pairs()) } else { reverify_remedy(&self.pairs()) }
+    /// The gap of `scenarios` after `trigger`, with its commands built from `ctx`.
+    fn new(repo: &Path, ctx: &GateContext, trigger: String, since: DateTime<Utc>, scenarios: Vec<(String, String)>, scoped: bool, chore: Option<ChangeId>) -> Self {
+        let pairs: Vec<(&str, &str)> = scenarios.iter().map(|(project, id)| (project.as_str(), id.as_str())).collect();
+        let multi_root = multi_root(repo);
+        let (commands, remedy) = if scoped {
+            (Vec::new(), scoped_reverify_remedy(&pairs))
+        } else {
+            (batch_commands(ctx, &pairs, multi_root), reverify_remedy(ctx, &pairs, multi_root))
+        };
+        Gap { trigger, since, scenarios, scoped, commands, chore, remedy }
     }
 
-    /// The `canon status` command for this gap: for a scoped finding, the
-    /// first scenario's own command (`evidence add` takes one scenario; the
-    /// next follows once it is evidenced).
-    pub fn command(&self) -> String {
-        let tail = "--report <junit|cucumber|swift-testing>:<path> --class test-run --role implementer --actor-id <unit> --session-id <session> --ref \"<test command>\"";
-        match self.scoped.then(|| self.scenarios.first()).flatten() {
-            Some((project, id)) => format!("canon evidence add --project-id {project} --scenario-id {id} {tail}"),
-            None => format!("canon evidence add --project-id {} --all-scenarios {tail}", self.project()),
+    /// The `canon evidence add` step this gap names: the batch for the
+    /// whole suite, the per-scenario command for a scoped finding.
+    pub fn remedy(&self) -> &str {
+        &self.remedy
+    }
+
+    /// The `canon status` steps for this gap: the batch command(s) for the
+    /// whole suite; for a scoped finding, the first scenario's own command
+    /// (`evidence add` takes one scenario; the next follows once it is
+    /// evidenced).
+    pub fn commands(&self) -> Vec<String> {
+        if let Some((project, id)) = self.scoped.then(|| self.scenarios.first()).flatten() {
+            return vec![format!("canon evidence add --project-id {project} --scenario-id {id} --report <junit|cucumber|swift-testing>:<path> --role implementer")];
         }
+        if self.commands.is_empty() {
+            return vec![format!("canon evidence add --project-id {} --all-scenarios --report <junit|cucumber|swift-testing>:<path> --role implementer", self.project())];
+        }
+        self.commands.clone()
     }
 
     /// `N evidenced scenario(s) (a, b, c, … k more)`.
@@ -81,7 +112,7 @@ impl Gap {
             self.since.to_rfc3339_opts(SecondsFormat::Secs, true),
             self.scenarios.len(),
             self.scenario_list(),
-            if self.scoped { "The finding names these scenarios, so evidence for each of them alone is enough" } else { "Run the whole suite again" }
+            if self.scoped { "The finding names these scenarios, so evidence for each of them alone is enough" } else { "Run the whole suite again; a scenario last evidenced on the code as it stands needs nothing" }
         )
     }
 }
@@ -106,16 +137,29 @@ fn chore_approvals(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<(Ch
 
 /// Every unmet chore trigger of `subject`.
 pub fn chore_gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Gap> {
-    chore_approvals(repo, ctx, subject)
+    let approvals = chore_approvals(repo, ctx, subject);
+    if approvals.is_empty() {
+        return Vec::new();
+    }
+    // The code as it is now (D11): a scenario last evidenced on it needs nothing.
+    // No git work tree means nothing to compare, and the time rule stands.
+    let code_tree = crate::git_rev::code_tree(repo, None).ok().map(|c| c.tree);
+    approvals
         .into_iter()
         .filter_map(|(change, since, _)| {
-            let scenarios: Vec<(String, String)> = scenarios_without_evidence_after(ctx, &subject.subject_id, since)
+            let scenarios: Vec<(String, String)> = scenarios_without_evidence_after_on_code(ctx, &subject.subject_id, since, code_tree.as_deref())
                 .into_iter()
                 .map(|s| (s.project_id.as_str().to_string(), s.scenario_id.as_str().to_string()))
                 .collect();
-            (!scenarios.is_empty()).then(|| Gap { trigger: format!("chore change `{}` approved", change.as_str()), since, scenarios, scoped: false })
+            (!scenarios.is_empty()).then(|| Gap::new(repo, ctx, format!("chore change `{}` approved", change.as_str()), since, scenarios, false, Some(change)))
         })
         .collect()
+}
+
+/// Whether `canon.yaml` configures several spec roots, which makes
+/// `--project-id` required on the commands the hints name.
+fn multi_root(repo: &Path) -> bool {
+    crate::inventory::load_spec_roots(&repo.join("canon.yaml")).is_ok_and(|roots| roots.len() > 1)
 }
 
 /// The approved chore changes of `subject` that lack a qualifying
@@ -171,7 +215,7 @@ pub fn gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Gap> {
                 fixed.unmet(ctx, &subject.subject_id).into_iter().map(|s| (s.project_id.as_str().to_string(), s.scenario_id.as_str().to_string())).collect();
             if !scenarios.is_empty() {
                 let f = fixed.finding;
-                gaps.push(Gap { trigger: format!("blocker finding {}#{}.{} was closed fixed", f.change_id.as_str(), f.round, f.seq), since: fixed.closed, scenarios, scoped: fixed.is_scoped() });
+                gaps.push(Gap::new(repo, ctx, format!("blocker finding {}#{}.{} was closed fixed", f.change_id.as_str(), f.round, f.seq), fixed.closed, scenarios, fixed.is_scoped(), None));
             }
         }
     }
@@ -211,22 +255,51 @@ pub fn chore_violations(repo: &Path, ctx: &GateContext, subject: &Subject) -> Ve
 /// The `canon review change` step a chore's review gap names.
 pub fn chore_review_remedy(change: &ChangeId) -> String {
     format!(
-        "have a reviewer record one review of the chore: `canon review change {} --project-id <root> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<brief>\"`",
+        "have a reviewer record one review of the chore: `canon review change {} --project-id <root> --actor-id <reviewer> --session-id <review-session> --role reviewer --original-spec-ref \"<brief>\"`",
         change.as_str()
     )
 }
 
 /// The hint a refusal carries when any of `violations` is a
-/// re-verification one: the batch command and what follows it, or, when
-/// every such refusal is for a finding that names its scenarios, the
-/// per-scenario command.
-pub fn hint(violations: &[&Violation]) -> Option<String> {
+/// re-verification one: the batch command (built from `subject`'s real
+/// report paths, [`Gap::commands`]) and what follows it, or, when every such
+/// refusal is for a finding that names its scenarios, the per-scenario
+/// command.
+pub fn hint(repo: &Path, ctx: Option<&GateContext>, subject: &Subject, violations: &[&Violation]) -> Option<String> {
     let reverify: Vec<&&Violation> = violations.iter().filter(|v| is_reverify(v)).collect();
     if reverify.is_empty() {
         return None;
     }
     if reverify.iter().all(|v| is_scoped_reverify(v)) {
-        return Some("record evidence again for the scenarios named, one command each: `canon evidence add --project-id <root> --scenario-id <id> --report <junit|cucumber|swift-testing>:<path> --class test-run --role implementer --ref \"<test command>\" --actor-id <unit> --session-id <session>`; the rest of the suite needs nothing; reviews stay current while a scenario's verdict and checks are unchanged, then ship".to_string());
+        return Some("record evidence again for the scenarios named, one command each (`canon evidence add --project-id <root> --scenario-id <id> --report <junit|cucumber|swift-testing>:<path> --role implementer`); the rest of the suite needs nothing; reviews stay current while a scenario's verdict and checks are unchanged, then ship".to_string());
     }
-    Some("record the suite again for the scenarios named: `canon evidence add --project-id <root> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --class test-run --role implementer --ref \"<test command>\" --actor-id <unit> --session-id <session>`; reviews stay current while a scenario's verdict and checks are unchanged; a chore also needs its change-level review (`canon review change <slug>`), then ship".to_string())
+    let commands = ctx.map(|ctx| batch_commands_of(repo, ctx, subject)).unwrap_or_default();
+    let how = match commands.as_slice() {
+        [] => "record the suite again for the scenarios named with `canon evidence add --all-scenarios` and a --report for each test report of the suite".to_string(),
+        [one] => format!("record the suite again for the scenarios named: `{one}`"),
+        many => format!("record the suite again for the scenarios named, once per spec root: {}", many.iter().map(|c| format!("`{c}`")).collect::<Vec<_>>().join("; ")),
+    };
+    let review = chore_review_commands(repo, ctx, subject).first().map_or_else(
+        || String::new(),
+        |change| format!("; a chore also needs its change-level review (`canon review change {change}`)"),
+    );
+    Some(format!("{how}; reviews stay current while a scenario's verdict and checks are unchanged{review}, then ship"))
+}
+
+/// The batch commands of every whole-suite gap of `subject`, each once.
+pub fn batch_commands_of(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<String> {
+    let mut commands: Vec<String> = Vec::new();
+    for gap in gaps(repo, ctx, subject).into_iter().filter(|g| !g.scoped) {
+        for command in gap.commands {
+            if !commands.contains(&command) {
+                commands.push(command);
+            }
+        }
+    }
+    commands
+}
+
+/// The chore changes of `subject` whose approval is on record, by slug.
+fn chore_review_commands(repo: &Path, ctx: Option<&GateContext>, subject: &Subject) -> Vec<String> {
+    ctx.map(|ctx| chore_approvals(repo, ctx, subject).into_iter().map(|(change, _, _)| change.as_str().to_string()).collect()).unwrap_or_default()
 }

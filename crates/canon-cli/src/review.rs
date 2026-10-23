@@ -115,7 +115,9 @@ pub struct ReviewAddArgs {
     /// chore (module doc); `scenario_ids` is then empty.
     pub change: Option<ChangeId>,
     pub reviewer: String,
-    pub pin: String,
+    /// `--rev`: the commit the review is about, recorded as its `pin` with the
+    /// code tree it saw (0.28 D7b).
+    pub rev: String,
     pub upstream_ref: Option<String>,
     pub original_spec_ref: Option<String>,
     pub actor_id: String,
@@ -207,6 +209,10 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     let scenario_ids = if args.change.is_some() { Vec::new() } else { requested_scenarios(args) };
 
     let repo = resolve_repo_root(repo);
+    let commit = match crate::git_rev::bind(&repo, &args.rev) {
+        Ok(commit) => commit,
+        Err(error) => return error.emit(&args.full(), args.json),
+    };
     if let Err(error) = crate::inventory::require_spec_root(&repo, &args.project_id) {
         return error.emit(&args.full(), args.json);
     }
@@ -267,7 +273,8 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     let at = Utc::now();
     let mut reviews: Vec<(Review, String)> = Vec::new();
     if let (Some(change), Some(digest)) = (&args.change, brief_digest) {
-        let mut review = Review::for_change(Envelope::new(1, RecordKind::Review, at, actor.clone()), args.project_id.clone(), change.clone(), &args.reviewer, &args.pin, provenance_ref.clone());
+        let mut review = Review::for_change(Envelope::new(1, RecordKind::Review, at, actor.clone()), args.project_id.clone(), change.clone(), &args.reviewer, commit.sha.as_str(), provenance_ref.clone())
+            .with_code(&commit.code_tree, commit.worktree_dirty);
         review.outcome = args.outcome;
         review.reviewer_provider = args.reviewer_provider.clone();
         review.reviewer_model = args.reviewer_model.clone();
@@ -284,9 +291,10 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
             args.project_id.clone(),
             scenario.scenario_id.clone(),
             &args.reviewer,
-            &args.pin,
+            commit.sha.as_str(),
             provenance_ref.clone(),
-        );
+        )
+        .with_code(&commit.code_tree, commit.worktree_dirty);
         review.outcome = args.outcome;
         review.reviewer_provider = args.reviewer_provider.clone();
         review.reviewer_model = args.reviewer_model.clone();
@@ -442,6 +450,9 @@ mod tests {
     fn repo_dir() -> TempDir {
         let dir = TempDir::new().unwrap();
         std::fs::write(dir.path().join("canon.yaml"), "specs:\n  roots:\n    - id: app-a\n      root: specs\n").unwrap();
+        for git_args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["add", "-A"], &["commit", "-q", "-m", "x"]] {
+            assert!(std::process::Command::new("git").args(git_args).current_dir(dir.path()).status().unwrap().success());
+        }
         dir
     }
 
@@ -451,7 +462,7 @@ mod tests {
             scenario_ids: vec![ScenarioId::parse("world.firstbuy-hotdeal.26").unwrap()],
             change: None,
             reviewer: "reviewer-1".into(),
-            pin: "abc123pin".into(),
+            rev: "HEAD".into(),
             upstream_ref: Some("routes/world.firstbuy-hotdeal.26#onReview".into()),
             original_spec_ref: None,
             actor_id: "agent-x".into(),

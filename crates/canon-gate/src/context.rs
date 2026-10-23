@@ -204,6 +204,12 @@ pub struct GateContext {
     /// silently inert pass — the failure mode that already made `Task`
     /// invisible to `canon report`.
     pub unreadable_kinds: Vec<RecordKind>,
+    /// The git tree id of the code as it stands now (0.28 D7b, computed by
+    /// the caller: `canon_cli::git_rev::code_tree`), when the caller knows
+    /// it. A check that compares a record to "current code" compares this
+    /// with the record's own `code_tree`, never commit shas. `None` after
+    /// [`Self::load`]: the loader does not run git.
+    pub code_tree: Option<String>,
     pub now: DateTime<Utc>,
 }
 
@@ -265,6 +271,7 @@ impl GateContext {
             violations,
             corpus_violations,
             unreadable_kinds,
+            code_tree: None,
             now,
         })
     }

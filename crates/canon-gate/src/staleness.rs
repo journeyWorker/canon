@@ -71,6 +71,8 @@ use crate::policy::{DEFAULT_MAX_COMMITS_BEHIND, DEFAULT_SURFACE_SCOPED};
 struct GreenCell {
     subject: String,
     evidence_sha: Option<Sha>,
+    /// The code tree the record was written against (0.28 D7b).
+    code_tree: Option<String>,
     surface_ref: Vec<String>,
     raw: serde_json::Value,
 }
@@ -129,6 +131,7 @@ fn fold_latest_green_cells(ctx: &GateContext) -> Vec<GreenCell> {
         .map(|c| GreenCell {
             subject: c.subject,
             evidence_sha: c.record.evidence_sha.clone(),
+            code_tree: c.record.code_tree.clone(),
             surface_ref: c.record.surface_ref.clone(),
             raw: serde_json::to_value(c.record).unwrap_or(serde_json::Value::Null),
         })
@@ -205,6 +208,12 @@ impl GateCheck for StalenessCheck {
             // ref to query. Unresolvable, never assumed stale (module
             // doc).
             let Some(sha) = cell.evidence_sha.as_ref() else { continue };
+            // The code is what it was when the evidence was recorded (D7b):
+            // commits since then (docs, specs, briefs) did not move it, so no
+            // surface changed and the ceiling is not about code.
+            if cell.code_tree.is_some() && cell.code_tree == ctx.code_tree {
+                continue;
+            }
 
             let mut reasons: Vec<String> = Vec::new();
 
@@ -342,6 +351,7 @@ mod tests {
             violations: read.violations,
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
+            code_tree: None,
             now,
         }
     }

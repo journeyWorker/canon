@@ -173,7 +173,7 @@ pub fn run_stage(
     repo: &Path,
     project_id: &canon_model::ProjectId,
     scenario_id: &canon_model::ScenarioId,
-    sha: &Sha,
+    commit: &crate::git_rev::Bound,
     status: DivergenceStatus,
     round: u32,
     reviewer: &str,
@@ -199,7 +199,7 @@ pub fn run_stage(
             return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence add", json);
         }
     };
-    let candidate = candidate(project_id, scenario_id, sha, status, round, reviewer, detail, Actor::new(actor_id, role.clone()), Utc::now());
+    let candidate = candidate(project_id, scenario_id, &commit.sha, Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, Actor::new(actor_id, role.clone()), Utc::now());
 
     let location = match stage(&gate_ctx.ledger_root, &candidate) {
         Ok(location) => location,
@@ -218,8 +218,8 @@ pub fn run_stage(
 /// The staged shape of one divergence: the full record, `run_seq` not yet
 /// assigned.
 #[allow(clippy::too_many_arguments)]
-fn candidate(project_id: &ProjectId, scenario_id: &ScenarioId, sha: &Sha, status: DivergenceStatus, round: u32, reviewer: &str, detail: &str, actor: Actor, at: DateTime<Utc>) -> Divergence {
-    Divergence::new(
+fn candidate(project_id: &ProjectId, scenario_id: &ScenarioId, sha: &Sha, code: Option<(&str, bool)>, status: DivergenceStatus, round: u32, reviewer: &str, detail: &str, actor: Actor, at: DateTime<Utc>) -> Divergence {
+    let record = Divergence::new(
         Envelope::new(1, RecordKind::Divergence, at, actor),
         project_id.clone(),
         scenario_id.clone(),
@@ -229,7 +229,11 @@ fn candidate(project_id: &ProjectId, scenario_id: &ScenarioId, sha: &Sha, status
         round,
         reviewer,
         detail,
-    )
+    );
+    match code {
+        Some((code_tree, dirty)) => record.with_code(code_tree, dirty),
+        None => record,
+    }
 }
 
 /// Stage `candidate` in the ledger's one staging directory; the location is
@@ -260,7 +264,7 @@ fn run_commit(
     repo: &Path,
     project_id: &canon_model::ProjectId,
     scenario_id: &canon_model::ScenarioId,
-    sha: &Sha,
+    commit: &crate::git_rev::Bound,
     status: DivergenceStatus,
     round: u32,
     reviewer: &str,
@@ -279,7 +283,7 @@ fn run_commit(
             return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&format!("canon divergence {verb}"), json);
         }
     };
-    let candidate = candidate(project_id, scenario_id, sha, status, round, reviewer, detail, Actor::new(actor_id, role.clone()), Utc::now());
+    let candidate = candidate(project_id, scenario_id, &commit.sha, Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, Actor::new(actor_id, role.clone()), Utc::now());
 
     match stage_and_promote(&gate_ctx.ledger_root, &candidate) {
         Ok(target) => {
@@ -302,7 +306,7 @@ pub fn run_resolve(
     repo: &Path,
     project_id: &canon_model::ProjectId,
     scenario_id: &canon_model::ScenarioId,
-    sha: &Sha,
+    commit: &crate::git_rev::Bound,
     round: u32,
     reviewer: &str,
     detail: &str,
@@ -310,7 +314,7 @@ pub fn run_resolve(
     role: &RoleId,
     json: bool,
 ) -> i32 {
-    run_commit("resolve", repo, project_id, scenario_id, sha, DivergenceStatus::Resolved, round, reviewer, detail, actor_id, role, json)
+    run_commit("resolve", repo, project_id, scenario_id, commit, DivergenceStatus::Resolved, round, reviewer, detail, actor_id, role, json)
 }
 
 /// `canon divergence defer --reason <..> --expiry <..>` (module doc):
@@ -320,7 +324,7 @@ pub fn run_defer(
     repo: &Path,
     project_id: &canon_model::ProjectId,
     scenario_id: &canon_model::ScenarioId,
-    sha: &Sha,
+    commit: &crate::git_rev::Bound,
     round: u32,
     reviewer: &str,
     reason: &str,
@@ -334,7 +338,7 @@ pub fn run_defer(
         repo,
         project_id,
         scenario_id,
-        sha,
+        commit,
         DivergenceStatus::Deferred { reason: reason.to_string(), expiry },
         round,
         reviewer,
@@ -447,6 +451,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
             // acceptance binds to evidence, not to an app state, so a
             // scenario whose evidence carries no commit gets the null one.
             &canon_gate::acceptance::evidence_sha(&context, scenario).unwrap_or_else(|| Sha::parse(&"0".repeat(40)).expect("forty hex digits")),
+            None,
             DivergenceStatus::Accepted {
                 reason: args.reason.clone(),
                 tracking: args.tracking.clone(),
@@ -625,12 +630,12 @@ mod tests {
         GateCtx::from_repo(dir.path()).unwrap().ledger_root
     }
 
-    fn ids() -> (ProjectId, ScenarioId, RoleId, Sha) {
+    fn ids() -> (ProjectId, ScenarioId, RoleId, crate::git_rev::Bound) {
         (
             ProjectId::parse("app-a").unwrap(),
             ScenarioId::parse("world.firstbuy-hotdeal.26").unwrap(),
             RoleId::parse("reviewer").unwrap(),
-            Sha::parse("a".repeat(40)).unwrap(),
+            crate::git_rev::Bound { sha: Sha::parse("a".repeat(40)).unwrap(), code_tree: "t".repeat(40), worktree_dirty: false },
         )
     }
 
@@ -668,7 +673,8 @@ mod tests {
         let malformed = candidate(
             &project_id,
             &ScenarioId::parse("world.firstbuy-hotdeal.90").unwrap(),
-            &sha,
+            &sha.sha,
+            None,
             DivergenceStatus::Open,
             1,
             "reviewer-1",
@@ -790,6 +796,6 @@ mod tests {
         assert_eq!(files_with_bytes(&divergence_dir), persisted_before, "reading must never rewrite the persisted resolution");
         let persisted: canon_model::records::Divergence = serde_json::from_slice(&persisted_before[0].1).unwrap();
         assert_eq!(persisted.status, DivergenceStatus::Resolved, "the record on disk still says resolved");
-        assert_eq!(persisted.sha, sha);
+        assert_eq!(persisted.sha, sha.sha);
     }
 }
