@@ -6,4 +6,4 @@ canon migrate: plan:
   subject          would move 3 of 4 file(s) (0.8 KiB); 1 stay
 canon ledger compact: 4 superseded version(s) would move to .canon/archive; nothing written
 canon migrate: would pin 1 review(s) to what their evidence says (the verdict and the checks of its latest record): 0 were pinned to evidence records, 1 to a commit before 0.15; 1 of those could not be checked because their commit, or the scenario at it, is not in this clone, so they are pinned as the scenario stands (check out full history, `fetch-depth: 0` in CI, to check them)
-planDigest 61d8c89680b1d127db0fea07155929be1bd0298690a1ad6a3fe49072223058b1; nothing written. To act: canon migrate --commit --plan-digest 61d8c89680b1d127db0fea07155929be1bd0298690a1ad6a3fe49072223058b1
+planDigest 1e415a7731b2333faa6b890cadf650f441a558b242c6ddb221d187aa587df1b8; nothing written. To act: canon migrate --commit --plan-digest 1e415a7731b2333faa6b890cadf650f441a558b242c6ddb221d187aa587df1b8
