@@ -28,6 +28,16 @@ def load_effects(path=SPEC_PATH):
 EFFECTS = load_effects()
 
 
+def load_options(path=SPEC_PATH):
+    """`{command path tuple: set of long option names (`--x`)}` for every leaf, `--as` included."""
+    with open(path, encoding="utf-8") as stream:
+        spec = json.load(stream)
+    return {tuple(node["path"]): {f"--{o['name']}" for o in node["options"]} | {"--as"} for node in spec["commands"] if node["nodeKind"] == "leaf"}
+
+
+OPTIONS = load_options()
+
+
 def leaf_of(words):
     """The longest leaf command path that starts `words`, or `()` for a spelling the spec does not know."""
     for size in range(min(len(words), 3), 0, -1):
@@ -99,7 +109,7 @@ def failure_envelopes(output):
             error = doc.get("error") if isinstance(doc, dict) else None
             if isinstance(error, dict):
                 meta = doc.get("meta") if isinstance(doc.get("meta"), dict) else {}
-                found.append({"code": error.get("code"), "message": error.get("message") or "",
+                found.append({"code": error.get("code"), "message": error.get("message") or "", "field": error.get("field") or "",
                               "hint": error.get("hint") or "", "command": meta.get("command")})
                 continue
         except json.JSONDecodeError:
@@ -109,7 +119,7 @@ def failure_envelopes(output):
         def pick(key):
             hit = re.search(r'"' + key + r'"\s*:\s*"((?:[^"\\]|\\.)*)"', rest)
             return hit[1] if hit else ""
-        found.append({"code": pick("code") or None, "message": pick("message"), "hint": pick("hint"),
+        found.append({"code": pick("code") or None, "message": pick("message"), "hint": pick("hint"), "field": pick("field"),
                       "command": pick("command") or None})
     return found
 
@@ -450,6 +460,20 @@ def strip_prefix(argv):
     return argv, env
 
 
+def expand_variables(args, assigned):
+    """`args` with `$NAME` / `${NAME}` replaced by what an earlier `NAME=value` in the same command set:
+    a word that is only the variable splits on whitespace, as an unquoted expansion does. Unknown names stay."""
+    out = []
+    for arg in args:
+        whole = re.fullmatch(r"\$(\w+)|\$\{(\w+)\}", arg)
+        name = whole and (whole[1] or whole[2])
+        if name in assigned:
+            out.extend(assigned[name].split())
+            continue
+        out.append(re.sub(r"\$(\w+)|\$\{(\w+)\}", lambda m: assigned.get(m[1] or m[2], m[0]), arg))
+    return out
+
+
 def merged(shell_env, env):
     return {"assigned": {**shell_env["assigned"], **env["assigned"]},
             "unset": shell_env["unset"] | env["unset"], "clear": shell_env["clear"] or env["clear"]}
@@ -536,6 +560,8 @@ def shell_activity(command, cwd, result, inherited=None):
         elif exe == "canon":
             # A pipeline's exit status belongs to its final command, not canon.
             known = code if ((all_and and code == 0 and separator != "|") or index == len(parts) - 1) else None
+            args = expand_variables(args, merged(shell_env, env)["assigned"])
+            argv = argv[:1] + args
             words = [a for a in args if not a.startswith("-")]
             verb = words[0] if words else "<bare>"
             action = words[1] if len(words) > 1 else ""
@@ -699,6 +725,27 @@ def wrong_shape_item(event, call, code, kind, message=""):
 CLAP_USAGE = re.compile(r"^error: (?:unexpected argument|the following required arguments? w|invalid value|unrecognized subcommand|a value is required|unknown option)", re.M)
 
 
+def message_command(message):
+    """The command a refusal names in backticks (`` `canon query` has no field … ``), as a leaf path, or `""`."""
+    match = re.match(r"`canon ((?:[a-z][a-z-]* ?)+)`", message)
+    return " ".join(leaf_of(match[1].split())) if match else ""
+
+
+def guess_call(calls, matched, envelope):
+    """The call a command-less envelope (its `meta` cut off by `head -c`) most likely came from: among the
+    calls not yet explained, one whose leaf has no such option when the refusal names an unexpected
+    `--option`; else the only candidate; else none, with the candidates' command lines for the report."""
+    free = [i for i, c in enumerate(calls) if i not in matched and c["leaf"]]
+    field = envelope.get("field") or ""
+    if field.startswith("--") and "unexpected argument" in envelope["message"]:
+        lacking = [i for i in free if field in calls[i]["command"].split() and field not in OPTIONS.get(tuple(calls[i]["leaf"].split()), set())]
+        if lacking:
+            return lacking[0], [calls[i]["command"] for i in lacking]
+    if len(free) == 1:
+        return free[0], []
+    return None, [calls[i]["command"] for i in free]
+
+
 def classify_calls(calls, output, event):
     """Attribute the failures in one tool result to its canon calls (`calls` may grow).
 
@@ -709,13 +756,16 @@ def classify_calls(calls, output, event):
     envelope, a clap usage error or a non-zero exit the call is known to own is a wrong shape."""
     wrong, refusals, matched = [], [], set()
     for envelope in failure_envelopes(output):
-        path = envelope["command"] or ""
-        index = next((i for i, c in enumerate(calls) if i not in matched and c["leaf"] == path), None)
-        if index is None and len(calls) == 1 and not matched and not path:
-            index = 0
+        path = envelope["command"] or message_command(envelope["message"])
+        index = next((i for i, c in enumerate(calls) if i not in matched and c["leaf"] == path), None) if path else None
+        if index is None and not path:
+            index, candidates = guess_call(calls, matched, envelope)
+        else:
+            candidates = []
         if index is None:
             index = len(calls)
-            calls.append(canon_call([], path.split(), "canon " + (path or "<unseen>"), None, NO_ENV))
+            shown = path and "canon " + path or (" | ".join(candidates) if candidates else "canon <unseen>")
+            calls.append(canon_call([], path.split(), shown, None, NO_ENV))
         matched.add(index)
         call = calls[index]
         call["error_code"] = envelope["code"]

@@ -104,3 +104,31 @@ fn an_option_the_leaf_lacks_is_a_usage_error_with_and_without_input() {
     let body: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(body["error"]["field"], "--bogus", "the refused option is named, not turned into an operand conflict: {body}");
 }
+
+#[test]
+fn an_unknown_option_hint_lists_what_the_leaf_takes_and_rules_out_attribution_on_a_read_leaf() {
+    let dir = repo();
+    let repo = dir.path();
+    let refused = |args: &[&str]| -> Value {
+        let out = canon(repo, args);
+        assert_eq!(out.status.code(), Some(2), "{args:?}");
+        serde_json::from_slice::<Value>(&out.stdout).unwrap()["error"].clone()
+    };
+    // A read leaf: every option it has is in `expected` and in the hint, and the hint says why attribution is out.
+    let error = refused(&["gate", "check", "--actor-id", "a", "--session-id", "s", "--json"]);
+    assert_eq!((error["code"].as_str(), error["field"].as_str()), (Some("USAGE"), Some("--actor-id")), "{error}");
+    let expected: Vec<&str> = error["expected"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
+    assert!(!expected.is_empty() && !expected.contains(&"--actor-id"), "{error}");
+    let hint = error["hint"].as_str().unwrap();
+    for option in &expected {
+        assert!(hint.contains(option), "the hint lists {option}: {hint}");
+    }
+    assert!(["--actor-id", "--session-id", "--role"].iter().all(|flag| hint.contains(flag)), "the hint names the attribution flags that do not apply: {hint}");
+    // A write leaf that lacks the flag: its own options are listed, with no read-leaf remark.
+    let error = refused(&["scenario", "new", "x.y.01", "--title", "T", "--role", "implementer", "--json"]);
+    let hint = error["hint"].as_str().unwrap();
+    for option in error["expected"].as_array().unwrap() {
+        assert!(hint.contains(option.as_str().unwrap()), "{hint}");
+    }
+    assert!(!hint.contains("--role"), "a write leaf is not told attribution does not apply: {hint}");
+}

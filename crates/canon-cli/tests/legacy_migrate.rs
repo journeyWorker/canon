@@ -97,6 +97,8 @@ fn repo_027() -> tempfile::TempDir {
     put(repo, ".codex/hooks.json", &fixture("repo/.codex/hooks.json"));
     put(repo, ".canon/scripts/canon-gate-pre-commit.sh", &fixture("repo/.canon/scripts/canon-gate-pre-commit.sh"));
     put(repo, HOOK_COPY, &fixture("skill/scripts/canon-retrieve-pre-dispatch.sh"));
+    // The AGENTS.md 0.27's `init` wrote, with the owner's own text before and after the canon block.
+    put(repo, "AGENTS.md", &fixture("repo/AGENTS.md"));
     // The retrieve hook entry `canon gate install-hooks` documents, beside the gate entry.
     ok(repo, &["gate", "install-hooks", "--event", "PreToolUse", "--matcher", "Task", "--command", &format!("sh {HOOK_COPY}"), "--timeout", "15"]);
     git(repo, &["add", "-A"]);
@@ -137,7 +139,7 @@ fn migrate_previews_the_027_effects_and_writes_nothing() {
     assert_eq!(tree(repo), before, "the preview writes nothing");
     assert_eq!(preview["data"]["committed"], false);
     let paths = effect_paths(&preview);
-    for expected in [".claude/settings.json", ".codex/hooks.json", HOOK_COPY, ".canon/skills/.install-lock.json"] {
+    for expected in [".claude/settings.json", ".codex/hooks.json", HOOK_COPY, ".canon/skills/.install-lock.json", "AGENTS.md"] {
         assert!(paths.iter().any(|path| path == expected), "{expected} is an effect: {paths:?}");
     }
     for projection in PROJECTIONS {
@@ -189,10 +191,18 @@ fn migrate_commit_rewrites_backs_up_and_is_idempotent() {
     assert!(!lock["files"].as_object().unwrap().keys().any(|key| key.contains("/reference/")));
     ok(repo, &["skills", "check"]);
 
+    // AGENTS.md: the canon block is this canon's, the owner's text around it is byte-identical.
+    let agents = String::from_utf8(read(repo, "AGENTS.md")).unwrap();
+    let before = String::from_utf8(originals["AGENTS.md"].clone()).unwrap();
+    let outside = |text: &str| (text[..text.find("<!-- canon:begin -->").unwrap()].to_string(), text[text.find("<!-- canon:end -->").unwrap() + "<!-- canon:end -->".len()..].to_string());
+    assert_eq!(outside(&agents), outside(&before), "text outside the markers is untouched");
+    assert!(agents.contains(canon_cli::init::AGENTS_BLOCK), "the block is the one this canon's init writes");
+    assert_ne!(agents, before);
+
     // Backups: one directory holding every rewritten or removed file with its original bytes.
     let backups = backup_dirs(repo);
     assert_eq!(backups.len(), 1, "{backups:?}");
-    for file in [".claude/settings.json", ".codex/hooks.json", HOOK_COPY, ".canon/skills/.install-lock.json", ".claude/skills/canon/SKILL.md", ".agents/skills/canon/reference/role-planner.md", ".claude/skills/canon/scripts/canon-retrieve-pre-dispatch.sh"] {
+    for file in [".claude/settings.json", ".codex/hooks.json", HOOK_COPY, ".canon/skills/.install-lock.json", ".claude/skills/canon/SKILL.md", ".agents/skills/canon/reference/role-planner.md", ".claude/skills/canon/scripts/canon-retrieve-pre-dispatch.sh", "AGENTS.md"] {
         assert_eq!(std::fs::read(backups[0].join(file)).unwrap(), originals[file], "{file} is backed up with its original bytes");
     }
 
@@ -277,4 +287,39 @@ fn skills_install_prunes_the_old_references_and_keeps_an_edited_one() {
         assert!(!repo.join(format!(".claude/skills/canon/reference/{name}.md")).exists(), "{name} is pruned");
     }
     assert_eq!(json(&ok(repo, &["skills", "install", "--json"]))["data"]["changed"], false, "a second install changes nothing");
+}
+
+/// D9: an AGENTS.md without the canon markers is the owner's file: migrate does not add the block, and a
+/// repo whose block is already current has nothing to rewrite there.
+#[test]
+fn migrate_leaves_an_agents_file_without_markers_or_with_a_current_block_alone() {
+    let dir = repo_027();
+    let repo = dir.path();
+    put(repo, "AGENTS.md", b"# Mine\n\nNo canon block here.\n");
+    let preview = json(&ok(repo, &["migrate", "--json"]));
+    assert!(!effect_paths(&preview).iter().any(|path| path == "AGENTS.md"), "{:?}", effect_paths(&preview));
+    let current = format!("# Mine\n\n{}\n\nafter\n", canon_cli::init::AGENTS_BLOCK);
+    put(repo, "AGENTS.md", current.as_bytes());
+    let preview = json(&ok(repo, &["migrate", "--json"]));
+    assert!(!effect_paths(&preview).iter().any(|path| path == "AGENTS.md"), "{:?}", effect_paths(&preview));
+    let committed = json(&commit(repo));
+    assert_eq!(committed["data"]["committed"], true);
+    assert_eq!(read(repo, "AGENTS.md"), current.as_bytes());
+}
+
+/// D9: a repo whose only 0.27 leftover is an old AGENTS.md block is 0.27-era state: `status` says so.
+#[test]
+fn an_old_agents_block_alone_is_detected_and_migrated() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    git(repo, &["init", "-q"]);
+    ok(repo, &["init", "--providers", "none", "--no-agents-md", "--no-policy"]);
+    put(repo, "AGENTS.md", &fixture("repo/AGENTS.md"));
+    let status = json(&canon(repo, &["status", "--json"]));
+    assert_eq!(status["meta"]["next"][0]["argv"], serde_json::json!(["canon", "migrate", "--json"]), "{}", status["meta"]);
+    let preview = json(&ok(repo, &["migrate", "--json"]));
+    assert_eq!(effect_paths(&preview), ["AGENTS.md"]);
+    commit(repo);
+    let status = json(&canon(repo, &["status", "--json"]));
+    assert!(!status["meta"]["next"].as_array().is_some_and(|next| next.iter().any(|s| s["command"].as_str().unwrap().starts_with("canon migrate"))), "{}", status["meta"]);
 }

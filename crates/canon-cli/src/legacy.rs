@@ -18,6 +18,8 @@
 //! - the canon-owned pre-commit script (`.canon/scripts/canon-gate-pre-commit.sh`),
 //!   or a retrieve hook script a hook command names, differs from the one this
 //!   canon ships and calls a removed spelling;
+//! - `AGENTS.md` holds the canon block (one begin and one end marker) and the block differs from
+//!   the one this canon's `init` writes; user text outside the markers is never touched;
 //! - the skill install lock records a canon older than 0.28 (or none), or lists a
 //!   `reference/**` file ([`crate::skills::has_full_projection`]).
 
@@ -221,6 +223,27 @@ pub struct Plan {
     pub hooks: Vec<HookFile>,
     pub scripts: Vec<ScriptFile>,
     pub skill: Option<SkillStub>,
+    /// `AGENTS.md` as it will be written: only its canon block changes.
+    pub agents: Option<AgentsFile>,
+}
+
+/// The `AGENTS.md` whose canon block is out of date.
+#[derive(Debug, Clone)]
+pub struct AgentsFile {
+    pub text: String,
+}
+
+/// The file `AGENTS.md` for `repo` rewritten with this canon's block, when it holds exactly one canon block
+/// (one begin and one end marker) that differs; `None` without markers (nothing of canon's to refresh), with
+/// an arrangement `init` would refuse, or when the block is current.
+pub fn agents_file(repo: &Path) -> Option<AgentsFile> {
+    let current = fs::read_to_string(repo.join("AGENTS.md")).ok()?;
+    let (begins, ends) = crate::init::marker_lines(&current).ok()?;
+    if begins.len() != 1 || ends.len() != 1 {
+        return None;
+    }
+    let merged = crate::init::merge_agents_md(Some(&current)).ok()?;
+    (merged != current).then_some(AgentsFile { text: merged })
 }
 
 /// The full skill projection and what replaces it: the files an install writes and prunes.
@@ -238,7 +261,7 @@ pub struct SkillStub {
 
 impl Plan {
     pub fn is_empty(&self) -> bool {
-        self.hooks.is_empty() && self.scripts.is_empty() && self.skill.is_none()
+        self.hooks.is_empty() && self.scripts.is_empty() && self.skill.is_none() && self.agents.is_none()
     }
 
     /// The effects, in a fixed order: hooks, scripts, the skill's files, the lock.
@@ -250,6 +273,9 @@ impl Plan {
         }
         for script in &self.scripts {
             out.push(Effect::path("rewrite", script.path.clone()).detail("regenerated from the script this canon ships; it called a removed spelling"));
+        }
+        if self.agents.is_some() {
+            out.push(Effect::path("rewrite", "AGENTS.md").detail("the canon block between its markers becomes the one this canon's `init` writes; text outside the markers is untouched"));
         }
         if let Some(skill) = &self.skill {
             for (path, existed) in &skill.rewritten {
@@ -268,6 +294,9 @@ impl Plan {
     /// The files [`Plan::apply`] overwrites or removes, repo-relative: what [`backup`] copies.
     pub fn backed_up(&self) -> Vec<String> {
         let mut out: Vec<String> = self.hooks.iter().map(|file| file.path.to_string()).chain(self.scripts.iter().map(|script| script.path.clone())).collect();
+        if self.agents.is_some() {
+            out.push("AGENTS.md".to_string());
+        }
         if let Some(skill) = &self.skill {
             out.extend(skill.rewritten.iter().filter(|(_, existed)| *existed).map(|(path, _)| path.clone()));
             out.extend(skill.pruned.iter().cloned());
@@ -296,6 +325,9 @@ impl Plan {
                 use std::os::unix::fs::PermissionsExt;
                 fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).map_err(|e| format!("could not make {} executable: {e}", script.path))?;
             }
+        }
+        if let Some(agents) = &self.agents {
+            write_file(&repo.join("AGENTS.md"), agents.text.as_bytes())?;
         }
         if self.skill.is_some() {
             skills::install_canonical(skills::resolve_source(None).as_deref(), repo, None, false).map_err(|e| format!("could not install the skill stub: {e}"))?;
@@ -336,7 +368,7 @@ pub fn plan(repo: &Path) -> Result<Plan, String> {
     if let Some(skill) = &skill {
         scripts.retain(|script| !skill.rewritten.iter().any(|(path, _)| *path == script.path));
     }
-    Ok(Plan { hooks: hook_files(repo), scripts, skill })
+    Ok(Plan { hooks: hook_files(repo), scripts, skill, agents: agents_file(repo) })
 }
 
 /// Copies each of `paths` (repo-relative, regular files that exist) to
@@ -372,6 +404,7 @@ pub struct Detected {
     pub hooks: bool,
     pub scripts: bool,
     pub skill: bool,
+    pub agents: bool,
 }
 
 impl Detected {
@@ -383,6 +416,9 @@ impl Detected {
         if self.scripts {
             parts.push("a canon script that calls a removed command spelling");
         }
+        if self.agents {
+            parts.push("an AGENTS.md canon block from an earlier canon (it may name removed commands; `canon migrate` refreshes it)");
+        }
         if self.skill {
             parts.push("a full skill projection (0.28 installs a stub that points to `canon skills show canon`)");
         }
@@ -393,8 +429,8 @@ impl Detected {
 /// Whether `repo` holds 0.27-era state (module doc, "Detection rule"). Reads two small JSON files, up to
 /// three scripts and the skill lock.
 pub fn detect(repo: &Path) -> Option<Detected> {
-    let found = Detected { hooks: !hook_files(repo).is_empty(), scripts: !script_files(repo).is_empty(), skill: skills::has_full_projection(repo) };
-    (found.hooks || found.scripts || found.skill).then_some(found)
+    let found = Detected { hooks: !hook_files(repo).is_empty(), scripts: !script_files(repo).is_empty(), skill: skills::has_full_projection(repo), agents: agents_file(repo).is_some() };
+    (found.hooks || found.scripts || found.skill || found.agents).then_some(found)
 }
 
 /// Said whenever the full 0.27 skill projection is on disk: those files are the old guide and still name removed
