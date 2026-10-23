@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-2"
+  },
+  "at": "2026-10-23T14:45:37.705950885Z",
+  "code_tree": "7c7d06847373654dafedac3630eedcda014eea0e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test migrate_pins migrate_pins_07_a_moved_root_is_searched_at_its_former_path_and_only_for_its_own_project"
+  },
+  "evidence_note": {
+    "summary": "migrate_pins migrate_pins_07_a_moved_root_is_searched_at_its_former_path_and_onl: 1 passed, 0 failed, 7 filtered out @ 335b01af"
+  },
+  "evidence_sha": "335b01afbd64a84dae00ea92d878d2e0ff50de42",
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 92,
+  "scenario_id": "gate.check.96",
+  "schema": 1,
+  "staging_id": "e2fc0a661067",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
