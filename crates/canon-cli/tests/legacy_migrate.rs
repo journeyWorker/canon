@@ -318,7 +318,7 @@ fn an_old_agents_block_alone_is_detected_and_migrated() {
     let status = json(&canon(repo, &["status", "--json"]));
     assert_eq!(status["meta"]["next"][0]["argv"], serde_json::json!(["canon", "migrate", "--json"]), "{}", status["meta"]);
     let preview = json(&ok(repo, &["migrate", "--json"]));
-    assert_eq!(effect_paths(&preview), ["AGENTS.md"]);
+    assert_eq!(effect_paths(&preview), ["AGENTS.md", ".canon/migrate-backup/"], "the rewrite and the backup copy of the file it rewrites");
     commit(repo);
     let status = json(&canon(repo, &["status", "--json"]));
     assert!(!status["meta"]["next"].as_array().is_some_and(|next| next.iter().any(|s| s["command"].as_str().unwrap().starts_with("canon migrate"))), "{}", status["meta"]);
