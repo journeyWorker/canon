@@ -3,7 +3,7 @@
 //! The grammar tests (T1-T14) are only worth having if they fail when the grammar is
 //! broken. This copies the workspace sources to a scratch directory, applies one
 //! violation at a time (a dropped metadata row, a dropped option help, a hand-built JSON
-//! print, a runnable group, a duplicate option name with another meaning, a vocabulary
+//! print, a runnable group, an option name with another value name on one leaf, a vocabulary
 //! row dropped), and runs the test that must catch it there: it has to fail, on an
 //! assertion and not on a compile error, while the same test passes on the unmutated copy.
 //!
@@ -86,9 +86,9 @@ const MUTATIONS: &[Mutation] = &[
         catches: ("cli_tree", "no_group_is_runnable"),
     },
     Mutation {
-        name: "add an option name that already means something else",
-        file: "crates/canon-cli/src/cli/top.rs",
-        apply: |text| replace_once(text, "pub struct StatusArgs {", "pub struct StatusArgs {\n    /// A reason, with a value name the other `--reason` options do not use\n    #[arg(long, value_name = \"NAME\")]\n    pub reason: Option<String>,"),
+        name: "give an option name another value name on one leaf",
+        file: "crates/canon-cli/src/cli/divergence.rs",
+        apply: |text| replace_once(text, "#[arg(long, value_name = \"ACTOR_ID\")]", "#[arg(long, value_name = \"NAME\")]"),
         catches: ("grammar_t3_options", "one_name_has_one_value_name_arity_and_value_set_on_every_leaf"),
     },
     Mutation {
@@ -124,9 +124,9 @@ fn cargo_test(work: &Path, target: &Path, tests: &[(&str, &str)]) -> (bool, Stri
     for binary in &binaries {
         command.args(["--test", binary]);
     }
-    command.arg("--");
+    command.args(["--", "--exact"]);
     for (_, test) in tests {
-        command.args(["--exact", test]);
+        command.arg(test);
     }
     let out = command.current_dir(work).env("CARGO_TARGET_DIR", target).env_remove("CANON_WITNESS_DIR").output().expect("spawn cargo");
     (out.status.success(), format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr)))
