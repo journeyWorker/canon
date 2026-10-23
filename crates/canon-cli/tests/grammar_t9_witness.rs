@@ -22,7 +22,10 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 /// The output of a leaf the suite never emits, as (leaf, report name or `failure`, why).
-const UNWITNESSED: &[(&str, &str, &str)] = &[];
+const UNWITNESSED: &[(&str, &str, &str)] = &[
+    ("plugin sync", "BatchPluginSyncReport", "stateful, coverable: needs an installed plugin; `tests/grammar_t12_refusal.rs` builds one for the single-object run, no test batches it"),
+    ("strategy promote", "BatchStrategyPromoteReport", "stateful, coverable: needs a seeded strategy; `tests/grammar_t12_refusal.rs` seeds one for the single-object run, no test batches it"),
+];
 
 /// What one leaf can emit: each declared report, and its failure envelope.
 fn declared() -> Vec<(String, String)> {
@@ -62,7 +65,9 @@ fn missing(lines: &[(String, bool, String)]) -> Vec<(String, String)> {
                 return !lines.iter().any(|(command, ok, _)| command == leaf && !ok);
             }
             let row = rows.iter().find(|r| r.command == leaf && &r.name == output).unwrap_or_else(|| panic!("`{leaf}` declares {output}, which has no report_schemas() row"));
-            !lines.iter().any(|(command, _, kind)| command == leaf && kind == row.type_name)
+            // A batch report is built from untyped elements, so the witness names `BatchReport<Value>` for every leaf.
+            let batch = output.starts_with("Batch");
+            !lines.iter().any(|(command, _, kind)| command == leaf && (kind == row.type_name || batch && kind.starts_with("canon_cli::input::BatchReport<")))
         })
         .collect()
 }

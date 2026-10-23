@@ -91,3 +91,32 @@ fn leaves_whose_refusals_no_other_test_provokes_answer_with_the_failure_envelope
         assert_eq!((body["meta"]["command"].as_str(), body["error"]["code"].as_str()), (Some(leaf), Some(code)), "{body}");
     }
 }
+
+/// Every leaf that takes `--input` answers a one-element batch with its batch report (D7), in a copy of the fixture.
+#[test]
+fn every_batch_leaf_answers_a_one_element_batch_with_its_batch_report() {
+    let home = TempDir::new().unwrap();
+    let base = fixture(home.path());
+    let mut batches = 0;
+    for node in leaves() {
+        let Some(input) = node["inputs"].as_array().unwrap().iter().find(|i| i["batch"] == true) else { continue };
+        let path = path_of(node);
+        let (_scratch, mut repo) = copy_of(base.path());
+        let _fresh;
+        if path == "init" || path == "demo init" {
+            _fresh = TempDir::new().unwrap();
+            repo = _fresh.path().to_path_buf();
+        }
+        let document_text = serde_json::to_string(&Value::Array(vec![input["example"].clone()])).unwrap();
+        let mut argv = path.split(' ').map(str::to_string).collect::<Vec<_>>();
+        argv.extend(["--input".to_string(), document_text, "--json".to_string()]);
+        let out = canon_in(&repo, home.path(), &argv, &[]);
+        let body = document(&out);
+        let problems = validate_document(&body);
+        assert!(problems.is_empty(), "canon {path} --input [..]: {problems:?}\n{body}");
+        if body["data"]["items"].is_array() {
+            batches += 1;
+        }
+    }
+    assert!(batches > 20, "batch reports were answered ({batches})");
+}
