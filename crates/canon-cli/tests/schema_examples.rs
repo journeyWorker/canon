@@ -126,7 +126,7 @@ fn every_leaf_has_an_example_and_it_runs_in_a_scratch_repo() {
     for leaf in &leaves {
         let path: Vec<&str> = leaf.split(' ').collect();
         let detail = schema(base.path(), home.path(), &path);
-        let Some(example) = detail["example"].as_str() else {
+        let Some(example) = detail["examples"][0].as_str() else {
             problems.push(format!("{leaf}: `canon schema {leaf}` has no example"));
             continue;
         };

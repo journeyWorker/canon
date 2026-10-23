@@ -404,6 +404,7 @@ pub const CONFIG_EXEMPT: &[(&str, &str)] = &[
     ("gate task", "run by agent hooks and pre-commit scripts: it flips a plan row on evidence it finds and refuses otherwise"),
     ("gate promote", "run by agent hooks and pre-commit scripts: with nothing staged it reports so"),
     ("gate install-hooks", "installs hook seams into a repo that may not be set up yet"),
+    ("completion", "writes a shell script from the command tree: no repo state"),
     ("dashboard", "serves a built app and a snapshot; its canon.yaml section is optional and a missing repo or app is refused with its own code"),
 ];
 

@@ -10,8 +10,12 @@
   },
   "files": [
     "bin.js",
-    "dist/**/*"
+    "dist/**/*",
+    "man"
   ],
+  "directories": {
+    "man": "./man"
+  },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"

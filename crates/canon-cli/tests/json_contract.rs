@@ -90,6 +90,7 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
         "area" => "area",
         "surface" => "auth.login",
         "tag" => "auth.login.02",
+        "shell" => "zsh",
         _ => "x",
     }
     .to_string()
@@ -139,7 +140,7 @@ fn every_leaf_command_answers_json_with_one_document_and_a_coded_error() {
         }
 
         let mut args: Vec<String> = leaf.split(' ').map(str::to_string).collect();
-        for positional in schema["arguments"].as_array().unwrap().iter().filter(|a| a["required"] == true) {
+        for positional in schema["operands"].as_array().unwrap().iter().filter(|a| a["required"] == true) {
             args.push(value_for(leaf, positional["name"].as_str().unwrap(), &regime));
         }
         for option in schema["options"].as_array().unwrap().iter().filter(|o| o["required"] == true && o["name"] != "json") {

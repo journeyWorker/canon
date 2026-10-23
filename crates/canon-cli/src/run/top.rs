@@ -384,3 +384,16 @@ fn print_paged(command: &str, rendered: &str, warnings: &[String]) {
     }
     crate::json_out::data_with_meta(command, &crate::json_out::untyped(data), meta);
 }
+
+/// `canon completion <SHELL>`: text mode prints the script itself, so
+/// `canon completion zsh > _canon` is the whole installation; `--json`
+/// envelopes it as `{shell, script}`.
+pub(super) fn run_completion(shell: crate::cli::CompletionShell, json: bool) -> ExitCode {
+    let report = crate::completion::script(shell);
+    if json {
+        crate::json_out::data("completion", &report);
+    } else {
+        print!("{}", report.script);
+    }
+    ExitCode::SUCCESS
+}

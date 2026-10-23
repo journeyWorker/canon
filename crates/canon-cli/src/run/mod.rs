@@ -95,6 +95,7 @@ pub fn run(cli: Cli) -> ExitCode {
         Command::RegimeKey(RegimeKeyArgs { role, repo, area, hash, json }) => run_regime_key(&role, &repo, &area, &hash, json),
         Command::Selftest(SelftestArgs { json }) => crate::selftest::run_selftest(json),
         Command::Schema(SchemaArgs { path, json, errors, all }) => ExitCode::from(crate::schema::run(&crate::cli::command(), &path, json, errors, all)),
+        Command::Completion(CompletionArgs { shell, json }) => run_completion(shell, json),
     }
 }
 

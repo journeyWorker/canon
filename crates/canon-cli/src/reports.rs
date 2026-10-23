@@ -50,13 +50,14 @@ pub fn schema_of<R: JsonSchema>() -> Value {
 /// A command not listed still prints its `data` through `json_out::untyped`
 /// until a later slice types it.
 pub fn report_schemas() -> Vec<ReportSchema> {
-    use crate::{adapter, artifact_ingest, brief_approve, brief_check, context, context_pack, plans, retrieve, selftest, status, subject};
+    use crate::{adapter, artifact_ingest, brief_approve, brief_check, completion, context, context_pack, plans, retrieve, selftest, status, subject};
     let mut schemas: Vec<ReportSchema> = vec![
         entry::<adapter::AuthorizationResult>("adapter authorize", "AdapterAuthorizeReport"),
         entry::<adapter::ValidationSummary>("adapter validate", "AdapterValidateReport"),
         entry::<brief_check::BriefCheckReport>("brief check", "BriefCheckReport"),
         entry::<brief_check::BriefShowReport>("brief show", "BriefShowReport"),
         entry::<brief_approve::Approved>("brief approve", "BriefApproveReport"),
+        entry::<completion::CompletionReport>("completion", "CompletionReport"),
         entry::<context::AuthoringSurface>("context", "ContextReport"),
         entry::<context_pack::ContextPack>("context-pack new", "ContextPackAddReport"),
         entry::<context_pack::ContextPack>("context-pack show", "ContextPackShowReport"),

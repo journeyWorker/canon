@@ -216,7 +216,7 @@ fn every_read_leaf_leaves_the_repo_tree_unchanged_or_declares_its_write() {
     let mut invocations: Vec<(String, Vec<String>)> = Vec::new();
     for leaf in &leaves {
         let detail = schema(base.path(), home.path(), &leaf.split(' ').collect::<Vec<_>>());
-        let example = detail["example"].as_str().unwrap_or_else(|| panic!("`{leaf}` has no example"));
+        let example = detail["examples"][0].as_str().unwrap_or_else(|| panic!("`{leaf}` has no example"));
         let mut argv = words(example);
         argv.remove(0);
         invocations.push((leaf.clone(), argv));

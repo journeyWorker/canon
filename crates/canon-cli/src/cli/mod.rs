@@ -273,6 +273,9 @@ pub enum Command {
     /// Describe canon's own commands: list them, or show one command's arguments, options, effect and exit codes
     #[command(after_help = "Examples:\n  canon schema\n  canon schema --all --json\n  canon schema evidence add --json\n  CANON_ROLE=reviewer canon schema --json\n  canon schema --errors --json\n\nGenerated from the command tree itself, so it never drifts from what the parser accepts.\nTouches no repo and no network: it works from any directory. An alias (`fmt`) resolves to its\ncanonical command and the output names the canonical one. An unknown path exits 2 and names the\nnearest matches.\n\nWith a declared role (CANON_ROLE or --as) the bare listing shows only that role's commands; --all\nlists every command. A command whose effect depends on its arguments carries `effectNote`.")]
     Schema(SchemaArgs),
+    /// Write the shell completion script for canon (bash, zsh or fish)
+    #[command(after_help = "Examples:\n  canon completion zsh > ~/.zfunc/_canon\n  canon completion bash > /etc/bash_completion.d/canon\n  canon completion fish > ~/.config/fish/completions/canon.fish\n\nThe script is generated from the command tree, so it completes exactly what the parser accepts. It needs no repo and no network.")]
+    Completion(CompletionArgs),
 }
 
 /// `--promote`/`--no-promote`, flattened into every staged write

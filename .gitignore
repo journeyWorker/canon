@@ -6,6 +6,8 @@ dist/
 # committed).
 packages/core-*/bin/*
 !packages/core-*/bin/.gitkeep
+# Man pages the publish workflow generates from the clap tree (`canon-man` example) into the launcher package.
+packages/cli/man/
 .superpowers/
 *.duckdb
 # Local runtime store roots (git/hot/cold-tier ledger + cursors + trajectory,
