@@ -423,7 +423,8 @@ Where the 0.28 implementation departs from the plan or the per-leaf table:
 **Acceptance.**
 
 - Workspace: 2920 tests passed, 0 failed (`cargo test --workspace`, last full
-  run). Closes #111, #116 and #117.
+  run). Closes #111 (the grammar tracking issue), #116 and #117 (re-verification
+  follows the code tree, D11).
 - Doc lint (`tests/docs_lint.rs`): every `canon` command in the skill, the
   website, the AGENTS block, the error hints and `meta.next` parses against the
   clap tree.
@@ -431,16 +432,18 @@ Where the 0.28 implementation departs from the plan or the per-leaf table:
   round 2 additions), with evidence by `canon-impl-028` (sessions 1 to 3). An
   independent review by `canon-reviewer-028` in a separate session re-ran
   every bound command and ran mutation checks: round 1 raised 29 findings (18
-  mutations survived), round 2 raised 9. Final review round and gate result:
-  TODO(lead).
+  mutations survived), round 2 raised 9, round 3 none. All 38 findings are
+  closed (33 fixed, 4 notes deferred, 1 note rejected) and `canon gate check`
+  is clean.
 - Dogfood eval ([eval 15](docs/research/2026-10-23-dogfood-eval-15.md)): a
   copy of `examples/platformer` at the 0.27 state, an `omp -p --auto-approve`
   agent with Korean prompts and orchestrated roles, six runs (15, 15b to
   15e). Probes (`--help` plus `canon schema`) stayed at or below eval 12 in
   every run from 15b on (0.08 per new scenario in the last). Wrong-shape calls
-  fell from 5 to 2, but not stably: the last run's two are
-  `canon migrate --dry-run` (a spelling the removed-flag hint answered in one
-  call) and a `skills check` chained after it. One human-only bypass attempt
+  fell from 5 to 1–2, but not stably: the last run's is
+  `canon migrate --dry-run`, read from the 0.27 guide still installed before
+  `migrate` replaced it, and answered in one call by the removed-flag hint
+  (the trace also counts a `skills check` chained on the same failed line). One human-only bypass attempt
   in the first run; none after the guide named it. The defects the runs found
   (role Commands blocks, stale-guide warning, `--fields` case, `--session-id`,
   AGENTS.md refresh by `migrate`) are fixed in this release.
