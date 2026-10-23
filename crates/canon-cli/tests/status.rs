@@ -915,8 +915,10 @@ fn status_reports_an_unreadable_canon_yaml_and_is_unverifiable() {
     let out = run(dir.path(), &["status", "--json"]);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     let report: Value = serde_json::from_str(&stdout(&out)).expect("status --json prints one JSON object");
-    assert!(report["warnings"].as_array().unwrap().iter().any(|w| w.as_str().unwrap().starts_with("cannot read this repo's ledger: parsing `")), "{report}");
-    assert_eq!(commands(&report), ["canon init --check-config"]);
+    assert_eq!(report["ok"], false, "{report}");
+    assert_eq!(report["error"]["code"], "UNVERIFIABLE", "{report}");
+    assert!(report["data"]["warnings"].as_array().unwrap().iter().any(|w| w.as_str().unwrap().starts_with("cannot read this repo's ledger: parsing `")), "{report}");
+    assert_eq!(report["meta"]["coverage"]["skipped"].as_array().map(|a| a.is_empty()), Some(false), "{report}");
 }
 
 #[test]

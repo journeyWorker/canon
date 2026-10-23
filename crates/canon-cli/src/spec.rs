@@ -201,20 +201,12 @@ pub struct Node {
     pub leaf: Option<Leaf>,
 }
 
-/// What an option holds when it is not given. A `--repo` whose default is `.`
-/// does not mean the current directory: `.` (given or not) is resolved to the
-/// nearest ancestor of it that has a `canon.yaml`
-/// ([`crate::context::resolve_repo_root`]), so the spec says that.
+/// What an option holds when it is not given. `--repo` (the shared `RepoArgs`)
+/// has none: absent, it means the nearest ancestor directory holding a
+/// `canon.yaml` (D5); `init` and `demo init` default to `.`, used as given.
 fn default_values(arg: &Arg) -> Vec<String> {
-    let values: Vec<String> = arg.get_default_values().iter().map(|v| v.to_string_lossy().into_owned()).collect();
-    if arg.get_id() == "repo" && values == ["."] {
-        return vec![NEAREST_CONFIG_DIR.to_string()];
-    }
-    values
+    arg.get_default_values().iter().map(|v| v.to_string_lossy().into_owned()).collect()
 }
-
-/// The reported default of a `--repo` that is `.` (see [`default_values`]).
-const NEAREST_CONFIG_DIR: &str = "nearest ancestor directory with a canon.yaml";
 
 /// Clap's own `--help` / `--version`: noise in a spec. A command's own
 /// argument that happens to be called `version` is not.

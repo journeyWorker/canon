@@ -23,7 +23,7 @@ fn run_adapter_validate(response: &std::path::Path, repo: &std::path::Path, json
             let refused = matches!(error, crate::adapter::AdapterError::Io { .. });
             let message = error.to_string();
             let error = if refused {
-                CliError::refused("ADAPTER_REFUSED", message).hint("check that the --response path names a readable file; `canon adapter validate --response <file>` re-checks it")
+                CliError::refused("ADAPTER_REFUSED", message).with_exit(crate::cli_error::EXIT_REFUSED).hint("check that the --response path names a readable file; `canon adapter validate --response <file>` re-checks it")
             } else {
                 CliError::failed("ADAPTER_REFUSED", message).hint("fix the response envelope the message names; `canon adapter validate --response <file>` re-checks it")
             };
@@ -67,7 +67,7 @@ fn run_adapter_authorize(response: &std::path::Path, repo: &std::path::Path, jso
             let refused = matches!(error, crate::adapter::AdapterError::Io { .. });
             let message = error.to_string();
             let error = if refused {
-                CliError::refused("ADAPTER_REFUSED", message).hint("check that the --response path names a readable file; `canon adapter validate --response <file>` re-checks it")
+                CliError::refused("ADAPTER_REFUSED", message).with_exit(crate::cli_error::EXIT_REFUSED).hint("check that the --response path names a readable file; `canon adapter validate --response <file>` re-checks it")
             } else {
                 CliError::failed("ADAPTER_REFUSED", message).hint("fix the response envelope the message names; `canon adapter validate --response <file>` re-checks it")
             };

@@ -1504,7 +1504,7 @@
         {
           "aliases": [],
           "default": [
-            "nearest ancestor directory with a canon.yaml"
+            "."
           ],
           "help": "Directory to set up (used as-is)",
           "kind": "value",
@@ -5865,7 +5865,7 @@
         {
           "aliases": [],
           "default": [
-            "nearest ancestor directory with a canon.yaml"
+            "."
           ],
           "help": "Directory to set up (used as-is)",
           "kind": "value",
@@ -11112,12 +11112,6 @@
       "retryable": false
     },
     {
-      "code": "UNVERIFIABLE",
-      "exit": 1,
-      "meaning": "a check examined nothing, so it cannot report clean: data.unverifiable is true and meta.coverage says what was looked at",
-      "retryable": false
-    },
-    {
       "code": "UNKNOWN_COMMAND",
       "exit": 2,
       "meaning": "`canon schema` was given a command path canon does not have",
@@ -11139,6 +11133,12 @@
       "code": "UNKNOWN_SPEC_ROOT",
       "exit": 2,
       "meaning": "`--project-id` names no spec root configured in canon.yaml, so nothing was written",
+      "retryable": false
+    },
+    {
+      "code": "UNVERIFIABLE",
+      "exit": 1,
+      "meaning": "a check examined nothing, so it cannot report clean: data.unverifiable is true and meta.coverage says what was looked at",
       "retryable": false
     },
     {
