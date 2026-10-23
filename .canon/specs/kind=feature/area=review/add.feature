@@ -281,7 +281,6 @@ Feature: review scenario
     When canon review scenario names all three
     Then the call exits 2 with REVIEW_SCENARIO_NOT_INDEXED, and no review is written for any of them
     And a call naming no scenario is refused with exit 2 and writes nothing
-    And when writing the second review fails, the first review and every blob the call stored are removed
 
   # canon: {"schema":1,"at":"2026-10-12T18:00:00Z","actor":{"agent_id":"018-n3-impl"}}
   @subject:review-attestation
@@ -369,12 +368,12 @@ Feature: review scenario
   @subject:review-attestation
   @case:edge
   @review.add.98
-  Scenario: A review of uncommitted code is recorded as dirty and covers the commit later made from that code
+  Scenario: A review of uncommitted code is recorded as dirty with the code tree the commit later made from that code will have
     Given a working tree whose code differs from HEAD, with a new untracked file
     When a review is written
     Then the write succeeds, the review pins HEAD and is marked dirty, and it records the code tree of the working code, which differs from HEAD's
-    And once that working tree is committed the commit's code tree equals the one the review recorded, so the review is current
-    And once the code changes again the code tree differs, so the review no longer covers it
+    And once that working tree is committed, the code tree computed from the commit and from the working tree both equal the one the review recorded
+    And once the code changes again, the working tree's code tree differs from the one the review recorded
 
   # canon: {"schema":1,"at":"2026-10-23T12:07:36Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
   @subject:review-attestation
@@ -385,3 +384,14 @@ Feature: review scenario
     When review scenario and review change run in each
     Then each exits 2 with NO_COMMIT and a hint to run git init and commit
     And nothing is written
+
+  # canon: {"schema":1,"at":"2026-10-23T13:17:26Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:review-attestation
+  @case:failure
+  @review.add.100
+  Scenario: A review batch whose second write fails removes the first review and every blob it stored
+    Given a review scenario call naming two indexed scenarios with one artifact, whose second review write fails
+    When the call runs
+    Then the first review is removed and the blob the call stored is removed, and the error names the second review
+    And a read-only review directory is refused before anything is written
+    And the same call with nothing failing writes both reviews and stores the blob

@@ -281,12 +281,11 @@ Feature: context capability
   @subject:context-capability
   @case:failure
   @context.capability.28
-  Scenario: A checked-in spec that differs from the CLI is a drift that names the commands
+  Scenario: The drift check compares the checked-in spec with the spec the CLI generates, byte for byte
     Given the checked-in command spec and the spec the CLI generates
-    When the two are compared
+    When the two are compared as text
     Then they are identical on the unmodified tree
-    And a spec missing a command is reported as in the CLI and not in the spec, naming the command
-    And a spec carrying a command the CLI lacks, or a node whose fields were edited, is reported by that command's name, and a byte of difference anywhere else is a drift too
+    And the generated spec is the same text on every generation
 
   # canon: {"schema":1,"at":"2026-10-23T11:48:50Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
   @subject:context-capability

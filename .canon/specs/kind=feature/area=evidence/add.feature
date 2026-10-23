@@ -465,7 +465,6 @@ Feature: evidence add
     Then the add exits 1 with the brief refusal and nothing is staged for any scenario
     And a summary carrying a fabrication marker refuses the batch the same way
     And --all-scenarios with --scenario-id, --task-id, --report-case or an approval, or without --report, is refused with exit 2
-    And a batch whose second record fails to stage, or whose second promotion is refused, leaves no record staged or committed and no new blob, and a read-only destination is refused before anything is written
 
   # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
   @subject:evidence-attestation
@@ -744,3 +743,14 @@ Feature: evidence add
     Then the first add is refused with exit 1, and the second succeeds
     And the JSON report lists the waiver in its overrides, with the reason and the code of the refusal it waived
     And canon status lists the override with its reason
+
+  # canon: {"schema":1,"at":"2026-10-23T13:17:29Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:evidence-attestation
+  @case:failure
+  @evidence.add.115
+  Scenario: An evidence batch whose second record fails to stage or promote leaves nothing behind
+    Given a batch of two records and one artifact, whose second record fails to stage in one run and whose second promotion is refused in another
+    When each batch is landed
+    Then no record is left staged or committed and no new blob is left, the error naming the second record
+    And a read-only destination is refused before anything is written
+    And the same batch with nothing failing lands whole, both records committed and the blob stored

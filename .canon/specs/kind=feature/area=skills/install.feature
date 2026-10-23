@@ -52,7 +52,7 @@ Feature: skills install
   Scenario: An unknown provider is refused before anything is written
     Given a canonical skill source and an empty target
     When the skill is installed for a provider canon does not know
-    Then the install fails with the provider named
+    Then the install is refused with exit 2, the provider named
     And no projection or lock file is written to the target
 
   # canon: {"schema":1,"at":"2026-10-10T14:03:19Z","actor":{"agent_id":"canon"}}
@@ -255,7 +255,7 @@ Feature: skills install
   Scenario: A malformed skills section in canon.yaml fails loud
     Given a canon.yaml whose skills section is a bare list, has a misspelled key, or names a provider canon does not know
     When canon skills install, check and doctor run with no provider named
-    Then each exits 1 naming the expected shape or the unknown provider
+    Then each is refused with exit 2 (SKILLS_INVALID_ARGUMENT), naming the expected shape or the unknown provider
     And nothing is projected and canon.yaml is byte-identical
     And canon init --check reports the skills section as FAIL with the same reason
 
