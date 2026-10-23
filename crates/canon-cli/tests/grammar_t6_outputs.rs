@@ -18,9 +18,6 @@ const NO_OUTPUT: &[(&str, &str)] = &[];
 const UNLISTED_SCHEMAS: &[(&str, &str)] = &[
     ("DashboardStatusReport", "served over HTTP by `dashboard` (GET /api/status), never printed by a command"),
     ("DashboardBriefsReport", "served over HTTP by `dashboard` (GET /api/briefs), never printed by a command"),
-    // Wave 4: `scenario new --from` is removed by the --input slice, and its refusal report with it.
-    ("ScenarioNewRefusalReport", "the batch refusal of `scenario new --from`, removed by the --input slice"),
-    ("ScenarioNewBatchReport", "the batch report of `scenario new --from`, replaced by the --input slice's `Batch<Name>Report` outputs"),
 ];
 
 #[test]
@@ -71,6 +68,8 @@ fn no_schema_of_the_spec_is_orphaned() {
     let mut listed: BTreeSet<&str> = BTreeSet::new();
     for node in leaves() {
         listed.extend(node["outputs"].as_array().unwrap().iter().filter_map(|o| o["report"].as_str()));
+        // A schema a leaf takes as `--input` is as declared as one it prints.
+        listed.extend(node["inputs"].as_array().unwrap().iter().filter_map(|i| i["schemaRef"].as_str()).filter_map(|r| r.strip_prefix("#/schemas/")));
     }
     let mut problems = Vec::new();
     for name in spec()["schemas"].as_object().expect("schemas").keys() {

@@ -278,6 +278,9 @@ pub fn fixture(home: &Path) -> TempDir {
     let feature = ".canon/specs/kind=feature/area=auth/login.feature";
     ok(repo, home, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--feature", feature]);
     ok(repo, home, &["inventory", "sync"]);
+    // Records about a commit need one.
+    git(repo, &["add", "-A"]);
+    git(repo, &["commit", "-q", "-m", "seed"]);
     ok(repo, home, &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "bob", "--summary", "Naming nit"]);
     ok(
         repo,

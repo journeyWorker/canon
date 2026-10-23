@@ -147,10 +147,7 @@ const REFUSALS: &[Row] = &[
 
 /// Cases the checks catch that are not fixed: (leaf, check, what is wrong).
 /// Each must still fail; a fix removes its entry.
-const KNOWN_BUGS: &[(&str, &str, &str)] = &[
-    ("divergence add", "idempotency", "a second identical `divergence add` stages and promotes another record (run_seq + 1) instead of a no-op reported unchanged"),
-    ("finding add", "idempotency", "a second identical `finding add` is refused FINDING_SEQ_OCCUPIED instead of a no-op reported unchanged"),
-];
+const KNOWN_BUGS: &[(&str, &str, &str)] = &[];
 
 /// Replay-safe, content-keyed or once leaves whose example cannot run to
 /// success in the fixture, and the state they need.
@@ -165,7 +162,6 @@ const IDEMPOTENCY_EXCLUDED: &[(&str, &str)] = &[("dashboard", "binds a port and 
 /// Paths a second run of a replay-safe leaf may rewrite, by the leaf's own declaration: (leaf, path prefix, why).
 const IDEMPOTENCY_ALLOWED_DIFF: &[(&str, &str, &str)] = &[
     ("export", ".canon/audit/", "effectNote: one access-audit line per run"),
-    ("report snapshot", "snapshot-out/manifest.json", "the design table: tables identical, manifest.json differs by generated_at"),
 ];
 
 fn write_leaves() -> Vec<&'static Value> {

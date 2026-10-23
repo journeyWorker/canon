@@ -18,7 +18,7 @@ pub enum SkillsCommand {
 #[derive(Args)]
 pub struct SkillsInstallArgs {
     /// Developer override: read SKILL.src.md's frontmatter and scripts/ from this directory instead of the text built into the binary; defaults to CANON_SKILLS_SOURCE, else the built-in text.
-    #[arg(long)]
+    #[arg(long, value_name = "DIR")]
     pub skills_source: Option<PathBuf>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

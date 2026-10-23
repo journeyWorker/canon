@@ -31,7 +31,7 @@ pub struct FindingAddArgs {
     #[arg(long, value_parser = crate::finding::severity_parser(), value_name = "SEVERITY")]
     pub severity: canon_model::FindingSeverity,
     /// open / fixed / rejected / deferred (fixed records --resolution-rev, default HEAD, and only fixed may carry one)
-    #[arg(long, default_value = "open", value_parser = crate::finding::disposition_parser())]
+    #[arg(long, default_value = "open", value_parser = crate::finding::disposition_parser(), value_name = "DISPOSITION")]
     pub disposition: canon_model::FindingDisposition,
     /// The reviewer who raised it, recorded as the finding's reviewer and author (line breaks refused)
     #[arg(long, value_name = "ACTOR_ID")]
@@ -82,7 +82,7 @@ pub struct FindingCloseArgs {
     #[arg(long, value_name = "N")]
     pub seq: u32,
     /// Where it lands: fixed / rejected / deferred / open (reopening is a real transition). fixed records --resolution-rev, default HEAD, and only fixed may carry one
-    #[arg(long, value_parser = crate::finding::disposition_parser())]
+    #[arg(long, value_parser = crate::finding::disposition_parser(), value_name = "DISPOSITION")]
     pub disposition: canon_model::FindingDisposition,
     /// The commit that closed it, any git revision (resolved to the full sha, with the code tree it saw). Permitted only with --disposition fixed, where it defaults to HEAD. Existence only; canon never reads the commit's message or diff
     #[arg(long, value_name = "REV")]

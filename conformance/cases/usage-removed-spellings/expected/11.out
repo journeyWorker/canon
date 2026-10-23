@@ -1,14 +1,14 @@
 Record the human's approval of the brief, bound to its text; refused while `brief check` has blockers
 
-Usage: canon brief approve [OPTIONS] --approver <APPROVER> --note <NOTE> [CHANGE_ID]
+Usage: canon brief approve [OPTIONS] --approver <NAME> --note <TEXT> [CHANGE_ID]
 
 Arguments:
   [CHANGE_ID]  The change to read (default: the repo's only live change)
 
 Options:
-      --approver <APPROVER>  Who approved (the human, not the agent)
+      --approver <NAME>      Who approved (the human, not the agent)
       --as <ROLE>            The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` and `context` list only the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` defaults to it [possible values: planner, implementer, reviewer, orchestrator]
-      --note <NOTE>          The human's own words
+      --note <TEXT>          The human's own words
       --repo <DIR>           The repo to act on (default: the nearest ancestor directory holding a canon.yaml)
       --json                 Output JSON instead of the human-readable form
       --input <JSON|FILE|->  The arguments as JSON: an object (one run) or an array / NDJSON file or `-` (a batch); keys are the option names in camelCase, `operands` an array

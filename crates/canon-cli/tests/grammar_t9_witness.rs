@@ -22,18 +22,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 /// The output of a leaf the suite never emits, as (leaf, report name or `failure`, why).
-const UNWITNESSED: &[(&str, &str, &str)] = &[
-    ("adapter authorize", "AdapterAuthorizeReport", "no test runs it with --json; needs a response file (tests/fixtures/adapter/*.json): coverable"),
-    ("adapter validate", "AdapterValidateReport", "no test runs it with --json; needs a response file (tests/fixtures/adapter/*.json): coverable"),
-    ("context-pack show", "ContextPackShowReport", "stateful: needs a pack made by `context-pack add` in a committed repo (see tests/grammar.rs repo_with_manifest)"),
-    ("context-pack verify", "ContextPackVerifyReport", "stateful: needs a pack made by `context-pack add` in a committed repo"),
-    ("divergence accept", "DivergenceAcceptReport", "stateful: needs a seeded divergent evidence record attested by another actor and session (tests/divergence_accept.rs seeds one, without --json)"),
-    ("prompt show", "PromptShowReport", "stateful: needs a bundle registered by `prompt add`"),
-    ("completion", "failure", "no test provokes a --json refusal (an unknown shell) with the document checked"),
-    ("demo init", "failure", "no test provokes a --json refusal (a non-empty target) with the document checked"),
-    ("selftest", "failure", "a failing suite cannot be provoked on a healthy build; a usage refusal is not emitted under `selftest`"),
-    ("subject show", "failure", "no test runs it on an unknown subject with --json"),
-];
+const UNWITNESSED: &[(&str, &str, &str)] = &[];
 
 /// What one leaf can emit: each declared report, and its failure envelope.
 fn declared() -> Vec<(String, String)> {

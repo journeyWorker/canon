@@ -23,8 +23,8 @@ const PRINTS: &[(&str, &str, &str)] = &[
 
 /// Schemas that are deliberately opaque, as (definition name, why).
 const OPAQUE: &[(&str, &str)] = &[
+    ("InputDoc", "its `example` and `batchExample` are example `--input` documents: their keys are the leaf's option names, so their shape is that leaf's `<Name>Input` schema, published beside it"),
     ("LedgerRecord", "a ledger record embedded verbatim keeps its own snake_case schema (crates/canon-model/schemas)"),
-    ("InputSchema", "a JSON Schema document is the value, by definition"),
 ];
 
 fn sources(dir: &Path, out: &mut Vec<(String, String)>) {
@@ -134,7 +134,8 @@ fn untyped(schema: &Value, at: &str, def: Option<&str>, out: &mut Vec<String>) {
             if is_object(schema) && !map.contains_key("properties") && !map.get("additionalProperties").is_some_and(Value::is_object) && !map.contains_key("oneOf") && !map.contains_key("anyOf") && !opaque_ok {
                 out.push(format!("{at}: an object with no declared members"));
             }
-            if !has_shape(schema) && !map.contains_key("properties") {
+            // A schema that only constrains (`{"required": [..]}` in a `oneOf`) names no type of its own.
+            if !has_shape(schema) && !map.contains_key("properties") && !map.contains_key("required") && !opaque_ok {
                 out.push(format!("{at}: no type"));
             }
             for (key, child) in map {

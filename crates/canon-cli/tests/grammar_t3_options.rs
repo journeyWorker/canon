@@ -41,15 +41,6 @@ const NO_REPO: &[&str] = &["schema", "selftest", "completion", "regime show", "s
 /// Short aliases the grammar allows; `-h` and `-V` are clap's own, `-o` is `--output`.
 const SHORTS: &[(char, Option<&str>)] = &[('h', None), ('V', None), ('o', Some("output")), ('q', None)];
 
-/// Options 0.28 adds in a later slice; until that slice lands they are in the vocabulary but not yet in the spec.
-const NOT_YET_IN_SPEC: &[&str] = &["rev", "resolution-rev", "introduced-rev", "input"];
-
-/// The 0.27 spellings the wave-4 slices remove (`--rev`, `--input`); until they land they are on leaves and in no vocabulary.
-const UNTIL_WAVE_4: &[&str] = &["pin", "sha", "artifact-sha", "reviewed-sha", "resolution-sha", "introduced-by", "from"];
-
-/// Leaves 0.28 adds in a later slice.
-const LEAF_NOT_YET_IN_SPEC: &[&str] = &["skills show"];
-
 /// An option that is repeatable on one leaf and single on another, by the per-leaf table's own rows:
 /// `finding add --scenario-id <SCENARIO_ID>...` names every scenario a finding is about, `evidence add` takes one.
 const REPEATABLE_DIFFERS: &[&str] = &["scenario-id"];
@@ -72,9 +63,6 @@ fn name(option: &Value) -> &str {
 fn every_option_says_what_it_is() {
     let mut problems = Vec::new();
     for (leaf, option) in all_options().into_iter().chain(spec()["globalOptions"].as_array().unwrap().iter().map(|o| ("(global)".to_string(), o))) {
-        if UNTIL_WAVE_4.contains(&name(option)) {
-            continue;
-        }
         if !option["help"].as_str().is_some_and(|h| !h.trim().is_empty()) {
             problems.push(format!("`{leaf}` --{}: no help", name(option)));
         }
@@ -86,9 +74,6 @@ fn every_option_says_what_it_is() {
 fn a_value_is_named_from_the_placeholder_list_and_a_flag_names_none() {
     let mut problems = Vec::new();
     for (leaf, option) in all_options() {
-        if UNTIL_WAVE_4.contains(&name(option)) {
-            continue;
-        }
         match (option["kind"].as_str().unwrap(), option["valueName"].as_str()) {
             ("value", Some(value)) => {
                 if !PLACEHOLDERS.contains(&value) && !value.ends_with("_ID") {
@@ -161,9 +146,6 @@ fn the_spec_carries_the_defaults_sets_and_arities_the_table_writes() {
     let mut compared = 0;
     for (leaf_path, rows) in table() {
         let Some(node) = leaves().into_iter().find(|n| path_of(n) == *leaf_path) else {
-            if LEAF_NOT_YET_IN_SPEC.contains(&leaf_path.as_str()) {
-                continue;
-            }
             problems.push(format!("`{leaf_path}` is a row of the table and no leaf of the spec"));
             continue;
         };
@@ -173,9 +155,7 @@ fn the_spec_carries_the_defaults_sets_and_arities_the_table_writes() {
                 continue;
             }
             let Some(option) = option(node, &row.name) else {
-                if !NOT_YET_IN_SPEC.contains(&row.name.as_str()) {
-                    problems.push(format!("`{leaf_path}` --{}: in the table, not in the spec", row.name));
-                }
+                problems.push(format!("`{leaf_path}` --{}: in the table, not in the spec", row.name));
                 continue;
             };
             compared += 1;
@@ -263,14 +243,13 @@ fn the_vocabulary_and_the_spec_use_the_same_options_with_the_same_value_names() 
     let mut problems = Vec::new();
     for (n, (value, leaf)) in &used {
         match vocabulary.iter().find(|r| &r.option == n) {
-            None if UNTIL_WAVE_4.contains(&n.as_str()) => {}
             None => problems.push(format!("--{n} (`{leaf}`) is not in docs/design/cli-vocabulary.tsv")),
             Some(row) if row.value_name != *value => problems.push(format!("--{n}: the vocabulary says {:?}, `{leaf}` takes {value:?}", row.value_name)),
             Some(_) => {}
         }
     }
     for row in vocabulary {
-        if !used.contains_key(&row.option) && !NOT_YET_IN_SPEC.contains(&row.option.as_str()) {
+        if !used.contains_key(&row.option) {
             problems.push(format!("--{} is in the vocabulary and on no leaf", row.option));
         }
     }

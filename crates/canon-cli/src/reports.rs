@@ -53,7 +53,7 @@ fn entry<R: Report>(command: &'static str, name: &str) -> ReportSchema {
 }
 
 fn batch_entry<R: Report + 'static>(command: &'static str, name: &str) -> ReportSchema {
-    ReportSchema { command, name: name.to_string(), schema_version: crate::input::BatchReport::<R>::SCHEMA_VERSION, schema: schema_of::<crate::input::BatchReport<R>>() }
+    ReportSchema { command, name: name.to_string(), schema_version: crate::input::BatchReport::<R>::SCHEMA_VERSION, type_name: std::any::type_name::<crate::input::BatchReport<R>>(), schema: schema_of::<crate::input::BatchReport<R>>() }
 }
 
 /// The JSON Schema of `R` as a value.

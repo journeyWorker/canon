@@ -72,7 +72,8 @@ pub struct DivergenceResolveArgs {
     pub project_id: Option<ProjectId>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
-    #[arg(long, default_value_t = 1)]
+    /// The review round this version belongs to (1-based)
+    #[arg(long, default_value_t = 1, value_name = "N")]
     pub round: u32,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
     #[arg(long, value_name = "ACTOR_ID")]
@@ -102,7 +103,8 @@ pub struct DivergenceDeferArgs {
     pub project_id: Option<ProjectId>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
-    #[arg(long, default_value_t = 1)]
+    /// The review round this version belongs to (1-based)
+    #[arg(long, default_value_t = 1, value_name = "N")]
     pub round: u32,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
     #[arg(long, value_name = "ACTOR_ID")]

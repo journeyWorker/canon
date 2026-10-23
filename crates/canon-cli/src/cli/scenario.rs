@@ -16,7 +16,7 @@ pub struct ScenarioNewArgs {
     #[arg(value_name = "SCENARIO_ID", value_parser = crate::scaffold::parse_scenario_tag)]
     pub tag: ScenarioId,
     /// The Scenario: header label
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub title: String,
     /// Optional subject id tag to pin above the scenario
     #[arg(long, value_parser = crate::subject::parse_subject_id, value_name = "SUBJECT_ID")]

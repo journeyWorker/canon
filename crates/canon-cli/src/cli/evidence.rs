@@ -33,7 +33,8 @@ pub struct EvidenceApprovalPayloadArgs {
     pub run_id: Option<RunId>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
-    #[arg(long = "surface-ref", value_parser = crate::evidence::parse_surface_ref)]
+    /// The risk surface being approved: a repository-relative path or `effect:<kebab-slug>` (repeatable)
+    #[arg(long = "surface-ref", value_parser = crate::evidence::parse_surface_ref, value_name = "PATH_OR_EFFECT")]
     pub surface_ref: Vec<String>,
     /// Who approved (the human whose detached signature the payload is for)
     #[arg(long, value_name = "NAME")]
@@ -63,7 +64,7 @@ pub struct EvidenceAddArgs {
     #[arg(long = "ref", value_name = "TEXT", required_unless_present = "reports")]
     pub evidence_ref: Option<String>,
     /// faithful / not-applicable / divergent. Given a --report and no --verdict, the verdict is derived from the bound cases (any failed: divergent; a skipped case and none failed: not-applicable; else faithful), one record at a time with --all-scenarios; with no report the default is faithful. An explicit faithful over a failed or skipped case is refused
-    #[arg(long, value_parser = crate::evidence::verdict_parser())]
+    #[arg(long, value_parser = crate::evidence::verdict_parser(), value_name = "VERDICT")]
     pub verdict: Option<EvidenceVerdict>,
     /// One-line note, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers; line breaks refused)
     #[arg(long, value_name = "TEXT")]
