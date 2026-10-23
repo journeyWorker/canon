@@ -127,6 +127,7 @@ pub fn path(cmd: &Command) -> &'static str {
         },
         Command::Selftest(_) => "selftest",
         Command::Schema(_) => "schema",
+        Command::Completion(_) => "completion",
     }
 }
 

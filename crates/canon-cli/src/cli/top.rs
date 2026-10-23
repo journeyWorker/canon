@@ -269,3 +269,21 @@ pub struct SchemaArgs {
     #[arg(long)]
     pub all: bool,
 }
+
+/// The shells `canon completion` writes a script for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub enum CompletionShell {
+    Bash,
+    Zsh,
+    Fish,
+}
+
+#[derive(Args)]
+pub struct CompletionArgs {
+    /// Shell to write the completion script for
+    #[arg(value_enum, value_name = "SHELL")]
+    pub shell: CompletionShell,
+    /// Output JSON instead of the human-readable form
+    #[arg(long)]
+    pub json: bool,
+}

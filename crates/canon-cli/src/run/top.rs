@@ -365,3 +365,25 @@ pub(super) fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path:
         Err(err) => ExitCode::from(err.to_cli_error().emit("canon dashboard", json) as u8),
     }
 }
+
+/// `canon completion <SHELL>`: the script `clap_complete` generates from the
+/// command tree. Text mode prints the script itself, so
+/// `canon completion zsh > _canon` is the whole installation; `--json`
+/// envelopes it as `{shell, script}`.
+pub(super) fn run_completion(shell: crate::cli::CompletionShell, json: bool) -> ExitCode {
+    use crate::cli::CompletionShell;
+    let (target, name) = match shell {
+        CompletionShell::Bash => (clap_complete::Shell::Bash, "bash"),
+        CompletionShell::Zsh => (clap_complete::Shell::Zsh, "zsh"),
+        CompletionShell::Fish => (clap_complete::Shell::Fish, "fish"),
+    };
+    let mut script = Vec::new();
+    clap_complete::generate(target, &mut crate::cli::command(), "canon", &mut script);
+    let script = String::from_utf8_lossy(&script);
+    if json {
+        crate::json_out::data("completion", serde_json::json!({ "shell": name, "script": script }));
+    } else {
+        print!("{script}");
+    }
+    ExitCode::SUCCESS
+}

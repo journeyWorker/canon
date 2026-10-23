@@ -144,7 +144,7 @@ fn subject_status_is_a_write_that_reads_without_to() {
     assert!(schema["data"]["effectNote"].as_str().unwrap().contains("without --to"), "{schema}");
     let options: Vec<&str> = schema["data"]["options"].as_array().unwrap().iter().map(|o| o["name"].as_str().unwrap()).collect();
     assert!(options.contains(&"to"), "{options:?}");
-    let arguments: Vec<&str> = schema["data"]["arguments"].as_array().unwrap().iter().map(|a| a["name"].as_str().unwrap()).collect();
+    let arguments: Vec<&str> = schema["data"]["operands"].as_array().unwrap().iter().map(|a| a["name"].as_str().unwrap()).collect();
     assert_eq!(arguments, ["id"], "the deprecated positional state is not advertised");
 }
 
