@@ -14,7 +14,7 @@ steps:
   - args: [brief, check, --change=add-login, --json]
     exit: 2
   - args: [brief, check, --change-id, add-login, --json]
-    exit: 1
+    exit: 2
   - args: [query, --kind, review_record, --json]
     exit: 2
   - args: [purge, --kind=session_record, --before, "2020-01-01T00:00:00Z", --plan, --json]

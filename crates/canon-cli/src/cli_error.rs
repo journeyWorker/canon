@@ -432,11 +432,11 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "TASK_ROW_NOT_FOUND", meaning: "the task's row is missing from its plan document", exit: 2, retryable: false },
     CodeInfo { code: "TIER_FAILED", meaning: "tier aging failed", exit: 1, retryable: false },
     CodeInfo { code: "TYPED_ATOMS_INVALID", meaning: "the typed-atoms file for the change does not parse", exit: 2, retryable: false },
-    CodeInfo { code: "UNVERIFIABLE", meaning: "a check examined nothing, so it cannot report clean: data.unverifiable is true and meta.coverage says what was looked at", exit: 1, retryable: false },
     CodeInfo { code: "UNKNOWN_COMMAND", meaning: "`canon schema` was given a command path canon does not have", exit: 2, retryable: false },
     CodeInfo { code: "UNKNOWN_FIELD", meaning: "`--fields` names a field the records do not have", exit: 2, retryable: false },
     CodeInfo { code: "UNKNOWN_ROLE", meaning: "`CANON_ROLE` holds a value that is not a role (planner, implementer, reviewer, orchestrator)", exit: 2, retryable: false },
     CodeInfo { code: "UNKNOWN_SPEC_ROOT", meaning: "`--project-id` names no spec root configured in canon.yaml, so nothing was written", exit: 2, retryable: false },
+    CodeInfo { code: "UNVERIFIABLE", meaning: "a check examined nothing, so it cannot report clean: data.unverifiable is true and meta.coverage says what was looked at", exit: 1, retryable: false },
     CodeInfo { code: "USAGE", meaning: "the command line did not parse: an unknown flag or subcommand, or a missing or malformed argument", exit: 2, retryable: false },
     CodeInfo { code: "WRITE_FAILED", meaning: "a file or ledger record could not be written", exit: 2, retryable: false },
 ];

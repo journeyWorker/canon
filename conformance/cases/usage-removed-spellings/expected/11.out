@@ -9,7 +9,7 @@ Options:
       --as <ROLE>    The role you act as: planner, implementer, reviewer or orchestrator. Overrides `CANON_ROLE`. `schema` lists the role's commands, `status` keeps its steps, and `--role` on `evidence add` / `evidence audit` / `review scenario` / `review change` defaults to it [possible values: planner, implementer, reviewer, orchestrator]
       --by <BY>      Who approved (the human, not the agent)
       --note <NOTE>  The human's own words
-      --repo <REPO>  Repo root (default: nearest ancestor with a canon.yaml) [default: .]
+      --repo <DIR>   The repo to act on (default: the nearest ancestor directory holding a canon.yaml)
       --json         Output JSON instead of the human-readable form
   -h, --help         Print help
   -V, --version      Print version
