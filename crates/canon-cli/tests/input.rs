@@ -47,7 +47,20 @@ fn ok(dir: &Path, home: &Path, args: &[&str]) {
 fn fixture(home: &Path, second: bool) -> TempDir {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
+    // The records bind a revision, so the story lives in a git work tree with one commit.
+    let git = |args: &[&str]| {
+        let out = Command::new("git")
+            .current_dir(repo)
+            .args(["-c", "user.name=canon", "-c", "user.email=canon@example.invalid"])
+            .args(args)
+            .output()
+            .expect("spawn git");
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    };
+    git(&["init", "-q"]);
     ok(repo, home, &["init", "--providers", "none"]);
+    git(&["add", "-A"]);
+    git(&["commit", "-q", "-m", "fixture"]);
     ok(repo, home, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(repo, home, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
     ok(repo, home, &["feature", "new", "auth.login", "--title", "Login"]);
@@ -250,63 +263,80 @@ const NOT_RUN: &[&str] = &["dashboard"];
 fn every_spec_example_document_writes_what_its_flags_write() {
     let home = TempDir::new().unwrap();
     let base = fixture(home.path(), false);
-    // Every run happens at the same path, so a record that embeds its repo path matches across runs.
-    let work = TempDir::new().unwrap();
+    let leaves: Vec<String> = write_leaves(base.path(), home.path()).into_iter().filter(|leaf| !NOT_RUN.contains(&leaf.as_str())).collect();
+    // One thread per slice of leaves; each leaf runs its four variants at its own path, so a
+    // record that embeds its repo path still matches across the variants of that leaf.
+    let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).min(8);
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let problems = std::sync::Mutex::new(Vec::new());
+    std::thread::scope(|scope| {
+        for _ in 0..threads {
+            scope.spawn(|| loop {
+                let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let Some(leaf) = leaves.get(i) else { break };
+                let found = example_problems(leaf, base.path(), home.path());
+                problems.lock().unwrap().extend(found);
+            });
+        }
+    });
+    let mut problems = problems.into_inner().unwrap();
+    problems.sort();
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+/// What differs between running `leaf`'s spec example as flags and as its `--input` document.
+fn example_problems(leaf: &str, base: &Path, home: &Path) -> Vec<String> {
     let mut problems = Vec::new();
-    for leaf in write_leaves(base.path(), home.path()) {
-        if NOT_RUN.contains(&leaf.as_str()) {
-            continue;
-        }
-        let detail = node(base.path(), home.path(), &leaf);
-        let example = detail["examples"][0].as_str().unwrap().to_string();
-        let document = detail["inputs"][0]["example"].to_string();
-        let mut flags: Vec<String> = split_words(&example).into_iter().skip(1).collect();
-        flags.push("--json".into());
-        let mut words: Vec<String> = leaf.split(' ').map(str::to_string).collect();
-        // `--repo` and `--as` are flags only: they stay on the command line beside `--input`
-        for pair in flags.windows(2) {
-            if pair[0] == "--repo" || pair[0] == "--as" {
-                words.extend([pair[0].clone(), pair[1].clone()]);
-            }
-        }
-
-        // The example run on its own copy of the repo; `how` says how its arguments arrive.
-        let run = |how: How| -> (Option<i32>, Value, BTreeMap<String, String>) {
-            let repo = work.path().join("repo");
-            let _ = std::fs::remove_dir_all(&repo);
-            if leaf == "init" {
-                std::fs::create_dir_all(&repo).unwrap();
-            } else {
-                copy_dir(base.path(), &repo);
-            }
-            let own_home = TempDir::new().unwrap();
-            let doc_file = work.path().join("doc.json");
-            std::fs::write(&doc_file, &document).unwrap();
-            let (argv, stdin): (Vec<String>, Option<&str>) = match how {
-                How::Flags => (flags.clone(), None),
-                How::Inline => ([words.clone(), vec!["--input".into(), document.clone(), "--json".into()]].concat(), None),
-                How::File => ([words.clone(), vec!["--input".into(), doc_file.to_string_lossy().into_owned(), "--json".into()]].concat(), None),
-                How::Stdin => ([words.clone(), vec!["--input".into(), "-".into(), "--json".into()]].concat(), Some(document.as_str())),
-            };
-            let out = canon(&repo, own_home.path(), &argv.iter().map(String::as_str).collect::<Vec<_>>(), stdin);
-            (out.status.code(), serde_json::from_slice(&out.stdout).unwrap_or(Value::Null), normalized_tree(&repo))
-        };
-
-        let by_flags = run(How::Flags);
-        let inline = run(How::Inline);
-        let by_file = run(How::File);
-        let by_stdin = run(How::Stdin);
-        for (how, got) in [("inline", &inline), ("file", &by_file), ("stdin", &by_stdin)] {
-            let code = |r: &(Option<i32>, Value, BTreeMap<String, String>)| r.1["error"]["code"].as_str().unwrap_or("").to_string();
-            if got.0 != by_flags.0 || code(got) != code(&by_flags) || got.1["ok"] != by_flags.1["ok"] {
-                problems.push(format!("{leaf}: --input {how} exited {:?} ({}), the flags {:?} ({})", got.0, code(got), by_flags.0, code(&by_flags)));
-            } else if got.2 != by_flags.2 {
-                let differing: Vec<&String> = got.2.keys().chain(by_flags.2.keys()).filter(|k| got.2.get(*k) != by_flags.2.get(*k)).collect();
-                problems.push(format!("{leaf}: --input {how} wrote different records than the flags: {differing:?}"));
-            }
+    let work = TempDir::new().unwrap();
+    let detail = node(base, home, leaf);
+    let example = detail["examples"][0].as_str().unwrap().to_string();
+    let document = detail["inputs"][0]["example"].to_string();
+    let mut flags: Vec<String> = split_words(&example).into_iter().skip(1).collect();
+    flags.push("--json".into());
+    let mut words: Vec<String> = leaf.split(' ').map(str::to_string).collect();
+    // `--repo` and `--as` are flags only: they stay on the command line beside `--input`
+    for pair in flags.windows(2) {
+        if pair[0] == "--repo" || pair[0] == "--as" {
+            words.extend([pair[0].clone(), pair[1].clone()]);
         }
     }
-    assert!(problems.is_empty(), "{}", problems.join("\n"));
+
+    // The example run on its own copy of the repo; `how` says how its arguments arrive.
+    let run = |how: How| -> (Option<i32>, Value, BTreeMap<String, String>) {
+        let repo = work.path().join("repo");
+        let _ = std::fs::remove_dir_all(&repo);
+        if leaf == "init" {
+            std::fs::create_dir_all(&repo).unwrap();
+        } else {
+            copy_dir(base, &repo);
+        }
+        let own_home = TempDir::new().unwrap();
+        let doc_file = work.path().join("doc.json");
+        std::fs::write(&doc_file, &document).unwrap();
+        let (argv, stdin): (Vec<String>, Option<&str>) = match how {
+            How::Flags => (flags.clone(), None),
+            How::Inline => ([words.clone(), vec!["--input".into(), document.clone(), "--json".into()]].concat(), None),
+            How::File => ([words.clone(), vec!["--input".into(), doc_file.to_string_lossy().into_owned(), "--json".into()]].concat(), None),
+            How::Stdin => ([words.clone(), vec!["--input".into(), "-".into(), "--json".into()]].concat(), Some(document.as_str())),
+        };
+        let out = canon(&repo, own_home.path(), &argv.iter().map(String::as_str).collect::<Vec<_>>(), stdin);
+        (out.status.code(), serde_json::from_slice(&out.stdout).unwrap_or(Value::Null), normalized_tree(&repo))
+    };
+
+    let by_flags = run(How::Flags);
+    let inline = run(How::Inline);
+    let by_file = run(How::File);
+    let by_stdin = run(How::Stdin);
+    for (how, got) in [("inline", &inline), ("file", &by_file), ("stdin", &by_stdin)] {
+        let code = |r: &(Option<i32>, Value, BTreeMap<String, String>)| r.1["error"]["code"].as_str().unwrap_or("").to_string();
+        if got.0 != by_flags.0 || code(got) != code(&by_flags) || got.1["ok"] != by_flags.1["ok"] {
+            problems.push(format!("{leaf}: --input {how} exited {:?} ({}), the flags {:?} ({})", got.0, code(got), by_flags.0, code(&by_flags)));
+        } else if got.2 != by_flags.2 {
+            let differing: Vec<&String> = got.2.keys().chain(by_flags.2.keys()).filter(|k| got.2.get(*k) != by_flags.2.get(*k)).collect();
+            problems.push(format!("{leaf}: --input {how} wrote different records than the flags: {differing:?}"));
+        }
+    }
+    problems
 }
 
 #[derive(Clone, Copy)]
