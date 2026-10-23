@@ -427,7 +427,7 @@ fn dispatch_diff_exits_zero_whatever_it_finds() {
 #[test]
 fn the_exceptions_declare_only_the_exits_they_have() {
     let dir = TempDir::new().unwrap();
-    for (command, exits) in [(vec!["context"], vec![0, 2]), (vec!["dispatch", "diff"], vec![0, 2]), (vec!["artifacts", "store"], vec![0, 2]), (vec!["gate", "check"], vec![0, 1, 2])] {
+    for (command, exits) in [(vec!["context"], vec![0, 2]), (vec!["dispatch", "diff"], vec![0, 2]), (vec!["artifacts", "store"], vec![0, 1, 2]), (vec!["gate", "check"], vec![0, 1, 2])] {
         let mut args = vec!["schema"];
         args.extend(&command);
         args.push("--json");

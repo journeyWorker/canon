@@ -14,7 +14,7 @@ pub enum AdapterCommand {
 #[derive(Args)]
 pub struct AdapterValidateArgs {
     /// JSON response file to validate
-    #[arg(long)]
+    #[arg(long, value_name = "FILE")]
     pub response: PathBuf,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -26,7 +26,7 @@ pub struct AdapterValidateArgs {
 #[derive(Args)]
 pub struct AdapterAuthorizeArgs {
     /// JSON response file to validate and authorize
-    #[arg(long)]
+    #[arg(long, value_name = "FILE")]
     pub response: PathBuf,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

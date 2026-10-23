@@ -66,7 +66,8 @@ const ENV_VARS: &[EnvVar] = &[
 ];
 
 /// Variables canon reads or sets that are not a user's to set: a build input,
-/// the roots canon points its own DuckDB views at, and a debug-build test seam.
+/// the roots canon points its own DuckDB views at, and debug-build test seams (`CANON_WITNESS_DIR`:
+/// where a debug build records which (command, report) pairs it emitted, for the T9 witness).
 pub const INTERNAL_ENV: &[&str] = &[
     "CANON_ARCHIVE_ROOT",
     "CANON_DASHBOARD_DIST",
@@ -75,6 +76,7 @@ pub const INTERNAL_ENV: &[&str] = &[
     "CANON_LEARN_ROOT",
     "CANON_R2_LOCAL_ROOT",
     "CANON_R2_ROOT",
+    "CANON_WITNESS_DIR",
 ];
 
 /// Every `CANON_*` variable the spec names.
@@ -160,6 +162,32 @@ pub struct Output {
     pub batch: bool,
 }
 
+/// One exit code of a leaf with its meaning: the leaf's own rows ([`crate::schema::META`]),
+/// then one row per exit a listed error code carries that the leaf did not declare.
+#[derive(Serialize, schemars::JsonSchema)]
+pub struct ExitRow {
+    pub code: u8,
+    pub meaning: String,
+}
+
+/// The exits of a leaf: its declared rows, and for each of exit 1 and 2 that a code it
+/// lists carries but it does not declare, a row naming those codes, so no listed code
+/// exits with a status the leaf says it never returns.
+fn exits_of(declared: &[ExitMeta], codes: &[&'static str]) -> Vec<ExitRow> {
+    let mut rows: Vec<ExitRow> = declared.iter().map(|e| ExitRow { code: e.code, meaning: e.meaning.to_string() }).collect();
+    for (exit, what) in [(1u8, "failed"), (2u8, "refused")] {
+        if rows.iter().any(|r| r.code == exit) {
+            continue;
+        }
+        let named: Vec<&str> = codes.iter().copied().filter(|c| crate::cli_error::code_info(c).is_some_and(|i| i.exit == i32::from(exit))).collect();
+        if !named.is_empty() {
+            rows.push(ExitRow { code: exit, meaning: format!("{what}: {}", named.join(", ")) });
+        }
+    }
+    rows.sort_by_key(|r| r.code);
+    rows
+}
+
 /// The part of a node only a leaf has.
 #[derive(Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -178,7 +206,7 @@ pub struct Leaf {
     pub options: Vec<OptionSpec>,
     /// Option sets of which exactly one is required.
     pub required_one_of: Vec<Vec<String>>,
-    pub exits: Vec<ExitMeta>,
+    pub exits: Vec<ExitRow>,
     pub error_codes: Vec<&'static str>,
     pub outputs: Vec<Output>,
     /// JSON input documents of the leaf (`--input`).
@@ -365,6 +393,7 @@ fn leaf_of(path: &str, cmd: &Command, reports: &[crate::reports::ReportSchema]) 
         .collect();
     let options: Vec<OptionSpec> = cmd.get_arguments().filter(|a| !a.is_positional() && !a.is_global_set() && !is_builtin(a)).map(|a| option_spec(cmd, a, &conflicts)).collect();
     let supports_json = options.iter().any(|o| o.name == "json");
+    let error_codes = error_codes(path);
     let batch_supported = crate::input::batch_supported(path);
     let mut outputs: Vec<Output> = facts
         .map(|f| f.outputs)
@@ -406,8 +435,8 @@ fn leaf_of(path: &str, cmd: &Command, reports: &[crate::reports::ReportSchema]) 
             .filter(|g| g.is_required_set() && !(*g).clone().is_multiple())
             .map(|g| g.get_args().filter_map(|id| cmd.get_arguments().find(|a| a.get_id() == id)).map(display_name).collect())
             .collect(),
-        exits: meta.map_or(STANDARD_EXITS, |m| m.exits).to_vec(),
-        error_codes: error_codes(path),
+        exits: exits_of(meta.map_or(STANDARD_EXITS, |m| m.exits), &error_codes),
+        error_codes,
         outputs,
         inputs: crate::input::inputs(path, cmd),
         examples: example_for(path).into_iter().collect(),

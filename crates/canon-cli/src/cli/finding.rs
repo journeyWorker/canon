@@ -19,25 +19,25 @@ pub enum FindingCommand {
 #[derive(Args)]
 pub struct FindingAddArgs {
     /// The change under review (e.g. s43-findings-are-records) — first component of the natural key
-    #[arg(long, value_parser = crate::finding::parse_change_id)]
+    #[arg(long, value_parser = crate::finding::parse_change_id, value_name = "CHANGE_ID")]
     pub change_id: ChangeId,
     /// Which review round on this change raised it (1-based)
-    #[arg(long)]
+    #[arg(long, value_name = "N")]
     pub round: u32,
     /// This finding's index within the round (1-based). Required, never auto-assigned; a collision is refused
-    #[arg(long)]
+    #[arg(long, value_name = "N")]
     pub seq: u32,
     /// blocker / should-fix / note — the reviewer's own judgement, never a score canon derives
-    #[arg(long, value_parser = crate::finding::severity_parser())]
+    #[arg(long, value_parser = crate::finding::severity_parser(), value_name = "SEVERITY")]
     pub severity: canon_model::FindingSeverity,
     /// open / fixed / rejected / deferred (fixed records --resolution-rev, default HEAD, and only fixed may carry one)
-    #[arg(long, default_value = "open", value_parser = crate::finding::disposition_parser())]
+    #[arg(long, default_value = "open", value_parser = crate::finding::disposition_parser(), value_name = "DISPOSITION")]
     pub disposition: canon_model::FindingDisposition,
     /// The reviewer who raised it, recorded as the finding's reviewer and author (line breaks refused)
-    #[arg(long)]
+    #[arg(long, value_name = "ACTOR_ID")]
     pub actor_id: String,
     /// One line of what the finding IS, in the reviewer's own words. NEVER checked against the code (line breaks refused)
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub summary: String,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
@@ -48,16 +48,16 @@ pub struct FindingAddArgs {
     #[arg(long, value_name = "REV", value_parser = crate::finding::parse_introduced_rev)]
     pub introduced_rev: Option<String>,
     /// Where in the tree, as path/to/file.rs:120-134 (line breaks refused)
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub file_ref: Option<String>,
     /// A scenario this finding is about (repeatable). After a `fixed` close, fresh evidence for these scenarios alone re-verifies the fix; with none named, every evidenced scenario of the subject does. Each must be a scenario the index knows; a close inherits the list
-    #[arg(long = "scenario-id", value_parser = crate::review::parse_scenario_id)]
+    #[arg(long = "scenario-id", value_parser = crate::review::parse_scenario_id, value_name = "SCENARIO_ID")]
     pub scenario_ids: Vec<ScenarioId>,
     /// Attribution only — unlike `canon evidence add`, no partition key derives from it
-    #[arg(long, default_value = "reviewer", value_parser = crate::retrieve::parse_role)]
+    #[arg(long, default_value = "reviewer", value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
     pub role: RoleId,
     /// The authoring session (recorded as actor.session_id)
-    #[arg(long, value_parser = crate::review::parse_session_id)]
+    #[arg(long, value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
     pub session_id: Option<canon_model::SessionId>,
     #[command(flatten)]
     pub promote: PromoteArgs,
@@ -76,28 +76,28 @@ pub struct FindingCloseArgs {
     #[arg(value_name = "CHANGE_ID", value_parser = crate::finding::parse_change_id)]
     pub change_id: ChangeId,
     /// Which review round raised it (1-based)
-    #[arg(long)]
+    #[arg(long, value_name = "N")]
     pub round: u32,
     /// The finding's index within the round (1-based)
-    #[arg(long)]
+    #[arg(long, value_name = "N")]
     pub seq: u32,
     /// Where it lands: fixed / rejected / deferred / open (reopening is a real transition). fixed records --resolution-rev, default HEAD, and only fixed may carry one
-    #[arg(long, value_parser = crate::finding::disposition_parser())]
+    #[arg(long, value_parser = crate::finding::disposition_parser(), value_name = "DISPOSITION")]
     pub disposition: canon_model::FindingDisposition,
     /// The commit that closed it, any git revision (resolved to the full sha, with the code tree it saw). Permitted only with --disposition fixed, where it defaults to HEAD. Existence only; canon never reads the commit's message or diff
     #[arg(long, value_name = "REV")]
     pub resolution_rev: Option<String>,
     /// Why it was closed, one line. Required for rejected and deferred, optional for fixed and open; stored on the closing version and shown by `finding list`
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub reason: Option<String>,
     /// The actor recorded as authoring the TRANSITION — not the original finding's author, which is preserved on the record this supersedes
-    #[arg(long, default_value = "canon")]
+    #[arg(long, default_value = "canon", value_name = "ACTOR_ID")]
     pub actor_id: String,
     /// Attribution only — no partition key derives from it
-    #[arg(long, default_value = "reviewer", value_parser = crate::retrieve::parse_role)]
+    #[arg(long, default_value = "reviewer", value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
     pub role: RoleId,
     /// The session that authored the TRANSITION (recorded as actor.session_id)
-    #[arg(long, value_parser = crate::review::parse_session_id)]
+    #[arg(long, value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
     pub session_id: Option<canon_model::SessionId>,
     #[command(flatten)]
     pub promote: PromoteArgs,
@@ -113,7 +113,7 @@ pub struct FindingCloseArgs {
 #[derive(Args)]
 pub struct FindingListArgs {
     /// The change whose findings to list
-    #[arg(long, value_parser = crate::finding::parse_change_id)]
+    #[arg(long, value_parser = crate::finding::parse_change_id, value_name = "CHANGE_ID")]
     pub change_id: ChangeId,
     /// Only findings whose current disposition is open
     #[arg(long)]

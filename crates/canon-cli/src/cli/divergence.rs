@@ -12,26 +12,30 @@ pub struct DivergenceAddArgs {
     #[arg(value_name = "SCENARIO_ID", value_parser = crate::review::parse_scenario_id)]
     pub scenario_id: ScenarioId,
     /// Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root
-    #[arg(long, value_parser = crate::review::parse_project_id)]
+    #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
     /// The divergence state to record (deferred needs --reason and --expiry)
     #[arg(long, value_name = "STATE", default_value = "open", value_parser = clap::builder::PossibleValuesParser::new(["open", "still-divergent", "resolved", "deferred"]))]
     pub state: String,
-    #[arg(long)]
+    /// Why the divergence is recorded; required with `--state deferred`
+    #[arg(long, value_name = "TEXT")]
     pub reason: Option<String>,
-    #[arg(long, value_parser = crate::divergence::parse_timestamp)]
+    /// When a deferral lapses (RFC3339 or YYYY-MM-DD, UTC); required with `--state deferred`
+    #[arg(long, value_parser = crate::divergence::parse_timestamp, value_name = "TIMESTAMP")]
     pub expiry: Option<DateTime<Utc>>,
-    #[arg(long, default_value_t = 1)]
+    /// The review round this version belongs to (1-based)
+    #[arg(long, default_value_t = 1, value_name = "N")]
     pub round: u32,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
-    #[arg(long)]
+    #[arg(long, value_name = "ACTOR_ID")]
     pub actor_id: String,
-    #[arg(long, default_value = "")]
-    pub detail: String,
+    /// Free-text detail recorded on the version (optional)
+    #[arg(long, value_name = "TEXT")]
+    pub detail: Option<String>,
     /// The role this record is attributed to (default: the role declared with --as / CANON_ROLE)
-    #[arg(long, value_parser = crate::retrieve::parse_role)]
+    #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
     pub role: Option<RoleId>,
     #[command(flatten)]
     pub promote: PromoteArgs,
@@ -64,19 +68,21 @@ pub struct DivergenceResolveArgs {
     #[arg(value_name = "SCENARIO_ID", value_parser = crate::review::parse_scenario_id)]
     pub scenario_id: ScenarioId,
     /// Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root
-    #[arg(long, value_parser = crate::review::parse_project_id)]
+    #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
-    #[arg(long, default_value_t = 1)]
+    /// The review round this version belongs to (1-based)
+    #[arg(long, default_value_t = 1, value_name = "N")]
     pub round: u32,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
-    #[arg(long)]
+    #[arg(long, value_name = "ACTOR_ID")]
     pub actor_id: String,
-    #[arg(long, default_value = "")]
-    pub detail: String,
+    /// Free-text detail recorded on the version (optional)
+    #[arg(long, value_name = "TEXT")]
+    pub detail: Option<String>,
     /// The role this record is attributed to (default: the role declared with --as / CANON_ROLE)
-    #[arg(long, value_parser = crate::retrieve::parse_role)]
+    #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
     pub role: Option<RoleId>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -93,21 +99,24 @@ pub struct DivergenceDeferArgs {
     #[arg(value_name = "SCENARIO_ID", value_parser = crate::review::parse_scenario_id)]
     pub scenario_id: ScenarioId,
     /// Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root
-    #[arg(long, value_parser = crate::review::parse_project_id)]
+    #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
-    #[arg(long, default_value_t = 1)]
+    /// The review round this version belongs to (1-based)
+    #[arg(long, default_value_t = 1, value_name = "N")]
     pub round: u32,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
-    #[arg(long)]
+    #[arg(long, value_name = "ACTOR_ID")]
     pub actor_id: String,
-    #[arg(long)]
+    /// Why the divergence is deferred
+    #[arg(long, value_name = "TEXT")]
     pub reason: String,
-    #[arg(long, value_parser = crate::divergence::parse_timestamp)]
+    /// When the deferral lapses (RFC3339 or YYYY-MM-DD, UTC)
+    #[arg(long, value_parser = crate::divergence::parse_timestamp, value_name = "TIMESTAMP")]
     pub expiry: DateTime<Utc>,
     /// The role this record is attributed to (default: the role declared with --as / CANON_ROLE)
-    #[arg(long, value_parser = crate::retrieve::parse_role)]
+    #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
     pub role: Option<RoleId>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -124,25 +133,25 @@ pub struct DivergenceAcceptArgs {
     #[arg(value_name = "SCENARIO_ID", required = true, value_parser = crate::review::parse_scenario_id)]
     pub scenario_ids: Vec<ScenarioId>,
     /// Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root
-    #[arg(long, value_parser = crate::review::parse_project_id)]
+    #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     /// Why the gap is accepted
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub reason: String,
     /// Where the gap is tracked: an issue URL or reference
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub tracking: String,
     /// The date (YYYY-MM-DD, UTC) the acceptance stops holding; none means it holds until new evidence
-    #[arg(long, value_parser = crate::divergence::parse_timestamp)]
+    #[arg(long, value_parser = crate::divergence::parse_timestamp, value_name = "TIMESTAMP")]
     pub expiry: Option<DateTime<Utc>>,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
-    #[arg(long)]
+    #[arg(long, value_name = "ACTOR_ID")]
     pub actor_id: String,
     /// Must be reviewer (default: the declared role, --as / CANON_ROLE; required when none is declared)
-    #[arg(long, value_parser = crate::retrieve::parse_role)]
+    #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
     pub role: Option<RoleId>,
     /// The accepting session (recorded as actor.session_id); it must not be one that attested the scenario's evidence
-    #[arg(long, value_parser = crate::review::parse_session_id)]
+    #[arg(long, value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
     pub session_id: Option<canon_model::SessionId>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -158,7 +167,7 @@ pub struct DivergenceListArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Governs Deferred expiry; defaults to now
-    #[arg(long, value_parser = crate::divergence::parse_timestamp)]
+    #[arg(long, value_parser = crate::divergence::parse_timestamp, value_name = "TIMESTAMP")]
     pub as_of: Option<DateTime<Utc>>,
     /// Print `{data, meta}` as JSON
     #[arg(long)]

@@ -13,10 +13,10 @@ pub enum PolicyCommand {
 #[derive(Args)]
 pub struct PolicyApproveArgs {
     /// Who approved it (a human's name or id)
-    #[arg(long)]
+    #[arg(long, value_name = "NAME")]
     pub approver: String,
     /// Why, or what was reviewed
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub note: Option<String>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

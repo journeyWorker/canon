@@ -27,10 +27,10 @@ const SEPARATOR: char = '\u{1f}';
 #[derive(Args, Debug, Clone, Default)]
 pub struct PageFlags {
     /// Return at most this many records (default 100)
-    #[arg(long, value_parser = clap::value_parser!(u64).range(1..), conflicts_with = "all")]
+    #[arg(long, value_parser = clap::value_parser!(u64).range(1..), conflicts_with = "all", value_name = "N")]
     pub limit: Option<u64>,
     /// Resume after the last record of the previous page (the `nextCursor` it reported)
-    #[arg(long)]
+    #[arg(long, value_name = "CURSOR")]
     pub cursor: Option<String>,
     /// Return every record from the cursor on, not one page
     #[arg(long)]

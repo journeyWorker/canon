@@ -46,10 +46,10 @@ pub struct BriefCheckArgs {
 #[derive(Args)]
 pub struct BriefApproveArgs {
     /// Who approved (the human, not the agent)
-    #[arg(long)]
+    #[arg(long, value_name = "NAME")]
     pub approver: String,
     /// The human's own words
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub note: String,
     /// The change to read (default: the repo's only live change)
     #[arg(value_name = "CHANGE_ID", value_parser = crate::subject::parse_change_id)]

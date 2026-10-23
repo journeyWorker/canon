@@ -17,7 +17,7 @@ pub struct PluginSyncArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// Sync exactly one ad hoc root, overriding canon.yaml's specs.roots[]
-    #[arg(long)]
+    #[arg(long, value_name = "DIR")]
     pub spec_root: Option<PathBuf>,
     #[command(flatten)]
     pub dry_run: crate::cli::DryRunArgs,

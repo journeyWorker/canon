@@ -117,6 +117,16 @@ pub fn project_dir(canon_yaml_path: &Path) -> &Path {
 /// `TierPolicy::from_yaml_at` itself (s32), so it arrives here
 /// already absolute.
 pub fn build_tiers(canon_yaml_path: &Path) -> Result<LoadedTiers, TierCliError> {
+    build_tiers_with(canon_yaml_path, false)
+}
+
+/// [`build_tiers`] for a run that only reads (a preview, or a plan that may be refused): an absent
+/// sqlite hot db is read as empty and not created.
+pub fn build_tiers_for_read(canon_yaml_path: &Path) -> Result<LoadedTiers, TierCliError> {
+    build_tiers_with(canon_yaml_path, true)
+}
+
+fn build_tiers_with(canon_yaml_path: &Path, read_only: bool) -> Result<LoadedTiers, TierCliError> {
     let display_path = canon_yaml_path.display().to_string();
     let yaml = std::fs::read_to_string(canon_yaml_path)
         .map_err(|source| TierCliError::ReadCanonYaml { path: display_path.clone(), source })?;
@@ -169,7 +179,7 @@ pub fn build_tiers(canon_yaml_path: &Path) -> Result<LoadedTiers, TierCliError> 
                 // hardcoded internally, mirroring `PgTier::connect`),
                 // which the strict path here simply propagates loud
                 // via `?`.
-                sqlite = Some(SqliteTier::connect(&cfg.path)?);
+                sqlite = Some(if read_only { SqliteTier::connect_for_read(&cfg.path)? } else { SqliteTier::connect(&cfg.path)? });
             }
         }
     }

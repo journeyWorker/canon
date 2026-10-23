@@ -150,7 +150,7 @@ pub const FACTS: &[LeafFacts] = &[
     leaf("ingest records").idem(ReplaySafe).out(&[report("IngestRecordsReport")]),
     leaf("ingest plans").idem(ReplaySafe).out(&[report("IngestPlansReport")]),
     leaf("ingest sessions").idem(ReplaySafe).out(&[report("IngestSessionsReport")]),
-    leaf("init").idem(ReplaySafe).out(&[report("InitReport")]),
+    leaf("init").idem(ReplaySafe).out(&[report("InitReport"), report("InitCheckReport")]),
     leaf("inventory sync").idem(ReplaySafe).out(&[report("InventorySyncReport")]),
     leaf("strategy approval-payload").idem(ReplaySafe).out(&[artifact("application/octet-stream", "StrategyApprovalPayloadReport")]).operands(&[operand("strategy_id", "The StrategyId (ULID) whose approval payload is printed")]),
     leaf("strategy promote").idem(ReplaySafe).out(&[report("StrategyPromoteReport")]),

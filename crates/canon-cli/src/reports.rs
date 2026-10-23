@@ -42,16 +42,18 @@ pub struct ReportSchema {
     /// `<PascalCaseCommandId>Report`, the name the per-leaf table gives it.
     pub name: String,
     pub schema_version: &'static str,
+    /// The Rust type of the report (`std::any::type_name`): the witness (`CANON_WITNESS_DIR`) names the type it saw.
+    pub type_name: &'static str,
     /// A JSON Schema 2020-12 for `data`.
     pub schema: Value,
 }
 
 fn entry<R: Report>(command: &'static str, name: &str) -> ReportSchema {
-    ReportSchema { command, name: name.to_string(), schema_version: R::SCHEMA_VERSION, schema: schema_of::<R>() }
+    ReportSchema { command, name: name.to_string(), schema_version: R::SCHEMA_VERSION, type_name: std::any::type_name::<R>(), schema: schema_of::<R>() }
 }
 
 fn batch_entry<R: Report + 'static>(command: &'static str, name: &str) -> ReportSchema {
-    ReportSchema { command, name: name.to_string(), schema_version: crate::input::BatchReport::<R>::SCHEMA_VERSION, schema: schema_of::<crate::input::BatchReport<R>>() }
+    ReportSchema { command, name: name.to_string(), schema_version: crate::input::BatchReport::<R>::SCHEMA_VERSION, type_name: std::any::type_name::<crate::input::BatchReport<R>>(), schema: schema_of::<crate::input::BatchReport<R>>() }
 }
 
 /// The JSON Schema of `R` as a value.

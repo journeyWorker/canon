@@ -45,16 +45,16 @@ pub struct GateInstallHooksArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     /// The hook event name (e.g. PreToolUse, Stop)
-    #[arg(long, default_value = "PreToolUse")]
+    #[arg(long, default_value = "PreToolUse", value_name = "NAME")]
     pub event: String,
     /// Omitted for a matcher-less event
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub matcher: Option<String>,
     /// The command the hook runs
-    #[arg(long, default_value = "canon task done")]
+    #[arg(long, default_value = "canon task done", value_name = "TEXT")]
     pub command: String,
     /// Hook timeout in seconds
-    #[arg(long, default_value_t = 30)]
+    #[arg(long, default_value_t = 30, value_name = "N")]
     pub timeout: u32,
     #[command(flatten)]
     pub dry_run: crate::cli::DryRunArgs,

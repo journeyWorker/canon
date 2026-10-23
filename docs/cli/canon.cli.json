@@ -62,7 +62,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "RESPONSE"
+          "valueName": "FILE"
         },
         {
           "aliases": [],
@@ -145,7 +145,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "RESPONSE"
+          "valueName": "FILE"
         },
         {
           "aliases": [],
@@ -235,6 +235,10 @@
         {
           "code": 0,
           "meaning": "previewed, or committed, or nothing to do"
+        },
+        {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED"
         },
         {
           "code": 2,
@@ -379,6 +383,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -409,7 +417,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "MIB"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -619,6 +627,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: BRIEF_HAS_BLOCKERS, BRIEF_WRITE_FAILED, INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -666,7 +678,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "APPROVER"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -677,7 +689,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "NOTE"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -964,6 +976,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -1038,7 +1054,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "TITLE"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -1307,6 +1323,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: CONTEXT_GIT_UNAVAILABLE, CONTEXT_OBJECT_CONFLICT, CONTEXT_PACK_TAMPERED, INPUT_ELEMENT_FAILED, SERIALIZE_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -1337,7 +1357,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "MANIFEST"
+          "valueName": "FILE"
         },
         {
           "aliases": [],
@@ -1631,6 +1651,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: BRIEF_HAS_BLOCKERS, DASHBOARD_FAILED, DASHBOARD_NOT_BUILT, DASHBOARD_PORT_IN_USE, INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -1670,7 +1694,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "SNAPSHOT"
+          "valueName": "DIR"
         },
         {
           "aliases": [],
@@ -1683,7 +1707,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "PORT"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -1766,6 +1790,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -1796,7 +1824,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "REPO"
+          "valueName": "DIR"
         },
         {
           "aliases": [],
@@ -1872,6 +1900,10 @@
         {
           "code": 0,
           "meaning": "success"
+        },
+        {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED"
         },
         {
           "code": 2,
@@ -2006,6 +2038,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: DISPATCH_END_IN_PROGRESS, INPUT_ELEMENT_FAILED, SERIALIZE_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -2048,7 +2084,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "REGIME"
+          "valueName": "KEY"
         },
         {
           "aliases": [],
@@ -2072,7 +2108,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "PROVIDER"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -2083,7 +2119,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "MODEL"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -2094,7 +2130,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "SKILL_ID"
+          "valueName": "ID"
         },
         {
           "aliases": [],
@@ -2105,7 +2141,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "SKILL_DIGEST"
+          "valueName": "DIGEST"
         },
         {
           "aliases": [],
@@ -2116,7 +2152,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "MANIFEST"
+          "valueName": "FILE"
         },
         {
           "aliases": [],
@@ -2127,7 +2163,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "PROMPT_BUNDLE"
+          "valueName": "NAME@VERSION"
         },
         {
           "aliases": [],
@@ -2149,7 +2185,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "PARENT_RUN_ID"
+          "valueName": "RUN_ID"
         },
         {
           "aliases": [],
@@ -2317,6 +2353,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: DISPATCH_END_IN_PROGRESS, INPUT_ELEMENT_FAILED, SERIALIZE_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -2478,6 +2518,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -2538,7 +2582,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "REASON"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -2549,7 +2593,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "TRACKING"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -2560,7 +2604,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "EXPIRY"
+          "valueName": "TIMESTAMP"
         },
         {
           "aliases": [],
@@ -2686,6 +2730,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED, PROMOTE_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -2785,37 +2833,37 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "Why the divergence is recorded; required with `--state deferred`",
           "kind": "value",
           "name": "reason",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "REASON"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "When a deferral lapses (RFC3339 or YYYY-MM-DD, UTC); required with `--state deferred`",
           "kind": "value",
           "name": "expiry",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "EXPIRY"
+          "valueName": "TIMESTAMP"
         },
         {
           "aliases": [],
           "default": [
             "1"
           ],
-          "help": null,
+          "help": "The review round this version belongs to (1-based)",
           "kind": "value",
           "name": "round",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "ROUND"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -2830,16 +2878,14 @@
         },
         {
           "aliases": [],
-          "default": [
-            ""
-          ],
-          "help": null,
+          "default": [],
+          "help": "Free-text detail recorded on the version (optional)",
           "kind": "value",
           "name": "detail",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "DETAIL"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -2972,6 +3018,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: DIVERGENCE_REFUSED, INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -3041,13 +3091,13 @@
           "default": [
             "1"
           ],
-          "help": null,
+          "help": "The review round this version belongs to (1-based)",
           "kind": "value",
           "name": "round",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "ROUND"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -3063,24 +3113,24 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "Why the divergence is deferred",
           "kind": "value",
           "name": "reason",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "REASON"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "When the deferral lapses (RFC3339 or YYYY-MM-DD, UTC)",
           "kind": "value",
           "name": "expiry",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "EXPIRY"
+          "valueName": "TIMESTAMP"
         },
         {
           "aliases": [],
@@ -3206,7 +3256,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "AS_OF"
+          "valueName": "TIMESTAMP"
         },
         {
           "aliases": [],
@@ -3230,7 +3280,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "LIMIT"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -3324,6 +3374,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: DIVERGENCE_REFUSED, INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -3391,13 +3445,13 @@
           "default": [
             "1"
           ],
-          "help": null,
+          "help": "The review round this version belongs to (1-based)",
           "kind": "value",
           "name": "round",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "ROUND"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -3412,16 +3466,14 @@
         },
         {
           "aliases": [],
-          "default": [
-            ""
-          ],
-          "help": null,
+          "default": [],
+          "help": "Free-text detail recorded on the version (optional)",
           "kind": "value",
           "name": "detail",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "DETAIL"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -3641,7 +3693,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "REF"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -3667,7 +3719,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "SUMMARY"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -3678,7 +3730,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "COMMAND_RESULT"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -3711,7 +3763,7 @@
           "possibleValues": [],
           "repeatable": true,
           "required": false,
-          "valueName": "SURFACE_REF"
+          "valueName": "PATH_OR_EFFECT"
         },
         {
           "aliases": [],
@@ -3757,7 +3809,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "APPROVER"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -3765,10 +3817,12 @@
           "help": "Approval role; only human is eligible for risk approval",
           "kind": "value",
           "name": "approval-role",
-          "possibleValues": [],
+          "possibleValues": [
+            "human"
+          ],
           "repeatable": false,
           "required": false,
-          "valueName": "APPROVAL_ROLE"
+          "valueName": "ROLE"
         },
         {
           "aliases": [],
@@ -3779,7 +3833,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "SIGNATURE_FILE"
+          "valueName": "FILE"
         },
         {
           "aliases": [],
@@ -3859,7 +3913,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "MIB"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -3870,7 +3924,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "OVERRIDE_REASON"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -3994,7 +4048,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "The plan task the approval is for (<change_id>#<n>); give this or --scenario-id",
           "kind": "value",
           "name": "task-id",
           "possibleValues": [],
@@ -4005,7 +4059,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "Spec corpus id for --scenario-id. Required only when canon.yaml configures more than one spec root",
           "kind": "value",
           "name": "project-id",
           "possibleValues": [],
@@ -4016,7 +4070,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "The scenario the approval is for; give this or --task-id",
           "kind": "value",
           "name": "scenario-id",
           "possibleValues": [],
@@ -4027,7 +4081,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "The dispatch run the approved work belongs to",
           "kind": "value",
           "name": "run-id",
           "possibleValues": [],
@@ -4051,13 +4105,13 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "The risk surface being approved: a repository-relative path or `effect:<kebab-slug>` (repeatable)",
           "kind": "value",
           "name": "surface-ref",
           "possibleValues": [],
           "repeatable": true,
           "required": false,
-          "valueName": "SURFACE_REF"
+          "valueName": "PATH_OR_EFFECT"
         },
         {
           "aliases": [],
@@ -4068,7 +4122,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "APPROVER"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -4128,6 +4182,7 @@
       "aliases": [],
       "command": "evidence audit",
       "effect": "write",
+      "effectNote": "refreshes stale scenario-index records first",
       "errorCodes": [
         "BRIEF_CHANGED_SINCE_APPROVAL",
         "BRIEF_UNAPPROVED",
@@ -4236,7 +4291,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "REF"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -4247,7 +4302,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "SUMMARY"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -4258,7 +4313,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "COMMAND_RESULT"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -4363,7 +4418,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "MIB"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -4374,7 +4429,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "EVALUATOR_ID"
+          "valueName": "ID"
         },
         {
           "aliases": [],
@@ -4385,7 +4440,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "EVALUATOR_VERSION"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -4396,7 +4451,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "EVALUATOR_DIGEST"
+          "valueName": "DIGEST"
         },
         {
           "aliases": [],
@@ -4411,7 +4466,7 @@
           ],
           "repeatable": false,
           "required": true,
-          "valueName": "AUDIT_RESULT"
+          "valueName": "RESULT"
         },
         {
           "aliases": [],
@@ -4422,7 +4477,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "OVERRIDE_REASON"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -4541,6 +4596,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -4566,7 +4625,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "The record kind to export",
           "kind": "value",
           "name": "kind",
           "possibleValues": [
@@ -4592,29 +4651,29 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "Only records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
           "kind": "value",
           "name": "before",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "BEFORE"
+          "valueName": "TIMESTAMP"
         },
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "Only records at or after this time (RFC3339 or YYYY-MM-DD, UTC)",
           "kind": "value",
           "name": "after",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "AFTER"
+          "valueName": "TIMESTAMP"
         },
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "Write the manifest to this file (mode 0600) instead of stdout",
           "kind": "value",
           "name": "output",
           "possibleValues": [],
@@ -4637,7 +4696,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
@@ -4647,7 +4706,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "Include records marked sensitive (only when policy explicitly allows it)",
           "kind": "flag",
           "name": "include-sensitive",
           "possibleValues": [],
@@ -4666,7 +4725,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "LIMIT"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -4796,6 +4855,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -4842,7 +4905,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "TITLE"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -4980,6 +5043,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED, PROMOTE_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -5044,7 +5111,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "ROUND"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -5055,7 +5122,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "SEQ"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -5110,7 +5177,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "SUMMARY"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -5156,7 +5223,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "FILE_REF"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -5167,7 +5234,7 @@
           "possibleValues": [],
           "repeatable": true,
           "required": false,
-          "valueName": "SCENARIO_IDS"
+          "valueName": "SCENARIO_ID"
         },
         {
           "aliases": [],
@@ -5315,6 +5382,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED, PROMOTE_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -5364,7 +5435,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "ROUND"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -5375,7 +5446,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "SEQ"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -5413,7 +5484,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "REASON"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -5622,7 +5693,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "LIMIT"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -5905,6 +5976,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -5946,7 +6021,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "EVENT"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -5957,7 +6032,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "MATCHER"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -5970,7 +6045,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "COMMAND"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -5983,7 +6058,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "TIMEOUT"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -6260,7 +6335,7 @@
           "requires": [
             "--plan-source"
           ],
-          "valueName": "DIALECT"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -6373,6 +6448,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INGEST_FAILED, INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -6413,7 +6492,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "INTERVAL_SECS"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -6523,6 +6602,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INGEST_FAILED, INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -6563,7 +6646,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "INTERVAL_SECS"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -6574,7 +6657,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "HOME"
+          "valueName": "DIR"
         },
         {
           "aliases": [],
@@ -6734,7 +6817,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "REPO"
+          "valueName": "DIR"
         },
         {
           "aliases": [],
@@ -6773,7 +6856,9 @@
             "--check",
             "--no-policy"
           ],
-          "default": [],
+          "default": [
+            "strict"
+          ],
           "help": "Level of the starter .canon/policy.yaml [default: strict]",
           "kind": "value",
           "name": "policy",
@@ -6868,6 +6953,12 @@
           "kind": "report",
           "report": "InitReport",
           "schemaRef": "#/schemas/InitReport",
+          "schemaVersion": "1.0"
+        },
+        {
+          "kind": "report",
+          "report": "InitCheckReport",
+          "schemaRef": "#/schemas/InitCheckReport",
           "schemaVersion": "1.0"
         },
         {
@@ -6973,7 +7064,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "SPEC_ROOT"
+          "valueName": "DIR"
         },
         {
           "aliases": [],
@@ -7077,6 +7168,10 @@
         {
           "code": 0,
           "meaning": "previewed, or committed, or nothing to do"
+        },
+        {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED, LEDGER_COMPACT_FAILED"
         },
         {
           "code": 2,
@@ -7415,7 +7510,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "SPEC_ROOT"
+          "valueName": "DIR"
         },
         {
           "aliases": [],
@@ -7518,6 +7613,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -7549,7 +7648,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "APPROVER"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -7560,7 +7659,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "NOTE"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -7788,7 +7887,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "MANIFEST"
+          "valueName": "FILE"
         },
         {
           "aliases": [],
@@ -7875,6 +7974,10 @@
         {
           "code": 0,
           "meaning": "success"
+        },
+        {
+          "code": 1,
+          "meaning": "failed: CONTEXT_GIT_UNAVAILABLE, CONTEXT_OBJECT_CONFLICT, CONTEXT_PACK_TAMPERED, SERIALIZE_FAILED"
         },
         {
           "code": 2,
@@ -7971,6 +8074,10 @@
           "meaning": "previewed, or committed, or nothing to do"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, an invalid input, or PLAN_CHANGED; nothing is removed"
         }
@@ -7996,7 +8103,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "The record kind to purge (session, run, event or trajectory)",
           "kind": "value",
           "name": "kind",
           "possibleValues": [
@@ -8012,13 +8119,13 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "Remove records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
           "kind": "value",
           "name": "before",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "BEFORE"
+          "valueName": "TIMESTAMP"
         },
         {
           "aliases": [],
@@ -8061,7 +8168,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
           "possibleValues": [],
@@ -8121,6 +8228,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: QUERY_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -8165,7 +8276,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "SINCE"
+          "valueName": "TIMESTAMP"
         },
         {
           "aliases": [],
@@ -8246,7 +8357,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "DOMAIN"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -8270,7 +8381,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "LIMIT"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -8400,7 +8511,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "AREA"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -8822,7 +8933,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "REGIME"
+          "valueName": "KEY"
         },
         {
           "aliases": [],
@@ -8833,7 +8944,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "DOMAIN"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -8848,7 +8959,9 @@
         },
         {
           "aliases": [],
-          "default": [],
+          "default": [
+            "5"
+          ],
           "help": "Cap on the guidance items returned (default: 5)",
           "kind": "value",
           "name": "limit",
@@ -8918,6 +9031,7 @@
       "aliases": [],
       "command": "review change",
       "effect": "write",
+      "effectNote": "refreshes stale scenario-index records first",
       "errorCodes": [
         "CONFIG_MISSING",
         "CONFIG_UNREADABLE",
@@ -8946,6 +9060,10 @@
         {
           "code": 0,
           "meaning": "success"
+        },
+        {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED"
         },
         {
           "code": 2,
@@ -9034,7 +9152,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "UPSTREAM_REF"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -9048,7 +9166,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "ORIGINAL_SPEC_REF"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -9080,7 +9198,11 @@
           "help": "How the reviewer's run ended: signed (an approval), indeterminate (ran, reached no verdict) or unavailable (could not run). Only signed counts; the others are recorded as review gaps",
           "kind": "value",
           "name": "review-outcome",
-          "possibleValues": [],
+          "possibleValues": [
+            "signed",
+            "indeterminate",
+            "unavailable"
+          ],
           "repeatable": false,
           "required": false,
           "valueName": "REVIEW_OUTCOME"
@@ -9094,7 +9216,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "REVIEWER_PROVIDER"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -9105,7 +9227,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "REVIEWER_MODEL"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -9116,7 +9238,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "REVIEWER_HARNESS"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -9140,7 +9262,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "MIB"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -9241,6 +9363,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -9326,7 +9452,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "UPSTREAM_REF"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -9340,7 +9466,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "ORIGINAL_SPEC_REF"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -9372,7 +9498,11 @@
           "help": "How the reviewer's run ended: signed (an approval), indeterminate (ran, reached no verdict) or unavailable (could not run). Only signed counts; the others are recorded as review gaps",
           "kind": "value",
           "name": "review-outcome",
-          "possibleValues": [],
+          "possibleValues": [
+            "signed",
+            "indeterminate",
+            "unavailable"
+          ],
           "repeatable": false,
           "required": false,
           "valueName": "REVIEW_OUTCOME"
@@ -9386,7 +9516,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "REVIEWER_PROVIDER"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -9397,7 +9527,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "REVIEWER_MODEL"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -9408,7 +9538,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "REVIEWER_HARNESS"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -9432,7 +9562,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "MIB"
+          "valueName": "N"
         },
         {
           "aliases": [],
@@ -9547,6 +9677,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -9610,7 +9744,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "TITLE"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -9632,7 +9766,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "LANE"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -9643,7 +9777,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "CASE"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -9654,7 +9788,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "F-ID"
+          "valueName": "FLOW_ID"
         },
         {
           "aliases": [],
@@ -9693,7 +9827,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "FEATURE"
+          "valueName": "FILE"
         },
         {
           "aliases": [],
@@ -10002,13 +10136,13 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "Source directory; defaults to CANON_SKILLS_SOURCE or canon/skills",
           "kind": "value",
           "name": "skills-source",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "SKILLS_SOURCE"
+          "valueName": "DIR"
         },
         {
           "aliases": [],
@@ -10030,7 +10164,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "PROVIDERS"
+          "valueName": "LIST"
         },
         {
           "aliases": [],
@@ -10078,6 +10212,14 @@
         {
           "code": 0,
           "meaning": "always: diagnostics only"
+        },
+        {
+          "code": 1,
+          "meaning": "failed: SKILLS_FAILED"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: UNKNOWN_ROLE, USAGE"
         }
       ],
       "inputs": [],
@@ -10088,13 +10230,13 @@
         {
           "aliases": [],
           "default": [],
-          "help": null,
+          "help": "Source directory; defaults to CANON_SKILLS_SOURCE or canon/skills",
           "kind": "value",
           "name": "skills-source",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "SKILLS_SOURCE"
+          "valueName": "DIR"
         },
         {
           "aliases": [],
@@ -10116,7 +10258,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "PROVIDERS"
+          "valueName": "LIST"
         },
         {
           "aliases": [],
@@ -10175,6 +10317,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED, SKILLS_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -10203,7 +10349,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "SKILLS_SOURCE"
+          "valueName": "DIR"
         },
         {
           "aliases": [],
@@ -10225,7 +10371,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "PROVIDERS"
+          "valueName": "LIST"
         },
         {
           "aliases": [],
@@ -10521,6 +10667,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: LEARN_DEMOTION_FAILED, LEARN_EVALUATION_REJECTED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -10553,7 +10703,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "EVALUATION"
+          "valueName": "FILE"
         },
         {
           "aliases": [],
@@ -10564,7 +10714,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "APPROVER"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -10715,7 +10865,7 @@
           "requires": [
             "--approval"
           ],
-          "valueName": "EVALUATION"
+          "valueName": "FILE"
         },
         {
           "aliases": [],
@@ -10729,7 +10879,7 @@
           "requires": [
             "--evaluation"
           ],
-          "valueName": "APPROVAL"
+          "valueName": "FILE"
         },
         {
           "aliases": [],
@@ -10743,7 +10893,7 @@
           "requires": [
             "--approval"
           ],
-          "valueName": "SIGNATURE_FILE"
+          "valueName": "FILE"
         },
         {
           "aliases": [],
@@ -10836,6 +10986,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED, LEARN_DEMOTION_FAILED, LEARN_ROLLBACK_FAILED"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -10885,7 +11039,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "REASON"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -10907,7 +11061,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "SIGNATURE_FILE"
+          "valueName": "FILE"
         },
         {
           "aliases": [],
@@ -10929,7 +11083,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "CONTRADICTING_TRAJECTORY_ID"
+          "valueName": "ID"
         },
         {
           "aliases": [],
@@ -11034,6 +11188,10 @@
         {
           "code": 0,
           "meaning": "success"
+        },
+        {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED, SUBJECT_GATE_VIOLATION"
         },
         {
           "code": 2,
@@ -11259,7 +11417,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "OVERRIDE_REASON"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -11270,7 +11428,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "REASON"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -11376,6 +11534,10 @@
           "meaning": "success"
         },
         {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED, SUBJECT_GATE_VIOLATION"
+        },
+        {
           "code": 2,
           "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
         }
@@ -11439,7 +11601,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "DOMAIN"
+          "valueName": "NAME"
         },
         {
           "aliases": [],
@@ -11450,20 +11612,18 @@
           "possibleValues": [],
           "repeatable": false,
           "required": true,
-          "valueName": "TITLE"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
-          "default": [
-            ""
-          ],
+          "default": [],
           "help": "The subject's summary (optional)",
           "kind": "value",
           "name": "summary",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "SUMMARY"
+          "valueName": "TEXT"
         },
         {
           "aliases": [],
@@ -11476,7 +11636,7 @@
           "possibleValues": [],
           "repeatable": false,
           "required": false,
-          "valueName": "OWNER_ROLE"
+          "valueName": "ROLE"
         },
         {
           "aliases": [],
@@ -11573,6 +11733,10 @@
           "meaning": "shown"
         },
         {
+          "code": 1,
+          "meaning": "failed: SUBJECT_GATE_VIOLATION"
+        },
+        {
           "code": 2,
           "meaning": "refused: an unknown subject (SUBJECT_NOT_FOUND), or CONFIG_MISSING"
         }
@@ -11664,6 +11828,10 @@
         {
           "code": 0,
           "meaning": "success"
+        },
+        {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED, SUBJECT_GATE_VIOLATION"
         },
         {
           "code": 2,
@@ -11975,6 +12143,10 @@
         {
           "code": 0,
           "meaning": "previewed, or committed, or nothing to do"
+        },
+        {
+          "code": 1,
+          "meaning": "failed: INPUT_ELEMENT_FAILED, TIER_FAILED"
         },
         {
           "code": 2,
@@ -27234,7 +27406,10 @@
                   "const": "flat",
                   "type": "string"
                 },
-                "value": true
+                "value": {
+                  "$ref": "#/$defs/PolicyFlatValue",
+                  "description": "The fixed value (the value itself is a [`serde_json::Value`] in memory; its schema is [`PolicyFlatValue`])."
+                }
               },
               "required": [
                 "kind",
@@ -27259,6 +27434,26 @@
               "type": "object"
             }
           ]
+        },
+        "PolicyFlatValue": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "format": "double",
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "What a fixed `policy.yaml` field can be: a flag, a count, a ratio or a name (a trust level)."
         },
         "PolicySurface": {
           "description": "`canon_gate::PolicyResolution`'s own fields, summarized field-by-field\nvia [`PolicyFieldSurface`] — one Rust field per `PolicyResolution` field,\nso the mapping between \"what the gate resolved\" and \"what context shows\"\nstays traceable by name, never a re-derived shape.",
@@ -28814,13 +29009,14 @@
           ]
         },
         "detail": {
-          "default": "",
+          "description": "Free-text detail recorded on the version (optional)",
           "type": [
             "string",
             "number"
           ]
         },
         "expiry": {
+          "description": "When a deferral lapses (RFC3339 or YYYY-MM-DD, UTC); required with `--state deferred`",
           "type": [
             "string",
             "number"
@@ -28854,6 +29050,7 @@
           "type": "boolean"
         },
         "reason": {
+          "description": "Why the divergence is recorded; required with `--state deferred`",
           "type": [
             "string",
             "number"
@@ -28876,6 +29073,7 @@
         },
         "round": {
           "default": 1,
+          "description": "The review round this version belongs to (1-based)",
           "type": [
             "integer",
             "string"
@@ -28937,6 +29135,7 @@
           ]
         },
         "expiry": {
+          "description": "When the deferral lapses (RFC3339 or YYYY-MM-DD, UTC)",
           "type": [
             "string",
             "number"
@@ -28962,6 +29161,7 @@
           ]
         },
         "reason": {
+          "description": "Why the divergence is deferred",
           "type": [
             "string",
             "number"
@@ -28984,6 +29184,7 @@
         },
         "round": {
           "default": 1,
+          "description": "The review round this version belongs to (1-based)",
           "type": [
             "integer",
             "string"
@@ -29149,7 +29350,7 @@
           ]
         },
         "detail": {
-          "default": "",
+          "description": "Free-text detail recorded on the version (optional)",
           "type": [
             "string",
             "number"
@@ -29191,6 +29392,7 @@
         },
         "round": {
           "default": 1,
+          "description": "The review round this version belongs to (1-based)",
           "type": [
             "integer",
             "string"
@@ -29246,9 +29448,8 @@
         },
         "approvalRole": {
           "description": "Approval role; only human is eligible for risk approval",
-          "type": [
-            "string",
-            "number"
+          "enum": [
+            "human"
           ]
         },
         "approver": {
@@ -29954,6 +30155,7 @@
       "additionalProperties": false,
       "properties": {
         "after": {
+          "description": "Only records at or after this time (RFC3339 or YYYY-MM-DD, UTC)",
           "type": [
             "string",
             "number"
@@ -29964,6 +30166,7 @@
           "type": "boolean"
         },
         "before": {
+          "description": "Only records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
           "type": [
             "string",
             "number"
@@ -29988,9 +30191,11 @@
           ]
         },
         "includeSensitive": {
+          "description": "Include records marked sensitive (only when policy explicitly allows it)",
           "type": "boolean"
         },
         "kind": {
+          "description": "The record kind to export",
           "enum": [
             "change",
             "task",
@@ -30016,6 +30221,7 @@
           ]
         },
         "output": {
+          "description": "Write the manifest to this file (mode 0600) instead of stdout",
           "type": [
             "string",
             "number"
@@ -32250,6 +32456,7 @@
           "type": "boolean"
         },
         "policy": {
+          "default": "strict",
           "description": "Level of the starter .canon/policy.yaml [default: strict]",
           "enum": [
             "light",
@@ -32649,6 +32856,117 @@
             "action"
           ],
           "type": "object"
+        },
+        "InventoryRootReport": {
+          "description": "One spec root of `canon inventory sync`'s report.",
+          "properties": {
+            "clean": {
+              "type": "boolean"
+            },
+            "id": {
+              "type": "string"
+            },
+            "removed": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "root": {
+              "type": "string"
+            },
+            "scanned": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "syncErrors": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "tagDiagnostics": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "violations": {
+              "description": "The format violations that aborted the root.",
+              "items": {
+                "$ref": "#/$defs/ViolationEntry"
+              },
+              "type": "array"
+            },
+            "written": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "root",
+            "clean",
+            "scanned",
+            "written",
+            "removed",
+            "violations",
+            "syncErrors",
+            "tagDiagnostics"
+          ],
+          "type": "object"
+        },
+        "InventorySyncReport": {
+          "description": "`canon inventory sync`'s report (`InventorySyncReport`).",
+          "properties": {
+            "clean": {
+              "type": "boolean"
+            },
+            "dryRun": {
+              "description": "True when `--dry-run` previewed the run without writing.",
+              "type": "boolean"
+            },
+            "roots": {
+              "items": {
+                "$ref": "#/$defs/InventoryRootReport"
+              },
+              "type": "array"
+            },
+            "totalWritten": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "dryRun",
+            "clean",
+            "totalWritten",
+            "roots"
+          ],
+          "type": "object"
+        },
+        "ViolationEntry": {
+          "description": "One format violation as `--json` shows it.",
+          "properties": {
+            "class": {
+              "description": "The failure class (`missing-provenance`, …).",
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "class",
+            "path",
+            "message"
+          ],
+          "type": "object"
         }
       },
       "$id": "urn:canon:report:MigrateReport",
@@ -32674,6 +32992,14 @@
           "type": "array"
         },
         "index": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InventorySyncReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "description": "The rebuild's own report when it found the corpus unclean (`MIGRATE_INDEX_FAILED`)."
         },
         "indexRecordsWritten": {
@@ -33216,12 +33542,14 @@
       "additionalProperties": false,
       "properties": {
         "before": {
+          "description": "Remove records strictly before this time (RFC3339 or YYYY-MM-DD, UTC)",
           "type": [
             "string",
             "number"
           ]
         },
         "kind": {
+          "description": "The record kind to purge (session, run, event or trajectory)",
           "enum": [
             "session",
             "run",
@@ -33725,9 +34053,10 @@
         "reviewOutcome": {
           "default": "signed",
           "description": "How the reviewer's run ended: signed (an approval), indeterminate (ran, reached no verdict) or unavailable (could not run). Only signed counts; the others are recorded as review gaps",
-          "type": [
-            "string",
-            "number"
+          "enum": [
+            "signed",
+            "indeterminate",
+            "unavailable"
           ]
         },
         "reviewerHarness": {
@@ -33930,9 +34259,10 @@
         "reviewOutcome": {
           "default": "signed",
           "description": "How the reviewer's run ended: signed (an approval), indeterminate (ran, reached no verdict) or unavailable (could not run). Only signed counts; the others are recorded as review gaps",
-          "type": [
-            "string",
-            "number"
+          "enum": [
+            "signed",
+            "indeterminate",
+            "unavailable"
           ]
         },
         "reviewerHarness": {
@@ -34265,8 +34595,8 @@
           ],
           "type": "object"
         },
-        "ExitMeta": {
-          "description": "One exit code a command can return, with its meaning.",
+        "ExitRow": {
+          "description": "One exit code of a leaf with its meaning: the leaf's own rows ([`crate::schema::META`]),\nthen one row per exit a listed error code carries that the leaf did not declare.",
           "properties": {
             "code": {
               "format": "uint8",
@@ -34459,7 +34789,7 @@
             },
             "exits": {
               "items": {
-                "$ref": "#/$defs/ExitMeta"
+                "$ref": "#/$defs/ExitRow"
               },
               "type": "array"
             },
@@ -36743,7 +37073,6 @@
           ]
         },
         "summary": {
-          "default": "",
           "description": "The subject's summary (optional)",
           "type": [
             "string",

@@ -113,8 +113,19 @@ jobs:
       - name: cargo fetch --locked
         run: cargo fetch --locked
 
+      # `CANON_WITNESS_DIR`: a debug `canon` records each JSON document it prints there (T9),
+      # and the next step holds the recording against the outputs the spec declares.
       - name: cargo test --workspace
-        run: cargo test --workspace --locked --offline
+        env:
+          CANON_WITNESS_DIR: ${{ runner.temp }}/canon-witness
+        run: |
+          mkdir -p "$CANON_WITNESS_DIR"
+          cargo test --workspace --locked --offline
+
+      - name: every declared output was emitted by the suite (witness)
+        env:
+          CANON_WITNESS_DIR: ${{ runner.temp }}/canon-witness
+        run: cargo test -p canon-cli --locked --offline --test grammar_t9_witness -- --ignored
 
       # Canon gates its own spec corpus. Scenario records are regenerable
       # (gitignored) so they are synced from `.canon/specs/` and
@@ -128,6 +139,33 @@ jobs:
           cargo build --locked --offline -p canon-cli
           ./target/debug/canon inventory sync
           ./target/debug/canon gate check
+
+  # T15: the grammar tests catch seeded violations (scripts/check-mutations.sh). Its own job:
+  # it builds a copy of the workspace, which would double the time of the job above.
+  grammar-mutation:
+    name: grammar tests catch seeded violations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+
+      - name: Cache cargo
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-test-mutation-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: cargo fetch --locked
+        run: cargo fetch --locked
+
+      - name: seeded violations each fail their test
+        run: scripts/check-mutations.sh
 
   launcher:
     name: "@journeykit/canon launcher (bun test)"

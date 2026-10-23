@@ -26,19 +26,19 @@ pub struct SubjectNewArgs {
     #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]
     pub id: SubjectId,
     /// The subject's domain (kebab slug)
-    #[arg(long)]
+    #[arg(long, value_name = "NAME")]
     pub domain: String,
     /// The subject's title
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub title: String,
     /// The subject's summary (optional)
-    #[arg(long, default_value = "")]
-    pub summary: String,
+    #[arg(long, value_name = "TEXT")]
+    pub summary: Option<String>,
     /// The accountable owning role (default: implementer)
-    #[arg(long, value_parser = crate::retrieve::parse_role, default_value = "implementer")]
+    #[arg(long, value_parser = crate::retrieve::parse_role, default_value = "implementer", value_name = "ROLE")]
     pub owner_role: RoleId,
     /// The invoking actor's id
-    #[arg(long, default_value = "canon")]
+    #[arg(long, default_value = "canon", value_name = "ACTOR_ID")]
     pub actor_id: String,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -55,7 +55,7 @@ pub struct SubjectAdoptArgs {
     #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]
     pub subject_id: SubjectId,
     /// The imported Change's id
-    #[arg(long, value_parser = crate::subject::parse_change_id)]
+    #[arg(long, value_parser = crate::subject::parse_change_id, value_name = "CHANGE_ID")]
     pub change_id: ChangeId,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -74,7 +74,7 @@ pub struct SubjectUnadoptArgs {
     #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]
     pub subject_id: SubjectId,
     /// The change to take out of the subject
-    #[arg(long, value_parser = crate::subject::parse_change_id)]
+    #[arg(long, value_parser = crate::subject::parse_change_id, value_name = "CHANGE_ID")]
     pub change_id: ChangeId,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -108,13 +108,13 @@ pub struct SubjectMoveArgs {
     #[arg(long, value_name = "STATE", value_parser = crate::subject::status_parser())]
     pub to: canon_model::SubjectStatus,
     /// Move anyway when only the require_review checks (unreviewed-promotion, open-blocker) refuse; the reason is recorded on the subject and `canon gate check` lists the gaps as advisories
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub override_reason: Option<String>,
     /// Why the subject moves (required for shipped → verifying, optional on every other transition); recorded on the subject with the actor
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub reason: Option<String>,
     /// The invoking actor's id, recorded with an --override-reason waiver or a --reason
-    #[arg(long, default_value = "canon")]
+    #[arg(long, default_value = "canon", value_name = "ACTOR_ID")]
     pub actor_id: String,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

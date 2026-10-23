@@ -19,20 +19,25 @@ pub enum EvidenceCommand {
 
 #[derive(Args)]
 pub struct EvidenceApprovalPayloadArgs {
-    #[arg(long, value_parser = crate::dispatch::parse_task_id)]
+    /// The plan task the approval is for (<change_id>#<n>); give this or --scenario-id
+    #[arg(long, value_parser = crate::dispatch::parse_task_id, value_name = "TASK_ID")]
     pub task_id: Option<TaskId>,
-    #[arg(long, value_parser = crate::review::parse_project_id)]
+    /// Spec corpus id for --scenario-id. Required only when canon.yaml configures more than one spec root
+    #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
-    #[arg(long, value_parser = crate::review::parse_scenario_id)]
+    /// The scenario the approval is for; give this or --task-id
+    #[arg(long, value_parser = crate::review::parse_scenario_id, value_name = "SCENARIO_ID")]
     pub scenario_id: Option<ScenarioId>,
-    #[arg(long, value_parser = crate::dispatch::parse_run_id)]
+    /// The dispatch run the approved work belongs to
+    #[arg(long, value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
     pub run_id: Option<RunId>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
-    #[arg(long = "surface-ref", value_parser = crate::evidence::parse_surface_ref)]
+    /// The risk surface being approved: a repository-relative path or `effect:<kebab-slug>` (repeatable)
+    #[arg(long = "surface-ref", value_parser = crate::evidence::parse_surface_ref, value_name = "PATH_OR_EFFECT")]
     pub surface_ref: Vec<String>,
     /// Who approved (the human whose detached signature the payload is for)
-    #[arg(long)]
+    #[arg(long, value_name = "NAME")]
     pub approver: String,
     /// The approval time that is signed into the payload: RFC3339, or YYYY-MM-DD (UTC midnight)
     #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::normalize)]
@@ -47,52 +52,52 @@ pub struct EvidenceApprovalPayloadArgs {
 #[derive(Args)]
 pub struct EvidenceAddArgs {
     /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given
-    #[arg(long, value_parser = crate::dispatch::parse_task_id)]
+    #[arg(long, value_parser = crate::dispatch::parse_task_id, value_name = "TASK_ID")]
     pub task_id: Option<TaskId>,
     /// Spec corpus id for --scenario-id (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (UNKNOWN_SPEC_ROOT) before anything is written
-    #[arg(long, value_parser = crate::review::parse_project_id)]
+    #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     /// What CLASS of evidence is attested to (test-run, review, ...); default `test-run` when a --report is given. `audit` is refused: an external evaluator's re-audit is `canon evidence audit`
     #[arg(long, value_name = "CLASS", required_unless_present = "reports")]
     pub class: Option<String>,
     /// The reference a reader can resolve: a command line, commit sha, or report path (default: the --report paths, comma-separated, when one is given). NEVER run or resolved by canon
-    #[arg(long = "ref", value_name = "REF", required_unless_present = "reports")]
+    #[arg(long = "ref", value_name = "TEXT", required_unless_present = "reports")]
     pub evidence_ref: Option<String>,
     /// faithful / not-applicable / divergent. Given a --report and no --verdict, the verdict is derived from the bound cases (any failed: divergent; a skipped case and none failed: not-applicable; else faithful), one record at a time with --all-scenarios; with no report the default is faithful. An explicit faithful over a failed or skipped case is refused
-    #[arg(long, value_parser = crate::evidence::verdict_parser())]
+    #[arg(long, value_parser = crate::evidence::verdict_parser(), value_name = "VERDICT")]
     pub verdict: Option<EvidenceVerdict>,
     /// One-line note, with or without --task; a task's flipped row shows it as the latest summary (scanned for fabrication markers; line breaks refused)
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub summary: Option<String>,
     /// The real captured output backing --summary (requires --summary; scanned for fabrication markers)
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub command_result: Option<String>,
     /// Scenario this evidence also joins to
-    #[arg(long, value_parser = crate::review::parse_scenario_id)]
+    #[arg(long, value_parser = crate::review::parse_scenario_id, value_name = "SCENARIO_ID")]
     pub scenario_id: Option<ScenarioId>,
     /// RunId (ULID) of the run that produced this evidence
-    #[arg(long, value_parser = crate::dispatch::parse_run_id)]
+    #[arg(long, value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
     pub run_id: Option<RunId>,
     /// Explicit risk binding: repository-relative path or effect:<kebab-slug>; persisted as surface_ref
-    #[arg(long = "surface-ref", value_parser = crate::evidence::parse_surface_ref)]
+    #[arg(long = "surface-ref", value_parser = crate::evidence::parse_surface_ref, value_name = "PATH_OR_EFFECT")]
     pub surface_ref: Vec<String>,
     /// The attesting actor's id (recorded as the attestation's author; line breaks refused)
-    #[arg(long, default_value = "canon")]
+    #[arg(long, default_value = "canon", value_name = "ACTOR_ID")]
     pub actor_id: String,
     /// The attesting role; `canon gate promote` derives its run_seq partition key from it. Default: the declared role (--as / CANON_ROLE); required when none is declared
-    #[arg(long, value_parser = crate::retrieve::parse_role)]
+    #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
     pub role: Option<RoleId>,
     /// The attesting session (recorded as actor.session_id). Under require_review.distinct_actor a review from this session does not count
-    #[arg(long, value_parser = crate::review::parse_session_id)]
+    #[arg(long, value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
     pub session_id: Option<canon_model::SessionId>,
     /// Human approval identity; authentication comes only from the detached signature.
-    #[arg(long)]
+    #[arg(long, value_name = "NAME")]
     pub approver: Option<String>,
     /// Approval role; only human is eligible for risk approval.
-    #[arg(long, value_parser = crate::retrieve::parse_role)]
+    #[arg(long, value_parser = crate::cli_error::closed_set(["human"], |word| RoleId::parse(word).map_err(|e| e.to_string())), value_name = "ROLE")]
     pub approval_role: Option<RoleId>,
     /// Armored SSH detached signature file. Canon never signs on the user's behalf.
-    #[arg(long)]
+    #[arg(long, value_name = "FILE")]
     pub signature_file: Option<PathBuf>,
     /// Timestamp (RFC3339 or YYYY-MM-DD) included in the signed approval payload.
     #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::normalize)]
@@ -112,10 +117,10 @@ pub struct EvidenceAddArgs {
     #[arg(long)]
     pub all_scenarios: bool,
     /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused
-    #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
+    #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
     pub max_artifact_mib: u64,
     /// Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor-id)
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub override_reason: Option<String>,
     #[command(flatten)]
     pub promote: PromoteArgs,
@@ -136,28 +141,28 @@ pub struct EvidenceAuditArgs {
     #[arg(value_name = "SCENARIO_ID", value_parser = crate::review::parse_scenario_id)]
     pub scenario_id: ScenarioId,
     /// Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root; refused (UNKNOWN_SPEC_ROOT) when it names none
-    #[arg(long, value_parser = crate::review::parse_project_id)]
+    #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     /// The reference a reader can resolve: a command line, commit sha, or report path. NEVER run or resolved by canon
-    #[arg(long = "ref", value_name = "REF")]
+    #[arg(long = "ref", value_name = "TEXT")]
     pub evidence_ref: String,
     /// One-line note (scanned for fabrication markers; line breaks refused)
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub summary: Option<String>,
     /// The real captured output backing --summary (requires --summary; scanned for fabrication markers)
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub command_result: Option<String>,
     /// RunId (ULID) of the run that produced this evidence
-    #[arg(long, value_parser = crate::dispatch::parse_run_id)]
+    #[arg(long, value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
     pub run_id: Option<RunId>,
     /// The attesting actor's id (recorded as the attestation's author; line breaks refused)
-    #[arg(long, default_value = "canon")]
+    #[arg(long, default_value = "canon", value_name = "ACTOR_ID")]
     pub actor_id: String,
     /// The attesting role; `canon gate promote` derives its run_seq partition key from it. Default: the declared role (--as / CANON_ROLE); required when none is declared
-    #[arg(long, value_parser = crate::retrieve::parse_role)]
+    #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
     pub role: Option<RoleId>,
     /// The attesting session (recorded as actor.session_id)
-    #[arg(long, value_parser = crate::review::parse_session_id)]
+    #[arg(long, value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
     pub session_id: Option<canon_model::SessionId>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
@@ -171,22 +176,22 @@ pub struct EvidenceAuditArgs {
     #[arg(long = "report-case", value_name = "NAME")]
     pub report_cases: Vec<String>,
     /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused
-    #[arg(long, value_name = "MIB", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
+    #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
     pub max_artifact_mib: u64,
     /// The external evaluator that re-audited the scenario (canon never runs it)
-    #[arg(long)]
+    #[arg(long, value_name = "ID")]
     pub evaluator_id: String,
     /// The evaluator's version
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub evaluator_version: String,
     /// sha256 of the evaluator (64 lowercase hex)
-    #[arg(long)]
+    #[arg(long, value_name = "DIGEST")]
     pub evaluator_digest: String,
     /// confirmed / refuted / indeterminate; the record's verdict follows it (confirmed → faithful, refuted → divergent, indeterminate → not-applicable)
-    #[arg(long, value_parser = ["confirmed", "refuted", "indeterminate"])]
+    #[arg(long, value_parser = ["confirmed", "refuted", "indeterminate"], value_name = "RESULT")]
     pub audit_result: String,
     /// Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor-id)
-    #[arg(long)]
+    #[arg(long, value_name = "TEXT")]
     pub override_reason: Option<String>,
     #[command(flatten)]
     pub promote: PromoteArgs,

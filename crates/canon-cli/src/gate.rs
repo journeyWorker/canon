@@ -1231,6 +1231,20 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
     let codex_path = repo.join(".codex").join("hooks.json");
 
     let already_has_canon_gate_command = any_canon_gate_command(&read_json_or_default(&claude_path)) || any_canon_gate_command(&read_json_or_default(&codex_path));
+    let script_path = repo.join(paths::PRE_COMMIT_SCRIPT);
+    let writes_script = !already_has_canon_gate_command && !script_path.exists();
+
+    // Every target is checked before the first is written: a refusal on a later one leaves the earlier ones as they were.
+    for path in [&claude_path, &codex_path] {
+        if let Err(e) = install_into(path, &entry, true) {
+            return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
+        }
+    }
+    if writes_script {
+        if let Err(e) = crate::write_mode::check_creatable(&script_path, true) {
+            return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", script_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon gate install-hooks", json);
+        }
+    }
 
     let claude_outcome = match install_into(&claude_path, &entry, dry_run) {
         Ok(o) => o,
@@ -1246,17 +1260,14 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
     };
 
     let mut script_written = false;
-    if !already_has_canon_gate_command {
-        let script_path = repo.join(paths::PRE_COMMIT_SCRIPT);
-        if !script_path.exists() {
-            if !dry_run {
-                if let Err(e) = write_pre_commit_script(&script_path) {
-                    return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", script_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon gate install-hooks", json);
-                }
+    if writes_script {
+        if !dry_run {
+            if let Err(e) = write_pre_commit_script(&script_path) {
+                return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", script_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon gate install-hooks", json);
             }
-            script_written = true;
-            crate::say!(json, "canon gate install-hooks: {} {}", if dry_run { "would write" } else { "wrote" }, script_path.display());
         }
+        script_written = true;
+        crate::say!(json, "canon gate install-hooks: {} {}", if dry_run { "would write" } else { "wrote" }, script_path.display());
     }
 
     let changed = !matches!((claude_outcome, codex_outcome), (InstallOutcome::Unchanged, InstallOutcome::Unchanged));

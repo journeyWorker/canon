@@ -371,6 +371,15 @@ struct InitLog {
 }
 
 impl InitLog {
+    /// The command a refusal is reported under: `init`, or `demo init` when it runs inside that command.
+    fn command(&self) -> &'static str {
+        if self.emit_data {
+            "canon init"
+        } else {
+            "canon demo init"
+        }
+    }
+
     fn new(json: bool, dry_run: bool, emit_data: bool) -> Self {
         Self { json, dry_run, emit_data, steps: Vec::new(), wrote: false }
     }
@@ -584,7 +593,7 @@ fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkill
                 ),
             )
             .hint(format!("once the skill source is available, run `canon skills install` (the override {} names a directory without a SKILL.src.md; unset it, or pass --skills-source <dir>; it follows skills.providers)", skills::CANONICAL_SOURCE_ENV))
-            .emit("canon init", log.json))
+            .emit(log.command(), log.json))
         }
     }
 }
@@ -677,13 +686,13 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
     let dry_run = options.dry_run;
     let mut log = InitLog::new(json, dry_run, emit_data);
     if let Err(e) = (!dry_run).then(|| fs::create_dir_all(repo)).transpose() {
-        return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", repo.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);
+        return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", repo.display())).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
     }
     let agents_path = repo.join("AGENTS.md");
     let language = match options.language.as_deref().map(crate::language::Language::parse).transpose() {
         Ok(language) => language,
         Err(e) => {
-            return CliError::refused("INIT_INVALID_ARGUMENT", format!("--language: {e}")).hint("`canon schema init` lists the accepted arguments and their forms").emit("canon init", json);
+            return CliError::refused("INIT_INVALID_ARGUMENT", format!("--language: {e}")).hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
         }
     };
     let agents = if options.agents_md {
@@ -691,13 +700,13 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
             Ok(text) => Some(text),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
             Err(e) => {
-                return CliError::refused("REPO_UNREADABLE", format!("failed to read `{}`: {e}", agents_path.display())).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon init", json);
+                return CliError::refused("REPO_UNREADABLE", format!("failed to read `{}`: {e}", agents_path.display())).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit(log.command(), json);
             }
         };
         match merge_agents_md(existing.as_deref()) {
             Ok(merged) => Some((existing, merged)),
             Err(e) => {
-                return CliError::refused("INIT_AGENTS_MD_CONFLICT", e.to_string()).hint("resolve the conflict in AGENTS.md by hand, or run `canon init --no-agents-md`").emit("canon init", json);
+                return CliError::refused("INIT_AGENTS_MD_CONFLICT", e.to_string()).hint("resolve the conflict in AGENTS.md by hand, or run `canon init --no-agents-md`").emit(log.command(), json);
             }
         }
     } else {
@@ -711,7 +720,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
         match choose_skills(repo, &options.skills) {
             Ok(skills) => skills,
             Err(e) => {
-                return CliError::refused("INIT_INVALID_ARGUMENT", e.to_string()).hint("`canon schema init` lists the accepted arguments and their forms").emit("canon init", json);
+                return CliError::refused("INIT_INVALID_ARGUMENT", e.to_string()).hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
             }
         }
     };
@@ -725,7 +734,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
             if let Some(mut file) = file {
                 let config = skeleton_yaml() + &language_section(language.as_ref()) + &skills_section(skills.as_ref());
                 if let Err(e) = file.write_all(config.as_bytes()) {
-                    return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", canon_yaml_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);
+                    return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", canon_yaml_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
                 }
             }
             let verb = if dry_run { "would write" } else { "wrote" };
@@ -739,7 +748,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
                     log.step("config-exists", canon_yaml_path.display().to_string(), format!("canon init: {} already exists and nothing is left to refresh", canon_yaml_path.display()));
                     return log.finish(repo);
                 }
-                return CliError::refused("INIT_CONFIG_EXISTS", format!("`{}` already exists; never overwriting an existing config", canon_yaml_path.display())).hint("keep the existing canon.yaml and check it with `canon init --check`, or remove it first to start over").emit("canon init", json);
+                return CliError::refused("INIT_CONFIG_EXISTS", format!("`{}` already exists; never overwriting an existing config", canon_yaml_path.display())).hint("keep the existing canon.yaml and check it with `canon init --check`, or remove it first to start over").emit(log.command(), json);
             }
             let what = if agents.is_some() { "the AGENTS.md block and the canon .gitignore lines" } else { "the canon .gitignore lines" };
             let refreshed = if dry_run { format!("{what} would be refreshed") } else { format!("{what} are refreshed") };
@@ -757,32 +766,32 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
                 }
                 Ok(_) => {}
                 Err(e) => {
-                    return CliError::refused("WRITE_FAILED", format!("failed to update `.gitignore`: {e}")).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);
+                    return CliError::refused("WRITE_FAILED", format!("failed to update `.gitignore`: {e}")).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
                 }
             }
             if let Some((existing, merged)) = agents {
                 if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged, dry_run, &mut log) {
-                    return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", agents_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);
+                    return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", agents_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
                 }
             }
             return log.finish(repo);
         }
         Err(e) => {
-            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", canon_yaml_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);
+            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", canon_yaml_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
         }
     }
 
     if let Err(e) = gitignore_step(repo, dry_run) {
-        return CliError::refused("WRITE_FAILED", format!("wrote `{}` but failed to update `.gitignore`: {e}", canon_yaml_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);
+        return CliError::refused("WRITE_FAILED", format!("wrote `{}` but failed to update `.gitignore`: {e}", canon_yaml_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
     }
     if let Some(level) = options.policy {
         if let Err(e) = scaffold_policy(repo, level, dry_run, &mut log) {
-            return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", repo.join(paths::POLICY_FILE).display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);
+            return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", repo.join(paths::POLICY_FILE).display())).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
         }
     }
     if let Some((existing, merged)) = agents {
         if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged, dry_run, &mut log) {
-            return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", agents_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);
+            return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", agents_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
         }
     }
     if let Some(chosen) = &skills {

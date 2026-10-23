@@ -164,8 +164,22 @@ pub struct CommandSurface {
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PolicyFieldSurface {
-    Flat { value: serde_json::Value },
+    Flat {
+        /// The fixed value (the value itself is a [`serde_json::Value`] in memory; its schema is [`PolicyFlatValue`]).
+        #[schemars(with = "PolicyFlatValue")]
+        value: serde_json::Value,
+    },
     Cel { expression: String },
+}
+
+/// What a fixed `policy.yaml` field can be: a flag, a count, a ratio or a name (a trust level).
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(untagged)]
+pub enum PolicyFlatValue {
+    Flag(bool),
+    Count(u64),
+    Ratio(f64),
+    Name(String),
 }
 
 #[derive(Debug, Clone, Serialize, JsonSchema)]

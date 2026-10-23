@@ -56,10 +56,6 @@ fn every_kind_option_value_is_a_context_kind() {
     for node in canon_cli::spec::nodes(&root) {
         let Some(leaf) = node.leaf else { continue };
         for option in leaf.options.iter().filter(|o| o.name == "kind" && !o.possible_values.is_empty()) {
-            // `change new --kind` names a brief template, not a record kind.
-            if node.command == "change new" {
-                continue;
-            }
             checked.insert(node.command.clone());
             for value in &option.possible_values {
                 assert!(kinds.contains(value), "`{} --kind {value}` is not in context.kinds", node.command);
