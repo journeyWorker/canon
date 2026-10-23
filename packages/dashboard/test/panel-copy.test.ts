@@ -535,7 +535,7 @@ test("the one canonical sentence is identical on every surface that reports fix_
     ["crates/canon-report/src/marts.rs", readFileSync(join(REPO_ROOT, "crates/canon-report/src/marts.rs"), "utf-8")],
     ["crates/canon-store/sql/views.sql", readFileSync(join(REPO_ROOT, "crates/canon-store/sql/views.sql"), "utf-8")],
     ["crates/canon-model/src/records.rs", readFileSync(join(REPO_ROOT, "crates/canon-model/src/records.rs"), "utf-8")],
-    ["crates/canon-cli/src/main.rs", readFileSync(join(REPO_ROOT, "crates/canon-cli/src/main.rs"), "utf-8")],
+    ["crates/canon-cli/src/cli/finding.rs", readFileSync(join(REPO_ROOT, "crates/canon-cli/src/cli/finding.rs"), "utf-8")],
     ["crates/canon-cli/src/finding.rs", readFileSync(join(REPO_ROOT, "crates/canon-cli/src/finding.rs"), "utf-8")],
   ];
   for (const [where, text] of surfaces) {
