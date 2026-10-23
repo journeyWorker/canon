@@ -144,14 +144,39 @@ pub fn paginate<T>(scope: &str, items: Vec<T>, key: impl Fn(&T) -> String, page:
     Ok((slice, meta))
 }
 
-/// Refuses (`UNKNOWN_FIELD`) any requested `--fields` name that `known` does not hold.
+/// A field name compared without its case style: lowercase, `_` and `-` dropped, so
+/// `scenarioId`, `scenario_id` and `Scenario-ID` are one field.
+pub fn normalize(name: &str) -> String {
+    name.chars().filter(|c| *c != '_' && *c != '-').flat_map(char::to_lowercase).collect()
+}
+
+/// Refuses (`UNKNOWN_FIELD`) any requested `--fields` name that `known` does not hold, in either case
+/// style (`scenarioId` or `scenario_id`); `suggestions` carries the nearest known fields.
 pub fn check_fields(command: &str, requested: &[String], known: &BTreeSet<String>) -> Result<(), CliError> {
-    let unknown: Vec<&str> = requested.iter().map(String::as_str).filter(|f| !known.contains(*f)).collect();
+    let normal: Vec<(String, &String)> = known.iter().map(|k| (normalize(k), k)).collect();
+    let unknown: Vec<&str> = requested.iter().map(String::as_str).filter(|f| !normal.iter().any(|(n, _)| *n == normalize(f))).collect();
     if unknown.is_empty() {
         return Ok(());
     }
     let list = known.iter().map(String::as_str).collect::<Vec<_>>().join(", ");
-    Err(CliError::refused("UNKNOWN_FIELD", format!("`{command}` has no field {}", unknown.iter().map(|f| format!("`{f}`")).collect::<Vec<_>>().join(", "))).hint(format!("known fields: {list}")).field("--fields").expected(known.iter().cloned()))
+    let mut suggestions: Vec<String> = Vec::new();
+    for field in &unknown {
+        let wanted = normalize(field);
+        for near in crate::suggest::nearest(&wanted, normal.iter().map(|(n, _)| n.as_str())) {
+            if let Some((_, original)) = normal.iter().find(|(n, _)| *n == near) {
+                if !suggestions.contains(original) {
+                    suggestions.push((*original).clone());
+                }
+            }
+        }
+    }
+    suggestions.truncate(3);
+    Err(CliError::refused("UNKNOWN_FIELD", format!("`{command}` has no field {}", unknown.iter().map(|f| format!("`{f}`")).collect::<Vec<_>>().join(", ")))
+        .hint(format!("known fields: {list} (a comma list; camelCase or snake_case both match)"))
+        .field("--fields")
+        .expected(known.iter().cloned())
+        .received(unknown.join(","))
+        .suggestions(suggestions))
 }
 
 /// [`check_fields`] against a fixed list of field names.
@@ -159,14 +184,21 @@ pub fn check_known(command: &str, requested: &[String], known: &[&str]) -> Resul
     check_fields(command, requested, &known.iter().map(|f| f.to_string()).collect())
 }
 
-/// Keeps only `fields` of an object record; a field the record happens
-/// not to carry is omitted.
+/// Whether `fields` names `member`, in either case style.
+pub fn wants(fields: &[String], member: &str) -> bool {
+    let member = normalize(member);
+    fields.iter().any(|f| normalize(f) == member)
+}
+
+/// Keeps only `fields` of an object record, matched in either case style; the record's own keys are
+/// kept as they are. A field the record happens not to carry is omitted.
 pub fn project(record: &Value, fields: &[String]) -> Value {
     let Some(object) = record.as_object() else { return record.clone() };
     let mut out = serde_json::Map::new();
     for field in fields {
-        if let Some(value) = object.get(field) {
-            out.insert(field.clone(), value.clone());
+        let wanted = normalize(field);
+        for (key, value) in object.iter().filter(|(key, _)| normalize(key) == wanted) {
+            out.insert(key.clone(), value.clone());
         }
     }
     Value::Object(out)

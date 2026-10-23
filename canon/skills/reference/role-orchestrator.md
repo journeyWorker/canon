@@ -17,7 +17,7 @@ in your ids. Use only the options on a line; never guess one. Ask `canon schema
 <command> --json` only for a leaf this block does not list, or after a `USAGE` refusal.
 
 <!-- canon:generated commands-orchestrator begin -->
-Every leaf takes `--as <ROLE>` and `--json`; `--repo <DIR>` too, except `completion`, `regime show`, `schema`, `selftest`, `skills show`. `--input <JSON|FILE|->` runs a leaf from one JSON document (an array is a batch) and is only on the lines ending `[--input]`.
+Every leaf takes `--as <ROLE>` and `--json`; `--repo <DIR>` too, except `completion`, `regime show`, `schema`, `selftest`, `skills show`. `--input <JSON|FILE|->` runs a leaf from one JSON document (an array is a batch) and is only on the lines ending `[--input]`. Its document keys are the option names in camelCase, singular even when the option repeats (the value is then an array), and `operands` holds the operands. `--fields <FIELDS>` is a comma list; camelCase and snake_case both match.
 In a syntax line `<X>` is a value, `[x]` optional, `a | b` a choice, `(a | b)` exactly one is required, `[--x <V>]*` may repeat, `<X>+` is one or more, `[--a --b <V>]` go together. An option that is not on the line does not exist: it is refused (`USAGE`).
 
 ```text

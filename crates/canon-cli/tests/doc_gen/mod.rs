@@ -289,7 +289,7 @@ pub fn role_commands(spec: &Value, role: &str) -> String {
     } else {
         let _ = write!(out, "; `--repo <DIR>` too, except {}", no_repo.join(", "));
     }
-    out.push_str(". `--input <JSON|FILE|->` runs a leaf from one JSON document (an array is a batch) and is only on the lines ending `[--input]`.\n");
+    out.push_str(". `--input <JSON|FILE|->` runs a leaf from one JSON document (an array is a batch) and is only on the lines ending `[--input]`. Its document keys are the option names in camelCase, singular even when the option repeats (the value is then an array), and `operands` holds the operands. `--fields <FIELDS>` is a comma list; camelCase and snake_case both match.\n");
     out.push_str("In a syntax line `<X>` is a value, `[x]` optional, `a | b` a choice, `(a | b)` exactly one is required, `[--x <V>]*` may repeat, `<X>+` is one or more, `[--a --b <V>]` go together. An option that is not on the line does not exist: it is refused (`USAGE`).\n\n");
     for leaf in mine {
         let about = gist(leaf["about"].as_str().expect("about"));

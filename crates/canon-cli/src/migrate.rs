@@ -311,6 +311,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> i32 {
         Err(e) => return e.emit("canon migrate", json),
     };
     if !commit {
+        crate::legacy::warn_stale_guide(&repo);
         ledger_lines.into_iter().for_each(|line| log.line(line));
         match &pins {
             Ok(report) => report.lines(true).into_iter().for_each(|line| log.line(line)),

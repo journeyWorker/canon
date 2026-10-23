@@ -149,6 +149,9 @@ fn migrate_previews_the_027_effects_and_writes_nothing() {
         }
     }
     assert!(!paths.iter().any(|path| path == ".canon/scripts/canon-gate-pre-commit.sh"), "the 0.27 pre-commit script already calls only spellings 0.28 keeps");
+    // The stale 0.27 guide on disk is called out by the preview itself: it names the replacement route.
+    let warnings = preview["meta"]["warnings"].as_array().unwrap_or_else(|| panic!("the preview warns: {}", preview["meta"]));
+    assert!(warnings.iter().any(|w| w.as_str().is_some_and(|w| w.contains("canon migrate --json") && w.contains("canon skills show canon"))), "{warnings:?}");
     let digest = preview["data"]["planDigest"].as_str().unwrap();
     let step = &preview["meta"]["next"][0];
     assert_eq!(step["argv"], serde_json::json!(["canon", "migrate", "--commit", "--plan-digest", digest, "--json"]));
@@ -231,6 +234,7 @@ fn status_gate_check_and_context_put_migrate_first() {
         assert_eq!(step["argv"], serde_json::json!(["canon", "migrate", "--json"]), "{args:?}: {}", document["meta"]);
         let warnings = document["meta"]["warnings"].as_array().unwrap_or_else(|| panic!("{args:?} has warnings: {}", document["meta"]));
         assert!(warnings.iter().any(|warning| warning.as_str().unwrap().contains("canon migrate")), "{args:?}: {warnings:?}");
+        assert!(warnings.iter().any(|warning| warning.as_str().unwrap().contains("canon skills show canon")), "the stale guide is named: {args:?}: {warnings:?}");
     }
     commit(repo);
     for args in [&["status", "--json"][..], &["context", "--json"][..]] {

@@ -58,7 +58,7 @@ pub struct StatusArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
-    /// With --json, keep only these top-level report fields (comma-separated); an unknown field is refused
+    /// With --json, keep only these top-level report fields (comma-separated); an unknown field is refused (camelCase and snake_case both match)
     #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
     pub fields: Option<Vec<String>>,
 }
@@ -70,7 +70,7 @@ pub struct ContextArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
-    /// With --json, keep only these top-level surface sections (comma-separated); an unknown field is refused
+    /// With --json, keep only these top-level surface sections (comma-separated); an unknown field is refused (camelCase and snake_case both match)
     #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
     pub fields: Option<Vec<String>>,
 }
@@ -145,7 +145,7 @@ pub struct QueryArgs {
     /// Return at most this many records per page, `--cursor` to continue, `--all` for every record
     #[command(flatten)]
     pub page: crate::paging::PageFlags,
-    /// With --json, keep only these top-level record fields (comma-separated); an unknown field is refused
+    /// With --json, keep only these top-level record fields (comma-separated); an unknown field is refused (camelCase and snake_case both match)
     #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
     pub fields: Option<Vec<String>>,
 }
@@ -174,7 +174,7 @@ pub struct ExportArgs {
     pub include_sensitive: bool,
     #[command(flatten)]
     pub page: crate::paging::PageFlags,
-    /// Keep only these fields of each exported record (comma-separated): kind, at, id, digest; an unknown field is refused
+    /// Keep only these fields of each exported record (comma-separated): kind, at, id, digest; an unknown field is refused (camelCase and snake_case both match)
     #[arg(long, value_name = "FIELDS", value_delimiter = ',', action = clap::ArgAction::Set)]
     pub fields: Option<Vec<String>>,
     #[command(flatten)]

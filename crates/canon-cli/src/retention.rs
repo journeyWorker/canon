@@ -348,7 +348,7 @@ impl ExportRecord {
 
     /// The members `--fields` asked for.
     fn project(self, fields: &[String]) -> ProjectedExportRecord {
-        let has = |name: &str| fields.iter().any(|f| f == name);
+        let has = |name: &str| crate::paging::wants(fields, name);
         ProjectedExportRecord { kind: has("kind").then_some(self.kind), at: has("at").then_some(self.at), id: has("id").then_some(self.id), digest: has("digest").then_some(self.digest) }
     }
 }

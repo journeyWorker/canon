@@ -536,6 +536,24 @@ fn type_name(value: &Value) -> &'static str {
     }
 }
 
+/// The valid keys nearest to a refused one: the singular of a plural (`scenarioIds` for `scenarioId`) first,
+/// then by edit distance.
+fn key_suggestions(name: &str, valid: &[String]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for singular in [name.strip_suffix("es"), name.strip_suffix('s')].into_iter().flatten() {
+        if let Some(key) = valid.iter().find(|k| k.eq_ignore_ascii_case(singular)) {
+            out.push(key.clone());
+        }
+    }
+    for near in crate::suggest::nearest(name, valid.iter().map(String::as_str)) {
+        if !out.contains(&near) {
+            out.push(near);
+        }
+    }
+    out.truncate(3);
+    out
+}
+
 fn settings(leaf: &Leaf, object: &Map<String, Value>, prefix: &str) -> Result<Vec<Setting>, CliError> {
     let mut out = Vec::with_capacity(object.len());
     for (name, value) in object {
@@ -554,7 +572,16 @@ fn settings(leaf: &Leaf, object: &Map<String, Value>, prefix: &str) -> Result<Ve
             let forbidden = FLAGS_ONLY.iter().any(|f| camel(f) == *name);
             let valid = leaf.valid_keys();
             let message = if forbidden { format!("`{name}` is a command-line flag and cannot be set in a document") } else { format!("`{name}` is not an option of `{}`", leaf.command()) };
-            return Err(CliError::refused("INPUT_UNKNOWN_FIELD", message).hint(if forbidden { "pass it as a flag on the command line".to_string() } else { SCHEMA_HINT.to_string() }).field(pointer).expected(valid.clone()).received(name.clone()).suggestions(crate::suggest::nearest(name, valid.iter().map(String::as_str))));
+            let suggestions = key_suggestions(name, &valid);
+            let hint = match (forbidden, suggestions.first()) {
+                (true, _) => "pass it as a flag on the command line".to_string(),
+                (false, Some(best)) => {
+                    let shape = if leaf.key(best).is_some_and(|k| k.repeatable) { "[...]" } else { "..." };
+                    format!("use \"{best}\": {shape} (document keys are the option names in camelCase, singular even when the option repeats); {SCHEMA_HINT}")
+                }
+                (false, None) => SCHEMA_HINT.to_string(),
+            };
+            return Err(CliError::refused("INPUT_UNKNOWN_FIELD", message).hint(hint).field(pointer).expected(valid.clone()).received(name.clone()).suggestions(suggestions));
         };
         let setting = match (key.kind, value) {
             (_, Value::Null) => return Err(null_refusal(&pointer)),

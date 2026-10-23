@@ -1241,7 +1241,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "With --json, keep only these top-level surface sections (comma-separated); an unknown field is refused",
+          "help": "With --json, keep only these top-level surface sections (comma-separated); an unknown field is refused (camelCase and snake_case both match)",
           "kind": "value",
           "name": "fields",
           "possibleValues": [],
@@ -3309,7 +3309,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "With --json, keep only these scenario fields (comma-separated): project_id, scenario_id, state, reason, expiry, tracking; an unknown field is refused",
+          "help": "With --json, keep only these scenario fields (comma-separated): project_id, scenario_id, state, reason, expiry, tracking; an unknown field is refused (camelCase and snake_case both match)",
           "kind": "value",
           "name": "fields",
           "possibleValues": [],
@@ -4754,7 +4754,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Keep only these fields of each exported record (comma-separated): kind, at, id, digest; an unknown field is refused",
+          "help": "Keep only these fields of each exported record (comma-separated): kind, at, id, digest; an unknown field is refused (camelCase and snake_case both match)",
           "kind": "value",
           "name": "fields",
           "possibleValues": [],
@@ -5722,7 +5722,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "With --json, keep only these finding fields (comma-separated): round, seq, severity, disposition, reviewer, summary, resolution_sha, file_ref",
+          "help": "With --json, keep only these finding fields (comma-separated): round, seq, severity, disposition, reviewer, summary, resolution_sha, file_ref; camelCase and snake_case both match",
           "kind": "value",
           "name": "fields",
           "possibleValues": [],
@@ -8410,7 +8410,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "With --json, keep only these top-level record fields (comma-separated); an unknown field is refused",
+          "help": "With --json, keep only these top-level record fields (comma-separated); an unknown field is refused (camelCase and snake_case both match)",
           "kind": "value",
           "name": "fields",
           "possibleValues": [],
@@ -10599,7 +10599,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "With --json, keep only these top-level report fields (comma-separated); an unknown field is refused",
+          "help": "With --json, keep only these top-level report fields (comma-separated); an unknown field is refused (camelCase and snake_case both match)",
           "kind": "value",
           "name": "fields",
           "possibleValues": [],
@@ -30191,7 +30191,7 @@
           "type": "boolean"
         },
         "fields": {
-          "description": "Keep only these fields of each exported record (comma-separated): kind, at, id, digest; an unknown field is refused",
+          "description": "Keep only these fields of each exported record (comma-separated): kind, at, id, digest; an unknown field is refused (camelCase and snake_case both match)",
           "type": [
             "string",
             "number"
