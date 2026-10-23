@@ -108,27 +108,63 @@ pub fn run_verify(repo: &Path, full: bool, json: bool) -> i32 {
     for line in &problem_lines {
         crate::say!(json, "  problem {line}");
     }
-    let data = serde_json::json!({
-        "backend": match artifacts_config(&repo).map(|c| c.backend) { Ok(ArtifactsBackend::Tier { name, .. }) => name, _ => "local".to_string() },
-        "full": full,
-        "bound": checks.len(),
-        "stored": stored,
-        "workingTreeOnly": tree_only,
-        "problems": problems.iter().zip(&problem_lines).map(|(c, line)| serde_json::json!({
-            "subject": c.file.subject, "path": c.file.path, "sha256": c.file.sha256, "blob": c.blob.as_str(), "detail": line,
-        })).collect::<Vec<_>>(),
-    });
+    let data = ArtifactsVerifyReport {
+        backend: match artifacts_config(&repo).map(|c| c.backend) {
+            Ok(ArtifactsBackend::Tier { name, .. }) => name,
+            _ => "local".to_string(),
+        },
+        full,
+        bound: checks.len(),
+        stored,
+        working_tree_only: tree_only,
+        problems: problems
+            .iter()
+            .zip(&problem_lines)
+            .map(|(c, line)| VerifyProblem { subject: &c.file.subject, path: &c.file.path, sha256: &c.file.sha256, blob: c.blob.as_str(), detail: line })
+            .collect(),
+    };
     let mut coverage = crate::coverage::Coverage::new();
     coverage.count("boundFiles", checks.len()).count("stored", stored).count("workingTreeOnly", tree_only);
     if problems.is_empty() {
         if json {
-            crate::json_out::data_with_meta("artifacts verify", &crate::json_out::untyped(data), coverage.meta());
+            crate::json_out::data_with_meta("artifacts verify", &data, coverage.meta());
         }
         return 0;
     }
     CliError::failed("ARTIFACTS_VERIFY_FAILED", format!("{} bound file(s) are missing from the artifact store or altered", problems.len()))
         .hint("re-upload a file the working tree still holds with `canon artifacts store`, or re-run and re-attest it with `canon evidence add`; see data.problems")
-        .emit_with_data_and_meta("canon artifacts verify", json, &crate::json_out::untyped(data), coverage.meta())
+        .emit_with_data_and_meta("canon artifacts verify", json, &data, coverage.meta())
+}
+
+/// `canon artifacts verify`: what the check looked at and the files that failed it.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactsVerifyReport<'a> {
+    /// `local`, or the name of the artifact store tier.
+    pub backend: String,
+    /// Whether every blob was re-hashed (`--full`).
+    pub full: bool,
+    /// Files the ledger's evidence binds.
+    pub bound: usize,
+    /// Files whose blob is in the store.
+    pub stored: usize,
+    /// Files proven by the working tree alone (local store only).
+    pub working_tree_only: usize,
+    pub problems: Vec<VerifyProblem<'a>>,
+}
+
+impl crate::json_out::Report for ArtifactsVerifyReport<'_> {}
+
+/// One bound file `artifacts verify` found missing or altered.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifyProblem<'a> {
+    pub subject: &'a str,
+    pub path: &'a str,
+    pub sha256: &'a str,
+    /// What the store holds: `missing`, or what it observed instead.
+    pub blob: &'a str,
+    pub detail: &'a str,
 }
 
 /// One blob in the local store.

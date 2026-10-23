@@ -181,14 +181,14 @@ impl CliError {
     /// The failure envelope for `command`, as a value: for a caller that
     /// answers over a socket instead of stdout.
     pub fn envelope(&self, command: &str) -> Value {
-        crate::json_out::failure_value::<crate::json_out::Untyped>(command, self, None)
+        crate::json_out::failure_value::<crate::json_out::NoData>(command, self, None)
     }
 
     /// Renders the error (see the module docs) and returns the exit code.
     pub fn emit(&self, command: &str, json: bool) -> i32 {
         debug_assert!(is_registered(self.code), "error code {} is not in cli_error::all_codes()", self.code);
         if json {
-            crate::json_out::print_failure::<crate::json_out::Untyped>(command, self, None);
+            crate::json_out::print_failure::<crate::json_out::NoData>(command, self, None);
         } else {
             eprintln!("{}", self.human(command));
         }

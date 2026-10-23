@@ -2,9 +2,7 @@
 //!
 //! Every `--json` payload is a struct that implements [`Report`]. The trait
 //! ties `Serialize` to `JsonSchema`, and `json_out::data` is generic over it,
-//! so a payload without a schema does not compile (the temporary
-//! `json_out::untyped` entry point is the one exception, removed by the
-//! slices that type the `json!` payloads). [`report_schemas`] lists one schema
+//! so a payload without a schema does not compile. [`report_schemas`] lists one schema
 //! per typed report for the generated spec; [`envelope_schemas`] holds the
 //! success and failure envelopes every report travels in.
 
@@ -47,8 +45,6 @@ pub fn schema_of<R: JsonSchema>() -> Value {
 }
 
 /// Every typed report, one entry per `(command, name)`, sorted by command.
-/// A command not listed still prints its `data` through `json_out::untyped`
-/// until a later slice types it.
 pub fn report_schemas() -> Vec<ReportSchema> {
     use crate::{adapter, artifact_ingest, artifacts, brief_approve, brief_check, change, completion, context, context_pack, demo, dispatch, divergence, evidence, finding, gate, learn, ledger, migrate, plans, policy_approval, retention, retrieve, review, scaffold, selftest, status, subject, tier};
     let mut schemas: Vec<ReportSchema> = vec![
@@ -83,6 +79,8 @@ pub fn report_schemas() -> Vec<ReportSchema> {
         entry::<scaffold::ScenarioNewBatchReport>("scenario new", "ScenarioNewBatchReport"),
         entry::<scaffold::ScenarioNewReport<'static>>("scenario new", "ScenarioNewReport"),
         entry::<scaffold::ScenarioNewRefusal<'static>>("scenario new", "ScenarioNewRefusalReport"),
+        entry::<evidence::ArtifactsStoreReport<'static>>("artifacts store", "ArtifactsStoreReport"),
+        entry::<artifacts::ArtifactsVerifyReport<'static>>("artifacts verify", "ArtifactsVerifyReport"),
         entry::<adapter::AuthorizationResult>("adapter authorize", "AdapterAuthorizeReport"),
         entry::<adapter::ValidationSummary>("adapter validate", "AdapterValidateReport"),
         entry::<brief_check::BriefCheckReport>("brief check", "BriefCheckReport"),
@@ -122,10 +120,10 @@ pub fn report_schemas() -> Vec<ReportSchema> {
         entry::<crate::inventory::InventorySyncReport<'static>>("inventory sync", "InventorySyncReport"),
         entry::<crate::plugin_sync::PluginSyncReport<'static>>("plugin sync", "PluginSyncReport"),
         entry::<crate::query::QueryReport>("query", "QueryReport"),
-        entry::<crate::retrieve::RegimeShowReport<'static>>("regime-key", "RegimeShowReport"),
-        entry::<crate::report::ReportBuildReport>("report", "ReportBuildReport"),
-        entry::<crate::report::ReportCheckReport>("report", "ReportCheckReport"),
-        entry::<crate::report::ReportSnapshotReport<'static>>("report", "ReportSnapshotReport"),
+        entry::<crate::retrieve::RegimeShowReport<'static>>("regime show", "RegimeShowReport"),
+        entry::<crate::report::ReportBuildReport>("report build", "ReportBuildReport"),
+        entry::<crate::report::ReportCheckReport>("report check", "ReportCheckReport"),
+        entry::<crate::report::ReportSnapshotReport<'static>>("report snapshot", "ReportSnapshotReport"),
         entry::<crate::schema::SchemaReport<'static>>("schema", "SchemaReport"),
         entry::<crate::skills::SkillsCheckReport>("skills check", "SkillsCheckReport"),
         entry::<crate::skills::SkillsDoctorReport<'static>>("skills doctor", "SkillsDoctorReport"),

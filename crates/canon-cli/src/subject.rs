@@ -299,9 +299,7 @@ fn report_subject_warning(
     let scope = crate::next::Scope::Subject(subject.subject_id.as_str().to_string());
     if dry_run {
         // A preview marks itself: the subject as it would stand, plus `dryRun`.
-        let mut data = serde_json::to_value(subject).expect("a subject serializes");
-        data.as_object_mut().expect("a subject is an object").insert("dryRun".to_string(), serde_json::Value::Bool(true));
-        crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &crate::json_out::untyped(data), crate::json_out::warnings_meta(warnings));
+        crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &SubjectPreviewReport { subject, dry_run: true }, crate::json_out::warnings_meta(warnings));
     } else {
         crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &SubjectReport(subject), crate::json_out::warnings_meta(warnings));
     }
@@ -313,6 +311,18 @@ fn report_subject_warning(
 pub struct SubjectReport<'a>(pub &'a Subject);
 
 impl crate::json_out::Report for SubjectReport<'_> {}
+
+/// `data` of a subject leaf under `--dry-run`: the Subject as it would stand, plus `dryRun`.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SubjectPreviewReport<'a> {
+    #[serde(flatten)]
+    pub subject: &'a Subject,
+    /// Always true.
+    pub dry_run: bool,
+}
+
+impl crate::json_out::Report for SubjectPreviewReport<'_> {}
 
 /// The `domain` enum name `canon.core` declares and a consumer repo
 /// extends — the SAME key `canon context` renders under `vocab.enums`.

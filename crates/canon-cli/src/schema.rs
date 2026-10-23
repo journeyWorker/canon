@@ -276,6 +276,13 @@ pub enum SchemaReport<'a> {
     Commands(ListSchema),
     Command(&'a spec::Node),
     Errors(ErrorList),
+    Error(ErrorEntry),
+}
+
+/// `canon schema --error <CODE>`: the one registry row.
+#[derive(Serialize, schemars::JsonSchema)]
+pub struct ErrorEntry {
+    pub error: spec::ErrorRow,
 }
 
 impl crate::json_out::Report for SchemaReport<'_> {}
@@ -482,7 +489,7 @@ fn print_error(code: &str, json: bool) -> u8 {
         return error.emit("canon schema", json) as u8;
     };
     if json {
-        crate::json_out::data("schema", &crate::json_out::untyped(serde_json::json!({ "error": row })));
+        crate::json_out::data("schema", &SchemaReport::Error(ErrorEntry { error: row }));
     } else {
         println!("{}  exit {}  retryable: {}", row.code, row.exit, row.retryable);
         println!("  {}", row.meaning);

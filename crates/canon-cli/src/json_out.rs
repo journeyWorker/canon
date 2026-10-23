@@ -135,15 +135,14 @@ impl JsonSchema for LedgerRecord {
     }
 }
 
-/// A payload with no schema yet. TEMPORARY: the slices that type the
-/// `json!`-built payloads (plan S3a–e) remove it; nothing new may use it.
-#[derive(Debug, Clone, Serialize)]
-#[serde(transparent)]
-pub struct Untyped(pub Value);
+/// The type parameter of a failure that carries no `data`: only its absence is
+/// printed, so it has no members and no schema.
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct NoData;
 
-impl JsonSchema for Untyped {
+impl JsonSchema for NoData {
     fn schema_name() -> std::borrow::Cow<'static, str> {
-        "Untyped".into()
+        "NoData".into()
     }
 
     fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
@@ -151,12 +150,7 @@ impl JsonSchema for Untyped {
     }
 }
 
-impl Report for Untyped {}
-
-/// TEMPORARY entry point for a `json!`-built payload; see [`Untyped`].
-pub fn untyped(value: Value) -> Untyped {
-    Untyped(value)
-}
+impl Report for NoData {}
 
 /// A `--fields` projection of a typed report: some of its top-level members. It
 /// serializes as the projected value and validates against the report's schema

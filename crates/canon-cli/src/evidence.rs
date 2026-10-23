@@ -1724,12 +1724,28 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
         crate::say!(json, "the bytes behind a file not stored are gone; `canon gate check` reports a latest record bound to one as stale-evidence — re-run and re-attest it with `canon evidence add`");
     }
     if json {
-        crate::json_out::data(
-            "artifacts store",
-            &crate::json_out::untyped(serde_json::json!({ "dryRun": dry_run, "boundFiles": files.len(), "stored": stored, "alreadyStored": already, "notStored": missing })));
+        crate::json_out::data("artifacts store", &ArtifactsStoreReport { dry_run, bound_files: files.len(), stored: &stored, already_stored: already, not_stored: &missing });
     }
     0
 }
+
+/// `canon artifacts store`: what the pass stored, or with `--dry-run` would store.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactsStoreReport<'a> {
+    /// True when `--dry-run` previewed the pass without writing.
+    pub dry_run: bool,
+    /// Files the ledger's evidence binds.
+    pub bound_files: usize,
+    /// One line per file stored (`<store path> <- <file>`).
+    pub stored: &'a [String],
+    /// Files already in the store.
+    pub already_stored: usize,
+    /// One line per file that could not be stored; their bytes are gone or over the limit.
+    pub not_stored: &'a [String],
+}
+
+impl crate::json_out::Report for ArtifactsStoreReport<'_> {}
 
 /// An [`EvidenceVerdict`]'s operator-facing spelling, matching
 /// [`parse_verdict`]'s own accepted domain. An exhaustive match rather
