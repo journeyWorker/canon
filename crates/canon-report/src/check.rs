@@ -36,10 +36,10 @@ impl CheckOutcome {
         let path = report_path.display();
         match self {
             CheckOutcome::Missing => {
-                format!("canon report --check: {path} MISSING — run `canon report` first, then `--check` verifies freshness at the same inputs")
+                format!("canon report check: {path} MISSING — run `canon report build` first, then `canon report check` verifies freshness at the same inputs")
             }
-            CheckOutcome::NoDrift => "canon report --check: no drift".to_string(),
-            CheckOutcome::Drift => format!("canon report --check: DRIFT — {path} is stale; regenerate with `canon report`"),
+            CheckOutcome::NoDrift => "canon report check: no drift".to_string(),
+            CheckOutcome::Drift => format!("canon report check: DRIFT — {path} is stale; regenerate with `canon report build`"),
         }
     }
 }

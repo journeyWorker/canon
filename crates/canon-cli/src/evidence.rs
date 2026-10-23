@@ -536,12 +536,12 @@ fn audit_of(args: &EvidenceArgs) -> Result<Option<EvidenceAudit>, String> {
         if given.is_empty() {
             return Ok(None);
         }
-        return Err(format!("{} belong(s) to `--kind {AUDIT_KIND}` only; this record is `--kind {}`", given.join(", "), args.kind));
+        return Err(format!("{} belong(s) to `--class {AUDIT_KIND}` only; this record is `--class {}`", given.join(", "), args.kind));
     }
     let missing: Vec<&str> = audit_flags.iter().filter(|(_, set)| !*set).map(|(flag, _)| *flag).collect();
     if !missing.is_empty() {
         return Err(format!(
-            "`--kind {AUDIT_KIND}` records an external evaluator's re-audit and needs {}; canon never generates or runs the audit, it records the evaluator's result",
+            "`--class {AUDIT_KIND}` records an external evaluator's re-audit and needs {}; canon never generates or runs the audit, it records the evaluator's result",
             missing.join(", ")
         ));
     }
@@ -557,12 +557,12 @@ fn audit_of(args: &EvidenceArgs) -> Result<Option<EvidenceAudit>, String> {
     let refused: Vec<&str> = declared_only.iter().filter(|(_, set)| *set).map(|(flag, _)| *flag).collect();
     if !refused.is_empty() {
         return Err(format!(
-            "{} do(es) not apply to `--kind {AUDIT_KIND}`: an audit re-checks one scenario (--scenario-id/--project-id), its verdict is its --audit-result, and it never flips a task or approves a risk",
+            "{} do(es) not apply to `--class {AUDIT_KIND}`: an audit re-checks one scenario (--scenario-id/--project-id), its verdict is its --audit-result, and it never flips a task or approves a risk",
             refused.join(", ")
         ));
     }
     if args.scenario_id.is_none() {
-        return Err(format!("`--kind {AUDIT_KIND}` needs --scenario-id and --project-id: an audit re-checks one scenario's declared success"));
+        return Err(format!("`--class {AUDIT_KIND}` needs --scenario-id and --project-id: an audit re-checks one scenario's declared success"));
     }
     let (Some(evaluator_id), Some(evaluator_version), Some(evaluator_digest), Some(result)) =
         (&args.evaluator_id, &args.evaluator_version, &args.evaluator_digest, &args.audit_result)
@@ -1206,7 +1206,7 @@ fn check_all_scenarios_flags(args: &EvidenceArgs) -> Result<(), String> {
         ("--scenario-id", args.scenario_id.is_some()),
         ("--task-id", args.task_id.is_some()),
         ("--report-case", !args.report_cases.is_empty()),
-        ("--kind audit", args.kind == AUDIT_KIND),
+        ("--class audit", args.kind == AUDIT_KIND),
         ("--approver", args.approval_by.is_some()),
         ("--approval-role", args.approval_role.is_some()),
         ("--signature-file", args.approval_signature_file.is_some()),
@@ -2102,11 +2102,11 @@ mod tests {
         serde_json::to_value(&record).unwrap()
     }
 
-    /// evidence.add.83: a batch that fails partway — its second record's
+    /// evidence.add.115: a batch that fails partway — its second record's
     /// staging write fails, or its promotion is refused — leaves no
     /// committed record, no staged record and no new blob.
     #[test]
-    fn evidence_add_83_a_batch_that_fails_partway_leaves_nothing_behind() {
+    fn evidence_add_115_a_batch_that_fails_partway_leaves_nothing_behind() {
         let tmp = repo_with_plan_corpus();
         let repo = tmp.path();
         let ledger_root = GateCtx::from_repo(repo).unwrap().ledger_root;

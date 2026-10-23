@@ -290,18 +290,33 @@ fn stdout_on_copy(base: &Path, home: &Path, sync_first: bool, args: &[&str]) -> 
 }
 
 #[test]
-fn status_and_gate_check_grade_a_stale_index_as_a_sync_would_leave_it_without_writing_it() {
+fn stale_index_status_and_gate_check_grade_a_stale_index_as_a_sync_would_leave_it_without_writing_it() {
     let home = TempDir::new().unwrap();
     let base = fixture(home.path());
     for args in [&["gate", "check", "--json"][..], &["gate", "check"][..], &["status", "--json"][..], &["status"][..]] {
         let stale = stdout_on_copy(base.path(), home.path(), false, args);
         let synced = stdout_on_copy(base.path(), home.path(), true, args);
-        let (changed, _, _, _) = run_on_copy(base.path(), home.path(), &args.iter().map(|a| a.to_string()).collect::<Vec<_>>());
+        let (changed, _, _, out) = run_on_copy(base.path(), home.path(), &args.iter().map(|a| a.to_string()).collect::<Vec<_>>());
         assert!(changed.is_empty(), "{args:?} must not write the index or its archive: {changed:?}");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(!stderr.contains("scenario index"), "{args:?} writes no index, so it prints no refresh line: {stderr}");
         assert_eq!(stale, synced, "{args:?}: a reader that does not write still answers from the specs as they are");
     }
     let gate = stdout_on_copy(base.path(), home.path(), false, &["gate", "check"]);
     assert!(gate.contains("auth.login.02"), "the scenario the index lacks is graded: {gate}");
+}
+
+#[test]
+fn stale_index_a_recording_command_refreshes_it_and_says_so_in_one_line() {
+    let home = TempDir::new().unwrap();
+    let base = fixture(home.path());
+    let argv: Vec<String> = ["artifacts", "store"].iter().map(|a| a.to_string()).collect();
+    let (changed, _, _, out) = run_on_copy(base.path(), home.path(), &argv);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(!changed.is_empty(), "the stale index is rebuilt by a command that records something");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let lines: Vec<&str> = stderr.lines().filter(|line| line.contains("scenario index")).collect();
+    assert_eq!(lines.len(), 1, "exactly one refresh line: {stderr}");
 }
 
 #[test]

@@ -1,5 +1,5 @@
 canon subject move: review guard for building → verifying (spec_coverage.require_review, scope: every status)
 canon subject move:   ran unreviewed-promotion — every owned scenario needs a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's
 canon subject move:   ran open-blocker — 1 adopted change(s) checked for open blocker findings
-canon subject move: SUBJECT_GATE_VIOLATION — unreviewed-promotion cart.add.01 — building → verifying: no signed review: the latest review recorded no sign-off (`reviewer-2` unavailable); an indeterminate or unavailable review is a gap, never an approval — run the review again and record `--outcome signed`
+canon subject move: SUBJECT_GATE_VIOLATION — unreviewed-promotion cart.add.01 — building → verifying: no signed review: the latest review recorded no sign-off (`reviewer-2` unavailable); an indeterminate or unavailable review is a gap, never an approval — run the review again and record `--review-outcome signed`
 hint: record an independent review (`canon review scenario`) and close blocker findings, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject and `canon gate check` keeps listing these gaps

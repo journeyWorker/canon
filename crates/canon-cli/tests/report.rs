@@ -87,6 +87,50 @@ fn check_exit_codes_track_missing_no_drift_and_drift_across_the_full_lifecycle()
     assert!(stderr(&drift).contains("DRIFT"), "{}", stderr(&drift));
 }
 
+fn files_under(dir: &Path) -> Vec<(std::path::PathBuf, Vec<u8>)> {
+    let mut out = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(current) = stack.pop() {
+        for entry in std::fs::read_dir(&current).unwrap().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                out.push((path.clone(), std::fs::read(&path).unwrap()));
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+#[test]
+fn report_check_over_empty_sources_reports_no_drift_creates_nothing_and_leaves_no_scratch() {
+    if !duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap();
+    let write = run_canon(&["report", "build", "--repo", "."], dir.path());
+    assert!(write.status.success(), "stderr: {}", stderr(&write));
+    let before = files_under(dir.path());
+
+    // A private temp dir for the child: whatever scratch the run makes lands here.
+    let scratch = tempfile::tempdir().unwrap();
+    let check = Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(["report", "check", "--repo", "."])
+        .current_dir(dir.path())
+        .env("TMPDIR", scratch.path())
+        .output()
+        .expect("spawn canon binary");
+
+    assert_eq!(check.status.code(), Some(0), "no drift must exit 0; stderr: {}", stderr(&check));
+    assert!(stderr(&check).contains("no drift"), "{}", stderr(&check));
+    assert!(before == files_under(dir.path()), "report check must create or change nothing in the repo (seed files, directories, parquet)");
+    assert!(std::fs::read_dir(scratch.path()).unwrap().next().is_none(), "the seeded scratch must be gone when the run ends");
+}
+
 #[test]
 fn snapshot_writes_ten_parquet_files_and_a_manifest_under_the_given_dir() {
     if !duckdb_available() {

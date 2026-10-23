@@ -49,10 +49,36 @@ fn the_bare_run_previews_the_candidates_and_performs_no_writes() {
 }
 
 #[test]
-fn a_committed_plan_moves_the_aged_record_and_a_stale_digest_moves_nothing() {
+fn a_committed_plan_moves_the_aged_record_leaves_the_rest_and_settles() {
     let fixture = support::Fixture::new(ROUTING, AGING);
     fixture.plant_trajectory_in_git(Utc::now() - Duration::days(30), 0.3);
     fixture.plant_trajectory_in_git(Utc::now(), 0.9); // within threshold, must stay
+    let digest = preview(&fixture)["data"]["planDigest"].as_str().unwrap().to_string();
+
+    let first = commit(&fixture, &digest);
+    assert!(first.status.success(), "stderr: {}", support::stderr(&first));
+    let body: serde_json::Value = serde_json::from_str(&support::stdout(&first)).unwrap();
+    assert_eq!(body["data"]["committed"], true, "{body}");
+    assert_eq!(body["data"]["rules"][0]["moved"], 1, "{body}");
+    assert_eq!(body["data"]["rules"][0]["alreadyAged"], 0, "{body}");
+    assert_eq!(fixture.git_file_count(), 1, "the within-threshold record must remain in git");
+    assert_eq!(fixture.r2_file_count(), 1, "the aged record must have landed in r2");
+
+    // A second, immediate run: nothing left in git past the threshold to
+    // re-select — idempotent (tier-policy spec, task 3.4's own pattern).
+    let again = preview(&fixture);
+    assert_eq!(again["data"]["effects"].as_array().unwrap().len(), 0, "{again}");
+    let second = commit(&fixture, again["data"]["planDigest"].as_str().unwrap());
+    assert!(second.status.success(), "stderr: {}", support::stderr(&second));
+    assert_eq!(fixture.git_file_count(), 1, "re-run must not touch the within-threshold record");
+    assert_eq!(fixture.r2_file_count(), 1, "re-run must not duplicate the already-aged record");
+}
+
+#[test]
+fn a_stale_digest_moves_nothing_and_a_fresh_preview_commits() {
+    let fixture = support::Fixture::new(ROUTING, AGING);
+    fixture.plant_trajectory_in_git(Utc::now() - Duration::days(30), 0.3);
+    fixture.plant_trajectory_in_git(Utc::now(), 0.9);
     let digest = preview(&fixture)["data"]["planDigest"].as_str().unwrap().to_string();
 
     // Another aged record lands between the preview and the commit.
@@ -65,22 +91,10 @@ fn a_committed_plan_moves_the_aged_record_and_a_stale_digest_moves_nothing() {
     assert_eq!(fixture.r2_file_count(), 0);
 
     let digest = preview(&fixture)["data"]["planDigest"].as_str().unwrap().to_string();
-    let first = commit(&fixture, &digest);
-    assert!(first.status.success(), "stderr: {}", support::stderr(&first));
-    let body: serde_json::Value = serde_json::from_str(&support::stdout(&first)).unwrap();
-    assert_eq!(body["data"]["committed"], true, "{body}");
-    assert_eq!(body["data"]["rules"][0]["moved"], 2, "{body}");
-    assert_eq!(fixture.git_file_count(), 1, "the within-threshold record must remain in git");
-    assert_eq!(fixture.r2_file_count(), 2, "the aged records must have landed in r2");
-
-    // A second, immediate run: nothing left in git past the threshold to
-    // re-select — idempotent (tier-policy spec, task 3.4's own pattern).
-    let again = preview(&fixture);
-    assert_eq!(again["data"]["effects"].as_array().unwrap().len(), 0, "{again}");
-    let second = commit(&fixture, again["data"]["planDigest"].as_str().unwrap());
-    assert!(second.status.success(), "stderr: {}", support::stderr(&second));
-    assert_eq!(fixture.git_file_count(), 1, "re-run must not touch the within-threshold record");
-    assert_eq!(fixture.r2_file_count(), 2, "re-run must not duplicate the already-aged records");
+    let fresh = commit(&fixture, &digest);
+    assert!(fresh.status.success(), "stderr: {}", support::stderr(&fresh));
+    assert_eq!(fixture.git_file_count(), 1);
+    assert_eq!(fixture.r2_file_count(), 2);
 }
 
 #[test]

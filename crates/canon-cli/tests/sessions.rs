@@ -147,13 +147,19 @@ fn every_write_command_stages_or_writes_directly_as_its_mode_says() {
         ok(repo, args);
         assert!(records_under(repo, "_staging").is_empty(), "canon {args:?} writes directly and must stage nothing");
     };
-    let staged = |args: &[&str], landed: Landed| {
-        let before = records_under(repo, "_staging").len();
+    let staged = |args: &[&str], kind: &str, landed: Landed| {
+        let before = (records_under(repo, "_staging").len(), committed(repo, kind).len());
         ok(repo, args);
-        let after = records_under(repo, "_staging").len();
+        let after = (records_under(repo, "_staging").len(), committed(repo, kind).len());
         match landed {
-            Landed::Staged => assert!(after > before, "canon {args:?} with --no-promote must leave its record staged"),
-            Landed::Committed => assert_eq!(after, before, "canon {args:?} must promote its record in the run"),
+            Landed::Staged => {
+                assert!(after.0 > before.0, "canon {args:?} with --no-promote must leave its record staged");
+                assert_eq!(after.1, before.1, "canon {args:?} with --no-promote must commit nothing");
+            }
+            Landed::Committed => {
+                assert_eq!(after.0, before.0, "canon {args:?} must promote its record in the run");
+                assert_eq!(after.1, before.1 + 1, "canon {args:?} must leave its record committed in the ledger");
+            }
         }
     };
 
@@ -167,12 +173,16 @@ fn every_write_command_stages_or_writes_directly_as_its_mode_says() {
 
     staged(
         &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke", "--role", "implementer", "--no-promote"],
+        "evidence_record",
         STAGED,
     );
-    staged(&["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke 2", "--role", "implementer"], PROMOTED);
-    staged(&["finding", "add", "--change-id", "cats", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "r", "--summary", "s", "--no-promote"], STAGED);
+    staged(&["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke 2", "--role", "implementer"], "evidence_record", PROMOTED);
+    staged(&["finding", "add", "--change-id", "cats", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "r", "--summary", "s", "--no-promote"], "finding", STAGED);
     ok(repo, &["gate", "promote"]);
-    staged(&["finding", "close", "cats", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"], PROMOTED);
+    // A close supersedes the committed finding, so the committed count holds: the disposition is what moves.
+    ok(repo, &["finding", "close", "cats", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"]);
+    let findings = committed(repo, "finding");
+    assert!(!findings.is_empty() && findings.iter().all(|finding| finding["disposition"] == "rejected"), "the close promotes its record in the run: {findings:?}");
     assert!(records_under(repo, "_staging").is_empty(), "nothing is left to promote");
 
     direct(&[
@@ -182,8 +192,12 @@ fn every_write_command_stages_or_writes_directly_as_its_mode_says() {
 
     staged(
         &["divergence", "add", "game.run.01", "--project-id", "root", "--actor-id", "r", "--role", "reviewer", "--no-promote"],
+        "divergence",
         STAGED,
     );
-    staged(&["divergence", "add", "game.run.01", "--project-id", "root", "--round", "2", "--actor-id", "r", "--role", "reviewer"], PROMOTED);
-    staged(&["divergence", "resolve", "game.run.01", "--project-id", "root", "--round", "3", "--actor-id", "r", "--role", "reviewer"], PROMOTED);
+    staged(&["divergence", "add", "game.run.01", "--project-id", "root", "--round", "2", "--actor-id", "r", "--role", "reviewer"], "divergence", PROMOTED);
+    let staged_before = records_under(repo, "_staging").len();
+    ok(repo, &["divergence", "resolve", "game.run.01", "--project-id", "root", "--round", "3", "--actor-id", "r", "--role", "reviewer"]);
+    assert_eq!(records_under(repo, "_staging").len(), staged_before, "resolve promotes its record in the run");
+    assert!(committed(repo, "divergence").iter().any(|divergence| divergence["status"] == "resolved"), "the resolution is committed: {:?}", committed(repo, "divergence"));
 }

@@ -79,14 +79,22 @@ fn status_keeps_only_the_named_fields_and_refuses_an_unknown_one() {
 
 #[test]
 fn context_keeps_only_the_named_sections() {
-    let dir = repo();
+    // A directory with no canon.yaml: `context` needs none.
+    let dir = TempDir::new().unwrap();
+    assert!(!dir.path().join("canon.yaml").exists());
     let out = run(dir.path(), &["context", "--json", "--fields", "kinds,enums"]);
-    assert!(out.status.success());
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     let mut got = keys(&body(&out)["data"]);
     got.sort();
     assert_eq!(got, ["enums", "kinds"]);
+
     let out = run(dir.path(), &["context", "--json", "--fields", "nope"]);
     assert_eq!((out.status.code(), body(&out)["error"]["code"].clone()), (Some(2), Value::from("UNKNOWN_FIELD")));
+
+    // Without --json the refusal is the same exit code.
+    let out = run(dir.path(), &["context", "--fields", "nope"]);
+    assert_eq!(out.status.code(), Some(2), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(out.stdout.is_empty(), "a refusal prints no report");
 }
 
 #[test]

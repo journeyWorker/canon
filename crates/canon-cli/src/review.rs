@@ -39,7 +39,7 @@
 //! ([`canon_gate::review_gate::change_review_gap`]).
 //!
 //! # The reviewer's run can fail visibly (0.15 D4)
-//! `--outcome` records `signed` (default), `indeterminate` or
+//! `--review-outcome` records `signed` (default), `indeterminate` or
 //! `unavailable`; only `signed` is an approval. `--reviewer-provider`,
 //! `--reviewer-model` and `--reviewer-harness` record the runtime that
 //! produced the review, as the caller reports it.
@@ -582,11 +582,11 @@ mod tests {
         assert!(reviews(&dir).is_empty());
     }
 
-    /// review.add.81: a write failure on the second review of a batch
+    /// review.add.100: a write failure on the second review of a batch
     /// removes the first and every blob the call stored; a read-only
     /// review directory is refused before anything is written.
     #[test]
-    fn review_add_81_a_batch_whose_second_write_fails_leaves_nothing() {
+    fn review_add_100_a_batch_whose_second_write_fails_leaves_nothing() {
         let dir = repo_with_scenario();
         let ledger_root = GateCtx::from_repo(dir.path()).unwrap().ledger_root;
         std::fs::write(dir.path().join("shot.png"), b"png").unwrap();

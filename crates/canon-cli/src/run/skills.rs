@@ -35,7 +35,7 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
                 }
                 ExitCode::SUCCESS
             }
-            Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).hint("check that the target directory is writable; `canon skills doctor` diagnoses the installation").emit("canon skills install", json) as u8) }
+            Err(err) => ExitCode::from(skills_error(&err).emit("canon skills install", json) as u8),
         };
     }
     match crate::skills::install_canonical(source.as_deref(), target, providers, dry_run) {
@@ -90,7 +90,7 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
             }
             ExitCode::SUCCESS
         }
-        Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).hint("check that the target directory is writable; `canon skills doctor` diagnoses the installation").emit("canon skills install", json) as u8) }
+        Err(err) => ExitCode::from(skills_error(&err).emit("canon skills install", json) as u8),
     }
 }
 
@@ -133,7 +133,7 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
                 ExitCode::from(CliError::failed("SKILLS_DRIFT", format!("an installed skill is missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version{orphaned}")).hint(hint).emit_with_data_and_meta("canon skills check", json, &data, coverage.meta()) as u8)
             }
         }
-        Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).hint("check that the target directory is writable; `canon skills doctor` diagnoses the installation").emit("canon skills check", json) as u8) }
+        Err(err) => ExitCode::from(skills_error(&err).emit("canon skills check", json) as u8),
     }
 }
 
@@ -147,7 +147,7 @@ fn run_skills_doctor(source: Option<&std::path::Path>, target: &std::path::Path,
             }
             ExitCode::SUCCESS
         }
-        Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).hint("check that the target directory is writable; `canon skills doctor` diagnoses the installation").emit("canon skills doctor", json) as u8) }
+        Err(err) => ExitCode::from(skills_error(&err).emit("canon skills doctor", json) as u8),
     }
 }
 
@@ -165,4 +165,19 @@ fn run_skills_show(name: &str, full: bool, json: bool) -> ExitCode {
         print!("{markdown}");
     }
     ExitCode::SUCCESS
+}
+
+/// A failed skills command. An unknown provider or a malformed `skills:` section is an invalid argument, a refusal (exit 2, D4); anything else is an operational failure (exit 1).
+fn skills_error(err: &crate::skills::SkillsError) -> CliError {
+    use crate::skills::SkillsError;
+    match err {
+        SkillsError::InvalidProvider(value) => CliError::refused("SKILLS_INVALID_ARGUMENT", err.to_string())
+            .field("--providers")
+            .received(value.clone())
+            .expected(["claude", "codex", "omp", "pi", "none"])
+            .hint("pass `--providers` any subset of claude, codex, omp, pi (comma-separated), or `none`"),
+        SkillsError::Config(_) => CliError::refused("SKILLS_INVALID_ARGUMENT", err.to_string()).hint("fix the `skills:` section of canon.yaml (`skills: { providers: [claude, codex, omp, pi] }`, any subset, `[]` for none), or pass `--providers`"),
+        SkillsError::SourceNotFound(_) | SkillsError::CanonicalSourceMissing(_) => CliError::failed("SKILLS_FAILED", err.to_string()).hint("point `--skills-source` at a directory that holds `SKILL.src.md`, or drop it to use the text built into canon"),
+        _ => CliError::failed("SKILLS_FAILED", err.to_string()).hint("check that the target directory is writable; `canon skills doctor` diagnoses the installation"),
+    }
 }

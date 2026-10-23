@@ -206,7 +206,7 @@ fn an_explicit_short_sha_branch_and_head_tilde_one_record_the_full_sha() {
 }
 
 #[test]
-fn a_dirty_working_tree_is_recorded_and_the_review_covers_the_commit_made_from_it() {
+fn a_dirty_working_tree_is_recorded_with_the_code_tree_of_the_commit_made_from_it() {
     let dir = repo();
     let r = dir.path();
     write(r, "src/main.rs", "fn main() { println!(\"changed\"); }\n");
@@ -225,13 +225,13 @@ fn a_dirty_working_tree_is_recorded_and_the_review_covers_the_commit_made_from_i
     assert_ne!(reviewed_tree, code_tree(r, Some("HEAD")).unwrap().tree, "the review saw code HEAD does not hold");
 
     commit_all(r, "commit made from the reviewed tree");
-    assert_eq!(code_tree(r, Some("HEAD")).unwrap().tree, reviewed_tree, "the commit has the code the review saw");
+    assert_eq!(code_tree(r, Some("HEAD")).unwrap().tree, reviewed_tree, "the commit has the code the review recorded");
     let now = code_tree(r, None).unwrap();
-    assert_eq!(now.tree, reviewed_tree, "so the review is current");
+    assert_eq!(now.tree, reviewed_tree, "and so does the working tree");
     assert!(!now.dirty);
 
     write(r, "src/main.rs", "fn main() { panic!() }\n");
-    assert_ne!(code_tree(r, None).unwrap().tree, reviewed_tree, "and it is not once the code changed");
+    assert_ne!(code_tree(r, None).unwrap().tree, reviewed_tree, "once the code changed, the working tree's code tree differs from the recorded one");
 }
 
 #[test]

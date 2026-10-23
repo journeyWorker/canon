@@ -40,7 +40,7 @@ fn check_reports_no_drift_immediately_after_a_write() {
 
     assert_eq!(outcome, CheckOutcome::NoDrift);
     assert_eq!(outcome.exit_code(), 0);
-    assert_eq!(outcome.message(&report_path), "canon report --check: no drift");
+    assert_eq!(outcome.message(&report_path), "canon report check: no drift");
 }
 
 #[test]

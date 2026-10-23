@@ -523,7 +523,7 @@ pub fn review_gap(ctx: &GateContext, scenario: &Scenario, distinct_actor: bool) 
     gap(
         ReviewGapKind::Unsigned,
         format!(
-            "no signed review: the latest review recorded no sign-off ({outcomes}); an indeterminate or unavailable review is a gap, never an approval — run the review again and record `--outcome signed`"
+            "no signed review: the latest review recorded no sign-off ({outcomes}); an indeterminate or unavailable review is a gap, never an approval — run the review again and record `--review-outcome signed`"
         ),
     )
 }

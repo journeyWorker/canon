@@ -77,8 +77,14 @@ fn commands_are_the_spec_leaves_each_role_uses() {
     let all = data(&context(&[], &[]));
     assert_eq!(command_set(&all), leaves.iter().map(|n| n.command.clone()).collect::<BTreeSet<_>>());
     for c in all["commands"].as_array().unwrap() {
-        assert!(c["effect"].is_string() && c["roles"].is_array(), "{c}");
+        let name = c["command"].as_str().unwrap();
+        let leaf = leaves.iter().find(|n| n.command == name).and_then(|n| n.leaf.as_ref()).unwrap_or_else(|| panic!("no leaf `{name}`"));
+        assert_eq!(c["effect"], leaf.effect.as_str(), "`{name}` effect");
+        let roles: Vec<&str> = leaf.roles.iter().map(|r| r.as_str()).collect();
+        assert_eq!(c["roles"].as_array().unwrap().iter().map(|r| r.as_str().unwrap()).collect::<Vec<_>>(), roles, "`{name}` roles");
     }
+    let with_roles = all["commands"].as_array().unwrap().iter().filter(|c| !c["roles"].as_array().unwrap().is_empty()).count();
+    assert!(with_roles > 30, "{with_roles} commands name their roles");
 
     for role in canon_cli::role::ALL {
         let doc = data(&context(&["--as", role.as_str()], &[]));

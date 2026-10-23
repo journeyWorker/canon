@@ -239,12 +239,23 @@ fn an_unknown_canon_role_is_refused_with_unknown_role() {
     let schema = canon_with(dir.path(), &["schema", "--json"], &[("CANON_ROLE", "janitor")]);
     assert!(schema.status.success(), "schema never consults CANON_ROLE: {}", stderr(&schema));
 
+    let context = canon_with(dir.path(), &["context", "--json"], &[("CANON_ROLE", "janitor")]);
+    assert!(context.status.success(), "context never consults CANON_ROLE: {}{}", stdout(&context), stderr(&context));
+    assert_eq!(json_of(&context)["ok"], true);
+    assert!(stderr(&context).is_empty(), "--json writes nothing to stderr: {}", stderr(&context));
+    assert!(!json_of(&context)["meta"]["warnings"].as_array().expect("warnings").is_empty(), "the bad variable is a warning");
+
     let human = canon_with(dir.path(), &["status"], &[("CANON_ROLE", "janitor")]);
     assert_eq!(human.status.code(), Some(2));
     assert!(stderr(&human).contains("UNKNOWN_ROLE"), "{}", stderr(&human));
 
     let overridden = canon_with(dir.path(), &["schema", "--as", "planner", "--json"], &[("CANON_ROLE", "janitor")]);
     assert!(overridden.status.success(), "the flag wins, so the bad variable is never consulted: {}", stderr(&overridden));
+
+    let seeded = repo_with_scenario();
+    let wins = canon_with(seeded.path(), &["status", "--as", "planner", "--json"], &[("CANON_ROLE", "janitor")]);
+    assert!(wins.status.success(), "--as wins over a bad CANON_ROLE on a command that does consult it: {}{}", stdout(&wins), stderr(&wins));
+    assert_eq!(json_of(&wins)["ok"], true);
 
     let bad_flag = canon(dir.path(), &["schema", "--as", "janitor"]);
     assert_eq!(bad_flag.status.code(), Some(2), "an unknown --as is a usage error");

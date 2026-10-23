@@ -182,7 +182,7 @@ fn skills_install_dry_run_refuses_like_the_real_run() {
     std::fs::create_dir_all(&target).unwrap();
     assert_eq!(
         bad_preview(&["skills", "install", "--skills-source", source.to_str().unwrap(), "--repo", target.to_str().unwrap(), "--providers", "bogus"], tmp.path(), &[tmp.path()]),
-        "SKILLS_FAILED"
+        "SKILLS_INVALID_ARGUMENT"
     );
 }
 

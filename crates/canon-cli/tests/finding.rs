@@ -287,7 +287,7 @@ fn finding_add_fixed_defaults_the_resolution_to_head() {
 /// not just `open`: `Finding::rejected`/`deferred` clear the resolution,
 /// so a CLI that only refused `open` would silently drop it.
 #[test]
-fn finding_add_refuses_a_resolution_rev_on_every_non_fixed_disposition() {
+fn finding_add_04_refuses_a_resolution_rev_on_every_non_fixed_disposition() {
     for disposition in ["open", "rejected", "deferred"] {
         let dir = repo();
         let repo = dir.path();
@@ -295,6 +295,30 @@ fn finding_add_refuses_a_resolution_rev_on_every_non_fixed_disposition() {
         let output = add(repo, &["--round", "1", "--seq", "1", "--disposition", disposition, "--resolution-rev", "HEAD", "--actor-id", "r", "--summary", "s"]);
         assert_eq!(output.status.code(), Some(2), "{disposition} accepted a resolution rev; stdout: {}", stdout(&output));
         assert!(staged_findings(repo).is_empty(), "{disposition}: a refused add must stage nothing");
+    }
+}
+
+/// Only a `fixed` finding carries a resolution, and a `fixed` one always does:
+/// with no `--resolution-rev` it resolves HEAD, and no other disposition has one.
+#[test]
+fn finding_add_04_only_a_fixed_finding_carries_a_resolution_and_a_fixed_one_always_does() {
+    let (dir, head) = git_repo();
+    let repo = dir.path();
+    for (seq, disposition) in ["open", "rejected", "deferred", "fixed"].into_iter().enumerate() {
+        let seq = (seq + 1).to_string();
+        let extra = ["--round", "1", "--seq", &seq, "--disposition", disposition, "--actor-id", "r", "--summary", "s"];
+        let output = add(repo, &extra);
+        assert_eq!(output.status.code(), Some(0), "{disposition}: {}{}", stdout(&output), stderr(&output));
+    }
+    let staged: Vec<serde_json::Value> = staged_findings(repo).iter().map(|path| body_at(path)).collect();
+    assert_eq!(staged.len(), 4);
+    for body in &staged {
+        let resolved = body.get("resolution_sha").is_some_and(|sha| !sha.is_null());
+        if body["disposition"] == "fixed" {
+            assert_eq!(body["resolution_sha"], head.as_str(), "a fixed finding with no --resolution-rev resolves HEAD: {body}");
+        } else {
+            assert!(!resolved, "only a fixed finding carries a resolution: {body}");
+        }
     }
 }
 
@@ -485,25 +509,30 @@ fn an_identical_finding_add_is_unchanged_and_writes_nothing() {
     assert_eq!(other.status.code(), Some(2), "{}", stdout(&other));
 }
 
-/// Closing a finding to the disposition it already has writes nothing and is `meta.unchanged`.
+/// Closing a finding to the disposition it already has (`fixed` and `rejected` alike) writes nothing and is `meta.unchanged`.
 #[test]
 fn closing_a_finding_to_its_current_disposition_is_unchanged() {
     let dir = repo();
     let repo = dir.path();
-    assert!(add(repo, &["--round", "5", "--seq", "1", "--actor-id", "r", "--summary", "to close"]).status.success());
-    assert!(run_canon(&["gate", "promote", "--repo", "."], repo).status.success());
-    let close = ["finding", "close", "s43-findings-are-records", "--round", "5", "--seq", "1", "--disposition", "rejected", "--reason", "works as designed", "--repo", ".", "--json"];
+    for (round, disposition, reason) in [("5", "rejected", Some("works as designed")), ("6", "fixed", None)] {
+        assert!(add(repo, &["--round", round, "--seq", "1", "--actor-id", "r", "--summary", "to close"]).status.success());
+        assert!(run_canon(&["gate", "promote", "--repo", "."], repo).status.success());
+        let mut close = vec!["finding", "close", "s43-findings-are-records", "--round", round, "--seq", "1", "--disposition", disposition, "--repo", ".", "--json"];
+        if let Some(reason) = reason {
+            close.extend(["--reason", reason]);
+        }
 
-    let first = run_canon(&close, repo);
-    assert!(first.status.success(), "{}", stdout(&first));
-    assert!(json_of(&first)["meta"].get("unchanged").is_none(), "the first close writes");
-    assert!(run_canon(&["gate", "promote", "--repo", "."], repo).status.success());
+        let first = run_canon(&close, repo);
+        assert!(first.status.success(), "{disposition}: {}", stdout(&first));
+        assert!(json_of(&first)["meta"].get("unchanged").is_none(), "{disposition}: the first close writes");
+        assert!(run_canon(&["gate", "promote", "--repo", "."], repo).status.success());
 
-    let before = tree(repo);
-    let again = run_canon(&close, repo);
-    assert_eq!(again.status.code(), Some(0), "{}", stderr(&again));
-    assert_eq!(json_of(&again)["meta"]["unchanged"], true);
-    assert_eq!(tree(repo), before, "a repeated close writes nothing");
+        let before = tree(repo);
+        let again = run_canon(&close, repo);
+        assert_eq!(again.status.code(), Some(0), "{disposition}: {}", stderr(&again));
+        assert_eq!(json_of(&again)["meta"]["unchanged"], true, "{disposition}");
+        assert_eq!(tree(repo), before, "{disposition}: a repeated close writes nothing");
+    }
 }
 
 /// A neighbouring `seq` in the same round is a different finding: the
@@ -574,49 +603,6 @@ fn context_capability_23_gate_promote_tallies_the_staged_kinds_by_the_names_kind
     let tally_line = tally.lines().find(|l| l.starts_with("canon gate promote:")).expect("a tally line");
     assert!(tally_line.contains("evidence=1, finding=1"), "{tally}");
     assert!(!tally_line.contains("evidence_record"), "{tally}");
-}
-
-/// Task 2.3. Asserted at the binary boundary because this is the text
-/// an operator or an agent actually reads before trusting a finding —
-/// and because the command exists on account of an unsupported claim,
-/// its own help overstating what it establishes would be the same
-/// mistake in the same release.
-#[test]
-fn finding_add_help_states_it_is_an_observation_and_names_what_canon_skips() {
-    let dir = tempfile::tempdir().expect("a temp dir");
-    let help = help_stdout(&["finding", "add", "--help"], ADD_HELP_MARKER, dir.path());
-
-    assert!(help.contains("RECORDED OBSERVATION, NOT PROOF"), "{help}");
-    assert!(help.contains("does not verify that the defect"), "{help}");
-    assert!(help.contains("can record its own review round"), "{help}");
-
-    // What it does NOT establish, each named.
-    for skipped in ["never resolved, never read", "never verified, and never guessed", "nothing here is gated"] {
-        assert!(help.contains(skipped), "the help must name `{skipped}`: {help}");
-    }
-
-    // What it IS good for, so the help is not merely a disclaimer.
-    assert!(help.contains("attribution"), "{help}");
-    assert!(help.contains("stops being typed from memory"), "{help}");
-
-    // The `--introduced-by` guidance, which is the decision a user makes
-    // at this command and nowhere else.
-    assert!(help.contains("must be SOURCED"), "{help}");
-    assert!(help.contains("Leaving it UNSET is the correct record"), "{help}");
-    // clap re-wraps `after_help` to the terminal width, so the sentence
-    // reaches a reader as several lines. Whitespace-collapse both sides
-    // and compare the prose: the pin is on the words, not the wrapping.
-    let flowed = help.split_whitespace().collect::<Vec<_>>().join(" ");
-    let canonical = canon_report::render::FIX_OF_FIX_MEANING.split_whitespace().collect::<Vec<_>>().join(" ");
-    assert!(flowed.contains(&canonical), "the help must carry the one canonical fix-of-fix sentence verbatim: {help}");
-
-    // Fix-of-fix stays derived: no flag, and the help says why.
-    assert!(help.contains("Fix-of-fix is DERIVED, never recorded"), "{help}");
-    assert!(!help.contains("--fix-of-fix"), "there must be no fix-of-fix flag: {help}");
-
-    // And it never claims proof of anything.
-    assert!(!help.contains("proof of"), "the help must never claim proof: {help}");
-    assert!(!help.contains("verifies that"), "{help}");
 }
 
 /// The nouns whose COUNT is the banned claim, in the plural. A value

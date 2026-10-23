@@ -211,7 +211,7 @@ query:
 
 Every query, export, and purge appends an actor-stamped record to
 `.canon/audit/access.jsonl` (mode `0600` on creation) in the repository
-whose `canon.yaml` it read (through `--repo` or `--canon-yaml`), never in
+whose `canon.yaml` it read (through `--repo`), never in
 the current directory; with no `canon.yaml` there is no audit and nothing
 is written. The log is local operator state: `canon init` keeps
 `.canon/audit/` out of git (below). `CANON_ACTOR` takes
@@ -252,7 +252,7 @@ line ends ``— run `canon gate promote` to commit it`` (`canon divergence
 promote` for a divergence), and the command exits `1`. With neither flag,
 a malformed `write:` section (anything but `promote: auto | manual`)
 refuses the write, exit `2`, before anything is staged. `canon init
---check-config` reports `[PASS] write (promote: auto)`, `[not configured]
+--check` reports `[PASS] write (promote: auto)`, `[not configured]
 write (promote: manual)`, or `[FAIL] write: …`. `canon gate promote` still
 works under `auto` and is idempotent: with nothing staged it prints
 `nothing staged` and exits `0`.

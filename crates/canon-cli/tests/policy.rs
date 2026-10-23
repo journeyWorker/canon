@@ -66,6 +66,15 @@ fn approve_records_the_policy_digest_the_approver_the_time_and_the_note() {
     assert_eq!(without_note.status.code(), Some(0), "stderr: {}", stderr(&without_note));
     assert_eq!(approval(repo)["note"], serde_json::Value::Null, "a re-approval replaces the record");
     assert_eq!(approval(repo)["approved_by"], "bob");
+
+    // The approval is meant to be committed: neither the .gitignore `canon init`
+    // wrote nor canon's own ignores it (`git check-ignore` exits 1 for "not ignored").
+    let ignored_in = |tree: &Path| {
+        Command::new("git").arg("-C").arg(tree).args(["check-ignore", "-q", APPROVAL]).status().expect("git must be on PATH").code()
+    };
+    assert_eq!(ignored_in(repo), Some(1), "the .gitignore canon init writes must not ignore the approval");
+    let canon_tree = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    assert_eq!(ignored_in(&canon_tree), Some(1), "canon's own .gitignore must not ignore the approval");
 }
 
 #[test]

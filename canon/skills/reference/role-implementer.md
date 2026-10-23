@@ -317,8 +317,8 @@ canon evidence add --input '[{"scenarioId":"auth.login.01","class":"test-run","r
    verdict, different checks or an edited scenario stales it. The add prints
    the reviewer and the `canon review scenario` call that signs it again; that
    is the reviewer's call. Do not run it yourself. A review of an uncommitted
-   working tree still covers the commit you make from it while the code did
-   not change in between.
+   working tree survives the commit you make from it: the review is judged by
+   the scenario and the evidence it pins, never by the commit.
 7. **After a fix or a chore, record again only where the code changed.**
    A blocker the reviewer closed `fixed` is not done until the scenarios it
    names (the whole suite when it names none) have evidence newer than the

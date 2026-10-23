@@ -409,18 +409,30 @@ fn review_scenario_93_an_object_is_one_report_and_an_array_is_a_batch() {
     let f = fixture();
     let r = f.path();
 
-    let one = f.ok(&["review", "scenario", "--input", &review_doc(&["auth.login.01"]).to_string(), "--json"]);
+    // An object naming two operands writes one review per operand and returns the ordinary report.
+    let one = f.ok(&["review", "scenario", "--input", &review_doc(&["auth.login.01", "auth.login.02"]).to_string(), "--json"]);
     let body = json_of(&one);
     assert_eq!(body["meta"]["command"], "review scenario");
-    assert_eq!(body["data"]["reviews"].as_array().unwrap().len(), 1, "{body}");
+    assert_eq!(body["data"]["reviews"].as_array().unwrap().len(), 2, "{body}");
     assert!(body["data"].get("items").is_none(), "an object returns the ordinary report: {body}");
+    let mut reviewed: Vec<String> = committed(r, "review").iter().map(|review| review["scenario_id"].as_str().unwrap().to_string()).collect();
+    reviewed.sort();
+    assert_eq!(reviewed, ["auth.login.01", "auth.login.02"], "one review per operand");
 
-    // Operands may name several scenarios in one document; an array is a batch of such documents.
-    let two = f.ok(&["review", "scenario", "--input", &json!([review_doc(&["auth.login.02"]), {"operands": ["auth.login.01"], "actorId": "reviewer-3", "role": "reviewer", "originalSpecRef": "docs/prd.md"}]).to_string(), "--json"]);
+    // An array is a batch of such documents: one item per element, in order, each written.
+    let doc = |scenarios: &[&str], reviewer: &str| json!({"operands": scenarios, "actorId": reviewer, "role": "reviewer", "originalSpecRef": "docs/prd.md"});
+    let two = f.ok(&["review", "scenario", "--input", &json!([doc(&["auth.login.02"], "reviewer-3"), doc(&["auth.login.01", "auth.login.02"], "reviewer-4")]).to_string(), "--json"]);
     let body = json_of(&two);
     assert_eq!(statuses(&body), ["written", "written"]);
     assert_eq!(body["meta"]["command"], "review scenario");
-    assert_eq!(committed(r, "review").len(), 3);
+    let items = body["data"]["items"].as_array().unwrap();
+    assert_eq!(items.iter().map(|item| item["index"].as_u64().unwrap()).collect::<Vec<_>>(), [0, 1], "in order: {body}");
+    let written: Vec<Vec<&str>> = items.iter().map(|item| item["data"]["reviews"].as_array().unwrap().iter().map(|review| review["location"].as_str().unwrap()).collect()).collect();
+    assert_eq!(written[0].len(), 1, "the first element reviews its one operand: {body}");
+    assert!(written[0][0].contains("auth.login.02"), "{body}");
+    assert_eq!(written[1].len(), 2, "the second element reviews each of its operands: {body}");
+    assert!(written[1][0].contains("auth.login.01") && written[1][1].contains("auth.login.02"), "{body}");
+    assert_eq!(committed(r, "review").len(), 5);
 }
 
 #[test]

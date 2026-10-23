@@ -321,7 +321,7 @@ impl StoreError {
             StoreError::InvalidDigest(_) => "a recorded digest must be 64 lowercase hex characters; fix or re-create the record",
             StoreError::UnsafeStoreDir | StoreError::Io(_) => "check that the artifact store is writable (permissions, disk space), then run the command again",
             StoreError::Locked(_) => "wait for the other canon process to finish, then run the command again",
-            StoreError::Config(_) => "fix the `artifact_store:` block of canon.yaml (`canon init --check-config` names the problem), or set `artifact_store: { backend: local }`",
+            StoreError::Config(_) => "fix the `artifact_store:` block of canon.yaml (`canon init --check` names the problem), or set `artifact_store: { backend: local }`",
             StoreError::Unattached { .. } | StoreError::Remote { .. } => OBJECT_STORE_HINT,
         }
     }

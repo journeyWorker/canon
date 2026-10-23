@@ -196,11 +196,11 @@ latest evidence per role, not which record held them. It stays current when
 the implementer records the same verdict from the same checks again, and
 goes stale when the verdict or the checks differ or the scenario changes.
 A review of code that is not committed yet is allowed: the record carries
-`codeTree` and `worktreeDirty: true`, and it still covers the commit made
-from that working tree while the code did not change in between. A review of
-code that changed afterwards does not. Reviews written before 0.23 do not
-count until `canon migrate` re-pins them (an advisory names it); that is
-the orchestrator's step, not yours.
+`codeTree` and `worktreeDirty: true`, and the commit made from that working
+tree has the same `codeTree`, so the review survives the commit; only its
+pins (above) make it stale, never the commit or the code tree. Reviews
+written before 0.23 do not count until `canon migrate` re-pins them (an
+advisory names it); that is the orchestrator's step, not yours.
 
 Run `gate check` once, before `review scenario`: its `unreviewed-promotion`
 violations are the subjects and scenarios that need your review. Do not loop

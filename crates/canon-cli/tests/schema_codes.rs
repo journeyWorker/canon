@@ -81,7 +81,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("run/ingest.rs", &[]),
     ("run/inventory.rs", &[]),
     ("run/plugin.rs", &[]),
-    ("run/skills.rs", &[]),
+    ("run/skills.rs", &["skills install", "skills check", "skills doctor"]),
     ("run/tier.rs", &[]),
     ("migrate.rs", &["migrate"]),
     ("policy_approval.rs", &["brief approve", "policy approve"]),

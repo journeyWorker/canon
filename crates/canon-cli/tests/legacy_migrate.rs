@@ -224,7 +224,7 @@ fn migrate_with_a_stale_digest_writes_nothing() {
 
 /// D9: `status`, `gate check` and `context` lead a 0.27 repo to the preview, with a warning.
 #[test]
-fn status_gate_check_and_context_put_migrate_first() {
+fn migrate_detection_status_gate_check_and_context_put_migrate_first() {
     let dir = repo_027();
     let repo = dir.path();
     for args in [&["status", "--json"][..], &["gate", "check", "--json"][..], &["context", "--json"][..]] {
@@ -245,7 +245,7 @@ fn status_gate_check_and_context_put_migrate_first() {
 
 /// D9: a `canon gate task` hook entry alone is 0.27-era state.
 #[test]
-fn a_gate_task_hook_entry_alone_is_detected_and_rewritten() {
+fn migrate_detection_a_gate_task_hook_entry_alone_is_detected_and_rewritten() {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
     git(repo, &["init", "-q"]);

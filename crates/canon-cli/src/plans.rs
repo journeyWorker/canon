@@ -721,7 +721,7 @@ fn resolve_sources(repo: &Path, canon_yaml_path: &Path, dialect: Option<&str>, s
             Ok(vec![PlanSource { dialect: d.to_string(), root: s.to_path_buf() }])
         }
         (Some(_), None) | (None, Some(_)) => Err(PlansError::Config(
-            "`--dialect` and `--source` must be given together (a one-shot plan-import override needs both; give neither for the config-driven canon.yaml `plans:` scan)".to_string(),
+            "`--dialect` and `--plan-source` must be given together (a one-shot plan-import override needs both; give neither for the config-driven canon.yaml `plans:` scan)".to_string(),
         )),
         (None, None) => load_plan_sources_from_config(canon_yaml_path, repo),
     }

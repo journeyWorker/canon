@@ -187,7 +187,7 @@ pub const META: &[CommandMeta] = &[
     row_exits("schema", Read, REFUSABLE_NO_REPO, EVERYONE),
     row_exits("selftest", Read, &[exit(0, "every suite is clean"), exit(1, "a suite failed"), exit(2, "refused: unknown suite")], &[O]).note("scratch directories in the system temp dir, removed on exit"),
     row_exits("skills check", Read, &[exit(0, "clean"), exit(1, "drift (SKILLS_DRIFT)"), exit(2, "refused: an invalid argument")], &[O]),
-    row_exits("skills doctor", Read, &[exit(0, "always: diagnostics only")], &[O]),
+    row_exits("skills doctor", Read, &[exit(0, "every diagnosis, healthy or not: diagnostics only"), exit(2, "refused: an unknown provider or a malformed `skills:` section")], &[O]),
     row_exits("skills install", Write, REFUSABLE, &[O]),
     row_exits("skills show", Read, REFUSABLE_NO_REPO, EVERYONE),
     row_exits("status", Read, &[exit(0, "success, whatever it finds"), exit(1, "unverifiable: nothing was examined"), exit(2, "refused: CONFIG_MISSING, or UNKNOWN_FIELD")], EVERYONE),

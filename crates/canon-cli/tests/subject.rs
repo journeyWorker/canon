@@ -518,7 +518,12 @@ fn seed_attested_subject(repo: &Path) {
 
 /// [`seed_attested_subject`], with the evidence attested from `session`.
 fn seed_attested_subject_in_session(repo: &Path, session: Option<&str>) {
-    seed_subject_with_changes(repo, "demo-subject", SubjectStatus::Building, &["world.demo.01"], &["c-demo"]);
+    seed_attested_subject_with(repo, session, SubjectStatus::Building);
+}
+
+/// [`seed_attested_subject_in_session`], with the subject at `status`.
+fn seed_attested_subject_with(repo: &Path, session: Option<&str>, status: SubjectStatus) {
+    seed_subject_with_changes(repo, "demo-subject", status, &["world.demo.01"], &["c-demo"]);
     let mut actor = Actor::new("impl-agent", RoleId::parse("implementer").unwrap());
     if let Some(session) = session {
         actor = actor.with_session(SessionId::parse(session).unwrap());
@@ -942,33 +947,41 @@ fn review_add_refuses_an_unsynced_scenario_and_names_inventory_sync() {
     assert!(!dir.path().join(".canon/ledger/kind=review").exists(), "a refused review add writes nothing");
 }
 
-/// review.add.24: an `unavailable` reviewer run is recorded but is a gap,
-/// end to end: `canon gate check` reports it (exit 1), the status guard
-/// refuses the move (exit 1), both naming the reviewer and the outcome.
+/// review.add.24: an `unavailable` or `indeterminate` reviewer run is
+/// recorded but is a gap, end to end: `canon gate check` reports it (exit
+/// 1), the status guard refuses the move (exit 1), both naming the reviewer
+/// and the outcome, and the gap is the only violation the review raises
+/// (neither outcome is a rejection).
 #[test]
-fn an_unavailable_review_is_a_gap_at_the_gate_and_the_status_guard() {
-    let dir = repo();
-    write_policy(dir.path(), "spec_coverage:\n  require_evidence: true\n  require_review:\n    scope: []\n");
-    seed_attested_subject(dir.path());
-    let out = run(
-        dir.path(),
-        &[
-            "review", "scenario", "world.demo.01", "--project-id", "demo", "--original-spec-ref",
-            "specs/demo.feature", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--review-outcome", "unavailable",
-        ],
-    );
-    assert!(out.status.success(), "stderr: {}", stderr(&out));
-    assert!(stdout(&out).contains("outcome `unavailable` is recorded as a review gap, never as an approval"), "{}", stdout(&out));
+fn an_unsigned_review_is_a_gap_at_the_gate_and_the_status_guard() {
+    for outcome in ["unavailable", "indeterminate"] {
+        let dir = repo();
+        write_policy(dir.path(), "spec_coverage:\n  require_evidence: true\n  require_review:\n    scope: []\n");
+        seed_attested_subject(dir.path());
+        let out = run(
+            dir.path(),
+            &[
+                "review", "scenario", "world.demo.01", "--project-id", "demo", "--original-spec-ref",
+                "specs/demo.feature", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--review-outcome", outcome,
+            ],
+        );
+        assert!(out.status.success(), "{outcome}: stderr: {}", stderr(&out));
+        assert!(stdout(&out).contains(&format!("outcome `{outcome}` is recorded as a review gap, never as an approval")), "{outcome}: {}", stdout(&out));
 
-    let detail = "unreviewed-promotion world.demo.01 — no signed review: the latest review recorded no sign-off (`reviewer-2` unavailable)";
-    let gate = run(dir.path(), &["gate", "check"]);
-    assert_eq!(gate.status.code(), Some(1), "{}", stdout(&gate));
-    assert!(stdout(&gate).contains(detail), "{}", stdout(&gate));
+        let detail = format!("unreviewed-promotion world.demo.01 — no signed review: the latest review recorded no sign-off (`reviewer-2` {outcome})");
+        let gate = run(dir.path(), &["gate", "check"]);
+        assert_eq!(gate.status.code(), Some(1), "{outcome}: {}", stdout(&gate));
+        assert!(stdout(&gate).contains(&detail), "{outcome}: {}", stdout(&gate));
+        assert!(stdout(&gate).contains("`--review-outcome signed`"), "the repair names the flag 0.28 has: {}", stdout(&gate));
+        let gate_text = stdout(&gate);
+        let about_scenario: Vec<&str> = gate_text.lines().filter(|line| line.contains("world.demo.01 —")).collect();
+        assert!(about_scenario.iter().all(|line| line.trim_start().starts_with("unreviewed-promotion ")), "{outcome}: the gap is the only violation: {about_scenario:?}");
 
-    let guard = run(dir.path(), &["subject", "move", "demo-subject", "--to", "verifying"]);
-    assert_eq!(guard.status.code(), Some(1), "stderr: {}", stderr(&guard));
-    assert!(stderr(&guard).contains("no signed review: the latest review recorded no sign-off (`reviewer-2` unavailable)"), "{}", stderr(&guard));
-    assert_eq!(current_subject(dir.path())["status"], "building", "an unavailable review approves nothing");
+        let guard = run(dir.path(), &["subject", "move", "demo-subject", "--to", "verifying"]);
+        assert_eq!(guard.status.code(), Some(1), "{outcome}: stderr: {}", stderr(&guard));
+        assert!(stderr(&guard).contains(&format!("no signed review: the latest review recorded no sign-off (`reviewer-2` {outcome})")), "{outcome}: {}", stderr(&guard));
+        assert_eq!(current_subject(dir.path())["status"], "building", "{outcome}: an unsigned review approves nothing");
+    }
 }
 
 /// A review of `world.demo.01` as written before 0.23 pinning (planted by
@@ -1019,6 +1032,24 @@ fn an_unmigrated_review_does_not_count_and_every_surface_names_migrate() {
     let status = run(dir.path(), &["status"]);
     assert_eq!(status.status.code(), Some(0));
     assert!(stdout(&status).contains(&format!("warning: {advisory}\n")), "{}", stdout(&status));
+}
+
+/// gate.check.40 (0.23): once the subject is in review scope, the gate itself
+/// exits 1 with unreviewed-promotion on the scenario whose review predates
+/// pinning, saying `canon migrate` rewrites it, and prints the advisory.
+#[test]
+fn an_unmigrated_review_does_not_count_and_the_gate_itself_refuses_a_verifying_subject() {
+    let dir = repo();
+    write_policy(dir.path(), REQUIRE_REVIEW);
+    seed_attested_subject_with(dir.path(), None, SubjectStatus::Verifying);
+    plant_unpinned_review(dir.path());
+
+    let gate = run(dir.path(), &["gate", "check"]);
+    assert_eq!(gate.status.code(), Some(1), "{}", stdout(&gate));
+    let out = stdout(&gate);
+    assert!(out.contains("unreviewed-promotion world.demo.01") && out.contains("`canon migrate`"), "{out}");
+    assert!(out.contains(&format!("advisory: {UNMIGRATED_ADVISORY}\n")), "{out}");
+    assert_eq!(current_subject(dir.path())["status"], "verifying");
 }
 
 /// review.add.61 (0.23): the status guard judges a review that predates

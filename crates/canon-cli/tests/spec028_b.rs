@@ -182,10 +182,12 @@ fn skills_install_07_an_unknown_provider_is_refused_before_anything_is_written()
     let repo = dir.path();
     let before = tree(repo);
     let out = canon(repo, &["skills", "install", "--providers", "gemini", "--json"]);
-    assert_ne!(out.status.code(), Some(0), "{}", text(&out));
+    assert_eq!(out.status.code(), Some(2), "an unknown provider is an invalid argument, a refusal: {}", text(&out));
     let body = json(&out);
     assert_eq!(body["ok"], false, "{body}");
-    assert!(body["error"]["message"].as_str().unwrap().contains("gemini"), "the provider is named: {body}");
+    assert_eq!(body["error"]["code"], "SKILLS_INVALID_ARGUMENT", "{body}");
+    assert_eq!(body["error"]["received"], "gemini", "the provider is named: {body}");
+    assert_eq!(body["error"]["field"], "--providers", "{body}");
     assert_eq!(tree(repo), before, "no projection and no lock were written");
     assert!(!repo.join(".canon/skills").exists());
 }

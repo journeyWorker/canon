@@ -193,8 +193,9 @@ promote`.
 `HEAD`. The review records the full sha and the `codeTree` of the code it
 saw (the tree with `.canon/`, the spec roots and `code.exclude` removed), and
 `worktreeDirty` when that code is uncommitted. Reviewing uncommitted code is
-allowed, and committing it afterwards leaves the review current as long as
-the code tree is the same; changing the code makes it stale. Outside git, or
+allowed, and the commit made from it has the same code tree, so committing it
+afterwards leaves the review as it was: a review is judged by its pins (the
+scenario and what its evidence says), not by the commit. Outside git, or
 with no commit, the write is refused with `NO_COMMIT`. An identical review
 written again is `unchanged` (`meta.unchanged` under `--json`) and adds no
 record.

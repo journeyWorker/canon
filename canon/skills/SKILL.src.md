@@ -94,10 +94,12 @@ came from). Evidence, a review or a finding of uncommitted work is allowed,
 never refused: the record carries `codeTree` (the git tree id of the code the
 command saw: `.canon/`, the spec roots and the `code.exclude` globs are left
 out, so editing a `.feature` file or a brief never changes it) and
-`worktreeDirty`. A review of a working tree therefore survives the commit
-made from it, as long as the code did not change; once it did, the review is
-stale. Outside a git work tree, or in a repo with no commits, a command that
-needs a commit refuses `NO_COMMIT`.
+`worktreeDirty`. The commit made from a working tree has the same `codeTree`
+the record carries, so a review of a working tree survives the commit made
+from it; a review is judged by what it pins (the scenario and what its
+evidence says), never by the commit or the code tree. Outside a git work
+tree, or in a repo with no commits, a command that needs a commit refuses
+`NO_COMMIT`.
 
 ### Evidence follows the code
 

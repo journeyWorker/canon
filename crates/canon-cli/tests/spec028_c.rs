@@ -23,6 +23,10 @@ fn json_of(out: &Output) -> Value {
     serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("stdout is not one JSON document ({e}): {}", String::from_utf8_lossy(&out.stdout)))
 }
 
+fn stdout_of(out: &Output) -> String {
+    String::from_utf8_lossy(&out.stdout).to_string()
+}
+
 fn stderr(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
@@ -83,33 +87,6 @@ fn nodes(doc: &Value) -> std::collections::BTreeMap<String, Value> {
     doc["commands"].as_array().expect("commands").iter().map(|n| (n["command"].as_str().expect("command").to_string(), n.clone())).collect()
 }
 
-/// What a drift check reports: nothing when the text is the one the CLI generates, else
-/// the commands whose nodes differ and which side lacks them.
-fn drift(checked_in: &str, generated: &str) -> Vec<String> {
-    if checked_in == generated {
-        return Vec::new();
-    }
-    let (Ok(have), Ok(want)) = (serde_json::from_str::<Value>(checked_in), serde_json::from_str::<Value>(generated)) else {
-        return vec!["the checked-in spec is not JSON".to_string()];
-    };
-    let (have, want) = (nodes(&have), nodes(&want));
-    let mut problems = Vec::new();
-    for (command, node) in &want {
-        match have.get(command) {
-            None => problems.push(format!("`{command}` is in the CLI and not in the spec")),
-            Some(other) if other != node => problems.push(format!("`{command}` differs")),
-            Some(_) => {}
-        }
-    }
-    for command in have.keys().filter(|c| !want.contains_key(*c)) {
-        problems.push(format!("`{command}` is in the spec and not in the CLI"));
-    }
-    if problems.is_empty() {
-        problems.push("the spec differs outside its commands".to_string());
-    }
-    problems
-}
-
 // ── D2: the spec ────────────────────────────────────────────────────────────────────────
 
 /// context.capability.27: `canon schema <command>` shows the node of the checked-in spec.
@@ -137,40 +114,14 @@ fn context_capability_27_schema_nodes_are_the_nodes_of_the_checked_in_spec() {
     assert_eq!(listed, leaves, "the bare listing is every leaf of the spec and nothing else");
 }
 
-/// context.capability.28: a spec that differs from the CLI is reported, command by command;
-/// the checked-in one does not differ.
+/// context.capability.28: the drift check is the byte comparison of the checked-in spec with the one the
+/// CLI generates (`cli_spec.rs` runs the same comparison); it holds on the unmodified tree, and the spec
+/// the CLI generates is the same text every time.
 #[test]
-fn context_capability_28_a_spec_that_differs_from_the_cli_is_a_drift() {
+fn context_capability_28_the_checked_in_spec_is_the_one_the_cli_generates() {
     let generated = spec::render();
-    assert!(drift(&spec_on_disk(), &generated).is_empty(), "{SPEC_PATH} is the one the CLI generates");
-
-    let original: Value = serde_json::from_str(&generated).expect("JSON");
-    let victim = original["commands"].as_array().expect("commands").iter().find(|n| n["command"] == "purge").expect("purge node").clone();
-
-    let mut removed = original.clone();
-    removed["commands"].as_array_mut().expect("commands").retain(|n| n["command"] != "purge");
-    let problems = drift(&serde_json::to_string_pretty(&removed).expect("render"), &generated);
-    assert!(problems.iter().any(|p| p.contains("`purge`") && p.contains("not in the spec")), "{problems:?}");
-
-    let mut invented = original.clone();
-    let mut extra = victim.clone();
-    extra["command"] = Value::from("purge everything");
-    invented["commands"].as_array_mut().expect("commands").push(extra);
-    let problems = drift(&serde_json::to_string_pretty(&invented).expect("render"), &generated);
-    assert!(problems.iter().any(|p| p.contains("`purge everything`") && p.contains("not in the CLI")), "{problems:?}");
-
-    let mut edited = original.clone();
-    for node in edited["commands"].as_array_mut().expect("commands") {
-        if node["command"] == "purge" {
-            node["effect"] = Value::from("read");
-        }
-    }
-    let problems = drift(&serde_json::to_string_pretty(&edited).expect("render"), &generated);
-    assert_eq!(problems, ["`purge` differs"], "an edited node is named");
-
-    // A byte of difference anywhere is a drift, even outside the commands.
-    let problems = drift(&format!("{generated} "), &generated);
-    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(spec_on_disk() == generated, "{SPEC_PATH} is not the text the CLI generates");
+    assert_eq!(spec::render(), generated, "two generations are the same text");
 }
 
 // ── D3: the envelope ────────────────────────────────────────────────────────────────────
@@ -226,12 +177,19 @@ fn context_capability_30_a_failure_is_an_error_object_with_code_message_hint_and
     let body = json_of(&usage);
     assert_eq!((body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some("USAGE"), Some("--class")), "{body}");
     assert!(body["error"]["hint"].as_str().is_some_and(|h| h.contains("canon evidence add")), "{body}");
+    assert!(body["error"]["message"].as_str().is_some_and(|m| !m.is_empty()), "{body}");
+    assert!(body["error"]["retryable"].is_boolean(), "{body}");
+    assert!(body.get("data").is_none(), "a usage error has no report: {body}");
 
     let blockers = canon(dir.path(), &["brief", "check", "add-x", "--json"]);
     assert_eq!(blockers.status.code(), Some(1));
     let body = json_of(&blockers);
     assert_eq!(body["ok"], false, "{body}");
     assert_eq!(body["error"]["code"], "BRIEF_HAS_BLOCKERS", "{body}");
+    for key in ["message", "hint"] {
+        assert!(body["error"][key].as_str().is_some_and(|s| !s.is_empty()), "error.{key}: {body}");
+    }
+    assert!(body["error"]["retryable"].is_boolean(), "{body}");
     assert!(body["data"]["counts"]["blockers"].as_u64().is_some_and(|n| n > 0), "the failing check keeps its report: {body}");
 
     // Every code a run printed is one `canon schema --error` explains.
@@ -315,6 +273,9 @@ fn context_capability_33_exit_zero_is_ok_one_is_a_finding_and_two_is_a_refusal()
 
     let brief = canon(dir.path(), &["brief", "check", "add-x"]);
     assert_eq!(brief.status.code(), Some(1), "a brief with blockers is a finding, not a refusal");
+    let brief = canon(dir.path(), &["brief", "check", "add-x", "--json"]);
+    assert_eq!(brief.status.code(), Some(1));
+    assert!(json_of(&brief)["data"]["counts"]["blockers"].as_u64().is_some_and(|n| n > 0), "the finding is in data: {}", stdout_of(&brief));
 
     let fresh = repo();
     let nothing = canon(fresh.path(), &["gate", "check", "--json"]);
@@ -415,16 +376,19 @@ fn parses(dir: &Path, call: &str) {
 #[test]
 fn context_capability_35_a_removed_leaf_is_exit_two_with_the_leaf_that_replaced_it() {
     let dir = repo_with_change();
-    for (args, replacement) in [
-        (&["evidence", "vault", "--json"][..], "canon artifacts store"),
-        (&["gate", "task", "add-x#1", "--json"], "canon task done"),
-        (&["subject", "status", "demo", "--json"], "canon subject show"),
-        (&["learn", "promote", "--json"], "canon strategy promote"),
-        (&["review", "add", "--scenario-id", "a.b.01", "--json"], "canon review scenario"),
-        (&["regime-key", "--json"], "canon regime show"),
-        (&["divergence", "status", "--json"], "canon divergence list"),
+    for (args, removed, replacement) in [
+        (&["evidence", "vault", "--json"][..], "evidence vault", "canon artifacts store"),
+        (&["gate", "task", "add-x#1", "--json"], "gate task", "canon task done"),
+        (&["subject", "status", "demo", "--json"], "subject status", "canon subject show"),
+        (&["learn", "promote", "--json"], "learn promote", "canon strategy promote"),
+        (&["review", "add", "--scenario-id", "a.b.01", "--json"], "review add", "canon review scenario"),
+        (&["regime-key", "--json"], "regime-key", "canon regime show"),
+        (&["divergence", "status", "--json"], "divergence status", "canon divergence list"),
     ] {
         let error = refused(dir.path(), args);
+        assert_eq!(error["field"], removed, "{args:?}: field is the removed spelling: {error}");
+        let replacement_words = replacement.trim_start_matches("canon ");
+        assert!(error["expected"].as_array().is_some_and(|e| e.iter().any(|v| v.as_str().is_some_and(|v| v == replacement_words || v.starts_with(&format!("{replacement_words} "))))), "{args:?}: expected holds the 0.28 spelling: {error}");
         let named = calls(error["hint"].as_str().unwrap_or_default());
         assert!(named.iter().any(|c| c == replacement || c.starts_with(&format!("{replacement} "))), "{args:?}: the hint names `{replacement}`: {error}");
         parses(dir.path(), replacement);
@@ -436,18 +400,18 @@ fn context_capability_35_a_removed_leaf_is_exit_two_with_the_leaf_that_replaced_
 #[test]
 fn context_capability_36_a_removed_option_is_exit_two_with_the_option_that_replaced_it() {
     let dir = repo_with_change();
-    for (args, leaf, replacement) in [
-        (&["format", "--check", "--json"][..], "format", "--check"),
-        (&["query", "--canon-yaml", "x", "--kind", "evidence", "--json"], "query", "--repo"),
-        (&["retrieve", "-k", "3", "--for-role", "reviewer", "--domain", "dev", "--json"], "retrieve", "--limit"),
-        (&["init", "--check-config", "--json"], "init", "--check"),
-        (&["evidence", "add", "--kind", "audit", "--scenario-id", "a.b.01", "--json"], "evidence add", "--class"),
-        (&["tier", "age", "--dry-run", "--json"], "tier age", "--commit"),
+    for (args, removed, leaf, replacement) in [
+        (&["format", "--check", "--json"][..], "--check", "format", "--check"),
+        (&["query", "--canon-yaml", "x", "--kind", "evidence", "--json"], "--canon-yaml", "query", "--repo"),
+        (&["retrieve", "-k", "3", "--for-role", "reviewer", "--domain", "dev", "--json"], "-k", "retrieve", "--limit"),
+        (&["init", "--check-config", "--json"], "--check-config", "init", "--check"),
+        (&["evidence", "add", "--kind", "audit", "--scenario-id", "a.b.01", "--json"], "--kind", "evidence add", "--class"),
+        (&["tier", "age", "--dry-run", "--json"], "--dry-run", "tier age", "--commit"),
     ] {
         let error = refused(dir.path(), args);
+        assert_eq!(error["field"], removed, "{args:?}: field is the removed option: {error}");
         if args[0] == "format" {
             // `format` lost the flag outright: the replacement is the bare command.
-            assert_eq!(error["field"], "--check", "{error}");
             assert!(calls(error["hint"].as_str().unwrap_or_default()).iter().any(|c| c == "canon format"), "{error}");
             parses(dir.path(), "canon format");
             continue;

@@ -109,7 +109,7 @@ pub fn bind(repo: &Path, rev: &str) -> Result<Bound, CliError> {
 /// The `code.exclude` globs of `<repo>/canon.yaml` ([`DEFAULT_EXCLUDE`] when
 /// the file or the key is absent). A malformed file or glob is `CONFIG_UNREADABLE`.
 pub fn code_exclude(repo: &Path) -> Result<Vec<String>, CliError> {
-    let bad = |why: String| CliError::refused("CONFIG_UNREADABLE", why).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again");
+    let bad = |why: String| CliError::refused("CONFIG_UNREADABLE", why).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again");
     let defaults = || DEFAULT_EXCLUDE.iter().map(|g| g.to_string()).collect();
     let Ok(raw) = std::fs::read_to_string(repo.join("canon.yaml")) else { return Ok(defaults()) };
     let doc: serde_yaml::Value = serde_yaml::from_str(&raw).map_err(|e| bad(format!("parsing `canon.yaml`: {e}")))?;
@@ -174,7 +174,7 @@ impl Drop for TempIndex {
 /// Repo-relative directories (no trailing slash) of every configured spec root inside the repo.
 fn spec_root_prefixes(repo: &Path) -> Result<Vec<String>, CliError> {
     let roots = crate::inventory::load_spec_roots(&repo.join("canon.yaml"))
-        .map_err(|e| CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again"))?;
+        .map_err(|e| CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again"))?;
     Ok(roots
         .iter()
         .filter_map(|r| r.root.strip_prefix(repo).ok())

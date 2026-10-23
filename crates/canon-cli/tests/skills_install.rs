@@ -883,8 +883,8 @@ fn skills_install_54_doctor_names_a_stray_projection_and_check_does_not_fail_on_
 }
 
 /// skills.install.55: a malformed `skills:` section, or one naming an
-/// unknown provider, fails install, check and doctor loud, writes
-/// nothing, and fails `canon init --check-config`.
+/// unknown provider, is refused (exit 2) by install, check and doctor,
+/// writes nothing, and fails `canon init --check`.
 #[test]
 fn skills_install_55_a_malformed_skills_section_fails_loud() {
     for (section, needle) in [
@@ -903,8 +903,13 @@ fn skills_install_55_a_malformed_skills_section_fails_loud() {
         for command in ["install", "check", "doctor"] {
             let output = canon(&["skills", command], &source, &target);
             let err = String::from_utf8_lossy(&output.stderr);
-            assert_eq!(output.status.code(), Some(1), "{command} {section:?}: {err}");
+            assert_eq!(output.status.code(), Some(2), "{command} {section:?}: {err}");
+            assert!(err.contains("SKILLS_INVALID_ARGUMENT"), "{command} {section:?}: {err}");
             assert!(err.contains(needle), "{command} {section:?}: {err}");
+        }
+        for command in ["install", "check", "doctor"] {
+            let output = canon(&["skills", command, "--providers", "gemini"], &source, &target);
+            assert_eq!(output.status.code(), Some(2), "{command} --providers gemini: {}", String::from_utf8_lossy(&output.stderr));
         }
         assert!(!target.join(".claude/skills").exists() && !target.join(".canon").exists(), "{section:?}: nothing is written");
         assert_eq!(fs::read_to_string(target.join("canon.yaml")).unwrap(), config);
@@ -939,9 +944,14 @@ fn skills_install_56_install_and_doctor_print_the_owned_path_globs() {
     fs::create_dir_all(&target).unwrap();
     fs::write(target.join("canon.yaml"), CONFIG_WITHOUT_SKILLS).unwrap();
     let expect_block = |out: &str| {
-        assert_owned(out, &[skills::Provider::Claude, skills::Provider::Codex]);
-        for glob in [".claude/skills/canon/**", ".agents/skills/canon/**"] {
-            assert!(out.lines().any(|line| line.trim() == glob), "{glob}: {out}");
+        let globs: Vec<&str> = out.lines().skip_while(|line| !line.starts_with("owned-paths:")).skip(1).map(str::trim).collect();
+        assert_eq!(globs[..2], [".claude/skills/canon/**", ".agents/skills/canon/**"], "the selected providers' projections come first, in provider order: {out}");
+        let rest = &globs[2..];
+        let mut sorted = rest.to_vec();
+        sorted.sort();
+        assert_eq!(rest, sorted.as_slice(), "every other path is sorted: {out}");
+        for named in [".canon/ledger/**", ".canon/artifacts/**", ".canon/migrate-backup/**"] {
+            assert!(rest.contains(&named), "{named} is listed: {out}");
         }
     };
 
