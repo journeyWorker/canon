@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-1"
+  },
+  "at": "2026-10-23T13:09:54.976624839Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/ingest.rs:1290-1316",
+  "kind": "finding",
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "schema": 1,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "Spec fidelity pass: ingest.sessions.05 was reworded and dropped its bounded-directive-capture claims (positive max_directive_chars carries a bounded user_directive; absent/zero/negative is rejected); no scenario states them now, capture_privacy_requires_a_positive_unicode_bound / capture_privacy_rejects_missing_or_zero_bound back nothing, and no test covers a negative bound. The reworded scenario itself holds (mutation: default capture on fails its test)",
+  "worktree_dirty": false
+}

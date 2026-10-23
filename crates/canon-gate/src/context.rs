@@ -145,7 +145,7 @@ pub struct GateContext {
     /// never become a scenario's latest declared verdict.
     pub evidence: Vec<EvidenceRecord>,
     /// AUDITED outcomes (0.15 D3): every well-formed record carrying
-    /// `audit` (`canon evidence add --kind audit`), split out of
+    /// `audit` (`canon evidence audit`), split out of
     /// `evidence` at load. Read by `crate::audit` only.
     pub audits: Vec<EvidenceRecord>,
     /// The spec corpus `canon inventory sync` materializes — the
@@ -162,7 +162,7 @@ pub struct GateContext {
     /// Divergence lifecycle events, unfolded. `crate::spec_coverage`
     /// folds them through `canon_model::fold` rather than reading
     /// `status` off individual rows, so the gate and
-    /// `canon divergence status` cannot disagree about which scenarios
+    /// `canon divergence list` cannot disagree about which scenarios
     /// are open.
     pub divergences: Vec<Divergence>,
     /// Subjects, for the `spec_coverage.scope` status filter. Loaded
@@ -204,6 +204,12 @@ pub struct GateContext {
     /// silently inert pass — the failure mode that already made `Task`
     /// invisible to `canon report`.
     pub unreadable_kinds: Vec<RecordKind>,
+    /// The git tree id of the code as it stands now (0.28 D7b, computed by
+    /// the caller: `canon_cli::git_rev::code_tree`), when the caller knows
+    /// it. A check that compares a record to "current code" compares this
+    /// with the record's own `code_tree`, never commit shas. `None` after
+    /// [`Self::load`]: the loader does not run git.
+    pub code_tree: Option<String>,
     pub now: DateTime<Utc>,
 }
 
@@ -265,6 +271,7 @@ impl GateContext {
             violations,
             corpus_violations,
             unreadable_kinds,
+            code_tree: None,
             now,
         })
     }

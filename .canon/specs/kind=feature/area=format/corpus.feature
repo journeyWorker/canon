@@ -18,7 +18,7 @@ Feature: format corpus
   Scenario: The root is a positional argument and a repo-relative root resolves to the same corpus
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a corpus root named as a bare positional path
-    When the same corpus is named again as a repo-relative positional root under an explicit repo directory
+    When the same corpus is named again as a repo-relative positional root under an explicit repo directory that holds a canon.yaml
     Then both invocations exit with the identical code
     And their stdout is byte-identical
     And so the positional root, not a flag, is what selects what gets checked

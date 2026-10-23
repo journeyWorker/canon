@@ -1,2 +1,2 @@
 canon subject new: cart (dev, proposed) — written directly; nothing to promote
-next: canon scenario new <area>.<surface>.01 --title "<behavior>" --subject-id cart --case happy --actor-id <unit> — cart owns no scenario; specify its behavior, one scenario per behavior
+next: canon scenario new <area>.<surface>.01 --title "<behavior>" --subject-id cart --case happy --actor-id <unit> --session-id <session> — cart owns no scenario; specify its behavior, one scenario per behavior

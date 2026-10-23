@@ -1,5 +1,5 @@
 //! `canon init [--repo <dir>] [--no-agents-md] [--policy <level> |
-//! --no-policy]` + `canon init --check-config [--repo <dir>]` (s19
+//! --no-policy]` + `canon init --check [--repo <dir>]` (s19
 //! `canon-init-scaffold` spec, 0.14 D2): scaffolds a fresh, WORKING
 //! `canon.yaml` skeleton (design D8/D9) at `<repo>/canon.yaml`, plus what
 //! a repo needs to start the working loop: a starter `.canon/policy.yaml`
@@ -11,7 +11,7 @@
 //! canon block in `AGENTS.md` between `<!-- canon:begin -->`/`<!-- canon:end -->`.
 //! It never overwrites an existing `canon.yaml` or `policy.yaml`; a
 //! second `init` on a repo that already has `canon.yaml` only refreshes
-//! the `AGENTS.md` block. With `--check-config` it READ-ONLY validates an
+//! the `AGENTS.md` block. With `--check` it READ-ONLY validates an
 //! EXISTING `canon.yaml` by chaining the SAME three independently
 //! strict loaders `canon inventory sync`/`canon ingest plans`/`canon
 //! tier age` already use: [`TierPolicy::from_yaml`],
@@ -28,10 +28,11 @@
 //! terminal, it asks with the detected harnesses (`.claude`, `.codex`,
 //! `.omp`, `.pi` directories) checked; otherwise it takes the detected
 //! ones. The answer is written as `canon.yaml` `skills.providers` and the
-//! skill is installed from the default skill source, as `canon skills
+//! skill is installed (the stub written from the text built into the
+//! binary, with no `canon/skills` tree in the repo), as `canon skills
 //! install` does. With no terminal, no flag and nothing detected, it
 //! records nothing, installs nothing and says how to choose.
-//! `--check-config` validates `skills:` through
+//! `--check` validates `skills:` through
 //! [`crate::skills::configured_providers`].
 //!
 //! # `<repo>` is used literally, never an ancestor walk
@@ -91,7 +92,7 @@ const GITIGNORE_LINES: [(&str, &str); 9] = [
     ("# the archive of superseded scenario index versions -- derived like the index, never committed.", paths::SCENARIO_ARCHIVE_GITIGNORE),
     ("# the lock that serializes scenario index rebuilds -- local process state.", paths::SCENARIO_INDEX_LOCK_FILE),
     ("# the lock that serializes artifact store writes -- local process state.", paths::ARTIFACT_STORE_LOCK_FILE),
-    ("# the snapshot `canon dashboard` and `canon report --snapshot` regenerate -- derived, never committed.", paths::DASHBOARD_SNAPSHOT_GITIGNORE),
+    ("# the snapshot `canon dashboard` and `canon report snapshot` regenerate -- derived, never committed.", paths::DASHBOARD_SNAPSHOT_GITIGNORE),
     ("# canon's learn scratch area -- rebuildable, never committed.", paths::LEARN_GITIGNORE),
     ("# canon's local object-store stand-in -- local state, never committed.", paths::R2_LOCAL_GITIGNORE),
 ];
@@ -160,7 +161,7 @@ fn skeleton_yaml() -> String {
     out.push_str("  # new` writes brief.md there); every reader reads them\n");
     out.push_str("  # with no entry here. `sources` lists external plans you prepare,\n");
     out.push_str("  # which canon only reads: it never writes into them, except that\n");
-    out.push_str("  # `canon gate task` flips a task's checkbox in their tasks.md.\n");
+    out.push_str("  # `canon task done` flips a task's checkbox in their tasks.md.\n");
     out.push_str("  # Their briefs and approvals live in .canon/changes/<change>/brief.md.\n");
     out.push_str("  #   - dialect: openspec      # openspec/changes/<change>/proposal.md + tasks.md\n");
     out.push_str("  #     root: .\n");
@@ -182,7 +183,7 @@ pub(crate) fn missing_gitignore_lines(repo: &Path) -> Vec<(&'static str, &'stati
     GITIGNORE_LINES.iter().copied().filter(|(_, line)| !existing.lines().any(|have| have.trim() == *line)).collect()
 }
 
-/// What `canon skills doctor` and `canon init --check-config` say when
+/// What `canon skills doctor` and `canon init --check` say when
 /// `<repo>/.gitignore` lacks managed lines (#105, #107): the lines, and
 /// the command that adds them. `None` when none is missing, and when
 /// the directory is neither a git checkout nor carries a `.gitignore`
@@ -241,6 +242,14 @@ pub(crate) fn scaffold_gitignore(repo: &Path) -> std::io::Result<Vec<&'static st
     Ok(missing.into_iter().map(|(_, line)| line).collect())
 }
 
+/// [`scaffold_gitignore`], or under `--dry-run` only the lines it would add.
+fn gitignore_step(repo: &Path, dry_run: bool) -> std::io::Result<Vec<&'static str>> {
+    if dry_run {
+        return Ok(missing_gitignore_lines(repo).into_iter().map(|(_, line)| line).collect());
+    }
+    scaffold_gitignore(repo)
+}
+
 /// Opening marker of the canon block `init` owns in `AGENTS.md`.
 pub(crate) const AGENTS_BEGIN: &str = "<!-- canon:begin -->";
 /// Closing marker of the canon block `init` owns in `AGENTS.md`.
@@ -249,29 +258,31 @@ pub(crate) const AGENTS_END: &str = "<!-- canon:end -->";
 /// The canon block, markers included, no trailing newline (0.14 D2):
 /// harness-neutral, short, and pointing at `canon status` and the skill
 /// for everything else.
-const AGENTS_BLOCK: &str = "\
+pub const AGENTS_BLOCK: &str = "\
 <!-- canon:begin -->
 ## Canon
 
 Features in this repo are managed with canon. Start with `canon status`,
-and read the canon skill (`canon skills install`) before you change a
+and run `canon skills show canon` for the full guide before you change a
 feature.
 
-Unsure of a command or its flags: `canon schema <command> --json`. Pass
+Your role guide's Commands block lists every option of every leaf the role uses; run `canon schema <command> --json` only for a leaf it does not list, or after a `USAGE` refusal. Pass
 `--json` and read `error.code` and `error.hint` when a command fails.
 
-Roles: if you were spawned as one (planner, implementer, reviewer, orchestrator), set `CANON_ROLE` (or pass `--as`) and load only `reference/role-<role>.md` from the canon skill; with no role, follow `canon status`.
+Roles: if you were spawned as one (planner, implementer, reviewer, orchestrator), set `CANON_ROLE` (or pass `--as`) and run `canon skills show role-<role>` for what the role does; with no role, follow `canon status`.
 
 The loop:
 
-1. Brief: for a new subject or a scope change, write the PRD brief in the change's `.canon/changes/<slug>/brief.md` (intent, outcome, user flow `F1`, `F2`, …, step detail, acceptance, questions and assumptions, out of scope), in the `language:` of `canon.yaml` (unset: the request's language, with \"which language?\" in the questions). Run `canon brief check` until it has no blockers, then stop and report the brief to the human in that language: build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you report; the brief is that report. One human answer approves the brief and the policy; record it in one call: `canon brief approve --change-id <slug> --by <the human> --note \"<their words>\"`. Never approve without a human answer. A brief edited after its approval needs a new answer.
-2. Subject: `canon subject new`, then `canon change new` for the change (`--kind chore` for a refactor, dependency, build, CI or infra change that alters no behavior: short brief, no scenarios, the suite run again with `canon evidence add --all-scenarios`, then one change-level review with `canon review add --change-id <slug>`; behavior-changing work is never a chore); it writes the brief skeleton `.canon/changes/<slug>/brief.md`. A change from an external plan (an openspec `proposal.md`) gets its brief there too: a `brief.md` whose `Source: <path>` line points at the plan; canon never edits the plan.
+1. Brief: for a new subject or a scope change, write the PRD brief in the change's `.canon/changes/<slug>/brief.md` (intent, outcome, user flow `F1`, `F2`, …, step detail, acceptance, questions and assumptions, out of scope), in the `language:` of `canon.yaml` (unset: the request's language, with \"which language?\" in the questions). Run `canon brief check` until it has no blockers, then stop and report the brief to the human in that language: build and attest nothing for that scope until the human answers. The approval is never assumed, even when the human said they cannot answer until you report; the brief is that report. One human answer approves the brief and the policy; the human records it in one call, in their own shell or on `canon dashboard`: `canon brief approve <slug> --approver <their name> --note \"<their words>\"`; you report that exact call, slug filled in, and wait, and never unset your role (`env -u CANON_ROLE`, no `--as`) to run it yourself. Never approve without a human answer. A brief edited after its approval needs a new answer.
+2. Subject: `canon subject new`, then `canon change new` for the change (`--change-kind chore` for a refactor, dependency, build, CI or infra change that alters no behavior: short brief, no scenarios, the suite run again with `canon evidence add --all-scenarios`, then one change-level review with `canon review change <slug>`; behavior-changing work is never a chore); it writes the brief skeleton `.canon/changes/<slug>/brief.md`. A change from an external plan (an openspec `proposal.md`) gets its brief there too: a `brief.md` whose `Source: <path>` line points at the plan; canon never edits the plan.
 3. Scenarios: `canon scenario new --flow <F-id>`, one per behavior of a flow step, failure paths included (`--case failure`).
 4. Units: split the work; one actor id and session per unit.
 5. Implement: tests named by scenario id.
 6. Evidence: `canon evidence add` (it promotes itself under `write: { promote: auto }`; only under `write.promote: manual` run `canon gate promote` after it).
-7. Independent review: a different session (a separate process with its own session id, never this session under another label; without a subagent tool, start one), one that can run the checks it signs off, records `canon review add` and `canon finding add`, on every change; a reviewer that cannot run the tests says so and does not sign off.
-8. Transition: `canon subject status`, with `canon gate check` clean; move to `shipped` yourself once its guard passes, unless the brief says the human ships. The ship guard and `canon evidence add` refuse while the brief is unapproved or was edited after approval, and shipping also needs every flow step covered by a scenario with a failure case; they are backstops, the stop is at step 1.
+7. Independent review: a different session (a separate process with its own session id, never this session under another label; without a subagent tool, start one), one that can run the checks it signs off, records `canon review scenario` (or `canon review change` for a chore) and `canon finding add`, on every change; a reviewer that cannot run the tests says so and does not sign off.
+8. Transition: `canon subject move`, with `canon gate check` clean; move to `shipped` yourself once its guard passes, unless the brief says the human ships. The ship guard and `canon evidence add` refuse while the brief is unapproved or was edited after approval, and shipping also needs every flow step covered by a scenario with a failure case; they are backstops, the stop is at step 1.
+
+Done when `canon gate check` exits 0 and `canon status` names no next step for the subject (`canon subject show <id>` reads where it stands).
 
 Inside an approved scope, never stop for a human: fixes, follow-ups and review rounds stay in the approved change, never `canon change new` (a new change is a new scope), and go straight to scenario, implement, evidence and review; a follow-up that adds or changes a step of the brief edits it, which needs a new answer. `tasks.md` is an optional work note nothing gates on. When no human can answer one of the brief's questions, write your assumption into the brief and proceed on it; that covers the brief's questions and work inside an approved scope, never the approval. `.canon/policy.yaml` is what the gate grades against.
 <!-- canon:end -->";
@@ -281,7 +292,7 @@ Inside an approved scope, never stop for a human: fixes, follow-ups and review r
 /// blocks, with `end` before the line's newline. `Err` when the text
 /// ends inside an unclosed fence: a block appended there would land in
 /// the fence and never be found again.
-fn marker_lines(text: &str) -> Result<(Vec<(usize, usize)>, Vec<(usize, usize)>), String> {
+pub(crate) fn marker_lines(text: &str) -> Result<(Vec<(usize, usize)>, Vec<(usize, usize)>), String> {
     let (mut begins, mut ends) = (Vec::new(), Vec::new());
     let mut open_fence: Option<(char, usize)> = None;
     let mut offset = 0;
@@ -315,7 +326,7 @@ fn marker_lines(text: &str) -> Result<(Vec<(usize, usize)>, Vec<(usize, usize)>)
 /// than guessed at, before anything is written. Bytes outside the
 /// markers are never changed, and merging the result again is a
 /// byte-identical no-op.
-fn merge_agents_md(existing: Option<&str>) -> Result<String, String> {
+pub(crate) fn merge_agents_md(existing: Option<&str>) -> Result<String, String> {
     let Some(text) = existing else {
         return Ok(format!("{AGENTS_BLOCK}\n"));
     };
@@ -348,29 +359,85 @@ fn merge_agents_md(existing: Option<&str>) -> Result<String, String> {
 /// for the JSON `data.steps`.
 struct InitLog {
     json: bool,
+    /// `--dry-run`: every step is a preview and the document says so.
+    dry_run: bool,
     /// Whether [`InitLog::finish`] prints the JSON document; `canon demo init`
     /// runs `init` inside its own command and prints one of its own.
     emit_data: bool,
-    steps: Vec<serde_json::Value>,
+    steps: Vec<InitStep>,
+    /// Whether any step wrote (or, under `--dry-run`, would write) something; a run
+    /// that did not found the repo already set up and reports `meta.unchanged`.
+    wrote: bool,
 }
 
 impl InitLog {
-    fn new(json: bool, emit_data: bool) -> Self {
-        Self { json, emit_data, steps: Vec::new() }
+    /// The command a refusal is reported under: `init`, or `demo init` when it runs inside that command.
+    fn command(&self) -> &'static str {
+        if self.emit_data {
+            "canon init"
+        } else {
+            "canon demo init"
+        }
+    }
+
+    fn new(json: bool, dry_run: bool, emit_data: bool) -> Self {
+        Self { json, dry_run, emit_data, steps: Vec::new(), wrote: false }
     }
 
     fn step(&mut self, step: &str, detail: impl Into<String>, line: String) {
         crate::say!(self.json, "{line}");
-        self.steps.push(serde_json::json!({ "step": step, "detail": detail.into() }));
+        self.steps.push(InitStep { step: step.to_string(), detail: detail.into() });
     }
 
     fn finish(self, repo: &Path) -> i32 {
         if self.emit_data {
-            crate::next::finish(repo, "init", &crate::next::Scope::Repo, false, self.json, serde_json::json!({ "steps": self.steps }));
+            if !self.wrote {
+                crate::json_out::mark_unchanged();
+            }
+            crate::next::finish(repo, "init", &crate::next::Scope::Repo, false, self.json, &InitReport { dry_run: self.dry_run, steps: self.steps });
         }
         0
     }
 }
+
+/// One step `canon init` took.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InitStep {
+    pub step: String,
+    pub detail: String,
+}
+
+/// `canon init`'s report (`InitReport`): what it did, step by step.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InitReport {
+    /// True when `--dry-run` previewed the run without writing.
+    pub dry_run: bool,
+    pub steps: Vec<InitStep>,
+}
+
+impl crate::json_out::Report for InitReport {}
+
+/// One `canon.yaml` section `init --check-config` examined.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InitCheckSection {
+    pub section: String,
+    /// `pass`, `fail`, `warn` or `not-configured`.
+    pub status: String,
+    pub detail: String,
+}
+
+/// `canon init --check-config`'s report (`InitCheckReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InitCheckReport {
+    pub ok: bool,
+    pub sections: Vec<InitCheckSection>,
+}
+
+impl crate::json_out::Report for InitCheckReport {}
 
 /// What `canon init` writes besides `canon.yaml` (the opt-out flags).
 #[derive(Debug, Clone)]
@@ -387,6 +454,9 @@ pub struct InitOptions {
     /// `language:`, the language briefs are written in. `None` records
     /// nothing (an unset language reads as `en`).
     pub language: Option<String>,
+    /// `--dry-run`: run every check, write nothing, report what would be
+    /// written or refreshed.
+    pub dry_run: bool,
 }
 
 /// How a fresh `canon init` picks the harnesses (0.17 D5).
@@ -488,7 +558,7 @@ fn language_section(language: Option<&crate::language::Language>) -> String {
 /// Installs the canon skill for the chosen harnesses through
 /// [`skills::install_canonical`] (which follows the `skills.providers`
 /// just written), and prints what happened. `Err` carries the exit code.
-fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkills, log: &mut InitLog) -> Result<(), i32> {
+fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkills, dry_run: bool, log: &mut InitLog) -> Result<(), i32> {
     if chosen.providers.is_empty() {
         if chosen.recorded {
             log.step("skills-none", "skills.providers is []", "canon init: skills.providers is [] — no canon skill installed; change it with `canon skills install --providers=<list>`".to_string());
@@ -498,7 +568,9 @@ fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkill
         return Ok(());
     }
     let source = skills::resolve_source(None);
-    match skills::install_canonical(&source, repo, None) {
+    // A preview has not written `skills.providers` yet, so it names the choice.
+    let names = chosen.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(",");
+    match skills::install_canonical(source.as_deref(), repo, dry_run.then_some(names.as_str()), dry_run) {
         Ok(report) => {
             let dirs = report
                 .providers
@@ -506,7 +578,9 @@ fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkill
                 .map(|provider| skills::provider_bundle_root(repo, *provider).display().to_string())
                 .collect::<Vec<_>>()
                 .join(", ");
-            log.step("skills-installed", dirs.clone(), format!("canon init: installed the canon skill for {} ({dirs})", skills::provider_names(&report.providers)));
+            let verb = if dry_run { "would install" } else { "installed" };
+            log.wrote |= report.changed || report.config_written.is_some();
+            log.step("skills-installed", dirs.clone(), format!("canon init: {verb} the canon skill for {} ({dirs})", skills::provider_names(&report.providers)));
             Ok(())
         }
         Err(e) => {
@@ -518,21 +592,29 @@ fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkill
                     canon_yaml_path.display()
                 ),
             )
-            .hint(format!("once the skill source is available, run `canon skills install` (set {} or pass --source <dir>; it follows skills.providers)", skills::CANONICAL_SOURCE_ENV))
-            .emit("canon init", log.json))
+            .hint(format!("once the skill source is available, run `canon skills install` (the override {} names a directory without a SKILL.src.md; unset it, or pass --skills-source <dir>; it follows skills.providers)", skills::CANONICAL_SOURCE_ENV))
+            .emit(log.command(), log.json))
         }
     }
 }
 
 /// Write `merged` to `AGENTS.md` unless it already holds exactly those
 /// bytes, and print what happened.
-fn write_agents_md(path: &Path, existing: Option<&str>, merged: &str, log: &mut InitLog) -> std::io::Result<()> {
+fn write_agents_md(path: &Path, existing: Option<&str>, merged: &str, dry_run: bool, log: &mut InitLog) -> std::io::Result<()> {
     if existing == Some(merged) {
         log.step("agents-md-current", path.display().to_string(), format!("canon init: the canon block in {} is already current", path.display()));
         return Ok(());
     }
-    fs::write(path, merged)?;
-    let verb = if existing.is_some() { "refreshed" } else { "wrote" };
+    if !dry_run {
+        fs::write(path, merged)?;
+    }
+    let verb = match (existing.is_some(), dry_run) {
+        (true, false) => "refreshed",
+        (false, false) => "wrote",
+        (true, true) => "would refresh",
+        (false, true) => "would write",
+    };
+    log.wrote = true;
     log.step("agents-md", path.display().to_string(), format!("canon init: {verb} the canon block in {}", path.display()));
     Ok(())
 }
@@ -542,17 +624,26 @@ fn write_agents_md(path: &Path, existing: Option<&str>, merged: &str, log: &mut 
 /// level parses with zero diagnostics through
 /// `canon_gate::PolicyResolution::resolve` (pinned by
 /// [`crate::policy_level`]'s tests).
-fn scaffold_policy(repo: &Path, level: PolicyLevel, log: &mut InitLog) -> std::io::Result<()> {
+fn scaffold_policy(repo: &Path, level: PolicyLevel, dry_run: bool, log: &mut InitLog) -> std::io::Result<()> {
     let path = repo.join(paths::POLICY_FILE);
-    fs::create_dir_all(repo.join(paths::CANON_DIR))?;
-    match fs::OpenOptions::new().write(true).create_new(true).open(&path) {
-        Ok(mut file) => {
-            file.write_all(starter_policy(level).as_bytes())?;
+    let created = if dry_run {
+        if path.exists() { Err(std::io::ErrorKind::AlreadyExists.into()) } else { Ok(None) }
+    } else {
+        fs::create_dir_all(repo.join(paths::CANON_DIR))?;
+        fs::OpenOptions::new().write(true).create_new(true).open(&path).map(Some)
+    };
+    match created {
+        Ok(file) => {
+            if let Some(mut file) = file {
+                file.write_all(starter_policy(level).as_bytes())?;
+            }
+            let verb = if dry_run { "would write" } else { "wrote" };
+            log.wrote = true;
             log.step(
                 "policy",
                 path.display().to_string(),
                 format!(
-                    "canon init: wrote {} — a human reviews it and approves it with `canon policy approve --by <who>`: the gate grades the work against it, and `canon status` and `canon gate check` say so until it is approved",
+                    "canon init: {verb} {} — a human reviews it and approves it with `canon policy approve --approver <who>`: the gate grades the work against it, and `canon status` and `canon gate check` say so until it is approved",
                     path.display()
                 ),
             );
@@ -592,15 +683,16 @@ pub fn run_init(repo: &Path, options: InitOptions, json: bool) -> i32 {
 /// [`run_init`], with `emit_data: false` leaving the JSON document to the
 /// calling command (`canon demo init`).
 pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_data: bool) -> i32 {
-    let mut log = InitLog::new(json, emit_data);
-    if let Err(e) = fs::create_dir_all(repo) {
-        return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", repo.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);
+    let dry_run = options.dry_run;
+    let mut log = InitLog::new(json, dry_run, emit_data);
+    if let Err(e) = (!dry_run).then(|| fs::create_dir_all(repo)).transpose() {
+        return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", repo.display())).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
     }
     let agents_path = repo.join("AGENTS.md");
     let language = match options.language.as_deref().map(crate::language::Language::parse).transpose() {
         Ok(language) => language,
         Err(e) => {
-            return CliError::refused("INIT_INVALID_ARGUMENT", format!("--language: {e}")).hint("`canon schema init` lists the accepted arguments and their forms").emit("canon init", json);
+            return CliError::refused("INIT_INVALID_ARGUMENT", format!("--language: {e}")).hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
         }
     };
     let agents = if options.agents_md {
@@ -608,13 +700,13 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
             Ok(text) => Some(text),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
             Err(e) => {
-                return CliError::refused("REPO_UNREADABLE", format!("failed to read `{}`: {e}", agents_path.display())).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon init", json);
+                return CliError::refused("REPO_UNREADABLE", format!("failed to read `{}`: {e}", agents_path.display())).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit(log.command(), json);
             }
         };
         match merge_agents_md(existing.as_deref()) {
             Ok(merged) => Some((existing, merged)),
             Err(e) => {
-                return CliError::refused("INIT_AGENTS_MD_CONFLICT", e.to_string()).hint("resolve the conflict in AGENTS.md by hand, or run `canon init --no-agents-md`").emit("canon init", json);
+                return CliError::refused("INIT_AGENTS_MD_CONFLICT", e.to_string()).hint("resolve the conflict in AGENTS.md by hand, or run `canon init --no-agents-md`").emit(log.command(), json);
             }
         }
     } else {
@@ -628,24 +720,38 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
         match choose_skills(repo, &options.skills) {
             Ok(skills) => skills,
             Err(e) => {
-                return CliError::refused("INIT_INVALID_ARGUMENT", e.to_string()).hint("`canon schema init` lists the accepted arguments and their forms").emit("canon init", json);
+                return CliError::refused("INIT_INVALID_ARGUMENT", e.to_string()).hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
             }
         }
     };
-    match fs::OpenOptions::new().write(true).create_new(true).open(&canon_yaml_path) {
-        Ok(mut file) => {
-            let config = skeleton_yaml() + &language_section(language.as_ref()) + &skills_section(skills.as_ref());
-            if let Err(e) = file.write_all(config.as_bytes()) {
-                return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", canon_yaml_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);
+    let created = if dry_run {
+        if canon_yaml_path.exists() { Err(std::io::ErrorKind::AlreadyExists.into()) } else { Ok(None) }
+    } else {
+        fs::OpenOptions::new().write(true).create_new(true).open(&canon_yaml_path).map(Some)
+    };
+    match created {
+        Ok(file) => {
+            if let Some(mut file) = file {
+                let config = skeleton_yaml() + &language_section(language.as_ref()) + &skills_section(skills.as_ref());
+                if let Err(e) = file.write_all(config.as_bytes()) {
+                    return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", canon_yaml_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
+                }
             }
-            log.step("config", canon_yaml_path.display().to_string(), format!("canon init: wrote {}", canon_yaml_path.display()));
+            let verb = if dry_run { "would write" } else { "wrote" };
+            log.wrote = true;
+            log.step("config", canon_yaml_path.display().to_string(), format!("canon init: {verb} {}", canon_yaml_path.display()));
         }
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
             let missing = missing_gitignore_lines(repo);
             if agents.is_none() && missing.is_empty() {
-                return CliError::refused("INIT_CONFIG_EXISTS", format!("`{}` already exists; never overwriting an existing config", canon_yaml_path.display())).hint("keep the existing canon.yaml and check it with `canon init --check-config`, or remove it first to start over").emit("canon init", json);
+                if emit_data {
+                    log.step("config-exists", canon_yaml_path.display().to_string(), format!("canon init: {} already exists and nothing is left to refresh", canon_yaml_path.display()));
+                    return log.finish(repo);
+                }
+                return CliError::refused("INIT_CONFIG_EXISTS", format!("`{}` already exists; never overwriting an existing config", canon_yaml_path.display())).hint("keep the existing canon.yaml and check it with `canon init --check`, or remove it first to start over").emit(log.command(), json);
             }
-            let refreshed = if agents.is_some() { "the AGENTS.md block and the canon .gitignore lines are refreshed" } else { "the canon .gitignore lines are refreshed" };
+            let what = if agents.is_some() { "the AGENTS.md block and the canon .gitignore lines" } else { "the canon .gitignore lines" };
+            let refreshed = if dry_run { format!("{what} would be refreshed") } else { format!("{what} are refreshed") };
             log.step("config-exists", canon_yaml_path.display().to_string(), format!("canon init: {} already exists — left unchanged; {refreshed}", canon_yaml_path.display()));
             if matches!(options.skills, SkillsChoice::Providers(_)) {
                 log.step("providers-ignored", "--providers", "canon init: --providers is not applied to an existing canon.yaml; run `canon skills install --providers=<list>`, which records the list in skills.providers".to_string());
@@ -653,47 +759,50 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
             if options.language.is_some() {
                 log.step("language-ignored", "--language", "canon init: --language is not applied to an existing canon.yaml; add `language: <tag>` to it by hand".to_string());
             }
-            match scaffold_gitignore(repo) {
-                Ok(added) if !added.is_empty() => log.step("gitignore", added.join(", "), format!("canon init: added to .gitignore: {}", added.join(", "))),
+            match gitignore_step(repo, dry_run) {
+                Ok(added) if !added.is_empty() => {
+                    log.wrote = true;
+                    log.step("gitignore", added.join(", "), format!("canon init: {} .gitignore: {}", if dry_run { "would add to" } else { "added to" }, added.join(", ")));
+                }
                 Ok(_) => {}
                 Err(e) => {
-                    return CliError::refused("WRITE_FAILED", format!("failed to update `.gitignore`: {e}")).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);
+                    return CliError::refused("WRITE_FAILED", format!("failed to update `.gitignore`: {e}")).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
                 }
             }
             if let Some((existing, merged)) = agents {
-                if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged, &mut log) {
-                    return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", agents_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);
+                if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged, dry_run, &mut log) {
+                    return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", agents_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
                 }
             }
             return log.finish(repo);
         }
         Err(e) => {
-            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", canon_yaml_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);
+            return CliError::refused("WRITE_FAILED", format!("failed to create `{}`: {e}", canon_yaml_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
         }
     }
 
-    if let Err(e) = scaffold_gitignore(repo) {
-        return CliError::refused("WRITE_FAILED", format!("wrote `{}` but failed to update `.gitignore`: {e}", canon_yaml_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);
+    if let Err(e) = gitignore_step(repo, dry_run) {
+        return CliError::refused("WRITE_FAILED", format!("wrote `{}` but failed to update `.gitignore`: {e}", canon_yaml_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
     }
     if let Some(level) = options.policy {
-        if let Err(e) = scaffold_policy(repo, level, &mut log) {
-            return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", repo.join(paths::POLICY_FILE).display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);
+        if let Err(e) = scaffold_policy(repo, level, dry_run, &mut log) {
+            return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", repo.join(paths::POLICY_FILE).display())).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
         }
     }
     if let Some((existing, merged)) = agents {
-        if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged, &mut log) {
-            return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", agents_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon init", json);
+        if let Err(e) = write_agents_md(&agents_path, existing.as_deref(), &merged, dry_run, &mut log) {
+            return CliError::refused("WRITE_FAILED", format!("failed to write `{}`: {e}", agents_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit(log.command(), json);
         }
     }
     if let Some(chosen) = &skills {
-        if let Err(code) = install_chosen_skills(repo, &canon_yaml_path, chosen, &mut log) {
+        if let Err(code) = install_chosen_skills(repo, &canon_yaml_path, chosen, dry_run, &mut log) {
             return code;
         }
     }
     log.finish(repo)
 }
 
-/// `canon init --check-config [--repo <dir>]` (task 4.2). Returns the
+/// `canon init --check [--repo <dir>]` (task 4.2). Returns the
 /// process exit code: `2` when `<repo>/canon.yaml` is missing (fails
 /// loud, distinct from any content report), `0` when every PRESENT
 /// section parses clean under its own existing loader, `1` when at
@@ -703,7 +812,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
 pub fn run_check_config(repo: &Path, json: bool) -> i32 {
     let canon_yaml_path = repo.join("canon.yaml");
     let Ok(text) = fs::read_to_string(&canon_yaml_path) else {
-        return CliError::refused("CONFIG_MISSING", format!("`{}` does not exist; run `canon init` first", canon_yaml_path.display())).hint("run `canon init` in the repository root first").emit("canon init --check-config", json);
+        return CliError::refused("CONFIG_MISSING", format!("`{}` does not exist; run `canon init` first", canon_yaml_path.display())).hint("run `canon init` in the repository root first").emit("canon init --check", json);
     };
 
     let mut all_ok = true;
@@ -821,23 +930,23 @@ pub fn run_check_config(repo: &Path, json: bool) -> i32 {
     }
 
     crate::say_raw!(json, "{report}");
-    let sections: Vec<serde_json::Value> = report
+    let sections: Vec<InitCheckSection> = report
         .lines()
         .filter_map(|line| {
             let (status, rest) = line.strip_prefix('[')?.split_once("] ")?;
             let section = rest.split([' ', ':']).next().unwrap_or(rest);
             let status = if status == "not configured" { "not-configured" } else { status };
-            Some(serde_json::json!({ "section": section, "status": status.to_ascii_lowercase(), "detail": rest }))
+            Some(InitCheckSection { section: section.to_string(), status: status.to_ascii_lowercase(), detail: rest.to_string() })
         })
         .collect();
-    let data = serde_json::json!({ "ok": all_ok, "sections": sections });
+    let data = InitCheckReport { ok: all_ok, sections };
     if all_ok {
         if json {
-            crate::json_out::data("init", data);
+            crate::json_out::data("init", &data);
         }
         0
     } else {
-        CliError::failed("CONFIG_UNREADABLE", "a present canon.yaml section fails its loader").hint("data.sections names each failing section").emit_with_data("canon init --check-config", json, data)
+        CliError::failed("CONFIG_CHECK_FAILED", "a present canon.yaml section fails its loader").hint("data.sections names each failing section").emit_with_data("canon init --check", json, &data)
     }
 }
 
@@ -974,7 +1083,7 @@ mod tests {
 #
 # This file is what `canon gate check` grades the work against. A human
 # should review and approve it, and every later change to it, with
-# `canon policy approve --by <who>`: the agent doing the work should not
+# `canon policy approve --approver <who>`: the agent doing the work should not
 # write the rules it is graded by.
 spec_coverage:
   # Every scenario in the spec corpus needs evidence (`canon evidence
@@ -986,7 +1095,7 @@ spec_coverage:
   # path alone.
   require_cases: [failure]
   # Every scenario of a subject in `verifying` or `shipped` needs a
-  # review (`canon review add`) by an actor other than its evidence
+  # review (`canon review scenario`) by an actor other than its evidence
   # author, and an open blocker finding on an adopted change blocks.
   require_review: {}
 ";

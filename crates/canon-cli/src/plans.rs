@@ -46,7 +46,7 @@
 //! a walk of the whole root: `canon init` writes `root: .`, and a
 //! source rooted at a JS repository must not read `node_modules` on
 //! every pass (0.14 acceptance rerun G1, where it cost ~10 s per
-//! `canon gate task`). The importer's OWN repo-local write surface (the
+//! `canon task done`). The importer's OWN repo-local write surface (the
 //! git ledger root under `tiers.git.root`, and the `<repo>/.canon/
 //! ingest` cursor tree) is still excluded by a canonicalized
 //! `starts_with` check computed once per run, so a dialect whose input
@@ -55,7 +55,7 @@
 //! / `touch` that doesn't change bytes never reaches parse. A source
 //! is (re-)parsed as a COMPLETE set whenever anything in it changed —
 //! never partially, so a multi-file change dir is never re-derived
-//! from a partial read. `canon gate task` re-imports only the change it
+//! from a partial read. `canon task done` re-imports only the change it
 //! flipped ([`refresh_change`]) and leaves the cursor alone.
 //!
 //! # Adoption survives a re-import (0.14 acceptance rerun G9)
@@ -142,8 +142,10 @@ use canon_store::cursor::{file_digest, CursorStore, SourceCursor};
 use canon_store::policy::{PolicyError, TierPolicy};
 use canon_store::registry::TierRegistry;
 use canon_store::tier::StoreError;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::json_out::Report;
 use crate::context::resolve_repo_root;
 use crate::tiers::TierCliError;
 
@@ -185,7 +187,7 @@ impl From<TierCliError> for PlansError {
 /// `plans.sources[]` or the `--dialect`/`--source` one-shot override —
 /// the driver treats both identically from here on. `pub(crate)`
 /// accessors let `crate::gate` (s35 `gate-plan-dialect-seam`) resolve a
-/// `canon gate task` flip through the SAME configured plan sources
+/// `canon task done` flip through the SAME configured plan sources
 /// `canon ingest plans` reads, rather than a second hardcoded path.
 pub(crate) struct PlanSource {
     pub(crate) dialect: String,
@@ -223,7 +225,8 @@ impl PlanSource {
 /// One configured source's contribution to a pass (human + `--json`
 /// output, task 3.5: "per-source counts + drop diagnostics + malformed
 /// tallies").
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct PlanSourceSummary {
     pub dialect: String,
     pub root: String,
@@ -268,7 +271,8 @@ pub struct PlanSourceSummary {
 /// process level". Never flagged for a legitimately empty/fresh source
 /// (`malformed == 0`) or a partial success (`persisted > 0`) — see
 /// [`run`]'s own flagging logic.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct NonCleanSource {
     pub dialect: String,
     pub root: String,
@@ -276,8 +280,12 @@ pub struct NonCleanSource {
 }
 
 /// One `canon ingest plans` pass's outcome.
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct PlansOutcome {
+    /// A `--dry-run` preview: nothing was persisted and no cursor moved;
+    /// the `*Persisted` counts are what a real pass would persist.
+    pub dry_run: bool,
     pub sources: Vec<PlanSourceSummary>,
     pub changes_persisted: usize,
     pub tasks_persisted: usize,
@@ -295,6 +303,8 @@ pub struct PlansOutcome {
     /// non-empty. Empty for an ordinary clean/partial-success pass.
     pub non_clean_sources: Vec<NonCleanSource>,
 }
+
+impl Report for PlansOutcome {}
 
 /// `canon.yaml`'s top-level `plans:` section — see module doc.
 #[derive(Debug, Default, Deserialize)]
@@ -314,7 +324,7 @@ struct RawPlanSource {
 /// One `scan(digest) -> gate -> parse -> collision-filter -> persist`
 /// pass over every configured plan source, in config/one-shot order
 /// (module doc).
-pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<PlansOutcome, PlansError> {
+fn run_pass(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: bool) -> Result<PlansOutcome, PlansError> {
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = repo.join("canon.yaml");
 
@@ -323,7 +333,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
         // Absent `plans:` (config-driven path only — the one-shot pair
         // always yields exactly one source) — a clean, explicit
         // no-op; never a hardcoded default root (task 3.2).
-        return Ok(PlansOutcome::default());
+        return Ok(PlansOutcome { dry_run, ..PlansOutcome::default() });
     }
     validate_source_roots(&sources)?;
 
@@ -345,7 +355,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
 
     let cursors = CursorStore::open(repo.join(".canon/ingest/cursors"));
 
-    let mut outcome = PlansOutcome::default();
+    let mut outcome = PlansOutcome { dry_run, ..PlansOutcome::default() };
     let mut seen_change_ids: BTreeSet<ChangeId> = BTreeSet::new();
     let mut pending_cursors: Vec<SourceCursor> = Vec::new();
     let mut adoptions = Adoptions::default();
@@ -416,7 +426,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
         let duplicate_change_id = duplicate_change_ids.len();
 
         let Persisted { changes_persisted, changes_unwritten, tasks_persisted, tasks_unwritten } =
-            persist_candidates(&store, &mut adoptions, accepted_changes, accepted_tasks, &mut outcome)?;
+            persist_candidates(&store, &mut adoptions, accepted_changes, accepted_tasks, &mut outcome, dry_run)?;
 
         // s23 durable-import-diagnostics: a malformed-nonzero,
         // zero-persisted pass produced no durable evidence at all --
@@ -429,7 +439,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
         // durable (task 3.4/spec) — a collision-skip alone never
         // blocks it (a deliberate, successful outcome, not a failure).
         let fully_durable = changes_unwritten == 0 && tasks_unwritten == 0 && !malformed_zero_persisted;
-        if fully_durable {
+        if fully_durable && !dry_run {
             let mut fresh = SourceCursor::empty(cursor_id);
             for (path, mtime_ms, size, digest) in &readable {
                 fresh.record(path, *mtime_ms, *size, digest.clone());
@@ -466,7 +476,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
             duplicate_change_id,
             unmapped,
             malformed,
-            cursor_advanced: fully_durable,
+            cursor_advanced: fully_durable && !dry_run,
         });
     }
 
@@ -478,6 +488,21 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>) -> Result<
         let _ = cursors.write(&cursor);
     }
 
+    Ok(outcome)
+}
+
+/// One `canon ingest plans` pass ([`run_pass`]); a pass in which every source
+/// was already imported (skipped unchanged, or persisting nothing) and nothing
+/// was left unwritten is marked unchanged ([`crate::json_out::mark_unchanged`]).
+pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: bool) -> Result<PlansOutcome, PlansError> {
+    let outcome = run_pass(repo, dialect, source, dry_run)?;
+    let nothing_new = outcome.unwritten_changes.is_empty()
+        && outcome.unwritten_tasks.is_empty()
+        && outcome.non_clean_sources.is_empty()
+        && outcome.sources.iter().all(|src| src.skipped_unchanged || (src.changes_persisted == 0 && src.tasks_persisted == 0));
+    if nothing_new {
+        crate::json_out::mark_unchanged();
+    }
     Ok(outcome)
 }
 
@@ -510,11 +535,11 @@ struct Persisted {
 /// Persist admitted candidates (module doc "Persistence + the
 /// `unwritten` seam"), each `Change` first carrying its adoption
 /// ([`Adoptions::carry`]). Unwritten bodies land in `outcome`.
-fn persist_candidates(store: &TierRegistry, adoptions: &mut Adoptions, changes: Vec<Change>, tasks: Vec<Task>, outcome: &mut PlansOutcome) -> Result<Persisted, PlansError> {
+fn persist_candidates(store: &TierRegistry, adoptions: &mut Adoptions, changes: Vec<Change>, tasks: Vec<Task>, outcome: &mut PlansOutcome, dry_run: bool) -> Result<Persisted, PlansError> {
     let mut persisted = Persisted { changes_persisted: 0, changes_unwritten: 0, tasks_persisted: 0, tasks_unwritten: 0 };
     for mut change in changes {
         adoptions.carry(store, &mut change)?;
-        match persist_or_unwritten(store, change)? {
+        match persist_or_unwritten(store, change, dry_run)? {
             None => persisted.changes_persisted += 1,
             Some(unwritten) => {
                 persisted.changes_unwritten += 1;
@@ -523,7 +548,7 @@ fn persist_candidates(store: &TierRegistry, adoptions: &mut Adoptions, changes: 
         }
     }
     for task in tasks {
-        match persist_or_unwritten(store, task)? {
+        match persist_or_unwritten(store, task, dry_run)? {
             None => persisted.tasks_persisted += 1,
             Some(unwritten) => {
                 persisted.tasks_unwritten += 1;
@@ -538,7 +563,7 @@ fn persist_candidates(store: &TierRegistry, adoptions: &mut Adoptions, changes: 
 /// `canon subject adopt`), read from the latest change records the
 /// first time an import has a change to persist (0.14 acceptance rerun
 /// G9). A plan document never names its subjects, so without this every
-/// re-import (a `canon gate task` flip, a ticked checkbox) appended a
+/// re-import (a `canon task done` flip, a ticked checkbox) appended a
 /// newer change version with no subject that superseded the adoption in
 /// every folded read.
 #[derive(Default)]
@@ -584,7 +609,7 @@ pub(crate) struct ChangeRefresh {
 }
 
 /// Re-import ONE change, `change_id`, from the configured plan sources:
-/// `canon gate task`'s refresh after a flip (0.14 D5). Each source in
+/// `canon task done`'s refresh after a flip (0.14 D5). Each source in
 /// config order reads only that change ([`PlanAdapter::parse_change`]),
 /// the first source carrying it owns it ([`admit_source_candidates`],
 /// exactly as in [`run`]), and its candidates persist exactly as [`run`]
@@ -610,7 +635,7 @@ pub(crate) fn refresh_change(repo: &Path, change_id: &ChangeId) -> Result<Change
         refresh.changes_parsed += changes.len();
         refresh.malformed += malformed.len();
         let admitted = admit_source_candidates(&mut seen_change_ids, changes, tasks);
-        persist_candidates(&store, &mut adoptions, admitted.changes, admitted.tasks, &mut unwritten)?;
+        persist_candidates(&store, &mut adoptions, admitted.changes, admitted.tasks, &mut unwritten, false)?;
     }
     Ok(refresh)
 }
@@ -696,7 +721,7 @@ fn resolve_sources(repo: &Path, canon_yaml_path: &Path, dialect: Option<&str>, s
             Ok(vec![PlanSource { dialect: d.to_string(), root: s.to_path_buf() }])
         }
         (Some(_), None) | (None, Some(_)) => Err(PlansError::Config(
-            "`--dialect` and `--source` must be given together (a one-shot plan-import override needs both; give neither for the config-driven canon.yaml `plans:` scan)".to_string(),
+            "`--dialect` and `--plan-source` must be given together (a one-shot plan-import override needs both; give neither for the config-driven canon.yaml `plans:` scan)".to_string(),
         )),
         (None, None) => load_plan_sources_from_config(canon_yaml_path, repo),
     }
@@ -785,13 +810,13 @@ fn plans_section_present(canon_yaml_path: &Path) -> bool {
     serde_yaml::from_str::<serde_yaml::Value>(&text).is_ok_and(|doc| doc.get("plans").is_some())
 }
 
-/// The plan sources `canon gate task` resolves a flip through (s35
+/// The plan sources `canon task done` resolves a flip through (s35
 /// `gate-plan-dialect-seam`, design "Compat default"): canon's own
 /// `.canon/changes/` first when it exists, then `canon.yaml`'s `plans:`
 /// sources exactly like `canon ingest plans`
 /// ([`load_plan_sources_from_config`]) — but where that command treats
 /// an ABSENT `plans:` section as zero configured sources (a clean no-op
-/// scan), `canon gate task` instead falls back to the documented compat
+/// scan), `canon task done` instead falls back to the documented compat
 /// default `[{ dialect: openspec, root: <repo> }]` so every consumer
 /// that worked before s35 (a repo with no `plans:` section, whose
 /// `tasks.md` lives at `<repo>/openspec/changes/<change_id>/`) keeps
@@ -804,7 +829,7 @@ fn plans_section_present(canon_yaml_path: &Path) -> bool {
 /// repo that writes `plans:\n  sources: []` — which is exactly what
 /// `canon init` scaffolds — has configured its external plans and
 /// declared there are none, so synthesizing an openspec source under it
-/// would make `canon gate task` report `consulted: openspec @ <repo>`
+/// would make `canon task done` report `consulted: openspec @ <repo>`
 /// against a dialect the operator never named. That is the same
 /// misleading shape `crate::dispatch`'s `--task` validation already
 /// refuses via `DispatchError::NoPlanSources`; the two commands agree.
@@ -889,9 +914,10 @@ fn canonicalize_or(path: &Path) -> PathBuf {
 /// non-fatal; the caller reports the record and does not advance this
 /// source's cursor. Any OTHER `StoreError` (Io/Json/Layout/…) is a
 /// genuine failure and propagates.
-fn persist_or_unwritten<T: CanonRecord>(store: &TierRegistry, record: T) -> Result<Option<T>, PlansError> {
-    match store.persist(&record) {
-        Ok(_) => Ok(None),
+fn persist_or_unwritten<T: CanonRecord>(store: &TierRegistry, record: T, dry_run: bool) -> Result<Option<T>, PlansError> {
+    let written = if dry_run { store.check_persist::<T>() } else { store.persist(&record).map(drop) };
+    match written {
+        Ok(()) => Ok(None),
         Err(StoreError::DuplicatePath { .. }) => Ok(None),
         Err(StoreError::TierUnavailable { .. }) | Err(StoreError::UnroutedKind { .. }) => Ok(Some(record)),
         Err(err) => Err(PlansError::Store(err)),
@@ -902,6 +928,9 @@ fn persist_or_unwritten<T: CanonRecord>(store: &TierRegistry, record: T) -> Resu
 /// diagnostics + malformed tallies").
 pub fn format_human(outcome: &PlansOutcome) -> String {
     let mut out = String::new();
+    if outcome.dry_run {
+        out.push_str("dry run: nothing is written; `persisted` counts what a real pass would persist\n");
+    }
     for src in &outcome.sources {
         if src.skipped_unchanged {
             out.push_str(&format!("{} ({}): skipped unchanged (watermark)\n", src.dialect, src.root));

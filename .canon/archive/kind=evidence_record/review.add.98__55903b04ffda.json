@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-1"
+  },
+  "at": "2026-10-23T12:27:49.953347888Z",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test commits a_dirty_working_tree_is_recorded_and_the_review_covers_the_commit_made_from_it"
+  },
+  "evidence_note": {
+    "summary": "commits a_dirty_working_tree_is_recorded_and_the_review_covers_the_commit_made_f: 1 passed, 0 failed, 3 filtered out @ 2c0fb497"
+  },
+  "evidence_sha": "2c0fb4972782486f9ee8a638db56be81405f3bda",
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 54,
+  "scenario_id": "review.add.98",
+  "schema": 1,
+  "staging_id": "0b6775d726d5",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

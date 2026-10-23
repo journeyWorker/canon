@@ -10,6 +10,15 @@ use std::process::{Command, Output};
 use serde_json::Value;
 use tempfile::TempDir;
 
+/// Makes `repo` a git work tree with one commit, which every revision-bound
+/// write needs.
+fn git_seed(repo: &Path) {
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["commit", "-q", "--allow-empty", "-m", "x"]] {
+        let out = Command::new("git").args(args).current_dir(repo).output().expect("spawn git");
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    }
+}
+
 fn run(repo: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).output().expect("spawn canon binary")
 }
@@ -30,6 +39,7 @@ fn stderr(o: &Output) -> String {
 /// A `canon init` repo with one subject, `auth`.
 fn inited_repo_with_subject() -> TempDir {
     let dir = TempDir::new().unwrap();
+    git_seed(dir.path());
     let init = run(dir.path(), &["init"]);
     assert!(init.status.success(), "{}", stderr(&init));
     let subject = run(dir.path(), &["subject", "new", "auth", "--domain", "dev", "--title", "Auth"]);
@@ -41,7 +51,7 @@ fn query(repo: &Path, kind: &str) -> Vec<Value> {
     let out = run(repo, &["query", "--kind", kind, "--json"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let payload: Value = serde_json::from_str(&stdout(&out)).unwrap();
-    payload["records"].as_array().unwrap().clone()
+    payload["data"]["records"].as_array().unwrap().clone()
 }
 
 #[test]
@@ -102,10 +112,10 @@ fn a_task_flip_keeps_the_changes_adopted_subject() {
     let brief = std::fs::read_to_string(&brief_path).unwrap();
     std::fs::write(&brief_path, format!("{brief}\nApproved: Journey 2026-10-12 — \"go\"\n")).unwrap();
 
-    let evidence = run(repo, &["evidence", "add", "--task", "add-login#1", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl"]);
+    let evidence = run(repo, &["evidence", "add", "--task-id", "add-login#1", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl"]);
     assert!(evidence.status.success(), "{}", stderr(&evidence));
     assert!(run(repo, &["gate", "promote"]).status.success());
-    let flip = run(repo, &["gate", "task", "add-login#1"]);
+    let flip = run(repo, &["task", "done", "add-login#1"]);
     assert!(flip.status.success(), "{}{}", stdout(&flip), stderr(&flip));
     assert!(!stderr(&flip).contains("WARN"), "the re-import is clean: {}", stderr(&flip));
     assert!(std::fs::read_to_string(&tasks_path).unwrap().contains("- [x] 1 Write the failure-path scenarios"), "canon's own tasks.md row flips");
@@ -265,7 +275,7 @@ fn change_new_failing_between_record_writes_prints_a_repair_that_completes_the_l
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     assert!(
         stderr(&out).contains("subject `auth` now lists change `add-login`, but the change record could not be written")
-            && stderr(&out).contains("complete the link with `canon ingest plans && canon subject adopt add-login --subject-id auth`"),
+            && stderr(&out).contains("complete the link with `canon ingest plans && canon subject adopt auth --change-id add-login`"),
         "{}",
         stderr(&out)
     );
@@ -278,7 +288,7 @@ fn change_new_failing_between_record_writes_prints_a_repair_that_completes_the_l
     // The printed repair, run as printed.
     let ingest = run(dir.path(), &["ingest", "plans"]);
     assert!(ingest.status.success(), "{}", stderr(&ingest));
-    let adopt = run(dir.path(), &["subject", "adopt", "add-login", "--subject-id", "auth"]);
+    let adopt = run(dir.path(), &["subject", "adopt", "auth", "--change-id", "add-login"]);
     assert!(adopt.status.success(), "{}", stderr(&adopt));
     assert!(stdout(&adopt).contains("linked change `add-login` to subject `auth`"), "{}", stdout(&adopt));
     let changes = query(dir.path(), "change");
@@ -286,7 +296,7 @@ fn change_new_failing_between_record_writes_prints_a_repair_that_completes_the_l
 
     // Idempotent: a second run writes nothing.
     let before = ledger_file_count(dir.path());
-    let again = run(dir.path(), &["subject", "adopt", "add-login", "--subject-id", "auth"]);
+    let again = run(dir.path(), &["subject", "adopt", "auth", "--change-id", "add-login"]);
     assert!(again.status.success(), "{}", stderr(&again));
     assert!(stdout(&again).contains("already linked") && stdout(&again).contains("nothing written"), "{}", stdout(&again));
     assert_eq!(ledger_file_count(dir.path()), before, "a rerun on a linked pair must write no record");
@@ -344,7 +354,7 @@ fn subject_lifecycle_33_a_change_adopted_by_a_second_subject_belongs_to_both_and
     let created = run(repo, &["change", "new", "refactor-core", "--subject-id", "perception", "--title", "Refactor core"]);
     assert!(created.status.success(), "{}", stderr(&created));
 
-    let adopt = run(repo, &["subject", "adopt", "refactor-core", "--subject-id", "editing"]);
+    let adopt = run(repo, &["subject", "adopt", "editing", "--change-id", "refactor-core"]);
     assert!(adopt.status.success(), "{}", stderr(&adopt));
     assert_eq!(
         without_next(&stdout(&adopt)),
@@ -368,14 +378,14 @@ fn subject_lifecycle_33_a_change_adopted_by_a_second_subject_belongs_to_both_and
 
     let status: Value = serde_json::from_str(&stdout(&run(repo, &["status", "--json"]))).unwrap();
     for id in ["perception", "editing"] {
-        let summary = status["subjects"].as_array().unwrap().iter().find(|s| s["id"] == id).unwrap();
+        let summary = status["data"]["subjects"].as_array().unwrap().iter().find(|s| s["id"] == id).unwrap();
         assert_eq!(summary["openBlockers"], 1, "{id}: {summary}");
     }
     for id in ["perception", "editing"] {
         for state in ["specced", "building"] {
-            assert!(run(repo, &["subject", "status", id, "--to", state]).status.success());
+            assert!(run(repo, &["subject", "move", id, "--to", state]).status.success());
         }
-        let out = run(repo, &["subject", "status", id, "--to", "verifying"]);
+        let out = run(repo, &["subject", "move", id, "--to", "verifying"]);
         assert_eq!(out.status.code(), Some(1), "{id}: {}", stderr(&out));
         assert!(
             stderr(&out).contains("open-blocker refactor-core#1.1 — building → verifying: open blocker finding by `reviewer-2`"),

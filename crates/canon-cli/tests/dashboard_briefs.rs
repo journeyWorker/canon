@@ -65,7 +65,8 @@ fn repo_with_briefs() -> TempDir {
     }
     std::fs::write(brief_path(repo, "ready"), clean_brief("Ready change")).unwrap();
     std::fs::write(brief_path(repo, "settled"), clean_brief("Settled change")).unwrap();
-    ok(repo, &["brief", "approve", "--change-id", "settled", "--by", "Ana", "--note", "Go."]);
+    ok(repo, &["brief", "approve",
+                "settled", "--approver", "Ana", "--note", "Go."]);
     let archived = repo.join(".canon/changes/archive/archived");
     std::fs::create_dir_all(&archived).unwrap();
     std::fs::write(archived.join("brief.md"), clean_brief("Archived change")).unwrap();
@@ -292,7 +293,8 @@ fn report_dashboard_06_approving_from_the_page_equals_canon_brief_approve() {
     assert_eq!(reply.code, 200, "{}", reply.body);
     let page = reply.json();
 
-    let cli = canon(twin.path(), &["brief", "approve", "--change-id", "ready", "--by", "Ana", "--note", "Ship it.", "--json"]);
+    let cli = canon(twin.path(), &["brief", "approve",
+                "ready", "--approver", "Ana", "--note", "Ship it.", "--json"]);
     assert!(cli.status.success(), "{}", String::from_utf8_lossy(&cli.stderr));
     let cli: Value = serde_json::from_slice(&cli.stdout).unwrap();
 
@@ -344,7 +346,7 @@ fn report_dashboard_08_refuses_a_brief_with_blockers() {
     let policy_before = policy_approval(dir.path());
     let reply = post_approval(&live, &approval_request(&live, "blocked"));
     assert_eq!(reply.code, 409, "{}", reply.body);
-    assert_eq!(reply.json()["error"]["code"], "BRIEF_HAS_BLOCKERS");
+    assert_eq!(reply.json()["error"]["code"], "BRIEF_APPROVE_REFUSED");
     assert!(reply.json()["error"]["hint"].as_str().unwrap().len() > 10);
     assert_eq!(std::fs::read(brief_path(dir.path(), "blocked")).unwrap(), before);
     assert_eq!(policy_approval(dir.path()), policy_before, "no policy approval was recorded");
@@ -445,7 +447,7 @@ fn report_dashboard_10_leaves_the_brief_untouched_on_every_refusal() {
     let sha = brief_of(&live, "ready")["sha256"].clone();
     let post = |headers: Vec<(&'static str, String)>, body: &str| http(port, "POST", "/api/briefs/approve", &headers, body.as_bytes());
 
-    for (by, note, field) in [("", "Ship it.", "--by"), ("Ana", "", "--note"), ("Ana\nBob", "Ship it.", "--by"), ("Ana", "one\ntwo", "--note")] {
+    for (by, note, field) in [("", "Ship it.", "--approver"), ("Ana", "", "--note"), ("Ana\nBob", "Ship it.", "--approver"), ("Ana", "one\ntwo", "--note")] {
         let reply = post_approval(&live, &json!({ "changeId": "ready", "by": by, "note": note, "sha256": sha }));
         assert_eq!(reply.code, 400, "{by:?} {note:?}: {}", reply.body);
         assert_eq!(reply.json()["error"]["code"], "APPROVAL_INCOMPLETE");
@@ -473,7 +475,8 @@ fn report_dashboard_04_a_repo_whose_snapshot_cannot_be_generated_is_still_served
     assert!(warnings.len() == 1 && warnings[0].as_str().unwrap().contains("duckdb"), "{}", live.startup);
     assert_eq!(live.startup["data"]["snapshotAvailable"], false);
     let stderr = std::fs::read_to_string(&live.stderr).unwrap();
-    let warning = stderr.lines().find(|l| l.starts_with("canon dashboard: warning: ")).unwrap_or_else(|| panic!("a warning line on stderr: {stderr:?}"));
+    assert!(stderr.is_empty(), "JSON mode writes nothing to stderr: {stderr:?}");
+    let warning = warnings[0].as_str().unwrap();
     assert!(warning.contains("duckdb") && warning.contains("the panels page says so instead of showing panels") && warning.contains("install DuckDB"), "{warning}");
 
     let status = get(&live, "/api/status");

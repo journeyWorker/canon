@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-2"
+  },
+  "at": "2026-10-23T15:08:48.404297682Z",
+  "change_id": "canon-0-28",
+  "code_tree": "7c7d06847373654dafedac3630eedcda014eea0e",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/spec028_c.rs:401-425",
+  "kind": "finding",
+  "reviewed_sha": "7e95cd1df901a7bcf04861ca597da3414ed794ad",
+  "reviewer": "canon-reviewer-028",
+  "round": 2,
+  "scenario_ids": [
+    "context.capability.36"
+  ],
+  "schema": 1,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "Standards pass: context.capability.36 'the hint names the option that replaced it' is checked as hint.contains(\"--check\"), which the removed `--check-config` in the hint already satisfies. Mutation confirmed: removed_028.rs:105 replacement --check -> --verify stays green; compare error.expected / the replacement exactly",
+  "worktree_dirty": false
+}

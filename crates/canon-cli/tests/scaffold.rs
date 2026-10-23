@@ -9,7 +9,7 @@
 //! in-process).
 //!
 //! Covers every scenario spec.md/tasks.md 5.3 names: a scaffolded
-//! `.feature` round-trips through `canon fmt --check` clean;
+//! `.feature` round-trips through `canon format` clean;
 //! `canon inventory sync` materializes exactly the tagged scenario,
 //! identical (on `project_id`/`scenario_id`/`title`) to an
 //! independently hand-authored `.feature` entry; `canon scenario new`
@@ -80,7 +80,7 @@ fn scenario_new_no_feature(dir: &Path, tag: &str, title: &str) -> Output {
 
 const HOTDEAL_FEATURE_PATH: &str = ".canon/specs/kind=feature/area=world/hotdeal.feature";
 
-// ── round-trip through `canon fmt --check` clean ──
+// ── round-trip through `canon format` clean ──
 
 #[test]
 fn a_scaffolded_feature_round_trips_through_canon_fmt_check_clean() {
@@ -93,8 +93,8 @@ fn a_scaffolded_feature_round_trips_through_canon_fmt_check_clean() {
     let out = scenario_new(dir.path(), "world.hotdeal.42", "Apply a hotdeal coupon", HOTDEAL_FEATURE_PATH);
     assert!(out.status.success(), "canon scenario new failed: {}", stderr(&out));
 
-    let out = run_canon(&["fmt", "--check", ".canon/specs"], dir.path());
-    assert!(out.status.success(), "canon fmt --check must be clean over the scaffolded corpus: {}\n{}", stdout(&out), stderr(&out));
+    let out = run_canon(&["format", ".canon/specs"], dir.path());
+    assert!(out.status.success(), "canon format must be clean over the scaffolded corpus: {}\n{}", stdout(&out), stderr(&out));
     assert!(stdout(&out).contains(", 0 violation(s)"), "expected zero violations: {}", stdout(&out));
 }
 
@@ -185,14 +185,14 @@ fn a_bare_feature_new_stub_is_fmt_dirty_until_scenario_new_adds_a_tagged_scenari
     let out = feature_new(dir.path(), "world.checkout", "Checkout flow");
     assert!(out.status.success(), "canon feature new failed: {}", stderr(&out));
 
-    // Bare stub: `fmt --check` flags the tagless feature (not yet valid corpus).
-    let out = run_canon(&["fmt", "--check", ".canon/specs"], dir.path());
+    // Bare stub: `format` flags the tagless feature (not yet valid corpus).
+    let out = run_canon(&["format", ".canon/specs"], dir.path());
     assert!(!out.status.success(), "a bare zero-scenario feature stub must not be fmt-clean yet: {}", stdout(&out));
 
     // Adding the first tagged scenario makes the same file fmt-clean.
     let out = scenario_new(dir.path(), "world.checkout.01", "Start checkout", ".canon/specs/kind=feature/area=world/checkout.feature");
     assert!(out.status.success(), "canon scenario new failed: {}", stderr(&out));
-    let out = run_canon(&["fmt", "--check", ".canon/specs"], dir.path());
+    let out = run_canon(&["format", ".canon/specs"], dir.path());
     assert!(out.status.success(), "after `scenario new` the stub must be fmt-clean: {}\n{}", stdout(&out), stderr(&out));
     assert!(stdout(&out).contains(", 0 violation(s)"), "expected zero violations: {}", stdout(&out));
 }
@@ -224,7 +224,7 @@ fn inventory_sync_materializes_exactly_the_tagged_scenario_identical_to_a_hand_a
         let out = run_canon(&["query", "--kind", "scenario", "--json"], dir);
         assert!(out.status.success(), "canon query failed: {}", stderr(&out));
         let payload: Value = serde_json::from_str(&stdout(&out)).expect("valid JSON on stdout");
-        let records = payload["records"].as_array().cloned().unwrap_or_default();
+        let records = payload["data"]["records"].as_array().cloned().unwrap_or_default();
         assert_eq!(records.len(), 1, "expected exactly one Scenario record, got {records:?}");
         records[0].clone()
     };
@@ -444,12 +444,12 @@ fn feature_new_prints_a_next_step_hint_and_fmt_check_reports_the_wip_stub_wordin
         "expected a next-step hint naming the derived `canon scenario new` invocation: {hint}"
     );
 
-    let check_out = run_canon(&["fmt", "--check", ".canon/specs"], dir.path());
+    let check_out = run_canon(&["format", ".canon/specs"], dir.path());
     assert!(!check_out.status.success(), "a bare stub must still be fmt-dirty (unchanged exit-code contract)");
     let report = stdout(&check_out);
     assert!(
         report.contains("empty feature stub (not yet a valid corpus entry)"),
-        "expected the reworded WIP-stub violation text in `canon fmt --check`'s report: {report}"
+        "expected the reworded WIP-stub violation text in `canon format`'s report: {report}"
     );
 }
 

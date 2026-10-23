@@ -35,10 +35,10 @@ Feature: divergence lifecycle
   @subject:divergence-lifecycle
   @case:happy
   @divergence.lifecycle.04
-  Scenario: A resolution is what the status view reports
+  Scenario: A resolution is what the divergence list reports
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a scenario resolved
-    When the divergence status is read
+    When canon divergence list is read
     Then the read exits zero, because it is a capability query and never a gate
     And the current state of that scenario is resolved
 
@@ -98,6 +98,25 @@ Feature: divergence lifecycle
   @divergence.lifecycle.10
   Scenario: A divergence command whose project id names no configured spec root is refused
     Given a repo whose canon.yaml configures one spec root, game
-    When divergence add, resolve, defer and accept each name a --project-id that is no configured root
+    When divergence add, resolve, defer and accept each name a --project-id that is no configured root, with no agent role declared
     Then each exits 2 with UNKNOWN_SPEC_ROOT and stages or commits no divergence record
-    And divergence status, which only reads, still lists what the ledger holds
+    And divergence list, which only reads, still lists what the ledger holds
+
+  # canon: {"schema":1,"at":"2026-10-23T12:06:16Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:divergence-lifecycle
+  @case:failure
+  @divergence.lifecycle.11
+  Scenario: An acceptance is a human act and every agent role is refused
+    Given an acceptance naming a reason and a tracking reference
+    When canon divergence accept runs as planner, implementer, reviewer or orchestrator, declared by --as or by the environment
+    Then each run exits 2 with HUMAN_ONLY, retryable false, and a hint addressed to the human naming canon divergence accept
+    And the refusal is the same whether the role is declared by --as or by the environment
+
+  # canon: {"schema":1,"at":"2026-10-23T12:06:21Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:divergence-lifecycle
+  @case:edge
+  @divergence.lifecycle.12
+  Scenario: With no agent role declared the acceptance reaches its own checks
+    Given the same acceptance and no agent role declared
+    When canon divergence accept runs
+    Then it is not refused as HUMAN_ONLY and reaches its own checks instead

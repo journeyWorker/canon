@@ -51,7 +51,7 @@ fn read_kind_fail_soft<T: for<'de> serde::Deserialize<'de>>(git_root: &Path, kin
 ///
 /// s44 promoted the derivation into `canon-store` so `canon-gate`'s
 /// `spec_coverage` check reads the SAME map — a second copy would let
-/// the gate and `canon divergence status` disagree about which
+/// the gate and `canon divergence list` disagree about which
 /// scenarios are open, which is precisely what one shared fold exists
 /// to prevent. See [`canon_store::fold::live_bindings_of`] for the
 /// semantics.

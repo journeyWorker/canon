@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-2"
+  },
+  "at": "2026-10-23T15:09:11.318179843Z",
+  "change_id": "canon-0-28",
+  "code_tree": "7c7d06847373654dafedac3630eedcda014eea0e",
+  "disposition": "open",
+  "file_ref": "docs/design/cli-commands-0.28.md:63",
+  "kind": "finding",
+  "reviewed_sha": "7e95cd1df901a7bcf04861ca597da3414ed794ad",
+  "reviewer": "canon-reviewer-028",
+  "round": 2,
+  "schema": 1,
+  "seq": 8,
+  "severity": "should_fix",
+  "summary": "Spec fidelity pass (docs): `canon init --check` with a failing section exits 2 CONFIG_UNREADABLE, while its cli-commands-0.28.md row says 'exit 1 = a failed section' and D4 puts a failed check at exit 1; skills_install.rs:919, write_path.rs:188 and two more tests pin exit 2. Pick one and align code, tests and doc (not introduced this round)",
+  "worktree_dirty": false
+}

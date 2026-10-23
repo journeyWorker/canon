@@ -1,0 +1,127 @@
+option	value_name	concept
+actor-id	ACTOR_ID	the actor a record is attributed to
+after	TIMESTAMP	lower time bound, inclusive
+all	-	mode: every record from the cursor on, or every item
+all-scenarios	-	mode: every scenario that has evidence
+all-workspaces	-	mode: every workspace on this machine
+approval	FILE	approval document with the detached signature
+approval-at	TIMESTAMP	when the approval was given
+approval-role	ROLE	role the approval was given in
+approver	NAME	the human who approved
+area	NAME	spec area segment
+artifact	PATH	file bound to a record by its sha256
+as	ROLE	the role the invoker acts as
+as-of	TIMESTAMP	point in time a deferral's expiry is judged at
+audit-result	RESULT	outcome of an external audit
+before	TIMESTAMP	upper time bound, exclusive
+case	NAME	case tag of a scenario
+change-id	CHANGE_ID	change
+change-kind	CHANGE_KIND	kind of a change
+check	-	mode: verify only and write nothing
+class	CLASS	evidence class
+command	TEXT	command line a hook runs
+command-result	TEXT	captured output backing a summary
+commit	-	mode: act on the previewed plan
+contradicting-trajectory-id	ID	trajectory that contradicts a strategy
+cursor	CURSOR	paging position
+detail	TEXT	free-text detail of a record
+dialect	NAME	plan dialect
+disposition	DISPOSITION	what became of a finding
+domain	NAME	subject domain
+dry-run	-	mode: validate fully and write nothing
+error	CODE	error code to explain
+errors	-	mode: list every error code
+evaluation	FILE	evaluation bundle
+evaluator-digest	DIGEST	digest of the external evaluator
+evaluator-id	ID	external evaluator
+evaluator-version	TEXT	version of the external evaluator
+event	NAME	hook event
+expiry	TIMESTAMP	when a deferral or acceptance lapses
+feature	FILE	feature file
+fields	FIELDS	comma list of top-level report fields
+file-ref	TEXT	place in the tree a finding points at
+flow	FLOW_ID	flow of the original spec
+for-role	ROLE	role the retrieved guidance is for
+full	-	mode: re-hash every blob
+hash	HASH	regime hash segment
+history	-	mode: every version of a record
+home	DIR	home directory sessions are scanned under
+include-sensitive	-	mode: include sensitive records
+input	JSON|FILE|-	the leaf's arguments as one JSON document
+interval-secs	N	seconds between polls
+introduced-rev	REV	commit that introduced a defect
+json	-	mode: print the enveloped document
+kind	KIND	record kind
+lane	NAME	lane tag of a scenario
+language	TAG	language of generated prose
+limit	N	page size or result cap
+manifest	FILE	input manifest
+matcher	TEXT	hook matcher
+max-artifact-mib	N	size cap of one bound artifact in MiB
+model	NAME	declared model
+no-agents-md	-	mode: leave AGENTS.md alone
+no-policy	-	mode: write no starter policy
+no-promote	-	mode: keep a staged record staged
+note	TEXT	free-text note on a record
+open	-	mode: only open findings
+original-spec-ref	TEXT	reference to the original spec
+output	FILE	file to write instead of stdout
+override-reason	TEXT	reason for proceeding although refused
+owner-role	ROLE	role that owns a strategy
+parent-run-id	RUN_ID	run a run descends from
+plan-digest	DIGEST	digest of the previewed plan
+plan-source	DIR	plan source root
+plugin-id	PLUGIN_ID	plugin
+policy	LEVEL	policy level
+port	N	local port
+project-id	PROJECT_ID	spec root a record belongs to
+promote	-	mode: promote the record staged in this run
+prompt-bundle	NAME@VERSION	prompt bundle version
+provider	NAME	declared provider
+providers	LIST	comma list of harness providers
+reason	TEXT	why a record or refusal waiver exists
+ref	TEXT	what the evidence refers to
+regime	KEY	full regime key
+release	-	mode: release-scoped trust check
+repo	DIR	repository to act on
+repo-name	NAME	repository segment of a regime key
+report	FORMAT:PATH	test report in a named format
+report-case	NAME	case of a test report
+resolution-rev	REV	commit that resolved a finding
+response	FILE	adapter response document
+rev	REV	commit a record is about
+review-outcome	REVIEW_OUTCOME	outcome of a review
+reviewer-harness	NAME	reviewer's harness
+reviewer-model	NAME	reviewer's model
+reviewer-provider	NAME	reviewer's provider
+role	ROLE	role a record is attributed to (open slug; an unknown role warns with the closest known one)
+role-segment	NAME	role segment of a regime key
+round	N	review round
+run-id	RUN_ID	dispatch run
+run-outcome	RUN_OUTCOME	how a dispatch run ended
+scenario-id	SCENARIO_ID	scenario
+seq	N	sequence number within a round
+session-id	SESSION_ID	agent session
+severity	SEVERITY	severity of a finding
+signature-file	FILE	detached signature
+since	TIMESTAMP	records at or after a time
+skill-digest	DIGEST	digest of a skill
+skill-id	ID	skill
+skills-source	DIR	directory the skills are read from
+snapshot	DIR	dashboard snapshot directory
+spec-root	DIR	spec root directory
+state	STATE	state of a divergence
+status	STATUS	status field of a record
+subject-id	SUBJECT_ID	subject
+suite	NAME	selftest suite
+summary	TEXT	one-line summary of a record
+surface-ref	PATH_OR_EFFECT	risk surface a scenario binds
+task-id	TASK_ID	task
+tier	TIER	storage tier
+timeout	N	hook timeout in seconds
+title	TEXT	title of an authored unit
+to	STATE	state a subject moves to
+tracking	TEXT	where an accepted gap is tracked
+upstream-ref	TEXT	upstream provenance reference
+verdict	VERDICT	verdict of a piece of evidence
+watch	-	mode: keep polling

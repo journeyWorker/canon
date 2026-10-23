@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-2"
+  },
+  "at": "2026-10-23T15:07:40.554265851Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/strategy_promote.rs:246-290",
+  "kind": "finding",
+  "resolution_code_tree": "7c7d06847373654dafedac3630eedcda014eea0e",
+  "resolution_sha": "7e95cd1df901a7bcf04861ca597da3414ed794ad",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "scenario_ids": [
+    "learn.promotion.04",
+    "learn.promotion.05",
+    "learn.promotion.06"
+  ],
+  "schema": 1,
+  "seq": 19,
+  "severity": "should_fix",
+  "summary": "Standards pass: learn.promotion.04/.05/.06 pass with the promotion gate disabled: each promotes a strategy with no evaluation/approval, which promote_strategy refuses anyway (LEARN_PROMOTION_FAILED). Mutation confirmed: learn.rs:148 `let blocked = false` keeps all three green; assert LEARN_PROMOTION_BLOCKED with an otherwise promotable strategy",
+  "worktree_dirty": false
+}

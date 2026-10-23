@@ -27,10 +27,10 @@ Every violation carries one of these stable, grep-able strings:
 | `stale-evidence` | A passing record degraded to stale: its declared surface changed since its `evidence_sha`, or HEAD moved past `staleness.max_commits_behind`. Only degrades an already-green record. Also: a file bound to a latest evidence record whose bytes are gone — no intact blob in `.canon/artifacts/sha256/` and no working-tree copy with the recorded digest — or a file bound to an in-effect review with no intact blob (see Bound evidence stays provable below). |
 | `malformed-evidence` | A candidate record doesn't parse, is misfiled, or carries an unparseable interim tag. Malformed evidence is no evidence. |
 | `flagged` | The human-only `flagged` overlay is set — never green regardless of passing evidence. |
-| `unevidenced-flip` | `canon gate task <task_id>` was asked to flip a checkbox with no matching, non-`Divergent` evidence record. |
-| `fabricated-evidence` | An evidence note contains a blocklisted marker (`"would pass"`, `"TBD"`, `"n/a"`) standing as a whole word — never inside a path, a file name, a URL or a longer word, so `pack.json/atlas` is not `n/a` — or a bare `verified` claim with no attached command result. `canon evidence add` refuses such a note before writing (`canon evidence add: refused — fabricated-evidence …`, exit 1). |
+| `unevidenced-flip` | `canon task done <task_id>` was asked to flip a checkbox with no matching, non-`Divergent` evidence record. |
+| `fabricated-evidence` | An evidence note contains a blocklisted marker (`"would pass"`, `"TBD"`, `"n/a"`) standing as a whole word — never inside a path, a file name, a URL or a longer word, so `pack.json/atlas` is not `n/a` — or a bare `verified` claim with no attached command result. `canon evidence add` refuses such a note before writing (refused with `fabricated-evidence`, exit 1). |
 | `open-blocker` | With `spec_coverage.require_review` set (and `block_on_findings`, the default), a Finding whose latest version is severity `blocker`, disposition `open`, on a change an in-scope subject adopted — or closed `fixed` while an evidenced scenario of the subject has no evidence recorded after the close (re-verification). Subject string `<change_id>#<round>.<seq>`. See `canon-review`. |
-| `false-success` | The latest audit record (`canon evidence add --kind audit`) of a scenario says `refuted`: an external evaluator found a counterexample to the claimed success. Always on, regardless of policy or sampling, and takes precedence over any declared faithful verdict; only a newer audit (`confirmed` or `indeterminate`) clears it. The detail names the evaluator, its version, its sha256 and the counterexample paths. |
+| `false-success` | The latest audit record (`canon evidence audit`) of a scenario says `refuted`: an external evaluator found a counterexample to the claimed success. Always on, regardless of policy or sampling, and takes precedence over any declared faithful verdict; only a newer audit (`confirmed` or `indeterminate`) clears it. The detail names the evaluator, its version, its sha256 and the counterexample paths. |
 
 ## `canon gate check [--repo <dir>] [--release]`
 
@@ -53,17 +53,27 @@ repo ROOT's `.canon/policy.yaml` and `.canon/ledger` from any subdirectory.
 
 When `.canon/policy.yaml` exists but has no approval, the gate prints
 `advisory: policy not approved: …` after its result, naming
-`canon policy approve --by <who>`; the exit code is unchanged. When its
+`canon policy approve --approver <who>`; the exit code is unchanged. When its
 bytes no longer match the approved digest, or the approval cannot be read,
 the gate fails closed: the violation is reported and the exit is `1` (see
 `canon-policy`).
+
+On a repository that still holds 0.27 canon state, `canon gate check` (like
+`canon status` and `canon context`) warns and puts `canon migrate --json`
+first in `meta.next`: run `canon migrate` (a preview), then `canon migrate
+--commit --plan-digest <digest from the preview>`, then `canon skills
+install`. Read the whole result with `--json`: `data.violations` lists the
+failures by class and `meta.next` the steps.
+
+**Done when:** `canon gate check` exits `0` with no violation; `canon status`
+repeats the result and names what is still open.
 
 The gate is a read command: it writes nothing. A scenario index that is
 stale (a `.feature` file added, edited or deleted since the last sync) is
 graded as the refresh would leave it, built in memory from the changed
 files with the code `canon inventory sync` runs; the index on disk is
 brought up to date by the next command that writes (`canon evidence add`,
-`canon review add`, `canon subject status`) or by `canon inventory sync`.
+`canon review scenario`, `canon subject move`) or by `canon inventory sync`.
 It prints no refresh line.
 
 A root that fails to sync (format violations, a duplicate id) cannot be
@@ -119,11 +129,11 @@ A present section, even `require_evidence: false` or a malformed one
 
 - **Unimplemented** — no `EvidenceRecord` carries the scenario's
   `(project_id, scenario_id)`. Author one with
-  `canon evidence add --scenario-id <id> --project-id <root-id>`; both
-  flags are required together, because two spec roots may carry the same
-  scenario id. `--summary` is allowed here too (scanned for fabrication
+  `canon evidence add --scenario-id <id> --project-id <root-id>`; the
+  root id is needed once more than one spec root is configured, because
+  two roots may carry the same scenario id. `--summary` is allowed here too (scanned for fabrication
   markers like a task's); it is a row suffix only when the record also
-  names a `--task`. A record carrying both `--task` and `--scenario-id`
+  names a `--task-id`. A record carrying both `--task-id` and `--scenario-id`
   is one attestation answering both joins: it counts for the task cell
   and for the scenario cell (verdicts, the shipped gate, the review gate).
 - **Mismatched** — the folded divergence state is `open`,
@@ -141,12 +151,12 @@ A present section, even `require_evidence: false` or a malformed one
   case). This is the gap evidence presence cannot see: every scenario
   attested, none of them specifying a refusal. Untagged scenarios satisfy
   no case, so an unclassified corpus is reported, not passed. Works with
-  `require_evidence: false` too. `canon subject status <id> --to shipped`
+  `require_evidence: false` too. `canon subject move <id> --to shipped`
   applies the same rule to the scenarios the subject owns.
 - **Independent review** (`require_review`) — scenarios whose subject is
   in `require_review.scope` (default `[verifying, shipped]`; `[]` = every
   scenario; independent of `scope` above) need a `Review` record
-  (`canon review add`) whose latest version per reviewer is `signed`,
+  (`canon review scenario`) whose latest version per reviewer is `signed`,
   still matches the scenario digest and latest evidence it pinned
   (a review written before 0.15 has no pins and skips this check), and,
   when `distinct_actor` (default `true`), is by a reviewer and actor
@@ -171,7 +181,7 @@ A present section, even `require_evidence: false` or a malformed one
 - **Sampled audits** (`require_audit`) — a deterministic sample of
   in-scope scenarios (`require_audit.scope`, default `[verifying,
   shipped]`; `exclude_lanes` applies) must carry an external audit
-  (`canon evidence add --kind audit`, see Audit records below). A sampled
+  (`canon evidence audit`, see Audit records below). A sampled
   scenario whose latest audit is missing or `indeterminate` is
   `uncovered-cell`:
 
@@ -202,11 +212,13 @@ purpose, so enabling nothing changes no existing verdict.
 ### Accepted divergence and re-verification
 
 ```bash
-canon divergence accept --project-id <root-id> --scenario-id <id> --reason "<why>" --tracking <issue-url-or-ref> [--expiry YYYY-MM-DD] --reviewer <me> --actor-id <me> --session-id <session> --as reviewer
+canon divergence accept cart.add.01 --project-id root --reason "known gap" --tracking "issue#12" --expiry 2026-12-31 --actor-id reviewer-2 --role reviewer --session-id review-session-1
 ```
 
-A reviewer accepts a scenario whose latest evidence is `divergent` as a
-known gap limited by something outside the change; never to skip a fix.
+Accepting a scenario whose latest evidence is `divergent` as a known gap
+limited by something outside the change is a human-only act: with a role
+declared (`--as`, `CANON_ROLE`) the leaf is refused with `HUMAN_ONLY`. It is
+never a way to skip a fix.
 Refused (`DIVERGENCE_ACCEPT_REFUSED`) unless the latest verdict is
 divergent and the session and actor differ from the evidence's. The record
 pins that evidence: new evidence for the scenario, or `--expiry` passing,
@@ -224,36 +236,36 @@ from shipping until every one of its evidenced scenarios has evidence
 recorded after the close or the approval. A blocker that names its
 scenarios (`finding add --scenario-id`) asks only those, and the refusal
 names them with the per-scenario command (`canon evidence add --project-id
-<root-id> --scenario-id <id> --report <format>:<path> …`). Otherwise the
+<root-id> --scenario-id <id> --report <format>:<path>` plus `--class`, `--role` and `--ref`). Otherwise the
 refusal names the scenarios and the batch command: `canon evidence add --project-id <root-id>
---all-scenarios --report <format>:<path> --kind test-run --role
-implementer --ref "<test command>" …`. Reviews pin what the evidence says
+--all-scenarios --report <format>:<path> --class test-run --role
+implementer --ref "<test command>"`. Reviews pin what the evidence says
 (its verdict and the identity of its checks), not which record it is, so
 recording the suite again with the same verdicts from the same cases leaves
 every scenario review current. A chore instead needs one change-level
-review of the chore itself (`canon review add --change-id <slug> …`) before
+review of the chore itself (`canon review change <slug>`) before
 `--to shipped`; a changed verdict or case set stales that scenario's
 review as before (and a new `divergence accept`, where the gap remains).
 
-### Audit records (`--kind audit`)
+### Audit records (`canon evidence audit`)
 
 canon never generates or runs an audit. An external evaluator does, and
 canon records its result:
 
 ```bash
-canon evidence add --kind audit --project-id root --scenario-id cart.add.01 \
+canon evidence audit cart.add.01 --project-id root \
   --ref "judge run 42" --role reviewer \
   --evaluator-id judge --evaluator-version 1.2 \
-  --evaluator-digest <64 lowercase hex sha256> \
+  --evaluator-digest 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 \
   --audit-result refuted --report junit:audit/counterexample.xml
 ```
 
-- `--kind audit` requires `--evaluator-id`, `--evaluator-version`,
-  `--evaluator-digest` (sha256, 64 lowercase hex), `--audit-result
-  confirmed|refuted|indeterminate`, and `--scenario-id` with
-  `--project-id`. It refuses `--task`, `--verdict`, `--surface-ref` and
-  `--approval-*`; the four evaluator flags are refused on any other kind.
-  All refusals exit `2`.
+- `evidence audit` requires the scenario operand, `--ref`, `--evaluator-id`,
+  `--evaluator-version`, `--evaluator-digest` (sha256, 64 lowercase hex)
+  and `--audit-result confirmed|refuted|indeterminate`, with `--project-id`
+  where several spec roots exist. It takes no `--task-id`, `--verdict`,
+  `--surface-ref` or `--approval-*`; the evaluator flags exist on no other
+  command. All refusals exit `2`.
 - The record carries `audit: {evaluator_id, evaluator_version,
   evaluator_digest, result}`; its verdict is derived (`confirmed` →
   faithful, `refuted` → divergent, `indeterminate` → not-applicable).
@@ -263,10 +275,10 @@ canon evidence add --kind audit --project-id root --scenario-id cart.add.01 \
 - Audits fold apart: per `(project_id, scenario_id)` there is a latest
   declared record and a latest audit. An audit never becomes the
   scenario's latest declared verdict.
-- `canon subject status <id> --to shipped` refuses `false-success`, and an
+- `canon subject move <id> --to shipped` refuses `false-success`, and an
   owed sampled audit when `require_audit.scope` covers `shipped`.
 - `canon status` shows an `audits` section (sampled / confirmed / owed /
-  refuted) and suggests `canon evidence add --kind audit …` in `next:`.
+  refuted) and suggests `canon evidence audit` in `next:`.
 
 ### A record binds what its own write names
 
@@ -275,7 +287,7 @@ canon evidence add --kind audit --project-id root --scenario-id cart.add.01 \
 from an earlier record, in a single add or in a suite batch
 (`--all-scenarios`), and no drop is recorded: history keeps the earlier
 records, and a new record is reviewed on its own files. An audit
-(`--kind audit`) replaces a refutation the same way, so a counterexample
+(`canon evidence audit`) replaces a refutation the same way, so a counterexample
 never rides along into a confirming audit. `--drop-attachment` and
 `--drop-reason` no longer exist.
 
@@ -293,11 +305,11 @@ external openspec plan with a `proposal.md` under the plan sources (the
 check `canon status` and the ship guard use; see
 `canon-subject`; which changes a scenario answers to is scoped by its `@flow:<change>.<F-id>` tags, described there). The subjects are the scenario's `@subject` owner for
 `--scenario-id`, and every subject adopting the task's change for
-`--task`:
+`--task-id`:
 
-```
-canon evidence add: unreviewed-promotion demo-subject — evidence for world.demo.01: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line, so the human has not answered it; once they do, record their words with `canon brief approve --change-id c-demo --by <the human> --note "<their words>"`
-canon evidence add: refused — stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their answer with `canon brief approve --by <the human> --note "<their words>"` only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record
+```stderr
+canon evidence add: unreviewed-promotion demo-subject — evidence for world.demo.01: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line, so the human has not answered it; once they do, record their words with `canon brief approve c-demo --approver <the human> --note "<their words>"`
+canon evidence add: refused — stop, report the brief to the human and wait for their answer: nothing is built or attested for a subject before its brief is approved. Record their answer with `canon brief approve --approver <the human> --note "<their words>"` only from that answer; to attest anyway, pass --override-reason <text>, which is recorded on the evidence record
 ```
 
 For a change from an external plan with no canon brief yet, the first
@@ -307,13 +319,13 @@ openspec/changes/c-ext/proposal.md, which canon reads and never edits, so
 its approval lives in that canon file, so the human has not answered it;
 once they do, create .canon/changes/c-ext/brief.md holding a `Source:
 openspec/changes/c-ext/proposal.md` line, then record their words with
-`canon brief approve --change-id c-ext --by <the human> --note "<their words>"` ``. An `Approved:` line in the
+`canon brief approve c-ext --approver <the human> --note "<their words>"` ``. An `Approved:` line in the
 external `proposal.md` itself is never read.
 
 A subject with no brief to answer (no adopted change, or a newest change
 with neither a canon `brief.md` nor an external `proposal.md`) and a
 scenario no subject owns are unaffected.
-`canon review add` and `canon finding add` are never refused.
+`canon review scenario` and `canon finding add` are never refused.
 `--override-reason "<one line>"` attests anyway, prints the `waived …`
 lines and `override recorded by `<actor>` for the N brief refusal(s)
 above: <reason>`, and records on the evidence record:
@@ -326,6 +338,12 @@ brief_override:
   actor: { agent_id: lead }   # from --actor-id
 ```
 
+Under `--json` the same waiver is `data.overrides[]` (`code` of the waived
+refusal, `reason` verbatim), so a caller sees what its `--override-reason`
+let through; a repeat of an identical record is `unchanged`
+(`meta.unchanged`) and records no second override. `--override-reason`
+exists on `subject move` too (see `canon-subject`).
+
 A blank or multi-line reason exits 2; an override when nothing refused is
 not recorded. `canon status` lists each such record as a `warning:`, and
 `canon gate check` prints them after the result without failing:
@@ -337,7 +355,7 @@ brief overrides: 1 evidence record(s) attested before their brief was approved �
 
 ### Review-waiver advisories
 
-A subject moved into a review-scoped status with `canon subject status <id> --to <state>
+A subject moved into a review-scoped status with `canon subject move <id> --to <state>
 --override-reason` (see `canon-subject`) keeps the `unreviewed-promotion`
 and `open-blocker` gaps its waiver recorded visible without failing the
 gate. Only those exact `(class, subject)` pairs are waived; a gap that
@@ -351,7 +369,7 @@ review waivers: 1 advisory(ies) — not failing the gate:
 
 The waiver lasts only until the subject's next status write.
 
-`canon subject status <id> --to shipped` also refuses where a brief exists and
+`canon subject move <id> --to shipped` also refuses where a brief exists and
 is not approved (the subject's scope, its newest adopted change walking back past pending drafts
 no scenario is tagged `@flow:<change>.*` for, has a canon
 `brief.md` with no `Approved:` line or one the brief's text no longer
@@ -414,13 +432,13 @@ what backed the claim:
 ```bash
 # any file: a Playwright trace, screenshots, an agent QA log — by sha256
 canon evidence add --scenario-id cart.add.04 --project-id root \
-  --kind agent-qa --ref "stagehand run 7" --role implementer \
+  --class agent-qa --ref "stagehand run 7" --role implementer \
   --artifact test-results/cart-trace.zip
 # a JUnit XML or Cucumber JSON report: also records the matched case + outcome
-canon evidence add ... --report junit:target/nextest/default/junit.xml
-canon evidence add ... --report cucumber:reports/cucumber.json
+canon evidence add --scenario-id cart.add.04 --project-id root --class test-run --ref "cargo nextest run" --role implementer --report junit:target/nextest/default/junit.xml
+canon evidence add --scenario-id cart.add.04 --project-id root --class test-run --ref "cucumber-js" --role implementer --report cucumber:reports/cucumber.json
 # a Swift Testing event stream (swift test --experimental-event-stream-output <path>)
-canon evidence add ... --report swift-testing:.build/events.jsonl
+canon evidence add --scenario-id cart.add.04 --project-id root --class test-run --ref "swift test" --role implementer --report swift-testing:.build/events.jsonl
 ```
 
 A case is bound when the scenario id is its OWN: the first
@@ -474,7 +492,7 @@ One test run proves many scenarios. Bind it once:
 ```bash
 canon evidence add --project-id root --all-scenarios \
   --report junit:target/nextest/default/junit.xml \
-  --kind test-run --ref "cargo nextest run" --role implementer
+  --class test-run --ref "cargo nextest run" --role implementer
 ```
 
 Each indexed scenario of `--project-id` that owns a case (the rule above)
@@ -497,12 +515,29 @@ It is all or nothing: a claimed `faithful` verdict over a failed case,
 a fabrication marker in `--summary`, an unapproved brief for any
 scenario's subject refuses the whole batch, and nothing is written. Each
 record binds only what the batch names (nothing is carried forward).
-`--scenario-id`, `--task`,
-`--report-case`, `--kind audit` and the approval flags name one subject
+`--scenario-id`, `--task-id`,
+`--report-case`, `canon evidence audit` and the approval flags name one subject
 and are refused with `--all-scenarios`.
 
 A task's evidence with `--report` and no `--scenario-id` binds EVERY case
 in the report, so a `faithful` verdict needs all of them to pass.
+
+Many records at once without a report: `--input` takes inline JSON, a file
+or `-`; an array (or NDJSON) is a batch, validated element by element before
+the first write (a refusal writes nothing, exit 2). Keys are the option
+names in camelCase plus `operands`: one object per scenario, with
+`scenarioId`, `class`, `ref` and `role`. `canon schema evidence add --json`
+shows the input schema and an example. Each element reports `written`,
+`unchanged` or `failed` in `data.items[]`.
+
+`--rev <rev>` names the commit the evidence ran against (default `HEAD`).
+Evidence for uncommitted code is recorded with its `codeTree` and
+`worktreeDirty`; outside git, or with no commit, the add is refused with
+`NO_COMMIT`.
+
+**Done when:** `canon gate check` shows no violation for the scenarios you
+recorded evidence for; each record's own output line says whether it was
+written or `unchanged`.
 
 ### A write that makes a review stale says so (0.18)
 
@@ -510,17 +545,20 @@ When new evidence (one record or a batch) supersedes the evidence a
 current pinned review saw, `canon evidence add` prints one line per
 review it makes stale (its verdict or checks differ from what the review saw), with the command that re-pins it:
 
-```
-canon evidence add: review by `reviewer-2` of cart.add.01 is now stale (this record's verdict or checks differ from what it saw); re-pin it: canon review add --project-id root --scenario-id cart.add.01 --reviewer reviewer-2 --actor-id reviewer-2 --role reviewer --pin <HEAD sha> --original-spec-ref specs/kind=feature/area=cart/add.feature
+```stderr
+canon evidence add: review by `reviewer-2` of cart.add.01 is now stale (this record's verdict or checks differ from what it saw); re-pin it: canon review scenario cart.add.01 --project-id root --actor-id reviewer-2 --role reviewer --original-spec-ref specs/kind=feature/area=cart/add.feature
 ```
 
 The decision is the gate's own (the same stale-review rule `canon gate
 check` reports). The command repeats the review's reviewer, actor, role,
-session, provenance ref, runtime labels and artifacts, pinned at `HEAD` (`<sha>`
-when the repository has no commit). A record that is only staged says
+session, provenance ref, runtime labels and artifacts, at the default
+`--rev` (`HEAD`). A record that is only staged says
 the review "goes stale once this evidence is promoted": promote first,
-then re-pin. The reviewer re-reviews before re-pinning; several
-scenarios re-pin in one `canon review add` (see `canon-review`).
+then re-review. The reviewer re-reviews before re-pinning; several
+scenarios re-review in one `canon review scenario` (see `canon-review`).
+
+**Done when:** `canon gate check` reports no stale review for the scenarios
+you recorded evidence for; the re-review's own output says `pinned`.
 
 ## Bound evidence stays provable (the artifact store)
 
@@ -534,11 +572,11 @@ raise the limit with `--max-artifact-mib <N>`.
 Where those bytes live is `canon.yaml`'s `artifact_store: { backend: local |
 <s3 tier>, prefix: artifacts/ }` (default `local`: the directory above,
 git-tracked, no credentials). With an object-store tier, `evidence add`,
-`review add` and `evidence vault` upload each blob under
+`review scenario` and `artifacts store` upload each blob under
 `<prefix>sha256/<digest>` and keep nothing locally. `canon gate check` and
 `canon artifacts verify [--full]` ask the store (a HEAD per digest; `--full`
 downloads and re-hashes) and refuse, never pass, when it cannot be reached.
-`canon artifacts migrate --to <tier> [--dry-run]` moves an existing local
+`canon artifacts move --tier <tier>` (a preview; `--commit --plan-digest` acts) moves an existing local
 store; it is the repo owner's decision. See `canon-storage`.
 
 `canon gate check` re-checks every file bound to a LATEST evidence record
@@ -548,11 +586,11 @@ store; it is the repo owner's decision. See `canon-storage`.
   after the working-tree file is rewritten (a smoke script that rewrites
   `reports/smoke.json` on every run no longer orphans the record);
 - no blob, but the working-tree path still hashes to the recorded digest
-  → clean, with an advisory naming `canon evidence vault` (records from
+  → clean, with an advisory naming `canon artifacts store` (records from
   before the store existed):
 
   ```
-  evidence artifacts: 1 bound file(s) not in the artifact store — not failing the gate; run `canon evidence vault` to store them before the working tree changes:
+  evidence artifacts: 1 bound file(s) not in the artifact store — not failing the gate; run `canon artifacts store` to store them before the working tree changes:
     unstored cart.add.01 reports/junit.xml (sha256 b7cb…) is verified against the working tree only
   ```
 - anything else → `stale-evidence` naming the path, the recorded digest,
@@ -568,7 +606,7 @@ subject's status, and a repo with no `spec_coverage` would otherwise never
 have its bindings checked. A superseded record is not checked —
 re-attesting is the fix.
 
-Files bound to a review (`canon review add --artifact`, see
+Files bound to a review (`canon review scenario --artifact`, see
 `canon-review`) are checked by the same rule for every CURRENT in-effect
 review: the latest per `(project_id, scenario_id, reviewer)`, less any
 that went stale against its scenario (its spec or evidence pin moved). A stale review is
@@ -585,7 +623,7 @@ Anything else is `stale-evidence` on the review's scenario, and the
 detail names the review: ``review by `<reviewer>` (actor `<id>`,
 <time>)``.
 
-`canon evidence vault [--max-artifact-mib <N>]` stores the bytes for
+`canon artifacts store [--max-artifact-mib <N>]` stores the bytes for
 existing evidence records and current reviews (a superseded review's files are not vaulted): every attachment whose
 working-tree file still matches its digest is copied in, and everything
 else is listed as not stored, with both digests. It exits `0` whenever it
@@ -621,7 +659,7 @@ Malformed `risk_tiers` sections produce a stable `uncovered-cell` policy
 violation (`risk_tiers policy-invalid: ...`) instead of degrading to an
 empty clean map.
 
-## `canon gate task <task_id> [--repo <dir>]`
+## `canon task done <task_id> [--repo <dir>]`
 
 For imported external plans, and for a `tasks.md` that already exists in
 a canon change. `canon change new` writes no `tasks.md` (0.19), and
@@ -640,7 +678,7 @@ task at all is a loud failure naming every source consulted. A repo with
 no `.canon/changes/` and `sources: []` is refused: "this repo configures
 no plan sources (no `.canon/changes` and no `plans.sources` entries in
 canon.yaml) … write the change with `canon change new`, or list your
-external plans under `plans.sources`" (`canon dispatch --task` says the
+external plans under `plans.sources`" (`canon dispatch begin --task-id` says the
 same).
 It requires
 a matching non-`Divergent` evidence record, and flips `- [ ]` → `- [x]`
@@ -654,7 +692,7 @@ exits `1` with the blocking violation on stderr. After a flip, the plan
 source is re-ingested so the record store's task status agrees with the
 checkbox (`canon query --kind task` reads `done`); a failed re-ingest is
 a stderr warning naming `canon ingest plans`, never a failed flip.
-The success line is `canon gate task: <task_id> flipped — written
+The success line is `canon task done: <task_id> flipped — written
 directly; nothing to promote`. An already-`[x]` row is an idempotent no-op (exit `0`). An unknown
 `task_id` is reported (exit `1`).
 
@@ -662,19 +700,19 @@ A flip on evidence that cannot prove the task still succeeds, but warns
 on stderr: when none of the task's evidence records binds a file and one
 of them cites a canon command as its `--ref` (`canon gate check`,
 `canon status`), the warning says to bind the artifact or report that
-proves the task (`canon evidence add --task <id> --artifact <path>` or
+proves the task (`canon evidence add --task-id <id> --artifact <path>` or
 `--report <format>:<path>`). A canon command reports on canon's own
 records, so it is never the proof of a task.
 
 ```bash
-canon gate task my-change#5.2 --repo .
+canon task done my-change#5.2 --repo .
 ```
 
 This is canon's own authority for the checkbox grammar — always flip
-through `canon gate task`, never by hand.
+through `canon task done`, never by hand.
 
 Canon only reads external plans, with this one exception: for a task
-from an external plan source, `canon gate task` flips the checkbox in
+from an external plan source, `canon task done` flips the checkbox in
 that plan's own `tasks.md` (or plan document). It is the one place canon
 writes into an external plan; their briefs and approvals still live in
 `.canon/changes/<change>/brief.md`. (Open for the maintainer: record
@@ -711,8 +749,8 @@ commits everything staged. It stays safe to run anyway: with nothing
 staged it prints
 `nothing staged` and exits `0`. `divergence add` stages for `canon
 gate promote` and names it, under the same `write:` rule. Every
-other write — `review add`, `subject new|adopt|status`, `change new`, `scenario new`, `feature new`,
-`gate task` (it edits the plan document and re-ingests it)
+other write — `review scenario`, `subject new|adopt|move`, `change new`, `scenario new`, `feature new`,
+`task done` (it edits the plan document and re-ingests it)
 — is final when it returns, and its success line ends `— written
 directly; nothing to promote`. Full promote-on-write contract:
 `canon-storage` (Staged writes and promotion). `divergence resolve|defer|accept` stage and promote their own record in the same run and end `— staged and promoted in this run; nothing to promote`.
@@ -737,7 +775,7 @@ canon gate install-hooks --repo . --event PreToolUse --matcher Edit --command "c
 
 Prefer this over hand-editing `settings.json`/`hooks.json`.
 
-## `canon gate selftest`
+## `canon selftest --suite trust-spine-gate`
 
 Runs the shipped fixture corpus — one fixture per failure class (ten,
 including `false-success`), each a
@@ -747,7 +785,7 @@ deliberately broken corpus proving that class fires and ONLY that class
 check` run's green.
 
 ```bash
-canon gate selftest
+canon selftest --suite trust-spine-gate
 ```
 
 ## Reading a violation

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-2"
+  },
+  "at": "2026-10-23T14:20:21.033214586Z",
+  "code_tree": "54e8398434596ae2a031bdb2368efe1b8b19aff3",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test write_path the_scenario_index_a_writer_rebuilds_stays_out_of_git"
+  },
+  "evidence_note": {
+    "summary": "write_path the_scenario_index_a_writer_rebuilds_stays_out_of_git: 1 passed, 0 failed, 16 filtered out @ 271f2054"
+  },
+  "evidence_sha": "271f205407c281f5b00a7f62309c3f24a7fdb5bc",
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 46,
+  "scenario_id": "authoring.init.71",
+  "schema": 1,
+  "staging_id": "771d618487ba",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -52,7 +52,8 @@ fn write_brief(repo: &Path, text: &str) {
 fn check(repo: &Path) -> (i32, Value) {
     let out = run(repo, &["brief", "check", "--json"]);
     let json: Value = serde_json::from_str(&stdout(&out)).unwrap_or_else(|e| panic!("not json ({e}): {}", stdout(&out)));
-    (out.status.code().unwrap(), json)
+    // The report rides in `data`, also when blockers fail the envelope.
+    (out.status.code().unwrap(), json["data"].clone())
 }
 
 /// The report of `text` judged in a repo with `lang` configured (or not).
@@ -119,8 +120,8 @@ fn authoring_brief_check_01_a_brief_is_judged_in_the_language_it_is_written_in()
     assert_eq!((code, report["language"].as_str()), (0, Some("ko")), "advisories never fail the check");
     assert!(!hits(&report, "prose.ko-ending").is_empty() && !hits(&report, "prose.colloquial").is_empty(), "{report}");
 
-    // Bare `canon brief` reads the same resolution.
-    assert!(stdout(&run(dir.path(), &["brief"])).contains("polish"));
+    // `canon brief show` reads the same resolution.
+    assert!(stdout(&run(dir.path(), &["brief", "show"])).contains("polish"));
 }
 
 /// authoring.brief-check.02: a configured `language:` decides; when the
@@ -232,7 +233,7 @@ fn authoring_brief_check_04_other_cjk_scripts_are_named_and_get_no_prose_rules()
     let dir = repo_with_change(None);
     write_brief(dir.path(), &swap(&ja, "<!-- canon:section out-of-scope role=context -->\n", ""));
     let (code, report) = check(dir.path());
-    assert_eq!(code, 2, "{report}");
+    assert_eq!(code, 1, "{report}");
     assert_eq!(report["language"], "ja");
     assert!(rules(&report).contains(&"brief.section-missing".to_string()), "{report}");
     assert!(stdout(&run(dir.path(), &["brief", "check"])).contains("language: ja (detected)"));

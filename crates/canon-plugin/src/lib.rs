@@ -87,7 +87,7 @@ pub use diagnostic::{Diagnostic, Severity};
 pub use manifest::schema::{AttachesTo, FieldDecl, OverlayEntry, PluginManifest};
 pub use manifest::snapshot::{OverlayDecl, PluginSnapshot, ResolvedPlugin};
 pub use manifest::types::{Type, type_accepts};
-pub use overlay::{OverlayEnvelope, OverlayWriteError, compose_overlay_body, validate_overlay_body, write_overlay};
+pub use overlay::{OverlayEnvelope, OverlayWriteError, check_overlay, compose_overlay_body, validate_overlay_body, write_overlay};
 pub use project::project_overlay;
 pub use resolve_plugin_snapshot::resolve_plugin_snapshot;
 pub use selftest::selftest;

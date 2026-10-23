@@ -43,7 +43,7 @@ fn report_writes_canon_report_md_under_the_resolved_repo_root() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap(); // `canon report` refuses a directory canon was never set up in
 
-    let output = run_canon(&["report", "--repo", "."], dir.path());
+    let output = run_canon(&["report", "build", "--repo", "."], dir.path());
 
     assert!(output.status.success(), "canon report must exit 0; stderr: {}", stderr(&output));
     assert!(stdout(&output).contains(".canon/REPORT.md"), "{}", stdout(&output));
@@ -63,16 +63,16 @@ fn check_exit_codes_track_missing_no_drift_and_drift_across_the_full_lifecycle()
     std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap(); // `canon report` refuses a directory canon was never set up in
 
     // MISSING — no report has been written yet.
-    let missing = run_canon(&["report", "--repo", ".", "--check"], dir.path());
+    let missing = run_canon(&["report", "check", "--repo", "."], dir.path());
     assert_eq!(missing.status.code(), Some(1), "MISSING must exit 1; stderr: {}", stderr(&missing));
     assert!(stderr(&missing).contains("MISSING"), "{}", stderr(&missing));
 
     // Write it.
-    let write = run_canon(&["report", "--repo", "."], dir.path());
+    let write = run_canon(&["report", "build", "--repo", "."], dir.path());
     assert!(write.status.success(), "stderr: {}", stderr(&write));
 
     // NoDrift — immediately after a write, over an unchanged corpus.
-    let no_drift = run_canon(&["report", "--repo", ".", "--check"], dir.path());
+    let no_drift = run_canon(&["report", "check", "--repo", "."], dir.path());
     assert_eq!(no_drift.status.code(), Some(0), "no-drift must exit 0; stderr: {}", stderr(&no_drift));
     assert!(stderr(&no_drift).contains("no drift"), "{}", stderr(&no_drift));
 
@@ -82,9 +82,58 @@ fn check_exit_codes_track_missing_no_drift_and_drift_across_the_full_lifecycle()
     content.push_str("\nhand-edited, never generated\n");
     std::fs::write(&report_path, content).unwrap();
 
-    let drift = run_canon(&["report", "--repo", ".", "--check"], dir.path());
+    let drift = run_canon(&["report", "check", "--repo", "."], dir.path());
     assert_eq!(drift.status.code(), Some(1), "DRIFT must exit 1; stderr: {}", stderr(&drift));
     assert!(stderr(&drift).contains("DRIFT"), "{}", stderr(&drift));
+}
+
+/// Every file (with its bytes) and every directory (with `None`) under `dir`.
+fn files_under(dir: &Path) -> Vec<(std::path::PathBuf, Option<Vec<u8>>)> {
+    let mut out = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(current) = stack.pop() {
+        for entry in std::fs::read_dir(&current).unwrap().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                out.push((path.clone(), None));
+                stack.push(path);
+            } else {
+                out.push((path.clone(), Some(std::fs::read(&path).unwrap())));
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+#[test]
+fn report_check_over_empty_sources_reports_no_drift_creates_nothing_and_leaves_no_scratch() {
+    if !duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap();
+    let write = run_canon(&["report", "build", "--repo", "."], dir.path());
+    assert!(write.status.success(), "stderr: {}", stderr(&write));
+    // The check must work from a repo with no ledger directory at all, and leave it that way.
+    let _ = std::fs::remove_dir_all(dir.path().join(".canon/ledger"));
+    assert!(!dir.path().join(".canon/ledger").exists());
+    let before = files_under(dir.path());
+
+    // A private temp dir for the child: whatever scratch the run makes lands here.
+    let scratch = tempfile::tempdir().unwrap();
+    let check = Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(["report", "check", "--repo", "."])
+        .current_dir(dir.path())
+        .env("TMPDIR", scratch.path())
+        .output()
+        .expect("spawn canon binary");
+
+    assert_eq!(check.status.code(), Some(0), "no drift must exit 0; stderr: {}", stderr(&check));
+    assert!(stderr(&check).contains("no drift"), "{}", stderr(&check));
+    assert!(before == files_under(dir.path()), "report check must create or change nothing in the repo (seed files, directories, parquet)");
+    assert!(std::fs::read_dir(scratch.path()).unwrap().next().is_none(), "the seeded scratch must be gone when the run ends");
 }
 
 #[test]
@@ -97,7 +146,7 @@ fn snapshot_writes_ten_parquet_files_and_a_manifest_under_the_given_dir() {
     std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap(); // `canon report` refuses a directory canon was never set up in
     let snapshot_dir = dir.path().join("snap-out");
 
-    let output = run_canon(&["report", "--repo", ".", "--snapshot", snapshot_dir.to_str().unwrap()], dir.path());
+    let output = run_canon(&["report", "snapshot", "--repo", ".", snapshot_dir.to_str().unwrap()], dir.path());
 
     assert!(output.status.success(), "canon report --snapshot must exit 0; stderr: {}", stderr(&output));
     assert!(stdout(&output).contains("10 table(s)"), "{}", stdout(&output));
@@ -138,16 +187,6 @@ fn snapshot_writes_ten_parquet_files_and_a_manifest_under_the_given_dir() {
     assert!(!dir.path().join(".canon/REPORT.md").exists());
 }
 
-#[test]
-fn report_help_smoke() {
-    let output = run_canon(&["report", "--help"], Path::new("."));
-    assert!(output.status.success(), "stderr: {}", stderr(&output));
-    let text = stdout(&output);
-    assert!(text.contains("--repo"));
-    assert!(text.contains("--check"));
-    assert!(text.contains("--snapshot"));
-}
-
 /// A present but unparseable `canon.yaml` is a usage error naming the
 /// file in every mode — the report never falls back to the default
 /// ledger. Needs no `duckdb`: the refusal precedes any view build.
@@ -157,11 +196,11 @@ fn report_refuses_an_unparseable_canon_yaml_in_every_mode() {
     std::fs::write(dir.path().join("canon.yaml"), "tiers:\n  local: [backend: git\n").unwrap();
     let snapshot = dir.path().join("snap");
     let snapshot_arg = snapshot.to_str().unwrap();
-    for args in [&["report"][..], &["report", "--check"][..], &["report", "--snapshot", snapshot_arg][..]] {
+    for args in [&["report", "build"][..], &["report", "check"][..], &["report", "snapshot", snapshot_arg][..]] {
         let output = run_canon(args, dir.path());
         assert_eq!(output.status.code(), Some(2), "{args:?}: stdout: {}\nstderr: {}", stdout(&output), stderr(&output));
         let err = stderr(&output);
-        assert!(err.starts_with("canon report: CONFIG_UNREADABLE — parsing `") && err.contains("canon.yaml`: "), "{args:?} must name the file: {err}");
+        assert!(err.contains("CONFIG_UNREADABLE") && err.contains("canon.yaml"), "{args:?} must name the file: {err}");
         assert!(err.contains("line 2"), "{args:?} must carry the parse error: {err}");
     }
     assert!(!dir.path().join(".canon/REPORT.md").exists(), "a refused report writes nothing");

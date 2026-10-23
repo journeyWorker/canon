@@ -76,7 +76,7 @@ use std::path::PathBuf;
 use canon_model::family::inventory::InventoryFile;
 use canon_model::ids::ScenarioId;
 use canon_model::{Actor, RawRecord};
-use canon_plugin::{OverlayDecl, OverlayEnvelope, OverlayWriteError, compose_overlay_body, resolve_plugin_snapshot, write_overlay};
+use canon_plugin::{OverlayDecl, OverlayEnvelope, OverlayWriteError, check_overlay, compose_overlay_body, resolve_plugin_snapshot, write_overlay};
 use canon_store::git_tier::GitTier;
 use chrono::DateTime;
 use serde_json::json;
@@ -237,6 +237,8 @@ pub struct RootOverlaySyncOutcome {
 pub struct PluginSyncOutcome {
     pub plugin_id: String,
     pub roots: Vec<RootOverlaySyncOutcome>,
+    /// A `--dry-run` preview: `written` counts what the sync would write.
+    pub dry_run: bool,
 }
 
 impl PluginSyncOutcome {
@@ -259,7 +261,7 @@ impl PluginSyncOutcome {
 /// tasks.md 4.3: "Reuse `canon inventory sync`'s root/tier
 /// resolution"), so a `canon plugin sync porting` run writes into the
 /// SAME git tier `canon query --plugin porting` reads.
-pub fn run_sync(repo: &std::path::Path, plugin_id: &str, spec_root_override: Option<&std::path::Path>) -> Result<PluginSyncOutcome, PluginSyncError> {
+pub fn run_sync(repo: &std::path::Path, plugin_id: &str, spec_root_override: Option<&std::path::Path>, dry_run: bool) -> Result<PluginSyncOutcome, PluginSyncError> {
     let repo = resolve_repo_root(repo);
     let ctx = SyncCtx::from_repo(&repo)?;
     let spec_roots = ctx.spec_roots(spec_root_override)?;
@@ -287,7 +289,8 @@ pub fn run_sync(repo: &std::path::Path, plugin_id: &str, spec_root_override: Opt
                 Ok(candidates) => {
                     outcome.candidates = candidates.len();
                     for body in candidates {
-                        match write_overlay(&git, decl, body) {
+                        let receipt = if dry_run { check_overlay(&git, decl, &body) } else { write_overlay(&git, decl, body) };
+                        match receipt {
                             Ok(receipt) if receipt.deduped => outcome.deduped += 1,
                             Ok(_) => outcome.written += 1,
                             Err(e) => outcome.errors.push(overlay_write_error_to_string(&e)),
@@ -300,7 +303,11 @@ pub fn run_sync(repo: &std::path::Path, plugin_id: &str, spec_root_override: Opt
         }
     }
 
-    Ok(PluginSyncOutcome { plugin_id: plugin_id.to_string(), roots })
+    let outcome = PluginSyncOutcome { plugin_id: plugin_id.to_string(), roots, dry_run };
+    if outcome.is_clean() && outcome.total_written() == 0 {
+        crate::json_out::mark_unchanged();
+    }
+    Ok(outcome)
 }
 
 fn overlay_write_error_to_string(err: &OverlayWriteError) -> String {
@@ -311,10 +318,11 @@ fn overlay_write_error_to_string(err: &OverlayWriteError) -> String {
 /// `(root, overlay)` pair.
 pub fn format_human(outcome: &PluginSyncOutcome) -> String {
     let total_candidates: usize = outcome.roots.iter().map(|r| r.candidates).sum();
-    let mut out = format!("plugin {} — {} candidate(s), {} written, {} deduped\n", outcome.plugin_id, total_candidates, outcome.total_written(), outcome.total_deduped());
+    let verb = if outcome.dry_run { "would be written" } else { "written" };
+    let mut out = format!("plugin {} — {} candidate(s), {} {verb}, {} deduped\n", outcome.plugin_id, total_candidates, outcome.total_written(), outcome.total_deduped());
     for root in &outcome.roots {
         out.push_str(&format!(
-            "  root {} ({}) overlay {}: {} candidate(s), {} written, {} deduped\n",
+            "  root {} ({}) overlay {}: {} candidate(s), {} {verb}, {} deduped\n",
             root.root_id,
             root.root.display(),
             root.overlay,
@@ -329,30 +337,50 @@ pub fn format_human(outcome: &PluginSyncOutcome) -> String {
     out
 }
 
+/// One spec root of `canon plugin sync`'s report.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginSyncRootReport<'a> {
+    pub root_id: &'a str,
+    pub root: String,
+    pub overlay: &'a str,
+    pub candidates: usize,
+    pub written: usize,
+    pub deduped: usize,
+    pub errors: &'a [String],
+}
+
+/// `canon plugin sync`'s report (`PluginSyncReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginSyncReport<'a> {
+    pub plugin_id: &'a str,
+    /// True when `--dry-run` previewed the run without writing.
+    pub dry_run: bool,
+    pub clean: bool,
+    pub written: usize,
+    pub deduped: usize,
+    pub roots: Vec<PluginSyncRootReport<'a>>,
+}
+
+impl crate::json_out::Report for PluginSyncReport<'_> {}
+
 /// The `--json` data for [`PluginSyncOutcome`].
-pub fn format_json(outcome: &PluginSyncOutcome) -> serde_json::Value {
-    let roots: Vec<serde_json::Value> = outcome
+pub fn format_json(outcome: &PluginSyncOutcome) -> PluginSyncReport<'_> {
+    let roots = outcome
         .roots
         .iter()
-        .map(|root| {
-            serde_json::json!({
-                "rootId": root.root_id,
-                "root": root.root.display().to_string(),
-                "overlay": root.overlay,
-                "candidates": root.candidates,
-                "written": root.written,
-                "deduped": root.deduped,
-                "errors": root.errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
-            })
+        .map(|root| PluginSyncRootReport {
+            root_id: &root.root_id,
+            root: root.root.display().to_string(),
+            overlay: &root.overlay,
+            candidates: root.candidates,
+            written: root.written,
+            deduped: root.deduped,
+            errors: &root.errors,
         })
         .collect();
-    serde_json::json!({
-        "pluginId": outcome.plugin_id,
-        "clean": outcome.is_clean(),
-        "written": outcome.total_written(),
-        "deduped": outcome.total_deduped(),
-        "roots": roots,
-    })
+    PluginSyncReport { plugin_id: &outcome.plugin_id, dry_run: outcome.dry_run, clean: outcome.is_clean(), written: outcome.total_written(), deduped: outcome.total_deduped(), roots }
 }
 
 #[cfg(test)]

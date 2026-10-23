@@ -25,17 +25,17 @@ Every persona authored REAL canon artifacts with the real CLI:
 | Voice | What they did | canon surface |
 |---|---|---|
 | planning | wrote the v2 implementation plan (6 tasks, 59 steps, writing-plans format) | `docs/superpowers/plans/2026-07-14-red-panda-ridge-v2.md` → mirrored by `canon ingest plans` (dialect `superpowers`) |
-| design | design one-pager + authored the 8 new behavior scenarios | `canon context` → `canon scenario new` × 8 → `canon fmt --check` (6 files, 0 violations) |
-| dev | ported v1 → Vite/React/Pixi, implemented features against the 16-scenario corpus, flipped plan checkboxes | `canon query --kind scenario`, `canon retrieve --role dev` (pre-task guidance) |
-| test | independently verified all 16 scenarios in-browser; fixed 2 defects it could prove | `canon review add` × 16 (attested, pinned to the verified sha) |
-| review | code review; 8 confirmed ship-blockers filed as divergences; all fixed then resolved | `canon divergence add/promote` × 8 → `resolve` × 6 ids |
+| design | design one-pager + authored the 8 new behavior scenarios | `canon context` → `canon scenario new` × 8 → `canon format` (6 files, 0 violations) |
+| dev | ported v1 → Vite/React/Pixi, implemented features against the 16-scenario corpus, flipped plan checkboxes | `canon query --kind scenario`, `canon retrieve --for-role dev` (pre-task guidance) |
+| test | independently verified all 16 scenarios in-browser; fixed 2 defects it could prove | `canon review scenario` × 16 (attested, bound to the verified revision) |
+| review | code review; 8 confirmed ship-blockers filed as divergences; all fixed then resolved | `canon divergence add` × 8 → `canon divergence resolve` × 6 ids |
 
 The trust chain this demonstrates:
 
 ```
 dev claims done   → plan checkboxes → canon ingest plans   (mirror, never trusted)
-test proves done  → canon review add per scenario           (evidence)
-review disagrees  → canon divergence add/promote          (tracked, run_seq-ordered)
+test proves done  → canon review scenario per scenario        (evidence)
+review disagrees  → canon divergence add               (tracked, run_seq-ordered)
 fix lands         → re-verify → attest → divergence resolve (burndown to zero)
                   → canon gate check: clean (0 violations)
 ```
@@ -68,9 +68,9 @@ Each test checks every Then of its scenario. One call binds the report
 to all 16 scenarios, each record getting the verdict of its own case:
 
 ```bash
-canon evidence add --project-id platformer --kind test-run \
+canon evidence add --project-id platformer --class test-run \
   --ref "cd examples/platformer && bun run test:junit" --role implementer \
-  --report junit:examples/platformer/reports/junit.xml --all-scenarios --promote
+  --report junit:examples/platformer/reports/junit.xml --all-scenarios
 ```
 
 The bound report is stored in `.canon/artifacts`. CI runs the suite in

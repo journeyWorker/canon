@@ -1,11 +1,10 @@
 //! `canon gate` (S5 wave-2-part2): the trust-spine gate's CLI surface over
 //! `canon-gate`'s library — `check` (the DISPATCHER, task 1.9, assembling
-//! `canon_gate::check_set` over a repo's `GateContext`), `task`
-//! (evidence-gated checkbox flip, task 3.2's `gate_task` wiring),
+//! `canon_gate::check_set` over a repo's `GateContext`), `run_task`
+//! (the evidence-gated checkbox flip behind `canon task done`),
 //! `promote` (O13 staging→committed, task 2.2's `promote` wiring),
 //! `install-hooks` (task 4.1's CLI wiring over `install_hooks` +
-//! `PRE_COMMIT_SCRIPT`), and `selftest` (task 5.2's CLI wiring over
-//! `canon_gate::selftest::run`). Every subcommand that takes `--repo`
+//! `PRE_COMMIT_SCRIPT`). Every subcommand that takes `--repo`
 //! resolves it through [`crate::context::resolve_repo_root`] — the SAME
 //! nearest-ancestor `canon.yaml` walk `canon context`/`canon fmt` use
 //! (design D7) — so a gate subcommand run from a subdirectory reads the
@@ -14,7 +13,7 @@
 //! doc is explicit that it takes `repo` AS GIVEN, no walk — the walk
 //! lives here, exactly once, mirroring `run_context`'s identical split.
 //!
-//! # `canon gate task` is dialect-agnostic (s35 `gate-plan-dialect-seam`)
+//! # `canon task done` is dialect-agnostic (s35 `gate-plan-dialect-seam`)
 //! [`run_task`] no longer hardcodes one plan dialect's directory layout.
 //! It resolves the task's plan document from `canon.yaml`'s `plans:`
 //! sources ([`crate::plans::load_plan_sources_for_gate`]; an absent
@@ -31,7 +30,7 @@
 //! reads/writes a plan document, and this module never encodes a
 //! dialect's on-disk shape.
 //!
-//! # `canon gate task`'s typed-evidence path (S10 part2, design.md D4)
+//! # `canon task done`'s typed-evidence path (S10 part2, design.md D4)
 //! [`run_task`] additionally consults the winning dialect's typed-atoms
 //! file (`PlanWriteBack::typed_atoms_path`, e.g. the openspec dialect's
 //! `<root>/openspec/changes/<change_id>/tasks.vocab.yaml`) — carrying
@@ -89,7 +88,7 @@
 use std::path::{Path, PathBuf};
 
 use canon_gate::{
-    evidence_note_of, gate_task, install_hooks, promote as gate_promote, promote_staged, selftest, EvidenceNote, FailureClass, GateContext, GateCtx, GateReport, HookEntry,
+    evidence_note_of, gate_task, install_hooks, promote as gate_promote, promote_staged, EvidenceNote, FailureClass, GateContext, GateCtx, GateReport, HookEntry,
     InstallOutcome, Promoted, PromoteReport, TaskFlipDecision, FAILURE_CLASSES, PRE_COMMIT_SCRIPT, STAGED_KINDS,
 };
 use canon_ingest::{PlanWriteBack, WriteBackError};
@@ -98,9 +97,46 @@ use canon_model::{validate_evidence_batch, Actor, ChangeId, Envelope, RawRecord,
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use chrono::Utc;
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
+
+/// One violation of `canon gate check`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GateViolation<'a> {
+    pub class: &'a str,
+    pub subject: &'a str,
+    pub message: &'a str,
+    /// The grep-stable wire line: `<class> <subject> — <message>`.
+    pub line: String,
+}
+
+/// A condition `canon gate check` reports without failing on it.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GateAdvisory {
+    /// `spec_coverage_off`, `policy_approval`, `evidence_binding`, `review_waivers`, `accepted_divergence`, `unmigrated_review`, `brief_overrides` or `unstored_attachments`.
+    pub kind: String,
+    pub message: String,
+    pub items: Vec<String>,
+}
+
+/// `canon gate check`: violations and advisories. On exit 1 the report stays in `data`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GateCheckReport<'a> {
+    pub clean: bool,
+    /// Present (`true`) when nothing was examined, so a vacuous pass does not read as clean.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unverifiable: Option<bool>,
+    pub violations: Vec<GateViolation<'a>>,
+    pub advisories: Vec<GateAdvisory>,
+}
+
+impl crate::reports::Report for GateCheckReport<'_> {}
 
 /// `canon gate check [--repo] [--release]` (task 1.9, the dispatcher):
 /// assembles `canon_gate::check_set(release)` (coverage/ledger/staleness/
@@ -110,10 +146,11 @@ use crate::context::resolve_repo_root;
 /// engaged) and runs it over the resolved repo's `GateContext`.
 pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
+    crate::legacy::announce(&repo);
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon gate check", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon gate check", json);
         }
     };
     let registry = SchemaRegistry::load();
@@ -130,6 +167,9 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
         }
     };
 
+    // The code as it stands (D7b): the staleness check compares each record's code tree with it, not commits.
+    gate_context.code_tree = crate::git_rev::code_tree(&repo, None).ok().map(|c| c.tree);
+
     // A stale scenario index is graded as the refresh would leave it, in memory: a read command writes nothing.
     crate::inventory::overlay_stale_index(&mut gate_context);
     let checks = canon_gate::check_set(release);
@@ -145,9 +185,15 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
         .collect::<Vec<_>>();
     // An approval that no longer holds fails closed (0.22 D3); a policy never approved is only an advisory below.
     let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).chain(unrefreshable).chain(reverify).chain(crate::policy_approval::violation(&repo)).collect());
-    let mut advisories: Vec<serde_json::Value> = Vec::new();
-    let advisory = |kind: &str, message: String, items: Vec<String>| serde_json::json!({ "kind": kind, "message": message, "items": items });
-    crate::say_raw!(json, "{}", format_gate_report(&report));
+    let mut advisories: Vec<GateAdvisory> = Vec::new();
+    let advisory = |kind: &str, message: String, items: Vec<String>| GateAdvisory { kind: kind.to_string(), message, items };
+    let coverage = gate_coverage(&repo, &gate_context);
+    let unverifiable = report.is_clean() && coverage.examined_nothing();
+    if unverifiable {
+        crate::say_raw!(json, "canon gate check: unverifiable — nothing to examine (0 scenarios, 0 subjects, 0 changes, 0 evidence records)\n");
+    } else {
+        crate::say_raw!(json, "{}", format_gate_report(&report));
+    }
     if let Some(count) = canon_gate::spec_coverage::coverage_off_scenarios(&gate_context) {
         crate::say_raw!(json, "{}", format_coverage_off_advisory(count));
         advisories.push(advisory("spec_coverage_off", format!("{count} scenario(s) are not checked for evidence; see .canon/policy.yaml"), Vec::new()));
@@ -191,25 +237,55 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     if !unstored.is_empty() {
         advisories.push(advisory(
             "unstored_attachments",
-            format!("{} bound file(s) not in the artifact store; run `canon evidence vault` to store them", unstored.len()),
+            format!("{} bound file(s) not in the artifact store; run `canon artifacts store` to store them", unstored.len()),
             unstored.iter().map(|a| a.line()).collect(),
         ));
     }
-    let violations: Vec<serde_json::Value> = report
+    let violations: Vec<GateViolation> = report
         .violations
         .iter()
-        .map(|v| serde_json::json!({ "class": v.class.as_str(), "subject": v.subject, "message": v.detail, "line": v.line() }))
+        .map(|v| GateViolation { class: v.class.as_str(), subject: &v.subject, message: &v.detail, line: v.line() })
         .collect();
-    let data = serde_json::json!({ "clean": report.is_clean(), "violations": violations, "advisories": advisories });
+    let mut data = GateCheckReport { clean: report.is_clean(), unverifiable: None, violations, advisories };
+    if unverifiable {
+        // Nothing was examined: a vacuous pass must not read as clean (D3).
+        data.clean = false;
+        data.unverifiable = Some(true);
+        return crate::coverage::unverifiable_error("canon gate check", "no scenario, subject, change or evidence record", "run `canon inventory sync` after authoring specs, or `canon context` to see what can be authored, then run `canon gate check` again")
+            .emit_with_data_and_meta("canon gate check", json, &data, coverage.meta());
+    }
     if report.is_clean() {
         if json {
-            crate::json_out::data("gate check", data);
+            crate::json_out::data_with_meta("gate check", &data, coverage.meta());
         }
         return 0;
     }
     CliError::failed("GATE_VIOLATIONS", format!("{} violation(s)", report.violations.len()))
         .hint("fix each violation named in data.violations, then run `canon gate check` again")
-        .emit_with_data("canon gate check", json, data)
+        .emit_with_data_and_meta("canon gate check", json, &data, coverage.meta())
+}
+
+/// What the gate looked at: the configured spec roots with the scenarios
+/// each holds, and the subjects, changes and evidence it joined.
+fn gate_coverage(repo: &Path, gate: &canon_gate::GateContext) -> crate::coverage::Coverage {
+    let mut coverage = crate::coverage::Coverage::new();
+    match crate::inventory::load_spec_roots(&repo.join("canon.yaml")) {
+        Ok(roots) => {
+            for root in roots {
+                let scenarios = gate.scenarios.iter().filter(|s| s.project_id == root.id).count();
+                coverage.root(root.id.as_str(), root.root.strip_prefix(repo).unwrap_or(&root.root).display().to_string(), scenarios);
+            }
+        }
+        Err(err) => {
+            coverage.skip("specs.roots", err.to_string());
+        }
+    }
+    coverage
+        .count("scenarios", gate.scenarios.len())
+        .count("subjects", gate.subjects.len())
+        .count("changes", gate.changes.len())
+        .count("evidence", gate.evidence.len() + gate.audits.len());
+    coverage
 }
 
 /// The one-line advisory (0.14 D3) printed when the spec corpus has
@@ -229,7 +305,7 @@ fn format_unstored_attachments(unstored: &[canon_gate::UnstoredAttachment]) -> S
         return String::new();
     }
     let mut out = format!(
-        "\nevidence artifacts: {} bound file(s) not in the artifact store — not failing the gate; run `canon evidence vault` to store them before the working tree changes:\n",
+        "\nevidence artifacts: {} bound file(s) not in the artifact store — not failing the gate; run `canon artifacts store` to store them before the working tree changes:\n",
         unstored.len()
     );
     for attachment in unstored {
@@ -252,7 +328,7 @@ fn format_brief_overrides(lines: &[String]) -> String {
     out
 }
 /// `spec_coverage.require_review`'s waived gaps (issue #2): a subject
-/// moved under `canon subject status --override-reason` keeps its gaps
+/// moved under `canon subject move --override-reason` keeps its gaps
 /// visible here, named with the waiver, without failing the gate.
 /// Prints nothing when there are none, so a repo without waivers sees
 /// no new output.
@@ -355,7 +431,7 @@ pub(crate) struct LocatedTask {
 /// record this function's caller then refuses.
 ///
 /// `Err` carries the operator-facing message ALREADY formed, including
-/// the sources consulted, minus the `canon gate task: ` prefix: every
+/// the sources consulted, minus the `canon task done: ` prefix: every
 /// location failure is a usage failure (exit `2`) for the flip, so the
 /// caller needs no further discrimination between them.
 fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
@@ -367,7 +443,7 @@ fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
         // ANY task id to live in. Naming a synthesized openspec source
         // here would blame a dialect the operator never configured —
         // the same refusal `crate::dispatch::DispatchError::NoPlanSources`
-        // already makes for `--task`.
+        // already makes for `--task-id`.
         return Err(format!(
             "this repo configures no plan sources (no `{}` and no `plans.sources` entries in canon.yaml), so no plan document exists for {task_id} to live in — write the change with `canon change new`, or list your external plans under `plans.sources`",
             canon_model::paths::CHANGES_DIR
@@ -393,7 +469,21 @@ fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
     Err(format!("no plan source locates {task_id} (consulted: {})", consulted.join("; ")))
 }
 
-/// `canon gate task <task_id> [--repo]` (task 3.2's CLI wiring, extended
+/// `canon task done`: the task row flipped, or already done.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskDoneReport<'a> {
+    pub task_id: &'a str,
+    /// False when the row was already `[x]`.
+    pub flipped: bool,
+    /// The task document written; absent when nothing was flipped.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub document: Option<String>,
+}
+
+impl crate::reports::Report for TaskDoneReport<'_> {}
+
+/// `canon task done <task_id> [--repo]` (task 3.2's CLI wiring, extended
 /// by S10 part2 task 4.4, made dialect-agnostic by s35 `gate-plan-
 /// dialect-seam`): resolves the task's plan document via the configured
 /// plan sources' [`PlanWriteBack::locate_task`] (first hit wins, compat
@@ -410,7 +500,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
     let task_id = match TaskId::parse(task_id_str) {
         Ok(t) => t,
         Err(e) => {
-            return CliError::refused("GATE_TASK_INVALID_ARGUMENT", e.to_string()).hint("`canon schema gate task` lists the accepted arguments and their forms").emit("canon gate task", json);
+            return CliError::refused("GATE_TASK_INVALID_ARGUMENT", e.to_string()).hint("`canon schema task done` lists the accepted arguments and their forms").emit("canon task done", json);
         }
     };
 
@@ -422,21 +512,21 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
     let LocatedTask { write_back, document_path, source_root } = match locate_task(&repo, &task_id) {
         Ok(located) => located,
         Err(e) => {
-            return CliError::refused("TASK_NOT_FOUND", e.to_string()).hint("task ids look like <change_id>#<n>; open the change's plan document to find the right number").emit("canon gate task", json);
+            return CliError::refused("TASK_NOT_FOUND", e.to_string()).hint("task ids look like <change_id>#<n>; open the change's plan document to find the right number").emit("canon task done", json);
         }
     };
 
     let document = match std::fs::read_to_string(&document_path) {
         Ok(d) => d,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", format!("cannot read {}: {e}", document_path.display())).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon gate task", json);
+            return CliError::refused("REPO_UNREADABLE", format!("cannot read {}: {e}", document_path.display())).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon task done", json);
         }
     };
 
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon gate task", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon task done", json);
         }
     };
     let registry = SchemaRegistry::load();
@@ -447,7 +537,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
     let gate_context = match GateContext::load(ctx, &registry, now) {
         Ok(gc) => gc,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon gate task", json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon task done", json);
         }
     };
 
@@ -457,7 +547,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
     let raw_records = match GitTier::new(gate_context.ctx.ledger_root.clone()).read_history(RecordKind::EvidenceRecord) {
         Ok(read) => read.records,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon gate task", json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon task done", json);
         }
     };
 
@@ -474,7 +564,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
         Ok(Some(atom)) => match typed_path_evidence(&repo, &atom, &raw_records, &task_id) {
             Ok(pair) => pair,
             Err(e) => {
-                return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon gate task", json);
+                return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
             }
         },
         Ok(None) => {
@@ -482,13 +572,13 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
             let notes = match notes_of(same_task_id, &task_id) {
                 Ok(n) => n,
                 Err(e) => {
-                    return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon gate task", json);
+                    return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
                 }
             };
             (canon_gate::history::evidence_history(&gate_context), notes)
         }
         Err(e) => {
-            return CliError::refused("TYPED_ATOMS_INVALID", e.to_string()).hint("fix the typed evidence atom in the plan task (the message names it), then run the command again").emit("canon gate task", json);
+            return CliError::refused("TYPED_ATOMS_INVALID", e.to_string()).hint("fix the typed evidence atom in the plan task (the message names it), then run the command again").emit("canon task done", json);
         }
     };
 
@@ -507,7 +597,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
     let flip = match write_back.flip_task(&document, &task_id, approved_note.as_deref().unwrap_or("")) {
         Ok(o) => o,
         Err(e @ WriteBackError::RowNotFound(_)) => {
-            return CliError::failed("TASK_ROW_NOT_FOUND", e.to_string()).hint("check that the task number exists in the plan document; `canon ingest plans` re-reads the plans").emit("canon gate task", json);
+            return CliError::failed("TASK_ROW_NOT_FOUND", e.to_string()).hint("check that the task number exists in the plan document; `canon ingest plans` re-reads the plans").emit("canon task done", json);
         }
         // Gate-red, not usage (the variant's own doc): the offending
         // text came from an already-COMMITTED ledger record's approved
@@ -518,10 +608,10 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
         // authored some other way still cannot forge a second checked
         // row.
         Err(e @ WriteBackError::MultiLineEvidenceNote { .. }) => {
-            return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon gate task", json);
+            return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
         }
         Err(e @ WriteBackError::Unsupported { .. }) => {
-            return CliError::refused("GATE_TASK_UNSUPPORTED", e.to_string()).hint("use a form the command supports (`canon schema gate task` lists the arguments)").emit("canon gate task", json);
+            return CliError::refused("GATE_TASK_UNSUPPORTED", e.to_string()).hint("use a form the command supports (`canon schema task done` lists the arguments)").emit("canon task done", json);
         }
     };
 
@@ -529,9 +619,10 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
         // Row already `[x]` — idempotent no-op, regardless of the
         // evidence decision (fail-open only for an ALREADY-satisfied
         // row, never a fresh flip).
-        crate::say!(json, "canon gate task: {task_id} already done (idempotent no-op)");
+        crate::say!(json, "canon task done: {task_id} already done (unchanged; nothing written)");
+        crate::json_out::mark_unchanged();
         if json {
-            crate::json_out::data("gate task", serde_json::json!({ "taskId": task_id.as_str(), "flipped": false }));
+            crate::json_out::data("task done", &TaskDoneReport { task_id: task_id.as_str(), flipped: false, document: None });
         }
         return 0;
     }
@@ -539,24 +630,24 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
     match decision {
         TaskFlipDecision::Approved { .. } => {
             if let Err(e) = std::fs::write(&document_path, &flip.document) {
-                return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", document_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon gate task", json);
+                return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", document_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon task done", json);
             }
-            crate::say!(json, "canon gate task: {task_id} flipped — {}", crate::write_mode::DIRECT);
+            crate::say!(json, "canon task done: {task_id} flipped — {}", crate::write_mode::DIRECT);
             if let Some(warning) = canon_command_proof_warning(&task_id, &raw_records) {
-                eprintln!("{warning}");
+                crate::warn_err!("{warning}");
             }
             refresh_task_status(&repo, &task_id.change_id());
             let change = crate::next::Scope::Change(task_id.change_id().as_str().to_string());
-            crate::next::finish(&repo, "gate task", &change, false, json, serde_json::json!({ "taskId": task_id.as_str(), "flipped": true, "document": document_path.display().to_string() }));
+            crate::next::finish(&repo, "task done", &change, false, json, &TaskDoneReport { task_id: task_id.as_str(), flipped: true, document: Some(document_path.display().to_string()) });
             0
         }
         TaskFlipDecision::Blocked { violations } => {
-            CliError::failed("GATE_TASK_BLOCKED", violations.iter().map(|v| v.line()).collect::<Vec<_>>().join("\n")).hint("record the missing evidence with `canon evidence add --task <id> ...`, then run `canon gate task` again").emit("canon gate task", json)
+            CliError::failed("GATE_TASK_BLOCKED", violations.iter().map(|v| v.line()).collect::<Vec<_>>().join("\n")).hint("record the missing evidence with `canon evidence add --task-id <id> ...`, then run `canon task done` again").emit("canon task done", json)
         }
     }
 }
 
-/// The warning `canon gate task` prints, without refusing, when a task
+/// The warning `canon task done` prints, without refusing, when a task
 /// flips on evidence that cannot prove it (0.15 D6, dogfood eval 2
 /// G13): none of the task's evidence records binds a file, and one of
 /// them cites a canon command (`--ref "canon gate check"`) as its proof.
@@ -573,7 +664,7 @@ fn canon_command_proof_warning(task_id: &TaskId, raw_records: &[RawRecord]) -> O
     }
     let canon_ref = task_records.iter().find_map(|body| body.get("evidence").and_then(|e| e.get("ref")).and_then(|r| r.as_str()).filter(|r| r.starts_with("canon ")))?;
     Some(format!(
-        "canon gate task: warning — {task_id}'s evidence binds no file, and its --ref is a canon command (`{canon_ref}`), which reports on canon's own records rather than proving the task; bind the artifact or report that proves it: canon evidence add --task {task_id} --artifact <path> (or --report <format>:<path>)"
+        "canon task done: warning — {task_id}'s evidence binds no file, and its --ref is a canon command (`{canon_ref}`), which reports on canon's own records rather than proving the task; bind the artifact or report that proves it: canon evidence add --task-id {task_id} --artifact <path> (or --report <format>:<path>)"
     ))
 }
 
@@ -591,8 +682,8 @@ fn canon_command_proof_warning(task_id: &TaskId, raw_records: &[RawRecord]) -> O
 fn refresh_task_status(repo: &Path, change_id: &ChangeId) {
     match crate::plans::refresh_change(repo, change_id) {
         Ok(refresh) if refresh.changes_parsed > 0 && refresh.malformed == 0 => {}
-        Ok(_) => eprintln!("canon gate task: WARN the change `{}` did not re-import cleanly; run `canon ingest plans` to see why", change_id.as_str()),
-        Err(e) => eprintln!("canon gate task: WARN the task status record was not refreshed ({e}); run `canon ingest plans` so `canon query --kind task` matches the plan"),
+        Ok(_) => crate::warn_err!("canon task done: WARN the change `{}` did not re-import cleanly; run `canon ingest plans` to see why", change_id.as_str()),
+        Err(e) => crate::warn_err!("canon task done: WARN the task status record was not refreshed ({e}); run `canon ingest plans` so `canon query --kind task` matches the plan"),
     }
 }
 
@@ -819,7 +910,7 @@ fn raw_evidence_kind_ref(raw: &serde_json::Value) -> Option<(String, String)> {
 /// [`run_promote`] drains: `<ledger_root>/_staging`, a SIBLING of the
 /// committed `kind=<k>/` tree — a committed read walks
 /// `<ledger_root>/kind=evidence_record/`, so a staged record is
-/// invisible to `canon gate task`/`canon gate check` until promotion
+/// invisible to `canon task done`/`canon gate check` until promotion
 /// (the same sibling-directory arrangement `canon_gate::
 /// divergence_staging_dir`'s `_staging_divergence` already uses).
 ///
@@ -831,6 +922,37 @@ pub(crate) fn evidence_staging_dir(ledger_root: &Path) -> PathBuf {
     ledger_root.join("_staging")
 }
 
+/// One staged record `canon gate promote` committed or recovered.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PromotedEntry {
+    pub kind: &'static str,
+    pub label: String,
+    /// The ledger path it landed at.
+    pub target: String,
+}
+
+/// One staged record `canon gate promote` refused.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RefusedEntry {
+    pub class: &'static str,
+    pub subject: String,
+    pub message: String,
+}
+
+/// `canon gate promote`: what left staging. On exit 1 (`PROMOTE_REFUSED`) the report stays in `data`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GatePromoteReport {
+    pub dry_run: bool,
+    pub promoted: Vec<PromotedEntry>,
+    pub recovered: Vec<PromotedEntry>,
+    pub refused: Vec<RefusedEntry>,
+}
+
+impl crate::reports::Report for GatePromoteReport {}
+
 /// `canon gate promote [--repo] [--dry-run]` (task 2.2/2.3's CLI wiring;
 /// s43 extends it to every kind in `canon_gate::STAGED_KINDS`):
 /// `_staging/` → committed, with a monotonic per-(role, surface)
@@ -840,33 +962,40 @@ pub(crate) fn evidence_staging_dir(ledger_root: &Path) -> PathBuf {
 /// idempotent per staged candidate (its own recovery section), so a
 /// re-run drains a candidate whose record already landed instead of
 /// committing it twice, and still exits `0`.
-pub fn run_promote(repo: &Path, dry_run: bool, json: bool) -> i32 {
+pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon gate promote", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon gate promote", json);
         }
     };
     let staging = GitTier::new(evidence_staging_dir(&ctx.ledger_root));
     let committed = GitTier::new(ctx.ledger_root.clone());
-    match gate_promote(&staging, &committed, dry_run) {
+    let promoted = match kind {
+        Some(kind) => canon_gate::promote_only(kind, &staging, &committed, dry_run),
+        None => gate_promote(&staging, &committed, dry_run),
+    };
+    match promoted {
         Ok(report) => {
             crate::say_raw!(json, "{}", format_promote_report(&report, dry_run));
-            let data = promote_json(&report, dry_run);
+            let data = promote_report(&report, dry_run);
+            if report.is_clean() && report.promoted.is_empty() && report.recovered.is_empty() {
+                crate::json_out::mark_unchanged();
+            }
             if report.is_clean() {
                 if dry_run {
                     if json {
-                        crate::json_out::data("gate promote", data);
+                        crate::json_out::data("gate promote", &data);
                     }
                 } else {
-                    crate::next::finish(&repo, "gate promote", &crate::next::Scope::Repo, false, json, data);
+                    crate::next::finish(&repo, "gate promote", &crate::next::Scope::Repo, false, json, &data);
                 }
                 0
             } else {
                 CliError::failed("PROMOTE_REFUSED", format!("{} staged record(s) refused", report.refused.len()))
                     .hint("each refusal is named in data.refused; fix the staged record or re-add it, then run `canon gate promote` again")
-                    .emit_with_data("canon gate promote", json, data)
+                    .emit_with_data("canon gate promote", json, &data)
             }
         }
         Err(e) => {
@@ -876,16 +1005,16 @@ pub fn run_promote(repo: &Path, dry_run: bool, json: bool) -> i32 {
 }
 
 /// The `--json` data for one [`PromoteReport`].
-pub(crate) fn promote_json(report: &PromoteReport, dry_run: bool) -> serde_json::Value {
-    let landed = |list: &[Promoted]| -> Vec<serde_json::Value> {
-        list.iter().map(|p| serde_json::json!({ "kind": p.kind.as_str(), "label": p.label(), "target": p.target.display().to_string() })).collect()
+pub(crate) fn promote_report(report: &PromoteReport, dry_run: bool) -> GatePromoteReport {
+    let landed = |list: &[Promoted]| -> Vec<PromotedEntry> {
+        list.iter().map(|p| PromotedEntry { kind: p.kind.as_str(), label: p.label(), target: p.target.display().to_string() }).collect()
     };
-    serde_json::json!({
-        "dryRun": dry_run,
-        "promoted": landed(&report.promoted),
-        "recovered": landed(&report.recovered),
-        "refused": report.refused.iter().map(|r| serde_json::json!({ "class": r.violation.class.as_str(), "subject": r.violation.subject, "message": r.violation.detail })).collect::<Vec<_>>(),
-    })
+    GatePromoteReport {
+        dry_run,
+        promoted: landed(&report.promoted),
+        recovered: landed(&report.recovered),
+        refused: report.refused.iter().map(|r| RefusedEntry { class: r.violation.class.as_str(), subject: r.violation.subject.clone(), message: r.violation.detail.clone() }).collect(),
+    }
 }
 
 /// Where a staged write ended up once its command decided whether to
@@ -924,12 +1053,12 @@ impl StagedOutcome {
 
     /// The `--json` record of where the write landed: `staged` is the staged
     /// location, `committed` the ledger path once promoted (`null` otherwise).
-    pub(crate) fn json(&self, staged: &str) -> serde_json::Value {
+    pub(crate) fn landing(&self, staged: &str) -> crate::retry::Landing {
         let committed = match self {
-            Self::Promoted { target } => Some(target.as_str()),
+            Self::Promoted { target } => Some(target.clone()),
             Self::Staged | Self::Refused => None,
         };
-        serde_json::json!({ "staged": staged, "committed": committed })
+        crate::retry::Landing { staged: Some(staged.to_string()), committed }
     }
 
     /// The exit code: a refused promotion is refused-by-policy.
@@ -959,7 +1088,7 @@ pub(crate) fn promote_after_stage(command: &str, ledger_root: &Path, location: &
         Err(refusal) => {
             crate::say_raw!(json, "{}", refusal.lines);
             match refusal.data {
-                Some(data) => refusal.error.emit_with_data(command, json, data),
+                Some(data) => refusal.error.emit_with_data(command, json, &data),
                 None => refusal.error.emit(command, json),
             };
             StagedOutcome::Refused
@@ -973,7 +1102,7 @@ pub(crate) fn promote_after_stage(command: &str, ledger_root: &Path, location: &
 pub(crate) struct PromoteRefusal {
     pub(crate) lines: String,
     pub(crate) error: CliError,
-    pub(crate) data: Option<serde_json::Value>,
+    pub(crate) data: Option<GatePromoteReport>,
 }
 
 /// [`promote_after_stage`]'s promotion, without its reporting: the committed
@@ -988,7 +1117,7 @@ pub(crate) fn try_promote(ledger_root: &Path, location: &str) -> Result<String, 
                 lines: format_candidate_lines(&report, false),
                 error: CliError::failed("PROMOTE_REFUSED", "staged, but promotion refused the record; it stays staged")
                     .hint("the refusal is named in data.refused; fix it and run `canon gate promote`"),
-                data: Some(promote_json(&report, false)),
+                data: Some(promote_report(&report, false)),
             }),
         },
         Err(e) => Err(PromoteRefusal { lines: String::new(), error: CliError::failed("PROMOTE_FAILED", format!("staged, but promoting it failed: {e}")).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`"), data: None }),
@@ -1070,6 +1199,18 @@ fn promotable_kinds() -> String {
     STAGED_KINDS.iter().map(|staged| crate::query::kind_cli_name(staged.kind)).collect::<Vec<_>>().join(", ")
 }
 
+/// `canon gate install-hooks`: whether the hooks changed.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GateInstallHooksReport {
+    /// True when `--dry-run` previewed the install without writing.
+    pub dry_run: bool,
+    pub installed: bool,
+    pub pre_commit_script_written: bool,
+}
+
+impl crate::reports::Report for GateInstallHooksReport {}
+
 /// `canon gate install-hooks [--repo] [--event] [--matcher] [--command]
 /// [--timeout]` (task 4.1's CLI wiring, design decision 8): idempotent,
 /// diff-only merge of one hook-seam entry into BOTH
@@ -1082,7 +1223,7 @@ fn promotable_kinds() -> String {
 /// `<repo>/.canon/scripts/`, matching spec.md's "a non-donor repo gets a generic
 /// pre-commit script" scenario.
 #[allow(clippy::too_many_arguments)]
-pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, command: &str, timeout: u32, json: bool) -> i32 {
+pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, command: &str, timeout: u32, dry_run: bool, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let entry = HookEntry::new(event, matcher.map(str::to_string), command, timeout);
 
@@ -1090,14 +1231,28 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
     let codex_path = repo.join(".codex").join("hooks.json");
 
     let already_has_canon_gate_command = any_canon_gate_command(&read_json_or_default(&claude_path)) || any_canon_gate_command(&read_json_or_default(&codex_path));
+    let script_path = repo.join(paths::PRE_COMMIT_SCRIPT);
+    let writes_script = !already_has_canon_gate_command && !script_path.exists();
 
-    let claude_outcome = match install_into(&claude_path, &entry) {
+    // Every target is checked before the first is written: a refusal on a later one leaves the earlier ones as they were.
+    for path in [&claude_path, &codex_path] {
+        if let Err(e) = install_into(path, &entry, true) {
+            return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
+        }
+    }
+    if writes_script {
+        if let Err(e) = crate::write_mode::check_creatable(&script_path, true) {
+            return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", script_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon gate install-hooks", json);
+        }
+    }
+
+    let claude_outcome = match install_into(&claude_path, &entry, dry_run) {
         Ok(o) => o,
         Err(e) => {
             return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
         }
     };
-    let codex_outcome = match install_into(&codex_path, &entry) {
+    let codex_outcome = match install_into(&codex_path, &entry, dry_run) {
         Ok(o) => o,
         Err(e) => {
             return CliError::refused("HOOKS_INSTALL_FAILED", e.to_string()).hint("check that this is a git checkout whose hooks directory is writable, then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
@@ -1105,25 +1260,27 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
     };
 
     let mut script_written = false;
-    if !already_has_canon_gate_command {
-        let script_path = repo.join(paths::PRE_COMMIT_SCRIPT);
-        if !script_path.exists() {
+    if writes_script {
+        if !dry_run {
             if let Err(e) = write_pre_commit_script(&script_path) {
                 return CliError::refused("WRITE_FAILED", format!("failed to write {}: {e}", script_path.display())).hint("check that the path is writable and the disk has room, then run the command again").emit("canon gate install-hooks", json);
             }
-            script_written = true;
-            crate::say!(json, "canon gate install-hooks: wrote {}", script_path.display());
         }
+        script_written = true;
+        crate::say!(json, "canon gate install-hooks: {} {}", if dry_run { "would write" } else { "wrote" }, script_path.display());
     }
 
     let changed = !matches!((claude_outcome, codex_outcome), (InstallOutcome::Unchanged, InstallOutcome::Unchanged));
     if changed {
-        crate::say!(json, "canon gate install-hooks: installed");
+        crate::say!(json, "canon gate install-hooks: {}", if dry_run { "would install" } else { "installed" });
     } else {
         crate::say!(json, "canon gate install-hooks: no diff, nothing written");
     }
+    if !changed && !script_written {
+        crate::json_out::mark_unchanged();
+    }
     if json {
-        crate::json_out::data("gate install-hooks", serde_json::json!({ "installed": changed, "preCommitScriptWritten": script_written }));
+        crate::json_out::data("gate install-hooks", &GateInstallHooksReport { dry_run, installed: changed, pre_commit_script_written: script_written });
     }
     0
 }
@@ -1141,10 +1298,13 @@ fn any_canon_gate_command(settings: &serde_json::Value) -> bool {
     })
 }
 
-fn install_into(path: &Path, entry: &HookEntry) -> std::io::Result<InstallOutcome> {
+fn install_into(path: &Path, entry: &HookEntry, dry_run: bool) -> std::io::Result<InstallOutcome> {
     let mut settings = read_json_or_default(path);
     let outcome = install_hooks(&mut settings, entry);
-    if matches!(outcome, InstallOutcome::Installed) {
+    if dry_run && matches!(outcome, InstallOutcome::Installed) {
+        crate::write_mode::check_creatable(path, true)?;
+    }
+    if matches!(outcome, InstallOutcome::Installed) && !dry_run {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -1166,35 +1326,6 @@ fn write_pre_commit_script(path: &Path) -> std::io::Result<()> {
         std::fs::set_permissions(path, perms)?;
     }
     Ok(())
-}
-
-/// `canon gate selftest` (task 5.2's CLI wiring): runs the shipped
-/// fixture corpus (`canon_gate::selftest::run`), never touches a real
-/// repo — no `--repo` flag.
-pub fn run_selftest(json: bool) -> i32 {
-    let report = selftest::run();
-    crate::say_raw!(json, "{}", report.format_human());
-    if report.is_clean() {
-        if json {
-            crate::json_out::data("gate selftest", serde_json::json!({ "clean": true, "fixtures": report.outcomes.len() }));
-        }
-        return 0;
-    }
-    let failures: Vec<serde_json::Value> = report
-        .outcomes
-        .iter()
-        .filter(|o| !o.is_clean())
-        .map(|o| {
-            serde_json::json!({
-                "class": o.class.as_str(),
-                "malformedExpected": o.expected_parse_error,
-                "missing": o.missing.iter().map(|(c, s)| format!("{} {}", c.as_str(), s)).collect::<Vec<_>>(),
-                "extra": o.extra.iter().map(|(c, s)| format!("{} {}", c.as_str(), s)).collect::<Vec<_>>(),
-            })
-        })
-        .collect();
-    CliError::failed("SELFTEST_FAILED", format!("{} fixture(s) did not match their expected violations", failures.len())).hint("the fixtures that differ are listed above; this is a canon defect, so report it with the output")
-        .emit_with_data("canon gate selftest", json, serde_json::json!({ "clean": false, "failures": failures }))
 }
 
 #[cfg(test)]

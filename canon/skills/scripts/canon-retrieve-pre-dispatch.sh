@@ -73,7 +73,7 @@ TOOL_NAME="$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || t
 # fixed point of `regime_key`'s own segment canonicalizer, so the
 # derived `--role` still equals the assembled regime_key's leading
 # segment. The repo/area segments are NOT slugified here — they are
-# canonicalized by `canon regime-key` below (the write-path serializer).
+# canonicalized by `canon regime show` below (the write-path serializer).
 slugify() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '-' | sed -E 's/-+/-/g; s/^-//; s/-$//'
 }
@@ -97,20 +97,25 @@ if [ -z "$REGIME" ]; then
   fi
   [ -n "$HASH" ] || exit 0
   # Assemble the regime_key through canon's OWN serializer (`canon
-  # regime-key` -> `canon_model::ids::regime_key`), the identical
+  # regime show` -> `canon_model::ids::regime_key`), the identical
   # normalizer the S4/S6/S14 WRITE path uses — never a second shell
   # derivation. A prior local `slugify` of the repo segment mapped a
   # written `my_repo` to a queried `my-repo`, so `retrieve_guidance`
   # fail-softed to empty and silently missed the namespace. `--role`
   # is the already-kebab ROLE (a fixed point of that canonicalizer, so
   # it still equals the assembled key's leading segment). Malformed
-  # segments make `canon regime-key` exit nonzero -> `|| true` -> empty
+  # segments make `canon regime show` exit nonzero -> `|| true` -> empty
   # REGIME -> the silent no-op just below.
-  REGIME="$(canon regime-key --role "$ROLE" --repo "$REPO_RAW" --area "$AREA_RAW" --hash "$HASH" 2>/dev/null || true)"
+  REGIME="$(canon regime show --role-segment "$ROLE" --repo-name "$REPO_RAW" --area "$AREA_RAW" --hash "$HASH" 2>/dev/null || true)"
   [ -n "$REGIME" ] || exit 0
 fi
 
-GUIDANCE_JSON="$(canon retrieve --role "$ROLE" --regime "$REGIME" --json 2>/dev/null || true)"
+GUIDANCE_JSON="$(canon retrieve --for-role "$ROLE" --regime "$REGIME" --json 2>/dev/null || true)"
+[ -n "$GUIDANCE_JSON" ] || exit 0
+
+# canon >= 0.28 envelopes the result ({ok, data: [...], meta}); 0.27 printed the bare array.
+# `(.data? // .)` reads either, so this hook works before and after the upgrade.
+GUIDANCE_JSON="$(printf '%s' "$GUIDANCE_JSON" | jq -c '(.data? // .)' 2>/dev/null || true)"
 [ -n "$GUIDANCE_JSON" ] || exit 0
 
 COUNT="$(printf '%s' "$GUIDANCE_JSON" | jq 'length' 2>/dev/null || echo 0)"

@@ -70,7 +70,7 @@ pub fn false_success(scenario_id: &str, record: &EvidenceRecord) -> Option<Viola
         FailureClass::FalseSuccess,
         scenario_id,
         format!(
-            "latest audit refuted this scenario's declared success (evaluator `{}` {}, sha256 {}{listed}); a declared faithful verdict does not override it — fix the behavior, re-attest, and record the evaluator's new audit with `canon evidence add --kind audit`",
+            "latest audit refuted this scenario's declared success (evaluator `{}` {}, sha256 {}{listed}); a declared faithful verdict does not override it — fix the behavior, re-attest, and record the evaluator's new audit with `canon evidence audit <SCENARIO_ID>`",
             audit.evaluator_id, audit.evaluator_version, audit.evaluator_digest
         ),
     ))
@@ -175,7 +175,7 @@ pub fn obligation_violation(require_audit: &RequireAudit, obligation: &AuditObli
     let sample = format!("sampled for audit by spec_coverage.require_audit (rate {}, seed `{}`)", require_audit.rate.get(), require_audit.seed);
     let detail = match obligation.state {
         AuditState::Missing => format!(
-            "{sample} and has no audit record — an external evaluator must re-audit it; record its result with `canon evidence add --kind audit`"
+            "{sample} and has no audit record — an external evaluator must re-audit it; record its result with `canon evidence audit <SCENARIO_ID>`"
         ),
         AuditState::Indeterminate(record) => {
             let (id, version) = record.audit.as_ref().map_or(("?", "?"), |a| (a.evaluator_id.as_str(), a.evaluator_version.as_str()));
@@ -273,6 +273,7 @@ mod tests {
             violations: Vec::new(),
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
+            code_tree: None,
             now: Utc::now(),
         }
     }

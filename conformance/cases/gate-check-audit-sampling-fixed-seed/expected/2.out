@@ -1,8 +1,8 @@
 canon gate check: 3 violation(s)
 
 uncovered-cell (3):
-  uncovered-cell shop.cart.02 — sampled for audit by spec_coverage.require_audit (rate 0.5, seed `canon-0.15`) and has no audit record — an external evaluator must re-audit it; record its result with `canon evidence add --kind audit`
-  uncovered-cell shop.cart.05 — sampled for audit by spec_coverage.require_audit (rate 0.5, seed `canon-0.15`) and has no audit record — an external evaluator must re-audit it; record its result with `canon evidence add --kind audit`
-  uncovered-cell shop.cart.06 — sampled for audit by spec_coverage.require_audit (rate 0.5, seed `canon-0.15`) and has no audit record — an external evaluator must re-audit it; record its result with `canon evidence add --kind audit`
+  uncovered-cell shop.cart.02 — sampled for audit by spec_coverage.require_audit (rate 0.5, seed `canon-0.15`) and has no audit record — an external evaluator must re-audit it; record its result with `canon evidence audit <SCENARIO_ID>`
+  uncovered-cell shop.cart.05 — sampled for audit by spec_coverage.require_audit (rate 0.5, seed `canon-0.15`) and has no audit record — an external evaluator must re-audit it; record its result with `canon evidence audit <SCENARIO_ID>`
+  uncovered-cell shop.cart.06 — sampled for audit by spec_coverage.require_audit (rate 0.5, seed `canon-0.15`) and has no audit record — an external evaluator must re-audit it; record its result with `canon evidence audit <SCENARIO_ID>`
 
-advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --approver <who>`

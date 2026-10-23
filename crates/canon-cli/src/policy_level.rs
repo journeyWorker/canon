@@ -54,7 +54,7 @@ const HEADER: &str = "\
 #
 # This file is what `canon gate check` grades the work against. A human
 # should review and approve it, and every later change to it, with
-# `canon policy approve --by <who>`: the agent doing the work should not
+# `canon policy approve --approver <who>`: the agent doing the work should not
 # write the rules it is graded by.
 spec_coverage:
   # Every scenario in the spec corpus needs evidence (`canon evidence
@@ -70,14 +70,14 @@ const CASES_DOC: &str = "  # Every feature surface (`<area>.<surface>`) needs at
 const CASES_KEY: &str = "  require_cases: [failure]\n";
 
 const REVIEW_DOC: &str = "  # Every scenario of a subject in `verifying` or `shipped` needs a
-  # review (`canon review add`) by an actor other than its evidence
+  # review (`canon review scenario`) by an actor other than its evidence
   # author, and an open blocker finding on an adopted change blocks.
 ";
 const REVIEW_KEY: &str = "  require_review: {}\n";
 
 const RAISE: &str = "  # To raise the level, uncomment what the next level adds below and
   # change the level line at the top of this file; a human approves the
-  # edit with `canon policy approve --by <who>`.
+  # edit with `canon policy approve --approver <who>`.
 ";
 
 /// Comment every line of `text` out (`  # ` after the indent).
@@ -162,10 +162,10 @@ pub fn detect(repo: &Path, policy: &PolicyResolution) -> Option<&'static str> {
 pub fn raise_hint(level: &str) -> Option<&'static str> {
     match level {
         "light" => Some(
-            "raise it by uncommenting `require_cases: [failure]` (standard) and `require_review: {}` (strict) in .canon/policy.yaml and changing its level line; a human approves the edit with `canon policy approve --by <who>`",
+            "raise it by uncommenting `require_cases: [failure]` (standard) and `require_review: {}` (strict) in .canon/policy.yaml and changing its level line; a human approves the edit with `canon policy approve --approver <who>`",
         ),
         "standard" => Some(
-            "raise it by uncommenting `require_review: {}` (strict) in .canon/policy.yaml and changing its level line; a human approves the edit with `canon policy approve --by <who>`",
+            "raise it by uncommenting `require_review: {}` (strict) in .canon/policy.yaml and changing its level line; a human approves the edit with `canon policy approve --approver <who>`",
         ),
         _ => None,
     }

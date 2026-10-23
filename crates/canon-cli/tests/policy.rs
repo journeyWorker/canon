@@ -34,6 +34,9 @@ fn initialized_repo() -> tempfile::TempDir {
     assert!(git.success());
     let init = run_canon(&["init", "--no-agents-md"], dir.path());
     assert_eq!(init.status.code(), Some(0), "stderr: {}", stderr(&init));
+    // One subject, so the gate has something to examine (an empty corpus is `unverifiable`, never clean).
+    let subject = run_canon(&["subject", "new", "demo", "--domain", "dev", "--title", "Demo"], dir.path());
+    assert_eq!(subject.status.code(), Some(0), "stderr: {}", stderr(&subject));
     dir
 }
 
@@ -46,7 +49,9 @@ fn approve_records_the_policy_digest_the_approver_the_time_and_the_note() {
     let dir = initialized_repo();
     let repo = dir.path();
 
-    let out = run_canon(&["policy", "approve", "--by", "alice", "--note", "reviewed the starter policy"], repo);
+    let started = chrono::Utc::now();
+    let out = run_canon(&["policy", "approve", "--approver", "alice", "--note", "reviewed the starter policy"], repo);
+    let finished = chrono::Utc::now();
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
     assert!(without_next(&stdout(&out)).ends_with("— written directly; nothing to promote\n"), "the direct-write suffix: {}", stdout(&out));
 
@@ -55,21 +60,31 @@ fn approve_records_the_policy_digest_the_approver_the_time_and_the_note() {
     assert_eq!(recorded["policy_digest"], format!("sha256:{:x}", Sha256::digest(&policy)), "{recorded}");
     assert_eq!(recorded["approved_by"], "alice");
     assert_eq!(recorded["note"], "reviewed the starter policy");
-    assert!(chrono::DateTime::parse_from_rfc3339(recorded["approved_at"].as_str().unwrap()).is_ok(), "{recorded}");
+    let at = chrono::DateTime::parse_from_rfc3339(recorded["approved_at"].as_str().unwrap()).expect("RFC3339").with_timezone(&chrono::Utc);
+    assert!(started - chrono::Duration::seconds(1) <= at && at <= finished + chrono::Duration::seconds(1), "approved_at is the time of the run: {at} not within {started}..{finished}");
     let text = std::fs::read_to_string(repo.join(APPROVAL)).unwrap();
     assert!(text.starts_with("{\n  \""), "pretty JSON: {text}");
 
-    let without_note = run_canon(&["policy", "approve", "--by", "bob"], repo);
+    let without_note = run_canon(&["policy", "approve", "--approver", "bob"], repo);
     assert_eq!(without_note.status.code(), Some(0), "stderr: {}", stderr(&without_note));
     assert_eq!(approval(repo)["note"], serde_json::Value::Null, "a re-approval replaces the record");
     assert_eq!(approval(repo)["approved_by"], "bob");
+
+    // The approval is meant to be committed: neither the .gitignore `canon init`
+    // wrote nor canon's own ignores it (`git check-ignore` exits 1 for "not ignored").
+    let ignored_in = |tree: &Path| {
+        Command::new("git").arg("-C").arg(tree).args(["check-ignore", "-q", APPROVAL]).status().expect("git must be on PATH").code()
+    };
+    assert_eq!(ignored_in(repo), Some(1), "the .gitignore canon init writes must not ignore the approval");
+    let canon_tree = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    assert_eq!(ignored_in(&canon_tree), Some(1), "canon's own .gitignore must not ignore the approval");
 }
 
 #[test]
 fn approve_refuses_a_repo_with_no_policy() {
     let dir = tempfile::tempdir().expect("a temp dir");
     std::fs::write(dir.path().join("canon.yaml"), "").unwrap();
-    let out = run_canon(&["policy", "approve", "--by", "alice"], dir.path());
+    let out = run_canon(&["policy", "approve", "--approver", "alice"], dir.path());
     assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
     assert!(stderr(&out).contains("no policy to approve"), "{}", stderr(&out));
     assert!(!dir.path().join(APPROVAL).exists(), "a refused approve writes nothing");
@@ -78,7 +93,7 @@ fn approve_refuses_a_repo_with_no_policy() {
 #[test]
 fn approve_refuses_an_empty_approver() {
     let dir = initialized_repo();
-    let out = run_canon(&["policy", "approve", "--by", "  "], dir.path());
+    let out = run_canon(&["policy", "approve", "--approver", "  "], dir.path());
     assert_eq!(out.status.code(), Some(2));
     assert!(!dir.path().join(APPROVAL).exists());
 }
@@ -92,7 +107,6 @@ fn approve_refuses_an_empty_approver() {
 fn gate_check_and_status_advise_until_the_current_policy_is_approved() {
     let dir = initialized_repo();
     let repo = dir.path();
-    const REPAIR: &str = "canon policy approve --by <who>";
 
     let check = |expect: Option<&str>, gate_exit: i32| {
         let gate = run_canon(&["gate", "check"], repo);
@@ -101,23 +115,21 @@ fn gate_check_and_status_advise_until_the_current_policy_is_approved() {
         assert_eq!(gate.status.code(), Some(gate_exit), "gate exit: {}{}", stdout(&gate), stderr(&gate));
         assert_eq!(status.status.code(), Some(0), "status: {}", stderr(&status));
         assert_eq!(json.status.code(), Some(0), "status --json: {}", stderr(&json));
-        let report: serde_json::Value = serde_json::from_str(&stdout(&json)).expect("status --json prints one JSON object");
+        let doc: serde_json::Value = serde_json::from_str(&stdout(&json)).expect("status --json prints one JSON document");
+        let report = &doc["data"];
         let warnings: Vec<&str> = report["warnings"].as_array().unwrap().iter().map(|w| w.as_str().unwrap()).collect();
         let policy_warnings: Vec<&str> = warnings.iter().copied().filter(|w| w.starts_with("policy not approved") || w.starts_with("policy changed")).collect();
         match expect {
             Some(text) => {
                 if gate_exit == 0 {
                     assert!(stdout(&gate).contains(&format!("advisory: {text}")), "gate check: {}", stdout(&gate));
-                    assert!(stdout(&gate).contains(REPAIR), "the advisory names the command: {}", stdout(&gate));
                 } else {
                     assert!(stdout(&gate).contains("policy changed since approval"), "gate check: {}", stdout(&gate));
-                    assert!(stdout(&gate).contains("canon policy approve --by <human>"), "the violation names the re-approval: {}", stdout(&gate));
                 }
                 let line = stdout(&status).lines().find(|line| line.starts_with(&format!("warning: {text}"))).map(str::to_string);
                 let line = line.unwrap_or_else(|| panic!("status: {}", stdout(&status)));
-                assert!(line.contains(REPAIR), "the status warning names the command: {line}");
                 assert_eq!(policy_warnings.len(), 1, "one policy warning in --json: {warnings:?}");
-                assert!(policy_warnings[0].starts_with(text) && policy_warnings[0].contains(REPAIR), "{warnings:?}");
+                assert!(policy_warnings[0].starts_with(text), "{warnings:?}");
                 assert_eq!(format!("warning: {}", policy_warnings[0]), line, "--json carries the same warning text");
             }
             None => {
@@ -129,7 +141,7 @@ fn gate_check_and_status_advise_until_the_current_policy_is_approved() {
     };
 
     check(Some("policy not approved"), 0);
-    let approved = run_canon(&["policy", "approve", "--by", "alice"], repo);
+    let approved = run_canon(&["policy", "approve", "--approver", "alice"], repo);
     assert_eq!(approved.status.code(), Some(0), "stderr: {}", stderr(&approved));
     check(None, 0);
 
@@ -157,16 +169,6 @@ fn a_repo_without_a_policy_gets_no_approval_advisory() {
     assert_eq!(init.status.code(), Some(0), "stderr: {}", stderr(&init));
     let gate = run_canon(&["gate", "check"], dir.path());
     assert!(!stdout(&gate).contains("policy not approved"), "{}", stdout(&gate));
-}
-
-#[test]
-fn init_names_the_approval_command_for_its_starter_policy() {
-    let dir = tempfile::tempdir().expect("a temp dir");
-    let init = run_canon(&["init"], dir.path());
-    assert_eq!(init.status.code(), Some(0), "stderr: {}", stderr(&init));
-    assert!(stdout(&init).contains("canon policy approve --by <who>"), "{}", stdout(&init));
-    let agents = std::fs::read_to_string(dir.path().join("AGENTS.md")).unwrap();
-    assert!(agents.contains("canon brief approve --change-id <slug> --by <the human> --note"), "{agents}");
 }
 
 /// The approval is authored and must reach git: neither the

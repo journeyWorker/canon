@@ -47,16 +47,15 @@ Feature: ingest sessions
   @subject:ingest-pipelines
   @case:happy
   @ingest.sessions.05
-  Scenario: Ingest is scoped to this project by default and explicit directive capture is bounded
+  Scenario: Ingest is scoped to this project and its linked worktrees by default
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a machine holding transcripts for this project, for a worktree linked to it, and for a foreign project
-    And the repository opts into bounded directive capture with a positive `max_directive_chars`
     When sessions are ingested with no scope flag
     Then this project's own session and its linked worktree's session are both ingested
     And the worktree session carries the main worktree's project key so the two aggregate together
     And the foreign project's session is excluded
-    And with `ingest.sessions.privacy.capture_user_directives: true` and `max_directive_chars: 4096`, the user turn is carried as a bounded user_directive event
-    And capture is rejected when `max_directive_chars` is absent, zero, or negative
+    And the default output carries no directive text
+
   @subject:ingest-pipelines
   @case:happy
   @ingest.sessions.06
@@ -146,3 +145,13 @@ Feature: ingest sessions
     Then the unwritten JSON contains scope, counts, IDs and digests
     And it contains a stable tier failure class and reason
     And it contains none of the directive text, credential text, task/context prose, or raw event detail
+
+  # canon: {"schema":1,"at":"2026-10-23T13:13:55Z","actor":{"agent_id":"canon-impl-028"}}
+  @subject:ingest-pipelines
+  @case:happy
+  @ingest.sessions.14
+  Scenario: Explicit directive capture carries a bounded user_directive and rejects an absent, zero or negative bound
+    Given a transcript whose user turn is longer than a positive `max_directive_chars`
+    When sessions are ingested with `capture_user_directives: true`
+    Then the persisted user_directive event carries the user turn cut to that many characters
+    And ingest fails with a config error and persists nothing when `max_directive_chars` is absent, zero, or negative

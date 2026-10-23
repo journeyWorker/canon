@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-2"
+  },
+  "at": "2026-10-23T15:07:45.285592144Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/skills_install.rs:934-972",
+  "kind": "finding",
+  "resolution_code_tree": "7c7d06847373654dafedac3630eedcda014eea0e",
+  "resolution_sha": "7e95cd1df901a7bcf04861ca597da3414ed794ad",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "scenario_ids": [
+    "skills.install.56"
+  ],
+  "schema": 1,
+  "seq": 20,
+  "severity": "should_fix",
+  "summary": "Standards pass: skills.install.56 compares the printed block with owned_path_globs() itself (circular); order and the named globs are never pinned. Mutation confirmed: skills.rs:939 canon.reverse() instead of sort() stays green",
+  "worktree_dirty": false
+}

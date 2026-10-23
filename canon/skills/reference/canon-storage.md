@@ -79,17 +79,21 @@ re-selects the record but the destination write is a no-op. A kind
 split across two rungs (some aged, some not) still reads correctly —
 `canon query` fans out.
 
+**Done when:** after `canon tier age --commit --plan-digest <digest from the
+preview>`, a bare `canon tier age` previews no effect (`moved` is `0`).
+
 ## Running `canon tier age` / `canon query`
 
-Both take `--canon-yaml <path>` (default `canon.yaml` in the current
-directory).
+Both read the `canon.yaml` of `--repo <dir>` (default: the nearest ancestor
+directory holding one).
 
 ```bash
-# Preview what would move (read-only; writes/deletes nothing).
-canon tier age --dry-run
-
-# Apply every `aging:` rule once (the destructive move+delete).
+# Preview what would move (the bare run is read-only; writes/deletes nothing).
 canon tier age
+
+# Apply every `aging:` rule once (the destructive move+delete), with the
+# `planDigest` the preview printed.
+canon tier age --commit --plan-digest "$PLAN_DIGEST"
 
 # Read a kind, fanning out across its routed rung AND its aging
 # destination, merged by time. --kind is the kind wire string — the
@@ -116,14 +120,17 @@ read the ledger only.
 
 ```bash
 canon query --kind evidence --history   # every version, archive included
-canon ledger compact --dry-run                 # report; writes nothing
-canon ledger compact                           # pre-0.23 ledger or interrupted move; idempotent; `canon migrate` runs it
+canon ledger compact                           # preview; writes nothing
+canon ledger compact --commit --plan-digest "$PLAN_DIGEST"   # pre-0.23 ledger or interrupted move; idempotent; `canon migrate` runs it
 ```
 
 A crash between the write and the move leaves a readable ledger that the next
 append or `canon ledger compact` finishes. The archive is local, not routed
 through `tiers:`; a `tiers.local.root` whose directory is not named `ledger`
 has no archive and keeps every version.
+
+**Done when:** after `canon ledger compact --commit --plan-digest <digest
+from the preview>`, a bare `canon ledger compact` previews no effect.
 
 ## Where artifact bytes live (`artifact_store:`)
 
@@ -133,40 +140,40 @@ artifact_store: { backend: local }                  # default
 ```
 
 `local` is `.canon/artifacts/sha256/`, git-tracked and credential-free. An
-object-store tier gets `evidence add`, `review add` and `evidence vault`
+object-store tier gets `evidence add`, `review scenario` and `artifacts store`
 uploads under `<prefix>sha256/<digest>` and keeps nothing locally. The gate
 and `canon artifacts verify [--full]` ask the store and refuse, never pass,
-when it cannot be reached. `canon artifacts migrate --to <tier> [--dry-run]`
+when it cannot be reached. `canon artifacts move --tier <tier>` (a preview; `--commit --plan-digest <digest>` acts)
 uploads, reads back and verifies every local blob, then writes the
 `artifact_store:` block, removes the local copies and ignores
 `.canon/artifacts/`; commit the removals, `.gitignore` and `canon.yaml`. It is
 resumable and a second run finds nothing to do.
 
-## What `canon report` does and doesn't read
+## What `canon report build` does and doesn't read
 
-canon exposes layered `stg_`/`int_`/`mart_` query views; `canon report`
+canon exposes layered `stg_`/`int_`/`mart_` query views; `canon report build`
 builds its numbers from the `mart_` views. Those read ONLY local roots
 — the git ledger, the sqlite `hot` db file (local, no credential; read
-since 0.18) and a LOCAL `.canon/r2` parquet mirror. `canon report`
+since 0.18) and a LOCAL `.canon/r2` parquet mirror. `canon report build`
 never opens a live DB connection or the live bucket, so:
 
-- Kinds routed to a postgres `hot` rung do NOT appear in `canon
-  report`; kinds routed to `canon init`'s default sqlite `hot` rung do.
+- Kinds routed to a postgres `hot` rung do NOT appear in `canon report
+  build`; kinds routed to `canon init`'s default sqlite `hot` rung do.
 - Kinds routed to `cold` (s3) appear only if a local `.canon/r2` mirror
   has been separately materialized — there is no automatic sync.
 
 These kinds are not lost: read them with `canon query --kind <kind>`.
 The gap is named loud, not under-counted — when any routed kind isn't
-report-readable, `canon report` renders a `## Kinds not read directly`
+report-readable, `canon report build` renders a `## Kinds not read directly`
 section listing them and emits a matching stderr `WARN`.
 
 ## Retention, export, and access audit
 
-`canon purge --kind <kind> --before <RFC3339> (--plan | --confirm <planDigest>) [--repo <dir>] [--json]`
-is the canonical data-lifecycle boundary: `--plan` prints the removal set and
-its `planDigest` and deletes nothing; `--confirm <planDigest>` deletes only if
+`canon purge --kind <kind> --before <RFC3339> [--commit --plan-digest <planDigest>] [--repo <dir>] [--json]`
+is the canonical data-lifecycle boundary: the bare run previews: it prints the removal set and
+its `planDigest` and deletes nothing; `--commit --plan-digest <planDigest>` deletes only if
 the plan recomputed now has the same digest (`PLAN_CHANGED`, exit 2, when the
-data moved), and a bare `purge` is refused (`PURGE_PLAN_REQUIRED`). The only purgeable kinds are
+data moved). The only purgeable kinds are
 `session`, `run`, `event`, and `trajectory`; the cutoff applies to every
 routed rung and every configured aging destination, including retained
 historical versions. For `trajectory`, the command also purges the
@@ -179,14 +186,19 @@ an explicit `partial` result with matched/deleted counts and a nonzero
 status. Purge never rewrites Git history or deletes source transcript
 files.
 
+**Done when:** after `canon purge --kind <kind> --before <time> --commit
+--plan-digest <digest from the preview>`, a bare `canon purge` with the same
+arguments previews an empty removal set.
+
 With `--json`, `purge` and `export` answer `{ "data", "meta" }` like every other
 command: `data` is the plan or manifest, `meta.next` the step after (a plan's is the
-human's review and `--confirm`), and an export's page state (`total`, `returned`,
-`nextCursor`) sits in `meta`. `export --json --out <file>` writes the manifest to the
-file and answers with `data: { out, kind, recordCount }`.
+human's review and `--commit --plan-digest`), and an export's page state (`total`, `returned`,
+`nextCursor`) sits in `meta`. `export --json --output <file>` writes the manifest to the
+file and answers with `data: { output, kind, recordCount }`; `--dry-run`
+answers with what it would write and writes nothing.
 
 `canon export --kind <kind> [--before <RFC3339>] [--after <RFC3339>]
-[--out <file>] [--json] [--limit <n> | --all] [--cursor <c>]` emits a versioned manifest containing source scope,
+[--output <file>] [--json] [--limit <n> | --all] [--cursor <c>]` emits a versioned manifest containing source scope,
 counts, digests, and redacted metadata. It does not authorize backend access;
 credentials remain an operator prerequisite. New output files are mode
 `0600`. Raw event detail text is excluded unless `--include-sensitive` is
@@ -199,7 +211,7 @@ query:
 
 Every query, export, and purge appends an actor-stamped record to
 `.canon/audit/access.jsonl` (mode `0600` on creation) in the repository
-whose `canon.yaml` it read (through `--repo` or `--canon-yaml`), never in
+whose `canon.yaml` it read (through `--repo`), never in
 the current directory; with no `canon.yaml` there is no audit and nothing
 is written. The log is local operator state: `canon init` keeps
 `.canon/audit/` out of git (below). `CANON_ACTOR` takes
@@ -212,7 +224,7 @@ record bodies.
 Four writes stage their record instead of committing it: `canon evidence
 add`, `canon finding add`, `canon finding close` and `canon divergence add`
 (under `.canon/ledger/_staging/`, one staging shape for every kind,
-committed by `canon gate promote`; `canon divergence promote` commits only
+committed by `canon gate promote`; `canon gate promote --kind divergence` commits only
 the staged divergences). `canon divergence resolve|defer|accept` stage and
 promote their own record in the same run. `canon.yaml`'s
 `write:` section decides whether they promote in the same run:
@@ -240,7 +252,7 @@ line ends ``— run `canon gate promote` to commit it`` (`canon divergence
 promote` for a divergence), and the command exits `1`. With neither flag,
 a malformed `write:` section (anything but `promote: auto | manual`)
 refuses the write, exit `2`, before anything is staged. `canon init
---check-config` reports `[PASS] write (promote: auto)`, `[not configured]
+--check` reports `[PASS] write (promote: auto)`, `[not configured]
 write (promote: manual)`, or `[FAIL] write: …`. `canon gate promote` still
 works under `auto` and is idempotent: with nothing staged it prints
 `nothing staged` and exits `0`.
@@ -264,7 +276,7 @@ install|check|doctor` follow the section; `install` prunes projected files the b
 --providers=<list>` rewrites it in place. Without the section they use the
 install lock's providers, then the detected ones; nothing undetected is ever
 added. A present section that is not this shape, or names another harness,
-fails those commands (exit `1`), and `canon init --check-config` reports
+fails those commands (exit `1`), and `canon init --check` reports
 `[PASS] skills (providers: …)`, `[not configured] skills (…)`, or
 `[FAIL] skills: …`.
 
@@ -278,13 +290,13 @@ or one whose recorded source digest differs from the file's current bytes,
 or when the index holds a scenario of a spec root that no `.feature` file
 of it declares any more.
 
-The commands that write records (`canon subject status`, `canon review
-add` and `canon evidence add`) rebuild a stale index on disk first: they
+The commands that write records (`canon subject move`, `canon review
+scenario`, `canon evidence add` and `canon artifacts store`) rebuild a stale index on disk first: they
 run `canon inventory sync`'s code on the changed files (validation still
 covers the whole root) and print one stderr line:
 
-```
-canon evidence add: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
+```stderr
+canon artifacts store: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
 ```
 
 The commands that only read (`canon gate check`, `canon status`) write
@@ -299,8 +311,8 @@ the report panels then treat it as absent; re-adding the scenario writes
 a live generation that supersedes the tombstone. A root that fails to
 sync writes no tombstone either.
 
-```
-canon evidence add: refreshed the scenario index from 1 scenario(s) no longer in any feature file (cart.pay.01): 1 record(s) written
+```stderr
+canon artifacts store: refreshed the scenario index from 1 scenario(s) no longer in any feature file (cart.pay.01): 1 record(s) written
 ```
 
 `canon inventory sync` and every refresh hold an OS file lock on
@@ -317,8 +329,8 @@ still runs; `canon gate check` then fails with `uncovered-cell <root>`,
 the `verifying → shipped` guard refuses, and `canon status` lists only
 `canon inventory sync`:
 
-```
-canon evidence add: found the scenario index stale for 1 changed feature file(s) (…): 0 record(s) written; NOT refreshed: root `root` (2 format violation(s), 0 sync error(s)) — `canon inventory sync` lists them
+```stderr
+canon artifacts store: found the scenario index stale for 1 changed feature file(s) (…): 0 record(s) written; NOT refreshed: root `root` (2 format violation(s), 0 sync error(s)) — `canon inventory sync` lists them
 ```
 
 Nothing is written in a directory without `canon.yaml`. `canon inventory
@@ -328,7 +340,7 @@ tag diagnostics.
 ## The artifact store lock
 
 Every write to the evidence artifact store (`.canon/artifacts/sha256/`:
-`canon evidence add`, `canon review add`, `canon evidence vault`) holds an
+`canon evidence add`, `canon review scenario`, `canon artifacts store`) holds an
 OS file lock on `.canon/artifact-store.lock` from its "already stored?"
 check through its last rename, so a write that fails and rolls back never
 removes a blob another writer published or counted as stored. A rollback
@@ -355,9 +367,23 @@ comment, only the missing ones):
 - `.canon/dashboard-snapshot/` — the snapshot `canon dashboard`
   regenerates on every run.
 - `.canon/learn/` and `.canon/r2/` — local learn scratch and the local
-  object-store stand-in `canon report` writes.
+  object-store stand-in `canon report build` writes.
 
 A rerun on a repo that already has `canon.yaml` only refreshes
 `AGENTS.md`; `canon migrate` adds the lines an existing `.gitignore`
-lacks, and `canon skills doctor` and `canon init --check-config` name a
+lacks, and `canon skills doctor` and `canon init --check` name a
 missing one.
+
+## Upgrading a 0.27 repository
+
+`canon status`, `canon gate check` and `canon context` warn on a repo that
+still holds 0.27 canon state and put `canon migrate --json` first in
+`meta.next`. `canon migrate` is destructive-class: the bare run is a
+preview (a report with `planDigest` and `effects[]`, exit 0, nothing
+written); `canon migrate --commit --plan-digest <digest from the preview>`
+acts, and only when the plan recomputed now has the same digest. Afterwards
+run `canon skills install`, which writes the stub guide; the guide itself is
+read with `canon skills show canon`.
+
+**Done when:** `canon status` no longer warns about 0.27 state and
+`canon migrate --json` is no longer the first step in `meta.next`.

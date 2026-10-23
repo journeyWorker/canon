@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-2"
+  },
+  "at": "2026-10-23T15:08:57.606441001Z",
+  "change_id": "canon-0-28",
+  "code_tree": "7c7d06847373654dafedac3630eedcda014eea0e",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/policy.rs:48-70",
+  "kind": "finding",
+  "reviewed_sha": "7e95cd1df901a7bcf04861ca597da3414ed794ad",
+  "reviewer": "canon-reviewer-028",
+  "round": 2,
+  "scenario_ids": [
+    "policy.expressions.30"
+  ],
+  "schema": 1,
+  "seq": 5,
+  "severity": "should_fix",
+  "summary": "Standards pass: policy.expressions.30 'records ... the time' is only parsed as RFC3339. Mutation confirmed: policy_approval.rs:277 approved_at fixed to 2000-01-01 stays green; bound it between timestamps taken before and after the run",
+  "worktree_dirty": false
+}

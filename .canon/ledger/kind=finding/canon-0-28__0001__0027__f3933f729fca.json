@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-2"
+  },
+  "at": "2026-10-23T15:08:11.496902551Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "deferred",
+  "kind": "finding",
+  "reason": "the capability.30 and .33 items were tightened; the rest are minor partial assertions on signed scenarios",
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "scenario_ids": [
+    "context.capability.16",
+    "context.capability.25",
+    "context.capability.30",
+    "context.capability.33",
+    "context.status.06",
+    "context.status.61"
+  ],
+  "schema": 1,
+  "seq": 27,
+  "severity": "note",
+  "summary": "Standards pass, signed anyway: partial assertions: context.capability.16 (field and --change-id run unchecked; `scenario new --change-id` alone needs --flow), .25 (help text unasserted; 'init is the one exception' vs doc's init and demo init), .30/.33 (message/hint/data unchecked on some failures), context.status.06 (skipped entry not named), .61 (--note in the approve hint unchecked)",
+  "worktree_dirty": false
+}

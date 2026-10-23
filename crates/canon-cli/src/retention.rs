@@ -9,10 +9,14 @@ use canon_model::envelope::RecordKind;
 use canon_store::registry::{PurgeOutcome, RetentionService, TierRegistry};
 use canon_store::tier::{raw_record_at, TierQuery};
 use chrono::{DateTime, Utc};
-use serde_json::{json, Value};
+use serde_json::json;
 
 use crate::cli_error::CliError;
 use crate::context::resolve_canon_yaml;
+use crate::json_out::Report;
+use crate::safety::{Effect, Mode, Plan};
+use schemars::JsonSchema;
+use serde::Serialize;
 use crate::tiers;
 
 #[derive(Debug, thiserror::Error)]
@@ -25,8 +29,8 @@ pub enum RetentionError {
     Learn(#[from] canon_learn::LearnError),
     #[error("partial purge: {matched} record(s) matched; at least {deleted} deleted: {reason}; purge backends are non-transactional")]
     PartialPurge { matched: usize, deleted: usize, reason: String },
-    #[error("plan digest {expected} no longer matches the data (now {actual})")]
-    PlanChanged { expected: String, actual: String },
+    #[error("{}", .0.message)]
+    Refusal(Box<CliError>),
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
     #[error("json: {0}")]
@@ -56,8 +60,8 @@ fn actor() -> String {
 /// had only read (0.15 D6, dogfood eval 2 G14). The event now goes to
 /// the repository whose `canon.yaml` was read, and to no directory at
 /// all when there is none.
-fn audit_path(repo: &Path, canon_yaml: Option<&Path>) -> Option<PathBuf> {
-    let yaml = resolve_canon_yaml(repo, canon_yaml);
+fn audit_path(repo: &Path) -> Option<PathBuf> {
+    let yaml = resolve_canon_yaml(repo);
     if !yaml.is_file() {
         return None;
     }
@@ -72,7 +76,6 @@ fn audit_path(repo: &Path, canon_yaml: Option<&Path>) -> Option<PathBuf> {
 #[allow(clippy::too_many_arguments)]
 pub fn append_access_audit(
     repo: &Path,
-    canon_yaml: Option<&Path>,
     operation: &str,
     kind: Option<RecordKind>,
     scope: &str,
@@ -80,7 +83,7 @@ pub fn append_access_audit(
     matched: usize,
     deleted: usize,
 ) -> Result<(), RetentionError> {
-    let Some(path) = audit_path(repo, canon_yaml) else {
+    let Some(path) = audit_path(repo) else {
         return Ok(());
     };
     if let Some(parent) = path.parent() {
@@ -132,9 +135,10 @@ fn ensure_sensitive(repo: &Path, requested: bool) -> Result<(), RetentionError> 
     Ok(())
 }
 
-fn loaded_registry(repo: &Path, kind: RecordKind) -> Result<(PathBuf, TierRegistry), RetentionError> {
-    let yaml = resolve_canon_yaml(repo, None);
-    let loaded = tiers::build_lenient_tiers_for_kind(&yaml, kind)?;
+/// The registry of the tiers `kind` lives in. `read_only`: an absent sqlite hot db is read as empty and not created.
+fn loaded_registry(repo: &Path, kind: RecordKind, read_only: bool) -> Result<(PathBuf, TierRegistry), RetentionError> {
+    let yaml = resolve_canon_yaml(repo);
+    let loaded = if read_only { tiers::build_lenient_tiers_for_kind_read(&yaml, kind)? } else { tiers::build_lenient_tiers_for_kind(&yaml, kind)? };
     let registry = TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite);
     Ok((yaml, registry))
 }
@@ -161,103 +165,106 @@ fn loaded_trajectory_store(repo: &Path, yaml: &Path) -> Result<ParquetTrajectory
     Ok(ParquetTrajectoryStore::open(learn_root.join("trajectories")))
 }
 
-fn print_human(value: &Value, summary: &str) {
-    println!("{summary}");
-    println!("{}", serde_json::to_string_pretty(value).expect("manifest is serializable"));
+/// One rung's counts in a purge report.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PurgeRung {
+    pub rung: String,
+    pub backend: String,
+    pub matched: usize,
+    pub deleted: usize,
 }
 
-fn purge_value(outcome: &PurgeOutcome, learn_counts: Option<(usize, usize)>) -> Value {
-    let mut value = json!({
-        "schema": "canon.retention.purge",
-        "version": 1,
-        "kind": outcome.kind.as_str(),
-        "before": outcome.before.to_rfc3339(),
-        "dry_run": outcome.dry_run,
-        "source_scope": "routed_and_aging_destinations",
-        "rungs": outcome.rungs.iter().map(|r| json!({"rung": r.rung.as_str(), "backend": r.backend.as_str(), "matched": r.matched, "deleted": r.deleted})).collect::<Vec<_>>(),
-        "unavailable": outcome.unavailable,
-    });
-    if let Some((matched, deleted)) = learn_counts {
-        value.as_object_mut().expect("purge manifest object").insert("learn_store".to_string(), json!({"backend": "parquet", "matched": matched, "deleted": deleted}));
+/// The learn store's counts in a `trajectory` purge report.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PurgeLearnStore {
+    pub backend: &'static str,
+    pub matched: usize,
+    pub deleted: usize,
+}
+
+/// `canon purge`'s `data`: the plan (`planDigest`, `effects[]`, `committed`)
+/// and what each rung matched and deleted.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PurgeReport {
+    pub kind: String,
+    pub before: String,
+    pub source_scope: &'static str,
+    pub rungs: Vec<PurgeRung>,
+    /// Rungs the plan could not reach.
+    pub unavailable: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub learn_store: Option<PurgeLearnStore>,
+    #[serde(flatten)]
+    pub plan: Plan,
+}
+
+impl Report for PurgeReport {}
+
+/// The `data` of a purge that stopped partway: tiers are not transactional, so
+/// some records may be gone.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PartialPurgeReport {
+    pub kind: String,
+    pub before: String,
+    pub status: &'static str,
+    pub matched: usize,
+    pub deleted: usize,
+    pub error: String,
+    pub atomic: bool,
+}
+
+impl Report for PartialPurgeReport {}
+
+fn purge_report(outcome: &PurgeOutcome, learn_counts: Option<(usize, usize)>, plan: Plan) -> PurgeReport {
+    PurgeReport {
+        kind: crate::query::kind_cli_name(outcome.kind).to_string(),
+        before: outcome.before.to_rfc3339(),
+        source_scope: "routed_and_aging_destinations",
+        rungs: outcome.rungs.iter().map(|r| PurgeRung { rung: r.rung.as_str().to_string(), backend: r.backend.as_str().to_string(), matched: r.matched, deleted: r.deleted }).collect(),
+        unavailable: outcome.unavailable.clone(),
+        learn_store: learn_counts.map(|(matched, deleted)| PurgeLearnStore { backend: "parquet", matched, deleted }),
+        plan,
     }
-    value
 }
 
-fn partial_purge_value(kind: RecordKind, before: DateTime<Utc>, matched: usize, deleted: usize, error: &str) -> Value {
-    json!({
-        "schema": "canon.retention.purge",
-        "version": 1,
-        "kind": kind.as_str(),
-        "before": before.to_rfc3339(),
-        "dry_run": false,
-        "status": "partial",
-        "matched": matched,
-        "deleted": deleted,
-        "error": error,
-        "atomic": false,
-    })
+fn partial_purge_report(kind: RecordKind, before: DateTime<Utc>, matched: usize, deleted: usize, error: &str) -> PartialPurgeReport {
+    PartialPurgeReport { kind: crate::query::kind_cli_name(kind).to_string(), before: before.to_rfc3339(), status: "partial", matched, deleted, error: error.to_string(), atomic: false }
 }
 
-/// What `canon purge` was asked to do. A bare `purge` is refused before
-/// this is built: deleting needs a reviewed plan.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PurgeMode {
-    /// `--plan`: report what would be removed and its `planDigest`; delete nothing.
-    Plan,
-    /// `--confirm <digest>`: delete only if the plan recomputed now still has this digest.
-    Confirm(String),
+/// The plan of a purge: one `delete` per record the removal set holds, in
+/// every rung and in the learn store, and one `skip` per rung that could not
+/// be reached (a plan that differs there is a different plan).
+fn purge_effects(outcome: &PurgeOutcome, keys: &[String], learn_keys: Option<&[String]>) -> Vec<Effect> {
+    let mut effects: Vec<Effect> = keys.iter().map(|key| Effect::record("delete", key.as_str())).collect();
+    effects.extend(learn_keys.unwrap_or_default().iter().map(|key| Effect::record("delete", format!("learn:parquet:{key}"))));
+    effects.extend(outcome.unavailable.iter().map(|rung| Effect::record("skip", rung.as_str()).detail("unreachable")));
+    effects
 }
 
-/// The digest of a purge plan: the kind, the cutoff, what the preflight
-/// counted at every rung and in the learn store, and the identity of every
-/// record it would remove (the sorted keys, streamed into the hash). A
-/// record added, removed or swapped for another between `--plan` and
-/// `--confirm` changes the digest even when the count does not.
-fn plan_digest(kind: RecordKind, before: DateTime<Utc>, outcome: &PurgeOutcome, learn_matched: Option<usize>, keys: &[String], learn_keys: Option<&[String]>) -> String {
-    use sha2::{Digest, Sha256};
-    let header = json!({
-        "kind": kind.as_str(),
-        "before": before.to_rfc3339(),
-        "rungs": outcome.rungs.iter().map(|r| json!([r.rung.as_str(), r.backend.as_str(), r.matched])).collect::<Vec<_>>(),
-        "unavailable": outcome.unavailable,
-        "learn_matched": learn_matched,
-    });
-    let mut hasher = Sha256::new();
-    hasher.update(header.to_string().as_bytes());
-    for (label, set) in [("registry", Some(keys)), ("learn", learn_keys)] {
-        hasher.update(format!("\n{label}:{}\n", set.map_or(0, <[String]>::len)).as_bytes());
-        for key in set.unwrap_or_default() {
-            hasher.update(key.as_bytes());
-            hasher.update(b"\n");
-        }
-    }
-    hasher.finalize().iter().map(|b| format!("{b:02x}")).collect()
-}
-
-pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Option<PurgeMode>, json_output: bool) -> u8 {
-    let Some(mode) = mode else {
-        return CliError::refused("PURGE_PLAN_REQUIRED", "`canon purge` deletes only a reviewed plan, and none was given")
-            .hint(format!("run `canon purge --kind {} --before {} --plan`, review it, then rerun with `--confirm <planDigest>`", crate::query::kind_cli_name(kind), before.to_rfc3339()))
-            .emit("canon purge", json_output) as u8;
-    };
+/// `canon purge --kind K --before T [--commit --plan-digest D]`. A bare run
+/// previews and writes nothing, not even the access-audit line; `--commit`
+/// deletes only when the plan recomputed now has the digest given. `base` is
+/// the command line without the safety flags ([`crate::safety::command`]).
+pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mode, base: &str, json_output: bool) -> u8 {
     let result = (|| -> Result<(), RetentionError> {
-        let (yaml, registry) = loaded_registry(repo, kind)?;
+        let (yaml, registry) = loaded_registry(repo, kind, true)?;
         let learn_store = if kind == RecordKind::Trajectory { Some(loaded_trajectory_store(repo, &yaml)?) } else { None };
         let learn_preflight = if let Some(store) = &learn_store { Some(store.purge_before(before, true)?) } else { None };
-        let plan = RetentionService::new(&registry).purge(kind, before, true)?;
+        let preflight = RetentionService::new(&registry).purge(kind, before, true)?;
         let keys = RetentionService::new(&registry).purge_plan_keys(kind, before)?;
         let learn_keys = if let Some(store) = &learn_store { Some(store.purge_keys_before(before)?) } else { None };
-        let digest = plan_digest(kind, before, &plan, learn_preflight, &keys, learn_keys.as_deref());
-        let confirmed = match &mode {
-            PurgeMode::Plan => false,
-            PurgeMode::Confirm(expected) if *expected == digest => true,
-            PurgeMode::Confirm(expected) => return Err(RetentionError::PlanChanged { expected: expected.clone(), actual: digest }),
-        };
-        let outcome = if confirmed { RetentionService::new(&registry).purge(kind, before, false)? } else { plan };
+        let plan = Plan::new(purge_effects(&preflight, &keys, learn_keys.as_deref()));
+        let commit = plan.gate(mode, base).map_err(|e| RetentionError::Refusal(Box::new(e)))?;
+        // Deleting writes the hot db; the plan above only read it, so a preview or a refused digest leaves no db behind.
+        let outcome = if commit { RetentionService::new(&loaded_registry(repo, kind, false)?.1).purge(kind, before, false)? } else { preflight };
         let registry_matched: usize = outcome.rungs.iter().map(|r| r.matched).sum();
         let registry_deleted: usize = outcome.rungs.iter().map(|r| r.deleted).sum();
         let learn_counts = if let Some(store) = learn_store {
-            if !confirmed {
+            if !commit {
                 Some((learn_preflight.expect("trajectory preflight count"), 0))
             } else {
                 let count = store.purge_before(before, false).map_err(|err| RetentionError::PartialPurge {
@@ -270,66 +277,50 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
         } else {
             None
         };
-        let learn_matched = learn_counts.map(|(matched, _)| matched).unwrap_or(0);
-        let learn_deleted = learn_counts.map(|(_, deleted)| deleted).unwrap_or(0);
-        let mut value = purge_value(&outcome, learn_counts);
-        value.as_object_mut().expect("purge manifest object").insert("planDigest".to_string(), json!(digest));
-        let matched = registry_matched + learn_matched;
-        let deleted = registry_deleted + learn_deleted;
-        append_access_audit(repo, None, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted)?;
-        let summary = if confirmed {
-            format!("canon purge --kind {}: {} matched, {} deleted", crate::query::kind_cli_name(kind), matched, deleted)
+        let matched = registry_matched + learn_counts.map_or(0, |(matched, _)| matched);
+        let deleted = registry_deleted + learn_counts.map_or(0, |(_, deleted)| deleted);
+        if commit && matched == 0 && deleted == 0 {
+            // Nothing was in the removal set, so nothing was read or deleted: no audit line, an unchanged run.
+            crate::json_out::mark_unchanged();
+        } else if commit {
+            append_access_audit(repo, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted)?;
+        }
+        let report = purge_report(&outcome, learn_counts, if commit { plan.committed() } else { plan });
+        if commit {
+            if !json_output {
+                println!("canon purge --kind {}: {matched} matched, {deleted} deleted", crate::query::kind_cli_name(kind));
+            }
+            crate::next::finish(repo, "purge", &crate::next::Scope::Repo, false, json_output, &report);
         } else {
-            format!(
-                "canon purge --kind {} --plan: {matched} record(s) would be removed (planDigest {digest}); delete them with `canon purge --kind {} --before {} --confirm {digest}`",
-                crate::query::kind_cli_name(kind),
-                crate::query::kind_cli_name(kind),
-                before.to_rfc3339()
-            )
-        };
-        if !json_output {
-            print_human(&value, &summary);
-        } else if confirmed {
-            crate::next::finish(repo, "purge", &crate::next::Scope::Repo, false, true, value);
-        } else {
-            // A plan deletes nothing: the one step is the human's review, then the confirm.
-            let step = crate::status::NextStep {
-                command: format!("review the plan, then run `canon purge --kind {} --before {} --confirm {digest}`", crate::query::kind_cli_name(kind), before.to_rfc3339()),
-                why: "the plan only lists what would be removed; deleting takes a reviewed plan digest".into(),
-                actor: crate::status::StepActor::Human,
-                role: None,
-            };
-            crate::json_out::data_with_next("purge", value, &crate::next::After::fixed(vec![step]));
+            crate::safety::finish_preview(base, "purge", &report.plan, "the plan only lists what would be removed; deleting takes its planDigest", json_output, &report);
         }
         Ok(())
     })();
     match result {
         Ok(()) => 0,
-        Err(RetentionError::PlanChanged { expected, actual }) => {
-            let _ = append_access_audit(repo, None, "purge", Some(kind), "routed_and_aging_destinations", false, 0, 0);
-            CliError::refused("PLAN_CHANGED", format!("the plan digest {expected} no longer matches the data (now {actual}); nothing was deleted"))
-                .hint(format!("run `canon purge --kind {} --before {} --plan` again and review it", crate::query::kind_cli_name(kind), before.to_rfc3339()))
-                .emit("canon purge", json_output) as u8
-        }
+        Err(RetentionError::Refusal(error)) => error.emit("canon purge", json_output) as u8,
         Err(err) => {
             let (matched, deleted) = match &err {
                 RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) => (*matched, *deleted),
                 RetentionError::PartialPurge { matched, deleted, .. } => (*matched, *deleted),
                 _ => (0, 0),
             };
-            let _ = append_access_audit(repo, None, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted);
-            let error = CliError::refused("RETENTION_PURGE_FAILED", err.to_string()).hint("run `canon purge --plan` again to see what remains, then confirm with `--confirm <planDigest>`");
+            // A refusal that read and deleted nothing leaves no audit line (O7).
+            if matched > 0 || deleted > 0 {
+                let _ = append_access_audit(repo, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted);
+            }
+            let error = CliError::refused("RETENTION_PURGE_FAILED", err.to_string()).hint(format!("run `{base}` again to see what remains, then commit its plan with `--commit --plan-digest <planDigest>`"));
             let partial = match &err {
                 RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) | RetentionError::PartialPurge { matched, deleted, .. } => {
-                    Some(partial_purge_value(kind, before, *matched, *deleted, &err.to_string()))
+                    Some(partial_purge_report(kind, before, *matched, *deleted, &err.to_string()))
                 }
                 _ => None,
             };
             match partial {
                 // One document: the partial-purge manifest is `data` beside the shared `error`.
                 Some(manifest) if json_output => {
-                    eprintln!("{}", error.human("canon purge"));
-                    error.emit_with_data("canon purge", true, manifest) as u8
+                    crate::human_err!("{}", error.human("canon purge"));
+                    error.emit_with_data("canon purge", true, &manifest) as u8
                 }
                 _ => error.emit("canon purge", json_output) as u8,
             }
@@ -337,12 +328,108 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
     }
 }
 
-fn redacted_metadata(kind: RecordKind, raw: &canon_model::evidence::RawRecord) -> Value {
-    let digest = canon_store::partition::content_digest12(&raw.0);
-    let at = raw_record_at(raw).to_rfc3339();
-    let id = canon_store::partition::resolve_partition(kind, &raw.0).ok().map(|p| p.natural_key);
-    json!({"kind": kind.as_str(), "at": at, "id": id, "digest": digest})
+/// One exported record: identity and digest, never the content.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportRecord {
+    pub kind: &'static str,
+    pub at: String,
+    pub id: Option<String>,
+    pub digest: String,
 }
+
+impl ExportRecord {
+    fn of(kind: RecordKind, raw: &canon_model::evidence::RawRecord) -> Self {
+        let digest = canon_store::partition::content_digest12(&raw.0);
+        let at = raw_record_at(raw).to_rfc3339();
+        let id = canon_store::partition::resolve_partition(kind, &raw.0).ok().map(|p| p.natural_key);
+        Self { kind: kind.as_str(), at, id, digest }
+    }
+
+    /// The members `--fields` asked for.
+    fn project(self, fields: &[String]) -> ProjectedExportRecord {
+        let has = |name: &str| crate::paging::wants(fields, name);
+        ProjectedExportRecord { kind: has("kind").then_some(self.kind), at: has("at").then_some(self.at), id: has("id").then_some(self.id), digest: has("digest").then_some(self.digest) }
+    }
+}
+
+/// An exported record cut to the `--fields` asked for.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectedExportRecord {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<Option<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub digest: Option<String>,
+}
+
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(untagged)]
+pub enum ExportRecordView {
+    Full(ExportRecord),
+    Projected(ProjectedExportRecord),
+}
+
+/// The `canon.retention.export` manifest: what `export` writes to stdout or
+/// `--output`, and what `--json` envelopes (without `meta`, which then travels
+/// in the envelope's `meta`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportManifest {
+    pub schema: &'static str,
+    pub version: u32,
+    pub kind: &'static str,
+    pub source_scope: &'static str,
+    pub before: Option<String>,
+    pub after: Option<String>,
+    pub record_count: usize,
+    pub content_digests: Vec<String>,
+    pub records: Vec<ExportRecordView>,
+    pub sensitive: bool,
+    /// Present only with `--include-sensitive`: the full records, verbatim.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sensitive_records: Option<Vec<crate::json_out::LedgerRecord>>,
+    /// The page state; only in the manifest file or stdout document.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<crate::paging::PageMeta>,
+}
+
+/// What `--json --output` returns: the file holds the manifest, this names it.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportWritten {
+    pub output: String,
+    pub kind: &'static str,
+    pub record_count: usize,
+}
+
+/// What `--json --dry-run` returns: what the run would write, nothing written.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportPreview {
+    /// Always true.
+    pub dry_run: bool,
+    /// The file `--output` names, when given.
+    pub output: Option<String>,
+    pub kind: &'static str,
+    pub record_count: usize,
+}
+
+/// `canon export --json` (`ExportReport`): the manifest, or with `--output` the
+/// file it was written to; with `--dry-run` the preview.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(untagged)]
+pub enum ExportReport {
+    Manifest(ExportManifest),
+    Written(ExportWritten),
+    Preview(ExportPreview),
+}
+
+impl crate::json_out::Report for ExportReport {}
 
 /// The fields of one exported record, which `--fields` may name.
 const RECORD_FIELDS: [&str; 4] = ["kind", "at", "id", "digest"];
@@ -357,6 +444,7 @@ pub fn run_export(
     include_sensitive: bool,
     page: &crate::paging::Page,
     fields: Option<&[String]>,
+    dry_run: bool,
 ) -> u8 {
     let mut next_cursor_line = None;
     let result = (|| -> Result<(), ExportFailure> {
@@ -364,7 +452,7 @@ pub fn run_export(
             crate::paging::check_known("canon export", requested, &RECORD_FIELDS).map_err(ExportFailure::Cursor)?;
         }
         ensure_sensitive(repo, include_sensitive)?;
-        let (_, registry) = loaded_registry(repo, kind)?;
+        let (_, registry) = loaded_registry(repo, kind, true)?;
         let mut query = TierQuery::kind(kind);
         if let Some(after) = after { query = query.since(after); }
         let rows = registry.query(&query)?.records;
@@ -373,34 +461,52 @@ pub fn run_export(
             &format!("export:{}", kind.as_str()),
             rows,
             |raw| {
-                let metadata = redacted_metadata(kind, raw);
-                format!("{}|{}|{}", metadata["at"].as_str().unwrap_or_default(), metadata["id"].as_str().unwrap_or_default(), metadata["digest"].as_str().unwrap_or_default())
+                let record = ExportRecord::of(kind, raw);
+                format!("{}|{}|{}", record.at, record.id.as_deref().unwrap_or_default(), record.digest)
             },
             page,
         )
         .map_err(ExportFailure::Cursor)?;
-        let metadata: Vec<Value> = rows.iter().map(|raw| redacted_metadata(kind, raw)).collect();
-        let mut manifest = json!({
-            "schema": "canon.retention.export",
-            "version": 1,
-            "kind": kind.as_str(),
-            "source_scope": "routed_and_aging_destinations",
-            "before": before.map(|t| t.to_rfc3339()),
-            "after": after.map(|t| t.to_rfc3339()),
-            "record_count": rows.len(),
-            "content_digests": metadata.iter().filter_map(|m| m.get("digest").cloned()).collect::<Vec<_>>(),
-            "records": match fields {
-                Some(requested) => metadata.iter().map(|m| crate::paging::project(m, requested)).collect::<Vec<_>>(),
-                None => metadata,
-            },
-            "sensitive": include_sensitive,
-            "meta": meta.to_json(),
-        });
-        if include_sensitive {
-            manifest.as_object_mut().expect("manifest object").insert("sensitive_records".to_string(), Value::Array(rows.iter().map(|r| r.0.clone()).collect()));
-        }
+        let records: Vec<ExportRecord> = rows.iter().map(|raw| ExportRecord::of(kind, raw)).collect();
+        let content_digests = records.iter().map(|m| m.digest.clone()).collect();
+        let records = match fields {
+            Some(requested) => records.into_iter().map(|r| ExportRecordView::Projected(r.project(requested))).collect(),
+            None => records.into_iter().map(ExportRecordView::Full).collect(),
+        };
+        let mut manifest = ExportManifest {
+            schema: "canon.retention.export",
+            version: 1,
+            kind: kind.as_str(),
+            source_scope: "routed_and_aging_destinations",
+            before: before.map(|t| t.to_rfc3339()),
+            after: after.map(|t| t.to_rfc3339()),
+            record_count: rows.len(),
+            content_digests,
+            records,
+            sensitive: include_sensitive,
+            sensitive_records: include_sensitive.then(|| rows.iter().map(|r| crate::json_out::LedgerRecord(r.0.clone())).collect()),
+            meta: Some(meta.clone()),
+        };
         let encoded = serde_json::to_vec_pretty(&manifest)?;
-        if let Some(path) = out {
+        if dry_run {
+            // The same refusal an unwritable `--out` would meet, with nothing written and no audit line.
+            if let Some(path) = out {
+                crate::write_mode::check_creatable(path, false)?;
+            }
+            if json_output {
+                let data = ExportReport::Preview(ExportPreview { dry_run: true, output: out.map(|p| p.display().to_string()), kind: kind.as_str(), record_count: rows.len() });
+                crate::next::finish_with_meta(repo, "export", &crate::next::Scope::Repo, false, true, &data, meta.to_json());
+            } else {
+                crate::human_err!("canon export: would write {} record(s){}", rows.len(), out.map(|p| format!(" to {}", p.display())).unwrap_or_default());
+            }
+            next_cursor_line = meta.human_line();
+            return Ok(());
+        }
+        if out.is_some_and(|path| fs::read(path).is_ok_and(|held| held == encoded)) {
+            // The file already holds exactly this manifest: left alone (the access audit
+            // line is still appended, O7), and the run is unchanged.
+            crate::json_out::mark_unchanged();
+        } else if let Some(path) = out {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::OpenOptionsExt;
@@ -413,17 +519,17 @@ pub fn run_export(
         } else if !json_output {
             println!("{}", String::from_utf8_lossy(&encoded));
         }
-        append_access_audit(repo, None, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, rows.len(), 0)?;
+        append_access_audit(repo, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, rows.len(), 0)?;
         if json_output {
             // The manifest is the result; with `--out` it went to the file, and the result names it.
-            let (manifest, page_meta) = crate::json_out::split_meta(manifest);
+            manifest.meta = None;
             let data = match out {
-                Some(path) => json!({ "out": path.display().to_string(), "kind": kind.as_str(), "recordCount": rows.len() }),
-                None => manifest,
+                Some(path) => ExportReport::Written(ExportWritten { output: path.display().to_string(), kind: kind.as_str(), record_count: rows.len() }),
+                None => ExportReport::Manifest(manifest),
             };
-            crate::next::finish_with_meta(repo, "export", &crate::next::Scope::Repo, false, true, data, page_meta);
+            crate::next::finish_with_meta(repo, "export", &crate::next::Scope::Repo, false, true, &data, meta.to_json());
         }
-        if out.is_some() && !json_output { eprintln!("canon export: wrote {} record(s)", rows.len()); }
+        if out.is_some() && !json_output { crate::human_err!("canon export: wrote {} record(s)", rows.len()); }
         // The manifest itself is JSON on stdout, so the human cursor line
         // goes to stderr and never breaks a pipe into a JSON parser.
         next_cursor_line = meta.human_line();
@@ -432,16 +538,15 @@ pub fn run_export(
     match result {
         Ok(()) => {
             if let Some(line) = next_cursor_line {
-                eprintln!("{line}");
+                crate::human_err!("{line}");
             }
             0
         }
+        // A refused export read and wrote nothing: no audit line (O7).
         Err(ExportFailure::Cursor(err)) => {
-            let _ = append_access_audit(repo, None, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, 0, 0);
             err.emit("canon export", json_output) as u8
         }
         Err(ExportFailure::Retention(err)) => {
-            let _ = append_access_audit(repo, None, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, 0, 0);
             CliError::refused("RETENTION_EXPORT_FAILED", err.to_string()).hint("check that the destination is writable and the ledger is readable, then run `canon export` again").emit("canon export", json_output) as u8
         }
     }
@@ -479,7 +584,7 @@ mod tests {
             "event_id": "evt-1",
             "detail": {"text": "secret"},
         }));
-        let metadata = redacted_metadata(RecordKind::Event, &raw);
+        let metadata = serde_json::to_value(ExportRecord::of(RecordKind::Event, &raw)).unwrap();
         assert!(metadata.get("detail").is_none());
         assert!(metadata.get("digest").is_some());
     }
@@ -493,15 +598,16 @@ mod tests {
             rungs: vec![],
             unavailable: vec![],
         };
-        let value = purge_value(&outcome, Some((3, 2)));
-        assert_eq!(value["learn_store"]["backend"], "parquet");
-        assert_eq!(value["learn_store"]["matched"], 3);
-        assert_eq!(value["learn_store"]["deleted"], 2);
+        let value = serde_json::to_value(purge_report(&outcome, Some((3, 2)), Plan::new(Vec::new()))).unwrap();
+        assert_eq!(value["learnStore"]["backend"], "parquet");
+        assert_eq!(value["learnStore"]["matched"], 3);
+        assert_eq!(value["learnStore"]["deleted"], 2);
+        assert_eq!(value["committed"], false);
     }
 
     #[test]
     fn partial_purge_manifest_preserves_non_atomic_counts() {
-        let value = partial_purge_value(RecordKind::Event, Utc::now(), 8, 3, "cold failed");
+        let value = serde_json::to_value(partial_purge_report(RecordKind::Event, Utc::now(), 8, 3, "cold failed")).unwrap();
         assert_eq!(value["status"], "partial");
         assert_eq!(value["matched"], 8);
         assert_eq!(value["deleted"], 3);
@@ -522,23 +628,23 @@ mod tests {
     fn audit_file_is_created_restrictively() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("canon.yaml"), "").unwrap();
-        append_access_audit(dir.path(), None, "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
+        append_access_audit(dir.path(), "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
         use std::os::unix::fs::PermissionsExt;
-        let mode = fs::metadata(audit_path(dir.path(), None).unwrap()).unwrap().permissions().mode() & 0o777;
+        let mode = fs::metadata(audit_path(dir.path()).unwrap()).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o600);
     }
 
     #[test]
     fn no_canon_yaml_means_no_audit_write() {
         let dir = tempfile::tempdir().unwrap();
-        append_access_audit(dir.path(), None, "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
+        append_access_audit(dir.path(), "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
         assert!(fs::read_dir(dir.path()).unwrap().next().is_none(), "a directory without canon.yaml must be left untouched");
     }
 }
 
 /// The access event for one `canon query`, scoped like every other
-/// event ([`audit_path`]): `canon_yaml` is the query's own
-/// `--canon-yaml` override, when it has one.
-pub fn audit_query(repo: &Path, canon_yaml: Option<&Path>, kind: RecordKind, since: Option<DateTime<Utc>>, sensitive: bool, matched: usize) -> Result<(), RetentionError> {
-    append_access_audit(repo, canon_yaml, "query", Some(kind), if since.is_some() { "since" } else { "all" }, sensitive, matched, 0)
+/// event ([`audit_path`]). Written only for a query that reached the store: a
+/// refused one leaves no line (O7).
+pub fn audit_query(repo: &Path, kind: RecordKind, since: Option<DateTime<Utc>>, sensitive: bool, matched: usize) -> Result<(), RetentionError> {
+    append_access_audit(repo, "query", Some(kind), if since.is_some() { "since" } else { "all" }, sensitive, matched, 0)
 }

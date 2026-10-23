@@ -49,10 +49,10 @@
 //! and no `Approved:` line in the canon `brief.md` (the brief is
 //! enforced) gets the one `human` step status ever emits once `canon brief
 //! check` has no blocker left for it (0.22 D4); while it has some, the
-//! subject's step is the planner's `canon brief check --change-id <slug>`,
+//! subject's step is the planner's `canon brief check <slug>`,
 //! `N blocker(s): write the brief`. With no blocker but advisories left
 //! (0.26 D4), a planner step to polish the brief
-//! (`reference/brief-polish.md`) and re-run `canon brief check` comes
+//! (`canon skills show brief-polish`) and re-run `canon brief check` comes
 //! first, naming the count and the top rule ids; the human step stays after
 //! it (advisories never refuse an approval). Those steps are the
 //! subject's only ones, whatever its status: the agent stops and reports
@@ -73,7 +73,7 @@
 //! ownership, verdicts, required cases, audits, and the review guard,
 //! open blockers only under `block_on_findings`, where `require_review`
 //! covers `shipped`) is flagged red ([`SubjectSummary::red`]), and its
-//! only step is the reopen, `canon subject status <id> --to verifying
+//! only step is the reopen, `canon subject move <id> --to verifying
 //! --reason …`: the follow-up goes into its approved change as tasks,
 //! then scenario, evidence and review, and it ships again through every
 //! guard. A subject's changes are joined from both sides
@@ -115,8 +115,10 @@ use canon_gate::{latest_verdicts, CellKey, GateContext, GateCtx, LedgerEntry, Po
 use canon_model::{AuditResult, ChangeId, EvidenceVerdict, Finding, ProjectId, RecordKind, Scenario, Subject, SubjectStatus};
 use canon_policy::SchemaRegistry;
 use chrono::Utc;
+use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::json_out::Report;
 use crate::context::{resolve_repo_root, spec_coverage_surface, SpecCoverageSurface};
 use crate::brief::BriefStatus;
 use crate::role::Role;
@@ -140,7 +142,7 @@ const DISPLAY_ORDER: [SubjectStatus; 6] =
 const NEXT_ORDER: [SubjectStatus; 5] = [SubjectStatus::Verifying, SubjectStatus::Building, SubjectStatus::Specced, SubjectStatus::Proposed, SubjectStatus::Shipped];
 
 /// The whole report, in the order it prints.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StatusReport {
     pub status_version: u32,
@@ -157,13 +159,19 @@ pub struct StatusReport {
     /// `require_audit` is off and no latest audit is refuted.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audits: Option<AuditSummary>,
+    /// The next steps, role-filtered: carried in `meta.next` (with `nextOmitted` and `waitingOn`), not in `data`.
+    #[serde(skip)]
+    #[schemars(skip)]
     pub next: Vec<NextStep>,
     /// How many further `next` entries the rules produced past
-    /// [`NEXT_LIMIT`].
+    /// [`NEXT_LIMIT`]: `meta.nextOmitted`.
+    #[serde(skip)]
+    #[schemars(skip)]
     pub next_omitted: usize,
     /// With a declared role: how many steps each other owner holds
-    /// (`human` for the steps only the human takes). Absent without one.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// (`human` for the steps only the human takes): `meta.waitingOn`.
+    #[serde(skip)]
+    #[schemars(skip)]
     pub waiting_on: Option<BTreeMap<String, usize>>,
     /// Every step the rules produced, before the limit and the role
     /// filter: what [`crate::next`] scopes a write's `meta.next` from.
@@ -178,10 +186,17 @@ pub struct StatusReport {
     /// Change id → the subjects joined to it.
     #[serde(skip)]
     pub change_subjects: BTreeMap<String, Vec<String>>,
+    /// Whether the ledger was read at all. False when canon.yaml or the
+    /// ledger could not be loaded: nothing was examined (D3), so the run is
+    /// `unverifiable` rather than a report of empty counts.
+    #[serde(skip)]
+    pub examined: bool,
 }
 
+impl Report for StatusReport {}
+
 /// Where audits stand (0.15 D3).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AuditSummary {
     /// In-scope scenarios `spec_coverage.require_audit` sampled (0 when
@@ -197,7 +212,7 @@ pub struct AuditSummary {
     pub refuted: Vec<AuditEntry>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AuditEntry {
     pub scenario: String,
@@ -209,7 +224,7 @@ pub struct AuditEntry {
     pub evaluator: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct PolicyStatus {
     /// Whether `.canon/policy.yaml` exists.
     pub present: bool,
@@ -222,7 +237,7 @@ pub struct PolicyStatus {
     pub level: Option<&'static str>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SubjectSummary {
     pub id: String,
@@ -291,7 +306,7 @@ pub struct SubjectSummary {
 }
 
 /// One flow step of the brief and what covers it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FlowStep {
     /// `F1`.
@@ -305,7 +320,7 @@ pub struct FlowStep {
 
 /// One scenario covering a flow step, with the evidence and review state
 /// the gate reads for it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FlowScenarioState {
     pub id: String,
@@ -320,7 +335,7 @@ pub struct FlowScenarioState {
     pub review: &'static str,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MissingCase {
     /// The `specs.roots[]` id the surface lives under.
@@ -344,7 +359,7 @@ pub struct NextStep {
 
 /// Who carries out a `next` step (0.16 D1). The only `human` step is
 /// getting a brief approved.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum StepActor {
     Agent,
@@ -382,21 +397,63 @@ pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> i32 {
         }
     }
     let repo = resolve_repo_root(repo);
+    crate::legacy::announce(&repo);
     let mut report = resolve_with_pending_index(&repo);
     report.apply_role(Role::current(None));
+    // A ledger that could not be read gave the report nothing to count (D3): `unverifiable`, never a silent pass.
+    let coverage = status_coverage(&repo, &report);
+    let unverifiable = coverage.examined_nothing();
+    let error = unverifiable.then(|| crate::coverage::unverifiable_error("canon status", "nothing: canon.yaml or the ledger could not be read", "fix what `warnings` names (`canon init --check` reports what is wrong in canon.yaml), then run `canon status` again"));
     if json {
-        let shown = match fields {
-            Some(requested) => serde_json::to_value(&report).and_then(|v| serde_json::to_string_pretty(&crate::paging::project(&v, requested))),
-            None => serde_json::to_string_pretty(&report),
-        };
-        match shown {
-            Ok(text) => println!("{text}"),
-            Err(e) => return crate::cli_error::CliError::failed("SERIALIZE_FAILED", format!("failed to serialize status: {e}")).hint("this is a canon bug: report it together with the command line that produced it").emit("canon status", true),
+        let after = crate::next::After::of_status(&report);
+        let mut meta = crate::json_out::warnings_meta(&report.warnings);
+        if !meta.is_object() {
+            meta = serde_json::json!({});
+        }
+        meta["coverage"] = coverage.meta()["coverage"].clone();
+        match (&error, fields) {
+            (Some(error), _) => return error.emit_with_data_and_meta("canon status", true, &report, meta),
+            (None, Some(requested)) => {
+                let projected = serde_json::to_value(&report).map(|v| crate::paging::project(&v, requested));
+                match projected {
+                    Ok(value) => crate::json_out::data_with_next_and_meta("status", &crate::json_out::Projected::<StatusReport>::new(value), &after, meta),
+                    Err(e) => return crate::cli_error::CliError::failed("SERIALIZE_FAILED", format!("failed to serialize status: {e}")).hint("this is a canon bug: report it together with the command line that produced it").emit("canon status", true),
+                }
+            }
+            (None, None) => crate::json_out::data_with_next_and_meta("status", &report, &after, meta),
         }
     } else {
         print!("{}", render(&report));
+        if let Some(error) = &error {
+            eprintln!("{}", error.human("canon status"));
+        }
+    }
+    if let Some(error) = error {
+        return error.exit;
     }
     0
+}
+
+/// What the report counted: the subjects and scenarios it joined, under the
+/// spec roots `canon.yaml` configures.
+pub fn status_coverage(repo: &Path, report: &StatusReport) -> crate::coverage::Coverage {
+    let mut coverage = crate::coverage::Coverage::new();
+    match crate::inventory::load_spec_roots(&repo.join("canon.yaml")) {
+        Ok(roots) => {
+            for root in roots {
+                coverage.root(root.id.as_str(), root.root.strip_prefix(repo).unwrap_or(&root.root).display().to_string(), 0);
+            }
+        }
+        Err(err) => {
+            coverage.skip("specs.roots", err.to_string());
+        }
+    }
+    coverage.count("subjects", report.subjects.len()).count("scenarios", report.scenario_owner.len() + report.unowned.len());
+    coverage.count("ledgers", usize::from(report.examined));
+    if !report.examined {
+        coverage.skip("ledger", "canon.yaml or the ledger could not be read");
+    }
+    coverage
 }
 
 impl StatusReport {
@@ -435,7 +492,7 @@ pub fn split_by_role(steps: Vec<NextStep>, role: Role) -> (Vec<NextStep>, BTreeM
 
 /// The top-level fields of the `--json` report, which `--fields` may name.
 /// `audits` is omitted from a report that has none.
-const REPORT_FIELDS: [&str; 10] = ["statusVersion", "canonVersion", "policy", "warnings", "subjects", "unowned", "audits", "next", "nextOmitted", "waitingOn"];
+const REPORT_FIELDS: [&str; 7] = ["statusVersion", "canonVersion", "policy", "warnings", "subjects", "unowned", "audits"];
 
 /// Build the report for an already-resolved repo root. The caller has
 /// refreshed a stale scenario index (a writer that reports does, first);
@@ -471,8 +528,10 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
             warnings.extend(policy_warning(&policy));
             warnings.extend(crate::policy_approval::advisory(repo));
             warnings.push(format!("cannot read this repo's ledger: {e}"));
-            next.push(NextStep { command: "canon init --check-config".into(), why: "canon.yaml must load before anything can be counted".into(), actor: StepActor::Agent, role: Some(Role::Orchestrator) });
-            return finish(repo, &policy, warnings, Vec::new(), Vec::new(), None, next);
+            next.push(NextStep { command: "canon init --check".into(), why: "canon.yaml must load before anything can be counted".into(), actor: StepActor::Agent, role: Some(Role::Orchestrator) });
+            let mut report = finish(repo, &policy, warnings, Vec::new(), Vec::new(), None, next);
+            report.examined = false;
+            return report;
         }
     };
 
@@ -498,6 +557,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
         warnings.push(note);
     }
     warnings.extend(crate::brief::override_lines(&ctx));
+    warnings.extend(crate::subject::override_lines(&ctx));
 
     let joins = Joins { verdicts: latest_verdicts(&ctx), blockers: open_blockers(&ctx) };
     let subjects = latest_subjects(&ctx);
@@ -506,7 +566,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     let plan_roots: Vec<PathBuf> = match crate::brief::plan_roots(repo) {
         Ok(roots) => roots,
         Err(e) => {
-            warnings.push(format!("canon.yaml's `plans:` section cannot be read ({e}), so no brief reads as approved; `canon init --check-config` names the problem"));
+            warnings.push(format!("canon.yaml's `plans:` section cannot be read ({e}), so no brief reads as approved; `canon init --check` names the problem"));
             Vec::new()
         }
     };
@@ -530,7 +590,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Orchestrator),
-            command: "canon init --check-config".into(),
+            command: "canon init --check".into(),
             why: format!(
                 "set `{settings}` in canon.yaml, then check it: status and the gate read only the local rung, so every count and step would rest on an empty corpus"
             ),
@@ -600,7 +660,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Planner),
-            command: format!("canon subject new {id} --domain <domain> --title \"<title>\" --actor-id <unit>"),
+            command: format!("canon subject new {id} --domain <domain> --title \"<title>\" --actor-id <unit> --session-id <session>"),
             why: format!("{} scenario(s) are tagged @subject:{id}, which no subject record carries", tagged.len()),
         });
     }
@@ -608,7 +668,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Planner),
-            command: "canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit>".into(),
+            command: "canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit> --session-id <session>".into(),
             why: "no subject exists yet; a subject is the unit status, review and shipping track".into(),
         });
     }
@@ -640,7 +700,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
             next.push(NextStep {
                 actor: StepActor::Agent,
                 role: Some(Role::Implementer),
-                command: format!("canon feature new <area>.<surface> --title \"<feature>\" --actor-id <unit>{}", project_flag(&roots, None)),
+                command: format!("canon feature new <area>.<surface> --title \"<feature>\" --actor-id <unit> --session-id <session>{}", project_flag(&roots, None)),
                 why: "no .feature file holds a scenario yet; write the features, then each subject's scenarios with `canon scenario new … --subject-id <id>`".into(),
             });
         }
@@ -721,6 +781,7 @@ fn finish(
         all_next,
         scenario_owner: BTreeMap::new(),
         change_subjects: BTreeMap::new(),
+        examined: true,
     }
 }
 
@@ -969,10 +1030,10 @@ fn shipped_red(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<String>
     classes.into_iter().map(|(class, count, first)| format!("{count} {class} (first: {first})")).collect()
 }
 
-/// `canon subject status <id> --to verifying --reason …`: the reopen command
+/// `canon subject move <id> --to verifying --reason …`: the reopen command
 /// status names for a red shipped subject (0.18 D3).
 pub(crate) fn reopen_command(id: &str) -> String {
-    format!("canon subject status {id} --to verifying --reason \"<why it reopens>\" --actor-id <unit>")
+    format!("canon subject move {id} --to verifying --reason \"<why it reopens>\" --actor-id <unit> --session-id <session>")
 }
 
 /// The next scenario number free on `surface` within spec root `project`.
@@ -1024,7 +1085,7 @@ fn flow_step(id: &str, all: &[&Scenario], roots: &[ProjectId], summary: &Subject
     Some(NextStep {
         actor: StepActor::Agent,
         role: Some(role),
-        command: format!("canon scenario new {suggested} --subject-id {id} --case {case} --flow {} --title \"{title}\" --actor-id <unit>{}", step.id, project_flag(roots, project.as_deref())),
+        command: format!("canon scenario new {suggested} --subject-id {id} --case {case} --flow {} --title \"{title}\" --actor-id <unit> --session-id <session>{}", step.id, project_flag(roots, project.as_deref())),
         why: format!("{id}: brief flow step {} has {gap}, and the ship guard refuses until it has one; tag it with --flow so it covers the step", step.id),
     })
 }
@@ -1046,7 +1107,7 @@ fn polish_step(id: &str, brief: &BriefStatus, draft: bool) -> Option<NextStep> {
     Some(NextStep {
         actor: StepActor::Agent,
         role: Some(Role::Planner),
-        command: format!("polish the brief in {} (reference/brief-polish.md), then run `canon brief check --change-id {change}`", brief.report_in()),
+        command: format!("polish the brief in {} (`canon skills show brief-polish`), then run `canon brief check {change}`", brief.report_in()),
         why: format!("{id}: {} advisory finding(s) remain in `{change}` ({top}); the check is clean of blockers, so the human can answer now, but a polished brief is easier to read; advisories never refuse an approval{draft}", counts.advisories),
     })
 }
@@ -1085,7 +1146,7 @@ fn subject_steps(
             (Some(change), Some(counts)) => next.push(NextStep {
                 actor: StepActor::Agent,
                 role: Some(Role::Planner),
-                command: format!("canon brief check --change-id {change}"),
+                command: format!("canon brief check {change}"),
                 why: format!("{id}: `{draft}` is a pending draft with {} blocker(s): write the brief in {} until `canon brief check` is clean; only then does the human answer it; {id} is not blocked meanwhile", counts.blockers, brief.report_in()),
             }),
             _ => {
@@ -1097,7 +1158,7 @@ fn subject_steps(
                     role: None,
                     command: format!("report the pending draft's brief in {} to the human; {id} is not blocked meanwhile", brief.report_in()),
                     why: format!(
-                        "{id}: `{draft}` is a pending draft ({}) and not yet part of the subject's scope: reopen, evidence and ship read the newest approved change until a scenario is tagged `@flow:{draft}.*`, and then the subject cannot ship until the human answers; once they do, {}",
+                        "{id}: `{draft}` is a pending draft ({}) and not yet part of the subject's scope: reopen, evidence and ship read the newest approved change until a scenario is tagged `@flow:{draft}.*`, and then the subject cannot ship until the human answers; {}",
                         brief.unanswered(),
                         brief.record()
                     ),
@@ -1114,7 +1175,7 @@ fn subject_steps(
             next.push(NextStep {
                 actor: StepActor::Agent,
                 role: Some(Role::Planner),
-                command: format!("canon brief check --change-id {change}"),
+                command: format!("canon brief check {change}"),
                 why: format!("{id}: {} blocker(s): write the brief in {} until `canon brief check` is clean; only then does the human answer it", counts.blockers, brief.report_in()),
             });
             return;
@@ -1129,7 +1190,7 @@ fn subject_steps(
                 brief.report_in()
             ),
             why: format!(
-                "{id}: {} (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses the scenarios tagged `@flow:{change}.*` and `{change}`'s tasks (and {id}'s untagged scenarios not evidenced before {id} adopted its first change, while no adopted change is approved) until it is recorded; once the human answers, {} (one call records the brief and the policy approval)",
+                "{id}: {} (an older change's approval does not cover a new scope), and the approval is never assumed: `canon evidence add` refuses the scenarios tagged `@flow:{change}.*` and `{change}`'s tasks (and {id}'s untagged scenarios not evidenced before {id} adopted its first change, while no adopted change is approved) until it is recorded; {} (one call records the brief and the policy approval)",
                 brief.unanswered(),
                 brief.record()
             ),
@@ -1165,7 +1226,7 @@ fn subject_steps(
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Implementer),
-            command: format!("canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id {id} --case happy --actor-id <unit>{}", project_flag(roots, None)),
+            command: format!("canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id {id} --case happy --actor-id <unit> --session-id <session>{}", project_flag(roots, None)),
             why: format!("{id} owns no scenario; specify its behavior, one scenario per behavior{roots_note}"),
         });
         return;
@@ -1187,7 +1248,7 @@ fn subject_steps(
             actor: StepActor::Agent,
             role: Some(Role::Implementer),
             command: format!(
-                "canon scenario new {} --title \"<what happens on this path>\" --subject-id {id} --case {} --actor-id <unit>{}",
+                "canon scenario new {} --title \"<what happens on this path>\" --subject-id {id} --case {} --actor-id <unit> --session-id <session>{}",
                 next_number(all, &gap.project_id, &gap.surface),
                 gap.case,
                 project_flag(roots, Some(&gap.project_id))
@@ -1202,7 +1263,7 @@ fn subject_steps(
                 actor: StepActor::Agent,
                 role: Some(Role::Implementer),
                 command: format!(
-                    "canon evidence add --scenario-id {} --project-id {} --kind test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
+                    "canon evidence add --scenario-id {} --project-id {} --class test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
                     first.scenario_id.as_str(),
                     first.project_id.as_str()
                 ),
@@ -1217,19 +1278,16 @@ fn subject_steps(
         // A fixed blocker or an approved chore asks for the whole suite
         // again (0.22 D2); the re-review follows the new evidence.
         if let Some(gap) = summary.reverify.first() {
-            next.push(NextStep {
-                actor: StepActor::Agent,
-                role: Some(Role::Implementer),
-                command: gap.command(),
-                why: gap.why(id),
-            });
+            for command in gap.commands() {
+                next.push(NextStep { actor: StepActor::Agent, role: Some(Role::Implementer), command, why: gap.why(id) });
+            }
         }
                 if let Some(first) = counted.iter().find(|s| joins.verdict_state(s).1 && !canon_gate::acceptance::is_accepted(ctx, s)) {
             next.push(NextStep {
                 actor: StepActor::Agent,
                 role: Some(Role::Implementer),
                 command: format!(
-                    "canon evidence add --scenario-id {} --project-id {} --kind test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
+                    "canon evidence add --scenario-id {} --project-id {} --class test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
                     first.scenario_id.as_str(),
                     first.project_id.as_str()
                 ),
@@ -1243,7 +1301,7 @@ fn subject_steps(
             actor: StepActor::Agent,
             role: Some(Role::Reviewer),
             command: format!(
-                "canon finding close --change-id {} --round {} --seq {} --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
+                "canon finding close {} --round {} --seq {} --disposition fixed --actor-id <unit> --session-id <session>",
                 blocker.change_id.as_str(),
                 blocker.round,
                 blocker.seq
@@ -1257,7 +1315,7 @@ fn subject_steps(
             actor: StepActor::Agent,
             role: Some(Role::Reviewer),
             command: format!(
-                "canon review add --project-id <root> --change-id {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<brief>\"",
+                "canon review change {} --project-id <root> --actor-id <reviewer> --session-id <review-session> --role reviewer --original-spec-ref \"<brief>\"",
                 change.as_str()
             ),
             why: format!("{id}: {why}"),
@@ -1271,7 +1329,7 @@ fn subject_steps(
                 actor: StepActor::Agent,
                 role: Some(Role::Reviewer),
                 command: format!(
-                    "canon review add --project-id {} --scenario-id {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"",
+                    "canon review scenario {1} --project-id {0} --actor-id <reviewer> --session-id <review-session> --role reviewer --original-spec-ref \"<feature file>\"",
                     first.project_id.as_str(),
                     first.scenario_id.as_str()
                 ),
@@ -1296,7 +1354,7 @@ fn subject_steps(
     let project_of = |scenario: &str| owned.iter().find(|s| s.scenario_id.as_str() == scenario).map_or("<root-id>", |s| s.project_id.as_str());
     let audit_command = |scenario: &str| {
         format!(
-            "canon evidence add --kind audit --scenario-id {scenario} --project-id {} --evaluator-id <evaluator> --evaluator-version <version> --evaluator-digest <sha256> --audit-result <confirmed|refuted|indeterminate> --ref \"<evaluator run>\" --role auditor --actor-id <evaluator>",
+            "canon evidence audit {scenario} --project-id {} --evaluator-id <evaluator> --evaluator-version <version> --evaluator-digest <sha256> --audit-result <confirmed|refuted|indeterminate> --ref \"<evaluator run>\" --role auditor --actor-id <evaluator>",
             project_of(scenario)
         )
     };
@@ -1322,7 +1380,7 @@ fn subject_steps(
         next.push(NextStep {
             actor: StepActor::Agent,
             role: Some(Role::Orchestrator),
-            command: format!("canon subject status {id} --to {to} --actor-id <unit>"),
+            command: format!("canon subject move {id} --to {to} --actor-id <unit> --session-id <session>"),
             why: match status {
                 SubjectStatus::Proposed | SubjectStatus::Specced => format!("{id} has its scenarios and every required case; move it on"),
                 SubjectStatus::Verifying => {
@@ -1432,7 +1490,7 @@ pub fn render(report: &StatusReport) -> String {
                     (Some(_), Some(_), _) if brief.changed => writeln!(out, "      brief: not approved ({}); {}", brief.unanswered(), brief.record()),
                     (Some(approval), Some(path), _) if brief.legacy_approval => writeln!(
                         out,
-                        "      brief: approved in {path} — {approval}\n      advisory: that approval has no digest, so it does not follow the brief's text; {} to bind it",
+                        "      brief: approved in {path} — {approval}\n      advisory: that approval has no digest, so it does not follow the brief's text; to bind it, {}",
                         brief.record_digest_hint()
                     ),
                     (Some(approval), Some(path), _) => writeln!(out, "      brief: approved in {path} — {approval}"),
@@ -1447,7 +1505,7 @@ pub fn render(report: &StatusReport) -> String {
                 let _ = writeln!(out, "      {names} {verb}: not yet part of the subject's scope (brief not approved and no scenario tagged `@flow:<change>.*`); reopen, evidence and ship read the newest approved or tagged change");
             }
             if let Some(counts) = s.brief.as_ref().and_then(|b| b.findings) {
-                let _ = writeln!(out, "      brief check: {} blocker(s), {} advisory(ies); `canon brief` names the next step", counts.blockers, counts.advisories);
+                let _ = writeln!(out, "      brief check: {} blocker(s), {} advisory(ies); `canon brief show` names the next step", counts.blockers, counts.advisories);
             }
             for step in &s.flow {
                 let _ = writeln!(out, "      flow {}{}", step.id, if step.gaps.is_empty() { String::new() } else { format!(" — {}", step.gaps.join(", ")) });

@@ -1,7 +1,7 @@
 //! `--repo` discovery and the `CONFIG_MISSING` refusal (#109).
 //!
-//! `--repo` absent or `.` means the nearest ancestor of the working directory
-//! that holds a `canon.yaml`; any other value is that directory as given. A
+//! `--repo` absent means the nearest ancestor of the working directory that
+//! holds a `canon.yaml`; any value, `.` included, is that directory as given. A
 //! command that needs canon state and finds no `canon.yaml` refuses with
 //! `CONFIG_MISSING` (exit 2) instead of grading an empty repo as clean.
 //!
@@ -96,13 +96,16 @@ fn a_nested_directory_of_a_canon_repo_finds_the_root_without_repo() {
     let nested = root.path().join("packages").join("app");
     std::fs::create_dir_all(&nested).unwrap();
 
-    for args in [&["status", "--json"][..], &["status", "--repo", ".", "--json"][..]] {
-        let out = canon(&nested, home.path(), args);
-        assert_eq!(out.status.code(), Some(0), "{args:?}: {}", stderr(&out));
-        let body: Value = serde_json::from_slice(&out.stdout).unwrap();
-        let subjects = body["subjects"].to_string();
-        assert!(subjects.contains("demo"), "{args:?} from a nested directory reads the root's ledger: {subjects}");
-    }
+    let out = canon(&nested, home.path(), &["status", "--json"]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    let body: Value = serde_json::from_slice(&out.stdout).unwrap();
+    let subjects = body["data"]["subjects"].to_string();
+    assert!(subjects.contains("demo"), "a nested directory reads the root's ledger: {subjects}");
+
+    // A given `--repo` is that directory as given, never searched upward from (D5).
+    let given = canon(&nested, home.path(), &["status", "--repo", ".", "--json"]);
+    assert_eq!(given.status.code(), Some(2), "{}", stderr(&given));
+    assert_eq!(error_of(&given)["code"], "CONFIG_MISSING");
 
     let gate = canon(&nested, home.path(), &["gate", "check"]);
     assert_ne!(gate.status.code(), Some(2), "the gate runs on the root's canon.yaml: {}", stderr(&gate));
@@ -116,14 +119,19 @@ fn every_command_that_needs_canon_state_refuses_without_a_canon_yaml() {
         &["status"],
         &["query", "--kind", "subject"],
         &["finding", "list", "--change-id", "add-login"],
-        &["divergence", "status"],
+        &["divergence", "list"],
         &["brief", "check"],
         &["policy", "show"],
         &["dispatch", "diff"],
         &["artifacts", "verify"],
         &["subject", "new", "x", "--domain", "dev", "--title", "X"],
         &["inventory", "sync"],
-        &["report"],
+        &["report", "build"],
+        &["ingest", "sessions"],
+        &["tier", "age"],
+        &["ledger", "compact"],
+        &["format"],
+        &["gate", "check"],
     ];
     for args in needing_config {
         let mut argv = args.to_vec();
@@ -139,7 +147,7 @@ fn every_command_that_needs_canon_state_refuses_without_a_canon_yaml() {
 fn commands_that_run_without_a_canon_yaml_still_do() {
     let home = TempDir::new().unwrap();
     let empty = TempDir::new().unwrap();
-    for args in [&["schema", "gate", "check"][..], &["context", "--json"][..], &["retrieve", "--role", "reviewer", "--domain", "dev"][..], &["regime-key", "--role", "reviewer", "--repo", "r", "--area", "a", "--hash", "abcdef012345"][..], &["--help"][..]] {
+    for args in [&["schema", "gate", "check"][..], &["context", "--json"][..], &["retrieve", "--for-role", "reviewer", "--domain", "dev"][..], &["regime", "show", "--role-segment", "reviewer", "--repo-name", "r", "--area", "a", "--hash", "abcdef012345"][..], &["--help"][..]] {
         let out = canon(empty.path(), home.path(), args);
         assert_eq!(out.status.code(), Some(0), "{args:?}: {}", stderr(&out));
     }
@@ -165,7 +173,9 @@ fn format_never_reports_a_missing_path_or_a_missing_config_as_clean() {
     assert_eq!(error_of(&no_config)["code"], "CONFIG_MISSING");
 
     // A corpus that exists is still checked without a canon.yaml: `format` validates the directory it is handed.
+    // One with no file in it examined nothing, so it is `unverifiable` (exit 1), never clean.
     std::fs::create_dir(empty.path().join("spec")).unwrap();
-    let present = canon(empty.path(), home.path(), &["format", "spec"]);
-    assert_eq!(present.status.code(), Some(0), "{}", stderr(&present));
+    let present = canon(empty.path(), home.path(), &["format", "spec", "--json"]);
+    assert_eq!(present.status.code(), Some(1), "{}", stderr(&present));
+    assert_eq!(error_of(&present)["code"], "UNVERIFIABLE");
 }

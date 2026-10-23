@@ -17,7 +17,7 @@ steps:
     exit: 2
   - args: [query, --kind, review_record, --json]
     exit: 2
-  - args: [purge, --kind=session_record, --before, "2020-01-01T00:00:00Z", --plan, --json]
+  - args: [purge, --kind=session_record, --before, "2020-01-01T00:00:00Z", --json]
     exit: 2
   - args: [query, --kind, review, --json]
     exit: 0

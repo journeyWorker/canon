@@ -9,6 +9,15 @@ fn canon(repo: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").current_dir(repo).output().expect("spawn canon")
 }
 
+/// Makes `repo` a git work tree with one commit, which every revision-bound
+/// write needs.
+fn git_seed(repo: &Path) {
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["commit", "-q", "--allow-empty", "-m", "x"]] {
+        let out = Command::new("git").args(args).current_dir(repo).output().expect("spawn git");
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    }
+}
+
 fn text(output: &Output) -> String {
     format!("{}{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr))
 }
@@ -26,7 +35,7 @@ fn ok(repo: &Path, args: &[&str]) -> String {
 fn setup() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
-    assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
+    git_seed(repo);
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
     let change = repo.join(".canon/changes/cats");
     std::fs::create_dir_all(&change).unwrap();
@@ -58,9 +67,14 @@ fn committed(repo: &Path, kind: &str) -> Vec<serde_json::Value> {
     records_under(repo, &format!("kind={kind}"))
 }
 
-const STAGED: &str = "— run `canon gate promote` to commit it";
-const DIRECT: &str = "— written directly; nothing to promote";
-const PROMOTED: &str = "— staged and promoted in this run; nothing to promote";
+/// Where a write left its record: kept staged (`--no-promote`), or in the committed ledger (promoted in the run, or written directly).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Landed {
+    Staged,
+    Committed,
+}
+const STAGED: Landed = Landed::Staged;
+const PROMOTED: Landed = Landed::Committed;
 
 /// `--session-id` on `evidence add` and `review add` fills each record's
 /// `actor.session_id`, and survives promotion.
@@ -72,7 +86,7 @@ fn session_ids_land_on_evidence_and_review_actors() {
     ok(repo, &["inventory", "sync"]);
 
     let evidence = [
-        "evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run smoke", "--role", "implementer",
+        "evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke", "--role", "implementer",
         "--actor-id", "impl-unit-1", "--session-id", "sess-impl",
     ];
     ok(repo, &evidence);
@@ -82,7 +96,7 @@ fn session_ids_land_on_evidence_and_review_actors() {
     assert_eq!(records[0]["actor"], serde_json::json!({"agent_id": "impl-unit-1", "role": "implementer", "session_id": "sess-impl"}));
 
     ok(repo, &[
-        "review", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--reviewer", "reviewer-2", "--pin", "r1", "--original-spec-ref",
+        "review", "scenario", "game.run.01", "--project-id", "root", "--original-spec-ref",
         "specs/x.feature", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review",
     ]);
     let reviews = committed(repo, "review");
@@ -103,12 +117,12 @@ fn a_session_id_outside_the_grammar_is_refused_and_nothing_is_written() {
     for bad in ["sess\timpl", " sess-impl", ""] {
         let evidence = canon(
             repo,
-            &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "r", "--role", "implementer", "--session-id", bad],
+            &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "r", "--role", "implementer", "--session-id", bad],
         );
         let review = canon(
             repo,
             &[
-                "review", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--reviewer", "r", "--pin", "p", "--original-spec-ref", "s", "--role",
+                "review", "scenario", "game.run.01", "--project-id", "root", "--actor-id", "r", "--original-spec-ref", "s", "--role",
                 "reviewer", "--session-id", bad,
             ],
         );
@@ -121,52 +135,75 @@ fn a_session_id_outside_the_grammar_is_refused_and_nothing_is_written() {
     assert!(committed(repo, "evidence_record").is_empty() && committed(repo, "review").is_empty());
 }
 
-/// D6 (F16): every write command ends its success line with the same
-/// suffix for the same write mode, so an operator knows whether a
-/// promote is due. `canon init` writes `write: { promote: auto }` (0.16
-/// D2), so a staged write says it promoted itself unless `--no-promote`
-/// keeps it staged.
+/// D6 (F16): every write command leaves its record where its write mode says,
+/// so an operator knows whether a promote is due. `canon init` writes
+/// `write: { promote: auto }` (0.16 D2), so a staged write promotes itself
+/// unless `--no-promote` keeps it staged; the direct writers never stage.
 #[test]
-fn every_write_command_says_whether_it_staged_or_wrote_directly() {
+fn every_write_command_stages_or_writes_directly_as_its_mode_says() {
     let dir = setup();
     let repo = dir.path();
     let direct = |args: &[&str]| {
-        let out = ok(repo, args);
-        assert!(out.lines().any(|l| l.ends_with(DIRECT)), "canon {args:?} wrote directly and must say so:\n{out}");
+        ok(repo, args);
+        assert!(records_under(repo, "_staging").is_empty(), "canon {args:?} writes directly and must stage nothing");
     };
-    let staged = |args: &[&str], suffix: &str| {
-        let out = ok(repo, args);
-        assert!(out.lines().any(|l| l.contains(suffix)), "canon {args:?} staged and must name its promote:\n{out}");
+    let staged = |args: &[&str], kind: &str, landed: Landed| {
+        let before = (records_under(repo, "_staging").len(), committed(repo, kind).len());
+        ok(repo, args);
+        let after = (records_under(repo, "_staging").len(), committed(repo, kind).len());
+        match landed {
+            Landed::Staged => {
+                assert!(after.0 > before.0, "canon {args:?} with --no-promote must leave its record staged");
+                assert_eq!(after.1, before.1, "canon {args:?} with --no-promote must commit nothing");
+            }
+            Landed::Committed => {
+                assert_eq!(after.0, before.0, "canon {args:?} must promote its record in the run");
+                assert_eq!(after.1, before.1 + 1, "canon {args:?} must leave its record committed in the ledger");
+            }
+        }
     };
 
     direct(&["feature", "new", "game.run", "--title", "Runs"]);
     direct(&["scenario", "new", "game.run.01", "--title", "A run ends at zero health", "--case", "failure"]);
     ok(repo, &["inventory", "sync"]);
     direct(&["subject", "new", "runs", "--domain", "dev", "--title", "Runs"]);
-    direct(&["subject", "adopt", "cats", "--subject-id", "runs"]);
-    direct(&["subject", "status", "runs", "--to", "specced"]);
+    direct(&["subject", "adopt", "runs", "--change-id", "cats"]);
+    direct(&["subject", "move", "runs", "--to", "specced"]);
     direct(&["change", "new", "runs-boss", "--subject-id", "runs", "--title", "A boss wave"]);
 
     staged(
-        &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run smoke", "--role", "implementer", "--no-promote"],
+        &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke", "--role", "implementer", "--no-promote"],
+        "evidence_record",
         STAGED,
     );
-    staged(&["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "test-run", "--ref", "npm run smoke 2", "--role", "implementer"], PROMOTED);
-    staged(&["finding", "add", "--change-id", "cats", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "r", "--summary", "s", "--no-promote"], STAGED);
+    staged(&["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke 2", "--role", "implementer"], "evidence_record", PROMOTED);
+    staged(&["finding", "add", "--change-id", "cats", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "r", "--summary", "s", "--no-promote"], "finding", STAGED);
     ok(repo, &["gate", "promote"]);
-    staged(&["finding", "close", "--change-id", "cats", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"], PROMOTED);
+    // A close supersedes the committed finding, so the committed count holds: the disposition is what moves.
+    ok(repo, &["finding", "close", "cats", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"]);
+    let findings = committed(repo, "finding");
+    assert!(!findings.is_empty() && findings.iter().all(|finding| finding["disposition"] == "rejected"), "the close promotes its record in the run: {findings:?}");
+    assert!(records_under(repo, "_staging").is_empty(), "nothing is left to promote");
+    // With --no-promote the close stays staged and the committed finding keeps its disposition.
+    ok(repo, &["finding", "close", "cats", "--round", "1", "--seq", "1", "--disposition", "deferred", "--reason", "later", "--no-promote"]);
+    assert_eq!(records_under(repo, "_staging").len(), 1, "the close with --no-promote is staged");
+    assert!(committed(repo, "finding").iter().all(|finding| finding["disposition"] == "rejected"), "and the ledger still holds the earlier disposition: {:?}", committed(repo, "finding"));
+    ok(repo, &["gate", "promote"]);
     assert!(records_under(repo, "_staging").is_empty(), "nothing is left to promote");
 
     direct(&[
-        "review", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--reviewer", "r", "--pin", "p", "--original-spec-ref", "specs/x.feature",
+        "review", "scenario", "game.run.01", "--project-id", "root", "--actor-id", "r", "--original-spec-ref", "specs/x.feature",
         "--role", "reviewer",
     ]);
 
-    let sha = "a".repeat(40);
     staged(
-        &["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--no-promote"],
-        "— run `canon gate promote` to commit it",
+        &["divergence", "add", "game.run.01", "--project-id", "root", "--actor-id", "r", "--role", "reviewer", "--no-promote"],
+        "divergence",
+        STAGED,
     );
-    staged(&["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--round", "2", "--reviewer", "r", "--role", "reviewer"], PROMOTED);
-    staged(&["divergence", "resolve", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--round", "3", "--reviewer", "r", "--role", "reviewer"], PROMOTED);
+    staged(&["divergence", "add", "game.run.01", "--project-id", "root", "--round", "2", "--actor-id", "r", "--role", "reviewer"], "divergence", PROMOTED);
+    let staged_before = records_under(repo, "_staging").len();
+    ok(repo, &["divergence", "resolve", "game.run.01", "--project-id", "root", "--round", "3", "--actor-id", "r", "--role", "reviewer"]);
+    assert_eq!(records_under(repo, "_staging").len(), staged_before, "resolve promotes its record in the run");
+    assert!(committed(repo, "divergence").iter().any(|divergence| divergence["status"] == "resolved"), "the resolution is committed: {:?}", committed(repo, "divergence"));
 }

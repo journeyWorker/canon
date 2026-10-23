@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-1"
+  },
+  "at": "2026-10-23T13:10:24.193756718Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/read_effects.rs:293-320",
+  "kind": "finding",
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "scenario_ids": [
+    "inventory.sync.50"
+  ],
+  "schema": 1,
+  "seq": 23,
+  "severity": "should_fix",
+  "summary": "Standards pass: inventory.sync.50 never reads stderr ('no refresh line') and its second Then (artifacts store still refreshes and says so in one line) is not in the bound test",
+  "worktree_dirty": false
+}

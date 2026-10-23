@@ -85,15 +85,15 @@ platformer.session.04: resolved divergence — Idle and resize sessions stay err
 </Aside>
 
 전략 메모리는 **한 번 계산되고 끝나는 게 아니라 재빌드**됩니다: `canon
-ingest artifacts`는 실행할 때마다 현재 trajectory 집합으로부터 증류된
+ingest records`는 실행할 때마다 현재 trajectory 집합으로부터 증류된
 전략을 다시 파생시킵니다(`rebuild_namespace`). 이 재파생은
 결정적입니다 — 같은 아티팩트를 두 번 ingest하면 바이트 단위로 동일한
 trajectory 콘텐츠가 파생되므로, 재빌드가 의존하는 중복 스킵이 그대로
 동작하고 반복 실행이 내용을 흔들지 않습니다. 이 재빌드는
 비파괴적(non-destructive)입니다 — 원시 trajectory 로우가 건드리지
 않는 전략은 절대 삭제되지 않으므로, 재빌드가 수동으로 승급한 전략을
-조용히 지우는 일은 없습니다. 독립된 `canon learn` 재빌드 명령은
-없으며, `canon learn`의 유일한 서브커맨드는 `promote`입니다.
+조용히 지우는 일은 없습니다. 독립된 `canon strategy` 재빌드 명령은
+없습니다.
 
 ## trajectory에 보상 매기기
 
@@ -146,17 +146,17 @@ policy 밖의 권한이 있는지 증명하지 않습니다.
 명시적인 `promotion.<role>`이 없는 역할은 `occurrence`, `n_min: 5`,
 `window_days: 30`으로 해석됩니다. 두 모드 모두 raw verdict row가
 아니라 해소된 trajectory outcome을 읽으므로 먼저
-`canon ingest artifacts`를 실행해야 합니다. 어느 모드도 품질 향상을
+`canon ingest records`를 실행해야 합니다. 어느 모드도 품질 향상을
 단독으로 증명하지 않습니다.
 
 ## 승급, 승인, 롤백
 
 ```bash
-canon ingest artifacts
-canon learn approve 01J...ULID --evaluation evaluation.json \
-  --principal alice --repo .
-# `request`는 `approve`의 정확한 alias입니다
-canon learn promote 01J...ULID --repo . \
+canon ingest records
+canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV \
+  --evaluation evaluation.json --approver alice \
+  --approval-at 2026-10-02T12:00:00Z --repo .
+canon strategy promote 01ARZ3NDEKTSV4RRFFQ69G5FAV --repo . \
   --evaluation evaluation.json --approval approval.json
 ```
 
@@ -171,7 +171,7 @@ regressions는 0이어야 합니다. 누락되었거나 unknown인 metric, 중�
 decision은 거부됩니다. Canon은 evaluator를 실행하지 않으며, 이
 repository에는 현재 **측정된 uplift 결과가 공개되어 있지 않습니다**.
 
-`canon learn approve`/`request`는 서명하지 않은 payload를 출력합니다:
+`canon strategy approval-payload`는 서명하지 않은 payload를 출력합니다:
 namespace `canon-learning-approval-v1`, subject `strategy:<id>`,
 evaluation digest, RFC3339 `approved_at`, `payload_hex`입니다. private
 key를 읽거나 `verified`를 설정하지 않습니다. 정확히 그 bytes를
@@ -202,6 +202,9 @@ approval:
 있습니다. 유효한 paired evidence와 이 signature가 없으면 quarantine
 candidate는 계속 quarantine 상태입니다. `--force`는 없습니다.
 
+**Done when:** `canon strategy promote`가 exit `0`으로 끝나면 전략이 git 티어에서 active입니다.
+결과는 그 출력의 `data`와 `.canon/strategies/`의 파일에서 읽습니다.
+
 일반적인 모순 trajectory는 이미 active인 전략을 demote합니다. 기본은
 기존 git 파일에 `status: demoted`와 `reason:`을 소프트 플래그하며,
 `demotion.hard_delete: true`이면 파일을 삭제합니다. 이것은 인증된
@@ -209,9 +212,9 @@ rollback이 아니며 rollback record도 만들지 않습니다. 명시적 rollb
 별도 작업입니다:
 
 ```bash
-canon learn rollback 01J...ULID --reason "regression" --actor-id alice \
-  --signature-file rollback.sig --approved-at 2026-10-02T12:00:00Z \
-  --contradicting-trajectory-id 01J...TRAJECTORY --repo .
+canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regression" --actor-id alice \
+  --signature-file rollback.sig --approval-at 2026-10-02T12:00:00Z \
+  --contradicting-trajectory-id 01ARZ3NDEKTSV4RRFFQ69G5FAW --repo .
 ```
 
 rollback signature는 `canon-learning-approval-v1` namespace에서
@@ -222,8 +225,8 @@ rollback은 provenance를 기록하고 lifecycle을 `rolled_back`로 설정합�
 ## 태스크 전에 retrieve하기
 
 ```bash
-canon retrieve --role dev --regime dev/canon/join-spine/9c93d024b1a2
-canon retrieve --role dev --regime dev/canon/join-spine/9c93d024b1a2 --k 3 --json
+canon retrieve --for-role dev --regime dev/canon/join-spine/9c93d024b1a2
+canon retrieve --for-role dev --regime dev/canon/join-spine/9c93d024b1a2 --limit 3 --json
 ```
 
 `--regime`은 전체 `regime_key` 문자열, `<role>/<repo>/<area>/<hash>`
@@ -231,10 +234,10 @@ canon retrieve --role dev --regime dev/canon/join-spine/9c93d024b1a2 --k 3 --jso
 갈라질 수 있는 별도 파생 대신 하나의 시리얼라이저로 조립하세요:
 
 ```bash
-canon regime-key --role dev --repo canon --area join-spine --hash abc123
+canon regime show --role-segment dev --repo-name canon --area join-spine --hash abc123
 ```
 
-`--role`은 `--regime`의 선두 세그먼트와 반드시 일치해야 합니다 —
+`--for-role`은 `--regime`의 선두 세그먼트와 반드시 일치해야 합니다 —
 불일치는 깔끔한 사용법 오류(exit `2`)입니다. role과 regime이 일치하고
 나면, retrieval은 **fail-soft이며 항상 exit `0`**입니다 — 스토어
 장애, 빈 스토어, 손상된 로우 모두 빈 가이던스 목록으로 저하될 뿐,
@@ -254,4 +257,4 @@ canon regime-key --role dev --repo canon --area join-spine --hash abc123
   전략이 실제로 어디에 저장되는지
 - [트러스트 스파인](/ko/concepts/trust-spine/) — 전략 메모리가 증류하는
   원천인 verdict
-- [CLI 레퍼런스](/ko/cli/) — `canon learn` / `canon retrieve`의 전체 표면
+- [CLI 레퍼런스](/ko/cli/) — `canon strategy` / `canon retrieve`의 전체 표면

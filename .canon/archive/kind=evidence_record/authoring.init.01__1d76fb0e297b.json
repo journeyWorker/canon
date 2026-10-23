@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-1"
+  },
+  "at": "2026-10-23T12:28:40.541766830Z",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test init init_scaffolds_a_working_config_in_a_fresh_repo"
+  },
+  "evidence_note": {
+    "summary": "init init_scaffolds_a_working_config_in_a_fresh_repo: 1 passed, 0 failed, 34 filtered out @ 2c0fb497"
+  },
+  "evidence_sha": "2c0fb4972782486f9ee8a638db56be81405f3bda",
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 30,
+  "scenario_id": "authoring.init.01",
+  "schema": 1,
+  "staging_id": "568dee9c8dca",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

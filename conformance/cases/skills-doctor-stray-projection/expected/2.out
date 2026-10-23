@@ -1,5 +1,5 @@
 canon v1 — installed (claude)
-canon skills install: wrote `skills: { providers: [claude] }` to ./canon.yaml
+canon skills install: wrote `skills: { providers: [claude] }` to <repo>/canon.yaml
 owned-paths: canon writes these; exclude them from formatters and linters:
   .claude/skills/canon/**
   .canon/REPORT.md
@@ -11,6 +11,7 @@ owned-paths: canon writes these; exclude them from formatters and linters:
   .canon/ingest/**
   .canon/learn/**
   .canon/ledger/**
+  .canon/migrate-backup/**
   .canon/plugins/**
   .canon/policy.approval.json
   .canon/r2/**

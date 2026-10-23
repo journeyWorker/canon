@@ -1,6 +1,6 @@
-description: "`canon evidence vault` lists a bound file whose working-tree bytes changed as not stored, naming both digests, and still exits 0 — the gate, not the vault, decides it is stale"
+description: "`canon artifacts store` lists a bound file whose working-tree bytes changed as not stored, naming both digests, and still exits 0 — the gate, not the vault, decides it is stale"
 steps:
-  - args: [evidence, vault]
+  - args: [artifacts, store]
     exit: 0
   - args: [gate, check]
     exit: 1

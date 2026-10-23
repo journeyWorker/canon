@@ -118,11 +118,12 @@ D1) — 하나라도 빠지면 조용히 loopback 개발 스택에 붙는 대신
 ## `canon tier age`와 `canon query`
 
 ```bash
-# 이동될 항목만 미리 확인 — read-only, 아무것도 쓰거나 삭제하지 않습니다.
-canon tier age --dry-run
-
-# aging: 규칙을 한 번 전부 적용합니다 (move+delete, 파괴적).
+# 이동될 항목만 미리 확인 — 기본 실행은 미리보기이며 planDigest를 출력하고
+# 아무것도 쓰거나 삭제하지 않습니다.
 canon tier age
+
+# aging: 미리보기의 계획을 그대로 적용합니다 (move+delete, 파괴적).
+canon tier age --commit --plan-digest 0123456789abcdef
 
 # 한 종류가 현재 있을 수 있는 모든 단(라우팅된 단 + 에이징 목적지가
 # 있다면 그곳)을 전부 조회해 `at` 기준으로 병합합니다.
@@ -136,6 +137,9 @@ canon query --kind trajectory --json
 멱등(idempotent)합니다: 전체 실행 직후 다시 실행하면 이동할 것이 남아
 있지 않고, 부분 실패(목적지 쓰기는 성공, 원본 삭제는 실패) 후 다시
 실행하면 같은 레코드를 다시 선택하지만 목적지 쓰기는 no-op이 됩니다.
+
+**Done when:** `canon tier age --commit --plan-digest <digest>`가 exit `0`으로 끝나고
+그다음 미리보기(`canon tier age`)가 이동할 항목이 없다고 보여 주면 끝입니다.
 
 한 종류가 현재 두 단에 걸쳐 있는 경우(일부는 에이징됨, 일부는 아님)도
 정확히 읽힙니다: `canon query`가 두 단을 `at` 기준으로 병합하며, 크로스
@@ -156,9 +160,9 @@ finding, 다시 쓴 시나리오, 다음 상태로 넘어간 서브젝트) 그�
 canon query --kind evidence --history
 
 # 0.23 이전에 쓴 ledger를 키마다 파일 하나로 맞춥니다(멱등,
-# `canon migrate`가 실행합니다). --dry-run은 보고만 하고 쓰지 않습니다.
-canon ledger compact --dry-run
+# `canon migrate`가 실행합니다). `--commit` 없는 실행은 보고만 하고 쓰지 않습니다.
 canon ledger compact
+canon ledger compact --commit --plan-digest 0123456789abcdef
 ```
 
 버전이 대체되었다는 것은 리더가 접는 어떤 그룹에서도 더는 현재 레코드가 아니라는
@@ -167,7 +171,7 @@ canon ledger compact
 읽는 레코드(`flagged` 오버레이, `reviewed` 라이프사이클 태그, brief override,
 현재 증거에 대한 승인)도 남습니다. 이력이 꼭 필요한 몇몇 규칙은 archive를 명시적으로
 읽습니다: `risk_routing` 커버리지, `canon divergence accept`의 독립성 검사, release
-트러스트 검사, `canon gate task`.
+트러스트 검사, `canon task done`.
 
 쓰기가 먼저 일어나고 이동이 뒤따르므로, 둘 사이에서 중단되어도 ledger는 읽을 수
 있고(모든 fold가 여전히 최신을 고릅니다) 다음 append나 `canon ledger compact`가
@@ -186,24 +190,28 @@ artifact_store: { backend: local }                        # 기본값
 ```
 
 `local`은 `.canon/artifacts/sha256/`이며 git으로 추적되고 자격 증명이 필요
-없습니다. 오브젝트 스토어 단을 쓰면 `canon evidence add`, `canon review add`,
-`canon evidence vault`가 blob을 digest로 `<prefix>sha256/<digest>`에 올리고
+없습니다. 오브젝트 스토어 단을 쓰면 `canon evidence add`, `canon review scenario`,
+`canon artifacts store`가 blob을 digest로 `<prefix>sha256/<digest>`에 올리고
 로컬에는 아무것도 남기지 않습니다. gate와 `canon artifacts verify [--full]`은
 스토어에 물어보며(업로드 때 기록한 크기·sha256에 대해 digest마다 HEAD 한 번,
 `--full`은 내려받아 다시 해시) 스토어에 닿지 못하면 통과시키지 않고 거부합니다.
 
 ```bash
 canon artifacts verify --full
-canon artifacts migrate --to cold --dry-run   # 기존 로컬 스토어 이전 미리보기
-canon artifacts migrate --to cold
+canon artifacts move --tier cold   # 기존 로컬 스토어 이전 미리보기
+canon artifacts move --tier cold --commit --plan-digest 0123456789abcdef
 ```
 
-`migrate`는 모든 로컬 blob을 해시하고 올린 뒤 다시 읽어 확인하고, 그 다음에야
+`artifacts move`는 모든 로컬 blob을 해시하고 올린 뒤 다시 읽어 확인하고, 그 다음에야
 `artifact_store:` 블록을 쓰고 로컬 사본을 지우고 `.canon/artifacts/`를 ignore에
 추가합니다. 삭제된 blob, `.gitignore`, `canon.yaml` 변경을 커밋하세요. 이어서 실행할 수
 있고(중단된 실행도 gate가 통과하는 레포를 남깁니다) 두 번째 실행은 할 일이
 없습니다. 스토어 이전은 레포 소유자가 정할 일이며, 바이트를 로컬로 되돌리는 것은
 지원하지 않습니다.
+
+**Done when:** `canon artifacts move --tier cold --commit --plan-digest <digest>`가
+exit `0`으로 끝나고 `canon artifacts verify --full`과 `canon gate check`가 통과하면
+끝입니다.
 
 ## DuckDB 뷰 읽기
 
@@ -225,12 +233,12 @@ CANON_R2_ROOT=/path/to/local/r2/root/canon \
     -c "SELECT * FROM mart_records_by_kind;"
 ```
 
-이 뷰들은 절대 단에 다시 쓰지 않습니다 — `canon fmt`, `canon migrate`,
+이 뷰들은 절대 단에 다시 쓰지 않습니다 — `canon format`, `canon migrate`,
 그리고 티어 쓰기만이 유일하게 승인된 변경자입니다. 리포트에서 직접 읽을
 수 없는 단(Postgres는 항상; S3/cold는 로컬 미러가 없는 한)으로
 라우팅된 종류도 유실되지 않습니다 — `canon query --kind <kind>`로
-계속 조회할 수 있고, `canon report`는 이 공백을 축소 집계하지 않고
-명시적으로 알립니다. 0.18부터 `canon report`는 sqlite `hot` 파일을
+계속 조회할 수 있고, `canon report build`가 만드는 리포트는 이 공백을 축소 집계하지 않고
+명시적으로 알립니다. 0.18부터 리포트는 sqlite `hot` 파일을
 직접 읽습니다(로컬 파일이고 자격 증명이 필요 없음). 그래서 `canon init`의
 기본 라우팅에서도 task 열이 채워집니다.
 

@@ -1,10 +1,10 @@
 description: "0.18 D3: a subject shipped on an approved brief reopens with `canon subject status <id> --to verifying --reason <text> --actor-id <id>` (exit 0), printing who reopened it, why, and the approved change the follow-up goes into; without `--reason` the reopen is a usage refusal (exit 2); shipping again passes its guards (exit 0)"
 steps:
-  - args: [subject, status, checkout, --to, shipped]
+  - args: [subject, move, checkout, --to, shipped]
     exit: 0
-  - args: [subject, status, checkout, --to, verifying]
+  - args: [subject, move, checkout, --to, verifying]
     exit: 2
-  - args: [subject, status, checkout, --to, verifying, --reason, "follow-up: the pay retry double-charges", --actor-id, impl]
+  - args: [subject, move, checkout, --to, verifying, --reason, "follow-up: the pay retry double-charges", --actor-id, impl]
     exit: 0
-  - args: [subject, status, checkout, --to, shipped]
+  - args: [subject, move, checkout, --to, shipped]
     exit: 0

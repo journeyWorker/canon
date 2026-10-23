@@ -1,8 +1,8 @@
-description: "0.16 D2: a canon.yaml `write:` section with a value other than `promote: auto | manual` refuses every staged write before anything is staged (`canon evidence add` and `canon finding add`, exit 2, naming the section), and `canon init --check-config` reports it as `[FAIL] write` (exit 1)"
+description: "0.16 D2: a canon.yaml `write:` section with a value other than `promote: auto | manual` refuses every staged write before anything is staged (`canon evidence add` and `canon finding add`, exit 2, naming the section), and `canon init --check-config` reports it as `[FAIL] write` (exit 2, an unreadable config)"
 steps:
-  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent]
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --class, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent]
     exit: 2
-  - args: [finding, add, --change-id, c-cart, --round, "1", --seq, "1", --severity, note, --reviewer, r, --summary, s]
+  - args: [finding, add, --change-id, c-cart, --round, "1", --seq, "1", --severity, note, --actor-id, r, --summary, s]
     exit: 2
-  - args: [init, --check-config]
+  - args: [init, --check]
     exit: 1

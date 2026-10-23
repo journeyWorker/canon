@@ -15,6 +15,8 @@
 
 use std::path::{Path, PathBuf};
 
+use schemars::JsonSchema;
+use serde::Serialize;
 use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, RecordKind, RoleId, ScenarioId};
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
@@ -28,7 +30,7 @@ const DEMO_SCENARIO: &str = "auth.login.01";
 
 /// The demo's `policy.yaml`: every cell that carries evidence requires an
 /// independent `reviewer`-role record. `demo init` seeds only the `dev`
-/// record, so the reviewer cell is uncovered until `demo add`.
+/// record, so the reviewer cell is uncovered until `demo review`.
 const DEMO_POLICY_YAML: &str = "\
 # canon demo policy (.canon/policy.yaml): every evidenced cell needs an
 # independent `reviewer`-role evidence record. `canon demo init` seeds
@@ -69,7 +71,7 @@ pub fn run_demo_init(repo: &Path, json: bool) -> i32 {
     // with no AGENTS.md block to refresh, a rerun has nothing to do. The
     // demo writes its own policy below, so init's starter policy is off,
     // and a sandbox gets no canon skill, so the harness choice is skipped.
-    let code = crate::init::run_init_in(repo, crate::init::InitOptions { agents_md: false, policy: None, skills: crate::init::SkillsChoice::Skip, language: None }, json, false);
+    let code = crate::init::run_init_in(repo, crate::init::InitOptions { agents_md: false, policy: None, skills: crate::init::SkillsChoice::Skip, language: None, dry_run: false }, json, false);
     if code != 0 {
         return code;
     }
@@ -96,30 +98,50 @@ pub fn run_demo_init(repo: &Path, json: bool) -> i32 {
     crate::say!(json, "  Watch it flip:");
     crate::say!(json, "");
     crate::say!(json, "      canon gate check      # RED:   uncovered-cell {DEMO_SCENARIO}");
-    crate::say!(json, "      canon demo add     # record the reviewer's evidence");
+    crate::say!(json, "      canon demo review     # record the reviewer's evidence");
     crate::say!(json, "      canon gate check      # GREEN: clean");
     if json {
         crate::json_out::data(
             "demo init",
-            serde_json::json!({ "repo": repo.display().to_string(), "scenario": DEMO_SCENARIO, "next": ["canon gate check", "canon demo add", "canon gate check"] }),
-        );
+            &DemoInitReport { repo: repo.display().to_string(), scenario: DEMO_SCENARIO, next: &["canon gate check", "canon demo review", "canon gate check"] });
     }
     0
 }
 
-/// `canon demo add [--repo <dir>]`: record the missing reviewer evidence
+/// `canon demo init`: the demo repo scaffolded and the commands that flip it.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DemoInitReport {
+    pub repo: String,
+    pub scenario: &'static str,
+    pub next: &'static [&'static str],
+}
+
+impl crate::reports::Report for DemoInitReport {}
+
+/// `canon demo review`: the reviewer evidence recorded.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DemoReviewReport {
+    pub scenario: &'static str,
+    pub next: &'static [&'static str],
+}
+
+impl crate::reports::Report for DemoReviewReport {}
+
+/// `canon demo review [--repo <dir>]`: record the missing reviewer evidence
 /// for [`DEMO_SCENARIO`], clearing the `uncovered-cell` the seeded dev
 /// evidence left. Resolves the repo root the same nearest-ancestor way
 /// every other subcommand does. Exit `0` on success, `2` when no demo
 /// scaffold is present.
-pub fn run_demo_add(repo: &Path, json: bool) -> i32 {
+pub fn run_demo_review(repo: &Path, json: bool) -> i32 {
     let root = resolve_repo_root(repo);
     if !root.join("canon.yaml").exists() {
-        return CliError::refused("DEMO_NOT_INITIALIZED", format!("no `canon.yaml` found under `{}` — run `canon demo init` first", root.display())).hint("run `canon demo init` first, or pass --repo <the demo directory>").emit("canon demo add", json);
+        return CliError::refused("DEMO_NOT_INITIALIZED", format!("no `canon.yaml` found under `{}` — run `canon demo init` first", root.display())).hint("run `canon demo init` first, or pass --repo <the demo directory>").emit("canon demo review", json);
     }
 
     if let Err(e) = write_evidence(&root, "reviewer-agent", "reviewer") {
-        return CliError::refused("WRITE_FAILED", format!("failed to record reviewer evidence: {e}")).hint("check that the path is writable and the disk has room, then run the command again").emit("canon demo add", json);
+        return CliError::refused("WRITE_FAILED", format!("failed to record reviewer evidence: {e}")).hint("check that the path is writable and the disk has room, then run the command again").emit("canon demo review", json);
     }
 
     crate::say!(json, "canon demo: recorded the reviewer's evidence for scenario `{DEMO_SCENARIO}`.");
@@ -128,7 +150,7 @@ pub fn run_demo_add(repo: &Path, json: bool) -> i32 {
     crate::say!(json, "");
     crate::say!(json, "      canon gate check      # GREEN: clean");
     if json {
-        crate::json_out::data("demo add", serde_json::json!({ "scenario": DEMO_SCENARIO, "next": ["canon gate check"] }));
+        crate::json_out::data("demo review", &DemoReviewReport { scenario: DEMO_SCENARIO, next: &["canon gate check"] });
     }
     0
 }

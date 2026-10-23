@@ -1,4 +1,4 @@
-//! `canon artifacts verify` and `canon artifacts migrate` (0.23 D3): the
+//! `canon artifacts verify` and `canon artifacts move` (0.23 D3; 0.28 D1, D6): the
 //! bytes behind evidence digests, off git.
 //!
 //! # `verify [--full]`
@@ -12,22 +12,24 @@
 //! altered, `2` when the store cannot be used or reached — an unreachable
 //! store is a refusal, never a pass.
 //!
-//! # `migrate --to <backend> [--dry-run]`
-//! Moves a repo's local blobs to the object-store tier `--to` names:
+//! # `move --tier <tier> [--commit --plan-digest D]`
+//! Moves a repo's local blobs to the object-store tier `--tier` names. The bare
+//! run previews (the uploads and removals as `effects[]`, with a `planDigest`)
+//! and writes nothing; `--commit --plan-digest` does exactly that plan:
 //! 1. every blob in `.canon/artifacts/sha256` is hashed (a blob that does
 //!    not match its name is never migrated) and uploaded by digest key,
 //!    read back, and — when the object was already there — re-hashed from
 //!    the store, because the local copy is about to go;
 //! 2. only when every blob verified, `canon.yaml` gains
 //!    `artifact_store: { backend: <to>, prefix: artifacts/ }` (a block canon
-//!    did not write is never rewritten: it must already name `--to`);
+//!    did not write is never rewritten: it must already name `--tier`);
 //! 3. then the local copies are removed and `.canon/artifacts/` is added to
 //!    `.gitignore`.
 //!
 //! Local copies leave only after the store is proven to hold their bytes,
 //! and the config switches before they leave, so a run stopped anywhere
 //! leaves a repo the gate still passes and the next run finishes. A second
-//! run finds nothing to do. `--to local` is a no-op on a local repo; moving
+//! run finds nothing to do. `--tier local` is a no-op on a local repo; moving
 //! bytes back from an object store is not supported.
 
 use std::path::{Path, PathBuf};
@@ -39,9 +41,13 @@ use canon_gate::{GateContext, GateCtx};
 use canon_policy::SchemaRegistry;
 use canon_store::artifact_blobs::{ArtifactsBackend, ArtifactsConfig, DEFAULT_PREFIX};
 use chrono::Utc;
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
+use crate::json_out::Report;
+use crate::safety::{Effect, Mode, Plan};
 
 /// The `.gitignore` line an object-store repo gains: the local store is
 /// gone, and a stray local blob must never be committed.
@@ -64,7 +70,7 @@ pub fn run_verify(repo: &Path, full: bool, json: bool) -> i32 {
     let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(context) => context,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon artifacts verify", json);
+            return CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon artifacts verify", json);
         }
     };
     let store = match ArtifactStore::open(&repo) {
@@ -102,25 +108,63 @@ pub fn run_verify(repo: &Path, full: bool, json: bool) -> i32 {
     for line in &problem_lines {
         crate::say!(json, "  problem {line}");
     }
-    let data = serde_json::json!({
-        "backend": match artifacts_config(&repo).map(|c| c.backend) { Ok(ArtifactsBackend::Tier { name, .. }) => name, _ => "local".to_string() },
-        "full": full,
-        "bound": checks.len(),
-        "stored": stored,
-        "workingTreeOnly": tree_only,
-        "problems": problems.iter().zip(&problem_lines).map(|(c, line)| serde_json::json!({
-            "subject": c.file.subject, "path": c.file.path, "sha256": c.file.sha256, "blob": c.blob.as_str(), "detail": line,
-        })).collect::<Vec<_>>(),
-    });
+    let data = ArtifactsVerifyReport {
+        backend: match artifacts_config(&repo).map(|c| c.backend) {
+            Ok(ArtifactsBackend::Tier { name, .. }) => name,
+            _ => "local".to_string(),
+        },
+        full,
+        bound: checks.len(),
+        stored,
+        working_tree_only: tree_only,
+        problems: problems
+            .iter()
+            .zip(&problem_lines)
+            .map(|(c, line)| VerifyProblem { subject: &c.file.subject, path: &c.file.path, sha256: &c.file.sha256, blob: c.blob.as_str(), detail: line })
+            .collect(),
+    };
+    let mut coverage = crate::coverage::Coverage::new();
+    coverage.count("boundFiles", checks.len()).count("stored", stored).count("workingTreeOnly", tree_only);
     if problems.is_empty() {
         if json {
-            crate::json_out::data("artifacts verify", data);
+            crate::json_out::data_with_meta("artifacts verify", &data, coverage.meta());
         }
         return 0;
     }
     CliError::failed("ARTIFACTS_VERIFY_FAILED", format!("{} bound file(s) are missing from the artifact store or altered", problems.len()))
-        .hint("re-upload a file the working tree still holds with `canon evidence vault`, or re-run and re-attest it with `canon evidence add`; see data.problems")
-        .emit_with_data("canon artifacts verify", json, data)
+        .hint("re-upload a file the working tree still holds with `canon artifacts store`, or re-run and re-attest it with `canon evidence add`; see data.problems")
+        .emit_with_data_and_meta("canon artifacts verify", json, &data, coverage.meta())
+}
+
+/// `canon artifacts verify`: what the check looked at and the files that failed it.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactsVerifyReport<'a> {
+    /// `local`, or the name of the artifact store tier.
+    pub backend: String,
+    /// Whether every blob was re-hashed (`--full`).
+    pub full: bool,
+    /// Files the ledger's evidence binds.
+    pub bound: usize,
+    /// Files whose blob is in the store.
+    pub stored: usize,
+    /// Files proven by the working tree alone (local store only).
+    pub working_tree_only: usize,
+    pub problems: Vec<VerifyProblem<'a>>,
+}
+
+impl crate::json_out::Report for ArtifactsVerifyReport<'_> {}
+
+/// One bound file `artifacts verify` found missing or altered.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifyProblem<'a> {
+    pub subject: &'a str,
+    pub path: &'a str,
+    pub sha256: &'a str,
+    /// What the store holds: `missing`, or what it observed instead.
+    pub blob: &'a str,
+    pub detail: &'a str,
 }
 
 /// One blob in the local store.
@@ -179,6 +223,11 @@ fn resolve_target(repo: &Path, to: &str) -> Result<(ArtifactsConfig, Option<Stri
     Ok((config, Some(candidate)))
 }
 
+/// Whether `<repo>/.gitignore` already lists the local store.
+fn gitignored(repo: &Path) -> bool {
+    std::fs::read_to_string(repo.join(".gitignore")).unwrap_or_default().lines().any(|line| line.trim() == GITIGNORE_LINE)
+}
+
 /// `.canon/artifacts/` in `<repo>/.gitignore`, appended under a comment
 /// when absent. `true` when it was added.
 fn ensure_gitignored(repo: &Path) -> std::io::Result<bool> {
@@ -196,21 +245,65 @@ fn ensure_gitignored(repo: &Path) -> std::io::Result<bool> {
     Ok(true)
 }
 
-/// `canon artifacts migrate`.
-pub fn run_migrate(repo: &Path, to: &str, dry_run: bool, json: bool) -> i32 {
-    const CMD: &str = "canon artifacts migrate";
-    let refuse = |message: String, hint: &str| CliError::refused("ARTIFACTS_MIGRATE_REFUSED", message).hint(hint.to_string()).emit("canon artifacts migrate", json);
+/// `canon artifacts move`'s `data`: the plan and what the run did to the blobs.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactsMoveReport {
+    /// The tier the blobs live in after the move (`local` for the no-op).
+    pub backend: String,
+    /// Blobs in the local store.
+    pub blobs: usize,
+    /// Blobs this run uploaded (0 in a preview).
+    pub uploaded: usize,
+    /// Blobs the store already held, verified.
+    pub already_in_store: usize,
+    /// Local copies this run removed (0 in a preview).
+    pub removed_local: usize,
+    pub config_written: bool,
+    pub gitignore_added: bool,
+    /// Entries of the local store that are not blobs and stay.
+    pub skipped: Vec<String>,
+    #[serde(flatten)]
+    pub plan: Plan,
+}
+
+impl Report for ArtifactsMoveReport {}
+
+/// What the read-only pass found: the plan's effects and the blobs that
+/// verified (the ones a commit uploads and removes).
+struct MovePlan<'a> {
+    effects: Vec<Effect>,
+    verified: Vec<&'a LocalBlob>,
+    already: usize,
+}
+
+/// `canon artifacts move --tier <TIER> [--commit --plan-digest D]`: the bare
+/// run previews the uploads and removals; `--commit` does exactly that plan.
+pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) -> i32 {
+    const CMD: &str = "canon artifacts move";
+    let refuse = |message: String, hint: &str| CliError::refused("ARTIFACTS_MOVE_REFUSED", message).hint(hint.to_string()).emit("canon artifacts move", json);
+    let base = crate::safety::command("artifacts move", &[("--tier", to.to_string())], repo);
     let repo = resolve_repo_root(repo);
 
     let current = match artifacts_config(&repo) {
         Ok(current) => current,
-        Err(e) => return store_error(&e).emit("canon artifacts migrate", json),
+        Err(e) => return store_error(&e).emit("canon artifacts move", json),
     };
     if to == "local" {
         if matches!(current.backend, ArtifactsBackend::Local) {
+            // Nothing to move: the empty plan still takes the digest handshake.
+            let plan = Plan::new(Vec::new());
+            let commit = match plan.gate(mode, &base) {
+                Ok(commit) => commit,
+                Err(e) => return e.emit("canon artifacts move", json),
+            };
+            if commit {
+                crate::json_out::mark_unchanged();
+            }
             crate::say!(json, "{CMD}: the artifact store is already local; nothing to move");
+            let report = ArtifactsMoveReport { backend: "local".into(), blobs: 0, uploaded: 0, already_in_store: 0, removed_local: 0, config_written: false, gitignore_added: false, skipped: Vec::new(), plan: if commit { plan.committed() } else { plan } };
             if json {
-                crate::json_out::data("artifacts migrate", serde_json::json!({ "backend": "local", "dryRun": dry_run, "blobs": 0, "uploaded": 0, "alreadyInStore": 0, "removedLocal": 0, "configWritten": false, "gitignoreAdded": false, "skipped": [] }));
+                crate::json_out::data("artifacts move", &report);
             }
             return 0;
         }
@@ -221,39 +314,40 @@ pub fn run_migrate(repo: &Path, to: &str, dry_run: bool, json: bool) -> i32 {
     }
     let (target, new_yaml) = match resolve_target(&repo, to) {
         Ok(resolved) => resolved,
-        Err(message) => return refuse(message, "`--to` names an `s3` tier of canon.yaml's `tiers:` (for example `cold`)"),
+        Err(message) => return refuse(message, "`--tier` names an `s3` tier of canon.yaml's `tiers:` (for example `cold`)"),
     };
     let store = match ArtifactStore::from_config(target) {
         Ok(store) => store,
-        Err(e) => return store_error(&e).emit("canon artifacts migrate", json),
+        Err(e) => return store_error(&e).emit("canon artifacts move", json),
     };
     let ArtifactStore::Object(object) = &store else {
-        return refuse(format!("`{to}` is not an object-store tier"), "`--to` names an `s3` tier of canon.yaml's `tiers:` (for example `cold`)");
+        return refuse(format!("`{to}` is not an object-store tier"), "`--tier` names an `s3` tier of canon.yaml's `tiers:` (for example `cold`)");
     };
 
-    // The local store is held for the whole move, so no writer adds a
-    // local blob between the listing and the removal.
-    let _lock = if dry_run {
-        None
-    } else {
+    // A commit holds the local store for the whole move, so no writer adds a
+    // local blob between the plan and the removal. A preview writes nothing and takes no lock.
+    let _lock = if matches!(mode, Mode::Commit(_)) {
         match StoreLock::acquire(&repo) {
             Ok(lock) => Some(lock),
             Err(e) => return refuse(e.to_string(), e.hint()),
         }
+    } else {
+        None
     };
     let (blobs, skipped) = match local_blobs(&repo) {
         Ok(listing) => listing,
-        Err(e) => return CliError::refused("REPO_UNREADABLE", format!("cannot read the local artifact store: {e}")).hint("check that .canon/artifacts/sha256 is a readable directory, then run the command again").emit("canon artifacts migrate", json),
+        Err(e) => return CliError::refused("REPO_UNREADABLE", format!("cannot read the local artifact store: {e}")).hint("check that .canon/artifacts/sha256 is a readable directory, then run the command again").emit("canon artifacts move", json),
     };
 
-    let (mut uploaded, mut already) = (0usize, 0usize);
+    // The plan: read-only. Every blob is hashed (one that does not match its
+    // name is never moved) and the store is asked about its digest.
     let mut problems: Vec<String> = Vec::new();
-    let mut verified: Vec<&LocalBlob> = Vec::new();
+    let mut moving = MovePlan { effects: Vec::new(), verified: Vec::new(), already: 0 };
     for blob in &blobs {
         let local = match std::fs::File::open(&blob.path).and_then(sha256_reader) {
             Ok(actual) if actual == blob.digest => actual,
             Ok(actual) => {
-                problems.push(format!("{}: its bytes hash to {actual}, not its name; it is not migrated", blob.digest));
+                problems.push(format!("{}: its bytes hash to {actual}, not its name; it is not moved", blob.digest));
                 continue;
             }
             Err(e) => {
@@ -261,27 +355,66 @@ pub fn run_migrate(repo: &Path, to: &str, dry_run: bool, json: bool) -> i32 {
                 continue;
             }
         };
-        if dry_run {
-            match store.observe(&repo, &local, false) {
-                Observed::Sha256(_) => already += 1,
-                Observed::Unavailable(why) => return CliError::refused("ARTIFACTS_STORE_UNREACHABLE", format!("could not ask {}: {why}", store.display(&local))).hint(OBJECT_STORE_HINT).emit("canon artifacts migrate", json),
-                _ => uploaded += 1,
+        match store.observe(&repo, &local, false) {
+            Observed::Sha256(_) => {
+                moving.already += 1;
+                moving.effects.push(Effect::record("skip", blob.digest.as_str()).detail("already in the store"));
             }
-            verified.push(blob);
-            continue;
+            Observed::Unavailable(why) => return CliError::refused("ARTIFACTS_STORE_UNREACHABLE", format!("could not ask {}: {why}", store.display(&local))).hint(OBJECT_STORE_HINT).emit("canon artifacts move", json),
+            _ => moving.effects.push(Effect::record("upload", blob.digest.as_str()).detail(format!("to {}", store.display(&blob.digest)))),
         }
+        moving.verified.push(blob);
+    }
+    if !problems.is_empty() {
+        for line in &problems {
+            crate::say!(json, "  problem {line}");
+        }
+        return refuse(
+            format!("{} of {} local blob(s) cannot be moved: {}", problems.len(), blobs.len(), problems.join("; ")),
+            "a blob that does not match its name proves nothing: delete it (`git rm`) if no record needs it, or re-run and re-attest the evidence, then run the command again; nothing was removed and canon.yaml is unchanged",
+        );
+    }
+    let relative = |blob: &LocalBlob| blob.path.strip_prefix(&repo).unwrap_or(&blob.path).display().to_string();
+    moving.effects.extend(moving.verified.iter().map(|blob| Effect::path("remove", relative(blob))));
+    if new_yaml.is_some() {
+        moving.effects.push(Effect::path("rewrite", "canon.yaml").detail(format!("add artifact_store: {{ backend: {to}, prefix: {DEFAULT_PREFIX} }}")));
+    }
+    if !gitignored(&repo) {
+        moving.effects.push(Effect::path("rewrite", ".gitignore").detail(format!("add {GITIGNORE_LINE}")));
+    }
+    let plan = Plan::new(std::mem::take(&mut moving.effects));
+    let commit = match plan.gate(mode, &base) {
+        Ok(commit) => commit,
+        Err(e) => return e.emit("canon artifacts move", json),
+    };
+    let (verified, already) = (moving.verified, moving.already);
+
+    if !commit {
+        crate::say!(json, "{CMD}: {} local blob(s) -> {} — {} already in the store", blobs.len(), store.location(), already);
+        for name in &skipped {
+            crate::say!(json, "  left in place (not a blob): {name}");
+        }
+        let report = ArtifactsMoveReport { backend: to.to_string(), blobs: blobs.len(), uploaded: 0, already_in_store: already, removed_local: 0, config_written: false, gitignore_added: false, skipped, plan };
+        crate::safety::finish_preview(&base, "artifacts move", &report.plan, "the plan only lists the uploads and removals; moving takes its planDigest", json, &report);
+        return 0;
+    }
+
+    // The commit: upload every verified blob and read it back, then switch the config, then remove the local copies.
+    let (mut uploaded, mut already) = (0usize, 0usize);
+    let mut uploads: Vec<&LocalBlob> = Vec::new();
+    for blob in &verified {
         let outcome = match std::fs::File::open(&blob.path).map_err(StoreError::from).and_then(|file| object.upload(&blob.digest, file)) {
             Ok(outcome) => outcome,
             Err(e @ (StoreError::Remote { .. } | StoreError::Unattached { .. })) => {
                 return CliError::refused("ARTIFACTS_STORE_UNREACHABLE", format!("uploading {} failed after {uploaded} upload(s): {e}", store.display(&blob.digest)))
                     .hint(format!("{OBJECT_STORE_HINT}; no local blob was removed, and a second run resumes where this one stopped"))
-                    .emit("canon artifacts migrate", json);
+                    .emit("canon artifacts move", json);
             }
             Err(StoreError::Changed { actual, .. }) => {
-                problems.push(format!("{}: its bytes changed while being read (now {actual}); it is not migrated", blob.digest));
+                problems.push(format!("{}: its bytes changed while being read (now {actual}); it is not moved", blob.digest));
                 continue;
             }
-            Err(e) => return refuse(format!("could not migrate {}: {e}", blob.digest), e.hint()),
+            Err(e) => return refuse(format!("could not move {}: {e}", blob.digest), e.hint()),
         };
         match outcome {
             StoreOutcome::Stored => uploaded += 1,
@@ -291,101 +424,77 @@ pub fn run_migrate(repo: &Path, to: &str, dry_run: bool, json: bool) -> i32 {
                 match store.observe(&repo, &blob.digest, true) {
                     Observed::Sha256(_) => already += 1,
                     other => {
-                        problems.push(format!("{}: the object already in the store does not verify ({}); it is not migrated", blob.digest, other.as_str()));
+                        problems.push(format!("{}: the object already in the store does not verify ({}); it is not moved", blob.digest, other.as_str()));
                         continue;
                     }
                 }
             }
         }
-        verified.push(blob);
+        uploads.push(blob);
     }
     if !problems.is_empty() {
         for line in &problems {
             crate::say!(json, "  problem {line}");
         }
         return refuse(
-            format!("{} of {} local blob(s) cannot be migrated: {}", problems.len(), blobs.len(), problems.join("; ")),
+            format!("{} of {} local blob(s) cannot be moved: {}", problems.len(), blobs.len(), problems.join("; ")),
             "a blob that does not match its name proves nothing: delete it (`git rm`) if no record needs it, or re-run and re-attest the evidence, then run the command again; nothing was removed and canon.yaml is unchanged",
         );
     }
 
     let mut config_written = false;
     let mut removed = 0usize;
-    let mut gitignore_added = false;
-    if !dry_run {
-        if let Some(yaml) = &new_yaml {
-            if let Err(e) = canon_store::atomic::write_atomic(&repo.join("canon.yaml"), yaml.as_bytes()) {
-                return CliError::refused("WRITE_FAILED", format!("failed to update canon.yaml: {e}")).hint("check that the path is writable and the disk has room, then run the command again").emit("canon artifacts migrate", json);
-            }
-            config_written = true;
+    if let Some(yaml) = &new_yaml {
+        if let Err(e) = canon_store::atomic::write_atomic(&repo.join("canon.yaml"), yaml.as_bytes()) {
+            return CliError::refused("WRITE_FAILED", format!("failed to update canon.yaml: {e}")).hint("check that the path is writable and the disk has room, then run the command again").emit("canon artifacts move", json);
         }
-        for blob in &verified {
-            match std::fs::remove_file(&blob.path) {
-                Ok(()) => removed += 1,
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                Err(e) => {
-                    return CliError::refused("WRITE_FAILED", format!("failed to remove {}: {e}", blob.path.display()))
-                        .hint("the bytes are safe in the store and canon.yaml already names it; fix the permissions and run the command again to finish the removal")
-                        .emit("canon artifacts migrate", json);
-                }
-            }
-        }
-        // Empty directories only: anything still there (a skipped entry) stays.
-        let dir = store_dir(&repo);
-        let _ = std::fs::remove_dir(&dir);
-        if let Some(parent) = dir.parent() {
-            let _ = std::fs::remove_dir(parent);
-        }
-        gitignore_added = match ensure_gitignored(&repo) {
-            Ok(added) => added,
-            Err(e) => return CliError::refused("WRITE_FAILED", format!("failed to update .gitignore: {e}")).hint("check that the path is writable and the disk has room, then run the command again").emit("canon artifacts migrate", json),
-        };
+        config_written = true;
     }
+    for blob in &uploads {
+        match std::fs::remove_file(&blob.path) {
+            Ok(()) => removed += 1,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => {
+                return CliError::refused("WRITE_FAILED", format!("failed to remove {}: {e}", blob.path.display()))
+                    .hint("the bytes are safe in the store and canon.yaml already names it; fix the permissions and run the command again to finish the removal")
+                    .emit("canon artifacts move", json);
+            }
+        }
+    }
+    // Empty directories only: anything still there (a skipped entry) stays.
+    let dir = store_dir(&repo);
+    let _ = std::fs::remove_dir(&dir);
+    if let Some(parent) = dir.parent() {
+        let _ = std::fs::remove_dir(parent);
+    }
+    let gitignore_added = match ensure_gitignored(&repo) {
+        Ok(added) => added,
+        Err(e) => return CliError::refused("WRITE_FAILED", format!("failed to update .gitignore: {e}")).hint("check that the path is writable and the disk has room, then run the command again").emit("canon artifacts move", json),
+    };
 
-    let verb = if dry_run { "would " } else { "" };
     crate::say!(
         json,
-        "{CMD}: {} local blob(s) -> {} — {verb}upload {uploaded}, already in the store {already}{}",
+        "{CMD}: {} local blob(s) -> {} — uploaded {uploaded}, already in the store {already}, removed {removed} local cop{}",
         blobs.len(),
         store.location(),
-        if dry_run { String::new() } else { format!(", removed {removed} local cop{}", if removed == 1 { "y" } else { "ies" }) }
+        if removed == 1 { "y" } else { "ies" }
     );
-    if dry_run {
-        if new_yaml.is_some() {
-            crate::say!(json, "  would add to canon.yaml: artifact_store: {{ backend: {to}, prefix: {DEFAULT_PREFIX} }}");
-        }
-        crate::say!(json, "  would remove {} local cop{} and add {GITIGNORE_LINE} to .gitignore", verified.len(), if verified.len() == 1 { "y" } else { "ies" });
-    } else {
-        if config_written {
-            crate::say!(json, "  canon.yaml: added artifact_store: {{ backend: {to}, prefix: {DEFAULT_PREFIX} }}");
-        }
-        if gitignore_added {
-            crate::say!(json, "  .gitignore: added {GITIGNORE_LINE}");
-        }
-        if removed > 0 || config_written {
-            crate::say!(json, "commit the removal of {}/ and the canon.yaml change with the ledger", canon_model::paths::ARTIFACTS_SHA256_DIR);
-        }
+    if config_written {
+        crate::say!(json, "  canon.yaml: added artifact_store: {{ backend: {to}, prefix: {DEFAULT_PREFIX} }}");
+    }
+    if gitignore_added {
+        crate::say!(json, "  .gitignore: added {GITIGNORE_LINE}");
+    }
+    if removed > 0 || config_written {
+        crate::say!(json, "commit the removal of {}/ and the canon.yaml change with the ledger", canon_model::paths::ARTIFACTS_SHA256_DIR);
     }
     for name in &skipped {
         crate::say!(json, "  left in place (not a blob): {name}");
     }
-    let data = serde_json::json!({
-        "backend": to,
-        "dryRun": dry_run,
-        "blobs": blobs.len(),
-        "uploaded": uploaded,
-        "alreadyInStore": already,
-        "removedLocal": removed,
-        "configWritten": config_written,
-        "gitignoreAdded": gitignore_added,
-        "skipped": skipped,
-    });
-    if dry_run {
-        if json {
-            crate::json_out::data("artifacts migrate", data);
-        }
-    } else {
-        crate::next::finish(&repo, "artifacts migrate", &crate::next::Scope::Repo, false, json, data);
+    if uploaded == 0 && removed == 0 && !config_written && !gitignore_added {
+        crate::json_out::mark_unchanged();
     }
+    let report = ArtifactsMoveReport { backend: to.to_string(), blobs: blobs.len(), uploaded, already_in_store: already, removed_local: removed, config_written, gitignore_added, skipped, plan: plan.committed() };
+    crate::next::finish(&repo, "artifacts move", &crate::next::Scope::Repo, false, json, &report);
     0
 }

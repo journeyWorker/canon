@@ -101,6 +101,88 @@ pub fn default_report_path(repo: &Path) -> PathBuf {
     repo.join(canon_report::render::DEFAULT_REPORT_PATH)
 }
 
+/// `canon report build`'s write: [`canon_report::write_report`], except that a
+/// report file already holding exactly these bytes is left alone and the run
+/// is marked unchanged ([`crate::json_out::mark_unchanged`]).
+pub fn build(inputs: &ReportInputs, report_path: &Path) -> Result<String, canon_report::ReportError> {
+    let content = canon_report::report(inputs)?;
+    if std::fs::read(report_path).is_ok_and(|held| held == content.as_bytes()) {
+        crate::json_out::mark_unchanged();
+        return Ok(content);
+    }
+    if let Some(parent) = report_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(report_path, &content)?;
+    Ok(content)
+}
+
+/// `canon report snapshot`'s write: [`canon_report::snapshot`], except that a
+/// snapshot whose tables and source are what the directory already holds keeps
+/// its manifest (and so its `generated_at`) byte for byte and is marked
+/// unchanged ([`crate::json_out::mark_unchanged`]).
+pub fn snapshot(inputs: &ReportInputs, dir: &Path) -> Result<canon_report::Manifest, canon_report::ReportError> {
+    let manifest_path = dir.join("manifest.json");
+    let held_manifest = std::fs::read(&manifest_path).ok();
+    let held_tables: Vec<(PathBuf, Option<Vec<u8>>)> = canon_report::snapshot::SNAPSHOT_TABLES.iter().map(|view| dir.join(format!("{view}.parquet"))).map(|path| { let bytes = std::fs::read(&path).ok(); (path, bytes) }).collect();
+    let manifest = canon_report::snapshot(inputs, dir)?;
+    let Some(held_manifest) = held_manifest else { return Ok(manifest) };
+    let without_time = |value: &mut serde_json::Value| {
+        if let Some(object) = value.as_object_mut() {
+            object.remove("generated_at");
+        }
+    };
+    let (Ok(mut held), Ok(mut fresh)) = (serde_json::from_slice::<serde_json::Value>(&held_manifest), serde_json::to_value(&manifest)) else { return Ok(manifest) };
+    without_time(&mut held);
+    without_time(&mut fresh);
+    let same_tables = held_tables.iter().all(|(path, held)| held.is_some() && std::fs::read(path).ok() == *held);
+    if held == fresh && same_tables {
+        std::fs::write(&manifest_path, held_manifest)?;
+        crate::json_out::mark_unchanged();
+    }
+    Ok(manifest)
+}
+
+/// `canon report build`: where the report was written (`ReportBuildReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportBuildReport {
+    /// The report file written.
+    pub path: String,
+}
+
+impl crate::json_out::Report for ReportBuildReport {}
+
+/// `canon report check`: whether the report file is current (`ReportCheckReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportCheckReport {
+    /// `fresh`, `missing` or `drift`.
+    pub state: &'static str,
+    /// The report file compared.
+    pub path: String,
+}
+
+impl crate::json_out::Report for ReportCheckReport {}
+
+/// One parquet table a snapshot wrote.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SnapshotTable<'a> {
+    pub table: &'a str,
+    pub file: &'a str,
+}
+
+/// `canon report snapshot <dir>`: the tables written (`ReportSnapshotReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportSnapshotReport<'a> {
+    pub directory: String,
+    pub tables: Vec<SnapshotTable<'a>>,
+}
+
+impl crate::json_out::Report for ReportSnapshotReport<'_> {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

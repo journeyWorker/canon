@@ -197,7 +197,7 @@ fn load_spec_roots_with_former(canon_yaml: &Path) -> Result<Vec<(SpecRoot, Vec<P
 pub fn require_spec_root(repo: &Path, project_id: &ProjectId) -> Result<(), crate::cli_error::CliError> {
     use crate::cli_error::CliError;
     let roots = load_spec_roots(&repo.join("canon.yaml")).map_err(|e| {
-        CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again")
+        CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again")
     })?;
     check_spec_root(&roots, project_id)
 }
@@ -220,6 +220,36 @@ pub fn check_spec_root(roots: &[SpecRoot], project_id: &ProjectId) -> Result<(),
     .hint(hint)
     .field("--project-id")
     .expected(ids))
+}
+
+/// The spec root a leaf writes under when `--project-id` is optional (D1):
+/// the one given, else the only root `canon.yaml` configures. With several
+/// roots and none given the leaf refuses with `code`, naming the roots. The
+/// id given is not checked here ([`require_spec_root`] does that).
+pub fn resolve_project_id(repo: &Path, given: Option<&ProjectId>, code: &'static str, command: &str, json: bool) -> Result<ProjectId, i32> {
+    use crate::cli_error::CliError;
+    if let Some(id) = given {
+        return Ok(id.clone());
+    }
+    let roots = match load_spec_roots(&repo.join("canon.yaml")) {
+        Ok(roots) => roots,
+        Err(e) => {
+            return Err(CliError::refused("CONFIG_UNREADABLE", e.to_string())
+                .hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again")
+                .emit(command, json));
+        }
+    };
+    match roots.as_slice() {
+        [one] => Ok(one.id.clone()),
+        many => {
+            let ids: Vec<&str> = many.iter().map(|root| root.id.as_str()).collect();
+            Err(CliError::refused(code, format!("canon.yaml configures {} spec roots ({}); `--project-id` names the one to use", ids.len(), ids.join(", ")))
+                .hint(format!("pass `--project-id <one of {}>`", ids.join(", ")))
+                .field("--project-id")
+                .expected(ids)
+                .emit(command, json))
+        }
+    }
 }
 
 /// Rebindable roots inventory-sync reads through (design D3,
@@ -336,6 +366,8 @@ impl RootSyncOutcome {
 #[derive(Debug, Clone, Default)]
 pub struct SyncOutcome {
     pub roots: Vec<RootSyncOutcome>,
+    /// A `--dry-run` preview: `written` counts what the sync would write.
+    pub dry_run: bool,
 }
 
 impl SyncOutcome {
@@ -361,10 +393,30 @@ impl SyncOutcome {
 /// run, so it never interleaves with another sync or a reader's
 /// [`refresh_stale_index`].
 pub fn run_sync(repo: &Path, spec_root: Option<&Path>) -> Result<SyncOutcome, InventoryError> {
+    let outcome = rebuild(repo, spec_root)?;
+    if outcome.is_clean() && outcome.total_written() == 0 {
+        crate::json_out::mark_unchanged();
+    }
+    Ok(outcome)
+}
+
+/// [`run_sync`] as one step of a larger command (`canon migrate`): the same
+/// sync, without marking the whole run unchanged when this step wrote nothing.
+pub fn rebuild(repo: &Path, spec_root: Option<&Path>) -> Result<SyncOutcome, InventoryError> {
+    sync_repo(repo, spec_root, false)
+}
+
+/// [`run_sync`] under `--dry-run`: the same validation and the same
+/// decisions, but no lock file and no record written.
+pub fn preview_sync(repo: &Path, spec_root: Option<&Path>) -> Result<SyncOutcome, InventoryError> {
+    sync_repo(repo, spec_root, true)
+}
+
+fn sync_repo(repo: &Path, spec_root: Option<&Path>, dry_run: bool) -> Result<SyncOutcome, InventoryError> {
     let repo = resolve_repo_root(repo);
     let ctx = SyncCtx::from_repo(&repo)?;
-    let _lock = lock_index(&ctx.repo)?;
-    run_sync_with_ctx(&ctx, spec_root)
+    let _lock = if dry_run { None } else { Some(lock_index(&ctx.repo)?) };
+    sync_with_ctx(&ctx, spec_root, dry_run)
 }
 
 /// The ONE downstream sync entry point (module doc / spec-ledger-selftest
@@ -375,6 +427,10 @@ pub fn run_sync(repo: &Path, spec_root: Option<&Path>) -> Result<SyncOutcome, In
 /// a fixture run owns its fresh scratch directory, and [`run_sync`]
 /// holds the lock around this call.
 pub fn run_sync_with_ctx(ctx: &SyncCtx, spec_root_override: Option<&Path>) -> Result<SyncOutcome, InventoryError> {
+    sync_with_ctx(ctx, spec_root_override, false)
+}
+
+fn sync_with_ctx(ctx: &SyncCtx, spec_root_override: Option<&Path>, dry_run: bool) -> Result<SyncOutcome, InventoryError> {
     let roots = ctx.spec_roots(spec_root_override)?;
     let tier = GitTier::new(&ctx.ledger_root);
     // Never an agent-authored attestation — a deterministic
@@ -387,9 +443,14 @@ pub fn run_sync_with_ctx(ctx: &SyncCtx, spec_root_override: Option<&Path>) -> Re
 
     let mut outcomes = Vec::with_capacity(roots.len());
     for (spec_root, scanned) in roots.iter().zip(&scans) {
-        outcomes.push(sync_one_root(&tier, &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None)?);
+        let outcome = if dry_run {
+            plan_one_root(|| latest_index(&tier), &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None)?.outcome
+        } else {
+            sync_one_root(&tier, &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None)?
+        };
+        outcomes.push(outcome);
     }
-    Ok(SyncOutcome { roots: outcomes })
+    Ok(SyncOutcome { roots: outcomes, dry_run })
 }
 
 /// Every scenario id the `.feature` corpus declares, per project, over
@@ -886,8 +947,9 @@ pub fn format_human(outcome: &SyncOutcome) -> String {
     for root in &outcome.roots {
         if root.is_clean() {
             let removed = if root.removed > 0 { format!(" ({} marking scenario(s) no longer in any feature file as removed)", root.removed) } else { String::new() };
+            let verb = if outcome.dry_run { "would be written" } else { "written" };
             out.push_str(&format!(
-                "canon inventory sync: root `{}` ({}) — {} scenario(s) scanned, {} record(s) written{removed}\n",
+                "canon inventory sync: root `{}` ({}) — {} scenario(s) scanned, {} record(s) {verb}{removed}\n",
                 root.id,
                 root.root.display(),
                 root.scanned,
@@ -917,27 +979,54 @@ pub fn format_human(outcome: &SyncOutcome) -> String {
     out
 }
 
+/// One spec root of `canon inventory sync`'s report.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InventoryRootReport<'a> {
+    pub id: &'a str,
+    pub root: String,
+    pub clean: bool,
+    pub scanned: usize,
+    pub written: usize,
+    pub removed: usize,
+    /// The format violations that aborted the root.
+    pub violations: Vec<crate::fmt::ViolationEntry<'a>>,
+    pub sync_errors: Vec<String>,
+    pub tag_diagnostics: Vec<String>,
+}
+
+/// `canon inventory sync`'s report (`InventorySyncReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InventorySyncReport<'a> {
+    /// True when `--dry-run` previewed the run without writing.
+    pub dry_run: bool,
+    pub clean: bool,
+    pub total_written: usize,
+    pub roots: Vec<InventoryRootReport<'a>>,
+}
+
+impl crate::json_out::Report for InventorySyncReport<'_> {}
+
 /// The `--json` data for [`SyncOutcome`]: one entry per root, with the
 /// violations and sync errors that aborted it.
-pub fn format_json(outcome: &SyncOutcome) -> serde_json::Value {
-    let roots: Vec<serde_json::Value> = outcome
+pub fn format_json(outcome: &SyncOutcome) -> InventorySyncReport<'_> {
+    let roots = outcome
         .roots
         .iter()
-        .map(|root| {
-            serde_json::json!({
-                "id": root.id,
-                "root": root.root.display().to_string(),
-                "clean": root.is_clean(),
-                "scanned": root.scanned,
-                "written": root.written,
-                "removed": root.removed,
-                "violations": root.violations.iter().map(|v| serde_json::json!({ "class": v.class.as_str(), "path": v.path.display().to_string(), "message": v.detail })).collect::<Vec<_>>(),
-                "syncErrors": root.sync_errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
-                "tagDiagnostics": root.tag_diagnostics.iter().map(|d| d.to_string()).collect::<Vec<_>>(),
-            })
+        .map(|root| InventoryRootReport {
+            id: root.id.as_str(),
+            root: root.root.display().to_string(),
+            clean: root.is_clean(),
+            scanned: root.scanned,
+            written: root.written,
+            removed: root.removed,
+            violations: root.violations.iter().map(crate::fmt::ViolationEntry::of).collect(),
+            sync_errors: root.sync_errors.iter().map(|e| e.to_string()).collect(),
+            tag_diagnostics: root.tag_diagnostics.iter().map(|d| d.to_string()).collect(),
         })
         .collect();
-    serde_json::json!({ "clean": outcome.is_clean(), "totalWritten": outcome.total_written(), "roots": roots })
+    InventorySyncReport { dry_run: outcome.dry_run, clean: outcome.is_clean(), total_written: outcome.total_written(), roots }
 }
 
 /// One root's stale part of the scenario index ([`stale_roots`]).
@@ -1001,7 +1090,7 @@ fn first_three(items: &[String]) -> String {
     }
 }
 
-/// A writer's stale-index refresh (0.16 D2): `canon subject status`,
+/// A writer's stale-index refresh (0.16 D2): `canon subject move`,
 /// `canon review add`, `canon evidence add` and the other commands that
 /// record something call this before they read the scenario index, so an
 /// edited, added or deleted scenario never needs a separate `canon
@@ -1046,13 +1135,13 @@ pub fn refresh_stale_index(repo: &Path, command: &str) {
     let Ok(roots) = ctx.spec_roots(None) else { return };
     let (old, roots) = split_pre_0_17(&ctx.repo, roots);
     for (_, detail) in &old {
-        eprintln!("{command}: {detail}; its scenario index is NOT refreshed");
+        crate::warn_err!("{command}: {detail}; its scenario index is NOT refreshed");
     }
     let tier = GitTier::new(&ctx.ledger_root);
     let checked = |tier: &GitTier| match stale_roots(tier, &roots) {
         Ok(stale) => Some(stale),
         Err(e) => {
-            eprintln!("{command}: could not check the scenario index for staleness: {e}");
+            crate::warn_err!("{command}: could not check the scenario index for staleness: {e}");
             None
         }
     };
@@ -1063,7 +1152,7 @@ pub fn refresh_stale_index(repo: &Path, command: &str) {
     let _lock = match lock_index(&ctx.repo) {
         Ok(lock) => lock,
         Err(e) => {
-            eprintln!("{command}: the scenario index is stale but was not refreshed: {e}");
+            crate::warn_err!("{command}: the scenario index is stale but was not refreshed: {e}");
             return;
         }
     };
@@ -1111,7 +1200,7 @@ pub fn refresh_stale_index(repo: &Path, command: &str) {
     if diagnostics > 0 || !refused.is_empty() {
         line.push_str(" — `canon inventory sync` lists them");
     }
-    eprintln!("{line}");
+    crate::warn_err!("{line}");
 }
 
 /// A configured spec root every grading reader must refuse: its scenario
@@ -1179,7 +1268,7 @@ fn split_pre_0_17(repo: &Path, roots: Vec<SpecRoot>) -> (Vec<(SpecRoot, String)>
 
 /// Every configured spec root a grading reader must refuse
 /// ([`UnrefreshableRoot`]): the ONE decision `canon gate check`, the
-/// `verifying → shipped` guard of `canon subject status`, and `canon
+/// `verifying → shipped` guard of `canon subject move`, and `canon
 /// status` fail closed on (0.16 M6, 0.17 D1), so none of them grades or
 /// advances on an index the `.feature` corpus is not in. Readers that
 /// only report (`query`, `context`) keep the stderr line of

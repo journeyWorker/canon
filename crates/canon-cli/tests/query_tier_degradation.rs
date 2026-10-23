@@ -68,6 +68,13 @@ fn stdout(o: &Output) -> String {
     String::from_utf8_lossy(&o.stdout).into_owned()
 }
 
+/// `data` of the one `{ok,data,meta}` document a `--json` success prints.
+fn data_of(out: &str) -> Value {
+    let body: Value = serde_json::from_str(out).expect("valid JSON on stdout");
+    assert_eq!(body["ok"], true, "{body}");
+    body["data"].clone()
+}
+
 fn stderr(o: &Output) -> String {
     String::from_utf8_lossy(&o.stderr).into_owned()
 }
@@ -152,7 +159,7 @@ fn git_routed_kind_query_succeeds_when_pg_and_r2_are_both_unreachable() {
     let output = run_canon(&["query", "--kind", "change", "--json"], dir.path(), &[]);
     assert!(output.status.success(), "a git-routed kind must never require live pg/r2 credentials: stderr={}", stderr(&output));
 
-    let payload: Value = serde_json::from_str(&stdout(&output)).expect("valid JSON on stdout");
+    let payload: Value = data_of(&stdout(&output));
     assert_eq!(payload["kind"], "change");
     assert_eq!(payload["count"], 1, "{payload}");
     assert_eq!(payload["records"][0]["change_id"], "add-widget", "{payload}");
@@ -177,7 +184,7 @@ fn pg_routed_kind_query_fails_naming_pg_and_the_no_live_dsn_reason() {
     for args in [&["query", "--kind", "task"][..], &["query", "--kind", "task", "--json"][..]] {
         let output = run_canon(args, dir.path(), &[]);
         assert!(!output.status.success(), "{args:?}: an unavailable OWN-routed tier must fail the command, never a silent empty result");
-        let err = stderr(&output);
+        let err = if args.contains(&"--json") { stdout(&output) } else { stderr(&output) };
         assert!(err.contains("hot"), "{args:?}: error must name the rung: {err}");
         assert!(err.contains("postgres"), "{args:?}: error must name the backend: {err}");
         assert!(err.contains("no live DSN"), "{args:?}: error must name the reason: {err}");
@@ -186,8 +193,10 @@ fn pg_routed_kind_query_fails_naming_pg_and_the_no_live_dsn_reason() {
         let out = stdout(&output);
         if args.contains(&"--json") {
             let body: serde_json::Value = serde_json::from_str(&out).unwrap_or_else(|e| panic!("{args:?}: stdout is not the error object ({e}): {out}"));
+            assert_eq!(body["ok"], false, "{args:?}: {out}");
             assert_eq!(body["error"]["code"], "QUERY_FAILED", "{args:?}: {out}");
-            assert_eq!(body.as_object().map(|o| o.len()), Some(1), "{args:?}: {out}");
+            assert!(body.get("data").is_none(), "{args:?}: no result payload on a failed query: {out}");
+            assert_eq!(stderr(&output), "", "{args:?}: --json writes nothing to stderr");
         } else {
             assert_eq!(out, "", "{args:?}: no result payload or empty-result report may be emitted");
         }
@@ -298,13 +307,13 @@ fn plugin_git_attachment_is_unconditional_even_when_the_queried_kinds_own_routin
     plant_overlay(&dir.path().join(".canon/ledger"), "root", "world.hotdeal.01", true, &["world.hotdeal.01"]);
 
     let output = run_canon(
-        &["query", "--kind", "scenario", "--plugin", "porting", "--json"],
+        &["query", "--kind", "scenario", "--plugin-id", "porting", "--json"],
         dir.path(),
         &[("CANON_R2_LOCAL_ROOT", r2_root.to_str().unwrap())],
     );
     assert!(output.status.success(), "stderr: {}", stderr(&output));
 
-    let payload: Value = serde_json::from_str(&stdout(&output)).expect("valid JSON on stdout");
+    let payload: Value = data_of(&stdout(&output));
     let records = payload["records"].as_array().expect("records array");
     let record = records.iter().find(|r| r["scenario_id"] == "world.hotdeal.01").expect("planted scenario present");
     assert_eq!(

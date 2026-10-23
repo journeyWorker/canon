@@ -1,10 +1,10 @@
-canon 0.27.0
+canon 0.28.0
 policy: .canon/policy.yaml
   spec_coverage: require_evidence=true scope=<every scenario>
   require_cases: failure
   require_review: scope=verifying, shipped distinct_actor=true block_on_findings=true
   level: strict
-warning: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+warning: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --approver <who>`
 
 subjects (1):
   proposed (1):
@@ -14,6 +14,6 @@ unowned: none
 
 next:
   # no .feature file holds a scenario yet; write the features, then each subject's scenarios with `canon scenario new … --subject-id <id>`
-  canon feature new <area>.<surface> --title "<feature>" --actor-id <unit>
+  canon feature new <area>.<surface> --title "<feature>" --actor-id <unit> --session-id <session>
   # demo owns no scenario; specify its behavior, one scenario per behavior
-  canon scenario new <area>.<surface>.01 --title "<behavior>" --subject-id demo --case happy --actor-id <unit>
+  canon scenario new <area>.<surface>.01 --title "<behavior>" --subject-id demo --case happy --actor-id <unit> --session-id <session>

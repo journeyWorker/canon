@@ -330,6 +330,7 @@ mod tests {
             violations: Vec::new(),
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
+            code_tree: None,
             now: Utc::now(),
         }
     }

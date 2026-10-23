@@ -1,4 +1,4 @@
-//! `canon ingest artifacts [--repo <dir>] [--watch]` (S14
+//! `canon ingest records [--repo <dir>] [--watch]` (S14
 //! `s14-artifact-ingest-cli`): the artifact/verdict half of canon's
 //! join-spine driver — the exact "future `canon ingest` artifact-ingest
 //! CLI wiring" `crates/canon-ingest/src/artifact_registry.rs`'s own doc
@@ -94,7 +94,7 @@
 //! every trajectory already recorded under the EXACT SAME `regime_key`
 //! and skips the persist when one matches (counted,
 //! `ArtifactIngestOutcome::trajectories_skipped_duplicate`) rather than
-//! double-writing — a repeat `canon ingest artifacts` pass over an
+//! double-writing — a repeat `canon ingest records` pass over an
 //! UNCHANGED corpus re-derives the identical identity
 //! (`canon_ingest::scanner::scan_dir`'s deterministic byte-lexical file
 //! order, plus [`group_by_regime`]'s total data-derived sort, means the
@@ -190,7 +190,7 @@
 //! still disagree about them.
 //!
 //! Deleting on the derivation key alone would therefore destroy real
-//! evidence, not an old rendering. `canon learn promote` reads exactly
+//! evidence, not an old rendering. `canon strategy promote` reads exactly
 //! these fields off `query_by_regime_key`'s rows — `OccurrencePromotionGate`
 //! folds `verdict_record.outcome` (one `Failure` resets its success
 //! streak) and `CrnPromotionGate` folds `verdict_record.reward` — so
@@ -318,7 +318,7 @@
 //! evidence TEXT to a trajectory some OTHER event's verdict created.
 //!
 //! # s42: attributing a trajectory to its dispatched run
-//! [`run`] takes an OPTIONAL [`RunId`] — `canon ingest artifacts --run-id`,
+//! [`run`] takes an OPTIONAL [`RunId`] — `canon ingest records --run-id`,
 //! s42 (`close-the-open-loops`) task 3.2 — and stamps it onto every
 //! trajectory this pass WRITES ([`plan_trajectory`]). That closes s40
 //! task 3.1, which asked `mart_flywheel_funnel`'s `applied` stage to
@@ -362,8 +362,10 @@ use canon_store::policy::{BackendConfig, Rung, TierPolicy};
 use canon_store::registry::TierRegistry;
 use canon_store::tier::{StoreError, TierQuery};
 use chrono::{DateTime, Utc};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::json_out::Report;
 use crate::context::resolve_repo_root;
 use crate::dispatch::DispatchError;
 use crate::tiers::{self, TierCliError};
@@ -465,7 +467,8 @@ pub enum ArtifactIngestError {
 /// visible, distinct outcome (module doc's "documented seam"), never
 /// collapsed into the same zero-events shape an unconfigured
 /// `Path`-source adapter reports.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ArtifactAdapterSummary {
     pub adapter_id: &'static str,
     /// `"path"` | `"records"` (mirrors [`ArtifactSourceKind`]).
@@ -483,8 +486,9 @@ pub struct ArtifactAdapterSummary {
     pub unavailable_reason: Option<String>,
 }
 
-/// One regime-keyed trajectory this pass persisted.
-#[derive(Debug, Clone, Serialize)]
+/// One regime showed trajectory this pass persisted.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct PersistedTrajectory {
     pub regime_key: String,
     pub verdict_count: usize,
@@ -505,11 +509,12 @@ pub struct PersistedTrajectory {
 /// finding 1.
 ///
 /// A report, never a resolution. Both rows stay exactly as they are, so
-/// `canon learn promote` keeps reading the contradiction off
+/// `canon strategy promote` keeps reading the contradiction off
 /// `query_by_regime_key` — which is the whole point: the alternative
 /// this replaced silently deleted the loser and changed what the gate
 /// saw.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ConvergenceConflict {
     /// The namespace both rows sit under.
     pub regime_key: String,
@@ -527,9 +532,13 @@ pub struct ConvergenceConflict {
     pub claims: Vec<String>,
 }
 
-/// One `canon ingest artifacts` pass's outcome.
-#[derive(Debug, Clone, Serialize)]
+/// One `canon ingest records` pass's outcome.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ArtifactIngestOutcome {
+    /// A `--dry-run` preview: nothing was written; the counts are what a
+    /// real pass would do (convergence of superseded copies is not previewed).
+    pub dry_run: bool,
     pub adapters: Vec<ArtifactAdapterSummary>,
     pub verdicts_derived: usize,
     pub trajectories_persisted: Vec<PersistedTrajectory>,
@@ -575,7 +584,7 @@ pub struct ArtifactIngestOutcome {
     /// every ordinary upgrade: the losing copies a pre-s38 pass appended
     /// were never marked and never attributed, so they claim nothing.
     /// A non-empty entry means two stored rows disagree about a fact
-    /// `canon learn promote` reads (module doc), and the disagreement is
+    /// `canon strategy promote` reads (module doc), and the disagreement is
     /// STANDING — it is re-reported every pass until an operator removes
     /// the row they judge wrong, because this driver will not pick for
     /// them.
@@ -609,6 +618,8 @@ pub struct ArtifactIngestOutcome {
     /// never an error.
     pub trajectories_left_pending: usize,
 }
+
+impl Report for ArtifactIngestOutcome {}
 
 #[derive(Debug, Clone, Default, Deserialize)]
 struct ArtifactsSectionManifest {
@@ -972,7 +983,7 @@ fn raw_field<'a>(record: &'a RawRecord, field: &str) -> Option<&'a str> {
 /// validate_envelope_shape") and therefore PANICS on a record that
 /// reached this index without that guarantee — a hand-edited ledger
 /// file is enough. The scenario-title join must degrade, never abort a
-/// `canon ingest artifacts` run, so it takes the same posture
+/// `canon ingest records` run, so it takes the same posture
 /// `canon_store::tier::raw_record_schema` already takes for ITS field:
 /// a malformed value falls back to a floor that sorts strictly below
 /// every well-formed record, so it can never out-rank one.
@@ -1176,7 +1187,7 @@ fn trajectory_derivation_key(regime_key: &RegimeKey, verdicts: &[VerdictRow]) ->
     content_digest(&serde_json::json!({"regime_key": regime_key.as_str(), "verdicts": verdict_rows_json(verdicts)}))
 }
 
-/// The FULL identity of one regime-keyed trajectory — the identity
+/// The FULL identity of one regime showed trajectory — the identity
 /// shape version, `regime_key`, the ordered `VerdictRow` contents, and
 /// the RENDERED `task`/`context` — reusing the SAME [`content_digest`]
 /// primitive [`regime_hash`] already uses (not a new hashing scheme).
@@ -2287,7 +2298,7 @@ fn resolve_dispatched_run(repo: &Path, run_id: Option<&RunId>) -> Result<(), Art
 /// `ArtifactAdapter` (module doc).
 ///
 /// `run_id` is the dispatched run this pass is executing inside, from
-/// `canon ingest artifacts --run-id` (s42 (`close-the-open-loops`) task
+/// `canon ingest records --run-id` (s42 (`close-the-open-loops`) task
 /// 3.2). `None` — the overwhelming case, and every pre-s42 invocation —
 /// means the trajectories this pass writes record NO run, rather than one
 /// guessed from the clock or from `.canon/dispatch/`'s newest entry. A
@@ -2299,7 +2310,7 @@ fn resolve_dispatched_run(repo: &Path, run_id: Option<&RunId>) -> Result<(), Art
 /// joins to nothing — or, worse, one that joins to the wrong run.
 /// [`plan_trajectory`] states where the value lands and why it is outside
 /// both write-identity digests.
-pub fn run(repo: &Path, run_id: Option<&RunId>) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
+fn run_pass(repo: &Path, run_id: Option<&RunId>, dry_run: bool) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = repo.join("canon.yaml");
     let canon_yaml_text = std::fs::read_to_string(&canon_yaml_path).unwrap_or_default();
@@ -2504,7 +2515,7 @@ pub fn run(repo: &Path, run_id: Option<&RunId>) -> Result<ArtifactIngestOutcome,
     let mut trajectories_skipped_unregistered_role = 0usize;
     let mut trajectories_skipped_duplicate = 0usize;
     let mut trajectories_converged_deleted = 0usize;
-    // `by_regime` is a `BTreeMap`, so this accumulates in regime-key
+    // `by_regime` is a `BTreeMap`, so this accumulates in regime show
     // order, and each regime's own contribution is already sorted by the
     // kept row's id (`plan_raw_convergence`) — the whole list is
     // data-ordered, and two passes over one unchanged store print
@@ -2518,6 +2529,10 @@ pub fn run(repo: &Path, run_id: Option<&RunId>) -> Result<ArtifactIngestOutcome,
         let existing = trajectory_store.query_by_regime_key(&regime_key)?;
         let (trajectory, superseded) = match plan_trajectory(&existing, &regime_key, &evidence, run_id)? {
             PersistPlan::SkipDuplicate => {
+                trajectories_skipped_duplicate += 1;
+                continue;
+            }
+            PersistPlan::ConvergeDistilled if dry_run => {
                 trajectories_skipped_duplicate += 1;
                 continue;
             }
@@ -2557,7 +2572,8 @@ pub fn run(repo: &Path, run_id: Option<&RunId>) -> Result<ArtifactIngestOutcome,
             PersistPlan::Supersede(trajectory) => (trajectory, true),
         };
 
-        match store_trajectory(&role_registry, &trajectory_store, &trajectory) {
+        let stored = if dry_run { trajectory.role().and_then(|role| role_registry.validate(&role)) } else { store_trajectory(&role_registry, &trajectory_store, &trajectory) };
+        match stored {
             Ok(()) => {
                 trajectories_persisted.push(PersistedTrajectory { regime_key: regime_key.as_str().to_string(), verdict_count, superseded });
                 // Resolve the covering verdict+reward from the SAME
@@ -2579,6 +2595,7 @@ pub fn run(repo: &Path, run_id: Option<&RunId>) -> Result<ArtifactIngestOutcome,
                     // for a later covering signal (the S7 webhook
                     // receiver's PR/CI path) and count it.
                     (VerdictOutcome::Pending, _) => trajectories_left_pending += 1,
+                    _ if dry_run => trajectories_marked += 1,
                     (outcome, reward) => {
                         // Marked BEFORE the distilled-tier rebuild
                         // deliberately: `mark_verdict` is the ONLY path
@@ -2589,6 +2606,9 @@ pub fn run(repo: &Path, run_id: Option<&RunId>) -> Result<ArtifactIngestOutcome,
                         mark_trajectory_verdict(&trajectory_store, &trajectory.id, outcome, reward)?;
                         trajectories_marked += 1;
                     }
+                }
+                if dry_run {
+                    continue;
                 }
                 let converged = rebuild_namespace_converged(&trajectory_store, &strategy_store, &regime_key)?;
                 trajectories_converged_deleted += converged.rows_deleted;
@@ -2603,6 +2623,7 @@ pub fn run(repo: &Path, run_id: Option<&RunId>) -> Result<ArtifactIngestOutcome,
     }
 
     Ok(ArtifactIngestOutcome {
+        dry_run,
         adapters,
         verdicts_derived,
         trajectories_persisted,
@@ -2614,6 +2635,17 @@ pub fn run(repo: &Path, run_id: Option<&RunId>) -> Result<ArtifactIngestOutcome,
         trajectories_marked,
         trajectories_left_pending,
     })
+}
+
+/// One `canon ingest records` pass ([`run_pass`]); a pass that persisted,
+/// converged and marked nothing found the records already ingested and is
+/// marked unchanged ([`crate::json_out::mark_unchanged`]).
+pub fn run(repo: &Path, run_id: Option<&RunId>, dry_run: bool) -> Result<ArtifactIngestOutcome, ArtifactIngestError> {
+    let outcome = run_pass(repo, run_id, dry_run)?;
+    if outcome.trajectories_persisted.is_empty() && outcome.trajectories_converged_deleted == 0 && outcome.trajectories_marked == 0 {
+        crate::json_out::mark_unchanged();
+    }
+    Ok(outcome)
 }
 
 /// Human-readable run summary — one line per adapter (its `status`
@@ -2640,7 +2672,8 @@ pub fn format_human(outcome: &ArtifactIngestOutcome) -> String {
         }
     }
     out.push_str(&format!("verdicts derived: {}\n", outcome.verdicts_derived));
-    out.push_str(&format!("trajectories persisted: {}\n", outcome.trajectories_persisted.len()));
+    let verb = if outcome.dry_run { "would be persisted" } else { "persisted" };
+    out.push_str(&format!("trajectories {verb}: {}\n", outcome.trajectories_persisted.len()));
     for trajectory in &outcome.trajectories_persisted {
         let how = if trajectory.superseded { ", superseded in place" } else { "" };
         out.push_str(&format!("  - {} ({} verdict(s){how})\n", trajectory.regime_key, trajectory.verdict_count));
@@ -2686,7 +2719,7 @@ pub fn format_json(outcome: &ArtifactIngestOutcome) -> String {
 /// 7.4). Wraps this driver's pure write-identity invariants —
 /// `regime_hash` (12-hex, deterministic, sensitive to the whole
 /// `event_identity` including its project half) and
-/// `trajectory_content_digest` (deterministic, regime-key-sensitive,
+/// `trajectory_content_digest` (deterministic, regime show-sensitive,
 /// verdict-content-and-order-sensitive, and rendered-text-sensitive) —
 /// as in-memory checks over synthetic keys/verdicts. No filesystem or
 /// network read, side-effect-free against the real repo.
@@ -2734,7 +2767,7 @@ pub fn selftest() -> Result<usize, Vec<String>> {
     {
         passed += 1;
     } else {
-        failures.push("trajectory-digest-determinism: not deterministic or not regime-key-sensitive".to_string());
+        failures.push("trajectory-digest-determinism: not deterministic or not regime show-sensitive".to_string());
     }
 
     let content_differs = trajectory_content_digest(&key, &guard, "t", "c") != trajectory_content_digest(&key, &strat, "t", "c");
@@ -3039,7 +3072,7 @@ mod tests {
         assert_eq!(task, "world.firstbuy-hotdeal.14: code-review finding, remediation resolved");
         assert_eq!(context, "code-review finding: reveal reads the client cart\nremediation resolved: re-read the grant from the result");
         assert!(
-            !context.contains("canon ingest artifacts") && !context.contains("VerdictRow"),
+            !context.contains("canon ingest records") && !context.contains("VerdictRow"),
             "a strategy's content never describes the ingest driver: {context}"
         );
     }
@@ -3628,7 +3661,7 @@ mod tests {
 
     // ── ReviewCore: identity, supersession, and total order ──
 
-    /// The exact shape a PRE-s38 `canon ingest artifacts` pass left in
+    /// The exact shape a PRE-s38 `canon ingest records` pass left in
     /// a store: this release's `regime_key` and its ordered verdict
     /// rows, under text that described the DRIVER rather than the
     /// evidence.
@@ -4343,7 +4376,7 @@ mod tests {
         // BLOCKER regression (s42 re-review, `ReviewRuns` finding 1).
         // `verdict_record` is written back AFTER derivation, so two rows
         // sharing a derivation key can carry OPPOSITE outcomes. Deleting
-        // the loser removed the contradiction `canon learn promote`
+        // the loser removed the contradiction `canon strategy promote`
         // refuses on — `OccurrencePromotionGate` resets its success
         // streak on one `Failure` — turning a refusal into a promotion.
         let dir = tempfile::tempdir().unwrap();

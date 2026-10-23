@@ -313,7 +313,7 @@ mod tests {
                 risk_routing: BTreeMap::new(), risk_tiers, spec_coverage: None, evidence_binding: None, diagnostics: Vec::new(),
             },
             evidence, audits: Vec::new(), scenarios: Vec::new(), divergences: Vec::new(), subjects: Vec::new(), changes: Vec::new(), reviews: Vec::new(), findings: Vec::new(),
-            violations: Vec::new(), corpus_violations: Vec::new(), unreadable_kinds: Vec::new(), now: now(),
+            violations: Vec::new(), corpus_violations: Vec::new(), unreadable_kinds: Vec::new(), code_tree: None, now: now(),
         }
     }
 

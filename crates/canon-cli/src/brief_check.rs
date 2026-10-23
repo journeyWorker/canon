@@ -1,4 +1,4 @@
-//! `canon brief check` and bare `canon brief` (0.19 D2): a read-only
+//! `canon brief check` and `canon brief show` (0.19 D2): a read-only
 //! checker for a change's PRD brief ([`crate::brief_template`]).
 //!
 //! # Findings
@@ -83,7 +83,7 @@
 //! counts as soon as it is written. `canon status` joins the same index
 //! to each scenario's evidence and review state.
 //!
-//! # `canon brief`
+//! # `canon brief show`
 //! Prints the brief's state and the next one to three steps (`shape`,
 //! `clarify`, `harden`, `align`, `polish`, `approve`), derived from the
 //! findings. It never edits.
@@ -93,18 +93,20 @@ use std::path::{Path, PathBuf};
 
 use canon_ingest::markdown::{fence_of, field};
 use canon_model::{paths, ChangeId, SubjectStatus};
+use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::json_out::Report;
 use crate::brief_template::{canonical_role, heading_of, marker, ChangeKind, Role, CHORE_CATEGORIES};
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 use crate::language::{Language, Resolved, Shipped, Tally};
 
-/// Exit code for blocker findings (mirrors `canon change new`'s refusal).
-const EXIT_BLOCKERS: i32 = 2;
+/// Exit code for blocker findings (D4: a finding is exit 1).
+const EXIT_BLOCKERS: i32 = crate::cli_error::EXIT_FAILED;
 
 /// A finding's severity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
     Blocker,
@@ -162,7 +164,7 @@ fn severity_of(rule: &str) -> Option<Severity> {
 }
 
 /// One finding.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct Finding {
     pub rule: String,
     pub severity: Severity,
@@ -186,7 +188,7 @@ struct Hit {
 
 /// One waiver comment, with the severity of the rule it waives and
 /// whether it matched a finding.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct Waiver {
     pub rule: String,
     pub section: String,
@@ -201,7 +203,7 @@ pub struct Waiver {
 }
 
 /// The finding counts `canon status` shows.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct Counts {
     pub blockers: usize,
     pub advisories: usize,
@@ -338,7 +340,7 @@ pub fn flow_tag_value(repo: &Path, subject: Option<&canon_model::SubjectId>, cha
     let change = match (change, subject) {
         (Some(change), _) => change.clone(),
         (None, Some(subject)) => newest_change_of(repo, subject)?,
-        (None, None) => resolve_change(repo, None).map(|(change, _)| change).map_err(|e| format!("{} — {}; pass --change-id or --subject-id", e.code, e.message))?,
+        (None, None) => resolve_change(repo, None).map(|(change, _)| change).map_err(|e| format!("{} — {}; name the change as the operand", e.code, e.message))?,
     };
     if crate::brief::canon_brief(repo, &change).is_none() {
         return Err(format!("change `{}` has no brief at {}/{}/brief.md; write it with `canon change new`", change.as_str(), paths::CHANGES_DIR, change.as_str()));
@@ -655,7 +657,7 @@ fn chore_rules(out: &mut Out, secs: &[Section]) {
             Some(&section.key),
             section.marker_line,
             format!("a chore brief has no `{}` section", section.key),
-            "a chore adds no flow, detail or acceptance; work that changes behavior is a feature change (`canon change new` without `--kind chore`)".to_string(),
+            "a chore adds no flow, detail or acceptance; work that changes behavior is a feature change (`canon change new` without `--change-kind chore`)".to_string(),
         );
     }
     if let Some(category) = secs.iter().find(|s| s.key == "category") {
@@ -1703,7 +1705,7 @@ pub fn prose_tally(text: &str) -> Tally {
 // ───────────────────────────── loading ─────────────────────────────
 
 /// The phase the flow-coverage rules need.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Phase {
     /// The brief is not approved yet, or no adopting subject is
@@ -1786,8 +1788,8 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
         1 => Ok(live.remove(0)),
         _ => Err(CliError::failed(
             "CHANGE_AMBIGUOUS",
-            format!("{} live changes have a brief ({}); pass --change-id <slug>", live.len(), live.iter().map(|(c, _)| c.as_str()).collect::<Vec<_>>().join(", ")),
-        ).hint("pass --change-id <slug> naming one of the listed changes")),
+            format!("{} live changes have a brief ({}); pass the change id as the operand", live.len(), live.iter().map(|(c, _)| c.as_str()).collect::<Vec<_>>().join(", ")),
+        ).hint("pass the change id of one of the listed changes as the operand")),
     }
 }
 
@@ -1801,10 +1803,10 @@ pub fn check(repo: &Path, requested: Option<&ChangeId>) -> Result<Checked, CliEr
 /// Judges `text`, the brief of `change` read from `path`: [`check`] for a
 /// caller that has already read the file and must judge those same bytes.
 pub fn check_text(repo: &Path, change: ChangeId, path: &Path, text: &str) -> Result<Checked, CliError> {
-    let resolved = crate::language::for_brief(repo, text).map_err(|e| CliError::failed("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again"))?;
+    let resolved = crate::language::for_brief(repo, text).map_err(|e| CliError::failed("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again"))?;
     let phase = phase_of(repo, &change, text);
     let flows = match phase {
-        Phase::Building if !is_chore(text) => Some(flow_scenarios(repo, &change).map_err(|e| CliError::failed("SPEC_ROOTS_UNREADABLE", format!("cannot read the scenarios the flow steps point at: {e}")).hint("fix `specs.roots` in canon.yaml (`canon init --check-config` reports what is wrong), then run the command again"))?),
+        Phase::Building if !is_chore(text) => Some(flow_scenarios(repo, &change).map_err(|e| CliError::failed("SPEC_ROOTS_UNREADABLE", format!("cannot read the scenarios the flow steps point at: {e}")).hint("fix `specs.roots` in canon.yaml (`canon init --check` reports what is wrong), then run the command again"))?),
         _ => None,
     };
     let evaluation = evaluate(text, &resolved, flows.as_ref());
@@ -1813,7 +1815,7 @@ pub fn check_text(repo: &Path, change: ChangeId, path: &Path, text: &str) -> Res
 
 /// One flow step of a brief: its id (`F1`), its text with the list marker
 /// dropped, and its line.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct FlowStep {
     pub id: String,
     pub text: String,
@@ -1824,7 +1826,7 @@ pub struct FlowStep {
 /// (never by heading text, so the `ko` headings read the same), with its
 /// heading and the body lines after it. Fenced code and HTML comments are
 /// not part of a body, as in every other reading of the brief.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BriefSection {
     pub key: String,
@@ -1923,13 +1925,14 @@ pub fn status_report(repo: &Path, change: &ChangeId, building: bool) -> Option<(
 
 // ───────────────────────────── commands ─────────────────────────────
 
-fn fail(json: bool, error: &CliError) -> i32 {
-    error.emit("canon brief", json)
+fn fail(command: &str, json: bool, error: &CliError) -> i32 {
+    error.emit(command, json)
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-struct CheckJson<'a> {
+/// The `brief check` report: the verdict over one change brief.
+pub struct BriefCheckReport<'a> {
     change: &'a str,
     brief: &'a str,
     language: &'a str,
@@ -1944,17 +1947,19 @@ struct CheckJson<'a> {
     waivers: &'a [Waiver],
 }
 
+impl Report for BriefCheckReport<'_> {}
+
 /// `canon brief check [--change-id <slug>] [--json]`.
 pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let checked = match check(&repo, change) {
         Ok(checked) => checked,
-        Err(e) => return fail(json, &e),
+        Err(e) => return fail("canon brief check", json, &e),
     };
     let ev = &checked.evaluation;
     let counts = ev.counts();
     if json {
-        let body = CheckJson {
+        let body = BriefCheckReport {
             change: checked.change.as_str(),
             brief: &checked.brief,
             language: &checked.language.tag,
@@ -1967,18 +1972,12 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
             findings: &ev.findings,
             waivers: &ev.waivers,
         };
-        match serde_json::to_value(&body) {
-            Ok(mut value) => {
-                if counts.blockers > 0 {
-                    // One document: the findings keep their fields and gain the shared `error`.
-                    let error = CliError::refused("BRIEF_HAS_BLOCKERS", format!("{} blocker(s) in {}", counts.blockers, checked.brief)).hint("fix each blocker in `findings`, then run `canon brief check` again");
-                    eprintln!("{}", error.human("canon brief check"));
-                    value["error"] = error.to_json()["error"].clone();
-                }
-                println!("{}", serde_json::to_string_pretty(&value).expect("a JSON value always serializes"));
-            }
-            Err(e) => return CliError::failed("SERIALIZE_FAILED", e.to_string()).hint("this is a canon bug: report it together with the command line that produced it").emit("canon brief check", true),
+        if counts.blockers > 0 {
+            // The failure keeps the report in `data`.
+            let error = CliError::refused("BRIEF_HAS_BLOCKERS", format!("{} blocker(s) in {}", counts.blockers, checked.brief)).hint("fix each blocker in `findings`, then run `canon brief check` again");
+            return error.emit_with_data("canon brief check", true, &body);
         }
+        crate::json_out::data("brief check", &body);
     } else {
         println!("canon brief check: {} — {} blocker(s), {} advisory(ies)", checked.brief, counts.blockers, counts.advisories);
         println!("  language: {}", checked.resolved().describe());
@@ -2004,9 +2003,9 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
     }
 }
 
-/// One next step of bare `canon brief`.
-#[derive(Debug, Serialize)]
-struct Step {
+/// One next step of `canon brief show`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Step {
     step: &'static str,
     why: String,
 }
@@ -2015,9 +2014,9 @@ struct Step {
 /// re-approval when its text changed after the approval (0.19 D3).
 fn approve_step(ev: &Evaluation, fresh: &str) -> Step {
     let why = if matches!(ev.approval, crate::brief::Approval::Changed { .. }) {
-        format!("the brief changed after its approval ({}); the human answers the changed brief and `canon brief approve` records it", crate::brief::CHANGED_CODE)
+        format!("the brief changed after its approval ({}); the human answers the changed brief and records it with `canon brief approve` (their own shell or `canon dashboard`, never yours)", crate::brief::CHANGED_CODE)
     } else {
-        format!("{fresh}; `canon brief approve --by <the human> --note \"<their words>\"` records it")
+        format!("{fresh}; the human records it with `canon brief approve --approver <their name> --note \"<their words>\"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role")
     };
     Step { step: "approve", why }
 }
@@ -2053,9 +2052,10 @@ fn next_steps(ev: &Evaluation) -> Vec<Step> {
     steps
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-struct NextJson<'a> {
+/// The `brief show` report: the brief's state and the next steps.
+pub struct BriefShowReport<'a> {
     change: &'a str,
     brief: &'a str,
     state: &'static str,
@@ -2063,12 +2063,14 @@ struct NextJson<'a> {
     next: Vec<Step>,
 }
 
-/// Bare `canon brief [--change-id <slug>] [--json]`: state and next steps.
+impl Report for BriefShowReport<'_> {}
+
+/// `canon brief show [<change>] [--json]`: state and next steps.
 pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let checked = match check(&repo, change) {
         Ok(checked) => checked,
-        Err(e) => return fail(json, &e),
+        Err(e) => return fail("canon brief show", json, &e),
     };
     let ev = &checked.evaluation;
     let counts = ev.counts();
@@ -2083,11 +2085,10 @@ pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
     };
     let next = next_steps(ev);
     if json {
-        let body = NextJson { change: checked.change.as_str(), brief: &checked.brief, state, counts, next };
-        let document = serde_json::to_value(&body).unwrap_or_default();
-        println!("{}", serde_json::to_string_pretty(&document).unwrap_or_default());
+        let body = BriefShowReport { change: checked.change.as_str(), brief: &checked.brief, state, counts, next };
+        crate::json_out::data("brief show", &body);
     } else {
-        println!("canon brief: {} — {state} ({} blocker(s), {} advisory(ies))", checked.brief, counts.blockers, counts.advisories);
+        println!("canon brief show: {} — {state} ({} blocker(s), {} advisory(ies))", checked.brief, counts.blockers, counts.advisories);
         if next.is_empty() {
             println!("  next: nothing — the brief is approved and clean");
         }

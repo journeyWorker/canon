@@ -1,6 +1,6 @@
 {
   "name": "@journeykit/canon",
-  "version": "0.27.0",
+  "version": "0.28.0",
   "description": "canon \u2014 harness knowledge substrate. JS launcher: platform detection + native binary resolution.",
   "license": "MIT",
   "type": "module",
@@ -10,8 +10,12 @@
   },
   "files": [
     "bin.js",
-    "dist/**/*"
+    "dist/**/*",
+    "man"
   ],
+  "directories": {
+    "man": "./man"
+  },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"

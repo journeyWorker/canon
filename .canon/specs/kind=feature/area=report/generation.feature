@@ -68,7 +68,7 @@ Feature: report generation
   Scenario: A snapshot exports every mart as Parquet plus a manifest listing exactly them
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a repository and an output directory for the snapshot
-    When the report is run in snapshot mode against that directory
+    When canon report snapshot is run against that directory
     Then it reports ten tables and writes one Parquet file per mart
     And the manifest beside them lists exactly those ten tables
     And the markdown report is not written, because exporting and generating are different actions
@@ -100,11 +100,11 @@ Feature: report generation
   @report.generation.10
   Scenario: A fresh canon init repo's report fills its task columns from the sqlite hot tier
     Given a fresh canon init repo, whose canon.yaml routes task to a sqlite hot rung, with a change carrying two tasks and its brief approved
-    When one task is attested and flipped with canon gate task, and the report is generated
+    When one task is attested and flipped with canon task done, and the report is generated with canon report build
     Then the trust matrix carries each task's title and status, the flipped one done
     And no task record reached the git ledger, so those rows were read from sqlite
     And no kind is named as not read directly and no warning is printed
-    And canon report --check reads the same report back
+    And canon report check reads the same report back
 
   # canon: {"schema":1,"at":"2026-10-12T14:00:00Z","actor":{"agent_id":"canon"}}
   @subject:report-generation
@@ -132,6 +132,6 @@ Feature: report generation
   @report.generation.13
   Scenario: A report check reads its empty sources from scratch and writes nothing into the repo
     Given a committed report and a repository whose r2 and learn sources are empty
-    When canon report --check runs
+    When canon report check runs
     Then it compares and reports no drift, and creates no seed file, directory or parquet under .canon
     And the empty sources are seeded in a scratch directory that is gone when the run ends

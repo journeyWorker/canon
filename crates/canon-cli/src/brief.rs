@@ -1,10 +1,10 @@
 //! Whether a subject's brief is approved (0.16 D1, 0.17 D3): the one
 //! decision `canon status` reports, the `verifying → shipped` guard of
-//! `canon subject status` enforces, and `canon evidence add` refuses on
+//! `canon subject move` enforces, and `canon evidence add` refuses on
 //! (0.16 M7). All call [`brief_of`], so status never says `ship` for a
 //! subject the guard would refuse on its brief, never suggests an
 //! attestation `evidence add` would refuse, and the guards never refuse
-//! a subject status reads as needing no brief.
+//! a subject move reads as needing no brief.
 //!
 //! One human answer approves a subject's scope: its brief and the
 //! policy. The agent records it, from that answer only, as an
@@ -73,6 +73,7 @@ use canon_gate::GateContext;
 use canon_ingest::markdown::{field, without_field};
 use canon_model::{paths, ChangeId, ProjectId, ScenarioId, Subject, SubjectStatus, TaskId};
 use chrono::{DateTime, NaiveDate, Utc};
+use schemars::JsonSchema;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
@@ -156,7 +157,7 @@ pub fn approved_at(line: &str) -> Option<DateTime<Utc>> {
 /// `brief.md` (module doc). A fix stays inside the approved
 /// change, so a newer adopted change is a new scope, and an older
 /// change's approval does not cover it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BriefStatus {
     pub approved: bool,
@@ -232,29 +233,30 @@ impl BriefStatus {
         }
     }
 
-    /// The re-approval advice for a digest-less approval line.
+    /// The re-approval advice for a digest-less or changed approval: the human's call, never the agent's.
     pub fn record_digest_hint(&self) -> String {
-        format!("re-approve with `canon brief approve --change-id {} --by <the human> --note \"<their words>\"`", self.change.as_deref().unwrap_or("<change>"))
+        format!(
+            "the human re-approves with `canon brief approve {} --approver <their name> --note \"<their words>\"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role to run it",
+            self.change.as_deref().unwrap_or("<change>")
+        )
     }
 
-    /// How the agent records the human's answer, for an enforced brief.
+    /// How the human's answer is recorded, for an enforced brief: the human runs the call.
     pub fn record(&self) -> String {
         let brief = self.brief.as_deref().unwrap_or_default();
         if self.changed {
             return self.record_digest_hint();
         }
+        let call = format!("`canon brief approve {} --approver <their name> --note \"<their words>\"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role to run it", self.change.as_deref().unwrap_or("<change>"));
         match (self.brief_exists, &self.source) {
-            (false, Some(source)) => format!(
-                "create {brief} holding a `Source: {source}` line, then record their words with `canon brief approve --change-id {} --by <the human> --note \"<their words>\"`",
-                self.change.as_deref().unwrap_or("<change>")
-            ),
-            _ => format!("record their words with `canon brief approve --change-id {} --by <the human> --note \"<their words>\"`", self.change.as_deref().unwrap_or("<change>")),
+            (false, Some(source)) => format!("create {brief} holding a `Source: {source}` line; when they answer, the human records it with {call}"),
+            _ => format!("when they answer, the human records it with {call}"),
         }
     }
 }
 
 /// The `openspec` plan source roots an external change's `proposal.md`
-/// is found under, resolved the way `canon gate task` resolves plan
+/// is found under, resolved the way `canon task done` resolves plan
 /// sources (an absent `plans:` section falls back to the repo root).
 /// `Err` names why `canon.yaml`'s `plans:` section cannot be read; then
 /// no external proposal is found.
@@ -547,7 +549,7 @@ pub fn adoption_warning(repo: &Path, subject: &Subject, change: &ChangeId) -> Op
         .filter(|brief| brief.enforced)?;
     let (change, subject_id) = (change.as_str(), subject.subject_id.as_str());
     Some(format!(
-        "subject `{subject_id}` is {} and change `{change}` is not approved ({}): the subject's existing scenarios keep accepting evidence, and while no scenario is tagged `@flow:{change}.*` it can still be reopened and shipped for its approved scope; once a scenario is tagged `@flow:{change}.*`, those scenarios wait for the approval and `{subject_id}` cannot ship until the brief is approved; to take the adoption back run `canon subject unadopt {change} --subject-id {subject_id}`",
+        "subject `{subject_id}` is {} and change `{change}` is not approved ({}): the subject's existing scenarios keep accepting evidence, and while no scenario is tagged `@flow:{change}.*` it can still be reopened and shipped for its approved scope; once a scenario is tagged `@flow:{change}.*`, those scenarios wait for the approval and `{subject_id}` cannot ship until the brief is approved; to take the adoption back run `canon subject unadopt {subject_id} --change-id {change}`",
         serde_json::to_value(subject.status).ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default(),
         brief.unanswered()
     ))

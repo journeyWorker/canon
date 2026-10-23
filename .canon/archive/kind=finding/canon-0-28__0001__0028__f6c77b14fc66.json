@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-1"
+  },
+  "at": "2026-10-23T13:10:32.137282402Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "scenario_ids": [
+    "ingest.artifacts.08",
+    "inventory.sync.42",
+    "learn.promotion.03",
+    "skills.install.44",
+    "tier.storage.11"
+  ],
+  "schema": 1,
+  "seq": 28,
+  "severity": "note",
+  "summary": "Standards pass, signed anyway: partial assertions: ingest.artifacts.08 ('before any read' only as no .canon/learn), inventory.sync.42 (only .canon/ledger absent), learn.promotion.03 (dry-run output only '[dry-run]'), skills.install.44 (nothing attested not counted), tier.storage.11 (only exit 2; USAGE and hint unchecked)",
+  "worktree_dirty": false
+}

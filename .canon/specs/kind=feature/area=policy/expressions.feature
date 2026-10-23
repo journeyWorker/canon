@@ -112,7 +112,7 @@ Feature: policy expressions
   @policy.expressions.30
   Scenario: Approving the policy records its digest, approver, time and note
     Given a repository with a .canon/policy.yaml
-    When a human runs canon policy approve --by <who> --note <text>
+    When a human runs canon policy approve --approver <who> --note <text>
     Then .canon/policy.approval.json records the sha256 of the policy bytes, the approver, the time and the note
     And the success line says the file was written directly, with nothing to promote
     And neither canon's .gitignore nor the one canon init writes ignores the approval file

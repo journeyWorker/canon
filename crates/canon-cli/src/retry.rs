@@ -22,10 +22,21 @@
 
 use std::path::Path;
 
+use schemars::JsonSchema;
+use serde::Serialize;
 use serde_json::Value;
 
 /// Keys a write or a promotion stamps; they never make two records differ.
 const STAMPED: [&str; 3] = ["at", "run_seq", "staging_id"];
+
+/// Where a written record lives, as a report says it: the staged location and
+/// the ledger path once promoted (`null` where absent).
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Landing {
+    pub staged: Option<String>,
+    pub committed: Option<String>,
+}
 
 /// Where an identical, already-written record lives.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,8 +49,8 @@ pub(crate) struct Existing {
 
 impl Existing {
     /// The `staged`/`committed` pair a write reports (`null` where absent).
-    pub(crate) fn json(&self) -> Value {
-        serde_json::json!({ "staged": self.staged, "committed": self.committed })
+    pub(crate) fn landing(&self) -> Landing {
+        Landing { staged: self.staged.clone(), committed: self.committed.clone() }
     }
 
     /// Human wording for where the record already is.

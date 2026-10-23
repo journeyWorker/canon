@@ -1,0 +1,2 @@
+canon init: ./canon.yaml already exists and nothing is left to refresh
+next: canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> --session-id <session> — no subject exists yet; a subject is the unit status, review and shipping track

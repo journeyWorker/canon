@@ -83,10 +83,10 @@ fn sync_porting(dir: &Path) -> Output {
 }
 
 fn query_scenarios_with_plugin(dir: &Path) -> Vec<Value> {
-    let out = run_canon(&["query", "--kind", "scenario", "--canon-yaml", "canon.yaml", "--plugin", "porting", "--json"], dir);
+    let out = run_canon(&["query", "--kind", "scenario", "--repo", ".", "--plugin-id", "porting", "--json"], dir);
     assert!(out.status.success(), "canon query --plugin porting failed: {}", stderr(&out));
     let json: Value = serde_json::from_str(&stdout(&out)).unwrap_or_else(|e| panic!("query --json didn't parse: {e}\n{}", stdout(&out)));
-    json["records"].as_array().cloned().unwrap_or_default()
+    json["data"]["records"].as_array().cloned().unwrap_or_default()
 }
 
 fn scenario_record<'a>(records: &'a [Value], scenario_id: &str) -> &'a Value {
@@ -322,8 +322,8 @@ fn plugin_sync_from_a_subdirectory_resolves_the_repo_root_tier() {
     sync_inventory(dir.path());
 
     let sub = dir.path().join(".canon/specs/kind=feature"); // a nested subdir, no canon.yaml of its own
-    let out = run_canon(&["plugin", "sync", "porting", "--repo", "."], &sub);
-    assert!(out.status.success(), "plugin sync --repo . from a subdir must resolve the repo root: {}", stderr(&out));
+    let out = run_canon(&["plugin", "sync", "porting"], &sub);
+    assert!(out.status.success(), "plugin sync from a subdir must resolve the repo root: {}", stderr(&out));
     assert!(stdout(&out).contains("2 written"), "must write into the repo-root tier: {}", stdout(&out));
 
     // Overlays land under the repo ROOT tier; no subdir-local tier appears.

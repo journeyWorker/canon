@@ -5,7 +5,7 @@
 //! `CANON_ROLE` environment variable or the global `--as <role>` flag (the
 //! flag wins). It is guidance, not enforcement: `schema` lists the role's
 //! commands, `status` and `meta.next` keep the role's steps, and `--role` on
-//! `evidence add` / `review add` defaults to it. Unset, every command behaves
+//! `evidence add` / `evidence audit` / `review scenario` / `review change` defaults to it. Unset, every command behaves
 //! as before.
 //!
 //! [`init`] runs once at startup: it resolves the declared role, refuses an
@@ -15,6 +15,7 @@
 use std::sync::OnceLock;
 
 use clap::ValueEnum;
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::cli_error::CliError;
@@ -22,7 +23,7 @@ use crate::cli_error::CliError;
 /// The environment variable that declares the role.
 pub const ENV: &str = "CANON_ROLE";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, ValueEnum, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 #[value(rename_all = "lowercase")]
 pub enum Role {
@@ -65,10 +66,85 @@ impl Role {
     }
 }
 
+/// The attribution of a record a leaf writes without a `--role` option: the
+/// declared role when there is one (D12), else `fallback` (what the leaf
+/// recorded before roles were declared; `None` records no role), in `session` when `--session-id` named one.
+pub fn attributed(agent_id: &str, fallback: Option<&canon_model::RoleId>, session: Option<&canon_model::SessionId>) -> canon_model::Actor {
+    let declared = Role::current(None).map(|role| canon_model::RoleId::parse(role.as_str()).expect("a role name is a valid role id"));
+    let actor = match declared.as_ref().or(fallback) {
+        Some(role) => canon_model::Actor::new(agent_id, role.clone()),
+        None => canon_model::Actor::new_unattributed(agent_id),
+    };
+    match session {
+        Some(session) => actor.with_session(session.clone()),
+        None => actor,
+    }
+}
+
 impl std::fmt::Display for Role {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
     }
+}
+
+/// Roles a repo's policy names: the keys of `risk_routing` and every value
+/// under a `role`, `roles`, `required_roles` or `require_roles` key, wherever
+/// it sits in `.canon/policy.yaml`. An unreadable or absent policy names none.
+fn policy_roles(repo: &std::path::Path) -> Vec<String> {
+    fn walk(value: &serde_yaml::Value, out: &mut Vec<String>) {
+        use serde_yaml::Value;
+        match value {
+            Value::Mapping(map) => {
+                for (key, child) in map {
+                    match key.as_str() {
+                        Some("risk_routing") => {
+                            if let Value::Mapping(routes) = child {
+                                out.extend(routes.keys().filter_map(|k| k.as_str().map(str::to_string)));
+                            }
+                        }
+                        Some("role" | "roles" | "required_roles" | "require_roles") => collect_strings(child, out),
+                        _ => {}
+                    }
+                    walk(child, out);
+                }
+            }
+            Value::Sequence(items) => items.iter().for_each(|item| walk(item, out)),
+            _ => {}
+        }
+    }
+    fn collect_strings(value: &serde_yaml::Value, out: &mut Vec<String>) {
+        match value {
+            serde_yaml::Value::String(text) => out.push(text.clone()),
+            serde_yaml::Value::Sequence(items) => items.iter().for_each(|item| collect_strings(item, out)),
+            _ => {}
+        }
+    }
+    let Ok(text) = std::fs::read_to_string(repo.join(canon_model::paths::POLICY_FILE)) else { return Vec::new() };
+    let Ok(document) = serde_yaml::from_str::<serde_yaml::Value>(&text) else { return Vec::new() };
+    let mut out = Vec::new();
+    walk(&document, &mut out);
+    out
+}
+
+/// `--role` is an open slug: a policy may require a role canon does not know.
+/// A value that is none of the four roles and no role the policy names still
+/// runs, with a warning (`meta.warnings`) that names the closest known role.
+pub fn warn_if_unknown(role: &canon_model::RoleId, repo: &std::path::Path) {
+    let value = role.as_str();
+    if Role::parse(value).is_some() {
+        return;
+    }
+    let named = policy_roles(repo);
+    if named.iter().any(|known| known == value) {
+        return;
+    }
+    let known: Vec<&str> = ALL.iter().map(|r| r.as_str()).chain(named.iter().map(String::as_str)).collect();
+    let nearest = crate::suggest::nearest(value, known.iter().copied());
+    let message = match nearest.first() {
+        Some(closest) => format!("role `{value}` is not a known role (planner, implementer, reviewer, orchestrator, or one the policy names); did you mean `{closest}`?"),
+        None => format!("role `{value}` is not a known role (planner, implementer, reviewer, orchestrator, or one the policy names); it is recorded as given"),
+    };
+    crate::json_out::warn(message);
 }
 
 /// Resolve the declared role once, at startup. The `--as` flag wins over

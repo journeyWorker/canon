@@ -25,7 +25,7 @@
 //! [`crate::subject::persist_adoption`] for the order) cannot be written
 //! atomically, so a failure between them keeps the change dir and the
 //! subject record and prints the command that completes the link,
-//! `canon ingest plans && canon subject adopt <slug> --subject-id <id>`,
+//! `canon ingest plans && canon subject adopt <id> --change-id <slug>`,
 //! which is safe to rerun.
 //!
 //! # Refusals (exit `2`, nothing written)
@@ -37,6 +37,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use canon_ingest::{native_plan_adapter, PlanSourceHandle};
+use schemars::JsonSchema;
+use serde::Serialize;
 use canon_model::{paths, Change, ChangeId, SubjectId, SubjectStatus};
 
 use crate::cli_error::CliError;
@@ -110,6 +112,18 @@ fn stage_change(staging: &Path, slug: &ChangeId, kind: ChangeKind, title: &str, 
         .ok_or_else(|| format!("the written change `{}` did not parse", slug.as_str()))
 }
 
+/// `canon change new`: the change opened.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangeNewReport<'a> {
+    pub change_id: &'a str,
+    pub subject_id: &'a str,
+    /// The staged `brief.md`, relative to the repo.
+    pub brief: &'a str,
+}
+
+impl crate::reports::Report for ChangeNewReport<'_> {}
+
 /// `canon change new` (module doc). Exit `0` written + adopted, `2`
 /// refused or failed with nothing left behind.
 pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: ChangeKind, title: &str, json: bool) -> i32 {
@@ -117,7 +131,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     let language = match crate::language::configured(&repo) {
         Ok(language) => language,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon change new", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon change new", json);
         }
     };
 
@@ -189,7 +203,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         crate::write_mode::DIRECT
     );
     for warning in &warnings {
-        eprintln!("canon change new: warning: {warning}");
+        crate::human_err!("canon change new: warning: {warning}");
     }
     // A shipped subject stays shipped until reopened: say how, once the
     // brief is approved (the reopen refuses an unapproved one).
@@ -216,9 +230,8 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         &crate::next::Scope::Change(slug.as_str().to_string()),
         false,
         json,
-        serde_json::json!({ "changeId": slug.as_str(), "subjectId": subject_id.as_str(), "brief": brief }),
+        &ChangeNewReport { change_id: slug.as_str(), subject_id: subject_id.as_str(), brief: &brief },
         crate::json_out::warnings_meta(&warnings),
-        extra,
-    );
+        extra);
     0
 }

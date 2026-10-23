@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-2"
+  },
+  "at": "2026-10-23T14:27:35.757736543Z",
+  "code_tree": "54e8398434596ae2a031bdb2368efe1b8b19aff3",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test tier_age a_committed_plan_moves_the_aged_record_leaves_the_rest_and_settles"
+  },
+  "evidence_note": {
+    "summary": "tier_age a_committed_plan_moves_the_aged_record_leaves_the_rest_and_settles: 1 passed, 0 failed, 4 filtered out @ 271f2054"
+  },
+  "evidence_sha": "271f205407c281f5b00a7f62309c3f24a7fdb5bc",
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 15,
+  "scenario_id": "tier.storage.04",
+  "schema": 1,
+  "staging_id": "57cc5880861f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

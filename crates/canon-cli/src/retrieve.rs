@@ -75,7 +75,7 @@ use canon_model::{RegimeKey, RoleId, StrategyRef, SubjectId};
 
 use crate::context::resolve_repo_root;
 
-/// `--role`'s `clap` value parser.
+/// `--role`'s clap value parser.
 pub fn parse_role(s: &str) -> Result<RoleId, String> {
     RoleId::parse(s).map_err(|e| e.to_string())
 }
@@ -151,7 +151,7 @@ fn open_strategy_store(repo: &Path) -> ParquetStrategyStore {
 /// from the `<area>` value itself, exactly as the shipped pre-dispatch
 /// hook does — so a Rust-assembled candidate lands on the IDENTICAL
 /// `<role>/<repo>/<area>/<hash>` directory a shell-assembled `canon
-/// regime-key --area <a> --hash "$(printf %s <a> | sha256sum | cut
+/// regime show --area <a> --hash "$(printf %s <a> | sha256sum | cut
 /// -c1-12)"` would. `<area>` here is already a kebab slug (a `<domain>`
 /// and `<subject_id>`, both kebab) — a fixed point of `regime_key`'s own
 /// segment canonicalizer — so hashing the raw `<area>` and the
@@ -344,15 +344,27 @@ pub fn format_human(role: &RoleId, regime_key: &RegimeKey, guidance: &[StrategyR
     out
 }
 
-/// `--json`: the raw `Vec<StrategyRef>`, machine-readable — the exact
-/// snapshot shape a caller would embed into `Run::injected_guidance`
-/// verbatim (design decision 2), never a human-table projection of it.
-/// An empty result prints `[]`, never an omitted/null value, so a
-/// caller piping this into a manifest write always gets a well-formed
-/// JSON array.
-pub fn format_json(guidance: &[StrategyRef]) -> String {
-    serde_json::to_string_pretty(guidance).expect("Vec<StrategyRef> is always serializable")
+/// `--json`'s `data`: the raw guidance items as an array, each a
+/// `StrategyRef` — the exact snapshot shape a caller would embed into
+/// `Run::injected_guidance` verbatim (design decision 2), never a
+/// human-table projection of it. An empty result is `[]`, never an
+/// omitted/null value, so a caller piping `(.data // .)` into a manifest
+/// write always gets a well-formed JSON array. The installed hook reads
+/// `(.data // .)`, so it works with the 0.27 bare array and this envelope.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(transparent)]
+pub struct RetrieveReport<'a>(pub &'a [StrategyRef]);
+
+impl crate::json_out::Report for RetrieveReport<'_> {}
+
+/// `canon regime-key`: the validated key (`RegimeShowReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RegimeShowReport<'a> {
+    pub regime_key: &'a str,
 }
+
+impl crate::json_out::Report for RegimeShowReport<'_> {}
 
 #[cfg(test)]
 mod tests {
@@ -434,10 +446,10 @@ mod tests {
     }
 
     #[test]
-    fn format_json_round_trips_an_empty_and_nonempty_vec() {
-        assert_eq!(serde_json::from_str::<Vec<StrategyRef>>(&format_json(&[])).unwrap(), Vec::<StrategyRef>::new());
+    fn the_json_report_is_the_array_itself() {
+        assert_eq!(serde_json::to_string(&RetrieveReport(&[])).unwrap(), "[]");
         let guidance = vec![StrategyRef::new("sid-1", "t", "c")];
-        let round_tripped: Vec<StrategyRef> = serde_json::from_str(&format_json(&guidance)).unwrap();
+        let round_tripped: Vec<StrategyRef> = serde_json::from_str(&serde_json::to_string(&RetrieveReport(&guidance)).unwrap()).unwrap();
         assert_eq!(round_tripped, guidance);
     }
 

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-1"
+  },
+  "at": "2026-10-23T12:31:19.924393195Z",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test write_path a_root_that_cannot_sync_is_named_and_a_dir_without_canon_yaml_is_never_written"
+  },
+  "evidence_note": {
+    "summary": "write_path a_root_that_cannot_sync_is_named_and_a_dir_without_canon_yaml_is_neve: 1 passed, 0 failed, 16 filtered out @ 2c0fb497"
+  },
+  "evidence_sha": "2c0fb4972782486f9ee8a638db56be81405f3bda",
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 27,
+  "scenario_id": "inventory.sync.42",
+  "schema": 1,
+  "staging_id": "1edbce12d4e1",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

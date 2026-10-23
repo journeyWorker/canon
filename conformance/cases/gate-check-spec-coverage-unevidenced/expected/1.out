@@ -3,4 +3,4 @@ canon gate check: 1 violation(s)
 uncovered-cell (1):
   uncovered-cell cart.add.02 — spec scenario has no evidence record — specified, never attested to
 
-advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --approver <who>`

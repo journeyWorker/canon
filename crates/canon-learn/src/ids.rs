@@ -13,7 +13,7 @@
 //! A [`StrategyId`] names a DERIVED row: [`crate::rebuild::
 //! rebuild_namespace`] deletes every strategy item for a regime and
 //! re-distills it from the retained raw trajectories on every `canon
-//! ingest artifacts` that touches that regime. While these ids were
+//! ingest records` that touches that regime. While these ids were
 //! minted with `StrategyId::new()`, that routine rebuild silently
 //! re-keyed the whole distilled layer, which broke three things at
 //! once:
@@ -47,7 +47,7 @@
 //! should expect:
 //!
 //! - `.canon/learn/strategies/**/<old-ULID>.parquet` — self-healing.
-//!   The next `canon ingest artifacts` touching that regime runs
+//!   The next `canon ingest records` touching that regime runs
 //!   [`crate::rebuild::rebuild_namespace`], which deletes the whole
 //!   regime's items and rewrites them under derived ids. A regime that
 //!   is never re-ingested keeps its old minted ids and stays

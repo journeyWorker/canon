@@ -42,7 +42,7 @@ Feature: finding close
   # canon: {"schema":1,"at":"2026-08-05T15:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a finding whose current disposition is already fixed
     When it is closed to fixed again
-    Then the command succeeds and reports a no-op
+    Then the command succeeds and reports it unchanged
     And nothing is staged, because an identical disposition carries no new fact
 
   @subject:finding-lifecycle
@@ -78,13 +78,13 @@ Feature: finding close
   @subject:finding-lifecycle
   @case:failure
   @finding.close.08
-  Scenario: A fixed finding must name a commit this repository holds
+  Scenario: A fixed close records the closing commit, HEAD by default, and refuses a revision this repository does not hold
   # canon: {"schema":1,"at":"2026-08-05T15:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a committed finding
-    When it is closed to fixed with no resolution sha, or with one this repo does not hold
-    Then the command refuses before reading the corpus
-    And a disposition other than fixed carrying a resolution sha is refused too
-    And nothing is staged in either case
+    When it is closed to fixed with no --resolution-rev, or with one this repo does not hold
+    Then without one the close records the full sha HEAD resolves to as its resolution, and with an unheld one the command exits 2 with NO_COMMIT
+    And a disposition other than fixed carrying --resolution-rev is refused with exit 2
+    And neither refusal stages anything
 
   # canon: {"schema":1,"at":"2026-10-10T16:02:37Z","actor":{"agent_id":"canon"}}
   @subject:finding-lifecycle
@@ -99,11 +99,10 @@ Feature: finding close
   @subject:finding-lifecycle
   @case:happy
   @finding.close.80
-  Scenario: Closing with a short resolution sha records the full commit
+  Scenario: Closing with a short resolution revision records the full commit
     Given a committed open finding and the commit that fixed it
-    When canon finding close --disposition fixed names that commit by a short --resolution-sha
+    When canon finding close --disposition fixed names that commit by a short --resolution-rev
     Then the staged transition records the full sha git resolved it to
-    And a short sha that names no commit is refused with exit 2
 
   # canon: {"schema":1,"at":"2026-10-21T09:00:02Z","actor":{"agent_id":"canon-impl-0241"}}
   @subject:finding-lifecycle

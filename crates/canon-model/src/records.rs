@@ -198,24 +198,24 @@ pub struct Subject {
     pub change_ids: Vec<ChangeId>,
     /// The accountable waiver this record's status transition was let
     /// through under, when `spec_coverage.require_review` refused it and
-    /// the operator passed `canon subject status --override-reason`.
+    /// the operator passed `canon subject move --override-reason`.
     /// Skipped when absent, so every subject written without one stays
-    /// byte-identical on the wire. Each `canon subject status` write
+    /// byte-identical on the wire. Each `canon subject move` write
     /// clears it and sets it again only when it waives something, so a
     /// waiver never outlives the status it was granted for.
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
     pub status_override: Option<StatusOverride>,
     /// Who reopened this subject from `shipped` to `verifying`, and why
-    /// (0.18 D3, `canon subject status <id> --to verifying --reason`). Set
+    /// (0.18 D3, `canon subject move <id> --to verifying --reason`). Set
     /// only on the record that reopens; every other `canon subject
-    /// status` write clears it, like [`Self::status_override`]. Skipped
+    /// move` write clears it, like [`Self::status_override`]. Skipped
     /// when absent, so every other subject stays byte-identical.
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
     pub reopen: Option<Reopen>,
     /// The note an operator gave the transition that wrote this record
-    /// (`canon subject status <id> --to <state> --reason`, 0.21.1), on
+    /// (`canon subject move <id> --to <state> --reason`, 0.21.1), on
     /// any transition; a reopen records it here too, next to
-    /// [`Self::reopen`]. Every `canon subject status` write clears it
+    /// [`Self::reopen`]. Every `canon subject move` write clears it
     /// and sets it again only when given a `--reason`. Skipped when
     /// absent, so every other subject stays byte-identical.
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
@@ -834,7 +834,7 @@ pub enum ProvenanceRef {
 /// optional and absent when unset, so a review written before 0.15
 /// reserializes byte-identically:
 /// - `pins` (D1): the scenario's source digest and its latest evidence
-///   records at review time. `canon review add` computes them; a pinned
+///   records at review time. `canon review scenario` computes them; a pinned
 ///   review only counts while both still match the corpus.
 /// - `outcome` (D4): `signed` (the default, and what every pre-0.15
 ///   review is), `indeterminate` or `unavailable`. Only `signed` is an
@@ -855,7 +855,7 @@ pub struct Review {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scenario_id: Option<ScenarioId>,
     /// The change reviewed, on a change-level review (0.23): a chore's
-    /// sign-off, recorded by `canon review add --change-id`. Absent on a
+    /// sign-off, recorded by `canon review change`. Absent on a
     /// scenario review.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub change_id: Option<ChangeId>,
@@ -883,6 +883,16 @@ pub struct Review {
     /// artifact store under its digest. Absent on the wire when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub artifacts: Vec<ReviewArtifact>,
+    /// The git tree id of the code the writing command saw (0.28 D7b):
+    /// the working tree for the default `HEAD`, the commit's own code for
+    /// an explicit rev; `.canon/`, spec roots and `code.exclude` are not
+    /// part of it. Absent on a record written before 0.28.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code_tree: Option<String>,
+    /// Whether the working tree's code differed from `HEAD`'s when this was
+    /// written (0.28 D7b). Absent on a record written before 0.28.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worktree_dirty: Option<bool>,
 }
 
 /// A file a [`Review`] binds (0.16 D5): what the reviewer looked at,
@@ -897,6 +907,13 @@ pub struct ReviewArtifact {
 }
 
 impl Review {
+    /// Record the code this review saw (0.28 D7b).
+    pub fn with_code(mut self, code_tree: impl Into<String>, worktree_dirty: bool) -> Self {
+        self.code_tree = Some(code_tree.into());
+        self.worktree_dirty = Some(worktree_dirty);
+        self
+    }
+
     pub fn new(
         envelope: Envelope,
         project_id: ProjectId,
@@ -920,6 +937,8 @@ impl Review {
             reviewer_model: None,
             reviewer_harness: None,
             artifacts: Vec::new(),
+            code_tree: None,
+            worktree_dirty: None,
         }
     }
 
@@ -958,6 +977,8 @@ impl Review {
             reviewer_model: None,
             reviewer_harness: None,
             artifacts: Vec::new(),
+            code_tree: None,
+            worktree_dirty: None,
         }
     }
 }
@@ -1141,9 +1162,26 @@ pub struct Divergence {
     pub reviewer: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub detail: String,
+    /// The git tree id of the code the writing command saw (0.28 D7b):
+    /// the working tree for the default `HEAD`, the commit's own code for
+    /// an explicit rev; `.canon/`, spec roots and `code.exclude` are not
+    /// part of it. Absent on a record written before 0.28.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code_tree: Option<String>,
+    /// Whether the working tree's code differed from `HEAD`'s when this was
+    /// written (0.28 D7b). Absent on a record written before 0.28.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worktree_dirty: Option<bool>,
 }
 
 impl Divergence {
+    /// Record the code this divergence was recorded against (0.28 D7b).
+    pub fn with_code(mut self, code_tree: impl Into<String>, worktree_dirty: bool) -> Self {
+        self.code_tree = Some(code_tree.into());
+        self.worktree_dirty = Some(worktree_dirty);
+        self
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         envelope: Envelope,
@@ -1157,7 +1195,7 @@ impl Divergence {
         detail: impl Into<String>,
     ) -> Self {
         debug_assert_eq!(envelope.kind, RecordKind::Divergence);
-        Self { envelope, project_id, scenario_id, sha, status, run_seq, round, reviewer: reviewer.into(), detail: detail.into() }
+        Self { envelope, project_id, scenario_id, sha, status, run_seq, round, reviewer: reviewer.into(), detail: detail.into(), code_tree: None, worktree_dirty: None }
     }
 }
 
@@ -1395,7 +1433,7 @@ impl AuditResult {
 }
 
 /// An external evaluator's re-audit of a scenario (0.15 D3), carried on
-/// an [`EvidenceRecord`] written by `canon evidence add --kind audit`.
+/// an [`EvidenceRecord`] written by `canon evidence audit`.
 /// Canon never generates or runs the audit; it records which evaluator
 /// ran (id, version, and the sha256 of the evaluator itself) and what it
 /// concluded. A record carrying this is an AUDITED outcome and is folded
@@ -1482,6 +1520,16 @@ pub struct EvidenceRecord {
     /// M7). Additive.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub brief_override: Option<BriefOverride>,
+    /// The git tree id of the code the writing command saw (0.28 D7b):
+    /// the working tree for the default `HEAD`, the commit's own code for
+    /// an explicit rev; `.canon/`, spec roots and `code.exclude` are not
+    /// part of it. Absent on a record written before 0.28.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code_tree: Option<String>,
+    /// Whether the working tree's code differed from `HEAD`'s when this was
+    /// written (0.28 D7b). Absent on a record written before 0.28.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worktree_dirty: Option<bool>,
 }
 
 impl EvidenceRecord {
@@ -1509,7 +1557,16 @@ impl EvidenceRecord {
             attachments: Vec::new(),
             audit: None,
             brief_override: None,
+            code_tree: None,
+            worktree_dirty: None,
         }
+    }
+
+    /// Record the code this evidence was recorded against (0.28 D7b).
+    pub fn with_code(mut self, code_tree: impl Into<String>, worktree_dirty: bool) -> Self {
+        self.code_tree = Some(code_tree.into());
+        self.worktree_dirty = Some(worktree_dirty);
+        self
     }
 
     pub fn with_project_id(mut self, project_id: ProjectId) -> Self {
@@ -1809,6 +1866,24 @@ pub struct Finding {
     /// ([`Finding::is_disposition_transition_of`]).
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
     pub reason: Option<String>,
+    /// The git tree id of the code the round reviewed (0.28 D7b): the
+    /// working tree for the default `HEAD`, the commit's own code for an
+    /// explicit `--rev`. Absent on a finding written before 0.28; a close
+    /// copies it.
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
+    pub code_tree: Option<String>,
+    /// Whether the working tree's code differed from `HEAD`'s when the round
+    /// was raised (0.28 D7b).
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
+    pub worktree_dirty: Option<bool>,
+    /// The code tree at the resolution commit, set with `resolution_sha` by a
+    /// `fixed` close (0.28 D7b).
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
+    pub resolution_code_tree: Option<String>,
+    /// Whether the working tree differed from `HEAD`'s when the finding was
+    /// closed `fixed` (0.28 D7b).
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
+    pub resolution_worktree_dirty: Option<bool>,
 }
 
 /// [`Finding`]'s deserialize-only twin: the SAME wire shape, with no
@@ -1854,6 +1929,14 @@ struct FindingWire {
     scenario_ids: Vec<ScenarioId>,
     #[serde(default, deserialize_with = "present_value")]
     reason: Option<String>,
+    #[serde(default, deserialize_with = "present_value")]
+    code_tree: Option<String>,
+    #[serde(default, deserialize_with = "present_value")]
+    worktree_dirty: Option<bool>,
+    #[serde(default, deserialize_with = "present_value")]
+    resolution_code_tree: Option<String>,
+    #[serde(default, deserialize_with = "present_value")]
+    resolution_worktree_dirty: Option<bool>,
 }
 
 impl FindingWire {
@@ -1875,6 +1958,10 @@ impl FindingWire {
             file_ref: self.file_ref,
             scenario_ids: self.scenario_ids,
             reason: self.reason,
+            code_tree: self.code_tree,
+            worktree_dirty: self.worktree_dirty,
+            resolution_code_tree: self.resolution_code_tree,
+            resolution_worktree_dirty: self.resolution_worktree_dirty,
         };
         finding.check_coherence()?;
         Ok(finding)
@@ -1937,7 +2024,26 @@ impl Finding {
             file_ref: None,
             scenario_ids: Vec::new(),
             reason: None,
+            code_tree: None,
+            worktree_dirty: None,
+            resolution_code_tree: None,
+            resolution_worktree_dirty: None,
         }
+    }
+
+    /// Record the code the round reviewed (0.28 D7b).
+    pub fn with_code(mut self, code_tree: impl Into<String>, worktree_dirty: bool) -> Self {
+        self.code_tree = Some(code_tree.into());
+        self.worktree_dirty = Some(worktree_dirty);
+        self
+    }
+
+    /// Record the code at the resolution commit (0.28 D7b); only meaningful
+    /// with [`Self::fixed_by`].
+    pub fn with_resolution_code(mut self, code_tree: impl Into<String>, worktree_dirty: bool) -> Self {
+        self.resolution_code_tree = Some(code_tree.into());
+        self.resolution_worktree_dirty = Some(worktree_dirty);
+        self
     }
 
     /// Name the COMMITTED state this round reviewed. Only call it when
@@ -1978,6 +2084,8 @@ impl Finding {
     pub fn rejected(mut self) -> Self {
         self.disposition = FindingDisposition::Rejected;
         self.resolution_sha = None;
+        self.resolution_code_tree = None;
+        self.resolution_worktree_dirty = None;
         self
     }
 
@@ -1985,6 +2093,8 @@ impl Finding {
     pub fn deferred(mut self) -> Self {
         self.disposition = FindingDisposition::Deferred;
         self.resolution_sha = None;
+        self.resolution_code_tree = None;
+        self.resolution_worktree_dirty = None;
         self
     }
 
@@ -2052,6 +2162,8 @@ impl Finding {
             && self.reviewer == earlier.reviewer
             && self.summary == earlier.summary
             && self.reviewed_sha == earlier.reviewed_sha
+            && self.code_tree == earlier.code_tree
+            && self.worktree_dirty == earlier.worktree_dirty
             && self.introduced_by == earlier.introduced_by
             && self.file_ref == earlier.file_ref
             && self.scenario_ids == earlier.scenario_ids

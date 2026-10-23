@@ -109,7 +109,7 @@ fn schema_json(args: &[&str]) -> Value {
 /// Every command of the clap tree, read through `canon schema` (visible
 /// arguments only).
 fn command_tree() -> Vec<Surface> {
-    let all = schema_json(&["schema", "--all", "--json"]);
+    let all = schema_json(&["schema", "--json"]);
     all["commands"]
         .as_array()
         .unwrap()
@@ -149,7 +149,9 @@ fn context_capability_14_one_concept_has_one_flag_spelling_across_every_command(
 #[test]
 fn context_capability_15_a_kind_value_never_carries_the_record_suffix() {
     let tree = command_tree();
-    for command in ["query", "export", "purge"] {
+    let purge = &tree.iter().find(|c| c.path == "purge").unwrap().kind_values;
+    assert_eq!(purge, &["session", "run", "event", "trajectory"], "purge takes only the kinds it can remove");
+    for command in ["query", "export"] {
         let values = &tree.iter().find(|c| c.path == command).unwrap().kind_values;
         assert!(values.contains(&"evidence".to_string()) && values.contains(&"strategy_item".to_string()), "{command}: {values:?}");
         assert!(values.iter().all(|v| !v.ends_with("_record")), "{command}: {values:?}");
@@ -158,7 +160,7 @@ fn context_capability_15_a_kind_value_never_carries_the_record_suffix() {
     // The stored names do not move: the record's own `kind`, the ledger directory and the routing key.
     let dir = repo_with_change();
     let repo = dir.path();
-    let out = canon_in(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "demo.login.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer"]);
+    let out = canon_in(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "demo.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer"]);
     assert!(out.status.success(), "{}{}", stdout(&out), stderr(&out));
     let ledger = repo.join(".canon/ledger/kind=evidence_record");
     let files: Vec<_> = std::fs::read_dir(&ledger).expect("the ledger directory keeps its stored name").flatten().collect();
@@ -187,6 +189,7 @@ fn repo_with_change() -> tempfile::TempDir {
         let out = canon_in(dir.path(), args);
         assert!(out.status.success(), "canon {args:?}: {}{}", stdout(&out), stderr(&out));
     }
+    git(dir.path(), &["-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty", "-m", "x"]);
     dir
 }
 
@@ -208,7 +211,7 @@ fn context_capability_16_a_removed_flag_spelling_is_refused_with_the_flag_that_r
 
     let old = canon_in(repo, &["change", "new", "add-search", "--subject", "demo", "--title", "Add search", "--json"]);
     let body = usage_error(&old);
-    assert_eq!(body["error"]["hint"], "--subject was renamed --subject-id in 0.24.0; use --subject-id", "{body}");
+    assert_eq!(body["error"]["expected"], serde_json::json!(["--subject-id"]), "{body}");
     assert_eq!(body["error"]["field"], "--subject", "{body}");
     assert!(!repo.join(".canon/changes/add-search").exists(), "a refused spelling runs nothing");
 
@@ -218,33 +221,33 @@ fn context_capability_16_a_removed_flag_spelling_is_refused_with_the_flag_that_r
 
     // The `=` form, a global argument placed before the subcommand, and a flag missing its value.
     for args in [
-        &["brief", "check", "--change=add-login", "--json"][..],
-        &["brief", "check", "--change", "add-login", "--json"],
-        &["brief", "--change", "add-login", "check", "--json"],
-        &["brief", "check", "--change", "--json"],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--change=add-login", "--json"][..],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--change", "add-login", "--json"],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--change", "--json"],
     ] {
         let body = usage_error(&canon_in(repo, args));
-        assert_eq!(body["error"]["hint"], "--change was renamed --change-id in 0.24.0; use --change-id", "{args:?}: {body}");
+        assert_eq!(body["error"]["expected"], serde_json::json!(["--change-id"]), "{args:?}: {body}");
     }
-    let canonical = canon_in(repo, &["brief", "check", "--change-id", "add-login", "--json"]);
+    let canonical = canon_in(repo, &["brief", "check", "add-login", "--json"]);
     let report: Value = serde_json::from_slice(&canonical.stdout).expect("one JSON document");
-    assert_eq!(report["change"], "add-login", "{report}");
+    assert_eq!(report["data"]["change"], "add-login", "{report}");
     assert!(report["meta"].get("deprecated").is_none(), "{report}");
 
     // Every removed flag, on a command that renamed it.
     for (args, old, new) in [
         (&["scenario", "new", "demo.login.01", "--title", "A", "--actor", "alice", "--json"][..], "--actor", "--actor-id"),
         (&["scenario", "new", "demo.login.01", "--title", "A", "--project", "root", "--json"], "--project", "--project-id"),
-        (&["dispatch", "end", "--run", "r1", "--json"], "--run", "--run-id"),
+        (&["ingest", "records", "--run", "r1", "--json"], "--run", "--run-id"),
     ] {
         let body = usage_error(&canon_in(repo, args));
-        assert_eq!(body["error"]["hint"], format!("{old} was renamed {new} in 0.24.0; use {new}"), "{args:?}: {body}");
+        assert_eq!(body["error"]["field"], old, "{args:?}: {body}");
+        assert!(body["error"]["expected"].as_array().unwrap().contains(&serde_json::json!(new)), "{args:?}: {body}");
     }
 
     // Without --json the refusal is still exit 2, on stderr, with the hint.
-    let human = canon_in(repo, &["brief", "check", "--change", "add-login"]);
+    let human = canon_in(repo, &["scenario", "new", "demo.login.01", "--title", "A", "--change", "add-login"]);
     assert_eq!(human.status.code(), Some(2));
-    assert!(stderr(&human).contains("use --change-id"), "{}", stderr(&human));
+    assert!(stderr(&human).contains("--change-id"), "{}", stderr(&human));
 }
 
 /// context.capability.17: a removed `--kind` value is a usage error naming the
@@ -258,10 +261,12 @@ fn context_capability_17_a_removed_kind_value_is_refused_with_the_value_that_rep
         (&["query", "--kind", "review_record", "--json"][..], "review_record", "review"),
         (&["export", "--kind", "evidence_record", "--json"], "evidence_record", "evidence"),
         (&["query", "--kind=finding_record", "--json"], "finding_record", "finding"),
-        (&["purge", "--kind=session_record", "--before", "2020-01-01T00:00:00Z", "--plan", "--json"], "session_record", "session"),
+        (&["purge", "--kind=session_record", "--before", "2020-01-01T00:00:00Z", "--json"], "session_record", "session"),
     ] {
         let body = usage_error(&canon_in(repo, args));
-        assert_eq!(body["error"]["hint"], format!("--kind {old} was renamed --kind {new} in 0.24.0; use --kind {new}"), "{args:?}: {body}");
+        assert_eq!(body["error"]["field"], "--kind", "{args:?}: {body}");
+        assert_eq!(body["error"]["expected"], serde_json::json!([format!("--kind {new}")]), "{args:?}: {body}");
+        let _ = old;
     }
 
     let canonical = canon_in(repo, &["query", "--kind", "evidence", "--json"]);
@@ -270,14 +275,14 @@ fn context_capability_17_a_removed_kind_value_is_refused_with_the_value_that_rep
 
     // An unknown value that was never a spelling gets no rename hint.
     let unknown = usage_error(&canon_in(repo, &["query", "--kind", "nonsense", "--json"]));
-    assert!(!unknown.to_string().contains("renamed"), "{unknown}");
+    assert!(!unknown.to_string().contains("was removed"), "{unknown}");
 }
 
 /// context.capability.18: help and schema show only the one name.
 #[test]
 fn context_capability_18_help_and_schema_show_only_the_one_name() {
     let dir = tempfile::tempdir().unwrap();
-    for (args, canonical) in [(&["brief", "approve", "--help"][..], "--change-id"), (&["change", "new", "--help"], "--subject-id"), (&["query", "--help"], "--kind <KIND>"), (&["scenario", "new", "--help"], "--subject-id")] {
+    for (args, canonical) in [(&["brief", "approve", "--help"][..], "CHANGE_ID"), (&["change", "new", "--help"], "--subject-id"), (&["query", "--help"], "--kind <KIND>"), (&["scenario", "new", "--help"], "--subject-id")] {
         let help = stdout(&canon_in(dir.path(), args));
         assert!(help.contains(canonical), "{args:?} help shows the canonical `{canonical}`:\n{help}");
         for old in ["--change ", "--change\n", "--subject ", "--subject\n", "--project ", "--actor ", "--run "] {
@@ -320,20 +325,20 @@ fn context_capability_19_a_token_after_the_separator_or_an_option_value_is_never
     // scan runs: a removed spelling after `--` or as an option's value is not
     // reported.
     for args in [
-        &["brief", "check", "--bogus", "--json", "--", "--change"][..],
-        &["brief", "check", "--bogus", "--change-id", "--change", "--json"],
-        &["brief", "check", "--bogus", "--change-id=--change", "--json"],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--json", "--", "--change"][..],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--change-id", "--change", "--json"],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--change-id=--change", "--json"],
     ] {
         let refused = usage_error(&canon_in(repo, args));
         let hint = refused["error"]["hint"].as_str().unwrap_or_default().to_string();
         assert!(!refused.to_string().contains("was removed") && !hint.contains("--change "), "{args:?}: {refused}");
     }
     // The same line with the spelling as a real flag is reported.
-    let flagged = usage_error(&canon_in(repo, &["brief", "check", "--bogus", "--change", "x", "--json"]));
-    assert!(flagged["error"]["hint"].as_str().unwrap().contains("use --change-id"), "{flagged}");
+    let flagged = usage_error(&canon_in(repo, &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--change", "x", "--json"]));
+    assert_eq!(flagged["error"]["expected"], serde_json::json!(["--change-id"]), "{flagged}");
 
     // As a flag it is refused, with a space or an equals sign.
-    for args in [&["brief", "check", "--change=add-login", "--json"][..], &["brief", "check", "--change", "add-login", "--json"]] {
+    for args in [&["scenario", "new", "demo.login.01", "--title", "A", "--change=add-login", "--json"][..], &["scenario", "new", "demo.login.01", "--title", "A", "--change", "add-login", "--json"]] {
         usage_error(&canon_in(repo, args));
     }
 }
@@ -344,41 +349,33 @@ fn context_capability_19_a_token_after_the_separator_or_an_option_value_is_never
 fn context_capability_20_a_removed_spelling_is_refused_only_on_the_commands_that_renamed_it() {
     let dir = repo_with_change();
     let other = usage_error(&canon_in(dir.path(), &["status", "--subject", "demo", "--json"]));
-    assert!(!other.to_string().contains("renamed"), "{other}");
-    let renamed = usage_error(&canon_in(dir.path(), &["brief", "check", "--change", "--json"]));
-    assert!(renamed["error"]["hint"].as_str().unwrap().contains("use --change-id"), "{renamed}");
+    assert!(!other.to_string().contains("was removed"), "{other}");
+    let renamed = usage_error(&canon_in(dir.path(), &["scenario", "new", "demo.login.01", "--title", "A", "--change", "--json"]));
+    assert_eq!(renamed["error"]["expected"], serde_json::json!(["--change-id"]), "{renamed}");
 }
 
-/// context.capability.21: a `scenario new --from` line with a removed key refuses
-/// the batch and names the key to use.
+/// context.capability.21: a batch element with a removed key name is refused, and the refusal
+/// names the key to use; the renamed keys write.
 #[test]
-fn context_capability_21_a_scenario_batch_line_with_a_removed_key_name_refuses_the_batch() {
+fn context_capability_21_a_batch_element_with_a_removed_key_name_refuses_the_batch() {
     let dir = repo_with_change();
     let repo = dir.path();
-    let file = repo.join("batch.ndjson");
-    for (key, new) in [("subject", "subject-id"), ("project", "project-id"), ("change", "change-id")] {
-        let lines = [r#"{"id":"demo.login.01","title":"One","subject-id":"demo"}"#.to_string(), format!(r#"{{"id":"demo.login.02","title":"Two","{key}":"{}"}}"#, match key { "subject" => "demo", "project" => "root", _ => "add-login" })];
-        std::fs::write(&file, lines.join("\n")).unwrap();
-        let out = canon_in(repo, &["scenario", "new", "--from", "batch.ndjson", "--json"]);
+    for (key, new) in [("subject", "subjectId"), ("project", "projectId"), ("change", "changeId")] {
+        let doc = format!(r#"[{{"operands":["demo.login.01"],"title":"One","subjectId":"demo"}},{{"operands":["demo.login.02"],"title":"Two","{key}":"x"}}]"#);
+        let out = canon_in(repo, &["scenario", "new", "--input", &doc, "--json"]);
         assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
         let body: Value = serde_json::from_slice(&out.stdout).expect("one JSON document");
-        assert_eq!(body["error"]["code"], "SCAFFOLD_INVALID_ARGUMENT", "{body}");
-        let item = &body["data"]["items"][0];
-        assert_eq!(item["line"], 2, "{body}");
-        assert_eq!(item["error"]["field"], key, "{body}");
-        assert_eq!(item["error"]["hint"], format!("`{key}` was renamed `{new}` in 0.24.0; use `{new}`"), "{body}");
+        assert_eq!(body["error"]["code"], "INPUT_UNKNOWN_FIELD", "{body}");
+        assert_eq!(body["error"]["field"], format!("/items/1/{key}"), "{body}");
+        assert!(body["error"]["expected"].as_array().unwrap().iter().any(|k| k == new), "{body}");
         assert!(!repo.join(".canon/specs/kind=feature/area=demo/login.feature").exists(), "a refused batch writes nothing");
     }
 
-    let lines = [
-        r#"{"id":"demo.login.01","title":"One","subject-id":"demo","project-id":"root"}"#,
-        r#"{"id":"demo.login.02","title":"Two","subject-id":"demo","case":"failure","flow":"F1","change-id":"add-login"}"#,
-    ];
-    std::fs::write(&file, lines.join("\n")).unwrap();
     let brief_path = repo.join(".canon/changes/add-login/brief.md");
     let brief = std::fs::read_to_string(&brief_path).unwrap().replace("## User flow\n", "## User flow\n\n1. F1 The visitor submits credentials → lands on the catalog.\n");
     std::fs::write(&brief_path, brief).unwrap();
-    let out = canon_in(repo, &["scenario", "new", "--from", "batch.ndjson", "--json"]);
+    let doc = r#"[{"operands":["demo.login.01"],"title":"One","subjectId":"demo","projectId":"root"},{"operands":["demo.login.02"],"title":"Two","subjectId":"demo","case":"failure","flow":"F1","changeId":"add-login"}]"#;
+    let out = canon_in(repo, &["scenario", "new", "--input", doc, "--json"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let feature = std::fs::read_to_string(repo.join(".canon/specs/kind=feature/area=demo/login.feature")).unwrap();
     assert_eq!(feature.matches("@subject:demo").count(), 2, "{feature}");

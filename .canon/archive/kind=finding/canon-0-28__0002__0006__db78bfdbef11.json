@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-2"
+  },
+  "at": "2026-10-23T15:09:02.133837703Z",
+  "change_id": "canon-0-28",
+  "code_tree": "7c7d06847373654dafedac3630eedcda014eea0e",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/report.rs:89-130",
+  "kind": "finding",
+  "reviewed_sha": "7e95cd1df901a7bcf04861ca597da3414ed794ad",
+  "reviewer": "canon-reviewer-028",
+  "round": 2,
+  "scenario_ids": [
+    "report.generation.13"
+  ],
+  "schema": 1,
+  "seq": 6,
+  "severity": "should_fix",
+  "summary": "Standards pass: report.generation.13 'creates no seed file, directory or parquet under .canon' compares files only. Mutation confirmed: roots.rs:246 also creating the repo's empty ledger dir stays green; include directories in files_under",
+  "worktree_dirty": false
+}

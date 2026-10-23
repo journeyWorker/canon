@@ -26,9 +26,13 @@ const EMIT_WINDOW: usize = 6;
 
 /// Files that are not error sites: the registry and the generated table, and
 /// `context.rs`, whose one code (`CONFIG_MISSING`, built by `require_config`)
-/// is emitted by `main.rs` for every command that needs canon state (see
-/// [`needs_config_leaves`]).
-const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs", "context.rs"];
+/// is emitted by `run::entry` for every command that needs canon state (see
+/// [`needs_config_leaves`]); `input.rs`, whose INPUT_* codes `derive` attributes to every
+/// leaf that takes `--input`.
+const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs", "context.rs", "input.rs"];
+
+/// Codes registered ahead of the commands that emit them (none: every code is emitted).
+const AWAITING_WIRING: &[&str] = &[];
 
 /// For each source file, the command prefixes that get a code the file builds
 /// without an `emit("canon …")` next to it: helpers, `to_cli_error`
@@ -36,13 +40,15 @@ const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs", "context.rs"];
 /// or a group (`brief` is `brief approve` and `brief check`).
 const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     // `store_error`: the refusal of a store that cannot be opened or attached, emitted by both commands.
-    ("artifacts.rs", &["artifacts verify", "artifacts migrate"]),
+    ("artifacts.rs", &["artifacts verify", "artifacts move"]),
     // `CHANGED_CODE`, picked by `evidence add`'s brief refusal.
-    ("brief.rs", &["evidence add"]),
+    ("brief.rs", &["evidence add", "evidence audit"]),
     ("brief_approve.rs", &["brief approve"]),
     // `check` is shared by `brief check` and `brief approve`.
-    ("brief_check.rs", &["brief check", "brief approve"]),
+    ("brief_check.rs", &["brief check", "brief approve", "brief show"]),
     ("change.rs", &["change new"]),
+    // `unverifiable_error`: the failure of a check that examined nothing, emitted by each check.
+    ("coverage.rs", &["gate check", "format", "status"]),
     ("context_pack.rs", &["context-pack", "prompt"]),
     // The server's refusals (`to_cli_error`, the request guards) and the briefs page's.
     ("dashboard.rs", &["dashboard"]),
@@ -50,26 +56,42 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("demo.rs", &["demo"]),
     ("dispatch.rs", &["dispatch begin", "dispatch end"]),
     ("divergence.rs", &["divergence"]),
-    ("evidence.rs", &["evidence add"]),
+    ("evidence.rs", &["evidence add", "evidence audit"]),
     ("finding.rs", &["finding add", "finding close"]),
-    // The typed-atom errors `canon evidence add` reports with `gate task`'s grading;
+    // `NO_COMMIT`: `git_rev::bind` refuses the leaves that take a commit option (`--rev`, `--resolution-rev`, `--introduced-rev`).
+    ("git_rev.rs", &["review scenario", "review change", "divergence add", "divergence resolve", "divergence defer", "evidence add", "evidence audit", "evidence approval-payload", "finding add", "finding close"]),
+    // The typed-atom errors `canon evidence add` reports with `task done`'s grading;
     // `promote_after_stage`'s command comes from its caller.
-    ("gate.rs", &["gate task", "evidence add"]),
+    ("gate.rs", &["task done", "evidence add", "evidence audit"]),
     ("init.rs", &["init"]),
     // `require_spec_root`: the refusal of a `--project-id` no configured spec root carries, made by every write command that takes one.
-    ("inventory.rs", &["evidence add", "evidence approval-payload", "review add", "divergence add", "divergence resolve", "divergence defer", "divergence accept", "scenario new"]),
-    ("learn.rs", &["learn"]),
+    ("inventory.rs", &["evidence add", "evidence audit", "evidence approval-payload", "review scenario", "review change", "divergence add", "divergence resolve", "divergence defer", "divergence accept", "scenario new"]),
+    ("learn.rs", &["strategy"]),
     ("ledger.rs", &["ledger compact"]),
     // Every code is next to its emit.
     ("main.rs", &[]),
+    ("run/mod.rs", &[]),
+    ("run/entry.rs", &[]),
+    // `project_for`: `--project-id` is required when several spec roots exist, for each of these.
+    ("run/divergence.rs", &["divergence add", "divergence resolve", "divergence defer", "divergence accept"]),
+    ("run/evidence.rs", &["evidence add", "evidence audit", "evidence approval-payload"]),
+    ("run/review.rs", &["review scenario", "review change"]),
+    ("run/top.rs", &[]),
+    ("run/adapter.rs", &[]),
+    ("run/ingest.rs", &[]),
+    ("run/inventory.rs", &[]),
+    ("run/plugin.rs", &[]),
+    ("run/skills.rs", &["skills install", "skills check", "skills doctor"]),
+    ("run/tier.rs", &[]),
     ("migrate.rs", &["migrate"]),
     ("policy_approval.rs", &["brief approve", "policy approve"]),
-    ("paging.rs", &["query", "finding list", "divergence status", "export"]),
+    ("paging.rs", &["query", "finding list", "divergence list", "export"]),
     // `ScopeError::to_cli_error`, emitted by `query`.
     ("query.rs", &["query"]),
     ("retention.rs", &["export", "purge"]),
-    ("review.rs", &["review add"]),
+    ("review.rs", &["review scenario", "review change"]),
     // Every code is next to its `human("canon selftest")`.
+    ("safety.rs", &["purge", "artifacts move", "migrate", "ledger compact", "tier age"]),
     ("selftest.rs", &[]),
     // The shared scenario validation (`Planner`) builds its errors for its caller, `scenario new`.
     ("scaffold.rs", &["scenario new"]),
@@ -90,6 +112,13 @@ const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans"), (
 
 /// Codes every command can emit, whatever its sources say: a `--json` usage
 /// error, and the refusal of an unknown `CANON_ROLE` before any command runs.
+/// Files whose `.emit(command, …)` takes the command from the caller, and the
+/// leaves that caller is: `run_report` serves the three `report` leaves.
+const CALLER_LEAVES: &[(&str, &[&str])] = &[("run/top.rs", &["report build", "report check", "report snapshot"])];
+
+/// The leaves that record a human's decision and refuse every agent role.
+const HUMAN_ONLY_LEAVES: &[&str] = &["brief approve", "policy approve", "divergence accept"];
+
 const GLOBAL: &[&str] = &["USAGE", "UNKNOWN_ROLE"];
 
 fn src_dir() -> PathBuf {
@@ -112,7 +141,7 @@ fn emitted_command(line: &str) -> Option<String> {
     if line.contains(".emit(command,") {
         return Some("<caller>".to_string());
     }
-    let start = ["emit(\"canon", "emit(&format!(\"canon", "emit_with_data(\"canon", "human(\"canon"].iter().find_map(|p| line.find(p))?;
+    let start = ["emit(\"canon", "emit(&format!(\"canon", "emit_with_data(\"canon", "emit_with_data_and_meta(\"canon", "human(\"canon"].iter().find_map(|p| line.find(p))?;
     let rest = &line[start..];
     let quoted = &rest[rest.find("\"canon")? + 1..];
     let text = &quoted[..quoted.find('"')?];
@@ -127,7 +156,7 @@ fn leaves_under(prefix: &str) -> Vec<&'static str> {
     found
 }
 
-/// The leaves `main.rs` refuses with `CONFIG_MISSING` when no `canon.yaml` is
+/// The leaves `run::entry` refuses with `CONFIG_MISSING` when no `canon.yaml` is
 /// found: those with a `--repo` option that are not in
 /// `canon_cli::context::CONFIG_EXEMPT`. A leaf's options come from its own
 /// `canon schema` output, so a new `--repo` option is picked up by itself.
@@ -148,14 +177,17 @@ fn needs_config_leaves() -> Vec<&'static str> {
 
 fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
     let mut table: BTreeMap<&'static str, BTreeSet<&'static str>> = META.iter().map(|m| (m.path, GLOBAL.iter().copied().collect())).collect();
-    let codes: Vec<&'static str> = all_codes().iter().map(|(c, _)| *c).filter(|c| !GLOBAL.contains(c)).collect();
+    let codes: Vec<&'static str> = all_codes().iter().map(|info| info.code).filter(|c| !GLOBAL.contains(c)).collect();
     let defaults: BTreeMap<&str, &[&str]> = FILE_DEFAULTS.iter().copied().collect();
     let mut problems = Vec::new();
-    let mut files: Vec<PathBuf> = fs::read_dir(src_dir()).expect("read src").map(|e| e.expect("dir entry").path()).filter(|p| p.extension().is_some_and(|e| e == "rs")).collect();
+    let mut files: Vec<PathBuf> = ["", "run"]
+        .iter()
+        .flat_map(|dir| fs::read_dir(src_dir().join(dir)).expect("read src").map(|e| e.expect("dir entry").path()).filter(|p| p.extension().is_some_and(|e| e == "rs")).collect::<Vec<_>>())
+        .collect();
     files.sort();
     let mut promoters = BTreeSet::new();
     for file in files {
-        let name = file.file_name().expect("file name").to_str().expect("utf-8 name").to_string();
+        let name = file.strip_prefix(src_dir()).expect("under src").to_str().expect("utf-8 name").to_string();
         if IGNORED.contains(&name.as_str()) {
             continue;
         }
@@ -177,6 +209,7 @@ fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
                 let targets: Vec<&'static str> = match window.iter().find_map(|l| emitted_command(l)).or(spliced) {
                     // Bare `canon` is usage, every command has it; a caller-supplied
                     // command is covered by the `promote_after_stage` rule below.
+                    Some(command) if command == "<caller>" && CALLER_LEAVES.iter().any(|(file, _)| *file == name) => CALLER_LEAVES.iter().filter(|(file, _)| *file == name).flat_map(|(_, leaves)| leaves.iter().copied()).collect(),
                     Some(command) if command.is_empty() || command == "<caller>" => continue,
                     Some(command) => match command.strip_suffix(" {") {
                         Some(prefix) => {
@@ -207,6 +240,20 @@ fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
     }
     for leaf in needs_config_leaves() {
         table.get_mut(leaf).expect("leaf has a row").insert("CONFIG_MISSING");
+    }
+    // `--input` (`input.rs`, run by `main` before the command): every INPUT_* code is possible on every
+    // leaf that takes the option, and a batch is refused only where it is unsupported.
+    for leaf in META.iter().filter(|m| m.effect != canon_cli::schema::Effect::Read) {
+        for info in all_codes().iter().filter(|c| c.code.starts_with("INPUT_")) {
+            if info.code == "INPUT_BATCH_UNSUPPORTED" && canon_cli::input::batch_supported(leaf.path) {
+                continue;
+            }
+            table.get_mut(leaf.path).expect("leaf has a row").insert(info.code);
+        }
+    }
+    // The human-only refusal (`run::human_only`) is emitted for its caller's leaf.
+    for leaf in HUMAN_ONLY_LEAVES {
+        table.get_mut(leaf).expect("leaf has a row").insert("HUMAN_ONLY");
     }
     for command in promoters {
         for leaf in leaves_under(&command) {
@@ -251,6 +298,6 @@ fn the_schema_error_codes_are_the_codes_the_sources_emit() {
 fn every_registered_code_is_emitted_by_some_command() {
     let table = derive();
     let emitted: BTreeSet<&str> = table.values().flatten().copied().collect();
-    let orphans: Vec<&str> = all_codes().iter().map(|(c, _)| *c).filter(|c| !emitted.contains(c)).collect();
+    let orphans: Vec<&str> = all_codes().iter().map(|info| info.code).filter(|c| !emitted.contains(c) && !AWAITING_WIRING.contains(c)).collect();
     assert!(orphans.is_empty(), "registered but attributed to no command: {orphans:?}");
 }

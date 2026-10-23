@@ -28,7 +28,7 @@ Feature: context status
   @case:happy
   @context.status.03
   Scenario: Status suggests shipping only a subject the ship gate accepts
-    Given a verifying subject whose every scenario is evidenced and independently reviewed, with a failure case on its surface
+    Given a verifying subject whose every scenario is evidenced and independently reviewed, with a failure case on its surface and its change's brief approved
     When status is run
     Then the only next command is moving that subject to shipped
     And running that command passes the ship and review gates
@@ -58,12 +58,12 @@ Feature: context status
   @subject:context-capability
   @case:failure
   @context.status.06
-  Scenario: Status on an unreadable manifest still answers, naming the repair command
+  Scenario: Status on an unreadable manifest still prints its report and exits 1 as unverifiable
     Given a manifest whose tier section does not parse
     When status is run
-    Then it still exits zero
-    And it warns that the ledger cannot be read, naming the parse error
-    And its only next command is checking the manifest
+    Then it still prints the report and warns that the ledger cannot be read, naming the parse error
+    And it exits 1 with UNVERIFIABLE and names the skipped ledger in its coverage, never a silent zero
+    And nothing was counted, so no scenario or subject is reported clean
 
   # canon: {"schema":1,"at":"2026-10-10T15:35:47Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
@@ -193,7 +193,7 @@ Feature: context status
     And a building subject that adopts no change
     When canon status runs
     Then the verifying subject gets one step whose actor is human: stop and report the brief, building and attesting nothing for the subject until the human answers, one answer covering brief and policy
-    And its reason names the brief.md that has no "Approved:" line, says canon evidence add refuses the subject's scenarios and tasks until then, and names the canon brief approve --change <slug> --by <the human> --note "<their words>" command, which records the brief and the policy approval in one call
+    And its reason names the brief.md that has no "Approved:" line, says canon evidence add refuses the subject's scenarios and tasks until then, and names the canon brief approve <change> --approver <the human> --note "<their words>" command, which records the brief and the policy approval in one call
     And the human step is the verifying subject's only step, so it is not suggested to move on
     And the subject with no change has no brief to answer, so it gets no human step and its next step is the agent's
     And the human form prints the step as "human:" and both briefs as not approved, the one with no change as an advisory
@@ -205,7 +205,7 @@ Feature: context status
   Scenario: With the brief approved and the guard passing, shipping is the agent's own step
     Given a verifying subject whose scenarios are all evidenced and reviewed, and whose change's brief.md carries an "Approved:" line
     When canon status runs
-    Then the only step is the agent's canon subject status <id> shipped command
+    Then the only step is the agent's canon subject move <id> --to shipped command
     And its reason says to ship it yourself unless the brief says the human ships, and asks nobody
     And following it succeeds, after which status lists nothing next
 
@@ -286,7 +286,7 @@ Feature: context status
   @subject:context-capability
   @case:happy
   @context.status.68
-  Scenario: No status step names a sync while the readers refresh the index themselves
+  Scenario: No status step names a sync, a format run or a plans import for a corpus the gate can read
     Given a building subject owning no scenario beside one that owns scenarios, and a scenario with no subject tag
     When canon status runs
     Then the empty subject's canon scenario new step gives its reason without naming canon inventory sync
@@ -311,7 +311,7 @@ Feature: context status
     Given a shipped subject that gained an unattested, unreviewed scenario and an open blocker on its change after it shipped
     When canon status runs
     Then the subject is flagged red, naming the uncovered scenario, the unreviewed scenario and the open blocker
-    And its only step is canon subject status with verifying and a reason, which parses as printed
+    And its only step is canon subject move with --to verifying and a reason, which parses as printed
     And the reason says to keep the follow-up in its approved change (never canon change new), then scenario, evidence and review, and ship it again
     And once the reopen is followed the flag and the reopen step are gone
 
@@ -322,7 +322,7 @@ Feature: context status
   Scenario: A clean brief with advisories left gets the planner's polish step before the human stop
     Given a subject whose unapproved brief has no blockers and advisories left
     When canon status runs or a write returns meta.next
-    Then the planner's polish step comes first, naming reference/brief-polish.md, the advisory count, the top rule ids and canon brief check --change-id
+    Then the planner's polish step comes first, naming canon skills show brief-polish, the advisory count, the top rule ids and canon brief check for the change
     And the human stop stays after it in the list, and while blockers remain only the canon brief check step is given
 
   # canon: {"schema":1,"at":"2026-10-21T16:24:53Z","actor":{"agent_id":"canon-impl-026"}}
@@ -332,7 +332,7 @@ Feature: context status
   Scenario: A pending draft with advisories left gets the polish step before its report step
     Given a subject with an approved change and a pending draft whose brief has no blockers and advisories left
     When canon status runs
-    Then the first step for the draft is the planner's polish step naming the advisory count and rule ids, then canon brief check for it
+    Then the first step for the draft is the planner's polish step naming canon skills show brief-polish, the advisory count and rule ids, then canon brief check for it
     And the human report step follows it, and the subject's own steps are not held back
 
   # canon: {"schema":1,"at":"2026-10-21T16:25:01Z","actor":{"agent_id":"canon-impl-026"}}

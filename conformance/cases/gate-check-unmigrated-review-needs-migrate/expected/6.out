@@ -1,0 +1,3 @@
+canon gate check: clean (0 violations)
+
+advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --approver <who>`

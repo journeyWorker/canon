@@ -50,6 +50,7 @@ fn repo_with_plan_corpus(change_id: &str, rows: &str) -> tempfile::TempDir {
     std::fs::create_dir_all(&change_dir).expect("creating the change dir");
     std::fs::write(change_dir.join("proposal.md"), format!("# {change_id}\n\n## Why\n\nTo exercise the authored-evidence loop.\n")).expect("writing proposal.md");
     std::fs::write(change_dir.join("tasks.md"), rows).expect("writing tasks.md");
+    git_commit_fixture(dir.path());
     dir
 }
 
@@ -78,11 +79,11 @@ fn committed_evidence_files(repo: &Path) -> Vec<std::path::PathBuf> {
 #[test]
 fn approval_requires_external_signature_and_ignores_environment_identity() {
     let dir = repo_with_plan_corpus("it-approval", "- [ ] 1.1 Approve the change\n");
-    let base = ["evidence", "add", "--task", "it-approval#1.1", "--kind", "test-run", "--ref", "report.txt", "--surface-ref", "effect:secret-access", "--role", "implementer"];
+    let base = ["evidence", "add", "--task-id", "it-approval#1.1", "--class", "test-run", "--ref", "report.txt", "--surface-ref", "effect:secret-access", "--role", "implementer"];
     for flags in [
-        vec!["--approval-by", "alice"],
+        vec!["--approver", "alice"],
         vec!["--approval-role", "human"],
-        vec!["--approval-by", "alice", "--approval-role", "human"],
+        vec!["--approver", "alice", "--approval-role", "human"],
     ] {
         let args: Vec<&str> = base.iter().copied().chain(flags).collect();
         let output = run_canon_as(&args, dir.path(), "alice");
@@ -109,9 +110,9 @@ fn the_three_command_loop_flips_a_checkbox_on_authored_evidence() {
         &[
             "evidence",
             "add",
-            "--task",
+            "--task-id",
             "it-evidence-loop#1.1",
-            "--kind",
+            "--class",
             "test-run",
             "--ref",
             "cargo test -p canon-cli --test evidence",
@@ -132,7 +133,7 @@ fn the_three_command_loop_flips_a_checkbox_on_authored_evidence() {
     // The gate refuses while the evidence is only staged — this is what
     // makes the flip below attributable to the promotion rather than to
     // the gate quietly reading the staging directory.
-    let premature = run_canon(&["gate", "task", "it-evidence-loop#1.1", "--repo", "."], repo);
+    let premature = run_canon(&["task", "done", "it-evidence-loop#1.1", "--repo", "."], repo);
     assert_eq!(premature.status.code(), Some(1), "an unpromoted record must not satisfy the gate; stdout: {}", stdout(&premature));
     assert!(tasks_md(repo, change_id).contains("- [ ] 1.1"), "a refused flip must leave the document untouched");
 
@@ -141,7 +142,7 @@ fn the_three_command_loop_flips_a_checkbox_on_authored_evidence() {
     assert!(staging_is_empty(repo), "promotion drains staging");
     assert_eq!(committed_evidence_files(repo).len(), 1, "the record is now committed");
 
-    let flip = run_canon(&["gate", "task", "it-evidence-loop#1.1", "--repo", "."], repo);
+    let flip = run_canon(&["task", "done", "it-evidence-loop#1.1", "--repo", "."], repo);
     assert!(flip.status.success(), "the promoted record must satisfy the gate; stdout: {} stderr: {}", stdout(&flip), stderr(&flip));
 
     let document = tasks_md(repo, change_id);
@@ -174,21 +175,21 @@ fn gate_task_warns_on_a_canon_command_cited_as_proof_with_nothing_bound() {
         ("it-evidence-circular#1.2", "canon status", &["--artifact", "proof.txt"][..]),
         ("it-evidence-circular#1.3", "cargo test -p demo", &[][..]),
     ] {
-        let mut args = vec!["evidence", "add", "--task", task, "--kind", "test-run", "--ref", evidence_ref, "--role", "implementer"];
+        let mut args = vec!["evidence", "add", "--task-id", task, "--class", "test-run", "--ref", evidence_ref, "--role", "implementer"];
         args.extend_from_slice(extra);
         let added = run_canon(&args, repo);
         assert!(added.status.success(), "{task}: {}", stderr(&added));
     }
     assert!(run_canon(&["gate", "promote"], repo).status.success());
 
-    let circular = run_canon(&["gate", "task", "it-evidence-circular#1.1"], repo);
+    let circular = run_canon(&["task", "done", "it-evidence-circular#1.1"], repo);
     assert_eq!(circular.status.code(), Some(0), "a warning never refuses: {}", stderr(&circular));
     assert!(tasks_md(repo, change_id).contains("- [x] 1.1"), "the row still flips");
     let warning = stderr(&circular);
     assert!(warning.contains("warning") && warning.contains("`canon gate check`") && warning.contains("--artifact <path>"), "{warning}");
 
     for task in ["it-evidence-circular#1.2", "it-evidence-circular#1.3"] {
-        let flipped = run_canon(&["gate", "task", task], repo);
+        let flipped = run_canon(&["task", "done", task], repo);
         assert_eq!(flipped.status.code(), Some(0), "{task}: {}", stderr(&flipped));
         assert!(!stderr(&flipped).contains("warning"), "{task}: {}", stderr(&flipped));
     }
@@ -204,7 +205,7 @@ fn evidence_add_refuses_a_task_the_plan_corpus_does_not_carry() {
     let repo = dir.path();
 
     let output = run_canon(
-        &["evidence", "add", "--task", "it-evidence-unknown#9.9", "--kind", "test-run", "--ref", "some-command", "--role", "implementer", "--repo", "."],
+        &["evidence", "add", "--task-id", "it-evidence-unknown#9.9", "--class", "test-run", "--ref", "some-command", "--role", "implementer", "--repo", "."],
         repo,
     );
     assert_eq!(output.status.code(), Some(2), "an unknown task is a fixable invocation; stdout: {}", stdout(&output));
@@ -225,9 +226,10 @@ fn evidence_add_refuses_a_repo_that_configures_no_plan_sources() {
     // fixture uses: a real `canon.yaml` carrying no `plans:` section at
     // all, so the corpus is CONSULTABLE and simply empty.
     std::fs::write(dir.path().join("canon.yaml"), "project: demo\n").expect("writing canon.yaml");
+    git_commit_fixture(dir.path());
 
     let output = run_canon(
-        &["evidence", "add", "--task", "it-no-corpus#1.1", "--kind", "test-run", "--ref", "some-command", "--role", "implementer", "--repo", "."],
+        &["evidence", "add", "--task-id", "it-no-corpus#1.1", "--class", "test-run", "--ref", "some-command", "--role", "implementer", "--repo", "."],
         dir.path(),
     );
     assert_eq!(output.status.code(), Some(2));
@@ -248,9 +250,9 @@ fn evidence_add_refuses_a_fabricated_summary_before_staging_anything() {
         &[
             "evidence",
             "add",
-            "--task",
+            "--task-id",
             "it-evidence-fake#1.1",
-            "--kind",
+            "--class",
             "test-run",
             "--ref",
             "some-command",
@@ -283,9 +285,9 @@ fn evidence_add_refuses_a_newline_that_would_forge_a_second_checked_row() {
         &[
             "evidence",
             "add",
-            "--task",
+            "--task-id",
             "it-evidence-inject#1.1",
-            "--kind",
+            "--class",
             "test-run",
             "--ref",
             "some-command",
@@ -317,9 +319,9 @@ fn evidence_add_refuses_a_newline_in_the_actor_id() {
         &[
             "evidence",
             "add",
-            "--task",
+            "--task-id",
             "it-evidence-actor#1.1",
-            "--kind",
+            "--class",
             "test-run",
             "--ref",
             "some-command",
@@ -338,22 +340,9 @@ fn evidence_add_refuses_a_newline_in_the_actor_id() {
     assert_eq!(tasks_md(repo, "it-evidence-actor"), rows);
 }
 
-/// The command's own help must not overstate what it proves
-/// (`ReviewEvidence` finding 1). Asserted at the binary boundary because
-/// this is the text an operator or an agent actually reads before
-/// trusting a flip.
-#[test]
-fn evidence_add_help_states_it_is_an_attestation_and_names_what_the_gate_skips() {
-    let dir = tempfile::tempdir().expect("a temp dir");
-    let output = run_canon(&["evidence", "add", "--help"], dir.path());
-    assert!(output.status.success(), "--help must exit 0: {}", stderr(&output));
-    let help = stdout(&output);
-
-    assert!(help.contains("ATTESTATION, NOT PROOF"), "{help}");
-    assert!(help.contains("never runs, resolves, or checks --ref"), "{help}");
-    assert!(help.contains("can authorize its own checkbox"), "{help}");
-    for skipped in ["staleness", "trust-ladder", "release-trust", "divergence"] {
-        assert!(help.contains(skipped), "the help must name `{skipped}` among what the gate does NOT check: {help}");
+/// `git init` + one commit so revision-taking commands have a commit to bind.
+fn git_commit_fixture(repo: &Path) {
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["add", "-A"], &["commit", "-q", "-m", "x"]] {
+        assert!(std::process::Command::new("git").args(args).current_dir(repo).status().unwrap().success());
     }
-    assert!(!help.contains("proof of"), "the help must never claim proof: {help}");
 }

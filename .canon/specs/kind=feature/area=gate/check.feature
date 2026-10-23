@@ -2,14 +2,14 @@ Feature: gate check
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
 
   @subject:gate-trust-spine
-  @case:edge
+  @case:failure
   @gate.check.01
-  Scenario: A repository with nothing to complain about gates green
+  Scenario: A repository with nothing to examine is unverifiable, not clean
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a repository carrying no policy and no ledger records at all
     When the gate checks it
-    Then it exits zero
-    And the report reads clean rather than reporting nothing at all
+    Then it exits one
+    And the report says nothing was examined rather than reading clean
 
   @subject:gate-trust-spine
   @case:failure
@@ -243,7 +243,7 @@ Feature: gate check
   Scenario: An unstored binding the working tree still proves is an advisory, not a violation
     Given a committed record bound to a report that has no stored blob
     When the working-tree report still hashes to the recorded digest
-    Then the gate stays clean and lists the binding as unstored, pointing to canon evidence vault
+    Then the gate stays clean and lists the binding as unstored, pointing to `canon artifacts store`
 
   # canon: {"schema":1,"at":"2026-10-10T18:33:15Z","actor":{"agent_id":"canon"}}
   @subject:gate-trust-spine
@@ -313,7 +313,7 @@ Feature: gate check
     Given require_review and a review written before 0.23, pinned to nothing or to evidence record files
     When `canon gate check` runs
     Then the gate exits 1 with unreviewed-promotion on that scenario, saying the review predates 0.23 review pinning and that `canon migrate` rewrites it
-    And one advisory line counts the scenarios whose review is not migrated, and `canon status` and `canon subject status` print the same advisory
+    And one advisory line counts the scenarios whose review is not migrated, and `canon subject move` and `canon status` print the same advisory
 
   # canon: {"schema":1,"at":"2026-10-10T20:02:32Z","actor":{"agent_id":"canon"}}
   @subject:gate-trust-spine
@@ -329,13 +329,13 @@ Feature: gate check
   @subject:gate-trust-spine
   @case:edge
   @gate.check.80
-  Scenario: Gate check re-indexes only the edited feature file and is silent when the index is fresh
+  Scenario: Gate check never writes the index, and the next writer re-indexes only the edited feature file
     Given a synced scenario index and an edited feature file
-    When gate check runs
-    Then one stderr line says the index was refreshed from that one file
+    When gate check runs, and then a writer such as `canon artifacts store` runs
+    Then gate check writes no index record, and neither does any other reader
+    And the writer's one stderr line says the index was refreshed from that one file
     And only the edited scenario gets a new record
-    And a later inventory sync writes nothing
-    And the next reader prints no refresh line
+    And a later inventory sync writes nothing, and the next reader prints no refresh line
 
   # canon: {"schema":1,"at":"2026-10-12T00:00:00Z","actor":{"agent_id":"canon"}}
   @subject:gate-trust-spine
@@ -343,7 +343,7 @@ Feature: gate check
   @gate.check.90
   Scenario: canon migrate pins a review written before 0.15 that is still current, and it counts afterwards
     Given require_review and reviews written before 0.15 whose pin is the commit they reviewed, and the scenarios unchanged since
-    When `canon gate check` runs, then `canon migrate`, then `canon gate check` again
+    When `canon gate check` runs, then `canon migrate` previews its plan and is run again with `--commit` and the previewed plan digest, then `canon gate check` again
     Then the first gate exits 1 and names `canon migrate`
     And migrate rewrites each review with the verdict and checks of its scenario's latest evidence, keeping its reviewer
     And the second gate exits 0, and a second migrate finds nothing to convert
@@ -354,7 +354,7 @@ Feature: gate check
   @gate.check.91
   Scenario: canon migrate leaves a review stale when its scenario changed after the commit it pinned
     Given require_review and reviews written before 0.15 of two scenarios, pinned to the commit they reviewed
-    When one scenario's steps change in a later commit and `canon migrate` runs
+    When one scenario's steps change in a later commit and `canon migrate` is previewed and committed
     Then the unchanged scenario's review is pinned and counts, and the changed one's review is left as it was
     And `canon gate check` exits 1 with unreviewed-promotion on the changed scenario only
 
@@ -364,7 +364,7 @@ Feature: gate check
   @gate.check.92
   Scenario: canon migrate leaves a review stale when its scenario has evidence newer than the review
     Given require_review and a review written before 0.15 of a scenario unchanged since its pinned commit
-    When evidence for that scenario is recorded after the review and `canon migrate` runs
+    When evidence for that scenario is recorded after the review and `canon migrate` is previewed and committed
     Then the review is left as it was and `canon gate check` exits 1 with unreviewed-promotion on that scenario
 
   # canon: {"schema":1,"at":"2026-10-12T00:00:00Z","actor":{"agent_id":"canon"}}
@@ -373,7 +373,7 @@ Feature: gate check
   @gate.check.93
   Scenario: canon migrate pins a review whose commit or scenario is not in the clone as the scenario stands
     Given require_review and reviews written before 0.15, one pinned to a commit this clone does not have and one to a commit that predates its scenario
-    When `canon migrate` runs and then `canon gate check`
+    When `canon migrate` is previewed and committed and then `canon gate check` runs
     Then both reviews are pinned and count and the gate exits 0, never reporting a missing commit as a violation
     And migrate counts them as unchecked and suggests checking out full history with fetch-depth 0
 
@@ -383,7 +383,7 @@ Feature: gate check
   @gate.check.94
   Scenario: canon migrate finds a review's scenario in the file it lived in at the pinned commit
     Given require_review and reviews written before 0.15 pinned to a commit where their scenarios lived in another feature file
-    When the scenarios have since moved, unchanged, to a new file and `canon migrate` runs
+    When the scenarios have since moved, unchanged, to a new file and `canon migrate` is previewed and committed
     Then the scenarios are found in the old file at the pinned commit
     And both reviews are pinned and the gate exits 0
 
@@ -394,7 +394,7 @@ Feature: gate check
   Scenario: A moved spec root is searched at its former path and only for its own project
     Given a spec root moved from specs to .canon/specs with former_roots [specs], and a second root declaring the same scenario ids with the same text
     And reviews written before 0.15 for both projects, pinned to a commit from before the move, when only the first project existed
-    When canon migrate runs
+    When canon migrate is previewed and committed
     Then the first project's review is found at its former root and pinned as current
     And the second project's review is undecidable and pinned as the scenario stands, never matched against the first project's scenario
 
@@ -404,7 +404,7 @@ Feature: gate check
   @gate.check.97
   Scenario: A fixed blocker that names its scenarios is re-verified by evidence for those scenarios alone
     Given a subject with scenarios A and B, both evidenced and reviewed, and a blocker naming only A closed fixed after that evidence
-    When the subject is moved to shipped, and gate check, subject status and status are read
+    When the subject is moved to shipped with canon subject move, and gate check and status are read
     Then each refuses naming A only, and the remedy is the per-scenario canon evidence add --scenario-id, never the whole-suite batch
     And evidence for B recorded after the close does not clear it, and evidence for A recorded before the close does not either
     And evidence for A recorded after the close clears gate check and the move, while B's evidence stays older than the close
@@ -448,3 +448,36 @@ Feature: gate check
     When canon status runs there with no --repo, and again with --repo .
     Then both read the root's canon.yaml and ledger, the nearest ancestor that holds one
     And an explicit --repo other than . names that directory as given, with no walk up
+
+  # canon: {"schema":1,"at":"2026-10-23T12:08:40Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @gate.check.102
+  Scenario: An unverifiable gate says so in its envelope and exits one, until something is examined
+    Given a repository with no scenario, no subject, no change and no evidence record
+    When canon gate check runs with --json
+    Then it exits 1 with the error code UNVERIFIABLE, data.unverifiable true and data.clean false
+    And meta.coverage counts zero scenarios
+    And once the repository holds an indexed scenario the same check examines it, exits 0 and reports clean
+
+  # canon: {"schema":1,"at":"2026-10-23T12:08:46Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:gate-trust-spine
+  @case:happy
+  @gate.check.103
+  Scenario: A chore that leaves the code as it was needs no new evidence, only its change review
+    Given a verifying subject whose scenarios are evidenced and reviewed on the current code, and an approved chore change
+    When the chore touches only documentation and the subject is moved to shipped
+    Then the refusal asks for the chore's change review and for no new evidence, because the evidence is on the code as it stands
+    And status leads its next steps with the change review and names no evidence command
+    And once the change review is recorded the move succeeds
+
+  # canon: {"schema":1,"at":"2026-10-23T12:08:52Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @gate.check.104
+  Scenario: A chore that changed code asks for every evidenced scenario with one runnable batch command
+    Given the same subject and an approved chore change that touches code
+    When the subject is moved to shipped
+    Then the refusal names every evidenced scenario and leads its hint with one batch command built from the real report paths, such as `canon evidence add --all-scenarios --report junit:a.xml --report junit:b.xml --role implementer`, never a loop over scenarios
+    And status leads its next steps with that same command, once
+    And the command runs as written and clears the evidence gap, leaving the chore's change review

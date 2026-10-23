@@ -93,6 +93,11 @@ pub const INGEST_CURSORS_DIR: &str = ".canon/ingest/cursors";
 /// The pre-commit gate script `canon gate install-hooks` materializes.
 pub const PRE_COMMIT_SCRIPT: &str = ".canon/scripts/canon-gate-pre-commit.sh";
 
+/// Where `canon migrate --commit` keeps the original bytes of every file it
+/// rewrites or removes, one `<timestamp>/` directory per run with the files'
+/// own relative paths below it (0.28 D9).
+pub const MIGRATE_BACKUP_DIR: &str = ".canon/migrate-backup";
+
 /// Content-addressed store of the bytes `canon evidence add --artifact/
 /// --report` bound, one file per digest at `<ARTIFACTS_SHA256_DIR>/<hex>`.
 /// Authored (no source regenerates a rewritten report's old bytes), so
@@ -160,6 +165,7 @@ mod tests {
             INGEST_DIR,
             INGEST_CURSORS_DIR,
             PRE_COMMIT_SCRIPT,
+            MIGRATE_BACKUP_DIR,
             ARTIFACTS_SHA256_DIR,
             ACCESS_AUDIT_FILE,
             AUDIT_GITIGNORE,

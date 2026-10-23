@@ -6,6 +6,8 @@ dist/
 # committed).
 packages/core-*/bin/*
 !packages/core-*/bin/.gitkeep
+# Man pages the publish workflow generates from the clap tree (`canon-man` example) into the launcher package.
+packages/cli/man/
 .superpowers/
 *.duckdb
 # Local runtime store roots (git/hot/cold-tier ledger + cursors + trajectory,
@@ -96,3 +98,5 @@ vendors/
 # --report` stores the bytes it binds in .canon/artifacts, so the
 # working-tree copy is a regenerable output.
 examples/platformer/reports/
+# the snapshot `canon dashboard` and `canon report snapshot` regenerate -- derived, never committed.
+.canon/dashboard-snapshot/

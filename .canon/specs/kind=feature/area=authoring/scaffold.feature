@@ -127,9 +127,9 @@ Feature: authoring scaffold
   @case:happy
   @authoring.scaffold.12
   Scenario: The scaffold writes the case tag after subject and lane
-    Given a scenario scaffolded with a subject, a lane and a case
+    Given a scenario scaffolded with a subject, a lane, a case and a flow
     When the stub is appended
-    Then the subject, lane and case tags appear in that order directly above the id tag
+    Then the subject, lane, case and flow tags appear in that order directly above the id tag
 
   # canon: {"schema":1,"at":"2026-10-12T10:34:27Z","actor":{"agent_id":"canon"}}
   @subject:authoring-scaffold
@@ -149,3 +149,22 @@ Feature: authoring scaffold
     Given a repo whose canon.yaml configures one spec root, game
     When scenario new writes into an explicit --feature file under that root and names a --project-id that is no configured root
     Then it exits 2 with UNKNOWN_SPEC_ROOT and writes nothing, even though the file itself lies under a configured root
+
+  # canon: {"schema":1,"at":"2026-10-23T11:49:03Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.scaffold.15
+  Scenario: A scenario batch with one invalid element writes nothing and points at the element
+    Given a repo with a subject, and a --input array of two scenarios whose second element carries a case that is not a kebab-case slug
+    When canon scenario new --input runs with --json
+    Then it exits 2 with error.field /items/1/case naming the received value, before the first element is written
+    And no feature file exists afterwards, though element 0 was valid
+
+  # canon: {"schema":1,"at":"2026-10-23T11:49:09Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.scaffold.16
+  Scenario: scenario new --from is refused as a usage error whose hint names --input
+    Given a repo set up by canon init
+    When canon scenario new --from names an NDJSON file
+    Then it exits 2 with a usage error whose expected list names --input

@@ -57,10 +57,10 @@ fn dispatch_begin(repo: &Path) -> serde_json::Value {
 fn a_consumer_reads_the_run_id_from_data_and_closes_that_run() {
     let dir = tempfile::tempdir().unwrap();
     let begun = dispatch_begin(dir.path());
-    let run_id = begun["run_id"].as_str().expect("`.data.run_id` is the run id a hook closes later").to_string();
+    let run_id = begun["runId"].as_str().expect("`.data.run_id` is the run id a hook closes later").to_string();
 
     let output = Command::new(env!("CARGO_BIN_EXE_canon"))
-        .args(["dispatch", "end", "--run-id", &run_id, "--status", "succeeded", "--json", "--repo"])
+        .args(["dispatch", "end", &run_id, "--run-outcome", "succeeded", "--json", "--repo"])
         .arg(dir.path())
         .output()
         .expect("spawn canon dispatch end");
@@ -68,7 +68,7 @@ fn a_consumer_reads_the_run_id_from_data_and_closes_that_run() {
     let ended: serde_json::Value = serde_json::from_slice(&output.stdout).expect("one JSON document");
     assert_eq!(ended["meta"]["command"], "dispatch end", "{ended}");
     assert!(ended["meta"]["next"].is_array(), "{ended}");
-    assert_eq!(ended["data"]["run_id"], run_id.as_str(), "{ended}");
+    assert_eq!(ended["data"]["runId"], run_id.as_str(), "{ended}");
     assert_eq!(ended["data"]["status"], "succeeded", "{ended}");
 }
 
@@ -81,7 +81,7 @@ fn dispatch_begin_records_retrieved_guidance_into_the_manifest() {
     let manifest_path = summary["manifest"].as_str().expect("summary carries the manifest path");
     assert!(Path::new(manifest_path).exists(), "the dispatch manifest must be written to {manifest_path}");
 
-    let guidance = summary["injected_guidance"].as_array().expect("injected_guidance is an array");
+    let guidance = summary["injectedGuidance"].as_array().expect("injectedGuidance is an array");
     assert_eq!(guidance.len(), 1, "the one seeded strategy is recorded: {summary}");
     assert_eq!(guidance[0]["strategy_id"], id.to_string(), "the injected guidance is the seeded strategy");
     assert_eq!(guidance[0]["title"], "guidance");
@@ -90,8 +90,8 @@ fn dispatch_begin_records_retrieved_guidance_into_the_manifest() {
     // The written file itself deserializes as a Run carrying the SAME
     // snapshot the summary reported — identity and content, not a count.
     let run: Run = serde_json::from_str(&std::fs::read_to_string(manifest_path).unwrap()).expect("the manifest is a valid Run");
-    assert_eq!(serde_json::to_value(&run.injected_guidance).unwrap(), summary["injected_guidance"], "the on-disk guidance must equal the injected summary snapshot");
-    assert_eq!(run.run_id.to_string(), summary["run_id"].as_str().expect("summary carries the run id"), "the manifest is the reported run");
+    assert_eq!(serde_json::to_value(&run.injected_guidance).unwrap(), summary["injectedGuidance"], "the on-disk guidance must equal the injected summary snapshot");
+    assert_eq!(run.run_id.to_string(), summary["runId"].as_str().expect("summary carries the run id"), "the manifest is the reported run");
 }
 
 #[test]

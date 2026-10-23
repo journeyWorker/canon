@@ -1,6 +1,6 @@
 canon gate check: clean (0 violations)
 
-advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --approver <who>`
 
 brief overrides: 1 evidence record(s) attested before their brief was approved — not failing the gate:
   evidence for checkout.pay.01 was attested by `lead` at <ts> while the brief of checkout was not approved (override: the human approved in chat; the line follows)

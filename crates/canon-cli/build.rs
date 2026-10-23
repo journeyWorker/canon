@@ -9,6 +9,11 @@
 //! (a debug build, a `cargo test`), and the table is empty. The variable
 //! set, even to an empty string, with no `index.html` under it fails the
 //! build: a release must not silently ship without its app.
+//!
+//! The guide (0.28 D10): every file of `canon/skills/` (`SKILL.src.md`,
+//! `reference/**`, `scripts/**`) is embedded as text, in sorted path order,
+//! into `guide_embedded.rs`, a `static GUIDE_FILES` table that `src/guide.rs`
+//! includes. The directory is part of the repo, so a build without it fails.
 
 use std::fs;
 use std::io::Write;
@@ -18,6 +23,12 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 
 const DIST_ENV: &str = "CANON_DASHBOARD_DIST";
+
+/// The skill sources the guide is embedded from, relative to this crate.
+const GUIDE_DIR: &str = "../../canon/skills";
+
+/// The entries of the guide directory that are embedded.
+const GUIDE_ENTRIES: [&str; 3] = ["SKILL.src.md", "reference", "scripts"];
 
 /// The demo fixture directory at the root of the built app.
 const DEMO_FIXTURE: &str = "snapshot";
@@ -53,6 +64,35 @@ fn main() {
 
     table.push_str("];\n");
     fs::write(out.join("dashboard_embedded.rs"), table).expect("write the embedded app table");
+
+    embed_guide(&out);
+}
+
+/// Writes `guide_embedded.rs`: `(path, text)` of every guide file, sorted by path.
+fn embed_guide(out: &Path) {
+    let manifest = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").expect("cargo sets CARGO_MANIFEST_DIR"));
+    let root = manifest.join(GUIDE_DIR).canonicalize().unwrap_or_else(|e| panic!("the guide sources {GUIDE_DIR} are missing: {e}"));
+    println!("cargo:rerun-if-changed={}", root.display());
+    let mut files = Vec::new();
+    for entry in GUIDE_ENTRIES {
+        let path = root.join(entry);
+        if path.is_dir() {
+            collect(&root, &path, &mut files);
+        } else if path.is_file() {
+            files.push(entry.to_string());
+        } else {
+            panic!("the guide source {} is missing", path.display());
+        }
+    }
+    files.sort();
+    let mut table = String::from("pub static GUIDE_FILES: &[(&str, &str)] = &[\n");
+    for relative in &files {
+        let path = root.join(relative);
+        println!("cargo:rerun-if-changed={}", path.display());
+        table.push_str(&format!("    ({relative:?}, include_str!({:?})),\n", path.display().to_string()));
+    }
+    table.push_str("];\n");
+    fs::write(out.join("guide_embedded.rs"), table).expect("write the embedded guide table");
 }
 
 /// Every file under `dir` as a `/`-separated path relative to `root`,

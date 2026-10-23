@@ -25,7 +25,7 @@
 //! # What a record from here IS: a RECORDED OBSERVATION
 //! Not proof of anything. Canon does not verify that the defect
 //! existed, that it was real, that it was fixed, or that
-//! `--introduced-by` names the commit that actually caused it. State it
+//! `--introduced-rev` names the commit that actually caused it. State it
 //! the blunt way, in the register `canon evidence add` set for
 //! attestations (`crate::evidence`'s module doc), because this command
 //! exists precisely because an unsupported claim shipped:
@@ -34,11 +34,11 @@
 //!   the diff, the review transcript, or the code. A finding saying
 //!   "teardown races HMR" is recorded identically whether that race is
 //!   real, misdiagnosed, or invented.
-//! - **`--disposition fixed --resolution-sha <sha>` is not evidence the
+//! - **`--disposition fixed --resolution-rev <sha>` is not evidence the
 //!   defect was fixed.** Canon never resolves the sha, never reads that
 //!   commit, and never checks that it touches anything the finding
 //!   mentions. It records that someone SAID this commit closed it.
-//! - **`--introduced-by` is not causation.** It is the author's sourced
+//! - **`--introduced-rev` is not causation.** It is the author's sourced
 //!   claim about which commit introduced the defect. Canon cannot check
 //!   it, and deliberately never guesses it (below).
 //! - **The author and the beneficiary are the same party**, exactly as
@@ -53,19 +53,19 @@
 //! its transcript. Neither is verification.
 //!
 //! # A defect the author found in its own work
-//! Record it like any other: `--reviewer` and `--actor-id` name the
+//! Record it like any other: `--actor-id` and `--actor-id` name the
 //! author itself. Nothing refuses a finding whose reviewer is also the
 //! change's implementer or evidence actor, and none should: hiding a
 //! defect because nobody else saw it is exactly how a review round looks
 //! cleaner than it was. An open `blocker` the author raised blocks under
 //! `require_review.block_on_findings` like one a reviewer raised.
-//! `--introduced-by` is not where "the author found it" goes: it names
-//! the commit that introduced the defect, so `--introduced-by self` is
-//! refused with a pointer to `--reviewer`.
+//! `--introduced-rev` is not where "the author found it" goes: it names
+//! the commit that introduced the defect, so `--introduced-rev self` is
+//! refused with a pointer to `--actor-id`.
 //!
-//! # `--introduced-by` must be SOURCED, and unset is the CORRECT answer
+//! # `--introduced-rev` must be SOURCED, and unset is the CORRECT answer
 //! This is the decision the CLI is where a user makes, so it is where
-//! the guidance belongs. Set `--introduced-by` only when the
+//! the guidance belongs. Set `--introduced-rev` only when the
 //! introducing commit was actually established — someone read the diff,
 //! or the fixing commit's own message names it. Do NOT set it from
 //! timing, commit adjacency, `git blame` output, or "it was probably
@@ -202,7 +202,7 @@
 //! JSON, and one such loop read the wrong file.
 //!
 //! # Line breaks are refused, not escaped
-//! `--summary`, `--reviewer`, `--file-ref` and `--actor-id` are the
+//! `--summary`, `--actor-id`, `--file-ref` and `--actor-id` are the
 //! free-text fields of this record — the ones with no grammar
 //! constraining them — and they are what a rendered finding row is
 //! built from. A row is ONE line, so a line separator in any of them
@@ -225,63 +225,18 @@
 //! can disagree, and the one that disagrees is the one that lets a
 //! forged row through.
 //!
-//! # A named sha must EXIST — checked, best-effort
-//! `--reviewed-sha`, `--resolution-sha` and `--introduced-by` are
-//! refused when this repository does not hold the commit they name.
-//! Grammar alone proves nothing, and s43's own round 2 proved it:
-//! findings were authored with a short sha zero-padded to 40, all of
-//! them were accepted, and all of them cited a commit that has never
-//! existed — a fabricated provenance recorded, permanently, by the
-//! command built to stop fabricated release facts.
-//!
-//! AN EXISTING COMMIT OBJECT, and deliberately nothing else. `git
-//! cat-file -t <sha>` must answer exactly `commit` — the object's OWN
-//! type, unpeeled. All three flags are commit-only by contract, and
-//! `<sha>^{commit}` would not enforce that: it peels RECURSIVELY, so
-//! an annotated TAG's own object id resolves through to the commit it
-//! points at and would be stored in a commit-only field. A tag, tree
-//! or blob object id is refused. Canon still never reads the commit's
-//! message, its diff, or its files (the observation section above),
-//! because existence is a different question from content: a
-//! resolvable `--introduced-by` is still only the author's sourced
-//! claim, and this check does not make it more than that. It only
-//! removes the case where the claim points at nothing at all, or at
-//! something that is not a commit.
-//!
-//! BEST-EFFORT, because a false refusal is worse than a missed check:
-//! - `git` not on PATH, or `repo` not a work tree → SKIPPED, not
-//!   failed. Authoring into a fixture directory or a corpus kept
-//!   outside a checkout is legitimate, and refusing it would break the
-//!   command where nothing is verifiable either way.
-//! - a SHALLOW clone → skipped wholesale. Its history is truncated by
-//!   construction, so "this clone does not hold that commit" says
-//!   nothing about whether the commit exists.
-//! - present as an object but UNREACHABLE from any ref (a not-yet-
-//!   merged branch, a partial clone, a dangling commit) → ACCEPTED.
-//!   This is the case worth stating explicitly, because the two answers
-//!   are genuinely different and the choice is deliberate: the question
-//!   asked is "does this repository hold this commit object", which is
-//!   exactly what `cat-file -t` answers. Requiring REACHABILITY would refuse a
-//!   finding authored against the review branch it was raised on, which
-//!   is the normal mid-review case.
-//!
-//! `GIT_NO_LAZY_FETCH=1` is set on every invocation, so a partial clone
-//! answers from what it already holds instead of an authoring command
-//! silently reaching the network.
-//!
-//! # A short sha is resolved, never padded (0.15 D6, dogfood G8)
-//! Each flag takes a full 40-character sha or an abbreviation of 4 or
-//! more lowercase hex characters ([`parse_commit`]). An abbreviation is
-//! resolved with `git rev-parse --verify <sha>^{commit}` in this
-//! repository and the record stores the FULL sha git answers — never
-//! the abbreviation, which a later commit can make ambiguous. An
-//! abbreviation that names no commit, or more than one, is refused
-//! (`2`), and so is one that only resolves by peeling a tag: the full
-//! sha git answers must itself begin with the abbreviation typed, which
-//! keeps the commit-only contract above. An abbreviation needs git to
-//! mean anything, so the best-effort skips above never apply to it:
-//! outside a work tree it is refused, and the author passes the full
-//! sha instead.
+//! # A named commit is resolved by git (0.28 D7b)
+//! `--rev`, `--resolution-rev` and `--introduced-rev` take any git
+//! revision (`HEAD~1`, a branch, a tag, a short sha) and are resolved
+//! with [`crate::git_rev`]: `git rev-parse --verify <rev>^{commit}`, the
+//! FULL sha is recorded, and a revision git cannot resolve (also: outside
+//! a git work tree, or in a repo with no commit) is `NO_COMMIT`, exit 2.
+//! `--rev` and `--resolution-rev` also record the code tree they saw
+//! (`code_tree`, `resolution_code_tree`) and `worktree_dirty`: the
+//! default `HEAD` is the working tree as it stands, so a round that
+//! reviewed uncommitted code is recorded, never refused. Only
+//! `--introduced-rev` has no default: it must be sourced, never guessed.
+//! Canon never reads a commit's message, diff or files.
 //!
 //! # Coherence is enforced by the TYPE; this command adds the diagnostic
 //! `FindingDisposition::Fixed` is unreachable without a closing sha on
@@ -292,10 +247,11 @@
 //! incoherent record is unconstructible through the API [`run_add`]
 //! builds with, and there is deliberately NO second coherence check
 //! here that could drift from `Finding::check_coherence`. What this
-//! command adds is the LOUD, early diagnostic: `--disposition fixed`
-//! with no `--resolution-sha`, or a `--resolution-sha` alongside any
-//! other disposition, is refused by name before anything is staged,
-//! rather than surfacing two commands later as a `malformed` record.
+//! command adds is the LOUD, early diagnostic: a `--resolution-rev`
+//! alongside any disposition but `fixed` is refused by name before
+//! anything is staged, rather than surfacing two commands later as a
+//! `malformed` record. `fixed` takes `--resolution-rev` or its default
+//! `HEAD`, so it can no longer lack a commit.
 //!
 //! # Exit-code contract
 //! `0` staged; `2` usage-or-infra (a malformed flag combination, a line
@@ -311,8 +267,6 @@
 //! that does not exist.
 
 use std::path::Path;
-use std::process::Command;
-
 use canon_gate::GateCtx;
 use canon_ingest::task_rows::first_row_line_break;
 use canon_model::{Actor, ChangeId, Envelope, Finding, FindingDisposition, FindingSeverity, RawRecord, RecordKind, RoleId, ScenarioId, SessionId, Sha};
@@ -321,6 +275,8 @@ use canon_store::git_tier::GitTier;
 use canon_store::partition::{content_digest12, resolve_partition};
 use canon_store::tier::{RawWrite, Tier, TierQuery};
 use chrono::Utc;
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
@@ -376,63 +332,25 @@ pub fn parse_change_id(s: &str) -> Result<ChangeId, String> {
     ChangeId::parse(s).map_err(|e| e.to_string())
 }
 
-/// The fewest hex characters an abbreviation may have — git's own
-/// floor for an abbreviated object name.
-const MIN_ABBREV: usize = 4;
-
-/// A sha-shaped flag's value as typed: a full 40-character sha, or an
-/// abbreviation that [`run_add`]/[`run_close`] resolve through git
-/// (module doc). Never stored: only the resolved [`Sha`] reaches a
-/// record.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CommitArg(String);
-
-impl CommitArg {
-    /// A full 40-character sha rather than an abbreviation.
-    fn is_full(&self) -> bool {
-        self.0.len() == 40
-    }
-}
-
-impl From<Sha> for CommitArg {
-    fn from(sha: Sha) -> Self {
-        Self(sha.to_string())
-    }
-}
-
-impl std::fmt::Display for CommitArg {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-/// The clap `value_parser` behind every sha-shaped flag on these
-/// commands (module doc's exit-code section): a malformed value is
-/// refused by clap, by flag name, before [`run_add`] is entered.
-pub fn parse_commit(s: &str) -> Result<CommitArg, String> {
-    if (MIN_ABBREV..=40).contains(&s.len()) && s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
-        Ok(CommitArg(s.to_string()))
-    } else {
-        Err(format!("`{s}` is not a commit sha: expected {MIN_ABBREV} to 40 lowercase hex characters (a full sha, or a short one git resolves in this repository)"))
-    }
-}
-
-/// `--introduced-by`'s value parser: [`parse_commit`], except that `self`
-/// (the spelling an author reaches for when recording its own defect)
-/// is refused with a pointer to the flag that records who found it.
-pub fn parse_introduced_by(s: &str) -> Result<CommitArg, String> {
+/// `--introduced-rev`'s value parser: any revision, except that `self` (the
+/// spelling an author reaches for when recording its own defect) is refused
+/// with a pointer to the option that records who found it.
+pub fn parse_introduced_rev(s: &str) -> Result<String, String> {
     if s == "self" {
-        return Err("--introduced-by names the COMMIT that introduced the defect, not who found it; to record a defect you found in your own work, set --reviewer (and --actor-id) to your own id, and leave --introduced-by unset unless that commit is sourced".to_string());
+        return Err("--introduced-rev names the COMMIT that introduced the defect, not who found it; to record a defect you found in your own work, set --actor-id to your own id, and leave --introduced-rev unset unless the introducing commit was sourced".to_string());
     }
-    parse_commit(s)
+    if s.trim().is_empty() {
+        return Err("--introduced-rev must name a git revision".to_string());
+    }
+    Ok(s.to_string())
 }
 
 /// One `canon finding add` invocation's already-parsed flags.
 ///
 /// A named struct rather than a positional parameter list, for
 /// `crate::evidence::EvidenceArgs`'s reason and more acutely: thirteen
-/// arguments, of which three are `Option<CommitArg>` and four are plain
-/// strings — `reviewed_sha`/`resolution_sha`/`introduced_by` mean three
+/// arguments, of which three are revisions and four are plain
+/// strings — `rev`/`resolution_rev`/`introduced_rev` mean three
 /// completely different things and would all compile if transposed,
 /// and transposing them would silently produce a WRONG fix-of-fix
 /// derivation rather than an error.
@@ -440,12 +358,11 @@ pub struct FindingArgs {
     /// The change under review — the finding's scope and the first
     /// component of its natural key.
     pub change_id: ChangeId,
-    /// The commit whose state this round reviewed, when that state was
-    /// committed at all. Absent is the common case: most rounds review
-    /// an uncommitted working tree, and canon-model makes the field
-    /// optional precisely so those rounds are recordable. Never
-    /// borrow an adjacent sha to fill it.
-    pub reviewed_sha: Option<CommitArg>,
+    /// `--rev`: the commit whose state this round reviewed, any git
+    /// revision. The default `HEAD` is the working tree as it stands, so a
+    /// round that reviewed uncommitted code is recorded with its code tree
+    /// and `worktree_dirty`, never refused. Recorded as `reviewed_sha`.
+    pub rev: String,
     /// Which review round on this change raised it (1-based).
     pub round: u32,
     /// This finding's index within `round` (1-based). REQUIRED and
@@ -464,14 +381,14 @@ pub struct FindingArgs {
     /// Never checked against anything (module doc's observation
     /// section). Refused when it carries a line separator.
     pub summary: String,
-    /// The commit that closed it. Required by, and permitted only
-    /// with, `disposition == Fixed`.
-    pub resolution_sha: Option<CommitArg>,
+    /// `--resolution-rev`: the commit that closed it. Permitted only with
+    /// `disposition == Fixed`, where `None` means `HEAD`.
+    pub resolution_rev: Option<String>,
     /// The SOURCED introducing commit, or `None`. `None` means
     /// UNSOURCED — never "no cause" — and is one of the two reasons a
     /// derived fix-of-fix count UNDER-counts. See the module doc's
     /// canonical sentence before setting this.
-    pub introduced_by: Option<CommitArg>,
+    pub introduced_rev: Option<String>,
     /// Where in the tree, as `path/to/file.rs:120-134`. Refused when it
     /// carries a line separator.
     pub file_ref: Option<String>,
@@ -510,6 +427,76 @@ fn authoring_actor(actor_id: &str, role: &RoleId, session_id: Option<&SessionId>
     }
 }
 
+/// `canon finding add`: the finding staged or committed.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FindingAddReport<'a> {
+    #[serde(flatten)]
+    pub landing: crate::retry::Landing,
+    pub change_id: &'a str,
+    pub round: u32,
+    pub seq: u32,
+    pub severity: &'static str,
+    pub disposition: &'static str,
+    /// No `--introduced-rev` was given: the finding names no commit that introduced it.
+    pub unsourced: bool,
+}
+
+impl crate::reports::Report for FindingAddReport<'_> {}
+
+/// `canon finding close`: the transition staged or committed, or a no-op.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FindingCloseReport<'a> {
+    /// Where the transition landed; absent on a no-op, which writes nothing.
+    #[serde(flatten)]
+    pub landing: Option<crate::retry::Landing>,
+    pub change_id: &'a str,
+    pub round: u32,
+    pub seq: u32,
+    /// The disposition it moved from; absent when unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from: Option<&'static str>,
+    pub disposition: &'static str,
+}
+
+impl crate::reports::Report for FindingCloseReport<'_> {}
+
+/// One finding of `canon finding list`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FindingRow<'a> {
+    pub round: u32,
+    pub seq: u32,
+    pub severity: &'static str,
+    pub disposition: &'static str,
+    pub reviewer: &'a str,
+    pub summary: &'a str,
+    pub resolution_sha: Option<&'a str>,
+    pub file_ref: Option<&'a str>,
+    pub reason: Option<&'a str>,
+}
+
+/// `canon finding list`: a change's findings; paging is in `meta`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FindingListReport<'a> {
+    pub change_id: &'a str,
+    pub findings: Vec<FindingRow<'a>>,
+}
+
+impl crate::reports::Report for FindingListReport<'_> {}
+
+/// `canon finding list --fields`: each finding keeps only the requested members.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FindingListFieldsReport<'a> {
+    pub change_id: &'a str,
+    pub findings: Vec<crate::json_out::Projected<FindingRow<'static>>>,
+}
+
+impl crate::reports::Report for FindingListFieldsReport<'_> {}
+
 /// `canon finding add` (module doc). Returns the process exit code.
 ///
 /// Order matters and is not incidental: every refusal below happens
@@ -528,7 +515,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon finding add", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding add", args.json);
         }
     };
 
@@ -538,7 +525,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
         )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").emit("canon finding add", args.json);
     }
 
-    for (flag, value) in [("--reviewer", args.reviewer.as_str()), ("--summary", args.summary.as_str())] {
+    for (flag, value) in [("--actor-id", args.reviewer.as_str()), ("--summary", args.summary.as_str())] {
         if value.trim().is_empty() {
             return CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} must be non-empty; a finding with no {} is a row that records nothing", &flag[2..])).hint("`canon schema finding add` lists the accepted arguments and their forms").emit("canon finding add", args.json);
         }
@@ -552,7 +539,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     // safe to put in a row.
     for (flag, value) in [
         ("--summary", Some(args.summary.as_str())),
-        ("--reviewer", Some(args.reviewer.as_str())),
+        ("--actor-id", Some(args.reviewer.as_str())),
         ("--file-ref", args.file_ref.as_deref()),
         ("--actor-id", Some(args.actor_id.as_str())),
     ] {
@@ -561,30 +548,22 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     }
 
     // The coherence pair, as a NAMED diagnostic rather than a second
-    // enforcement layer (module doc): the construction below physically
-    // cannot produce either of these states, so this exists to say
-    // which flag was wrong, now, instead of leaving the caller a
-    // `malformed` record two commands later.
-    match (args.disposition, &args.resolution_sha) {
-        (FindingDisposition::Fixed, None) => {
-            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha; `fixed` means CLOSED BY A COMMIT, so a fixed finding that cannot name one is a fix nobody can go look at").hint("pass --resolution-sha <commit> (`git rev-parse HEAD` prints the current one), or choose another --disposition").field("--resolution-sha").emit("canon finding add", args.json);
-        }
-        (disposition, Some(sha)) if disposition != FindingDisposition::Fixed => {
-            return CliError::refused("FINDING_RESOLUTION_SHA_UNEXPECTED", format!("--resolution-sha {sha} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the sha or set --disposition fixed",
+    // enforcement layer (module doc): `fixed` takes `--resolution-rev` or
+    // its default `HEAD`, so only the other direction can be wrong.
+    if let (disposition, Some(rev)) = (args.disposition, &args.resolution_rev) {
+        if disposition != FindingDisposition::Fixed {
+            return CliError::refused("FINDING_RESOLUTION_REV_UNEXPECTED", format!("--resolution-rev {rev} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the revision or set --disposition fixed",
                 disposition.as_str()
-            )).hint("drop --resolution-sha, or set --disposition fixed").field("--resolution-sha").emit("canon finding add", args.json);
+            )).hint("drop --resolution-rev, or set --disposition fixed").field("--resolution-rev").emit("canon finding add", args.json);
         }
-        _ => {}
     }
 
-    // Every sha-shaped flag must name a commit this repository actually
-    // holds, and a short one is resolved to the full sha the record
-    // stores (module doc's sha sections). Placed here, after the
-    // pure-string refusals and before anything is constructed, so a
-    // refused add still writes nothing — and so the two cheap local
-    // checks run before this one ever spawns `git`.
-    let shas = match resolve_shas(&repo, args) {
-        Ok(shas) => shas,
+    // Every commit option is resolved by git to the full sha the record
+    // stores (module doc); the code tree each saw is recorded with it.
+    // Placed after the pure-string refusals and before anything is
+    // constructed, so a refused add still writes nothing.
+    let commits = match resolve_commits(&repo, args) {
+        Ok(commits) => commits,
         Err(refusal) => {
             return refusal.emit("canon finding add", args.json);
         }
@@ -602,23 +581,18 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
         args.reviewer.as_str(),
         args.summary.as_str(),
     );
-    finding = match (args.disposition, shas.resolution) {
-        (FindingDisposition::Fixed, Some(sha)) => finding.fixed_by(sha),
+    finding = match (args.disposition, commits.resolution) {
+        (FindingDisposition::Fixed, Some(resolution)) => finding.fixed_by(resolution.sha).with_resolution_code(&resolution.code_tree, resolution.worktree_dirty),
         (FindingDisposition::Rejected, _) => finding.rejected(),
         (FindingDisposition::Deferred, _) => finding.deferred(),
-        // `Open` is what `Finding::new` already produced, and the match
-        // above proved `resolution_sha` is `None` here.
+        // `Open` is what `Finding::new` already produced.
         (FindingDisposition::Open, _) => finding,
-        // Unreachable: `(Fixed, None)` was refused above. Handled
-        // rather than assumed away, and never by fabricating a sha.
-        (FindingDisposition::Fixed, None) => {
-            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha").hint("pass --resolution-sha <commit> (`git rev-parse HEAD` prints the current one), or choose another --disposition").field("--resolution-sha").emit("canon finding add", args.json);
-        }
+        // Unreachable: `resolve_commits` binds `HEAD` for a `fixed` finding
+        // with no `--resolution-rev`. Handled rather than assumed away.
+        (FindingDisposition::Fixed, None) => unreachable!("a fixed finding always resolves a commit"),
     };
-    if let Some(sha) = shas.reviewed {
-        finding = finding.reviewing_sha(sha);
-    }
-    if let Some(sha) = shas.introduced_by {
+    finding = finding.reviewing_sha(commits.reviewed.sha).with_code(&commits.reviewed.code_tree, commits.reviewed.worktree_dirty);
+    if let Some(sha) = commits.introduced {
         finding = finding.with_introduced_by(sha);
     }
     if let Some(file_ref) = &args.file_ref {
@@ -642,11 +616,29 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon finding add", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding add", args.json);
         }
     };
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
     let committed = GitTier::new(&ledger_root);
+    // An identical add repeated (same key, same content, whoever the clock
+    // says) is a repeat: nothing is staged and the existing record is reported.
+    let same_finding = |stored: &serde_json::Value| resolve_partition(RecordKind::Finding, stored).is_ok_and(|key| key.natural_key == natural_key);
+    if let Some(existing) = crate::retry::repeats_latest(&ledger_root, Some(&evidence_staging_dir(&ledger_root)), RecordKind::Finding.as_str(), &body, same_finding, None) {
+        crate::say!(args.json, "canon finding add: unchanged — an identical finding (`{}`, round {}, seq {}) is already {}; nothing written", args.change_id, args.round, args.seq, existing.describe());
+        crate::json_out::mark_unchanged();
+        let record = FindingAddReport {
+            landing: existing.landing(),
+            change_id: args.change_id.as_str(),
+            round: args.round,
+            seq: args.seq,
+            severity: severity_slug(args.severity),
+            disposition: args.disposition.as_str(),
+            unsourced: args.introduced_rev.is_none(),
+        };
+        crate::next::finish(&repo, "finding add", &crate::next::Scope::Change(args.change_id.as_str().to_string()), false, args.json, &record);
+        return 0;
+    }
     match occupied_by(&natural_key, &staging, &committed) {
         Ok(Some(occupant)) => {
             return CliError::refused("FINDING_SEQ_OCCUPIED", format!("{} is already occupied by a {occupant} finding (`{}`, round {}, seq {}); pick the next free --seq rather than authoring a second record under one finding's identity. To move THAT finding's disposition instead, use `canon finding close`.",
@@ -673,7 +665,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
                 args.disposition.as_str(),
                 settled.suffix()
             );
-            if args.introduced_by.is_none() {
+            if args.introduced_rev.is_none() {
                 // Said on the success path, not only in `--help`: this
                 // is the moment the author still remembers whether the
                 // introducing commit was sourced, and an unsourced
@@ -681,18 +673,20 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
                 // UNDER-counts (module doc's canonical sentence).
                 crate::say!(
                     args.json,
-                    "canon finding add: note — no --introduced-by, so this finding is UNSOURCED for fix-of-fix derivation. That is the correct record when the introducing commit was not established; never guess one."
+                    "canon finding add: note — no --introduced-rev, so this finding is UNSOURCED for fix-of-fix derivation. That is the correct record when the introducing commit was not established; never guess one."
                 );
             }
             if settled.exit_code() == 0 {
-                let mut record = settled.json(&receipt.location);
-                record["changeId"] = serde_json::json!(args.change_id.as_str());
-                record["round"] = serde_json::json!(args.round);
-                record["seq"] = serde_json::json!(args.seq);
-                record["severity"] = serde_json::json!(severity_slug(args.severity));
-                record["disposition"] = serde_json::json!(args.disposition.as_str());
-                record["unsourced"] = serde_json::json!(args.introduced_by.is_none());
-                crate::next::finish(&repo, "finding add", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, record);
+                let record = FindingAddReport {
+                    landing: settled.landing(&receipt.location),
+                    change_id: args.change_id.as_str(),
+                    round: args.round,
+                    seq: args.seq,
+                    severity: severity_slug(args.severity),
+                    disposition: args.disposition.as_str(),
+                    unsourced: args.introduced_rev.is_none(),
+                };
+                crate::next::finish(&repo, "finding add", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, &record);
             }
             settled.exit_code()
         }
@@ -721,7 +715,8 @@ pub struct FindingCloseArgs {
     /// after a fix that did not hold is a real transition, and refusing
     /// it would leave the ledger able to record only one direction.
     pub disposition: FindingDisposition,
-    pub resolution_sha: Option<CommitArg>,
+    /// `--resolution-rev`; `None` means `HEAD` when the disposition is `fixed`.
+    pub resolution_rev: Option<String>,
     /// Why it was closed (0.25, #98): required for `rejected` and
     /// `deferred`, optional otherwise, always one line.
     pub reason: Option<String>,
@@ -740,7 +735,7 @@ pub struct FindingCloseArgs {
 /// with the one flag it lacks.
 fn reason_shape(args: &FindingCloseArgs) -> String {
     format!(
-        "canon finding close --change-id {} --round {} --seq {} --disposition {} --reason \"<why, one line>\"",
+        "canon finding close {} --round {} --seq {} --disposition {} --reason \"<why, one line>\"",
         args.change_id,
         args.round,
         args.seq,
@@ -776,7 +771,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon finding close", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding close", args.json);
         }
     };
 
@@ -790,16 +785,12 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     // voice. It runs BEFORE the lookup so a caller who named the wrong
     // flags is told that, rather than being told a finding they spelled
     // correctly does not exist.
-    match (args.disposition, &args.resolution_sha) {
-        (FindingDisposition::Fixed, None) => {
-            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha; `fixed` means CLOSED BY A COMMIT, so a fixed finding that cannot name one is a fix nobody can go look at").hint("pass --resolution-sha <commit> (`git rev-parse HEAD` prints the current one), or choose another --disposition").field("--resolution-sha").emit("canon finding close", args.json);
-        }
-        (disposition, Some(sha)) if disposition != FindingDisposition::Fixed => {
-            return CliError::refused("FINDING_RESOLUTION_SHA_UNEXPECTED", format!("--resolution-sha {sha} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the sha or set --disposition fixed",
+    if let (disposition, Some(rev)) = (args.disposition, &args.resolution_rev) {
+        if disposition != FindingDisposition::Fixed {
+            return CliError::refused("FINDING_RESOLUTION_REV_UNEXPECTED", format!("--resolution-rev {rev} was given with --disposition {}; only a `fixed` finding was closed by a commit, so drop the revision or set --disposition fixed",
                 disposition.as_str()
-            )).hint("drop --resolution-sha, or set --disposition fixed").field("--resolution-sha").emit("canon finding close", args.json);
+            )).hint("drop --resolution-rev, or set --disposition fixed").field("--resolution-rev").emit("canon finding close", args.json);
         }
-        _ => {}
     }
 
     // `--reason`, refused before any lookup or write: owed by `rejected`
@@ -820,22 +811,18 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
         None => {}
     }
 
-    let resolution_sha = match args.resolution_sha.as_ref().map(|arg| resolve_commit(&repo, arg, true)).transpose() {
-        Ok(sha) => sha,
-        Err(Unresolved::NoCommit) => {
-            return CliError::refused("FINDING_UNRESOLVABLE_COMMIT", format!("--resolution-sha {} does not name a commit this repository holds; a resolution sha nobody can check out closes nothing",
-                args.resolution_sha.as_ref().expect("only a present flag can fail to resolve")
-            )).hint("pass the full sha of a commit this repository holds (`git rev-parse <rev>` prints it)").emit("canon finding close", args.json);
-        }
-        Err(Unresolved::Abbreviation(why)) => {
-            return abbreviation_refusal("--resolution-sha", args.resolution_sha.as_ref().expect("only a present flag can fail to resolve"), &why).emit("canon finding close", args.json);
-        }
+    let resolution = match (args.disposition, args.resolution_rev.as_deref()) {
+        (FindingDisposition::Fixed, rev) => match crate::git_rev::bind(&repo, rev.unwrap_or(crate::git_rev::DEFAULT_REV)) {
+            Ok(bound) => Some(bound),
+            Err(refusal) => return refusal.emit("canon finding close", args.json),
+        },
+        _ => None,
     };
 
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon finding close", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding close", args.json);
         }
     };
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
@@ -887,8 +874,9 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
             args.seq,
             args.disposition.as_str()
         );
-        let noop = serde_json::json!({ "changeId": args.change_id.as_str(), "round": args.round, "seq": args.seq, "disposition": args.disposition.as_str(), "noop": true });
-        crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), false, args.json, noop);
+        crate::json_out::mark_unchanged();
+        let noop = FindingCloseReport { landing: None, change_id: args.change_id.as_str(), round: args.round, seq: args.seq, from: None, disposition: args.disposition.as_str() };
+        crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), false, args.json, &noop);
         return 0;
     }
 
@@ -906,19 +894,19 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
         existing.reviewer.as_str(),
         existing.summary.as_str(),
     );
-    transitioned = match (args.disposition, resolution_sha) {
-        (FindingDisposition::Fixed, Some(sha)) => transitioned.fixed_by(sha),
+    transitioned = match (args.disposition, resolution) {
+        (FindingDisposition::Fixed, Some(resolution)) => transitioned.fixed_by(resolution.sha).with_resolution_code(&resolution.code_tree, resolution.worktree_dirty),
         (FindingDisposition::Rejected, _) => transitioned.rejected(),
         (FindingDisposition::Deferred, _) => transitioned.deferred(),
         (FindingDisposition::Open, _) => transitioned,
-        // Unreachable: refused by the coherence pair above. Handled
-        // rather than assumed away, and never by fabricating a sha.
-        (FindingDisposition::Fixed, None) => {
-            return CliError::refused("FINDING_RESOLUTION_SHA_REQUIRED", "--disposition fixed requires --resolution-sha").hint("pass --resolution-sha <commit> (`git rev-parse HEAD` prints the current one), or choose another --disposition").field("--resolution-sha").emit("canon finding close", args.json);
-        }
+        // Unreachable: a `fixed` close always binds a commit above.
+        (FindingDisposition::Fixed, None) => unreachable!("a fixed close always resolves a commit"),
     };
     if let Some(sha) = existing.reviewed_sha.clone() {
         transitioned = transitioned.reviewing_sha(sha);
+    }
+    if let (Some(tree), Some(dirty)) = (&existing.code_tree, existing.worktree_dirty) {
+        transitioned = transitioned.with_code(tree, dirty);
     }
     if let Some(sha) = existing.introduced_by.clone() {
         transitioned = transitioned.with_introduced_by(sha);
@@ -958,14 +946,15 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
                 settled.suffix()
             );
             if settled.exit_code() == 0 {
-                let mut record = settled.json(&receipt.location);
-                record["changeId"] = serde_json::json!(args.change_id.as_str());
-                record["round"] = serde_json::json!(args.round);
-                record["seq"] = serde_json::json!(args.seq);
-                record["from"] = serde_json::json!(existing.disposition().as_str());
-                record["disposition"] = serde_json::json!(args.disposition.as_str());
-                record["noop"] = serde_json::json!(false);
-                crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, record);
+                let record = FindingCloseReport {
+                    landing: Some(settled.landing(&receipt.location)),
+                    change_id: args.change_id.as_str(),
+                    round: args.round,
+                    seq: args.seq,
+                    from: Some(existing.disposition().as_str()),
+                    disposition: args.disposition.as_str(),
+                };
+                crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, &record);
             }
             settled.exit_code()
         }
@@ -1025,7 +1014,7 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon finding list", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding list", args.json);
         }
     };
     let read = current_findings(&GitTier::new(&ledger_root), &args.change_id)
@@ -1052,28 +1041,26 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
     };
 
     if args.json {
-        let rows: Vec<serde_json::Value> = findings
-            .iter()
-            .map(|f| {
-                let row = serde_json::json!({
-                    "round": f.round,
-                    "seq": f.seq,
-                    "severity": severity_slug(f.severity),
-                    "disposition": f.disposition().as_str(),
-                    "reviewer": f.reviewer,
-                    "summary": f.summary,
-                    "resolution_sha": f.resolution_sha().map(|sha| sha.as_str()),
-                    "file_ref": f.file_ref,
-                    "reason": f.reason,
-                });
-                match &args.fields {
-                    Some(fields) => crate::paging::project(&row, fields),
-                    None => row,
-                }
-            })
-            .collect();
-        let out = serde_json::json!({ "change_id": args.change_id.as_str(), "findings": rows, "meta": meta.to_json() });
-        println!("{}", serde_json::to_string_pretty(&out).expect("a JSON value always serializes"));
+        let rows = findings.iter().map(|f| FindingRow {
+            round: f.round,
+            seq: f.seq,
+            severity: severity_slug(f.severity),
+            disposition: f.disposition().as_str(),
+            reviewer: &f.reviewer,
+            summary: &f.summary,
+            resolution_sha: f.resolution_sha().map(|sha| sha.as_str()),
+            file_ref: f.file_ref.as_deref(),
+            reason: f.reason.as_deref(),
+        });
+        match &args.fields {
+            Some(fields) => {
+                let findings = rows
+                    .map(|row| crate::json_out::Projected::new(crate::paging::project(&serde_json::to_value(row).expect("a finding row serializes"), fields)))
+                    .collect();
+                crate::json_out::data_with_meta("finding list", &FindingListFieldsReport { change_id: args.change_id.as_str(), findings }, meta.to_json());
+            }
+            None => crate::json_out::data_with_meta("finding list", &FindingListReport { change_id: args.change_id.as_str(), findings: rows.collect() }, meta.to_json()),
+        }
     } else if findings.is_empty() {
         let which = if args.open { "open findings" } else { "findings" };
         println!("canon finding list: no committed {which} on change `{}`", args.change_id);
@@ -1084,13 +1071,13 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
         }
     }
     if staged > 0 {
-        eprintln!("canon finding list: {staged} staged finding(s) on change `{}` are not listed until committed — run `canon gate promote`", args.change_id);
+        crate::say_err!(args.json, "canon finding list: {staged} staged finding(s) on change `{}` are not listed until committed — run `canon gate promote`", args.change_id);
     }
     0
 }
 
 /// The JSON fields of one `finding list` row, which `--fields` may name.
-const LIST_FIELDS: [&str; 9] = ["round", "seq", "severity", "disposition", "reviewer", "summary", "resolution_sha", "file_ref", "reason"];
+const LIST_FIELDS: [&str; 9] = ["round", "seq", "severity", "disposition", "reviewer", "summary", "resolutionSha", "fileRef", "reason"];
 
 /// One header row and one row per finding, columns padded to their
 /// widest cell; the summary, last, is never padded and carries the
@@ -1217,7 +1204,7 @@ fn occupied_by(natural_key: &str, staging: &GitTier, committed: &GitTier) -> Res
 /// be evidenced. Matched by id across spec roots, as the finding keys it.
 fn check_scenarios_exist(repo: &Path, ids: &[ScenarioId]) -> Result<(), CliError> {
     let unreadable = |e: String| {
-        CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again")
+        CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again")
     };
     let ctx = GateCtx::from_repo(repo).map_err(|e| unreadable(e.to_string()))?;
     let context = canon_gate::GateContext::load(ctx, &canon_policy::SchemaRegistry::load(), Utc::now()).map_err(|e| unreadable(e.to_string()))?;
@@ -1234,139 +1221,33 @@ fn check_scenarios_exist(repo: &Path, ids: &[ScenarioId]) -> Result<(), CliError
     .hint("run `canon inventory sync`, or name an id from `canon query --kind scenario`, then run `canon finding add` again"))
 }
 
-/// The three sha-shaped flags of one `canon finding add`, each resolved
-/// to the full sha its record stores.
-struct ResolvedShas {
-    reviewed: Option<Sha>,
-    resolution: Option<Sha>,
-    introduced_by: Option<Sha>,
+/// The commit options of one `canon finding add`, each resolved to the full
+/// sha its record stores.
+struct ResolvedCommits {
+    /// `--rev`, with the code tree it saw.
+    reviewed: crate::git_rev::Bound,
+    /// `--resolution-rev`, or `HEAD` for a `fixed` finding; `None` for any other disposition.
+    resolution: Option<crate::git_rev::Bound>,
+    /// `--introduced-rev`; `None` when it was not sourced.
+    introduced: Option<Sha>,
 }
 
-/// Resolve every sha-shaped flag, or the refusal for the first one that
-/// does not resolve (module doc's sha sections).
-///
-/// Returns the whole message rather than a bool so the flag NAME and the
-/// value travel with the failure: "a sha did not resolve" is unusable
-/// when three flags could have carried it.
-fn resolve_shas(repo: &Path, args: &FindingArgs) -> Result<ResolvedShas, CliError> {
-    let flags = [
-        ("--reviewed-sha", args.reviewed_sha.as_ref()),
-        ("--resolution-sha", args.resolution_sha.as_ref()),
-        ("--introduced-by", args.introduced_by.as_ref()),
-    ];
-    // A full sha's existence check is best-effort (module doc): it runs
-    // only inside a non-shallow work tree. No full sha, no git spawned
-    // to ask — the common case, since most findings carry none. The
-    // skip conditions are asked cheap negative first: a non-checkout
-    // answers `false`/non-zero to both, so the second call only ever
-    // runs inside a real work tree.
-    let verify_full = flags.iter().any(|(_, arg)| arg.is_some_and(CommitArg::is_full))
-        && git_answers(repo, &["rev-parse", "--is-inside-work-tree"], "true")
-        && !git_answers(repo, &["rev-parse", "--is-shallow-repository"], "true");
-
-    let mut resolved: [Option<Sha>; 3] = [None, None, None];
-    for (slot, (flag, arg)) in resolved.iter_mut().zip(flags) {
-        let Some(arg) = arg else { continue };
-        *slot = Some(resolve_commit(repo, arg, verify_full).map_err(|unresolved| match unresolved {
-            Unresolved::NoCommit => CliError::refused("FINDING_UNRESOLVABLE_COMMIT", format!(
-                "{flag} {arg} is well-formed but names no commit in this repository. Canon does not read the commit's message or diff and is not doing so now; it only refuses a record whose provenance points at nothing. This flag is commit-only, so an object id that names a tag, a tree or a blob is refused here too. Check the sha (a short sha padded to 40 characters is the way this has actually happened), or omit the flag."
-            )).hint("pass the full sha of a commit this repository holds (`git rev-parse <rev>` prints it)"),
-            Unresolved::Abbreviation(why) => abbreviation_refusal(flag, arg, &why),
-        })?);
-    }
-    let [reviewed, resolution, introduced_by] = resolved;
-    Ok(ResolvedShas { reviewed, resolution, introduced_by })
-}
-
-/// Why a sha-shaped flag did not resolve to a commit this repository
-/// holds.
-enum Unresolved {
-    /// A full sha that names no commit object here, or names an object
-    /// that is not a commit.
-    NoCommit,
-    /// An abbreviation git could not resolve to exactly one commit's own
-    /// sha; the payload says why.
-    Abbreviation(String),
-}
-
-/// Resolve one flag's value to the full commit sha a record stores
-/// (module doc). A full sha is checked with [`commit_exists`] only when
-/// `verify_full` — `finding add` skips that check outside a checkout,
-/// `finding close` never does. An abbreviation is always resolved
-/// through `git rev-parse --verify <abbrev>^{commit}`, and the answer
-/// must itself begin with the abbreviation: `^{commit}` peels a tag
-/// through to its commit, and a commit-only field must not take a tag's
-/// id by way of that peel.
-fn resolve_commit(repo: &Path, arg: &CommitArg, verify_full: bool) -> Result<Sha, Unresolved> {
-    if let Ok(sha) = Sha::parse(arg.0.as_str()) {
-        return if !verify_full || commit_exists(repo, &sha) { Ok(sha) } else { Err(Unresolved::NoCommit) };
-    }
-    let output = git_command(repo)
-        .args(["rev-parse", "--verify", &format!("{arg}^{{commit}}")])
-        .output()
-        .map_err(|e| Unresolved::Abbreviation(format!("git could not be run ({e})")))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let why = if stderr.contains("ambiguous") {
-            "it is ambiguous here: more than one commit starts with it"
-        } else if stderr.contains("not a git repository") {
-            "this directory is not a git repository, so nothing can resolve it"
-        } else {
-            "it names no commit in this repository"
-        };
-        return Err(Unresolved::Abbreviation(why.to_string()));
-    }
-    let answer = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    match Sha::parse(answer.as_str()) {
-        Ok(sha) if answer.starts_with(arg.0.as_str()) => Ok(sha),
-        Ok(_) => Err(Unresolved::Abbreviation(format!("it resolves only by peeling a tag or ref through to commit {answer}, and this flag records a commit's own sha"))),
-        Err(_) => Err(Unresolved::Abbreviation(format!("git answered `{answer}`, which is not a 40-character commit sha"))),
-    }
-}
-
-/// The refusal for an abbreviation that did not resolve, naming the
-/// flag, the value and why.
-fn abbreviation_refusal(flag: &str, arg: &CommitArg, why: &str) -> CliError {
-    CliError::refused("FINDING_UNRESOLVABLE_COMMIT", format!("{flag} {arg} cannot be resolved to a commit: {why}. Pass more of the sha, or the full sha (`git rev-parse <rev>` prints it).")).hint("pass the full sha of a commit this repository holds (`git rev-parse <rev>` prints it)")
-}
-
-/// `true` iff `git -C repo <args>` succeeds and prints exactly
-/// `expected`. Any failure — `git` missing, a non-zero exit, non-UTF-8
-/// output — is `false`, which is what makes the two skip conditions
-/// above SKIP rather than refuse, and what makes [`commit_exists`]
-/// refuse an object it cannot type.
-fn git_answers(repo: &Path, args: &[&str], expected: &str) -> bool {
-    git_command(repo).args(args).output().is_ok_and(|out| out.status.success() && String::from_utf8_lossy(&out.stdout).trim() == expected)
-}
-
-/// `true` iff `repo` holds `sha` as a COMMIT object — the object's OWN
-/// type, unpeeled.
-///
-/// `cat-file -t` reports the type of the named object and peels
-/// nothing, which is the whole reason it is used here instead of
-/// `cat-file -e <sha>^{commit}`: `^{commit}` peels RECURSIVELY, so an
-/// annotated TAG's own object id resolves through to the commit it
-/// points at and would pass. All three flags this backs are
-/// commit-only by contract, so a tag, tree or blob object id is as
-/// wrong as a sha naming nothing, and each answers a type that is not
-/// `commit`.
-///
-/// Existence, never reachability (module doc): the object database is
-/// asked directly, so a commit on an unmerged review branch resolves,
-/// which is the normal mid-review case.
-fn commit_exists(repo: &Path, sha: &Sha) -> bool {
-    git_answers(repo, &["cat-file", "-t", &sha.to_string()], "commit")
-}
-
-/// The one place `git` is spawned for this module — `-C repo` so the
-/// process CWD never decides which repository is asked, and
-/// `GIT_NO_LAZY_FETCH=1` so a partial clone answers from local objects
-/// instead of an authoring command silently hitting the network. (Older
-/// gits ignore the variable, which costs nothing.)
-fn git_command(repo: &Path) -> Command {
-    let mut command = Command::new("git");
-    command.arg("-C").arg(repo).env("GIT_NO_LAZY_FETCH", "1");
-    command
+/// Resolve every commit option through [`crate::git_rev`], or the refusal
+/// (`NO_COMMIT`) of the first that does not resolve (module doc).
+fn resolve_commits(repo: &Path, args: &FindingArgs) -> Result<ResolvedCommits, CliError> {
+    let reviewed = crate::git_rev::bind(repo, &args.rev)?;
+    let resolution = match (args.disposition, args.resolution_rev.as_deref()) {
+        (FindingDisposition::Fixed, rev) => Some(crate::git_rev::bind(repo, rev.unwrap_or(crate::git_rev::DEFAULT_REV))?),
+        _ => None,
+    };
+    let introduced = match args.introduced_rev.as_deref() {
+        Some(rev) => {
+            let sha = crate::git_rev::resolve_rev(repo, rev)?;
+            Some(Sha::parse(&sha).map_err(|e| crate::git_rev::no_commit(format!("`{rev}` resolves to `{sha}`, which is not a 40-digit sha: {e}")))?)
+        }
+        None => None,
+    };
+    Ok(ResolvedCommits { reviewed, resolution, introduced })
 }
 
 /// A [`FindingSeverity`]'s operator-facing spelling, matching
@@ -1387,20 +1268,21 @@ fn severity_slug(severity: FindingSeverity) -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    use std::process::Command;
     use super::*;
 
     fn args(change_id: &str, round: u32, seq: u32) -> FindingArgs {
         FindingArgs {
             change_id: ChangeId::parse(change_id).unwrap(),
-            reviewed_sha: None,
+            rev: "HEAD".to_string(),
             round,
             seq,
             severity: FindingSeverity::Blocker,
             disposition: FindingDisposition::Open,
             reviewer: "reviewer-1".to_string(),
             summary: "the release count was typed from memory".to_string(),
-            resolution_sha: None,
-            introduced_by: None,
+            resolution_rev: None,
+            introduced_rev: None,
             file_ref: None,
             scenario_ids: Vec::new(),
             actor_id: "canon".to_string(),
@@ -1412,6 +1294,10 @@ mod tests {
     }
 
     fn repo() -> tempfile::TempDir {
+        git_repo().0
+    }
+
+    fn files() -> tempfile::TempDir {
         let dir = tempfile::tempdir().expect("a temp dir");
         std::fs::write(dir.path().join("canon.yaml"), "routing:\n  finding: local\n").expect("writing canon.yaml");
         dir
@@ -1422,17 +1308,15 @@ mod tests {
         staging.read(&TierQuery::kind(RecordKind::Finding)).expect("reading staging").records.into_iter().map(|raw| raw.0).collect()
     }
 
-    /// A repo() that is ALSO a real git checkout with one commit, so the
-    /// sha-existence check actually engages. `repo()` alone is not a work
-    /// tree, which is exactly why every other test in this module is
-    /// unaffected by that check.
+    /// The fixture files committed as one git commit, which every
+    /// revision-binding command needs.
     fn git_repo() -> (tempfile::TempDir, Sha) {
-        let dir = repo();
+        let dir = files();
         let git = |args: &[&str]| {
             let status = Command::new("git").arg("-C").arg(dir.path()).args(args).status().expect("git must be on PATH for this test");
             assert!(status.success(), "git {args:?} failed");
         };
-        git(&["init", "-q"]);
+        git(&["init", "-q", "-b", "main"]);
         git(&["config", "user.email", "test@canon.invalid"]);
         git(&["config", "user.name", "canon test"]);
         git(&["add", "canon.yaml"]);
@@ -1442,103 +1326,60 @@ mod tests {
         (dir, head)
     }
 
-    /// An ANNOTATED tag on `HEAD`, and its OWN object id — the id
-    /// `git rev-parse <tag>` prints, which is the tag object, not the
-    /// commit it points at. The distinction is the whole test below.
-    fn annotated_tag(repo: &Path, name: &str) -> Sha {
-        let git = |args: &[&str]| {
-            let status = Command::new("git").arg("-C").arg(repo).args(args).status().expect("git must be on PATH for this test");
-            assert!(status.success(), "git {args:?} failed");
-        };
-        git(&["tag", "-a", name, "-m", "an annotated tag", "HEAD"]);
-        let out = Command::new("git").arg("-C").arg(repo).args(["rev-parse", name]).output().expect("git rev-parse");
-        let tag = Sha::parse(String::from_utf8(out.stdout).unwrap().trim()).expect("a tag object id is a 40-hex sha");
-        // The premise, asserted rather than assumed: if this fixture ever
-        // produced a lightweight tag, `rev-parse` would print the COMMIT
-        // and the test below would pass for the wrong reason.
-        let typed = Command::new("git").arg("-C").arg(repo).args(["cat-file", "-t", &tag.to_string()]).output().expect("git cat-file");
-        assert_eq!(String::from_utf8_lossy(&typed.stdout).trim(), "tag", "the fixture must produce a tag OBJECT");
-        tag
-    }
-
-    /// The three commit-only sha flags with the mutation that sets each
-    /// one. `--resolution-sha` drags `--disposition fixed` along, or the
-    /// coherence refusal fires first and the sha check never runs.
-    fn sha_flags() -> [(&'static str, fn(&mut FindingArgs, Sha)); 3] {
+    /// The three revision flags with the mutation that sets each one.
+    /// `--resolution-rev` drags `--disposition fixed` along, or the
+    /// coherence refusal fires first and the revision check never runs.
+    fn rev_flags() -> [(&'static str, fn(&mut FindingArgs, &str)); 3] {
         [
-            ("--reviewed-sha", |a: &mut FindingArgs, s: Sha| a.reviewed_sha = Some(s.into())),
-            ("--introduced-by", |a: &mut FindingArgs, s: Sha| a.introduced_by = Some(s.into())),
-            ("--resolution-sha", |a: &mut FindingArgs, s: Sha| {
+            ("--rev", |a: &mut FindingArgs, r: &str| a.rev = r.to_string()),
+            ("--introduced-rev", |a: &mut FindingArgs, r: &str| a.introduced_rev = Some(r.to_string())),
+            ("--resolution-rev", |a: &mut FindingArgs, r: &str| {
                 a.disposition = FindingDisposition::Fixed;
-                a.resolution_sha = Some(s.into());
+                a.resolution_rev = Some(r.to_string());
             }),
         ]
     }
 
-    /// s43 round 2, seq 10 — the input that got past authoring: a
-    /// well-formed 40-hex sha naming no commit. Records citing a commit
-    /// that never existed were accepted by the command built to stop
-    /// fabricated release facts.
+    /// A revision that names no commit is refused on every flag, and a
+    /// refused add stages nothing.
     #[test]
-    fn a_well_formed_sha_that_names_no_commit_is_refused_by_flag_name() {
-        // The literal shape that caused it: a short sha zero-padded to 40.
-        let fabricated = Sha::parse(format!("aa9a4552{}", "0".repeat(32))).unwrap();
-
-        for (label, apply) in sha_flags() {
-            let (dir, _head) = git_repo();
-            let mut fabricating = args("s43-findings-are-records", 2, 10);
-            apply(&mut fabricating, fabricated.clone());
-            assert_eq!(run_add(dir.path(), &fabricating), 2, "{label} accepted a commit that does not exist");
-            assert!(staged_bodies(dir.path()).is_empty(), "{label}: a refused add must stage nothing");
+    fn a_revision_that_names_no_commit_is_refused_on_every_flag() {
+        for revision in ["f".repeat(40), "no-such-branch".to_string()] {
+            for (label, apply) in rev_flags() {
+                let (dir, _head) = git_repo();
+                let mut fabricating = args("s43-findings-are-records", 2, 10);
+                apply(&mut fabricating, &revision);
+                assert_eq!(run_add(dir.path(), &fabricating), 2, "{label} accepted `{revision}`");
+                assert!(staged_bodies(dir.path()).is_empty(), "{label}: a refused add must stage nothing");
+            }
         }
     }
 
-    /// s43 round 3, finding 2. All three flags are commit-only by
-    /// contract, and the check used to be `cat-file -e <sha>^{commit}`
-    /// — which peels RECURSIVELY, so an annotated TAG's own object id
-    /// resolved through to the commit it points at and was accepted
-    /// into a commit-only provenance field. The object EXISTS and is
-    /// not a commit, which is exactly the case the peeling check could
-    /// not distinguish.
+    /// Outside a git work tree there is nothing to bind to: refused.
     #[test]
-    fn an_annotated_tags_own_object_id_is_refused_on_every_sha_flag() {
-        for (label, apply) in sha_flags() {
-            let (dir, _head) = git_repo();
-            let tag = annotated_tag(dir.path(), "v-review");
-            let mut tagged = args("s43-findings-are-records", 3, 2);
-            apply(&mut tagged, tag.clone());
-            assert_eq!(run_add(dir.path(), &tagged), 2, "{label} accepted a tag object id {tag} into a commit-only field");
-            assert!(staged_bodies(dir.path()).is_empty(), "{label}: a refused add must stage nothing");
-        }
+    fn outside_a_git_checkout_the_add_is_refused() {
+        let dir = files();
+        assert!(!dir.path().join(".git").exists(), "the premise: this fixture is not a checkout");
+        assert_eq!(run_add(dir.path(), &args("s43-findings-are-records", 2, 12)), 2);
+        assert!(staged_bodies(dir.path()).is_empty());
     }
 
-    /// The other half: a sha this repository DOES hold goes through on
-    /// every flag, so the check is existence and not a blanket refusal.
+    /// A revision this repository holds goes through on every flag, in
+    /// any spelling git resolves, and is stored as the full sha.
     #[test]
-    fn a_sha_this_repository_holds_is_accepted_on_every_flag() {
+    fn a_revision_this_repository_holds_is_accepted_and_stored_in_full() {
         let (dir, head) = git_repo();
         let mut resolvable = args("s43-findings-are-records", 2, 11);
-        resolvable.reviewed_sha = Some(head.clone().into());
-        resolvable.introduced_by = Some(head.clone().into());
+        resolvable.rev = head.as_str()[..8].to_string();
+        resolvable.introduced_rev = Some("HEAD".to_string());
         resolvable.disposition = FindingDisposition::Fixed;
-        resolvable.resolution_sha = Some(head.clone().into());
+        resolvable.resolution_rev = Some("main".to_string());
         assert_eq!(run_add(dir.path(), &resolvable), 0);
-        assert_eq!(staged_bodies(dir.path()).len(), 1);
-    }
-
-    /// Best-effort, stated in the module doc and pinned here: outside a
-    /// git work tree the check is SKIPPED, never failed. A fixture
-    /// directory has no history to check against, and refusing there
-    /// would break authoring where nothing is verifiable either way.
-    #[test]
-    fn outside_a_git_checkout_the_sha_existence_check_is_skipped() {
-        let dir = repo();
-        assert!(!dir.path().join(".git").exists(), "the premise: this fixture is not a checkout");
-
-        let mut unverifiable = args("s43-findings-are-records", 2, 12);
-        unverifiable.reviewed_sha = Some(Sha::parse("f".repeat(40)).unwrap().into());
-        assert_eq!(run_add(dir.path(), &unverifiable), 0, "a non-checkout must skip the check, not refuse");
-        assert_eq!(staged_bodies(dir.path()).len(), 1);
+        let staged = staged_bodies(dir.path());
+        assert_eq!(staged.len(), 1);
+        for field in ["reviewed_sha", "introduced_by", "resolution_sha"] {
+            assert_eq!(staged[0][field].as_str(), Some(head.as_str()), "{field}");
+        }
     }
 
     /// The round-trip contract at the authoring surface: a record this
@@ -1555,7 +1396,7 @@ mod tests {
             (1, (|_: &mut FindingArgs| {}) as fn(&mut FindingArgs)),
             (2, |a: &mut FindingArgs| {
                 a.disposition = FindingDisposition::Fixed;
-                a.resolution_sha = Some(Sha::parse("b".repeat(40)).unwrap().into());
+                a.resolution_rev = Some("HEAD".to_string());
             }),
             (3, |a: &mut FindingArgs| a.disposition = FindingDisposition::Rejected),
             (4, |a: &mut FindingArgs| a.disposition = FindingDisposition::Deferred),
@@ -1601,17 +1442,16 @@ mod tests {
         assert_eq!(staged_bodies(dir.path()).len(), 2);
     }
 
-    /// Every optional field round-trips as asked, and `reviewed_sha`
-    /// absent stays ABSENT rather than serializing as `null` — an
-    /// explicit `null` fails `Finding`'s own deserialize, so a record
-    /// staged that way would be unreadable.
+    /// An add with no `--rev` binds HEAD and records the code tree.
     #[test]
-    fn a_worktree_round_stages_with_no_reviewed_sha_key_at_all() {
-        let dir = repo();
+    fn an_add_without_rev_records_head_and_its_code_tree() {
+        let (dir, head) = git_repo();
         assert_eq!(run_add(dir.path(), &args("s43-findings-are-records", 8, 1)), 0);
 
         let body = &staged_bodies(dir.path())[0];
-        assert!(body.get("reviewed_sha").is_none(), "an uncommitted round must omit the key, never write null: {body}");
+        assert_eq!(body["reviewed_sha"].as_str(), Some(head.as_str()), "{body}");
+        assert!(body["code_tree"].is_string(), "{body}");
+        assert!(body["worktree_dirty"].is_boolean(), "{body}");
         assert!(body.get("introduced_by").is_none(), "{body}");
         assert!(body.get("resolution_sha").is_none(), "{body}");
         assert_eq!(body["change_id"], "s43-findings-are-records");
@@ -1623,26 +1463,28 @@ mod tests {
     /// carries both halves of the biconditional.
     #[test]
     fn a_fixed_finding_stages_with_its_resolution_sha() {
-        let dir = repo();
+        let (dir, head) = git_repo();
         let mut fixed = args("s43-findings-are-records", 2, 1);
         fixed.disposition = FindingDisposition::Fixed;
-        fixed.resolution_sha = Some(Sha::parse("b".repeat(40)).unwrap().into());
-        fixed.introduced_by = Some(Sha::parse("c".repeat(40)).unwrap().into());
+        fixed.resolution_rev = Some("HEAD".to_string());
+        fixed.introduced_rev = Some("HEAD".to_string());
         assert_eq!(run_add(dir.path(), &fixed), 0);
 
         let body = &staged_bodies(dir.path())[0];
         assert_eq!(body["disposition"], "fixed");
-        assert_eq!(body["resolution_sha"], "b".repeat(40));
-        assert_eq!(body["introduced_by"], "c".repeat(40));
+        assert_eq!(body["resolution_sha"].as_str(), Some(head.as_str()));
+        assert_eq!(body["introduced_by"].as_str(), Some(head.as_str()));
+        assert!(body["resolution_code_tree"].is_string(), "{body}");
     }
 
+    /// `fixed` with no `--resolution-rev` resolves HEAD.
     #[test]
-    fn fixed_without_a_resolution_sha_is_refused_and_stages_nothing() {
-        let dir = repo();
-        let mut incoherent = args("s43-findings-are-records", 3, 1);
-        incoherent.disposition = FindingDisposition::Fixed;
-        assert_eq!(run_add(dir.path(), &incoherent), 2);
-        assert!(staged_bodies(dir.path()).is_empty());
+    fn fixed_without_a_resolution_rev_defaults_to_head() {
+        let (dir, head) = git_repo();
+        let mut fixed = args("s43-findings-are-records", 3, 1);
+        fixed.disposition = FindingDisposition::Fixed;
+        assert_eq!(run_add(dir.path(), &fixed), 0);
+        assert_eq!(staged_bodies(dir.path())[0]["resolution_sha"].as_str(), Some(head.as_str()));
     }
 
     /// Every non-`Fixed` disposition, not just `Open` — `rejected` and
@@ -1655,7 +1497,7 @@ mod tests {
             let dir = repo();
             let mut incoherent = args("s43-findings-are-records", 4, 1);
             incoherent.disposition = disposition;
-            incoherent.resolution_sha = Some(Sha::parse("d".repeat(40)).unwrap().into());
+            incoherent.resolution_rev = Some("HEAD".to_string());
             assert_eq!(run_add(dir.path(), &incoherent), 2, "{disposition:?} must not accept a resolution sha");
             assert!(staged_bodies(dir.path()).is_empty(), "{disposition:?} staged something");
         }
@@ -1729,7 +1571,7 @@ mod tests {
             round,
             seq,
             disposition,
-            resolution_sha: None,
+            resolution_rev: None,
             reason: matches!(disposition, FindingDisposition::Rejected | FindingDisposition::Deferred).then(|| "by design".to_string()),
             actor_id: "canon".to_string(),
             role: RoleId::parse("reviewer").unwrap(),
@@ -1767,13 +1609,13 @@ mod tests {
         let (dir, head) = git_repo();
         let mut raised = args("s44-spec-derived-worklist", 1, 1);
         raised.file_ref = Some("crates/canon-cli/src/finding.rs:1-2".to_string());
-        raised.introduced_by = Some(head.clone().into());
-        raised.reviewed_sha = Some(head.clone().into());
+        raised.introduced_rev = Some(head.clone().to_string());
+        raised.rev = head.clone().to_string();
         assert_eq!(run_add(dir.path(), &raised), 0);
         promote_staged(dir.path());
 
         let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
-        close.resolution_sha = Some(head.clone().into());
+        close.resolution_rev = Some(head.clone().to_string());
         close.actor_id = "someone-who-fixed-it".to_string();
         assert_eq!(run_close(dir.path(), &close), 0);
 
@@ -1805,7 +1647,7 @@ mod tests {
         let before = committed_bodies(dir.path());
 
         let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
-        close.resolution_sha = Some(head.into());
+        close.resolution_rev = Some(head.to_string());
         assert_eq!(run_close(dir.path(), &close), 0);
         assert_eq!(committed_bodies(dir.path()), before, "close appends; it must never rewrite the committed corpus");
     }
@@ -1821,7 +1663,7 @@ mod tests {
         promote_staged(dir.path());
 
         let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
-        close.resolution_sha = Some(head.into());
+        close.resolution_rev = Some(head.to_string());
         assert_eq!(run_close(dir.path(), &close), 0);
         promote_staged(dir.path());
 
@@ -1839,7 +1681,7 @@ mod tests {
         assert_eq!(run_add(dir.path(), &args("s44-spec-derived-worklist", 1, 1)), 0);
         promote_staged(dir.path());
         let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
-        close.resolution_sha = Some(head.into());
+        close.resolution_rev = Some(head.to_string());
         assert_eq!(run_close(dir.path(), &close), 0);
         promote_staged(dir.path());
         assert_eq!(committed_bodies(dir.path()).len(), 1, "the ledger holds the key's current version: the fixed one");
@@ -1873,26 +1715,26 @@ mod tests {
         assert_eq!(run_add(dir.path(), &args("s44-spec-derived-worklist", 1, 1)), 0);
 
         let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
-        close.resolution_sha = Some(head.into());
+        close.resolution_rev = Some(head.to_string());
         assert_eq!(run_close(dir.path(), &close), 2);
         assert_eq!(staged_bodies(dir.path()).len(), 1, "the staged original is left exactly as it was");
     }
 
-    /// The `disposition` ⇔ `resolution_sha` biconditional, in `close`'s
-    /// own voice — checked BEFORE the lookup, so a caller who named the
-    /// wrong flags is told that rather than told their finding is missing.
+    /// `close --disposition fixed` with no `--resolution-rev` resolves
+    /// HEAD; any other disposition refuses one.
     #[test]
-    fn close_enforces_the_disposition_resolution_sha_pair() {
+    fn close_defaults_fixed_to_head_and_refuses_a_rev_on_other_dispositions() {
         let (dir, head) = git_repo();
         assert_eq!(run_add(dir.path(), &args("s44-spec-derived-worklist", 1, 1)), 0);
         promote_staged(dir.path());
 
-        assert_eq!(run_close(dir.path(), &close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed)), 2, "`fixed` with no sha is a fix nobody can go look at");
+        let mut with_rev = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Rejected);
+        with_rev.resolution_rev = Some(head.to_string());
+        assert_eq!(run_close(dir.path(), &with_rev), 2, "only a `fixed` finding was closed by a commit");
+        assert!(staged_bodies(dir.path()).is_empty(), "the refusal stages nothing");
 
-        let mut with_sha = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Rejected);
-        with_sha.resolution_sha = Some(head.into());
-        assert_eq!(run_close(dir.path(), &with_sha), 2, "only a `fixed` finding was closed by a commit");
-        assert!(staged_bodies(dir.path()).is_empty(), "neither refusal stages anything");
+        assert_eq!(run_close(dir.path(), &close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed)), 0);
+        assert_eq!(staged_bodies(dir.path())[0]["resolution_sha"].as_str(), Some(head.as_str()));
     }
 
     /// A resolution sha nobody can check out closes nothing.
@@ -1903,7 +1745,7 @@ mod tests {
         promote_staged(dir.path());
 
         let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
-        close.resolution_sha = Some(Sha::parse(&"b".repeat(40)).unwrap().into());
+        close.resolution_rev = Some("b".repeat(40));
         assert_eq!(run_close(dir.path(), &close), 2);
         assert!(staged_bodies(dir.path()).is_empty());
     }
@@ -1917,7 +1759,7 @@ mod tests {
         assert_eq!(run_add(dir.path(), &args("s44-spec-derived-worklist", 1, 1)), 0);
         promote_staged(dir.path());
         let mut close = close_args("s44-spec-derived-worklist", 1, 1, FindingDisposition::Fixed);
-        close.resolution_sha = Some(head.into());
+        close.resolution_rev = Some(head.to_string());
         assert_eq!(run_close(dir.path(), &close), 0);
         promote_staged(dir.path());
 

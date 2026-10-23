@@ -40,6 +40,10 @@ const DIFF_CONTEXT: usize = 3;
 #[serde(deny_unknown_fields)]
 struct CaseSpec {
     description: String,
+    /// Commit the `repo/` fixture before the steps run (default). `false` keeps
+    /// it untracked, for a case about uncommitted state.
+    #[serde(default = "commit_by_default")]
+    commit: bool,
     #[serde(default)]
     env: BTreeMap<String, String>,
     steps: Vec<StepSpec>,
@@ -50,6 +54,10 @@ struct CaseSpec {
 struct StepSpec {
     args: Vec<String>,
     exit: i32,
+}
+
+fn commit_by_default() -> bool {
+    true
 }
 
 struct Case {
@@ -460,6 +468,28 @@ fn run_case(case: &Case, bless: bool) -> Result<(), String> {
             "git init failed: {}",
             String::from_utf8_lossy(&git.stderr)
         ));
+    }
+
+    // A commit for the commit options to name (0.28 D7b): fixed identity and
+    // dates, so the sha is the same on every run. Everything the fixture holds
+    // is in it; what a step writes afterwards is uncommitted code.
+    let mut commit_env = env.clone();
+    for (key, value) in [
+        ("GIT_AUTHOR_NAME", "conformance"),
+        ("GIT_AUTHOR_EMAIL", "conformance@example.com"),
+        ("GIT_AUTHOR_DATE", "2026-01-01T00:00:00Z"),
+        ("GIT_COMMITTER_NAME", "conformance"),
+        ("GIT_COMMITTER_EMAIL", "conformance@example.com"),
+        ("GIT_COMMITTER_DATE", "2026-01-01T00:00:00Z"),
+    ] {
+        commit_env.insert(key.to_string(), value.to_string());
+    }
+    let commit_steps: &[&[&str]] = if case.spec.commit { &[&["add", "-A"], &["commit", "-q", "--allow-empty", "-m", "fixture"]] } else { &[] };
+    for args in commit_steps.iter().copied() {
+        let out = Command::new("git").args(args).current_dir(&repo).env_clear().envs(&commit_env).output().map_err(|e| format!("spawn git {args:?}: {e}"))?;
+        if !out.status.success() {
+            return Err(format!("git {args:?} failed: {}", String::from_utf8_lossy(&out.stderr)));
+        }
     }
 
     let repo_paths = repo_path_spellings(&repo);

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-1"
+  },
+  "at": "2026-10-23T13:10:29.063223976Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "scenario_ids": [
+    "divergence.lifecycle.04",
+    "divergence.lifecycle.10",
+    "evidence.add.110",
+    "evidence.add.111",
+    "review.add.99",
+    "review.add.26",
+    "gate.check.80",
+    "gate.check.93",
+    "gate.task.06"
+  ],
+  "schema": 1,
+  "seq": 26,
+  "severity": "note",
+  "summary": "Standards pass, signed anyway: partial assertions: divergence.lifecycle.04/.10 (list output not read), evidence.add.110 (evidence_sha not checked when dirty), evidence.add.111/review.add.99 (hint only contains 'git'), review.add.26 (label parser called directly, not via clap), gate.check.80 (next reader not run), gate.check.93 (fetch-depth hint not asserted), gate.task.06 (tasks.md not re-read)",
+  "worktree_dirty": false
+}

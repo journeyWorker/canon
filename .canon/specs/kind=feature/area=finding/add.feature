@@ -23,61 +23,60 @@ Feature: finding add
     And seq is never auto-assigned, so the author transcribes the number the review artifact already gave it
 
   @subject:finding-lifecycle
-  @case:failure
+  @case:happy
   @finding.add.03
-  Scenario: A fixed finding that names no closing commit is refused
+  Scenario: A fixed finding that names no closing commit records HEAD as its resolution
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given an invocation whose disposition is fixed
-    When no resolution sha accompanies it
-    Then the command exits as a fixable usage error naming both flags
-    And nothing is staged
+    When no --resolution-rev accompanies it
+    Then the finding is staged with the full sha HEAD resolves to as its resolution
 
   @subject:finding-lifecycle
   @case:failure
   @finding.add.04
-  Scenario: A resolution sha alongside any disposition other than fixed is refused
+  Scenario: A resolution revision alongside any disposition other than fixed is refused
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
-    Given a resolution sha on the invocation
+    Given a --resolution-rev on the invocation
     When the disposition is open, rejected or deferred
-    Then every one of those combinations is refused rather than quietly dropping the sha
-    And the pair holds in both directions, so fixed and a closing commit imply each other
+    Then every one of those combinations is refused with exit 2 rather than quietly dropping the revision
+    And only a fixed finding carries a resolution, and a fixed finding always does
 
   @subject:finding-lifecycle
   @case:failure
   @finding.add.05
-  Scenario: A well-formed sha this repository does not hold is refused by flag name
+  Scenario: A revision this repository does not hold is refused on every revision option
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
-    Given a checkout and a forty-hex sha naming no commit in it
-    When that value is given to the reviewed, introduced-by or resolution flag
-    Then the command refuses and the failure names which flag carried the value
-    And a sha the checkout does hold is accepted on each of the three flags
-
-  @subject:finding-lifecycle
-  @case:failure
-  @finding.add.06
-  Scenario: An annotated tag's own object id is not a commit and is refused
-  # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
-    Given a checkout carrying an annotated tag
-    When the tag object's own id is given to any sha-shaped flag
-    Then the command refuses it, because the object this repository holds under that id is a tag and not a commit
-    And the refusal names the offending flag
+    Given a checkout, a forty-hex sha naming no commit in it, and a branch name that does not exist
+    When either is given to --rev, --introduced-rev or --resolution-rev
+    Then the command exits 2 and stages nothing
+    And a revision the checkout does hold is accepted on each of the three options in any spelling git resolves, and stored as the full sha
 
   @subject:finding-lifecycle
   @case:edge
+  @finding.add.06
+  Scenario: An annotated tag resolves to the commit it names
+  # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
+    Given a checkout carrying an annotated tag
+    When the tag's name, or the tag object's own id, is given to --rev and --introduced-rev
+    Then the record stores the full sha of the commit the tag points at
+    And never the tag object's own id
+
+  @subject:finding-lifecycle
+  @case:failure
   @finding.add.07
-  Scenario: Outside a checkout the existence check is skipped rather than failed
+  Scenario: Outside a checkout there is no commit to bind and the add is refused
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
     Given a corpus directory that is not a git work tree
-    When a finding is authored citing a sha nothing there can resolve
-    Then the record is staged
-    And the check is best-effort, so a place where nothing is verifiable refuses nothing
+    When a finding is authored
+    Then the command exits 2
+    And nothing is staged, because no commit can be named there
 
   @subject:finding-lifecycle
   @case:failure
   @finding.add.08
   Scenario: A line separator in any free-text field is refused and never escaped
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
-    Given the summary, the reviewer, the file ref and the actor id
+    Given the summary, the file ref and the actor id, which names the reviewer
     When any one of them carries any character the shared row-break set names
     Then the invocation is refused and stages nothing
     And the set is the one the row grammar already owns, so a separator that forges a second rendered row is refused wherever it appears
@@ -85,14 +84,13 @@ Feature: finding add
   @subject:finding-lifecycle
   @case:happy
   @finding.add.09
-  Scenario: A finding is a recorded observation and the command says canon verifies none of it
+  Scenario: A finding is a recorded observation and its text is never checked against the code
   # canon: {"schema":1,"at":"2026-08-06T07:00:00.000000Z","actor":{"agent_id":"canon"}}
-    Given the help an operator reads before trusting a finding
-    When it is read
-    Then it calls the record an observation and not proof
-    And it states that canon never resolves or reads the commits the record cites, never verifies or guesses the introducing commit, and gates nothing here
-    And it admits the author and the beneficiary are the same party
-    And it still names what the record is good for: attribution, and a count that stops being typed from memory
+    Given a finding whose summary claims a defect and whose file ref names a path that does not exist in the tree
+    When it is added
+    Then the add succeeds and the record carries the summary and the file ref exactly as given
+    And the record names who raised it, in which round, against which change, at which severity and disposition
+    And no introducing commit is recorded, because none was sourced and none is guessed
 
   # canon: {"schema":1,"at":"2026-10-10T16:02:33Z","actor":{"agent_id":"canon"}}
   @subject:finding-lifecycle
@@ -100,7 +98,7 @@ Feature: finding add
   @finding.add.10
   Scenario: A defect the author found in its own work is accepted and blocks like a reviewer's
     Given a subject whose evidence the author attested and an independent review
-    When the author raises an open blocker against its own change with --reviewer set to itself
+    When the author raises an open blocker against its own change, naming itself as the actor
     Then the finding is staged and promotes like any other
     And the subject cannot enter verifying while that blocker is open
 
@@ -108,10 +106,10 @@ Feature: finding add
   @subject:finding-lifecycle
   @case:failure
   @finding.add.11
-  Scenario: An introduced-by of self is refused, pointing at the reviewer flag
+  Scenario: An introduced-rev of self is refused
     Given an author recording a defect it found itself
-    When it passes --introduced-by self
-    Then the command exits 2, saying --introduced-by names a commit and pointing at --reviewer
+    When it passes --introduced-rev self
+    Then the command exits 2, because --introduced-rev names a commit and the reviewer is the actor id
     And nothing is staged
 
   # canon: {"schema":1,"at":"2026-10-10T16:02:37Z","actor":{"agent_id":"canon"}}
@@ -128,9 +126,9 @@ Feature: finding add
   @subject:finding-lifecycle
   @case:happy
   @finding.add.30
-  Scenario: A short sha is resolved to the full commit it names
+  Scenario: A short revision is resolved to the full commit it names
     Given a git repository holding a commit
-    When canon finding add names it by a short sha on --reviewed-sha, --resolution-sha or --introduced-by
+    When canon finding add names it by a short sha on --rev or --introduced-rev, or canon finding close does on --resolution-rev
     Then git resolves the short sha in that repository
     And the staged finding stores the full 40-character sha, never the abbreviation
 
@@ -138,11 +136,10 @@ Feature: finding add
   @subject:finding-lifecycle
   @case:failure
   @finding.add.31
-  Scenario: A short sha that names no single commit is refused
+  Scenario: A short revision that names no commit is refused
     Given a git repository
-    When canon finding add names a short sha that matches no commit, more than one commit, or only a tag that peels to a commit
-    Then the add is refused with exit 2 naming the flag and the value
-    And outside a git work tree a short sha is refused, since nothing can resolve it
+    When canon finding add names a short revision that matches no commit on --rev, --introduced-rev or --resolution-rev
+    Then the add is refused with exit 2 and NO_COMMIT, naming the value
     And nothing is staged
 
   # canon: {"schema":1,"at":"2026-10-21T09:00:00Z","actor":{"agent_id":"canon-impl-0241"}}
@@ -164,3 +161,43 @@ Feature: finding add
     When canon finding add names world.demo.99 through --scenario-id
     Then the command exits 2 with FINDING_UNKNOWN_SCENARIO, the field --scenario-id and a hint, naming the unknown id
     And nothing is staged
+
+  # canon: {"schema":1,"at":"2026-10-23T12:05:39Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:finding-lifecycle
+  @case:happy
+  @finding.add.34
+  Scenario: One finding add document records one finding and an array records one per element
+    Given a git work tree
+    When finding add is given its arguments as one JSON object with --input, then as a JSON array
+    Then the object returns the ordinary report and records one finding
+    And the array returns a batch report with one item per element, in order, each written
+
+  # canon: {"schema":1,"at":"2026-10-23T12:05:44Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:finding-lifecycle
+  @case:failure
+  @finding.add.35
+  Scenario: A batch with one invalid element writes nothing and points at the element
+    Given a batch of two finding documents whose second carries a severity outside the closed set, or lacks a required key
+    When finding add is run on it with --input
+    Then it exits 2 and the error's field points at that element and key, such as /items/1/severity
+    And nothing is staged or committed, not even the valid first element
+
+  # canon: {"schema":1,"at":"2026-10-23T12:05:48Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:finding-lifecycle
+  @case:edge
+  @finding.add.36
+  Scenario: Repeating a finding add that already landed writes nothing and is reported unchanged
+    Given a finding add that already landed, staged or committed
+    When the identical add is repeated
+    Then it exits 0 and the report says unchanged
+    And nothing is written, and a different finding at the same round and seq is still refused
+
+  # canon: {"schema":1,"at":"2026-10-23T12:05:53Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:finding-lifecycle
+  @case:happy
+  @finding.add.37
+  Scenario: A finding names the commit it reviewed, HEAD by default, with the code tree it saw
+    Given a finding add that names no revision, in a git work tree
+    When it is invoked
+    Then the record names the full sha HEAD resolves to as the commit it reviewed
+    And it carries the code tree it saw and a worktree-dirty flag, and no introduced or resolution commit

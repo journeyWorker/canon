@@ -1,4 +1,3 @@
 canon migrate: plan:
-  rebuild the scenario index (full sync)
   left: 1 openspec change(s) not written by `canon change new` stay where they are, read as an external plan: c-checkout
-canon migrate: rebuilt the scenario index: 0 record(s) written
+planDigest 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945; nothing written. To act: canon migrate --commit --plan-digest 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945

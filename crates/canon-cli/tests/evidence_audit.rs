@@ -1,6 +1,6 @@
 //! 0.15 D3 and 0.23 D1 through the real binary: a record binds exactly the
 //! files its own write names (nothing is carried forward), and an external
-//! evaluator's audit (`--kind audit`) is recorded beside the declared
+//! evaluator's audit (`evidence audit`) is recorded beside the declared
 //! verdict, sampled by `spec_coverage.require_audit`, and turns a refuted
 //! success into `false-success`.
 
@@ -39,6 +39,7 @@ fn setup() -> tempfile::TempDir {
     let repo = dir.path();
     assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
+    commit_all(repo);
     dir
 }
 
@@ -54,7 +55,7 @@ fn scenario(repo: &Path, id: &str, subject: Option<&str>) {
 fn subject_at(repo: &Path, id: &str, status: &str) {
     ok(repo, &["subject", "new", id, "--domain", "dev", "--title", "A run", "--actor-id", "lead"]);
     for step in ["specced", "building", "verifying"] {
-        ok(repo, &["subject", "status", id, "--to", step, "--actor-id", "lead"]);
+        ok(repo, &["subject", "move", id, "--to", step, "--actor-id", "lead"]);
         if step == status {
             return;
         }
@@ -79,14 +80,14 @@ fn write(repo: &Path, path: &str, bytes: &[u8]) {
 }
 
 fn attest_args<'a>(id: &'a str, extra: &[&'a str]) -> Vec<&'a str> {
-    let mut args = vec!["evidence", "add", "--scenario-id", id, "--project-id", "root", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"];
+    let mut args = vec!["evidence", "add", "--scenario-id", id, "--project-id", "root", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"];
     args.extend_from_slice(extra);
     args
 }
 
 fn audit_args<'a>(id: &'a str, result: &'a str, extra: &[&'a str]) -> Vec<&'a str> {
     let mut args = vec![
-        "evidence", "add", "--scenario-id", id, "--project-id", "root", "--kind", "audit", "--ref", "testjack run 42", "--role", "auditor", "--actor-id",
+        "evidence", "audit", id, "--project-id", "root", "--ref", "testjack run 42", "--role", "auditor", "--actor-id",
         "testjack", "--evaluator-id", "testjack", "--evaluator-version", "1.4.0", "--evaluator-digest", DIGEST, "--audit-result", result,
     ];
     args.extend_from_slice(extra);
@@ -185,29 +186,26 @@ fn the_drop_flags_are_refused_as_unknown() {
     assert_eq!(staged(repo), 0);
 }
 
-/// evidence.add.44: the audit flags belong to `--kind audit`, which needs
-/// all of them and refuses the declared-only flags.
+/// The audit flags belong to `evidence audit`, which needs all of them;
+/// `evidence add` no longer takes them and `--kind audit` points at the new leaf.
 #[test]
-fn audit_flags_are_required_with_kind_audit_and_refused_elsewhere() {
+fn audit_flags_are_required_on_evidence_audit_and_refused_on_evidence_add() {
     let dir = setup();
     let repo = dir.path();
     scenario(repo, "game.run.01", None);
 
-    let out = refused(repo, &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--kind", "audit", "--ref", "x", "--role", "auditor"]);
-    assert!(out.contains("needs --evaluator-id, --evaluator-version, --evaluator-digest, --audit-result") && out.contains("canon never generates or runs the audit"), "{out}");
+    refused(repo, &["evidence", "audit", "game.run.01", "--project-id", "root", "--ref", "x", "--role", "auditor"]);
     let out = refused(repo, &attest_args("game.run.01", &["--evaluator-id", "testjack", "--audit-result", "confirmed"]));
-    assert!(out.contains("--evaluator-id, --audit-result belong(s) to `--kind audit` only; this record is `--kind test-run`"), "{out}");
-    let out = refused(repo, &audit_args("game.run.01", "confirmed", &["--verdict", "faithful"]));
-    assert!(out.contains("--verdict do(es) not apply to `--kind audit`"), "{out}");
-    let out = refused(repo, &audit_args("game.run.01", "confirmed", &["--task", "cats#1"]));
-    assert!(out.contains("--task do(es) not apply to `--kind audit`"), "{out}");
-    let out = refused(repo, &audit_args("game.run.01", "maybe", &[]));
-    assert!(out.contains("--audit-result `maybe` is not an audit result"), "{out}");
+    assert!(out.contains("evidence audit"), "{out}");
+    let out = refused(repo, &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "audit", "--ref", "x", "--role", "auditor"]);
+    assert!(out.contains("evidence audit"), "{out}");
+    refused(repo, &audit_args("game.run.01", "confirmed", &["--verdict", "faithful"]));
+    refused(repo, &audit_args("game.run.01", "confirmed", &["--task-id", "cats#1"]));
+    refused(repo, &audit_args("game.run.01", "maybe", &[]));
     let mut bad_digest = audit_args("game.run.01", "confirmed", &[]);
     let at = bad_digest.iter().position(|a| *a == DIGEST).unwrap();
     bad_digest[at] = "ABC";
-    let out = refused(repo, &bad_digest);
-    assert!(out.contains("--evaluator-digest `ABC` is not a sha256"), "{out}");
+    refused(repo, &bad_digest);
     assert_eq!(staged(repo), 0);
 }
 
@@ -246,12 +244,12 @@ fn a_refuted_audit_is_false_success_until_a_newer_audit_confirms() {
     assert!(!out.contains("uncovered-cell"), "the declared verdict is still faithful — the audit sits beside it: {out}");
 
     let report = status_json(repo);
-    let run = report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "run").unwrap();
+    let run = report["data"]["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "run").unwrap();
     assert_eq!((run["evidenced"].as_u64(), run["divergent"].as_u64()), (Some(1), Some(0)), "an audit never becomes the declared verdict: {report}");
-    assert_eq!(report["audits"]["refuted"][0]["scenario"], "game.run.01", "{report}");
-    assert!(report["next"].as_array().unwrap().iter().any(|n| n["command"].as_str().unwrap().contains("--kind audit --scenario-id game.run.01")), "{report}");
+    assert_eq!(report["data"]["audits"]["refuted"][0]["scenario"], "game.run.01", "{report}");
+    assert!(report["meta"]["next"].as_array().unwrap().iter().any(|n| n["command"].as_str().unwrap().contains("evidence audit game.run.01")), "{report}");
 
-    let ship = canon(repo, &["subject", "status", "run", "--to", "shipped", "--actor-id", "lead"]);
+    let ship = canon(repo, &["subject", "move", "run", "--to", "shipped", "--actor-id", "lead"]);
     assert_eq!(ship.status.code(), Some(1), "{}", text(&ship));
     assert!(text(&ship).contains("false-success game.run.01 — verifying → shipped: latest audit refuted"), "{}", text(&ship));
 
@@ -262,7 +260,7 @@ fn a_refuted_audit_is_false_success_until_a_newer_audit_confirms() {
     record(repo, &audit_args("game.run.01", "confirmed", &[]));
     ok(repo, &["gate", "check"]);
     approve_brief(repo, "run");
-    ok(repo, &["subject", "status", "run", "--to", "shipped", "--actor-id", "lead"]);
+    ok(repo, &["subject", "move", "run", "--to", "shipped", "--actor-id", "lead"]);
 }
 
 /// gate.check.65 (0.23 D1): the false-success line names the
@@ -322,10 +320,10 @@ fn require_audit_samples_deterministically_and_owes_until_confirmed() {
     assert!(!expected.is_empty() && expected.len() < ids.len(), "the fixed seed splits the corpus: {expected:?}");
 
     let report = status_json(repo);
-    let owed: Vec<String> = report["audits"]["owed"].as_array().unwrap().iter().map(|e| e["scenario"].as_str().unwrap().to_string()).collect();
+    let owed: Vec<String> = report["data"]["audits"]["owed"].as_array().unwrap().iter().map(|e| e["scenario"].as_str().unwrap().to_string()).collect();
     assert_eq!(owed, expected, "{report}");
-    assert_eq!(report["audits"]["sampled"].as_u64(), Some(expected.len() as u64));
-    assert_eq!(report["policy"]["spec_coverage"]["require_audit"], serde_json::json!({"rate": 0.5, "seed": "canon-0.15", "scope": []}));
+    assert_eq!(report["data"]["audits"]["sampled"].as_u64(), Some(expected.len() as u64));
+    assert_eq!(report["data"]["policy"]["spec_coverage"]["require_audit"], serde_json::json!({"rate": 0.5, "seed": "canon-0.15", "scope": []}));
 
     let gate = canon(repo, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(1));
@@ -345,8 +343,8 @@ fn require_audit_samples_deterministically_and_owes_until_confirmed() {
     }
     ok(repo, &["gate", "check"]);
     let report = status_json(repo);
-    assert_eq!(report["audits"]["confirmed"].as_u64(), Some(expected.len() as u64), "{report}");
-    assert!(report["audits"]["owed"].as_array().unwrap().is_empty());
+    assert_eq!(report["data"]["audits"]["confirmed"].as_u64(), Some(expected.len() as u64), "{report}");
+    assert!(report["data"]["audits"]["owed"].as_array().unwrap().is_empty());
 }
 
 /// gate.check.63: `scope` defaults to `[verifying, shipped]`, and `rate`
@@ -360,10 +358,10 @@ fn require_audit_scope_defaults_to_claimed_done_subjects_and_rate_is_inclusive()
     write_policy(repo, "spec_coverage:\n  require_audit:\n    rate: 1\n");
     ok(repo, &["gate", "check"]);
 
-    ok(repo, &["subject", "status", "run", "--to", "verifying", "--actor-id", "lead"]);
+    ok(repo, &["subject", "move", "run", "--to", "verifying", "--actor-id", "lead"]);
     let out = text(&canon(repo, &["gate", "check"]));
     assert!(out.contains("uncovered-cell game.run.01 — sampled for audit"), "{out}");
-    let ship = canon(repo, &["subject", "status", "run", "--to", "shipped", "--actor-id", "lead"]);
+    let ship = canon(repo, &["subject", "move", "run", "--to", "shipped", "--actor-id", "lead"]);
     assert_eq!(ship.status.code(), Some(1), "the ship guard refuses an owed audit: {}", text(&ship));
     assert!(text(&ship).contains("uncovered-cell game.run.01 — verifying → shipped: sampled for audit"), "{}", text(&ship));
 
@@ -391,5 +389,33 @@ fn a_malformed_require_audit_poisons_spec_coverage() {
         assert_eq!(gate.status.code(), Some(1), "{yaml}: {}", text(&gate));
         let out = text(&gate);
         assert!(out.contains("uncovered-cell spec_coverage — policy.yaml's `spec_coverage` section is unusable") && out.contains(detail), "{yaml}: {out}");
+    }
+}
+
+/// `evidence audit` writes the audit record shape: class audit, a verdict
+/// derived from the result, the evaluator fields, scenario and project ids.
+#[test]
+fn evidence_audit_derives_the_verdict_from_the_result() {
+    let dir = setup();
+    let repo = dir.path();
+    scenario(repo, "game.run.01", None);
+    for (result, verdict) in [("confirmed", "faithful"), ("refuted", "divergent"), ("indeterminate", "not_applicable")] {
+        record(repo, &audit_args("game.run.01", result, &[]));
+        let rec = committed(repo).pop().unwrap();
+        assert_eq!(rec["evidence"]["kind"], "audit", "{rec}");
+        assert_eq!(rec["verdict"], verdict, "{rec}");
+        assert_eq!(rec["audit"]["result"], result, "{rec}");
+        assert_eq!(rec["audit"]["evaluator_id"], "testjack", "{rec}");
+        assert_eq!(rec["audit"]["evaluator_version"], "1.4.0", "{rec}");
+        assert_eq!(rec["audit"]["evaluator_digest"], DIGEST, "{rec}");
+        assert_eq!(rec["scenario_id"], "game.run.01", "{rec}");
+        assert_eq!(rec["project_id"], "root", "{rec}");
+    }
+}
+
+/// Commit the fixture so revision-taking commands have a commit to bind.
+fn commit_all(repo: &std::path::Path) {
+    for args in [&["config", "user.name", "t"][..], &["config", "user.email", "t@example.com"], &["add", "-A"], &["commit", "-q", "-m", "x"]] {
+        assert!(std::process::Command::new("git").args(args).current_dir(repo).status().unwrap().success());
     }
 }

@@ -55,7 +55,7 @@ change와 여러 scenario에 걸쳐 계획하고, 설계하고, 구현하고, �
 것이며, 다시 연 뒤 다시 출하할 때도 모든 가드가 다시 실행됩니다. 한 change는
 여러 서브젝트에 속할 수 있습니다: `Change.subject_ids`가 각 서브젝트를, 각
 서브젝트의 `change_ids`가 그 change를 담으며, 그 change의 열린 blocker는 속한
-모든 서브젝트를 막습니다. `canon query --kind subject`와 `canon report`의 Subjects 패널이
+모든 서브젝트를 막습니다. `canon query --kind subject`와 `canon report build`가 만드는 리포트의 Subjects 패널이
 도메인별 관리 뷰를 제공하며, [CLI 레퍼런스](/ko/cli/#subjects)에 저작
 명령어가 정리되어 있습니다.
 
@@ -103,6 +103,11 @@ canon의 핵심 설계 결정:
 - **리뷰는 판정 신호입니다.** 축적된 코드·디자인 리뷰가 역할별
   가드레일과 전략의 증류 입력이 되어, 네 섬이 결코 닫지 못했던 루프를
   닫습니다.
+- **하나의 문법, 하나의 명세.** CLI는 명세 하나(`docs/cli/canon.cli.json`)에서
+  생성된 하나의 문법입니다. `--help`, `canon schema`, 문서 표가 같은 명세를 읽고,
+  `--json` 출력은 `{ok, data, meta}` 봉투 하나이며, 쓰기 명령은 `--input`으로 JSON/배치를
+  받고, 파괴적 명령은 미리보기가 기본입니다. 에이전트 가이드는 레포에 복사되지 않고
+  바이너리가 `canon skills show`로 출력합니다.
 
 ## 다음
 

@@ -1,0 +1,2 @@
+canon finding add: NO_COMMIT — `no-such-branch` names no commit in this directory
+hint: run the command inside a git work tree that has at least one commit (`git init` and `git commit`)

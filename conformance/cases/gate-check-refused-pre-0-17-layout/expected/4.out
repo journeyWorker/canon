@@ -1,10 +1,10 @@
-canon 0.27.0
+canon 0.28.0
 policy: .canon/policy.yaml
   spec_coverage: require_evidence=true scope=<every scenario>
   require_cases: <none>
   require_review: <absent>
-  level: light — raise it by uncommenting `require_cases: [failure]` (standard) and `require_review: {}` (strict) in .canon/policy.yaml and changing its level line; a human approves the edit with `canon policy approve --by <who>`
-warning: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+  level: light — raise it by uncommenting `require_cases: [failure]` (standard) and `require_review: {}` (strict) in .canon/policy.yaml and changing its level line; a human approves the edit with `canon policy approve --approver <who>`
+warning: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --approver <who>`
 warning: spec root(s) `root` are on the pre-0.17 layout (`features/kind=feature/`), which canon no longer reads, so `canon gate check` fails and no subject is suggested to move on
 
 subjects (0):

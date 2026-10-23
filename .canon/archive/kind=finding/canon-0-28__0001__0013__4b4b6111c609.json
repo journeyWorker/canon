@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-1"
+  },
+  "at": "2026-10-23T13:10:09.018561575Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/sessions.rs:143-160",
+  "kind": "finding",
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "scenario_ids": [
+    "evidence.add.21"
+  ],
+  "schema": 1,
+  "seq": 13,
+  "severity": "should_fix",
+  "summary": "Standards pass: evidence.add.21 'promote their own record in the same run' is asserted only as the staging count not growing; the ledger is never read. Mutation confirmed: deleting the promoted file in promote_after_stage (gate.rs:1087) stays green",
+  "worktree_dirty": false
+}

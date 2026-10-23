@@ -71,6 +71,16 @@ pub struct Report {
     pub acceptances: usize,
     /// Accepted divergences left stale.
     pub acceptances_stale: usize,
+    /// Every record file the run rewrites (a preview lists the same ones): the record is replaced by a new file, so both paths are named.
+    pub rewrites: Vec<Rewrite>,
+}
+
+/// One review or acceptance record replaced by its pinned successor, repo-relative.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Rewrite {
+    pub kind: RecordKind,
+    pub from: Option<String>,
+    pub to: String,
 }
 
 impl Report {
@@ -99,7 +109,7 @@ impl Report {
         }
         if self.stale > 0 {
             lines.push(format!(
-                "canon migrate: left {} stale review(s) as they are: the scenario or its evidence changed since the review, so each stays stale until it is reviewed again (`canon review add`)",
+                "canon migrate: left {} stale review(s) as they are: the scenario or its evidence changed since the review, so each stays stale until it is reviewed again (`canon review scenario`)",
                 self.stale
             ));
         }
@@ -120,7 +130,12 @@ impl Report {
 /// `apply: false` reports what would change and writes nothing.
 pub fn run(repo: &Path, apply: bool) -> Result<Report, String> {
     let ctx = GateCtx::from_repo(repo).map_err(|e| e.to_string())?;
-    let ctx = GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())?;
+    let mut ctx = GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())?;
+    if !apply {
+        // A preview judges the reviews against the scenario index the migration rebuilds first, in memory, so it names the records the commit rewrites.
+        crate::inventory::overlay_stale_index(&mut ctx);
+    }
+    let prefix = ctx.ctx.ledger_root.strip_prefix(repo).unwrap_or(&ctx.ctx.ledger_root).to_path_buf();
     let live: BTreeMap<(&ProjectId, &ScenarioId), &Scenario> = latest_scenarios(&ctx).into_iter().map(|s| ((&s.project_id, &s.scenario_id), s)).collect();
     let tier = GitTier::new(&ctx.ctx.ledger_root);
     let file_digests = evidence_file_digests(&tier)?;
@@ -141,11 +156,15 @@ pub fn run(repo: &Path, apply: bool) -> Result<Report, String> {
             (Currency::Current, false) => report.unpinned_current += 1,
             (Currency::Undecidable, _) => report.undecidable += 1,
         }
-        if currency == Currency::Stale || !apply {
+        if currency == Currency::Stale {
             continue;
         }
         let mut pinned = review.clone();
         pinned.pins = Some(current_pins(&ctx, scenario));
+        report.rewrites.push(rewrite(&prefix, &on_disk, review, &pinned, RecordKind::Review)?);
+        if !apply {
+            continue;
+        }
         replace(&tier, &ctx.ctx.ledger_root, &on_disk, review, &pinned, RecordKind::Review)?;
     }
 
@@ -167,11 +186,12 @@ pub fn run(repo: &Path, apply: bool) -> Result<Report, String> {
             continue;
         }
         report.acceptances += 1;
+        let mut pinned = latest.clone();
+        pinned.status = DivergenceStatus::Accepted { reason: reason.clone(), tracking: tracking.clone(), expiry: *expiry, checks: Some(current_checks(&ctx, scenario)), evidence: Vec::new() };
+        report.rewrites.push(rewrite(&prefix, &on_disk, latest, &pinned, RecordKind::Divergence)?);
         if !apply {
             continue;
         }
-        let mut pinned = latest.clone();
-        pinned.status = DivergenceStatus::Accepted { reason: reason.clone(), tracking: tracking.clone(), expiry: *expiry, checks: Some(current_checks(&ctx, scenario)), evidence: Vec::new() };
         replace(&tier, &ctx.ctx.ledger_root, &on_disk, latest, &pinned, RecordKind::Divergence)?;
     }
     Ok(report)
@@ -245,6 +265,14 @@ fn records_of<T: serde::de::DeserializeOwned>(tier: &GitTier, kind: RecordKind) 
         .iter()
         .filter_map(|raw| Some((serde_json::from_value::<T>(raw.0.clone()).ok()?, expected_relative_path(kind, &raw.0).ok()?.display().to_string())))
         .collect())
+}
+
+/// The files `old` is read from and `new` is written to, as the effect names them.
+fn rewrite<T: canon_model::CanonRecord + PartialEq + serde::Serialize>(prefix: &Path, on_disk: &[(T, String)], old: &T, new: &T, kind: RecordKind) -> Result<Rewrite, String> {
+    let body = serde_json::to_value(new).map_err(|e| format!("cannot write the migrated {}: {e}", kind.as_str()))?;
+    let to = expected_relative_path(kind, &body).map_err(|e| format!("cannot place the migrated {}: {e}", kind.as_str()))?;
+    let from = on_disk.iter().find(|(record, _)| record == old).map(|(_, path)| prefix.join(path).display().to_string());
+    Ok(Rewrite { kind, from, to: prefix.join(to).display().to_string() })
 }
 
 /// Write `new` and remove the file `old` was read from. Unarchived: the

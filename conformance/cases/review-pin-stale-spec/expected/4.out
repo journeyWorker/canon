@@ -1,2 +1,2 @@
 canon inventory sync: root `root` (<repo>/specs) — 1 scenario(s) scanned, 0 record(s) written
-next: canon subject status cart --to shipped --actor-id <unit> — cart: every scenario is evidenced and reviewed, with no blocker or case gap, and no brief is written to approve; ship it yourself unless the brief says the human ships
+next: canon subject move cart --to shipped --actor-id <unit> --session-id <session> — cart: every scenario is evidenced and reviewed, with no blocker or case gap, and no brief is written to approve; ship it yourself unless the brief says the human ships

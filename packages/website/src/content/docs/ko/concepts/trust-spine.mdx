@@ -31,10 +31,10 @@ description: canon gate가 태스크 완료를 자가 보고에서 증거 기반
 | `stale-evidence` | 통과했던 레코드가 stale로 저하됨: `evidence_sha` 이후 선언된 표면이 변경됐거나, HEAD가 `staleness.max_commits_behind`를 넘어섬. 이미 green인 레코드만 저하시킴. 또한: 최신 증거 레코드에 묶인 파일의 바이트가 아티팩트 저장소와 작업 트리 양쪽에서 모두 사라진 경우. |
 | `malformed-evidence` | 후보 레코드가 파싱되지 않거나, 잘못된 위치에 있거나, 파싱 불가능한 임시 태그를 가짐. 잘못된 형식의 증거는 증거가 아님. |
 | `flagged` | 사람만 설정 가능한 `flagged` 오버레이가 켜짐 — 어떤 통과 증거가 있어도 절대 green이 되지 않음. |
-| `unevidenced-flip` | `canon gate task <task_id>`가 대응하는 non-`Divergent` `EvidenceRecord` 없이 체크박스 플립을 요청받음. |
+| `unevidenced-flip` | `canon task done <task_id>`가 대응하는 non-`Divergent` `EvidenceRecord` 없이 체크박스 플립을 요청받음. |
 | `fabricated-evidence` | 플립에 첨부된 증거 노트에 차단 대상 마커(`"would pass"`, `"TBD"`, `"n/a"`)가 독립된 단어로 있거나(경로, 파일 이름, URL, 더 긴 단어 안에 든 것은 해당하지 않음), 첨부된 커맨드 결과 없이 `verified`만 주장함. |
 | `open-blocker` | `spec_coverage.require_review`가 켜진 경우, 범위 안 subject가 adopt한 change에 최신 버전 기준 severity `blocker`, disposition `open`인 리뷰 finding이 있음. subject 문자열은 `<change_id>#<round>.<seq>`입니다. |
-| `false-success` | 시나리오의 최신 audit 레코드(`canon evidence add --kind audit`)가 `refuted`: 외부 평가자가 반례를 찾음. 정책이나 샘플링과 무관하게 항상 켜져 있으며, 더 새로운 audit(`confirmed` 또는 `indeterminate`)이 해소할 때까지 선언된 faithful 판정보다 우선합니다. 상세에는 평가자, 버전, sha256, 반례 경로가 나옵니다. |
+| `false-success` | 시나리오의 최신 audit 레코드(`canon evidence audit`)가 `refuted`: 외부 평가자가 반례를 찾음. 정책이나 샘플링과 무관하게 항상 켜져 있으며, 더 새로운 audit(`confirmed` 또는 `indeterminate`)이 해소할 때까지 선언된 faithful 판정보다 우선합니다. 상세에는 평가자, 버전, sha256, 반례 경로가 나옵니다. |
 
 ## 스펙 커버리지: 해야 할 일 목록
 
@@ -85,8 +85,8 @@ Subject에 연결된 시나리오 중 해당 [라이프사이클
 경로를 명세하는지 말합니다: `happy`, `failure`(거부·오류·차단된 동작),
 `edge`(빈 집합·한계·중복 같은 경계). 범위 안 시나리오가 있는 모든 기능
 표면(`<area>.<surface>`)은 나열된 case마다 시나리오를 하나 이상 가져야
-하며, 없으면 그 표면이 `uncovered-cell`로 보고되고 `canon subject status
-<id> shipped`도 같은 규칙으로 거부됩니다. 태그 없는 시나리오는 어떤 case도
+하며, 없으면 그 표면이 `uncovered-cell`로 보고되고 `canon subject move
+<id> --to shipped`도 같은 규칙으로 거부됩니다. 태그 없는 시나리오는 어떤 case도
 채우지 않으므로, 분류되지 않은 코퍼스는 통과하지 않고 모든 표면이
 보고됩니다. 생략하면 아무것도 요구하지 않습니다.
 
@@ -112,9 +112,9 @@ spec_coverage:
 
 subject가 `require_review.scope`에 있는 모든 시나리오(`spec_coverage.scope`와는
 독립적이며, `exclude_lanes`는 여기서도 제외합니다)는 `Review` 레코드가
-필요합니다 — `canon review add --project-id <root> --scenario-id <id>
---reviewer <who> --role reviewer --pin <sha> --upstream-ref <ref>
---session-id <session>`. 리뷰는 바로 기록되므로 promote할 것이 없습니다.
+필요합니다 — `canon review scenario <scenario-id> --project-id <root>
+--actor-id <who> --role reviewer --rev <rev> --upstream-ref <ref>
+--session-id <session>`(`--rev` 기본값은 `HEAD`). 리뷰는 바로 기록되므로 promote할 것이 없습니다.
 `distinct_actor`이면 리뷰의 `reviewer`와 액터가 둘 다 그 시나리오 증거의 모든
 액터와 달라야 하고, 세션이 있는 리뷰는 증거 세션(`evidence add --session-id`)과
 다른 세션에서 써야 하므로, 에이전트가 다른 id로 자기 작업을 리뷰할 수 없습니다.
@@ -122,37 +122,40 @@ subject가 `require_review.scope`에 있는 모든 시나리오(`spec_coverage.s
 판단합니다. 리뷰가 없거나 본인 리뷰뿐이면 `unreviewed-promotion`입니다.
 리뷰에는 판정이 없으며, 판정은 여전히 ship 게이트가 확인합니다.
 
-리뷰는 본 것을 고정합니다: `review add`가 시나리오의 source digest와 최신
+리뷰는 본 것을 고정합니다: `review scenario`가 시나리오의 source digest와 최신
 증거 레코드를 기록하고, 둘 다 그대로일 때만 리뷰가 인정됩니다. `.feature`
 파일을 고쳐 sync하거나 시나리오를 다시 증명하면 리뷰는 낡은 것이 되어, 스펙·증거
 또는 둘 다를 명시한 `unreviewed-promotion`이 됩니다. `signed` 리뷰만 인정되며,
-`--outcome indeterminate`나 `unavailable`로 기록된 리뷰어 실행은 공백이고,
-리뷰어별 최신 리뷰가 이깁니다. 0.15 이전에 쓴 리뷰는 pin 정보가 없지만, 리뷰한
-커밋(`pin`)은 남아 있습니다. 게이트는 `git`으로 그 커밋의 시나리오를 읽어
-`inventory sync`와 같은 시나리오별 digest를 계산합니다. 그 digest가 지금과 같고
-리뷰보다 새로운 선언 증거가 없으면 리뷰는 유효(current)하고, 아니면
-낡은(stale) 리뷰가 됩니다. 커밋이나 그 커밋의 시나리오가 클론에 없으면(얕은
-체크아웃, 히스토리 재작성) 판정 불가(undecidable)로 두고 계속 인정합니다. 커밋이
-없다는 이유로 위반이 되지는 않습니다. `gate check`는 `advisory: N review(s)
-predate review pinning (0.15) and were checked against the commit each one
-pinned: C current, S stale, U undecidable …` 한 줄을 출력합니다. 시나리오에 다른
-유효한 리뷰가 이미 있으면 그 낡은 리뷰는 superseded로 세고, 리뷰가 아직 필요한
-시나리오만 다시 리뷰하라고 나열합니다. CI에서는 게이트 job의 체크아웃을 전체
-히스토리(`actions/checkout`의 `fetch-depth: 0`)로 받으세요.
+`--review-outcome indeterminate`나 `unavailable`로 기록된 리뷰어 실행은 공백이고,
+리뷰어별 최신 리뷰가 이깁니다. 0.23 이전에 쓴 리뷰는 증거 레코드 파일(0.15 이전에는 리뷰한 커밋만)을 고정하고
+있어서, `canon migrate`가 증거가 지금 말하는 내용으로 다시 쓰기 전까지는 인정되지
+않습니다. migrate는 당시 유효했던 리뷰는 유지하고 낡은 리뷰는 낡은 채로 둡니다.
+`gate check`는 아직 리뷰를 기다리는 시나리오 수를 알리는 advisory 한 줄을
+출력합니다. CI에서는 `canon migrate`를 실행하는 job의 체크아웃을 전체
+히스토리(`actions/checkout`의 `fetch-depth: 0`)로 받으세요. 옵션 없이 실행하면
+미리보기와 `planDigest`만 출력하고, `--commit --plan-digest`가 그 계획을 그대로
+적용합니다. 0.28의 `migrate`는 리뷰 pin 외에도 0.27 설치의 훅 명령과 canon
+스크립트를 0.28 철자로 고치고 전체 스킬 프로젝션을 스텁으로 교체합니다.
+
+커밋하지 않은 코드에 대한 리뷰도 기록할 수 있습니다. 리뷰는 `--rev`의 커밋 대신
+작업 트리의 `codeTree`와 `worktreeDirty`를 담고, 그 코드를 커밋한 뒤에도 코드
+트리가 같다면 리뷰는 유효합니다. 코드가 달라졌을 때만 낡은 리뷰가 됩니다.
+git 밖이거나 커밋이 아직 없으면 `NO_COMMIT`입니다. 시나리오가 여럿이면 `--input`
+배열로 한 번에 기록합니다(전부 검증된 뒤에야 쓰기 시작).
 
 `block_on_findings`이면 리뷰 finding(`canon finding add --severity
 blocker|should-fix|note`)은 `(change_id, round, seq)`별 최신 버전으로
 읽힙니다. 범위 안 subject가 adopt한 change에 열린 `blocker`가 있으면, 닫힐
-때까지 — `--resolution-sha <sha>`와 함께 `fixed`, 또는 `rejected`나
+때까지 — `--resolution-rev <rev>`와 함께 `fixed`, 또는 `rejected`나
 `deferred` — `open-blocker`입니다:
 
-```
-open-blocker c-demo#1.1 — open blocker finding by `reviewer-2` on change `c-demo` (subject `demo-subject`): unbounded subprocess wait; fix it and `canon finding close --disposition fixed --resolution-sha <sha>`, or close it as rejected or deferred
+```output
+open-blocker c-demo#1.1 — open blocker finding by `reviewer-2` on change `c-demo` (subject `demo-subject`): unbounded subprocess wait; fix it and `canon finding close <change> --round <n> --seq <n> --disposition fixed`, or close it as rejected or deferred
 ```
 
 `should-fix`와 `note` finding은 절대 차단하지 않습니다.
 
-`canon subject status --override-reason`으로 이 검사를 넘긴 subject는
+`canon subject move --override-reason`으로 이 검사를 넘긴 subject는
 ([CLI 레퍼런스](/ko/cli/) 참고) 면제 기록에 적힌 빈틈만 게이트를 실패시키지
 않고 위반 목록 뒤에 advisory로 계속 보여줍니다. 나중에 생긴 빈틈은 면제되지
 않고 평소처럼 실패합니다:
@@ -171,14 +174,14 @@ review waivers: 1 advisory(ies) — not failing the gate:
 canon은 audit을 생성하거나 실행하지 않고, 결과만 기록합니다:
 
 ```bash
-canon evidence add --kind audit --project-id root --scenario-id cart.add.01 \
+canon evidence audit cart.add.01 --project-id root \
   --ref "judge run 42" --role reviewer \
   --evaluator-id judge --evaluator-version 1.2 \
-  --evaluator-digest <sha256, 소문자 hex 64자> \
+  --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
   --audit-result refuted --report junit:audit/counterexample.xml
 ```
 
-`--kind audit`은 평가자 플래그 네 개와 `--scenario-id`, `--project-id`가
+`canon evidence audit`은 평가자 플래그 네 개와 시나리오 operand, `--project-id`가
 필요하고, `--task`, `--verdict`, `--surface-ref`, `--approval-*`는
 거부합니다. 레코드에는 `audit: {evaluator_id, evaluator_version,
 evaluator_digest, result}`와 파생 판정(confirmed → faithful, refuted →
@@ -187,7 +190,7 @@ divergent, indeterminate → not-applicable)이 실립니다. audit은 선언
 `--report`/`--artifact` 반례는 다른 바인딩처럼 묶이고 다시 검사됩니다.
 
 최신 audit이 `refuted`이면 어디서나 `false-success`이고,
-`canon subject status <id> --to shipped`도 거부합니다. audit을 요구하려면
+`canon subject move <id> --to shipped`도 거부합니다. audit을 요구하려면
 샘플링합니다:
 
 ```yaml
@@ -230,10 +233,17 @@ JUnit 리포터는 테스트가 첨부한 것(`testInfo.attach(name, {path})` �
 
 ```bash
 # 어떤 파일이든 — trace, 스크린샷, 에이전트 QA 로그 — sha256으로 묶음
-canon evidence add ... --artifact test-results/cart-trace.zip
+canon evidence add --scenario-id cart.add.01 --class test-run --ref "npm test" --role implementer --artifact test-results/cart-trace.zip
 # JUnit XML / Cucumber JSON 리포트: 매칭된 케이스와 결과까지 기록
-canon evidence add ... --report junit:target/nextest/default/junit.xml
+canon evidence add --scenario-id cart.add.01 --class test-run --ref "npm test" --role implementer --report junit:target/nextest/default/junit.xml
 ```
+
+증거 기록은 `--rev`(git revision, 기본 `HEAD`)의 코드에 묶입니다. 커밋하지 않은
+코드에 대한 기록도 허용되며 `codeTree`/`worktreeDirty`를 담습니다. 테스트 리포트가
+여럿이면 `canon evidence add --all-scenarios --report <리포트> --report <리포트>
+--role implementer`가 시나리오마다 반복하는 대신 한 번에 기록합니다. 시나리오별로
+서로 다른 값을 쓸 때는 `--input` 배열(키는 옵션 이름의 camelCase)로 보내며,
+전부 검증된 뒤에야 쓰기 시작합니다. 같은 입력을 반복하면 `meta.unchanged`입니다.
 
 리포트 케이스는 시나리오 id가 그 케이스 자신의 id일 때 묶입니다. 전체
 이름(classname, 그다음 name)에서 처음 나오는 시나리오 id 형태의 토큰이
@@ -273,17 +283,17 @@ experimental:
   (실행할 때마다 리포트를 덮어쓰는 smoke 스크립트가 더는 증거를 고아로 만들지
   않습니다).
 - blob은 없지만 작업 트리 파일이 기록된 digest와 같으면 → 깨끗함. 다만
-  `canon evidence vault`를 안내하는 advisory가 붙고, 이 명령이 그 바이트를
+  `canon artifacts store`를 안내하는 advisory가 붙고, 이 명령이 그 바이트를
   저장합니다(0.14 이전 레코드).
 - 그 밖의 경우 → `stale-evidence`. 경로, 기록된 digest, 저장소와 작업
   트리에 지금 있는 것을 함께 보여주고, 저장된 blob이 바뀌었는지(이름과
   내용이 맞지 않음) 사라졌는지 구분해 알려줍니다. 다시 실행하고 다시
   신고하세요.
 
-리뷰어가 `canon review add --artifact`로 묶은 파일도 현재 리뷰에 대해서는
+리뷰어가 `canon review scenario --artifact`로 묶은 파일도 현재 리뷰에 대해서는
 같은 규칙을 따릅니다. 현재 리뷰는 리뷰어와 시나리오마다 가장 최근 리뷰 가운데
 시나리오에 비해 stale해지지 않은 것입니다. stale해진 리뷰는 대체된 것으로
-보고 그 파일은 다시 검사하지도, 저장하지도 않습니다. `canon evidence vault`는
+보고 그 파일은 다시 검사하지도, 저장하지도 않습니다. `canon artifacts store`는
 현재 리뷰의 파일도 저장합니다.
 
 ## 트러스트 래더
@@ -307,14 +317,20 @@ canon gate check --repo . --release  # + trust-below-required
 검사를 추가로 켭니다 — `--release`가 전달되어도 트러스트 래더 검사는
 절대 빠지지 않습니다. 종료 코드: 깨끗하면 `0`, 게이트 red(위반 존재)면
 `1`, 사용법/로드 실패(읽을 수 없는 레저, 손상된 `canon.yaml`)면 `2`입니다.
+아무것도 살펴보지 못한 검사는 `clean`이 아니라 `unverifiable`(exit `1`)이며
+`meta.coverage`가 무엇을 살펴봤는지 알려 줍니다.
+
+**Done when:** `canon gate check`가 `clean (0 violations)`(exit `0`)이면 끝입니다.
+위반은 같은 출력에 실패 클래스별로 나오고, 다음 단계는 `canon status`나
+`meta.next`가 알려 줍니다.
 
 ## 태스크 체크박스 플립 게이팅
 
 ```bash
-canon gate task s5-trust-spine-gate#5.2 --repo .
+canon task done s5-trust-spine-gate#5.2 --repo .
 ```
 
-`canon gate task <task_id>`는 change의 plan 문서에서 체크박스 행 하나를
+`canon task done <task_id>`는 change의 plan 문서에서 체크박스 행 하나를
 증거 기반으로 플립합니다. `<task_id>`(`<change_id>#<n>`)는 canon 자체의
 `.canon/changes/`(`plans:` 항목 없이 먼저 읽습니다)와 이어서 `canon.yaml`의
 `plans.sources`를 통해 해석됩니다 — 해당 태스크를 먼저 찾아낸 dialect가
@@ -347,7 +363,8 @@ canon gate promote --repo . --dry-run    # 미리보기만
 커밋된 레저로 옮겨집니다. 잘못된 형식이거나 파티션 불가능한 후보는
 거부됩니다: `1`로 종료하고, `run_seq`가 소비되지 않으며, 스테이징 파일은
 리뷰어가 고칠 수 있도록 그대로 남습니다. `--dry-run`은 아무것도 쓰거나
-지우지 않고 계획만 출력합니다.
+지우지 않고 계획만 출력합니다. `gate promote`는 데이터를 덧붙이는 명령이라
+`--commit` 없이 바로 실행됩니다(미리보기가 기본인 것은 삭제·재작성 명령뿐입니다).
 
 ## 훅 심(seam) 설치
 
@@ -366,7 +383,7 @@ canon gate install-hooks --repo .
 ## 게이트 자체를 검증하기
 
 ```bash
-canon gate selftest
+canon selftest --suite trust-spine-gate
 ```
 
 내장된 픽스처 코퍼스를 실행합니다 — 실패 클래스마다 하나씩(`false-success`를

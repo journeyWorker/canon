@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-2"
+  },
+  "at": "2026-10-23T15:08:52.852262931Z",
+  "change_id": "canon-0-28",
+  "code_tree": "7c7d06847373654dafedac3630eedcda014eea0e",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/sessions.rs:143-175",
+  "kind": "finding",
+  "reviewed_sha": "7e95cd1df901a7bcf04861ca597da3414ed794ad",
+  "reviewer": "canon-reviewer-028",
+  "round": 2,
+  "scenario_ids": [
+    "evidence.add.21"
+  ],
+  "schema": 1,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "Standards pass: evidence.add.21's Given lists finding close, but `finding close --no-promote` is never run. Mutation confirmed: run/finding.rs:56 forcing Promote on close stays green",
+  "worktree_dirty": false
+}

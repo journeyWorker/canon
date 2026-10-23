@@ -122,9 +122,9 @@ pub fn divergent_detail(ctx: &GateContext, scenario: &Scenario, by: &str) -> Str
 /// accept the known gap. `cells` are `(project_id, scenario_id)` pairs.
 pub fn hint(cells: &[(String, String)]) -> String {
     let (project, scenario) = cells.first().cloned().unwrap_or_else(|| ("<project-id>".to_string(), "<scenario-id>".to_string()));
-    let more = if cells.len() > 1 { format!(" (repeat --scenario-id for the other {})", cells.len() - 1) } else { String::new() };
+    let more = if cells.len() > 1 { format!(" (name the other {} scenario ids as further operands)", cells.len() - 1) } else { String::new() };
     format!(
-        "fix the behavior and re-attest (`canon evidence add --scenario-id {scenario} --project-id {project} … --verdict faithful`), or record a known gap a reviewer accepts: `canon divergence accept --project-id {project} --scenario-id {scenario} --reason <text> --tracking <issue-url-or-ref> [--expiry YYYY-MM-DD] --reviewer <id> --role reviewer`{more}; acceptance is a reviewer step from a session other than the evidence's, and a changed verdict or check, or its expiry, ends it"
+        "fix the behavior and re-attest (`canon evidence add --scenario-id {scenario} --project-id {project} … --verdict faithful`), or record a known gap a reviewer accepts: `canon divergence accept {scenario} --project-id {project} --reason <text> --tracking <issue-url-or-ref> [--expiry YYYY-MM-DD] --actor-id <id> --role reviewer`{more}; acceptance is a reviewer step from a session other than the evidence's, and a changed verdict or check, or its expiry, ends it"
     )
 }
 

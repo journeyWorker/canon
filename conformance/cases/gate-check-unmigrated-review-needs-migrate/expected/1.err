@@ -1,7 +1,7 @@
-canon subject status: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
-canon subject status: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
-canon subject status:   ran unreviewed-promotion — every owned scenario needs a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's
-canon subject status:   ran open-blocker — 1 adopted change(s) checked for open blocker findings
-canon subject status: advisory: 1 scenario(s) have a review that predates 0.23 review pinning (cart.add.01); such a review does not count until `canon migrate` rewrites it to what the evidence says
-canon subject status: SUBJECT_GATE_VIOLATION — unreviewed-promotion cart.add.01 — building → verifying: review by `reviewer-2` predates 0.23 review pinning (it pins evidence records, or nothing): `canon migrate` rewrites it to what the evidence says, and a review that is not migrated does not count; a review counts only while what it saw is current — review it again (`canon review add`)
-hint: record an independent review (`canon review add`) and close blocker findings, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject and `canon gate check` keeps listing these gaps
+canon subject move: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
+canon subject move: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
+canon subject move:   ran unreviewed-promotion — every owned scenario needs a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's
+canon subject move:   ran open-blocker — 1 adopted change(s) checked for open blocker findings
+canon subject move: advisory: 1 scenario(s) have a review that predates 0.23 review pinning (cart.add.01); such a review does not count until `canon migrate` rewrites it to what the evidence says
+canon subject move: SUBJECT_GATE_VIOLATION — unreviewed-promotion cart.add.01 — building → verifying: review by `reviewer-2` predates 0.23 review pinning (it pins evidence records, or nothing): `canon migrate` rewrites it to what the evidence says, and a review that is not migrated does not count; a review counts only while what it saw is current — review it again (`canon review scenario`, or `canon review change` for a chore)
+hint: record an independent review (`canon review scenario`) and close blocker findings, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject and `canon gate check` keeps listing these gaps

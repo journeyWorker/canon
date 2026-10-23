@@ -1,6 +1,6 @@
 providers: claude
 status: healthy
-competing-skill: ./.claude/skills/sites (description claims: build, sites, apps, games) — if an agent picks `site-builder` for build work, canon's loop will not run
+competing-skill: <repo>/.claude/skills/sites (description claims: build, sites, apps, games) — if an agent picks `site-builder` for build work, canon's loop will not run
 owned-paths: canon writes these; exclude them from formatters and linters:
   .claude/skills/canon/**
   .canon/REPORT.md
@@ -12,6 +12,7 @@ owned-paths: canon writes these; exclude them from formatters and linters:
   .canon/ingest/**
   .canon/learn/**
   .canon/ledger/**
+  .canon/migrate-backup/**
   .canon/plugins/**
   .canon/policy.approval.json
   .canon/r2/**

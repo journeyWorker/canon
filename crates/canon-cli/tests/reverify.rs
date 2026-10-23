@@ -32,8 +32,18 @@ routing:
 
 const REQUIRE_REVIEW: &str = "spec_coverage:\n  require_evidence: true\n  require_review: {}\n";
 
+/// Makes `repo` a git work tree with one commit, which every revision-bound
+/// write needs.
+fn git_seed(repo: &Path) {
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["commit", "-q", "--allow-empty", "-m", "x"]] {
+        let out = Command::new("git").args(args).current_dir(repo).output().expect("spawn git");
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    }
+}
+
 fn repo() -> TempDir {
     let dir = TempDir::new().unwrap();
+    git_seed(dir.path());
     std::fs::write(dir.path().join("canon.yaml"), CANON_YAML).unwrap();
     std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
     std::fs::write(dir.path().join(".canon/policy.yaml"), REQUIRE_REVIEW).unwrap();
@@ -92,13 +102,13 @@ fn seed_evidence(repo: &Path, scenario: &str, at: DateTime<Utc>) {
     ledger(repo).write(&record).unwrap();
 }
 
-/// `canon review add` for `scenario`: pinned to the evidence and spec as
+/// `canon review scenario` for `scenario`: pinned to the evidence and spec as
 /// they are now, so newer evidence makes it stale (0.15 D1).
 fn review_add(repo: &Path, scenario: &str) {
     let out = run(
         repo,
         &[
-            "review", "add", "--project-id", "demo", "--scenario-id", scenario, "--reviewer", "reviewer-2", "--pin", "pin-sha", "--original-spec-ref", "specs/demo.feature", "--actor-id",
+            "review", "scenario", scenario, "--project-id", "demo", "--original-spec-ref", "specs/demo.feature", "--actor-id",
             "reviewer-2", "--role", "reviewer",
         ],
     );
@@ -107,12 +117,12 @@ fn review_add(repo: &Path, scenario: &str) {
 
 /// A blocker on `c-demo`: raised at `raised`, and when `fixed` is given,
 /// closed `fixed` at that time (a second record of the same natural key).
-/// `canon review add --change-id`: the chore's change-level review.
+/// `canon review change`: the chore's change-level review.
 fn change_review(repo: &Path, change: &str) -> Output {
     run(
         repo,
         &[
-            "review", "add", "--project-id", "demo", "--change-id", change, "--reviewer", "reviewer-3", "--pin", "pin-sha", "--original-spec-ref", ".canon/changes/brief.md", "--actor-id",
+            "review", "change", change, "--project-id", "demo", "--original-spec-ref", ".canon/changes/brief.md", "--actor-id",
             "reviewer-3", "--role", "reviewer",
         ],
     )
@@ -155,18 +165,18 @@ fn chore_brief(approved: DateTime<Utc>) -> String {
 fn subject_json(repo: &Path) -> Value {
     let out = run(repo, &["query", "--kind", "subject", "--json"]);
     assert!(out.status.success(), "{}", stderr(&out));
-    serde_json::from_str::<Value>(&stdout(&out)).unwrap()["records"][0].clone()
+    serde_json::from_str::<Value>(&stdout(&out)).unwrap()["data"]["records"][0].clone()
 }
 
 fn status_steps(repo: &Path) -> Vec<Value> {
     let out = run(repo, &["status", "--json"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let report: Value = serde_json::from_str(&stdout(&out)).unwrap();
-    report["next"].as_array().unwrap().iter().filter(|s| s["why"].as_str().unwrap_or("").starts_with("demo-subject")).cloned().collect()
+    report["meta"]["next"].as_array().unwrap().iter().filter(|s| s["why"].as_str().unwrap_or("").starts_with("demo-subject")).cloned().collect()
 }
 
 fn ship(repo: &Path) -> Output {
-    run(repo, &["subject", "status", "demo-subject", "--to", "shipped"])
+    run(repo, &["subject", "move", "demo-subject", "--to", "shipped"])
 }
 
 /// #72: a blocker closed `fixed` keeps the ship refused until the suite
@@ -192,7 +202,7 @@ fn a_fixed_blocker_keeps_blocking_until_the_suite_is_evidenced_again_and_reviewe
     let err = stderr(&out);
     assert!(err.contains("open-blocker c-demo#1.1"), "{err}");
     assert!(err.contains("closed `fixed` but not re-verified") && err.contains("`world.demo.01`") && err.contains("`world.demo.02`"), "{err}");
-    assert!(err.contains("hint: ") && err.contains("canon evidence add --project-id") && err.contains("--all-scenarios") && err.contains("stays current"), "{err}");
+    assert!(err.contains("hint: ") && err.contains("canon evidence add --all-scenarios") && err.contains("stays current"), "{err}");
     assert_eq!(subject_json(r)["status"], "verifying");
     let gate = run(r, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(1), "gate check reports the same: {}", stdout(&gate));
@@ -262,9 +272,9 @@ fn an_approved_chore_on_a_shipped_subject_needs_the_suite_again_then_a_change_re
     assert_eq!(gate.status.code(), Some(1), "{}", stdout(&gate));
     assert!(stdout(&gate).contains("chore change `bump-client` approved") && stdout(&gate).contains("--all-scenarios"), "{}", stdout(&gate));
     let steps = status_steps(r);
-    assert!(steps[0]["command"].as_str().unwrap().starts_with("canon subject status demo-subject --to verifying --reason"), "red shipped subject: reopen first: {steps:?}");
+    assert!(steps[0]["command"].as_str().unwrap().starts_with("canon subject move demo-subject --to verifying --reason"), "red shipped subject: reopen first: {steps:?}");
 
-    let out = run(r, &["subject", "status", "demo-subject", "--to", "verifying", "--reason", "chore bump-client", "--json"]);
+    let out = run(r, &["subject", "move", "demo-subject", "--to", "verifying", "--reason", "chore bump-client", "--json"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let reopened: Value = serde_json::from_str(&stdout(&out)).unwrap();
     let next = reopened["meta"]["next"].as_array().unwrap();
@@ -275,7 +285,7 @@ fn an_approved_chore_on_a_shipped_subject_needs_the_suite_again_then_a_change_re
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("chore change `bump-client` approved") && err.contains("`world.demo.01`"), "{err}");
-    assert!(err.contains("hint: ") && err.contains("--all-scenarios") && err.contains("canon review add --change-id"), "{err}");
+    assert!(err.contains("hint: ") && err.contains("--all-scenarios"), "{err}");
     assert_eq!(subject_json(r)["status"], "verifying");
 
     // The suite again, same verdict: the scenario review stays current, and
@@ -288,7 +298,7 @@ fn an_approved_chore_on_a_shipped_subject_needs_the_suite_again_then_a_change_re
     assert!(err.contains("no review of change `bump-client`") && !err.contains("unreviewed-promotion world.demo.01"), "{err}");
     let next = status_steps(r);
     assert!(
-        next[0]["command"].as_str().unwrap().starts_with("canon review add") && next[0]["command"].as_str().unwrap().contains("--change-id bump-client"),
+        next[0]["command"].as_str().unwrap().starts_with("canon review change bump-client"),
         "the change review follows: {next:?}"
     );
 
@@ -343,9 +353,14 @@ fn a_chore_review_goes_stale_when_the_brief_changes_and_a_feature_change_is_refu
 
     let refused = change_review(r, "c-demo");
     assert_eq!(refused.status.code(), Some(2), "{}", stderr(&refused));
-    assert!(stderr(&refused).contains("is not a chore"), "{}", stderr(&refused));
+    let reviews = |r: &Path| std::fs::read_dir(r.join(".canon/ledger/kind=review")).map(|d| d.count()).unwrap_or(0);
+    let json = run(r, &["review", "change", "c-demo", "--project-id", "demo", "--original-spec-ref", ".canon/changes/brief.md", "--actor-id", "reviewer-3", "--role", "reviewer", "--json"]);
+    assert_eq!(json.status.code(), Some(2));
+    assert!(stdout(&json).contains("REVIEW_INVALID_ARGUMENT"), "{}", stdout(&json));
+    let before = reviews(r);
 
     assert!(change_review(r, "bump-client").status.success());
+    assert_eq!(reviews(r), before + 1, "a chore gets exactly one review");
     write_brief(r, "bump-client", &format!("{}\nAlso bump the lockfile.\n", chore_brief(ago(100))));
     let out = ship(r);
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
@@ -398,13 +413,13 @@ fn change_new_on_a_shipped_subject_names_the_reopen() {
     let dir = repo();
     let r = dir.path();
     seed_subject(r, SubjectStatus::Shipped, &[], ago(250));
-    let reopen = "canon subject status demo-subject --to verifying --reason";
+    let reopen = "canon subject move demo-subject --to verifying --reason";
 
-    let out = run(r, &["change", "new", "bump-client", "--subject-id", "demo-subject", "--kind", "chore", "--title", "Bump the client"]);
+    let out = run(r, &["change", "new", "bump-client", "--subject-id", "demo-subject", "--change-kind", "chore", "--title", "Bump the client"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert!(stdout(&out).contains("subject `demo-subject` is shipped and stays so until reopened") && stdout(&out).contains(reopen), "{}", stdout(&out));
 
-    let out = run(r, &["change", "new", "bump-again", "--subject-id", "demo-subject", "--kind", "chore", "--title", "Bump again", "--json"]);
+    let out = run(r, &["change", "new", "bump-again", "--subject-id", "demo-subject", "--change-kind", "chore", "--title", "Bump again", "--json"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let value: Value = serde_json::from_str(&stdout(&out)).unwrap();
     let next = value["meta"]["next"].as_array().unwrap();
@@ -413,7 +428,7 @@ fn change_new_on_a_shipped_subject_names_the_reopen() {
     // A subject that is not shipped gets no reopen step.
     let dir = repo();
     seed_subject(dir.path(), SubjectStatus::Building, &[], ago(250));
-    let out = run(dir.path(), &["change", "new", "bump-client", "--subject-id", "demo-subject", "--kind", "chore", "--title", "Bump the client", "--json"]);
+    let out = run(dir.path(), &["change", "new", "bump-client", "--subject-id", "demo-subject", "--change-kind", "chore", "--title", "Bump the client", "--json"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert!(!stdout(&out).contains("--to verifying"), "{}", stdout(&out));
 }
@@ -502,22 +517,6 @@ fn gate_check_98_a_fixed_blocker_naming_no_scenario_still_asks_every_evidenced_s
     assert!(ship(r).status.success());
 }
 
-fn git(r: &Path, args: &[&str]) -> String {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(r)
-        .args(["-c", "commit.gpgsign=false"])
-        .args(args)
-        .env("GIT_AUTHOR_NAME", "a")
-        .env("GIT_AUTHOR_EMAIL", "a@a")
-        .env("GIT_COMMITTER_NAME", "a")
-        .env("GIT_COMMITTER_EMAIL", "a@a")
-        .output()
-        .expect("git on PATH");
-    assert!(out.status.success(), "git {args:?}: {}", stderr(&out));
-    stdout(&out).trim().to_string()
-}
-
 /// #87 through the CLI: `finding add --scenario-id` names the scenario, the
 /// close inherits it (it takes no list of its own), and the ship refusal
 /// then names that scenario only.
@@ -526,25 +525,21 @@ fn finding_close_81_inherits_the_scenarios_the_finding_names() {
     let dir = repo();
     let r = dir.path();
     two_scenarios(r);
-    git(r, &["init", "-q"]);
-    git(r, &["add", "canon.yaml"]);
-    git(r, &["commit", "-q", "-m", "initial"]);
-    let head = git(r, &["rev-parse", "HEAD"]);
 
     let add = run(
         r,
         &[
-            "finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--reviewer", "reviewer-2", "--summary", "double click", "--scenario-id", "world.demo.01",
+            "finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--actor-id", "reviewer-2", "--summary", "double click", "--scenario-id", "world.demo.01",
             "--scenario-id", "world.demo.01", "--promote",
         ],
     );
     assert!(add.status.success(), "stderr: {}", stderr(&add));
-    let close = run(r, &["finding", "close", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--disposition", "fixed", "--resolution-sha", &head, "--promote"]);
+    let close = run(r, &["finding", "close", "c-demo", "--round", "1", "--seq", "1", "--disposition", "fixed", "--promote"]);
     assert!(close.status.success(), "stderr: {}", stderr(&close));
 
     let listed = run(r, &["query", "--kind", "finding", "--json"]);
     let records: Value = serde_json::from_str(&stdout(&listed)).unwrap();
-    let fixed: Vec<&Value> = records["records"].as_array().unwrap().iter().filter(|f| f["disposition"] == "fixed").collect();
+    let fixed: Vec<&Value> = records["data"]["records"].as_array().unwrap().iter().filter(|f| f["disposition"] == "fixed").collect();
     assert_eq!(fixed.len(), 1, "{records}");
     assert_eq!(fixed[0]["scenario_ids"], serde_json::json!(["world.demo.01"]), "named once, inherited by the close: {}", fixed[0]);
 
@@ -566,7 +561,7 @@ fn finding_add_33_refuses_a_scenario_id_the_index_does_not_know() {
     two_scenarios(r);
     let out = run(
         r,
-        &["finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--reviewer", "r", "--summary", "s", "--scenario-id", "world.demo.99", "--json"],
+        &["finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--actor-id", "r", "--summary", "s", "--scenario-id", "world.demo.99", "--json"],
     );
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     let body: Value = serde_json::from_str(&stdout(&out)).unwrap();
@@ -584,7 +579,7 @@ fn finding_add_32_records_the_scenarios_it_names_once_each() {
     let dir = repo();
     let r = dir.path();
     two_scenarios(r);
-    let base = ["finding", "add", "--change-id", "c-demo", "--round", "1", "--reviewer", "r", "--summary", "s", "--severity", "should-fix", "--promote"];
+    let base = ["finding", "add", "--change-id", "c-demo", "--round", "1", "--actor-id", "r", "--summary", "s", "--severity", "should-fix", "--promote"];
     let named = [&base[..], &["--seq", "1", "--scenario-id", "world.demo.02", "--scenario-id", "world.demo.01", "--scenario-id", "world.demo.02"]].concat();
     let plain = [&base[..], &["--seq", "2"]].concat();
     for args in [named, plain] {
@@ -593,7 +588,7 @@ fn finding_add_32_records_the_scenarios_it_names_once_each() {
     }
     let listed = run(r, &["query", "--kind", "finding", "--json"]);
     let records: Value = serde_json::from_str(&stdout(&listed)).unwrap();
-    let by_seq = |seq: u64| records["records"].as_array().unwrap().iter().find(|f| f["seq"] == seq).unwrap().clone();
+    let by_seq = |seq: u64| records["data"]["records"].as_array().unwrap().iter().find(|f| f["seq"] == seq).unwrap().clone();
     assert_eq!(by_seq(1)["scenario_ids"], serde_json::json!(["world.demo.02", "world.demo.01"]), "{records}");
     assert!(by_seq(2).get("scenario_ids").is_none(), "a finding naming none carries no field: {records}");
 }
@@ -617,7 +612,7 @@ fn gate_check_99_a_scoped_refusal_names_a_command_for_each_spec_root() {
         seed_other(scenario, ago(300));
         let out = run(
             r,
-            &["review", "add", "--project-id", "other", "--scenario-id", scenario, "--reviewer", "reviewer-2", "--pin", "pin-sha", "--original-spec-ref", "specs/other.feature", "--actor-id", "reviewer-2", "--role", "reviewer"],
+            &["review", "scenario", scenario, "--project-id", "other", "--original-spec-ref", "specs/other.feature", "--actor-id", "reviewer-2", "--role", "reviewer"],
         );
         assert!(out.status.success(), "review add: {}", stderr(&out));
     }

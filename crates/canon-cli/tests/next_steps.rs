@@ -12,6 +12,15 @@ use std::process::{Command, Output};
 use serde_json::Value;
 use tempfile::TempDir;
 
+/// Makes `repo` a git work tree with one commit, which every revision-bound
+/// write needs.
+fn git_seed(repo: &Path) {
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["commit", "-q", "--allow-empty", "-m", "x"]] {
+        let out = Command::new("git").args(args).current_dir(repo).output().expect("spawn git");
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    }
+}
+
 fn canon(repo: &Path, args: &[&str], role: Option<&str>) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_canon"));
     command.args(args).current_dir(repo).env("CANON_ACTOR", "agent-a").env_remove("CANON_ROLE");
@@ -24,6 +33,19 @@ fn canon(repo: &Path, args: &[&str], role: Option<&str>) -> Output {
 fn json_of(out: &Output, what: &str) -> Value {
     assert!(out.status.success(), "{what}: {}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{what}: stdout is not one JSON value ({e}): {}", String::from_utf8_lossy(&out.stdout)))
+}
+
+/// `status --json` as one report: `data` plus the `meta.next` / `meta.waitingOn` it carries.
+fn status_report(repo: &Path, role: Option<&str>) -> Value {
+    let doc = json_of(&canon(repo, &["status", "--json"], role), "status");
+    assert_eq!(doc["ok"], true, "{doc}");
+    let mut report = doc["data"].clone();
+    for key in ["next", "nextOmitted", "waitingOn"] {
+        if !doc["meta"][key].is_null() {
+            report[key] = doc["meta"][key].clone();
+        }
+    }
+    report
 }
 
 fn ok(repo: &Path, args: &[&str]) -> Value {
@@ -48,6 +70,7 @@ fn brief() -> String {
 fn repo_with_change() -> (TempDir, Value) {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
+    git_seed(repo);
     ok(repo, &["init", "--providers", "none", "--json"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo", "--json"]);
     let created = ok(repo, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login", "--json"]);
@@ -57,7 +80,7 @@ fn repo_with_change() -> (TempDir, Value) {
 
 /// `status --json`'s first step about `subject`.
 fn status_step(repo: &Path, subject: &str) -> Value {
-    let report = json_of(&canon(repo, &["status", "--json"], None), "status");
+    let report = status_report(repo, None);
     report["next"].as_array().unwrap().iter().find(|step| step["why"].as_str().unwrap_or("").starts_with(subject)).cloned().unwrap_or_else(|| panic!("status names no step for {subject}: {}", report["next"]))
 }
 
@@ -113,7 +136,7 @@ fn writes_name_the_step_status_names_for_the_subject_they_touched() {
     let steps = meta_next(&created);
     assert_eq!(steps[0]["actor"], "agent");
     assert_eq!(steps[0]["role"], "planner");
-    assert_eq!(steps[0]["command"], "canon brief check --change-id add-login");
+    assert_eq!(steps[0]["command"], "canon brief check add-login");
     assert!(steps[0]["why"].as_str().unwrap().contains("blocker(s): write the brief"), "{}", steps[0]);
 
     // Once the brief is written clean, the one human stop is the subject's only step.
@@ -121,26 +144,26 @@ fn writes_name_the_step_status_names_for_the_subject_they_touched() {
     assert_eq!(step["actor"], "human");
     assert!(step["role"].is_null());
 
-    let approved = ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
+    let approved = ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go.", "--json"]);
     assert_eq!(meta_next(&approved)[0], status_step(repo, "demo"), "brief approve");
     assert_eq!(meta_next(&approved)[0]["actor"], "agent");
 
     let scenario = ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject-id", "demo", "--case", "happy", "--flow", "F1", "--json"]);
     assert_eq!(meta_next(&scenario)[0], status_step(repo, "demo"), "scenario new");
 
-    let moved = ok(repo, &["subject", "status", "demo", "--to", "specced", "--json"]);
+    let moved = ok(repo, &["subject", "move", "demo", "--to", "specced", "--json"]);
     assert_eq!(meta_next(&moved)[0], status_step(repo, "demo"), "subject status");
 
-    ok(repo, &["subject", "status", "demo", "--to", "building", "--json"]);
+    ok(repo, &["subject", "move", "demo", "--to", "building", "--json"]);
     let evidence = ok(
         repo,
-        &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--kind", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--promote", "--json"],
+        &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--class", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--promote", "--json"],
     );
     assert_eq!(meta_next(&evidence)[0], status_step(repo, "demo"), "evidence add");
 
     let review = ok(
         repo,
-        &["review", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--reviewer", "rev", "--actor-id", "rev", "--session-id", "s2", "--role", "reviewer", "--pin", "0123456789abcdef0123456789abcdef01234567", "--original-spec-ref", "login.feature", "--json"],
+        &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "rev", "--session-id", "s2", "--role", "reviewer", "--original-spec-ref", "login.feature", "--json"],
     );
     assert_eq!(meta_next(&review)[0], status_step(repo, "demo"), "review add");
 }
@@ -149,11 +172,11 @@ fn writes_name_the_step_status_names_for_the_subject_they_touched() {
 fn a_staged_write_names_the_promote_that_makes_it_count() {
     let (dir, _) = repo_with_change();
     let repo = dir.path();
-    ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
+    ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go.", "--json"]);
     ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject-id", "demo", "--case", "happy", "--flow", "F1", "--json"]);
     let staged = ok(
         repo,
-        &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--kind", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--no-promote", "--json"],
+        &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--class", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--no-promote", "--json"],
     );
     let steps = meta_next(&staged);
     assert_eq!(steps.len(), 1, "{steps:?}");
@@ -164,7 +187,7 @@ fn a_staged_write_names_the_promote_that_makes_it_count() {
 fn human_mode_ends_with_one_next_line_and_a_count_of_the_rest() {
     let (dir, _) = repo_with_change();
     let repo = dir.path();
-    let out = canon(repo, &["brief", "approve", "--by", "Ana", "--note", "Go."], None);
+    let out = canon(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go."], None);
     assert!(out.status.success());
     let text = String::from_utf8_lossy(&out.stdout);
     let last = text.lines().last().unwrap();
@@ -177,7 +200,7 @@ fn one_scenario_goes_from_its_brief_to_shipped_on_meta_next_alone() {
     let (dir, created) = repo_with_change();
     let repo = dir.path();
     // The human answers; everything after that is the next step each write names.
-    let mut last = ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
+    let mut last = ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go.", "--json"]);
     let _ = created;
     let mut ran = vec!["canon brief approve --by Ana --note Go.".to_string()];
     for _ in 0..24 {
@@ -201,7 +224,7 @@ fn one_scenario_goes_from_its_brief_to_shipped_on_meta_next_alone() {
         last = ok(repo, &refs);
     }
     println!("{}", ran.join("\n"));
-    let status = json_of(&canon(repo, &["status", "--json"], None), "status");
+    let status = status_report(repo, None);
     let demo = status["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "demo").unwrap();
     assert_eq!(demo["status"], "shipped", "ran:\n{}\n{status}", ran.join("\n"));
     assert!(meta_next(&last).is_empty(), "a shipped subject has no step: {last}");
@@ -212,14 +235,14 @@ fn one_scenario_goes_from_its_brief_to_shipped_on_meta_next_alone() {
 fn two_roles_waiting() -> TempDir {
     let (dir, _) = repo_with_change();
     let repo = dir.path();
-    ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
+    ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go.", "--json"]);
     ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject-id", "demo", "--case", "happy", "--flow", "F1", "--json"]);
     ok(repo, &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject-id", "demo", "--case", "failure", "--flow", "F1", "--json"]);
-    ok(repo, &["subject", "status", "demo", "--to", "specced", "--json"]);
-    ok(repo, &["subject", "status", "demo", "--to", "building", "--json"]);
+    ok(repo, &["subject", "move", "demo", "--to", "specced", "--json"]);
+    ok(repo, &["subject", "move", "demo", "--to", "building", "--json"]);
     ok(
         repo,
-        &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--kind", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--promote", "--json"],
+        &["evidence", "add", "--scenario-id", "auth.login.01", "--project-id", "root", "--class", "test-run", "--role", "implementer", "--actor-id", "agent-a", "--session-id", "s1", "--verdict", "faithful", "--ref", "cargo test", "--promote", "--json"],
     );
     dir
 }
@@ -229,16 +252,16 @@ fn a_declared_role_keeps_its_steps_and_counts_the_rest() {
     let dir = two_roles_waiting();
     let repo = dir.path();
 
-    let unset = json_of(&canon(repo, &["status", "--json"], None), "status");
+    let unset = status_report(repo, None);
     assert!(unset.get("waitingOn").is_none(), "no role, no counts");
     assert!(unset["next"].as_array().unwrap().iter().all(|s| s.get("role").is_some()), "every step carries its role");
     let roles: Vec<&str> = unset["next"].as_array().unwrap().iter().filter_map(|s| s["role"].as_str()).collect();
     assert!(roles.contains(&"reviewer") && roles.contains(&"implementer"), "{roles:?}");
 
-    let reviewer = json_of(&canon(repo, &["status", "--json"], Some("reviewer")), "status as reviewer");
+    let reviewer = status_report(repo, Some("reviewer"));
     let steps = reviewer["next"].as_array().unwrap();
     assert!(!steps.is_empty() && steps.iter().all(|s| s["role"] == "reviewer"), "{steps:?}");
-    assert!(steps[0]["command"].as_str().unwrap().starts_with("canon review add"), "{steps:?}");
+    assert!(steps[0]["command"].as_str().unwrap().starts_with("canon review scenario"), "{steps:?}");
     assert_eq!(reviewer["waitingOn"]["implementer"], 1, "{reviewer}");
 
     let text = canon(repo, &["status"], Some("reviewer"));
@@ -261,7 +284,7 @@ fn brief_with_two_flows() -> String {
 
 /// The step `status` names for `demo` that carries `--flow <flow>`.
 fn flow_step_of(repo: &Path, flow: &str) -> Option<Value> {
-    let report = json_of(&canon(repo, &["status", "--json"], None), "status");
+    let report = status_report(repo, None);
     report["next"].as_array().unwrap().iter().find(|step| step["command"].as_str().unwrap_or("").contains(&format!("--flow {flow} "))).cloned()
 }
 
@@ -270,7 +293,7 @@ fn a_flow_step_with_only_a_happy_scenario_is_asked_for_its_failure_case_with_its
     let (dir, _) = repo_with_change();
     let repo = dir.path();
     std::fs::write(repo.join(".canon/changes/add-login/brief.md"), brief_with_two_flows()).unwrap();
-    ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
+    ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go.", "--json"]);
     ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject-id", "demo", "--case", "happy", "--flow", "F1", "--json"]);
     ok(repo, &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject-id", "demo", "--case", "failure", "--flow", "F1", "--json"]);
 
@@ -302,7 +325,7 @@ fn brief_with_an_advisory() -> String {
 
 /// The steps `status --json` gives about `subject`.
 fn status_steps(repo: &Path, subject: &str) -> Vec<Value> {
-    let report = json_of(&canon(repo, &["status", "--json"], None), "status");
+    let report = status_report(repo, None);
     report["next"].as_array().unwrap().iter().filter(|step| step["why"].as_str().unwrap_or("").starts_with(subject)).cloned().collect()
 }
 
@@ -319,7 +342,7 @@ fn context_status_81_the_polish_step_comes_before_the_human_stop() {
     assert_eq!(steps.len(), 2, "{steps:?}");
     assert_eq!((steps[0]["actor"].as_str(), steps[0]["role"].as_str()), (Some("agent"), Some("planner")), "{}", steps[0]);
     let command = steps[0]["command"].as_str().unwrap();
-    assert!(command.contains("reference/brief-polish.md") && command.contains("`canon brief check --change-id add-login`"), "{command}");
+    assert!(command.contains("canon skills show brief-polish") && command.contains("`canon brief check add-login`"), "{command}");
     let why = steps[0]["why"].as_str().unwrap();
     assert!(why.contains("1 advisory finding(s)") && why.contains("prose.key-sentence"), "{why}");
     assert_eq!((steps[1]["actor"].as_str(), steps[1]["role"].is_null()), (Some("human"), true), "{}", steps[1]);
@@ -332,7 +355,7 @@ fn context_status_81_the_polish_step_comes_before_the_human_stop() {
     std::fs::write(repo.join(".canon/changes/add-login/brief.md"), brief_with_an_advisory().replace("## Out of scope\n\nSocial sign-in.", "## Out of scope\n\nTBD")).unwrap();
     let blocked = status_steps(repo, "demo");
     assert_eq!(blocked.len(), 1, "{blocked:?}");
-    assert_eq!(blocked[0]["command"], "canon brief check --change-id add-login");
+    assert_eq!(blocked[0]["command"], "canon brief check add-login");
 }
 
 /// context.status.83: with no advisories the human stop is the only step,
@@ -347,7 +370,7 @@ fn context_status_83_no_advisories_keeps_the_human_stop_and_approve_ignores_advi
 
     std::fs::write(repo.join(".canon/changes/add-login/brief.md"), brief_with_an_advisory()).unwrap();
     assert_eq!(status_steps(repo, "demo").len(), 2);
-    let approved = ok(repo, &["brief", "approve", "--by", "Ana", "--note", "Go.", "--json"]);
+    let approved = ok(repo, &["brief", "approve", "--approver", "Ana", "--note", "Go.", "--json"]);
     assert_eq!(meta_next(&approved)[0]["actor"], "agent");
     assert!(status_steps(repo, "demo").iter().all(|s| !s["command"].as_str().unwrap().contains("brief-polish")), "an approved brief is not polished");
 }

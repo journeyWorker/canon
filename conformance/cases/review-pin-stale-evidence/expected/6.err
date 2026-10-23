@@ -1,6 +1,6 @@
-canon subject status: review guard for verifying → shipped (spec_coverage.require_review, scope: verifying, shipped)
-canon subject status:   ran unreviewed-promotion — every owned scenario needs a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's
-canon subject status:   ran open-blocker — 1 adopted change(s) checked for open blocker findings
-canon subject status: advisory: cart's brief is not approved — its newest adopted change `c-cart` has no brief (no .canon/changes/c-cart/brief.md, no openspec proposal.md), so there is no brief to answer and shipping is not refused
-canon subject status: SUBJECT_GATE_VIOLATION — unreviewed-promotion cart.add.01 — verifying → shipped: stale review by `reviewer-2`: its evidence changed (the latest evidence says a different verdict or names different checks than the review saw) since the review; a review counts only while what it saw is current — review it again (`canon review add`)
-hint: record an independent review (`canon review add`) and close blocker findings, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject and `canon gate check` keeps listing these gaps
+canon subject move: review guard for verifying → shipped (spec_coverage.require_review, scope: verifying, shipped)
+canon subject move:   ran unreviewed-promotion — every owned scenario needs a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's
+canon subject move:   ran open-blocker — 1 adopted change(s) checked for open blocker findings
+canon subject move: advisory: cart's brief is not approved — its newest adopted change `c-cart` has no brief (no .canon/changes/c-cart/brief.md, no openspec proposal.md), so there is no brief to answer and shipping is not refused
+canon subject move: SUBJECT_GATE_VIOLATION — unreviewed-promotion cart.add.01 — verifying → shipped: stale review by `reviewer-2`: its evidence changed (the latest evidence says a different verdict or names different checks than the review saw) since the review; a review counts only while what it saw is current — review it again (`canon review scenario`, or `canon review change` for a chore)
+hint: record an independent review (`canon review scenario`) and close blocker findings, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject and `canon gate check` keeps listing these gaps

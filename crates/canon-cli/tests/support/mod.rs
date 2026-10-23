@@ -23,6 +23,11 @@ use canon_store::git_tier::GitTier;
 use canon_store::tier::{Tier, WriteReceipt};
 use chrono::{DateTime, Utc};
 
+/// The `planDigest` a destructive leaf's human preview printed (its last line).
+pub fn preview_digest(stdout: &str) -> Option<String> {
+    stdout.lines().find_map(|line| line.strip_prefix("planDigest ")).and_then(|rest| rest.split(';').next()).map(str::to_string)
+}
+
 /// A tempdir-rooted fixture: `<root>/canon.yaml`, `<root>/.canon/ledger`
 /// (git tier), `<root>/r2-local` (the offline r2 tier's local root,
 /// bound in via `canon-cli`'s `CANON_R2_LOCAL_ROOT` test seam).
@@ -161,28 +166,14 @@ impl Fixture {
         count_files(&self.r2_root())
     }
 
-    /// Run the built `canon` binary against this fixture's `canon.yaml`,
-    /// with `CANON_R2_LOCAL_ROOT` bound to this fixture's local r2 root
-    /// (the offline-r2 test seam `canon-cli`'s `tiers` module
-    /// documents). `subcommand_args` is the full subcommand path plus
-    /// any of its own flags (e.g. `["tier", "age", "--dry-run"]` or
-    /// `["query", "--kind", "trajectory"]`) — `--canon-yaml` is a
-    /// per-subcommand flag in `canon-cli`'s `clap` tree, so it is
+    /// Run the built `canon` binary against this fixture's repo (`--repo`
+    /// names its root), with `CANON_R2_LOCAL_ROOT` bound to this fixture's
+    /// local r2 root (the offline-r2 test seam `canon-cli`'s `tiers` module
+    /// documents). `subcommand_args` is the full subcommand path plus any of
+    /// its own flags (e.g. `["tier", "age"]` or `["query", "--kind",
+    /// "trajectory"]`); `--repo` is a per-subcommand option, so it is
     /// appended after the subcommand path, never before it.
     pub fn run_canon(&self, subcommand_args: &[&str]) -> Output {
-        let bin = Path::new(env!("CARGO_BIN_EXE_canon"));
-        let mut args: Vec<String> = subcommand_args.iter().map(|s| s.to_string()).collect();
-        args.push("--canon-yaml".to_string());
-        args.push(self.canon_yaml_path().display().to_string());
-        Command::new(bin).args(&args).env("CANON_R2_LOCAL_ROOT", self.r2_root()).output().expect("spawning the built `canon` binary")
-    }
-
-    /// Same as [`Fixture::run_canon`], but resolves the `canon.yaml`
-    /// through `--repo <fixture-root>` instead of an explicit
-    /// `--canon-yaml` override (s26 `repo-flag-uniformity` D2/F4) --
-    /// exercises the `resolve_repo_root(repo).join("canon.yaml")` path,
-    /// never the `--canon-yaml`-bypass arm.
-    pub fn run_canon_with_repo(&self, subcommand_args: &[&str]) -> Output {
         let bin = Path::new(env!("CARGO_BIN_EXE_canon"));
         let mut args: Vec<String> = subcommand_args.iter().map(|s| s.to_string()).collect();
         args.push("--repo".to_string());

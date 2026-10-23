@@ -1,4 +1,4 @@
-//! `canon divergence {stage,promote,resolve,defer,accept}` (s15 P3b,
+//! `canon divergence {add,resolve,defer,accept,list}` (s15 P3b,
 //! native-verdict-lifecycle spec, design D10): the ONLY producer of
 //! `canon_model::Divergence` records — without it, `canon-gate`'s
 //! divergence fold (`canon_model::fold_to_current_state`) has no
@@ -14,8 +14,8 @@
 //! - `add` stages a candidate of ANY status. With `--promote` (or `write:
 //!   { promote: auto }`) the same run promotes that one record;
 //!   `--no-promote` keeps it staged.
-//! - `promote` promotes every currently-staged divergence
-//!   (`canon_gate::promote_only`); `canon gate promote` drains them too.
+//! - `canon gate promote --kind divergence` promotes every currently-staged
+//!   divergence (`canon_gate::promote_only`).
 //! - `resolve`/`defer`/`accept` stage their record and promote it in the
 //!   same run: they have no staged-only mode, because the gate must see the
 //!   resolution or acceptance the moment the command succeeds.
@@ -23,12 +23,14 @@
 use std::path::Path;
 
 use canon_gate::promote::UNASSIGNED_RUN_SEQ;
-use canon_gate::{promote_only, GateCtx, PromoteReport};
+use canon_gate::GateCtx;
 use canon_model::{Actor, Divergence, DivergenceStatus, Envelope, ProjectId, RecordKind, RoleId, ScenarioId, SessionId, Sha, TotalOrder};
 use canon_store::tier::Tier;
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use chrono::{DateTime, Utc};
+use schemars::JsonSchema;
+use serde::Serialize;
 
 pub use crate::review::{parse_project_id, parse_scenario_id};
 use crate::cli_error::CliError;
@@ -39,14 +41,13 @@ pub fn parse_sha(s: &str) -> Result<Sha, String> {
     Sha::parse(s).map_err(|e| e.to_string())
 }
 
-/// `--expiry`'s `clap` value parser — an RFC3339/ISO-8601 timestamp
-/// (`canon_cli::query::parse_since`'s identical grammar, a distinct
-/// function so the error message names `--expiry`, not `--since`).
+/// `--expiry`'s and `--as-of`'s `clap` value parser: the shared `<TIMESTAMP>`
+/// grammar (RFC3339 or `YYYY-MM-DD`).
 pub fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, String> {
-    DateTime::parse_from_rfc3339(s).map(|dt| dt.with_timezone(&Utc)).map_err(|e| format!("invalid timestamp `{s}`: {e}"))
+    crate::timestamp::parse(s)
 }
 
-/// `canon divergence add --status <status>`'s status-string ->
+/// `canon divergence add --state <state>`'s state-string ->
 /// `DivergenceStatus` builder (module doc: `stage` accepts ANY
 /// status, not only `Open`). `--reason`/`--expiry` are REQUIRED
 /// together only when `status == "deferred"` — an `Err` here is a
@@ -57,36 +58,109 @@ pub fn parse_status(status: &str, reason: Option<&str>, expiry: Option<DateTime<
         "still-divergent" => Ok(DivergenceStatus::StillDivergent),
         "resolved" => Ok(DivergenceStatus::Resolved),
         "deferred" => {
-            let reason = reason.ok_or("`--status deferred` requires `--reason`")?;
-            let expiry = expiry.ok_or("`--status deferred` requires `--expiry`")?;
+            let reason = reason.ok_or("`--state deferred` requires `--reason`")?;
+            let expiry = expiry.ok_or("`--state deferred` requires `--expiry`")?;
             Ok(DivergenceStatus::Deferred { reason: reason.to_string(), expiry })
         }
-        other => Err(format!("unknown --status `{other}` (expected one of: open, still-divergent, resolved, deferred)")),
+        other => Err(format!("unknown --state `{other}` (expected one of: open, still-divergent, resolved, deferred)")),
     }
 }
 
-fn format_promote_report(report: &PromoteReport, dry_run: bool) -> String {
-    let mut out = format_candidate_lines(report, dry_run);
-    if report.promoted.is_empty() && report.refused.is_empty() {
-        out.push_str("canon divergence promote: nothing staged\n");
-    }
-    out
+/// `canon divergence add`: where the divergence landed.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DivergenceAddReport {
+    #[serde(flatten)]
+    pub landing: crate::retry::Landing,
 }
 
-/// One line per candidate in `report` — [`format_promote_report`]'s
-/// body, and the whole of what `stage --promote` prints for its one
-/// candidate.
-fn format_candidate_lines(report: &PromoteReport, dry_run: bool) -> String {
-    let verb = if dry_run { "would promote" } else { "promoted" };
-    let mut out = String::new();
-    for p in &report.promoted {
-        out.push_str(&format!("{verb} {} -> {}\n", p.label(), p.target.display()));
-    }
-    for r in &report.refused {
-        out.push_str(&format!("refused: {}\n", r.violation.line()));
-    }
-    out
+impl crate::reports::Report for DivergenceAddReport {}
+
+/// `canon divergence defer` and `canon divergence resolve`: the record committed.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DivergenceCommitReport {
+    /// The ledger path of the committed record.
+    pub committed: String,
 }
+
+impl crate::reports::Report for DivergenceCommitReport {}
+
+/// One scenario `canon divergence accept` accepted.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AcceptedScenario {
+    pub scenario_id: String,
+    /// The ledger path of the acceptance record.
+    pub location: String,
+}
+
+/// `canon divergence accept`: the acceptances written (all or none).
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DivergenceAcceptReport<'a> {
+    pub tracking: &'a str,
+    /// The date the acceptance lapses (`YYYY-MM-DD`); `null` without `--expiry`.
+    pub expiry: Option<String>,
+    pub accepted: Vec<AcceptedScenario>,
+}
+
+impl crate::reports::Report for DivergenceAcceptReport<'_> {}
+
+/// Per-state counts of `canon divergence list`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BurndownSummary {
+    pub open: usize,
+    pub resolved: usize,
+    pub still_divergent: usize,
+    pub deferred: usize,
+    pub resolved_invalid: usize,
+    pub accepted: usize,
+    pub total: usize,
+}
+
+/// One scenario's current state in `canon divergence list`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioRow<'a> {
+    pub project_id: &'a str,
+    pub scenario_id: &'a str,
+    /// `open`, `resolved`, `still-divergent`, `deferred`, `resolved-invalid` or `accepted`.
+    pub state: &'static str,
+    /// Why it is deferred.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<&'a str>,
+    /// When a deferral or acceptance lapses.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expiry: Option<String>,
+    /// Where an accepted gap is tracked.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tracking: Option<&'a str>,
+}
+
+/// `canon divergence list`: the current state of every divergence; paging is in `meta`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DivergenceListReport<'a> {
+    /// The instant deferred expiry was judged at (RFC 3339).
+    pub as_of: String,
+    pub summary: BurndownSummary,
+    pub scenarios: Vec<ScenarioRow<'a>>,
+}
+
+impl crate::reports::Report for DivergenceListReport<'_> {}
+
+/// `canon divergence list --fields`: each scenario keeps only the requested members.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DivergenceListFieldsReport {
+    pub as_of: String,
+    pub summary: BurndownSummary,
+    pub scenarios: Vec<crate::json_out::Projected<ScenarioRow<'static>>>,
+}
+
+impl crate::reports::Report for DivergenceListFieldsReport {}
 
 /// `canon divergence add` (module doc): writes ONE unordered staging
 /// candidate — `run_seq` is assigned later, at `promote` time. With
@@ -99,13 +173,14 @@ pub fn run_stage(
     repo: &Path,
     project_id: &canon_model::ProjectId,
     scenario_id: &canon_model::ScenarioId,
-    sha: &Sha,
+    commit: &crate::git_rev::Bound,
     status: DivergenceStatus,
     round: u32,
     reviewer: &str,
     detail: &str,
     actor_id: &str,
     role: &RoleId,
+    session: Option<&SessionId>,
     promote: crate::write_mode::PromoteFlag,
     json: bool,
 ) -> i32 {
@@ -116,17 +191,29 @@ pub fn run_stage(
     let promote = match crate::write_mode::should_promote(&repo, promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon divergence add", json);
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence add", json);
         }
     };
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon divergence add", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence add", json);
         }
     };
-    let candidate = candidate(project_id, scenario_id, sha, status, round, reviewer, detail, Actor::new(actor_id, role.clone()), Utc::now());
+    let candidate = candidate(project_id, scenario_id, &commit.sha, Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, actor_in(actor_id, role, session), Utc::now());
 
+    // The scenario's newest divergence already says exactly this: a repeat
+    // writes nothing and reports the record that is there.
+    let body = serde_json::to_value(&candidate).expect("a Divergence always serializes");
+    let same_scenario = |stored: &serde_json::Value| ["project_id", "scenario_id"].iter().all(|key| stored.get(key) == body.get(key));
+    if let Some(existing) = crate::retry::repeats_latest(&gate_ctx.ledger_root, Some(&crate::gate::evidence_staging_dir(&gate_ctx.ledger_root)), RecordKind::Divergence.as_str(), &body, same_scenario, None) {
+        crate::say!(json, "canon divergence add: unchanged — an identical divergence for {} is already {}; nothing written", scenario_id.as_str(), existing.describe());
+        crate::json_out::mark_unchanged();
+        if json {
+            crate::json_out::data("divergence add", &DivergenceAddReport { landing: existing.landing() });
+        }
+        return 0;
+    }
     let location = match stage(&gate_ctx.ledger_root, &candidate) {
         Ok(location) => location,
         Err(e) => {
@@ -136,7 +223,7 @@ pub fn run_stage(
     let outcome = crate::gate::promote_after_stage("canon divergence add", &gate_ctx.ledger_root, &location, promote, json);
     crate::say!(json, "canon divergence add: {} — {}", outcome.landed(&location), outcome.suffix());
     if json {
-        crate::json_out::data("divergence add", outcome.json(&location));
+        crate::json_out::data("divergence add", &DivergenceAddReport { landing: outcome.landing(&location) });
     }
     outcome.exit_code()
 }
@@ -144,8 +231,8 @@ pub fn run_stage(
 /// The staged shape of one divergence: the full record, `run_seq` not yet
 /// assigned.
 #[allow(clippy::too_many_arguments)]
-fn candidate(project_id: &ProjectId, scenario_id: &ScenarioId, sha: &Sha, status: DivergenceStatus, round: u32, reviewer: &str, detail: &str, actor: Actor, at: DateTime<Utc>) -> Divergence {
-    Divergence::new(
+fn candidate(project_id: &ProjectId, scenario_id: &ScenarioId, sha: &Sha, code: Option<(&str, bool)>, status: DivergenceStatus, round: u32, reviewer: &str, detail: &str, actor: Actor, at: DateTime<Utc>) -> Divergence {
+    let record = Divergence::new(
         Envelope::new(1, RecordKind::Divergence, at, actor),
         project_id.clone(),
         scenario_id.clone(),
@@ -155,7 +242,11 @@ fn candidate(project_id: &ProjectId, scenario_id: &ScenarioId, sha: &Sha, status
         round,
         reviewer,
         detail,
-    )
+    );
+    match code {
+        Some((code_tree, dirty)) => record.with_code(code_tree, dirty),
+        None => record,
+    }
 }
 
 /// Stage `candidate` in the ledger's one staging directory; the location is
@@ -173,39 +264,7 @@ fn stage_and_promote(ledger_root: &Path, candidate: &Divergence) -> Result<std::
         Ok(target) => Ok(std::path::PathBuf::from(target)),
         Err(refusal) => {
             let _ = std::fs::remove_file(crate::gate::evidence_staging_dir(ledger_root).join(&location));
-            Err(refusal.data.and_then(|data| data["refused"][0]["message"].as_str().map(str::to_string)).unwrap_or_else(|| refusal.error.message.clone()))
-        }
-    }
-}
-
-/// `canon divergence promote [--dry-run]` (module doc): batch-promotes
-/// every currently-staged candidate.
-pub fn run_promote(repo: &Path, dry_run: bool, json: bool) -> i32 {
-    let repo = resolve_repo_root(repo);
-    let gate_ctx = match GateCtx::from_repo(&repo) {
-        Ok(ctx) => ctx,
-        Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon divergence promote", json);
-        }
-    };
-    let staging = GitTier::new(crate::gate::evidence_staging_dir(&gate_ctx.ledger_root));
-    let committed = GitTier::new(&gate_ctx.ledger_root);
-
-    match promote_only(RecordKind::Divergence, &staging, &committed, dry_run) {
-        Ok(report) => {
-            crate::say_raw!(json, "{}", format_promote_report(&report, dry_run));
-            let data = crate::gate::promote_json(&report, dry_run);
-            if report.is_clean() {
-                if json {
-                    crate::json_out::data("divergence promote", data);
-                }
-                0
-            } else {
-                CliError::failed("PROMOTE_REFUSED", format!("{} staged divergence(s) refused", report.refused.len())).hint("`canon gate check` names what promotion refused; fix it, then run `canon divergence promote` (the record stays staged)").emit_with_data("canon divergence promote", json, data)
-            }
-        }
-        Err(e) => {
-            CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon divergence promote", json)
+            Err(refusal.data.and_then(|data| data.refused.into_iter().next().map(|refused| refused.message)).unwrap_or_else(|| refusal.error.message.clone()))
         }
     }
 }
@@ -218,13 +277,14 @@ fn run_commit(
     repo: &Path,
     project_id: &canon_model::ProjectId,
     scenario_id: &canon_model::ScenarioId,
-    sha: &Sha,
+    commit: &crate::git_rev::Bound,
     status: DivergenceStatus,
     round: u32,
     reviewer: &str,
     detail: &str,
     actor_id: &str,
     role: &RoleId,
+    session: Option<&SessionId>,
     json: bool,
 ) -> i32 {
     let repo = resolve_repo_root(repo);
@@ -234,22 +294,31 @@ fn run_commit(
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit(&format!("canon divergence {verb}"), json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&format!("canon divergence {verb}"), json);
         }
     };
-    let candidate = candidate(project_id, scenario_id, sha, status, round, reviewer, detail, Actor::new(actor_id, role.clone()), Utc::now());
+    let candidate = candidate(project_id, scenario_id, &commit.sha, Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, actor_in(actor_id, role, session), Utc::now());
 
     match stage_and_promote(&gate_ctx.ledger_root, &candidate) {
         Ok(target) => {
             crate::say!(json, "canon divergence {verb}: committed {} — {}", target.display(), crate::write_mode::PROMOTED);
             if json {
-                crate::json_out::data(&format!("divergence {verb}"), serde_json::json!({ "committed": target.display().to_string() }));
+                crate::json_out::data(&format!("divergence {verb}"), &DivergenceCommitReport { committed: target.display().to_string() });
             }
             0
         }
         Err(message) => {
-            CliError::failed("DIVERGENCE_REFUSED", message).hint("`canon divergence status` lists the scenario's divergences and their state; fix what the message names, then run the command again").emit(&format!("canon divergence {verb}"), json)
+            CliError::failed("DIVERGENCE_REFUSED", message).hint("`canon divergence list` lists the scenario's divergences and their state; fix what the message names, then run the command again").emit(&format!("canon divergence {verb}"), json)
         }
+    }
+}
+
+/// The actor of a divergence record: `actor_id` in `role`, in `session` when `--session-id` named one.
+fn actor_in(actor_id: &str, role: &RoleId, session: Option<&SessionId>) -> Actor {
+    let actor = Actor::new(actor_id, role.clone());
+    match session {
+        Some(session) => actor.with_session(session.clone()),
+        None => actor,
     }
 }
 
@@ -260,15 +329,16 @@ pub fn run_resolve(
     repo: &Path,
     project_id: &canon_model::ProjectId,
     scenario_id: &canon_model::ScenarioId,
-    sha: &Sha,
+    commit: &crate::git_rev::Bound,
     round: u32,
     reviewer: &str,
     detail: &str,
     actor_id: &str,
     role: &RoleId,
+    session: Option<&SessionId>,
     json: bool,
 ) -> i32 {
-    run_commit("resolve", repo, project_id, scenario_id, sha, DivergenceStatus::Resolved, round, reviewer, detail, actor_id, role, json)
+    run_commit("resolve", repo, project_id, scenario_id, commit, DivergenceStatus::Resolved, round, reviewer, detail, actor_id, role, session, json)
 }
 
 /// `canon divergence defer --reason <..> --expiry <..>` (module doc):
@@ -278,13 +348,14 @@ pub fn run_defer(
     repo: &Path,
     project_id: &canon_model::ProjectId,
     scenario_id: &canon_model::ScenarioId,
-    sha: &Sha,
+    commit: &crate::git_rev::Bound,
     round: u32,
     reviewer: &str,
     reason: &str,
     expiry: DateTime<Utc>,
     actor_id: &str,
     role: &RoleId,
+    session: Option<&SessionId>,
     json: bool,
 ) -> i32 {
     run_commit(
@@ -292,26 +363,16 @@ pub fn run_defer(
         repo,
         project_id,
         scenario_id,
-        sha,
+        commit,
         DivergenceStatus::Deferred { reason: reason.to_string(), expiry },
         round,
         reviewer,
         "",
         actor_id,
         role,
+        session,
         json,
     )
-}
-
-/// `--expiry`'s `clap` value parser for `divergence accept`: a calendar
-/// date, `YYYY-MM-DD`, read as that day's start in UTC (the acceptance
-/// stops holding when the date begins); an RFC3339 timestamp is also taken
-/// as given, like `divergence defer --expiry`.
-pub fn parse_expiry_date(s: &str) -> Result<DateTime<Utc>, String> {
-    match chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d") {
-        Ok(date) => Ok(date.and_hms_opt(0, 0, 0).expect("midnight exists").and_utc()),
-        Err(_) => parse_timestamp(s).map_err(|_| format!("invalid expiry `{s}`: want a date, YYYY-MM-DD")),
-    }
 }
 
 /// `canon divergence accept`'s arguments.
@@ -374,7 +435,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
     }
     let context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| canon_gate::GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(context) => context,
-        Err(e) => return CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml (`canon init --check-config` names the problem), then run `canon divergence accept` again").emit(CMD, args.json),
+        Err(e) => return CliError::refused("CONFIG_UNREADABLE", e).hint("fix canon.yaml (`canon init --check` names the problem), then run `canon divergence accept` again").emit(CMD, args.json),
     };
     let indexed = canon_gate::spec_coverage::latest_scenarios(&context);
     let mut scenarios = Vec::new();
@@ -416,6 +477,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
             // acceptance binds to evidence, not to an app state, so a
             // scenario whose evidence carries no commit gets the null one.
             &canon_gate::acceptance::evidence_sha(&context, scenario).unwrap_or_else(|| Sha::parse(&"0".repeat(40)).expect("forty hex digits")),
+            None,
             DivergenceStatus::Accepted {
                 reason: args.reason.clone(),
                 tracking: args.tracking.clone(),
@@ -452,7 +514,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
     for (scenario, target) in &wrote {
         crate::say!(args.json, "canon divergence accept: {scenario} accepted as a known gap ({}) -> {} — {}", args.tracking, target.display(), crate::write_mode::PROMOTED);
     }
-    let accepted: Vec<serde_json::Value> = wrote.iter().map(|(scenario, target)| serde_json::json!({ "scenarioId": scenario, "location": target.display().to_string() })).collect();
+    let accepted: Vec<AcceptedScenario> = wrote.iter().map(|(scenario, target)| AcceptedScenario { scenario_id: scenario.to_string(), location: target.display().to_string() }).collect();
     let scope = crate::next::Scope::Scenarios(wrote.iter().map(|(scenario, _)| scenario.clone()).collect());
     crate::next::finish(
         &repo,
@@ -460,12 +522,11 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
         &scope,
         false,
         args.json,
-        serde_json::json!({ "tracking": args.tracking, "expiry": args.expiry.map(|e| e.format("%Y-%m-%d").to_string()), "accepted": accepted }),
-    );
+        &DivergenceAcceptReport { tracking: &args.tracking, expiry: args.expiry.map(|e| e.format("%Y-%m-%d").to_string()), accepted });
     0
 }
 
-/// `canon divergence status [--as-of <timestamp>]` (task 4.5): the S9
+/// `canon divergence list [--as-of <timestamp>]` (task 4.5): the S9
 /// divergence burn-down's CURRENT-STATE view, over
 /// `canon_report::divergence::{current_states, summarize}` — the
 /// consumer of `canon_model::fold_to_current_state` this crate wires
@@ -473,79 +534,74 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
 /// with `mart_review_burndown`'s per-day TREND). `as_of` defaults to
 /// "now"; ALWAYS exits `0` — a read-only capability query over
 /// whatever is currently on the ledger, never a gate.
-/// The fields of one `divergence status` scenario row, which `--fields` may name.
-const ROW_FIELDS: [&str; 6] = ["project_id", "scenario_id", "state", "reason", "expiry", "tracking"];
+/// The fields of one `divergence list` scenario row, which `--fields` may name.
+const ROW_FIELDS: [&str; 6] = ["projectId", "scenarioId", "state", "reason", "expiry", "tracking"];
 
-pub fn run_status(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &crate::paging::Page, fields: Option<&[String]>) -> i32 {
+pub fn run_list(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &crate::paging::Page, fields: Option<&[String]>) -> i32 {
     if let Some(requested) = fields {
-        if let Err(e) = crate::paging::check_known("canon divergence status", requested, &ROW_FIELDS) {
-            return e.emit("canon divergence status", json);
+        if let Err(e) = crate::paging::check_known("canon divergence list", requested, &ROW_FIELDS) {
+            return e.emit("canon divergence list", json);
         }
     }
     let repo = resolve_repo_root(repo);
     let gate_ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon divergence status", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence list", json);
         }
     };
     let as_of = as_of.unwrap_or_else(Utc::now);
 
     let states = canon_report::divergence::current_states(&gate_ctx.ledger_root, as_of);
     let summary = canon_report::divergence::summarize(&states);
-    let (rows, meta) = match crate::paging::paginate("divergence status", states.into_iter().collect::<Vec<_>>(), |((project_id, scenario_id), _)| format!("{project_id}/{scenario_id}"), page) {
+    let (rows, meta) = match crate::paging::paginate("divergence list", states.into_iter().collect::<Vec<_>>(), |((project_id, scenario_id), _)| format!("{project_id}/{scenario_id}"), page) {
         Ok(paged) => paged,
-        Err(e) => return e.emit("canon divergence status", json),
+        Err(e) => return e.emit("canon divergence list", json),
     };
 
     if json {
-        let scenarios: Vec<serde_json::Value> = rows
-            .iter()
-            .map(|((project_id, scenario_id), state)| {
-                let mut row = serde_json::json!({ "project_id": project_id.as_str(), "scenario_id": scenario_id.as_str(), "state": state_slug(state) });
-                match state {
-                    canon_model::FoldedState::Deferred { reason, expiry } => {
-                        row["reason"] = serde_json::json!(reason);
-                        row["expiry"] = serde_json::json!(expiry.to_string());
-                    }
-                    canon_model::FoldedState::Accepted { tracking, expiry } => {
-                        row["tracking"] = serde_json::json!(tracking);
-                        if let Some(expiry) = expiry {
-                            row["expiry"] = serde_json::json!(expiry.to_string());
-                        }
-                    }
-                    _ => {}
+        let scenarios = rows.iter().map(|((project_id, scenario_id), state)| {
+            let mut row = ScenarioRow { project_id: project_id.as_str(), scenario_id: scenario_id.as_str(), state: state_slug(state), reason: None, expiry: None, tracking: None };
+            match state {
+                canon_model::FoldedState::Deferred { reason, expiry } => {
+                    row.reason = Some(reason);
+                    row.expiry = Some(expiry.to_string());
                 }
-                match fields {
-                    Some(requested) => crate::paging::project(&row, requested),
-                    None => row,
+                canon_model::FoldedState::Accepted { tracking, expiry } => {
+                    row.tracking = Some(tracking);
+                    row.expiry = expiry.map(|expiry| expiry.to_string());
                 }
-            })
-            .collect();
-        let mut meta_json = serde_json::json!({ "command": "divergence status" });
-        meta.insert_into(meta_json.as_object_mut().expect("meta is an object"));
-        let out = serde_json::json!({
-            "data": {
-                "as_of": as_of.to_rfc3339(),
-                "summary": {
-                    "open": summary.open,
-                    "resolved": summary.resolved,
-                    "still_divergent": summary.still_divergent,
-                    "deferred": summary.deferred,
-                    "resolved_invalid": summary.resolved_invalid,
-                    "accepted": summary.accepted,
-                    "total": summary.total(),
-                },
-                "scenarios": scenarios,
-            },
-            "meta": meta_json,
+                _ => {}
+            }
+            row
         });
-        println!("{}", serde_json::to_string_pretty(&out).expect("a JSON value always serializes"));
+        let summary = BurndownSummary {
+            open: summary.open,
+            resolved: summary.resolved,
+            still_divergent: summary.still_divergent,
+            deferred: summary.deferred,
+            resolved_invalid: summary.resolved_invalid,
+            accepted: summary.accepted,
+            total: summary.total(),
+        };
+        let as_of = as_of.to_rfc3339();
+        let mut page = serde_json::Map::new();
+        meta.insert_into(&mut page);
+        let page = serde_json::Value::Object(page);
+        match fields {
+            Some(requested) => {
+                let scenarios = scenarios
+                    .map(|row| crate::json_out::Projected::new(crate::paging::project(&serde_json::to_value(row).expect("a scenario row serializes"), requested)))
+                    .collect();
+                crate::json_out::data_with_meta("divergence list", &DivergenceListFieldsReport { as_of, summary, scenarios }, page);
+            }
+            None => crate::json_out::data_with_meta("divergence list", &DivergenceListReport { as_of, summary, scenarios: scenarios.collect() }, page),
+        }
         return 0;
     }
 
     println!(
-        "canon divergence status (as of {as_of}): open={} resolved={} still-divergent={} deferred={} resolved-invalid={} accepted={} (total={})",
+        "canon divergence list (as of {as_of}): open={} resolved={} still-divergent={} deferred={} resolved-invalid={} accepted={} (total={})",
         summary.open,
         summary.resolved,
         summary.still_divergent,
@@ -600,12 +656,12 @@ mod tests {
         GateCtx::from_repo(dir.path()).unwrap().ledger_root
     }
 
-    fn ids() -> (ProjectId, ScenarioId, RoleId, Sha) {
+    fn ids() -> (ProjectId, ScenarioId, RoleId, crate::git_rev::Bound) {
         (
             ProjectId::parse("app-a").unwrap(),
             ScenarioId::parse("world.firstbuy-hotdeal.26").unwrap(),
             RoleId::parse("reviewer").unwrap(),
-            Sha::parse("a".repeat(40)).unwrap(),
+            crate::git_rev::Bound { sha: Sha::parse("a".repeat(40)).unwrap(), code_tree: "t".repeat(40), worktree_dirty: false },
         )
     }
 
@@ -615,10 +671,10 @@ mod tests {
         let (project_id, scenario_id_a, role, sha) = ids();
         let scenario_id_b = ScenarioId::parse("world.firstbuy-hotdeal.27").unwrap();
 
-        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id_a, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default(), false), 0);
-        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id_b, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default(), false), 0);
+        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id_a, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, None, Default::default(), false), 0);
+        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id_b, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, None, Default::default(), false), 0);
 
-        let code = run_promote(dir.path(), false, false);
+        let code = crate::gate::run_promote(dir.path(), Some(RecordKind::Divergence), false, false);
         assert_eq!(code, 0);
 
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
@@ -643,7 +699,8 @@ mod tests {
         let malformed = candidate(
             &project_id,
             &ScenarioId::parse("world.firstbuy-hotdeal.90").unwrap(),
-            &sha,
+            &sha.sha,
+            None,
             DivergenceStatus::Open,
             1,
             "reviewer-1",
@@ -653,9 +710,9 @@ mod tests {
         );
         stage(&gate_ctx_root(&dir), &malformed).unwrap();
 
-        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default(), false), 0);
+        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, None, Default::default(), false), 0);
 
-        let code = run_promote(dir.path(), false, false);
+        let code = crate::gate::run_promote(dir.path(), Some(RecordKind::Divergence), false, false);
         assert_eq!(code, 1, "a refusal reports a non-zero (but not usage-error) exit code");
 
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
@@ -693,16 +750,16 @@ mod tests {
         let deferred_id = ScenarioId::parse("world.firstbuy-hotdeal.51").unwrap();
 
         // Something else is mid-`stage`.
-        assert_eq!(run_stage(dir.path(), &project_id, &ScenarioId::parse("world.firstbuy-hotdeal.50").unwrap(), &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, Default::default(), false), 0);
+        assert_eq!(run_stage(dir.path(), &project_id, &ScenarioId::parse("world.firstbuy-hotdeal.50").unwrap(), &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, None, Default::default(), false), 0);
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let staging_dir = crate::gate::evidence_staging_dir(&gate_ctx.ledger_root);
         let staged_before = files_with_bytes(&staging_dir);
         assert_eq!(staged_before.len(), 1, "exactly the one unrelated candidate is staged");
 
-        assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, false), 0);
+        assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, None, false), 0);
         // Whole seconds so the persisted expiry compares exactly.
         let expiry = chrono::DateTime::from_timestamp((Utc::now() + chrono::Duration::days(7)).timestamp(), 0).unwrap();
-        assert_eq!(run_defer(dir.path(), &project_id, &deferred_id, &sha, 1, "reviewer-1", "needs another look", expiry, "agent-x", &role, false), 0);
+        assert_eq!(run_defer(dir.path(), &project_id, &deferred_id, &sha, 1, "reviewer-1", "needs another look", expiry, "agent-x", &role, None, false), 0);
 
         let committed = GitTier::new(&gate_ctx.ledger_root);
         let landed = committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap();
@@ -725,10 +782,10 @@ mod tests {
         let dir = repo_dir();
         let (project_id, scenario_id, role, sha) = ids();
 
-        assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, false), 0);
+        assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, None, false), 0);
 
         // Read-only capability query — always exits 0.
-        assert_eq!(run_status(dir.path(), None, false, &crate::paging::Page::first_page(), None), 0);
+        assert_eq!(run_list(dir.path(), None, false, &crate::paging::Page::first_page(), None), 0);
 
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let states = canon_report::divergence::current_states(&gate_ctx.ledger_root, Utc::now());
@@ -738,13 +795,13 @@ mod tests {
     /// divergence.lifecycle.08 against a real ledger: a committed
     /// resolution against sha `a` reads back as resolved-invalid once the
     /// scenario's live evidence binding names sha `b`, and neither
-    /// `canon divergence status` nor the fold rewrites the persisted
+    /// `canon divergence list` nor the fold rewrites the persisted
     /// resolved record — the downgrade is derived at read time.
     #[test]
     fn a_moved_live_binding_reads_resolved_invalid_without_rewriting_the_resolution() {
         let dir = repo_dir();
         let (project_id, scenario_id, role, sha) = ids();
-        assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, false), 0);
+        assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, None, false), 0);
 
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let moved = Sha::parse("b".repeat(40)).unwrap();
@@ -758,13 +815,13 @@ mod tests {
         let persisted_before = files_with_bytes(&divergence_dir);
         assert_eq!(persisted_before.len(), 1, "exactly the one committed resolution");
 
-        assert_eq!(run_status(dir.path(), None, false, &crate::paging::Page::first_page(), None), 0);
+        assert_eq!(run_list(dir.path(), None, false, &crate::paging::Page::first_page(), None), 0);
         let states = canon_report::divergence::current_states(&gate_ctx.ledger_root, Utc::now());
         assert_eq!(states.get(&(project_id, scenario_id)), Some(&canon_model::FoldedState::ResolvedInvalid));
 
         assert_eq!(files_with_bytes(&divergence_dir), persisted_before, "reading must never rewrite the persisted resolution");
         let persisted: canon_model::records::Divergence = serde_json::from_slice(&persisted_before[0].1).unwrap();
         assert_eq!(persisted.status, DivergenceStatus::Resolved, "the record on disk still says resolved");
-        assert_eq!(persisted.sha, sha);
+        assert_eq!(persisted.sha, sha.sha);
     }
 }

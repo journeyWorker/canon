@@ -1,8 +1,8 @@
 description: "0.25 D1 (#96): `canon subject unadopt <change> --subject-id <id>` refuses a change whose brief carries an `Approved:` line (SUBJECT_UNADOPT_REFUSED, exit 2): it is the subject's approved scope; an unknown change is refused like adopt (exit 2)"
 steps:
-  - args: [subject, unadopt, a, --subject-id, s]
+  - args: [subject, unadopt, s, --change-id, a]
     exit: 2
-  - args: [subject, unadopt, a, --subject-id, s, --json]
+  - args: [subject, unadopt, s, --change-id, a, --json]
     exit: 2
-  - args: [subject, unadopt, no-such-change, --subject-id, s]
+  - args: [subject, unadopt, s, --change-id, no-such-change]
     exit: 2

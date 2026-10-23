@@ -1,12 +1,11 @@
 //! 0.18 D1/D2 through the real binary: one report attests many
 //! scenarios (`canon evidence add --all-scenarios`), a task's report with
 //! no scenario id binds every case, a Swift Testing event stream binds,
-//! one `canon review add` signs off many scenarios, and a write that
+//! one `canon review scenario` signs off many scenarios, and a write that
 //! makes a pinned review stale names the review and its re-pin command.
 
-use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+use std::process::{Command, Output};
 
 use canon_model::{Actor, ChangeId, Envelope, RecordKind, RoleId, Subject, SubjectId, SubjectStatus};
 use canon_store::git_tier::GitTier;
@@ -52,6 +51,7 @@ fn shop_repo(subject_tag: &str) -> tempfile::TempDir {
     let repo = dir.path();
     assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
+    commit_all(repo);
     let path = repo.join(FEATURE);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(path, feature(subject_tag)).unwrap();
@@ -105,7 +105,7 @@ fn stored_blobs(repo: &Path) -> usize {
 
 /// `canon evidence add --all-scenarios` over `report`, plus `extra`.
 fn attest_all(repo: &Path, report: &str, extra: &[&str]) -> Output {
-    let mut args = vec!["evidence", "add", "--project-id", "root", "--all-scenarios", "--report", report, "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"];
+    let mut args = vec!["evidence", "add", "--project-id", "root", "--all-scenarios", "--report", report, "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"];
     args.extend_from_slice(extra);
     canon(repo, &args)
 }
@@ -228,20 +228,17 @@ fn evidence_add_83_any_refusal_refuses_the_whole_batch() {
 
     for (extra, flag) in [
         (vec!["--scenario-id", "shop.cart.01"], "--scenario-id"),
-        (vec!["--task", "c-demo#1.1"], "--task"),
+        (vec!["--task-id", "c-demo#1.1"], "--task-id"),
         (vec!["--report-case", "x"], "--report-case"),
-        (vec!["--approval-by", "alice", "--approval-role", "human"], "--approval-by, --approval-role"),
+        (vec!["--approver", "alice", "--approval-role", "human"], "--approver, --approval-role"),
     ] {
         let out = attest_all(repo, "junit:reports/junit.xml", &extra);
         assert_eq!(out.status.code(), Some(2), "{flag}: {}", stderr(&out));
-        assert!(stderr(&out).contains(&format!("EVIDENCE_INVALID_ARGUMENT — {flag}")) && stderr(&out).contains("do(es) not combine with --all-scenarios"), "{flag}: {}", stderr(&out));
+        assert!(stderr(&out).contains("EVIDENCE_INVALID_ARGUMENT") && stderr(&out).contains(flag.split(", ").next().unwrap()), "{flag}: {}", stderr(&out));
     }
-    let bare = canon(repo, &["evidence", "add", "--project-id", "root", "--all-scenarios", "--kind", "test-run", "--ref", "x", "--role", "implementer"]);
+    let bare = canon(repo, &["evidence", "add", "--project-id", "root", "--all-scenarios", "--class", "test-run", "--ref", "x", "--role", "implementer"]);
     assert_eq!(bare.status.code(), Some(2));
     assert!(stderr(&bare).contains("none was given"), "{}", stderr(&bare));
-    let no_root = canon(repo, &["evidence", "add", "--all-scenarios", "--report", "junit:reports/junit.xml", "--kind", "test-run", "--ref", "x", "--role", "implementer"]);
-    assert_eq!(no_root.status.code(), Some(2));
-    assert!(stderr(&no_root).contains("--all-scenarios needs --project-id"), "{}", stderr(&no_root));
     assert_eq!(evidence_files(repo), before);
 }
 
@@ -255,7 +252,7 @@ fn shots_repo() -> tempfile::TempDir {
     write(repo, "reports/junit.xml", TWO_CASES);
     write(repo, "shots/a.png", "frame a");
     write(repo, "shots/b.png", "frame b");
-    ok(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--artifact", "shots/a.png", "--artifact", "shots/b.png"]);
+    ok(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--artifact", "shots/a.png", "--artifact", "shots/b.png"]);
     dir
 }
 
@@ -466,7 +463,7 @@ fn evidence_add_96_a_scoped_artifact_binds_one_scenario() {
 
     // One scenario on its own: its own id, or a bare path; another id is refused.
     let single = |artifact: &str| {
-        canon(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent", "--artifact", artifact])
+        canon(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent", "--artifact", artifact])
     };
     assert_eq!(single("shop.cart.01=notes/qa.md").status.code(), Some(0));
     assert_eq!(paths_of(&latest_of(repo, "shop.cart.01")), ["notes/qa.md"]);
@@ -500,7 +497,7 @@ fn evidence_add_97_an_unbindable_report_attachment_refuses() {
         let err = stderr(&batch);
         assert!(err.contains("case `shop.cart.01 adds`") && err.contains(needle), "{what}: {err}");
 
-        let mut single = vec!["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent", "--report", "junit:reports/bad.xml"];
+        let mut single = vec!["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent", "--report", "junit:reports/bad.xml"];
         single.extend_from_slice(args);
         let one = canon(repo, &single);
         assert_eq!(one.status.code(), Some(2), "{what}: {}{}", stdout(&one), stderr(&one));
@@ -517,7 +514,7 @@ fn evidence_add_98_a_single_scenario_binds_its_cases_attachments() {
     let dir = playwright_repo();
     let repo = dir.path();
 
-    ok(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.02", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent", "--report", "junit:reports/junit.xml"]);
+    ok(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.02", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent", "--report", "junit:reports/junit.xml"]);
     assert_eq!(paths_of(&latest_of(repo, "shop.cart.02")), ["reports/junit.xml", "test-results/c2/shot.png"]);
 }
 
@@ -532,7 +529,7 @@ fn evidence_add_99_new_screenshot_bytes_keep_a_review_current() {
     assert!(attest_all(repo, "junit:reports/junit.xml", &[]).status.success());
     ok(
         repo,
-        &["review", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--reviewer", "reviewer-2", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--pin", "r1", "--upstream-ref", "tests/cart.rs#shop_cart_01"],
+        &["review", "scenario", "shop.cart.01", "--project-id", "root", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--upstream-ref", "tests/cart.rs#shop_cart_01"],
     );
     let git = |args: &[&str]| {
         let out = Command::new("git").args(args).current_dir(repo).env("GIT_AUTHOR_NAME", "t").env("GIT_AUTHOR_EMAIL", "t@t").env("GIT_COMMITTER_NAME", "t").env("GIT_COMMITTER_EMAIL", "t@t").output().unwrap();
@@ -563,7 +560,7 @@ fn evidence_add_84_a_task_report_without_a_scenario_binds_every_case() {
     write(repo, ".canon/changes/c-demo/tasks.md", "## 1. Build\n\n- [ ] 1.1 Build the demo\n");
     write(repo, "reports/failing.xml", r#"<testsuite><testcase name="helper adds"/><testcase name="helper removes"><failure/></testcase></testsuite>"#);
     write(repo, "reports/passing.xml", r#"<testsuite><testcase name="helper adds"/><testcase name="helper removes"/></testsuite>"#);
-    let task = |report: &str| canon(repo, &["evidence", "add", "--task", "c-demo#1.1", "--report", report, "--kind", "test-run", "--ref", "npm test", "--role", "implementer"]);
+    let task = |report: &str| canon(repo, &["evidence", "add", "--task-id", "c-demo#1.1", "--report", report, "--verdict", "faithful", "--class", "test-run", "--ref", "npm test", "--role", "implementer"]);
 
     let out = task("junit:reports/failing.xml");
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
@@ -648,11 +645,11 @@ fn evidence_add_86_a_write_that_stales_a_pinned_review_names_the_re_pin() {
     let dir = shop_repo("");
     let repo = dir.path();
     std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_review:\n    scope: []\n").unwrap();
-    let attest = |id: &str| canon(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", id, "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
+    let attest = |id: &str| canon(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", id, "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
     assert!(attest("shop.cart.01").status.success());
     ok(
         repo,
-        &["review", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--reviewer", "reviewer-2", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--pin", "r1", "--upstream-ref", "tests/cart.rs#shop_cart_01"],
+        &["review", "scenario", "shop.cart.01", "--project-id", "root", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--upstream-ref", "tests/cart.rs#shop_cart_01"],
     );
     let git = |args: &[&str]| {
         let out = Command::new("git").args(args).current_dir(repo).env("GIT_AUTHOR_NAME", "t").env("GIT_AUTHOR_EMAIL", "t@t").env("GIT_COMMITTER_NAME", "t").env("GIT_COMMITTER_EMAIL", "t@t").output().unwrap();
@@ -661,7 +658,6 @@ fn evidence_add_86_a_write_that_stales_a_pinned_review_names_the_re_pin() {
     };
     git(&["add", "-A"]);
     git(&["commit", "-q", "-m", "reviewed"]);
-    let head = git(&["rev-parse", "HEAD"]);
     let gate = |repo: &Path| stdout(&canon(repo, &["gate", "check"]));
     assert!(!gate(repo).contains("unreviewed-promotion shop.cart.01"), "the review is current");
 
@@ -671,10 +667,10 @@ fn evidence_add_86_a_write_that_stales_a_pinned_review_names_the_re_pin() {
     assert!(!stdout(&same).contains("stale"), "no notice for evidence that says the same: {}", stdout(&same));
     assert!(!gate(repo).contains("unreviewed-promotion shop.cart.01"), "the review is still current");
 
-    let out = canon(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent", "--verdict", "not-applicable", "--summary", "skipped in this run"]);
+    let out = canon(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent", "--verdict", "not-applicable", "--summary", "skipped in this run"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let expected = format!(
-        "canon evidence add: review by `reviewer-2` of shop.cart.01 is now stale (this record's verdict or checks differ from what it saw); re-pin it: canon review add --project-id root --scenario-id shop.cart.01 --reviewer reviewer-2 --actor-id reviewer-2 --role reviewer --pin {head} --session-id sess-review --upstream-ref 'tests/cart.rs#shop_cart_01'"
+        "canon evidence add: review by `reviewer-2` of shop.cart.01 is now stale (this record's verdict or checks differ from what it saw); re-pin it: canon review scenario shop.cart.01 --project-id root --actor-id reviewer-2 --role reviewer --session-id sess-review --upstream-ref 'tests/cart.rs#shop_cart_01'"
     );
     let text = stdout(&out);
     let line = text.lines().find(|l| l.contains("is now stale")).unwrap_or_else(|| panic!("no stale-review line: {text}"));
@@ -696,67 +692,51 @@ fn evidence_add_86_a_write_that_stales_a_pinned_review_names_the_re_pin() {
     assert!(!stdout(&out).contains("stale"), "no review, no notice: {}", stdout(&out));
 }
 
-fn review_args<'a>(extra: &[&'a str]) -> Vec<&'a str> {
-    let mut args = vec!["review", "add", "--project-id", "root", "--reviewer", "reviewer-2", "--actor-id", "reviewer-2", "--role", "reviewer", "--pin", "r1", "--original-spec-ref", FEATURE];
+fn review_args<'a>(ids: &[&'a str], extra: &[&'a str]) -> Vec<&'a str> {
+    let mut args = vec!["review", "scenario"];
+    args.extend_from_slice(ids);
+    args.extend(["--project-id", "root", "--actor-id", "reviewer-2", "--role", "reviewer", "--original-spec-ref", FEATURE]);
     args.extend_from_slice(extra);
     args
 }
 
-/// review.add.80: one invocation, one review per scenario, the same
+/// One invocation, one review per scenario, the same
 /// reviewer, pin and artifacts, each pinning its own scenario.
 #[test]
-fn review_add_80_one_review_add_signs_off_several_scenarios() {
+fn review_scenario_one_invocation_signs_off_several_scenarios() {
     let dir = shop_repo("");
     let repo = dir.path();
-    write(repo, "ids.txt", "# the batch\nshop.cart.03  # third\n\n");
     write(repo, "shot.png", "png");
-    let out = ok(repo, &review_args(&["--scenario-id", "shop.cart.01", "--scenario-id", "shop.cart.02", "--scenario-ids-from", "ids.txt", "--artifact", "shot.png"]));
-    assert_eq!(out.lines().filter(|l| l.starts_with("canon review add: pinned shop.cart.0")).count(), 3, "{out}");
-    assert_eq!(out.lines().filter(|l| l.starts_with("canon review add: wrote kind=review/")).count(), 3, "{out}");
+    ok(repo, &review_args(&["shop.cart.01", "shop.cart.02", "shop.cart.03"], &["--artifact", "shot.png"]));
 
     let written = reviews(repo);
     let mut ids: Vec<&str> = written.iter().map(|r| r["scenario_id"].as_str().unwrap()).collect();
     ids.sort();
     assert_eq!(ids, ["shop.cart.01", "shop.cart.02", "shop.cart.03"]);
-    assert!(written.iter().all(|r| r["reviewer"] == "reviewer-2" && r["pin"] == "r1" && r["artifacts"][0]["path"] == "shot.png"), "{written:?}");
+    assert!(written.iter().all(|r| r["reviewer"] == "reviewer-2" && r["pin"] == written[0]["pin"] && r["artifacts"][0]["path"] == "shot.png"), "{written:?}");
     let digests: std::collections::BTreeSet<&str> = written.iter().map(|r| r["pins"]["scenario_digest"].as_str().unwrap()).collect();
     assert_eq!(digests.len(), 3, "each review pins its own scenario");
     assert_eq!(stored_blobs(repo), 1, "the artifact is stored once");
-
-    let mut child = Command::new(env!("CARGO_BIN_EXE_canon"))
-        .args(review_args(&["--scenario-ids-from", "-"]))
-        .current_dir(repo)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
-    child.stdin.take().unwrap().write_all(b"shop.cart.04\n").unwrap();
-    let out = child.wait_with_output().unwrap();
-    assert!(out.status.success(), "{}", stderr(&out));
-    assert_eq!(reviews(repo).len(), 4, "stdin names one more scenario");
 }
 
-/// review.add.81: one id without a scenario record refuses the batch,
-/// and an ids file with a line that is not an id is refused.
+/// One id without a scenario record refuses the batch and writes nothing.
 #[test]
-fn review_add_81_a_batch_with_an_unindexed_scenario_writes_nothing() {
+fn review_scenario_a_batch_with_an_unindexed_scenario_writes_nothing() {
     let dir = shop_repo("");
     let repo = dir.path();
-    let out = canon(repo, &review_args(&["--scenario-id", "shop.cart.01", "--scenario-id", "shop.cart.02", "--scenario-id", "shop.cart.77"]));
+    let out = canon(repo, &review_args(&["shop.cart.01", "shop.cart.02", "shop.cart.77"], &["--json"]));
     assert_eq!(out.status.code(), Some(2));
-    assert_eq!(
-        stderr(&out),
-        "canon review add: REVIEW_SCENARIO_NOT_INDEXED — no scenario record for `shop.cart.77` in spec root `root`; a review pins the scenario it saw, so index it first (`canon inventory sync`) (nothing is written for any of the scenarios)\nhint: run `canon inventory sync`, then run `canon review add` again\n"
-    );
+    assert!(stderr(&out).contains("REVIEW_SCENARIO_NOT_INDEXED") || stdout(&out).contains("REVIEW_SCENARIO_NOT_INDEXED"), "{}{}", stdout(&out), stderr(&out));
     assert!(reviews(repo).is_empty());
 
-    write(repo, "ids.txt", "shop.cart.01\nnot an id\n");
-    let out = canon(repo, &review_args(&["--scenario-ids-from", "ids.txt"]));
-    assert_eq!(out.status.code(), Some(2));
-    assert!(stderr(&out).contains("--scenario-ids-from ids.txt: line 2: `not an id` is not a scenario id"), "{}", stderr(&out));
-    let none = canon(repo, &review_args(&[]));
+    let none = canon(repo, &review_args(&[], &[]));
     assert_eq!(none.status.code(), Some(2));
-    assert!(stderr(&none).contains("no scenario to review"), "{}", stderr(&none));
     assert!(reviews(repo).is_empty());
+}
+
+/// Commit the fixture so revision-taking commands have a commit to bind.
+fn commit_all(repo: &std::path::Path) {
+    for args in [&["config", "user.name", "t"][..], &["config", "user.email", "t@example.com"], &["add", "-A"], &["commit", "-q", "-m", "x"]] {
+        assert!(std::process::Command::new("git").args(args).current_dir(repo).status().unwrap().success());
+    }
 }

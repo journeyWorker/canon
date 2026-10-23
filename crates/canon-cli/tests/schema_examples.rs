@@ -16,23 +16,24 @@ use tempfile::TempDir;
 const NEEDS_STATE: &[(&str, &str)] = &[
     ("adapter authorize", "a provider's adapter response file"),
     ("adapter validate", "a provider's adapter response file"),
-    ("artifacts migrate", "a canon.yaml with an s3 tier named cold: the scratch repo has none, so the target is refused"),
+    ("artifacts move", "a canon.yaml with an s3 tier named cold: the scratch repo has none, so the target is refused"),
     ("brief approve", "a brief with no blockers (the scaffolded one is a template to fill in)"),
     ("brief check", "a finished brief: the scaffolded one has blocker findings, which exit 2 by contract"),
-    ("context-pack new", "a context manifest file"),
-    ("context-pack show", "a context pack made by `context-pack new`"),
-    ("context-pack verify", "a context pack made by `context-pack new`"),
+    ("context-pack add", "a context manifest file"),
+    ("context-pack show", "a context pack made by `context-pack add`"),
+    ("context-pack verify", "a context pack made by `context-pack add`"),
     ("divergence accept", "a scenario whose latest evidence is divergent, attested by another actor and session"),
-    ("evidence approval-payload", "a git commit to bind: --artifact-sha must name a commit of the repo"),
     ("dispatch end", "a run opened by `dispatch begin`, whose run id this one closes"),
     ("gate check", "a repo that passes the gate: the scratch repo has unattested scenarios, which exit 1 by contract"),
-    ("gate task", "a plan corpus with the task row"),
-    ("learn approve", "a strategy and its evaluation file"),
-    ("learn promote", "a strategy in the strategy store"),
-    ("learn rollback", "a strategy, and a human's signed approval"),
+    ("task done", "a plan corpus with the task row"),
+    ("strategy approval-payload", "a strategy and its evaluation file"),
+    ("strategy promote", "a strategy in the strategy store"),
+    ("strategy rollback", "a strategy, and a human's signed approval"),
     ("plugin sync", "an installed plugin"),
     ("prompt add", "a prompt bundle manifest file"),
     ("prompt show", "a registered prompt bundle"),
+    ("report check", "a written report: `canon report build` creates .canon/REPORT.md, and a missing one is stale"),
+    ("review change", "a chore change: the scratch repo's add-login is a feature, and a feature is reviewed per scenario"),
 ];
 
 /// Examples that are not run at all.
@@ -52,13 +53,17 @@ fn ok(dir: &Path, home: &Path, args: &[&str]) {
 fn fixture(home: &Path) -> TempDir {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
+    for args in [&["init", "-q", "-b", "main"][..], &["config", "user.name", "t"], &["config", "user.email", "t@example.com"], &["commit", "-q", "--allow-empty", "-m", "x"]] {
+        let out = Command::new("git").args(args).current_dir(repo).output().expect("spawn git");
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    }
     ok(repo, home, &["init", "--providers", "none"]);
     ok(repo, home, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(repo, home, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
     ok(repo, home, &["feature", "new", "auth.login", "--title", "Login"]);
     ok(repo, home, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--feature", ".canon/specs/kind=feature/area=auth/login.feature"]);
     ok(repo, home, &["inventory", "sync"]);
-    ok(repo, home, &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "bob", "--summary", "Naming nit"]);
+    ok(repo, home, &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "bob", "--summary", "Naming nit"]);
     dir
 }
 
@@ -126,7 +131,7 @@ fn every_leaf_has_an_example_and_it_runs_in_a_scratch_repo() {
     for leaf in &leaves {
         let path: Vec<&str> = leaf.split(' ').collect();
         let detail = schema(base.path(), home.path(), &path);
-        let Some(example) = detail["example"].as_str() else {
+        let Some(example) = detail["examples"][0].as_str() else {
             problems.push(format!("{leaf}: `canon schema {leaf}` has no example"));
             continue;
         };
@@ -154,6 +159,24 @@ fn every_leaf_has_an_example_and_it_runs_in_a_scratch_repo() {
         argv.push("--json".into());
         let out = canon(&cwd, home.path(), &argv);
         let code = out.status.code();
+        // D3: every leaf's `--json` stdout is one envelope naming the leaf, and stderr stays empty.
+        match serde_json::from_slice::<Value>(&out.stdout) {
+            Ok(document) => {
+                if !document["ok"].is_boolean() {
+                    problems.push(format!("{leaf}: the document has no boolean `ok`: {document}"));
+                }
+                if document["meta"]["command"].as_str() != Some(leaf.as_str()) {
+                    problems.push(format!("{leaf}: meta.command is {}", document["meta"]["command"]));
+                }
+                if document["ok"].as_bool() == Some(true) && code != Some(0) || document["ok"].as_bool() == Some(false) && code == Some(0) {
+                    problems.push(format!("{leaf}: ok={} but exit {code:?}", document["ok"]));
+                }
+            }
+            Err(e) => problems.push(format!("{leaf}: stdout is not one JSON document ({e}): {}", String::from_utf8_lossy(&out.stdout))),
+        }
+        if !out.stderr.is_empty() {
+            problems.push(format!("{leaf}: stderr is not empty in JSON mode: {}", String::from_utf8_lossy(&out.stderr)));
+        }
         let needs = NEEDS_STATE.iter().find(|(name, _)| name == leaf);
         match (code, needs) {
             (Some(0), None) => {}

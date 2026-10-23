@@ -90,7 +90,7 @@ pub fn spec_pin(scenario: &Scenario) -> (SpecDigest, PinnedSpec) {
 }
 
 /// What a review of `scenario` pins right now: the spec pin and the
-/// evidence's verdicts and checks. `canon review add` writes this.
+/// evidence's verdicts and checks. `canon review scenario` and `canon review change` write this.
 pub fn current_pins(ctx: &GateContext, scenario: &Scenario) -> ReviewPins {
     let (scenario_digest, scenario_digest_scope) = spec_pin(scenario);
     ReviewPins { scenario_digest, scenario_digest_scope, checks: Some(current_checks(ctx, scenario)), evidence: Vec::new() }
@@ -145,11 +145,30 @@ pub fn evidence_current(pinned: Option<&[CheckPin]>, now: &[CheckPin]) -> bool {
 /// all is not listed; the ship guard reports it as missing evidence on its
 /// own.
 pub fn scenarios_without_evidence_after<'a>(ctx: &'a GateContext, subject: &SubjectId, after: DateTime<Utc>) -> Vec<&'a Scenario> {
+    scenarios_without_evidence_after_on_code(ctx, subject, after, None)
+}
+
+/// [`scenarios_without_evidence_after`], except that a scenario whose latest
+/// evidence was recorded on `code_tree` (the code tree of the working tree
+/// now, 0.28 D7b) needs none: the code it verified is the code there is, so
+/// what happened since (a docs-only chore) changes nothing it covered. `None`
+/// compares nothing, and a record written before 0.28 carries no code tree,
+/// so it never matches.
+pub fn scenarios_without_evidence_after_on_code<'a>(ctx: &'a GateContext, subject: &SubjectId, after: DateTime<Utc>, code_tree: Option<&str>) -> Vec<&'a Scenario> {
     subject_scenarios(ctx, subject)
         .into_iter()
         .filter(|scenario| {
             let evidence = scenario_evidence(ctx, scenario);
-            !evidence.is_empty() && evidence.iter().all(|e| e.envelope.at <= after)
+            if evidence.is_empty() || !evidence.iter().all(|e| e.envelope.at <= after) {
+                return false;
+            }
+            let on_current_code = code_tree.is_some_and(|tree| latest_evidence(&evidence).is_some_and(|latest| latest.code_tree.as_deref() == Some(tree)));
+            !on_current_code
         })
         .collect()
+}
+
+/// The newest of `evidence` by `at`.
+pub fn latest_evidence<'a>(evidence: &[&'a EvidenceRecord]) -> Option<&'a EvidenceRecord> {
+    evidence.iter().copied().max_by_key(|e| e.envelope.at)
 }

@@ -70,6 +70,40 @@ jobs:
           path: packages/dashboard/dist
           if-no-files-found: error
 
+  # The man pages are generated from the clap tree (`clap_mangen`, the
+  # `man` feature of canon-cli: never built into the shipped binary) and
+  # shipped in the @journeykit/canon launcher package, which links them
+  # (`directories.man`). One platform-independent build; no dashboard needed.
+  man:
+    name: Generate man pages
+    needs: safety
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+
+      - name: Cache cargo
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-cli-man-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: Generate man pages
+        run: cargo run --locked --release -p canon-cli --features man --example canon-man -- man-pages
+
+      - name: Upload man pages
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: man-pages
+          path: man-pages
+          if-no-files-found: error
+
   build:
     name: Build - ${{ matrix.settings.target }}
     runs-on: ${{ matrix.settings.host }}

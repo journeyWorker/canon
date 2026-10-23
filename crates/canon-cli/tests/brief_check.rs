@@ -1,4 +1,4 @@
-//! Integration tests for `canon brief check` and bare `canon brief` (0.19
+//! Integration tests for `canon brief check` and `canon brief show` (0.19
 //! D2), the PRD brief `canon change new` writes (D1) and `language:` (D6),
 //! against the actually-built `canon` binary.
 
@@ -48,7 +48,10 @@ fn check(repo: &Path, extra: &[&str]) -> (i32, Value) {
     args.extend(extra);
     let out = run(repo, &args);
     let json: Value = serde_json::from_str(&stdout(&out)).unwrap_or_else(|e| panic!("not json ({e}): {}\n{}", stdout(&out), stderr(&out)));
-    (out.status.code().unwrap(), json)
+    // The report rides in `data` (blockers fail the envelope but keep it); a bare
+    // failure has no `data`, so its `error` is what the caller reads.
+    let report = if json["data"].is_object() { json["data"].clone() } else { json };
+    (out.status.code().unwrap(), report)
 }
 
 fn rules(report: &Value) -> Vec<String> {
@@ -78,7 +81,7 @@ fn a_fresh_ko_repo_writes_a_ko_brief_whose_only_findings_are_placeholders_until_
     assert!(brief.contains("## 의도") && brief.contains("<!-- canon:section flow role=normative -->"), "{brief}");
 
     let (code, report) = check(dir.path(), &[]);
-    assert_eq!(code, 2);
+    assert_eq!(code, 1);
     let found = rules(&report);
     assert_eq!(found.len(), 7, "{report}");
     assert!(found.iter().all(|r| r == "brief.placeholder"), "{found:?}");
@@ -108,7 +111,7 @@ fn a_pre_0_19_brief_checks_as_legacy_advisory_and_status_shows_no_finding_counts
     assert_eq!(report["legacy"], true);
 
     let status: Value = serde_json::from_str(&stdout(&run(dir.path(), &["status", "--json"]))).unwrap();
-    let brief = &status["subjects"][0]["brief"];
+    let brief = &status["data"]["subjects"][0]["brief"];
     assert!(brief.get("findings").is_none(), "a legacy brief reads as before: {brief}");
 }
 
@@ -122,7 +125,7 @@ fn structure_blockers_name_duplicate_ids_a_detail_mismatch_and_section_order() {
     let broken = en_brief("").replace("2. F2 The visitor", "2. F1 The visitor").replace("### F2 Failed submit", "### F3 Failed submit");
     std::fs::write(brief_path(dir.path()), broken).unwrap();
     let (code, report) = check(dir.path(), &[]);
-    assert_eq!(code, 2);
+    assert_eq!(code, 1);
     let found = rules(&report);
     assert!(found.contains(&"brief.flow-duplicate-id".to_string()), "{found:?}");
     assert!(found.contains(&"brief.detail-mismatch".to_string()), "{found:?}");
@@ -139,13 +142,13 @@ fn structure_blockers_name_duplicate_ids_a_detail_mismatch_and_section_order() {
     assert!(detail_at < acceptance_at);
     std::fs::write(brief_path(dir.path()), swapped).unwrap();
     let (code, report) = check(dir.path(), &[]);
-    assert_eq!(code, 2);
+    assert_eq!(code, 1);
     assert!(rules(&report).contains(&"brief.section-order".to_string()), "{report}");
 
     // A section whose marker is gone.
     std::fs::write(brief_path(dir.path()), en_brief("").replace("<!-- canon:section out-of-scope role=context -->\n", "")).unwrap();
     let (code, report) = check(dir.path(), &[]);
-    assert_eq!(code, 2);
+    assert_eq!(code, 1);
     assert!(rules(&report).contains(&"brief.section-missing".to_string()), "{report}");
 }
 
@@ -155,7 +158,7 @@ fn a_waiver_clears_one_rule_in_one_section_is_listed_and_needs_a_reason() {
     let with_todo = en_brief("").replace("Social sign-in.", "TODO decide the provider list.");
     std::fs::write(brief_path(dir.path()), &with_todo).unwrap();
     let (code, report) = check(dir.path(), &[]);
-    assert_eq!((code, rules(&report)), (2, vec!["brief.placeholder".to_string()]));
+    assert_eq!((code, rules(&report)), (1, vec!["brief.placeholder".to_string()]));
     assert_eq!(report["findings"][0]["section"], "out-of-scope");
 
     let waived = format!("{with_todo}<!-- canon:waive brief.placeholder out-of-scope \"the provider list is a policy question\" -->\n");
@@ -169,11 +172,11 @@ fn a_waiver_clears_one_rule_in_one_section_is_listed_and_needs_a_reason() {
     // Another section's waiver does not clear it; a missing reason is a blocker itself.
     let wrong_section = format!("{with_todo}<!-- canon:waive brief.placeholder outcome \"x\" -->\n");
     std::fs::write(brief_path(dir.path()), wrong_section).unwrap();
-    assert_eq!(check(dir.path(), &[]).0, 2);
+    assert_eq!(check(dir.path(), &[]).0, 1);
     let no_reason = format!("{with_todo}<!-- canon:waive brief.placeholder out-of-scope -->\n");
     std::fs::write(brief_path(dir.path()), no_reason).unwrap();
     let (code, report) = check(dir.path(), &[]);
-    assert_eq!(code, 2);
+    assert_eq!(code, 1);
     assert!(rules(&report).contains(&"brief.waiver-invalid".to_string()), "{report}");
 }
 
@@ -246,8 +249,8 @@ fn flow_coverage_blocks_once_the_brief_is_approved_and_the_subject_is_building()
     std::fs::write(brief_path(dir.path()), en_brief("")).unwrap();
     assert_eq!(check(dir.path(), &[]).0, 0, "before building, no coverage rule applies");
 
-    ok(dir.path(), &["subject", "status", "demo", "--to", "specced"]);
-    ok(dir.path(), &["subject", "status", "demo", "--to", "building"]);
+    ok(dir.path(), &["subject", "move", "demo", "--to", "specced"]);
+    ok(dir.path(), &["subject", "move", "demo", "--to", "building"]);
     // A new scope on a subject already past `building` (dogfood eval 7):
     // its scenarios come after the approval, so none is due yet.
     let (code, report) = check(dir.path(), &[]);
@@ -255,7 +258,7 @@ fn flow_coverage_blocks_once_the_brief_is_approved_and_the_subject_is_building()
 
     std::fs::write(brief_path(dir.path()), en_brief(APPROVED)).unwrap();
     let (code, report) = check(dir.path(), &[]);
-    assert_eq!(code, 2);
+    assert_eq!(code, 1);
     assert_eq!(report["phase"], "building");
     assert_eq!(rules(&report), vec!["brief.flow-uncovered", "brief.flow-uncovered"], "{report}");
 
@@ -267,7 +270,7 @@ fn flow_coverage_blocks_once_the_brief_is_approved_and_the_subject_is_building()
     )
     .unwrap();
     let (code, report) = check(dir.path(), &[]);
-    assert_eq!(code, 2);
+    assert_eq!(code, 1);
     assert_eq!(rules(&report), vec!["brief.flow-no-failure"; 2], "{report}");
 
     std::fs::write(
@@ -288,8 +291,8 @@ fn scenario_new_flow_tags_the_step_and_status_lists_per_step_coverage() {
     let repo = dir.path();
     std::fs::write(brief_path(repo), en_brief(APPROVED)).unwrap();
     assert!(!repo.join(".canon/changes/add-login/tasks.md").exists(), "change new writes no tasks.md");
-    ok(repo, &["subject", "status", "demo", "--to", "specced"]);
-    ok(repo, &["subject", "status", "demo", "--to", "building"]);
+    ok(repo, &["subject", "move", "demo", "--to", "specced"]);
+    ok(repo, &["subject", "move", "demo", "--to", "building"]);
 
     let refused = run(repo, &["scenario", "new", "world.login.01", "--title", "x", "--subject-id", "demo", "--flow", "F9"]);
     assert_eq!(refused.status.code(), Some(2), "{}", stderr(&refused));
@@ -303,13 +306,13 @@ fn scenario_new_flow_tags_the_step_and_status_lists_per_step_coverage() {
 
     // F1 is covered with a failure case; F2 has no scenario: the brief blocks.
     let (code, report) = check(repo, &[]);
-    assert_eq!((code, rules(&report)), (2, vec!["brief.flow-uncovered".to_string()]), "{report}");
+    assert_eq!((code, rules(&report)), (1, vec!["brief.flow-uncovered".to_string()]), "{report}");
     let out = run(repo, &["status"]);
     let text = stdout(&out);
     assert!(text.contains("flow F1\n") && text.contains("world.login.02 \"Wrong password\" [failure] — evidence: none, review: missing"), "{text}");
     assert!(text.contains("flow F2 — no scenario"), "{text}");
     let json: Value = serde_json::from_str(&stdout(&run(repo, &["status", "--json"]))).unwrap();
-    let flow = &json["subjects"][0]["flow"];
+    let flow = &json["data"]["subjects"][0]["flow"];
     assert_eq!((flow[0]["id"].as_str(), flow[1]["gaps"][0].as_str()), (Some("F1"), Some("no scenario")), "{flow}");
 
     ok(repo, &["scenario", "new", "world.login.03", "--title", "Retry", "--subject-id", "demo", "--flow", "F2"]);
@@ -318,45 +321,45 @@ fn scenario_new_flow_tags_the_step_and_status_lists_per_step_coverage() {
 }
 
 #[test]
-fn operational_errors_carry_a_string_code_and_exit_1() {
+fn operational_errors_carry_a_string_code_and_the_registry_exit() {
     let dir = TempDir::new().unwrap();
     ok(dir.path(), &["init", "--providers", "none"]);
     let (code, report) = check(dir.path(), &[]);
-    assert_eq!((code, report["error"]["code"].as_str()), (1, Some("NO_BRIEF")));
+    assert_eq!((code, report["error"]["code"].as_str()), (2, Some("NO_BRIEF")));
 
     ok(dir.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     ok(dir.path(), &["change", "new", "one", "--subject-id", "demo", "--title", "One"]);
     ok(dir.path(), &["change", "new", "two", "--subject-id", "demo", "--title", "Two"]);
     let (code, report) = check(dir.path(), &[]);
-    assert_eq!((code, report["error"]["code"].as_str()), (1, Some("CHANGE_AMBIGUOUS")));
-    let (code, report) = check(dir.path(), &["--change-id", "one"]);
-    assert_eq!((code, report["findings"].is_array()), (2, true), "naming the change resolves the ambiguity");
-    let (code, report) = check(dir.path(), &["--change-id", "missing"]);
-    assert_eq!((code, report["error"]["code"].as_str()), (1, Some("BRIEF_NOT_FOUND")));
+    assert_eq!((code, report["error"]["code"].as_str()), (2, Some("CHANGE_AMBIGUOUS")));
+    let (code, report) = check(dir.path(), &["one"]);
+    assert_eq!((code, report["findings"].is_array()), (1, true), "naming the change resolves the ambiguity");
+    let (code, report) = check(dir.path(), &["missing"]);
+    assert_eq!((code, report["error"]["code"].as_str()), (2, Some("BRIEF_NOT_FOUND")));
 
     std::fs::write(dir.path().join("canon.yaml"), std::fs::read_to_string(dir.path().join("canon.yaml")).unwrap() + "language: [ko]\n").unwrap();
-    let (code, report) = check(dir.path(), &["--change-id", "one"]);
-    assert_eq!((code, report["error"]["code"].as_str()), (1, Some("CONFIG_UNREADABLE")));
+    let (code, report) = check(dir.path(), &["one"]);
+    assert_eq!((code, report["error"]["code"].as_str()), (2, Some("CONFIG_UNREADABLE")));
 }
 
 #[test]
-fn bare_brief_names_the_next_steps_from_the_findings_and_never_edits() {
+fn brief_show_names_the_next_steps_from_the_findings_and_never_edits() {
     let dir = repo_with_change(None);
     let before = std::fs::read(brief_path(dir.path())).unwrap();
-    let out = run(dir.path(), &["brief"]);
+    let out = run(dir.path(), &["brief", "show"]);
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(stdout(&out).contains("next 1: shape"), "{}", stdout(&out));
-    assert_eq!(std::fs::read(brief_path(dir.path())).unwrap(), before, "bare `canon brief` never edits");
+    assert_eq!(std::fs::read(brief_path(dir.path())).unwrap(), before, "`canon brief show` never edits");
 
     let questions = en_brief("").replace("None.\n", "Should guests keep their cart?\n");
     std::fs::write(brief_path(dir.path()), questions).unwrap();
-    let json: Value = serde_json::from_str(&stdout(&run(dir.path(), &["brief", "--json"]))).unwrap();
-    let steps: Vec<&str> = json["next"].as_array().unwrap().iter().map(|s| s["step"].as_str().unwrap()).collect();
+    let json: Value = serde_json::from_str(&stdout(&run(dir.path(), &["brief", "show", "--json"]))).unwrap();
+    let steps: Vec<&str> = json["data"]["next"].as_array().unwrap().iter().map(|s| s["step"].as_str().unwrap()).collect();
     assert_eq!(steps, vec!["clarify", "approve"], "{json}");
 
     std::fs::write(brief_path(dir.path()), en_brief("Approved: Ana 2026-10-14 — \"go\"\n")).unwrap();
-    let json: Value = serde_json::from_str(&stdout(&run(dir.path(), &["brief", "--json"]))).unwrap();
-    assert_eq!((json["state"].as_str(), json["next"].as_array().unwrap().len()), (Some("approved"), 0), "{json}");
+    let json: Value = serde_json::from_str(&stdout(&run(dir.path(), &["brief", "show", "--json"]))).unwrap();
+    assert_eq!((json["data"]["state"].as_str(), json["data"]["next"].as_array().unwrap().len()), (Some("approved"), 0), "{json}");
 }
 
 #[test]
@@ -367,11 +370,11 @@ fn init_language_is_validated_recorded_and_checked() {
     assert!(!dir.path().join("canon.yaml").exists(), "nothing is written on a refused tag");
 
     ok(dir.path(), &["init", "--providers", "none", "--language", "ko"]);
-    let out = run(dir.path(), &["init", "--check-config"]);
+    let out = run(dir.path(), &["init", "--check"]);
     assert!(stdout(&out).contains("[PASS] language (ko)"), "{}", stdout(&out));
 
     std::fs::write(dir.path().join("canon.yaml"), std::fs::read_to_string(dir.path().join("canon.yaml")).unwrap().replace("language: ko", "language: 한국어")).unwrap();
-    let out = run(dir.path(), &["init", "--check-config"]);
+    let out = run(dir.path(), &["init", "--check"]);
     assert_eq!(out.status.code(), Some(1));
     assert!(stdout(&out).contains("[FAIL] language"), "{}", stdout(&out));
 }
@@ -396,41 +399,41 @@ fn chore_brief(category: &str) -> String {
 #[test]
 fn a_chore_brief_is_written_and_judged_by_the_chore_rule_set() {
     let dir = repo_with_change(Some("ko"));
-    ok(dir.path(), &["change", "new", "bump-client", "--subject-id", "demo", "--kind", "chore", "--title", "클라이언트 올리기"]);
+    ok(dir.path(), &["change", "new", "bump-client", "--subject-id", "demo", "--change-kind", "chore", "--title", "클라이언트 올리기"]);
     let path = dir.path().join(".canon/changes/bump-client/brief.md");
     let brief = std::fs::read_to_string(&path).unwrap();
     assert!(brief.contains("<!-- canon:kind chore -->") && brief.contains("## 불변 조건") && brief.contains("## 분류"), "{brief}");
     assert!(!brief.contains("canon:section flow"), "{brief}");
-    let (code, report) = check(dir.path(), &["--change-id", "bump-client"]);
-    assert_eq!(code, 2);
+    let (code, report) = check(dir.path(), &["bump-client"]);
+    assert_eq!(code, 1);
     assert_eq!(rules(&report), vec!["brief.placeholder"; 5], "{report}");
 
     let en = |name: &str, brief: String| {
         std::fs::write(&path, brief).unwrap();
-        check(dir.path(), &["--change-id", name])
+        check(dir.path(), &[name])
     };
     let (code, report) = en("bump-client", chore_brief("`Dependency`."));
     assert_eq!((code, rules(&report)), (0, Vec::<String>::new()), "a clean chore, category case and punctuation aside: {report}");
 
     let (code, report) = en("bump-client", chore_brief("upgrade"));
-    assert_eq!((code, rules(&report)), (2, vec!["brief.chore-category".to_string()]), "{report}");
+    assert_eq!((code, rules(&report)), (1, vec!["brief.chore-category".to_string()]), "{report}");
     let (_, report) = en("bump-client", chore_brief("refactor and build"));
     assert_eq!(rules(&report), vec!["brief.chore-category"], "two categories are not one: {report}");
 
     let with_flow = chore_brief("ci").replace("<!-- canon:section invariants", "<!-- canon:section flow role=normative -->\n## User flow\n\n1. F1 x\n\n<!-- canon:section invariants");
     let (code, report) = en("bump-client", with_flow);
-    assert_eq!((code, rules(&report)), (2, vec!["brief.chore-section".to_string()]), "{report}");
+    assert_eq!((code, rules(&report)), (1, vec!["brief.chore-section".to_string()]), "{report}");
 
     let none_invariants = chore_brief("ci").replace("- Requests and responses stay byte-identical. ==**No behavior changes.**==", "None.");
     let (code, report) = en("bump-client", none_invariants);
-    assert!(code == 2 && rules(&report).contains(&"brief.chore-empty".to_string()), "{report}");
+    assert!(code == 1 && rules(&report).contains(&"brief.chore-empty".to_string()), "{report}");
 
     std::fs::write(&path, format!("{}\n{APPROVED}", chore_brief("infra"))).unwrap();
-    ok(dir.path(), &["subject", "status", "demo", "--to", "specced"]);
-    ok(dir.path(), &["subject", "status", "demo", "--to", "building"]);
-    let (code, report) = check(dir.path(), &["--change-id", "bump-client"]);
+    ok(dir.path(), &["subject", "move", "demo", "--to", "specced"]);
+    ok(dir.path(), &["subject", "move", "demo", "--to", "building"]);
+    let (code, report) = check(dir.path(), &["bump-client"]);
     assert_eq!((code, report["phase"].as_str(), rules(&report)), (0, Some("building"), Vec::<String>::new()), "a chore has no flow to cover: {report}");
 
-    let out = run(dir.path(), &["change", "new", "x", "--subject-id", "demo", "--kind", "epic", "--title", "x"]);
+    let out = run(dir.path(), &["change", "new", "x", "--subject-id", "demo", "--change-kind", "epic", "--title", "x"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
 }

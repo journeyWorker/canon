@@ -41,8 +41,8 @@ fn run_canon_ingest(fixture: &support::Fixture, extra_args: &[&str]) -> Output {
     let bin = Path::new(env!("CARGO_BIN_EXE_canon"));
     let mut args: Vec<String> = vec!["ingest".to_string(), "sessions".to_string()];
     args.extend(extra_args.iter().map(|s| s.to_string()));
-    args.push("--canon-yaml".to_string());
-    args.push(fixture.canon_yaml_path().display().to_string());
+    args.push("--repo".to_string());
+    args.push(fixture.canon_yaml_path().parent().unwrap().display().to_string());
     Command::new(bin)
         .args(&args)
         .env("CANON_R2_LOCAL_ROOT", fixture.r2_root())
@@ -76,7 +76,7 @@ fn unrouted_default_run_prints_the_normalized_json_fallback_without_the_json_fla
     let payload: Value = serde_json::from_str(&stdout[json_start..]).expect("valid JSON on stdout even without --json");
     let sessions = payload["sessions"].as_array().expect("metadata session summaries");
     assert_eq!(sessions.len(), 1, "only the isolated fixture home's one session, no ambient env leakage: {stdout}");
-    assert_eq!(sessions[0]["session_id"], "cli_ing_ses_1", "the only normalized output must not be discarded");
+    assert_eq!(sessions[0]["sessionId"], "cli_ing_ses_1", "the only normalized output must not be discarded");
     assert!(payload["events"].is_array(), "metadata fallback must include event summaries");
     assert!(payload["failure"]["class"].is_string(), "metadata fallback must include stable failure class");
     assert!(!stdout.contains("secret directive prose"), "metadata-only fallback must omit directive text: {stdout}");
@@ -126,4 +126,68 @@ fn help_shows_all_workspaces_flag_and_no_stale_wave_text() {
     assert!(text.contains("--all-workspaces"), "{text}");
     assert!(!text.contains("Wave 1"), "help text must not claim a stale Wave-1-only adapter set: {text}");
     assert!(!text.contains("omp` only"), "help text must not claim `omp` is the only registered adapter: {text}");
+}
+
+fn privacy_yaml(privacy: &str) -> String {
+    format!(
+        "tiers:\n  local: {{ backend: git, root: .canon/ledger }}\nrouting:\n  session: local\n  run: local\n  event: local\ningest:\n  sessions:\n    privacy:\n{privacy}"
+    )
+}
+
+fn ledger_files(root: &Path) -> Vec<std::path::PathBuf> {
+    let mut out = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                out.push(path);
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+#[test]
+fn capture_privacy_positive_bound_persists_a_bounded_user_directive() {
+    let fixture = support::Fixture::new("  session: local\n  run: local\n  event: local\n", "");
+    let home = tempfile::tempdir().unwrap();
+    write_omp_fixture_home(home.path());
+    std::fs::write(fixture.canon_yaml_path(), privacy_yaml("      capture_user_directives: true\n      max_directive_chars: 6\n")).unwrap();
+
+    let output = run_canon_ingest(&fixture, &["--home", &home.path().display().to_string(), "--all-workspaces"]);
+    assert!(output.status.success(), "stderr: {}", support::stderr(&output));
+
+    let mut directive_texts = Vec::new();
+    for path in ledger_files(&fixture.git_root()) {
+        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let Ok(value) = serde_json::from_str::<Value>(&text) else { continue };
+        if value["label"] == "user_directive" {
+            directive_texts.push(value["detail"]["text"].as_str().unwrap_or_default().to_string());
+        }
+    }
+    assert_eq!(directive_texts, vec!["secret".to_string()], "exactly one user_directive carrying the turn cut to 6 characters");
+}
+
+#[test]
+fn capture_privacy_rejects_an_absent_zero_or_negative_bound_and_persists_nothing() {
+    for bound in ["", "      max_directive_chars: 0\n", "      max_directive_chars: -5\n"] {
+        let fixture = support::Fixture::new("  session: local\n  run: local\n  event: local\n", "");
+        let home = tempfile::tempdir().unwrap();
+        write_omp_fixture_home(home.path());
+        std::fs::write(fixture.canon_yaml_path(), privacy_yaml(&format!("      capture_user_directives: true\n{bound}"))).unwrap();
+        let before = fixture.git_file_count();
+
+        let output = run_canon_ingest(&fixture, &["--home", &home.path().display().to_string(), "--all-workspaces", "--json"]);
+        assert_eq!(output.status.code(), Some(2), "bound {bound:?} is a refused config, not a crash or a failed run; stdout: {}", support::stdout(&output));
+        let doc: Value = serde_json::from_slice(&output.stdout).expect("a refusal is one JSON document");
+        assert_eq!(doc["ok"], false, "{doc}");
+        assert_eq!(doc["error"]["code"], "CONFIG_UNREADABLE", "{doc}");
+        assert!(doc["error"]["message"].as_str().is_some_and(|m| m.contains("max_directive_chars") || m.contains("`ingest:` section")), "the error names the config key or section: {doc}");
+        assert_eq!(fixture.git_file_count(), before, "bound {bound:?}: nothing may be persisted");
+    }
 }

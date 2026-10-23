@@ -14,6 +14,13 @@ mod support;
 use chrono::{Duration, Utc};
 use serde_json::Value;
 
+/// `data` of the one `{ok,data,meta}` document a `--json` success prints.
+fn data_of(stdout: &str) -> Value {
+    let body: Value = serde_json::from_str(stdout).expect("valid JSON on stdout");
+    assert_eq!(body["ok"], true, "{body}");
+    body["data"].clone()
+}
+
 const ROUTING: &str = "  trajectory: local\n";
 const AGING: &str = "  trajectory: { after: 1d, to: cold }\n";
 
@@ -29,7 +36,7 @@ fn merges_records_split_across_the_routed_tier_and_its_aging_destination() {
     let output = fixture.run_canon(&["query", "--kind", "trajectory", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
 
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).expect("valid JSON on stdout");
+    let payload: Value = data_of(&support::stdout(&output));
     assert_eq!(payload["kind"], "trajectory");
     assert_eq!(payload["count"], 2);
     let records = payload["records"].as_array().expect("records array");
@@ -52,7 +59,7 @@ fn since_filters_to_records_at_or_after_the_given_timestamp() {
     let output = fixture.run_canon(&["query", "--kind", "trajectory", "--since", &cutoff.to_rfc3339(), "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
 
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).expect("valid JSON on stdout");
+    let payload: Value = data_of(&support::stdout(&output));
     let records = payload["records"].as_array().expect("records array");
     let rewards: Vec<f64> = records.iter().map(|record| record["reward"].as_f64().unwrap()).collect();
     assert_eq!(rewards, vec![0.15, 0.2], "the at-cutoff and newer records must be returned, the older one filtered out");
@@ -74,9 +81,9 @@ fn two_reviews_of_one_scenario_at_two_pins_are_two_keys_and_both_read_back() {
 
     let output = fixture.run_canon(&["query", "--kind", "review", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).expect("valid JSON on stdout");
+    let payload: Value = data_of(&support::stdout(&output));
     assert_eq!(payload["count"], 1, "the ledger holds the one in-effect review of this reviewer: {payload}");
-    let history: Value = serde_json::from_str(&support::stdout(&fixture.run_canon(&["query", "--kind", "review", "--json", "--history"]))).expect("valid JSON");
+    let history: Value = data_of(&support::stdout(&fixture.run_canon(&["query", "--kind", "review", "--json", "--history"])));
     assert_eq!(history["count"], 2, "--history returns both attestations: {history}");
     let payload = history;
     let records = payload["records"].as_array().expect("records array");
@@ -176,57 +183,6 @@ fn query_explicit_non_default_repo_is_used_as_is_no_walk() {
     );
 }
 
-/// s18 `uniform-repo-resolution` spec: "An explicit --canon-yaml still
-/// resolves the literal path from any cwd" — the pre-this-change,
-/// back-compat behavior: no ancestor walk, no dependency on `--repo`.
-#[test]
-fn query_explicit_canon_yaml_still_resolves_the_literal_path_from_any_cwd() {
-    let snapshot = tempfile::tempdir().unwrap();
-    let canon_yaml_path = snapshot.path().join("snapshot-canon.yaml");
-    std::fs::write(&canon_yaml_path, "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n").unwrap();
-    let cwd = tempfile::tempdir().unwrap(); // unrelated to `snapshot`, no ancestor relation
-
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_canon"))
-        .args(["query", "--kind", "change", "--canon-yaml"])
-        .arg(&canon_yaml_path)
-        .current_dir(cwd.path())
-        .output()
-        .expect("spawn canon binary");
-    assert!(
-        output.status.success(),
-        "--canon-yaml must resolve its literal path regardless of cwd, unaffected by any ancestor walk; stderr: {}",
-        support::stderr(&output)
-    );
-}
-
-/// s18 `uniform-repo-resolution` spec: "--canon-yaml wins when both flags
-/// are supplied and would resolve differently" — `--repo <a>` names a
-/// `canon.yaml` with NO routing for `change` (an unrouted-kind query
-/// error), `--canon-yaml <b>/canon.yaml` names a DIFFERENT, well-routed
-/// file; the command must succeed, proving `--canon-yaml`'s file was read,
-/// never `--repo`'s.
-#[test]
-fn query_canon_yaml_wins_over_repo_when_both_supplied_and_would_resolve_differently() {
-    let repo_a = tempfile::tempdir().unwrap();
-    std::fs::write(repo_a.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap();
-    let repo_b = tempfile::tempdir().unwrap();
-    let canon_yaml_b = repo_b.path().join("canon.yaml");
-    std::fs::write(&canon_yaml_b, "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n").unwrap();
-
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_canon"))
-        .args(["query", "--kind", "change", "--repo"])
-        .arg(repo_a.path())
-        .arg("--canon-yaml")
-        .arg(&canon_yaml_b)
-        .output()
-        .expect("spawn canon binary");
-    assert!(
-        output.status.success(),
-        "--canon-yaml must win over --repo when both are supplied and would resolve differently; stderr: {}",
-        support::stderr(&output)
-    );
-}
-
 /// s18 `uniform-repo-resolution` spec: "A missing canon.yaml at every
 /// ancestor still fails loud, named" — a genuinely unconfigured cwd never
 /// silently succeeds with an empty result.
@@ -278,27 +234,24 @@ fn read_commands_leave_a_directory_without_canon_yaml_unchanged() {
 }
 
 /// The access audit lands in the repository whose `canon.yaml` was read
-/// — through `--repo` or `--canon-yaml` — never in the directory the
-/// command happened to run from.
+/// — through `--repo` — never in the directory the command happened to run
+/// from.
 #[test]
 fn query_audits_into_the_repo_it_read_never_into_the_cwd() {
     let repo = tempfile::tempdir().unwrap();
     std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n").unwrap();
     let cwd = tempfile::tempdir().unwrap();
 
-    for flag in ["--repo", "--canon-yaml"] {
-        let target = if flag == "--repo" { repo.path().to_path_buf() } else { repo.path().join("canon.yaml") };
-        let output = std::process::Command::new(env!("CARGO_BIN_EXE_canon"))
-            .args(["query", "--kind", "change", flag])
-            .arg(&target)
-            .current_dir(cwd.path())
-            .output()
-            .expect("spawn canon binary");
-        assert!(output.status.success(), "{flag}: {}", support::stderr(&output));
-        assert_eq!(tree(cwd.path()), Vec::<String>::new(), "{flag}: the cwd must be left unchanged");
-    }
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(["query", "--kind", "change", "--repo"])
+        .arg(repo.path())
+        .current_dir(cwd.path())
+        .output()
+        .expect("spawn canon binary");
+    assert!(output.status.success(), "--repo: {}", support::stderr(&output));
+    assert_eq!(tree(cwd.path()), Vec::<String>::new(), "--repo: the cwd must be left unchanged");
     let audit = std::fs::read_to_string(repo.path().join(".canon/audit/access.jsonl")).expect("the target repo carries the audit");
-    assert_eq!(audit.lines().count(), 2, "one event per query: {audit}");
+    assert_eq!(audit.lines().count(), 1, "one event per query: {audit}");
 }
 
 // ── s19 `query-scope-filters`: --change-id/--status + rollup + deterministic sort ──
@@ -340,7 +293,7 @@ fn change_id_scopes_a_task_query_to_one_changes_rows() {
 
     let output = fixture.run_canon(&["query", "--kind", "task", "--change-id", "add-audio-reactive", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).unwrap();
+    let payload: Value = data_of(&support::stdout(&output));
     let ids: Vec<String> = payload["records"].as_array().unwrap().iter().map(|r| r["task_id"].as_str().unwrap().to_string()).collect();
     assert_eq!(ids, vec!["add-audio-reactive#1.1", "add-audio-reactive#2.2"], "add-widget#1.1 must be excluded: {ids:?}");
 }
@@ -355,7 +308,7 @@ fn change_id_scopes_a_change_query_to_at_most_one_record() {
 
     let output = fixture.run_canon(&["query", "--kind", "change", "--change-id", "add-widget", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).unwrap();
+    let payload: Value = data_of(&support::stdout(&output));
     let records = payload["records"].as_array().unwrap();
     assert_eq!(records.len(), 1, "the two add-widget versions fold to the current one (0.18 D4), add-other excluded: {records:?}");
     assert_eq!(records[0]["title"], "Add widget, refined", "the newer version wins: {records:?}");
@@ -370,7 +323,7 @@ fn status_filters_task_records_by_open_done() {
 
     let output = fixture.run_canon(&["query", "--kind", "task", "--status", "open", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).unwrap();
+    let payload: Value = data_of(&support::stdout(&output));
     let records = payload["records"].as_array().unwrap();
     assert_eq!(records.len(), 1);
     assert_eq!(records[0]["task_id"], "add-widget#1.1");
@@ -385,7 +338,7 @@ fn status_filters_change_records_by_their_four_value_domain() {
 
     let output = fixture.run_canon(&["query", "--kind", "change", "--status", "in_progress", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).unwrap();
+    let payload: Value = data_of(&support::stdout(&output));
     let records = payload["records"].as_array().unwrap();
     assert_eq!(records.len(), 1);
     assert_eq!(records[0]["change_id"], "add-widget");
@@ -413,7 +366,7 @@ fn rollup_reflects_the_filtered_result_set_not_the_whole_ledger() {
 
     let output = fixture.run_canon(&["query", "--kind", "task", "--change-id", "add-audio-reactive", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).unwrap();
+    let payload: Value = data_of(&support::stdout(&output));
     assert_eq!(payload["rollup"], serde_json::json!({"done": 2, "total": 6}));
 }
 
@@ -428,7 +381,7 @@ fn an_unfiltered_task_query_rolls_up_the_whole_result_set() {
 
     let output = fixture.run_canon(&["query", "--kind", "task", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).unwrap();
+    let payload: Value = data_of(&support::stdout(&output));
     assert_eq!(payload["rollup"], serde_json::json!({"done": 4, "total": 10}));
 }
 
@@ -446,7 +399,7 @@ fn task_output_sorts_by_change_id_then_task_number_not_merge_order() {
 
     let output = fixture.run_canon(&["query", "--kind", "task", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).unwrap();
+    let payload: Value = data_of(&support::stdout(&output));
     let ids: Vec<String> = payload["records"].as_array().unwrap().iter().map(|r| r["task_id"].as_str().unwrap().to_string()).collect();
     assert_eq!(ids, vec!["add-audio-reactive#1.1", "add-audio-reactive#1.2", "add-widget#1.1", "add-widget#2.1"]);
 }
@@ -473,7 +426,7 @@ fn fold_is_a_noop_for_an_unsuperseded_task_corpus() {
 
     let output = fixture.run_canon(&["query", "--kind", "task", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).unwrap();
+    let payload: Value = data_of(&support::stdout(&output));
     let ids: Vec<String> = payload["records"].as_array().unwrap().iter().map(|r| r["task_id"].as_str().unwrap().to_string()).collect();
     assert_eq!(ids.len(), 3, "one write per key must fold to exactly 3 rows, not fewer: {ids:?}");
     assert_eq!(ids, vec!["add-other#1.1", "add-widget#1.1", "add-widget#1.2"]);
@@ -489,7 +442,7 @@ fn fold_is_a_noop_for_an_unsuperseded_handoff_corpus() {
 
     let output = fixture.run_canon(&["query", "--kind", "handoff", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).unwrap();
+    let payload: Value = data_of(&support::stdout(&output));
     let ids: Vec<String> = payload["records"].as_array().unwrap().iter().map(|r| r["id"].as_str().unwrap().to_string()).collect();
     assert_eq!(ids.len(), 2, "one write per key must fold to exactly 2 rows, not fewer: {ids:?}");
 }
@@ -511,7 +464,7 @@ fn fold_resolves_to_the_newer_version_for_a_superseded_task() {
 
     let output = fixture.run_canon(&["query", "--kind", "task", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).unwrap();
+    let payload: Value = data_of(&support::stdout(&output));
     let records = payload["records"].as_array().unwrap();
     assert_eq!(records.len(), 1, "two versions of the same task_id must fold to exactly one row: {records:?}");
     assert_eq!(records[0]["status"], "done", "the chronologically newer (done) version must win, not the physically-last-arrived (open) one");
@@ -529,7 +482,7 @@ fn fold_resolves_to_the_newer_version_for_a_superseded_handoff() {
 
     let output = fixture.run_canon(&["query", "--kind", "handoff", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).unwrap();
+    let payload: Value = data_of(&support::stdout(&output));
     let records = payload["records"].as_array().unwrap();
     assert_eq!(records.len(), 1, "two versions of the same handoff id must fold to exactly one row: {records:?}");
     assert_eq!(records[0]["body"]["fields"]["tag"], "v2", "the chronologically newer version must win, not the physically-last-arrived one");
@@ -603,7 +556,7 @@ fn a_resynced_scenario_reads_as_one_current_record() {
     assert_eq!(raw.records.len(), 2, "a re-sync keeps both generations: the current one in the ledger, the prior one in the archive");
     assert_eq!(canon_store::tier::Tier::read(&tier, &canon_store::tier::TierQuery::kind(canon_model::RecordKind::Scenario)).unwrap().records.len(), 1);
 
-    let outcome = canon_cli::query::run(dir.path(), None, canon_model::RecordKind::Scenario, None, None, None, None, false).expect("query the scenario corpus");
+    let outcome = canon_cli::query::run(dir.path(), canon_model::RecordKind::Scenario, None, None, None, None, false).expect("query the scenario corpus");
     assert_eq!(outcome.records.len(), 1, "`canon query --kind scenario` must fold to the CURRENT record, the way the gate already does");
     assert_eq!(
         outcome.records[0].0.get("title").and_then(|t| t.as_str()),

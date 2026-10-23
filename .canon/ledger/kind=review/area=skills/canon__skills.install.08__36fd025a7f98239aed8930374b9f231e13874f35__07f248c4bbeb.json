@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-codexfix",
+    "role": "reviewer"
+  },
+  "at": "2026-10-10T14:29:42.327184Z",
+  "kind": "review",
+  "pin": "36fd025a7f98239aed8930374b9f231e13874f35",
+  "pins": {
+    "checks": [
+      {
+        "checks": [],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "0e41173d1b6a5fd3c24b62303b62c063384a90272ca0ded7317046c651c00bb5",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": "dogfood-eval-1 codex projection fix review"
+  },
+  "reviewer": "canon-reviewer-codexfix",
+  "scenario_id": "skills.install.08",
+  "schema": 1
+}

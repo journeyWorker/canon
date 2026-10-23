@@ -5,11 +5,11 @@ Feature: canon migrate
   @subject:authoring-scaffold
   @case:happy
   @authoring.migrate.01
-  Scenario: A repo canon 0.16 set up moves onto the 0.17 layout in one command
+  Scenario: A repo canon 0.16 set up moves onto the 0.17 layout: a preview, then the commit of that plan
     Given a git repo canon 0.16 set up: its corpus under specs/features/kind=feature/, a change canon change new wrote under openspec/changes/ and adopted, the init openspec source, an install lock and a gitignore missing canon's newer lines
-    When canon migrate --dry-run runs
-    Then it prints every move, the canon.yaml and gitignore edits and the index rebuild, and writes nothing
-    When canon migrate runs
+    When canon migrate runs without --commit
+    Then it previews every move, the canon.yaml and gitignore edits and the index rebuild, names the command that commits the plan, and writes nothing
+    When canon migrate --commit --plan-digest <the previewed digest> runs
     Then the corpus is at .canon/specs/kind=feature/ by git mv and canon.yaml names root .canon/specs with former_roots [specs], every other byte kept
     And the change is at .canon/changes/<slug>/ with proposal.md renamed brief.md, re-imported from canon's own source under the same change id with its adoption and task ids
     And the init openspec source and its .gitkeep are gone, skills.providers holds the lock's providers, the missing gitignore lines are added and the index is rebuilt
@@ -21,7 +21,7 @@ Feature: canon migrate
   @authoring.migrate.02
   Scenario: A spec root other than the repo-level specs only drops its features level
     Given a repo outside git whose CRLF canon.yaml names a spec root game/specs still holding features/kind=feature/
-    When canon migrate runs
+    When canon migrate is committed with the digest of its preview
     Then the corpus moves to game/specs/kind=feature/ with a plain rename and the emptied features/ directory is removed
     And other files in the root stay, and canon.yaml is byte-identical
 
@@ -41,7 +41,7 @@ Feature: canon migrate
   @authoring.migrate.04
   Scenario: A destination that already exists refuses the migration
     Given a repo on the 0.16 layout that already holds .canon/specs/kind=feature/
-    When canon migrate --dry-run runs
+    When canon migrate runs
     Then it exits 2 naming the spec root, its source and the existing destination, and nothing moves
 
   # canon: {"schema":1,"at":"2026-10-12T11:44:52Z","actor":{"agent_id":"canon"}}
@@ -50,7 +50,7 @@ Feature: canon migrate
   @authoring.migrate.05
   Scenario: An approval 0.16 recorded in an external proposal moves into a canon pointer brief
     Given an external openspec change whose proposal.md holds the Approved: line canon 0.16 recorded there
-    When canon migrate runs
+    When canon migrate is committed with the digest of its preview
     Then .canon/changes/<change>/brief.md holds a Source: line pointing at the proposal and that Approved: line
     And the proposal is not edited and the output names the line left in it
     And the openspec source stays because a change is still under it, and canon status reads the approval from the canon brief
@@ -62,7 +62,7 @@ Feature: canon migrate
   @authoring.migrate.06
   Scenario: A change with only one sign that canon change new wrote it stays where it is and is named
     Given one openspec change in canon change new's scaffold whose first stored version was not adopted, and one adopted at once whose files are not the scaffold
-    When canon migrate --dry-run runs
+    When canon migrate runs and previews the plan
     Then both stay where they are and the plan names each with the signal it lacks
     And the change that carries both signals still moves
 
@@ -72,7 +72,7 @@ Feature: canon migrate
   @authoring.migrate.07
   Scenario: Reviews pinned before the move stay current after the spec root moves into .canon
     Given require_review and a review written before 0.15 pinned to a commit where the scenario sat under specs/
-    When canon migrate moves the root to .canon/specs
+    When canon migrate is committed and moves the root to .canon/specs
     Then the review is pinned to what its evidence says and counts, as it would have had the root not moved
     And without former_roots in canon.yaml the review would be undecidable
 
@@ -91,9 +91,9 @@ Feature: canon migrate
   @case:failure
   @authoring.migrate.09
   Scenario: A migrate run that stopped before writing canon.yaml is finished by the next run
-    Given a repo canon 0.16 set up, and a canon migrate run whose canon.yaml write fails after the corpus and the change moved
+    Given a repo canon 0.16 set up, and a committed canon migrate run whose canon.yaml write fails after the corpus and the change moved
     Then that run exits 2 and canon.yaml is byte-identical, never half-written
-    When canon migrate runs again
+    When canon migrate is committed again
     Then it sees the root already at .canon/specs while canon.yaml names specs and writes root .canon/specs with former_roots [specs]
     And it re-imports the moved change under the same change id with its adoption, removes the init openspec source, and a third run finds nothing to migrate
 
@@ -103,9 +103,9 @@ Feature: canon migrate
   @authoring.migrate.10
   Scenario: A pointer brief that cannot be written keeps the openspec source that holds the approval
     Given an external openspec change whose proposal.md holds an Approved: line, the init openspec source, and a .canon/changes directory canon cannot write into
-    When canon migrate runs
+    When canon migrate is committed with the digest of its preview
     Then it exits 2 naming the brief it could not write, and canon.yaml still lists the init openspec source and its .gitkeep stays
-    When the directory is writable again and canon migrate runs
+    When the directory is writable again and canon migrate is committed
     Then it writes the pointer brief with Source: and that Approved: line, and only then removes the init openspec source
 
   # canon: {"schema":1,"at":"2026-10-12T12:49:07Z","actor":{"agent_id":"canon"}}
@@ -117,7 +117,7 @@ Feature: canon migrate
     When canon migrate runs
     Then it exits 2 naming the directory before anything moves, and canon.yaml is unchanged
     Given an earlier run moved that change to .canon/changes/<slug>/ and stopped before renaming proposal.md
-    When canon migrate runs
+    When canon migrate is committed
     Then it renames proposal.md to brief.md, re-imports the change from canon's own source, and finishes the rest of the migration
 
   # canon: {"schema":1,"at":"2026-10-12T12:49:07Z","actor":{"agent_id":"canon"}}
@@ -126,9 +126,9 @@ Feature: canon migrate
   @authoring.migrate.12
   Scenario: Change material the openspec reader cannot read keeps the openspec source
     Given a repo canon 0.16 set up with a canon-written change, a change directory with no proposal.md and a loose file under openspec/changes/
-    When canon migrate --dry-run runs
+    When canon migrate runs and previews the plan
     Then the directory is named as staying with the openspec reader's diagnostic, the canon-written change still moves, and the init openspec source is kept
-    When only the loose file is left and canon migrate runs
+    When only the loose file is left and canon migrate is committed
     Then the plan names the source as staying because canon has not read that file, and the file and the source stay
 
   # canon: {"schema":1,"at":"2026-10-21T16:36:09Z","actor":{"agent_id":"canon-impl-026"}}
@@ -137,7 +137,7 @@ Feature: canon migrate
   @authoring.migrate.13
   Scenario: migrate adds the missing managed gitignore lines to an existing block and a second run adds none
     Given a repo whose gitignore already holds canon's block without the scenario archive, dashboard-snapshot, learn and r2 lines
-    When canon migrate runs, and again
+    When canon migrate is committed, and again
     Then the first run adds exactly the missing lines under their comments and keeps every other byte of the gitignore
     And the second run adds none
 
@@ -147,6 +147,61 @@ Feature: canon migrate
   @authoring.migrate.14
   Scenario: migrate adds only the missing line when its managed comment is kept
     Given a gitignore that kept a managed comment but lost the line under it
-    When canon migrate runs, and again
+    When canon migrate is committed, and again
     Then the first run writes only the missing line, directly under its comment, and no comment twice
     And the second run changes nothing
+
+  # canon: {"schema":1,"at":"2026-10-23T11:48:21Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @authoring.migrate.15
+  Scenario: canon migrate previews by default, commits only with the digest of that plan, and writes nothing before
+    Given a repo canon 0.16 set up
+    When canon migrate runs with --json
+    Then it exits 0 with data.committed false, a planDigest, and effects listing each write, and the first next step is canon migrate --commit --plan-digest with that digest
+    And the tree is byte-identical afterwards
+    And canon migrate --commit --plan-digest with that digest exits 0 with data.committed true and the corpus moved
+    And the 0.27 spellings --dry-run, --commit alone and --plan-digest alone are usage errors that exit 2
+
+  # canon: {"schema":1,"at":"2026-10-23T11:48:36Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @authoring.migrate.16
+  Scenario: A commit whose plan digest no longer matches the repo is refused PLAN_CHANGED and writes nothing
+    Given a repo whose migrate preview gave a digest, and the repo changed afterwards so the plan differs
+    When canon migrate --commit --plan-digest runs with the old digest
+    Then it exits 2 with PLAN_CHANGED and nothing is written
+    And a fresh preview gives a new digest that commits
+
+  # canon: {"schema":1,"at":"2026-10-23T11:48:42Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @authoring.migrate.17
+  Scenario: The preview lists every review record the commit rewrites
+    Given a repo with two legacy review records and no scenario index built
+    When canon migrate previews, then is committed with the digest
+    Then the preview exits 0, writes nothing and lists one rewrite effect per review record, naming the file it replaces and the file that takes its place
+    And after the commit the review files that were removed are exactly the ones the preview named
+
+  # canon: {"schema":1,"at":"2026-10-23T11:48:48Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @authoring.migrate.18
+  Scenario: migrate rewrites a 0.27 setup of hooks, scripts and skill and backs up what it replaces
+    Given a repo set up by canon 0.27: the skill with its reference files in the Claude and Codex projections, canon gate task hook entries in both settings files, a retrieve hook script copy and the install lock
+    When canon migrate previews, then is committed with the digest
+    Then the preview lists each settings file, the script copy, the skill files, the reference files to remove and the lock as effects, and writes nothing
+    And the commit replaces canon gate task with canon task done in each settings file, keeps the other hook entries, regenerates the scripts, projects the stub in place of the skill and drops the reference files
+    And every rewritten or removed file is kept with its original bytes in one directory under .canon/migrate-backup
+    And a second run lists no effect, makes no new backup and leaves the tree untouched
+
+  # canon: {"schema":1,"at":"2026-10-23T11:48:54Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
+  @subject:authoring-scaffold
+  @case:edge
+  @authoring.migrate.19
+  Scenario: A 0.27 setup that is not migrated yet is detected and migrate is named first
+    Given a repo set up by canon 0.27 that has not been migrated
+    When canon status, canon gate check and canon context run with --json
+    Then each puts canon migrate --json first in meta.next and warns that canon migrate is needed
+    And a hook entry that still calls canon gate task is enough to be detected
+    And after the migration is committed neither status nor context names canon migrate

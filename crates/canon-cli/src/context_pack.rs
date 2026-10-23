@@ -12,9 +12,11 @@ use std::process::Command;
 
 use canon_model::records::StrategyRef;
 use canon_store::write_atomic;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::json_out::Report;
 use crate::cli_error::CliError;
 
 pub const CONTEXT_PACK_FORMAT_VERSION: u32 = 1;
@@ -53,15 +55,15 @@ impl ContextPackError {
     pub fn to_cli_error(&self) -> CliError {
         match self {
             Self::UnsafePath(_) => CliError::refused("CONTEXT_UNSAFE_PATH", self.to_string()).hint("use a repository-relative path that stays inside the repository (no `..`, no absolute path)"),
-            Self::InvalidManifestVersion(_) => CliError::refused("CONTEXT_MANIFEST_INVALID", self.to_string()).hint("set `manifestVersion` in the manifest to the version the message names, then run `canon context-pack new` again"),
-            Self::MissingInput(_) => CliError::refused("CONTEXT_INPUT_MISSING", self.to_string()).hint("create the missing file or remove it from the manifest, then run `canon context-pack new` again"),
+            Self::InvalidManifestVersion(_) => CliError::refused("CONTEXT_MANIFEST_INVALID", self.to_string()).hint("set `manifestVersion` in the manifest to the version the message names, then run `canon context-pack add` again"),
+            Self::MissingInput(_) => CliError::refused("CONTEXT_INPUT_MISSING", self.to_string()).hint("create the missing file or remove it from the manifest, then run `canon context-pack add` again"),
             Self::SecretDetected(_) => CliError::refused("CONTEXT_SECRET_DETECTED", self.to_string()).hint("remove the secret from the input, or drop the file from the manifest; canon never stores a detected secret"),
-            Self::MissingPack(_) => CliError::refused("CONTEXT_PACK_NOT_FOUND", self.to_string()).hint("check the pack id (sha256:<64 hex digits>), or create the pack with `canon context-pack new --manifest <file>`"),
+            Self::MissingPack(_) => CliError::refused("CONTEXT_PACK_NOT_FOUND", self.to_string()).hint("check the pack id (sha256:<64 hex digits>), or create the pack with `canon context-pack add --manifest <file>`"),
             Self::PromptBundle { .. } => CliError::refused("PROMPT_BUNDLE_INVALID", self.to_string()).hint("fix the bundle name, version or manifest (`canon schema prompt add` lists them), then run `canon prompt add` again"),
             Self::Serialize(_) => CliError::refused("SERIALIZE_FAILED", self.to_string()).hint("this is a canon bug: report it together with the command line that produced it"),
             Self::Io { .. } => CliError::failed("REPO_UNREADABLE", self.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root"),
             Self::ObjectConflict { .. } => CliError::failed("CONTEXT_OBJECT_CONFLICT", self.to_string()).hint("an object already stored under this digest differs from the new content: inspect it with `git status` and restore or remove it, then run the command again"),
-            Self::Tampered { .. } => CliError::failed("CONTEXT_PACK_TAMPERED", self.to_string()).hint("restore the pack from version control (`git checkout -- <path>`), or create a fresh pack with `canon context-pack new`"),
+            Self::Tampered { .. } => CliError::failed("CONTEXT_PACK_TAMPERED", self.to_string()).hint("restore the pack from version control (`git checkout -- <path>`), or create a fresh pack with `canon context-pack add`"),
             Self::Git(_) => CliError::failed("CONTEXT_GIT_UNAVAILABLE", self.to_string()).hint("run from inside a git repository with git installed (`git init` creates one)"),
         }
     }
@@ -75,7 +77,7 @@ fn digest(bytes: &[u8]) -> String {
     format!("sha256:{:x}", Sha256::digest(bytes))
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ContentRef {
     pub digest: String,
@@ -83,7 +85,7 @@ pub struct ContentRef {
     pub replayable: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FileSnapshot {
     pub path: String,
@@ -92,7 +94,7 @@ pub struct FileSnapshot {
     pub content: ContentRef,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RepoIdentity {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -101,7 +103,7 @@ pub struct RepoIdentity {
     pub state_digest: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkRefs {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -110,7 +112,7 @@ pub struct WorkRefs {
     pub task_ref: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PromptSnapshot {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -123,7 +125,7 @@ pub struct PromptSnapshot {
     pub output_schema: Option<FileSnapshot>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolSnapshot {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -193,7 +195,7 @@ impl ContextPackSpec {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextPack {
     pub format_version: u32,
@@ -227,7 +229,9 @@ pub struct ContextPack {
     pub non_replayable: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+impl Report for ContextPack {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PromptBundleVersion {
     pub name: String,
@@ -235,6 +239,8 @@ pub struct PromptBundleVersion {
     pub digest: String,
     pub prompts: PromptSnapshot,
 }
+
+impl Report for PromptBundleVersion {}
 
 /// Register a prompt bundle version by copying only its explicitly selected
 /// files into the same immutable content registry used by ContextPack.
@@ -351,7 +357,7 @@ pub fn load_manifest_spec(repo: &Path, manifest: &Path) -> Result<ContextPackSpe
 /// Load an explicit JSON input manifest and create its immutable pack.
 pub fn create_from_manifest(repo: &Path, manifest: &Path) -> Result<ContextPack, ContextPackError> {
     let spec = load_manifest_spec(repo, manifest)?;
-    create(repo, &spec)
+    mark_unchanged_if_nothing_written(|| create(repo, &spec))
 }
 
 /// Register a prompt bundle described by a repository-local JSON manifest.
@@ -360,7 +366,7 @@ pub fn register_prompt_bundle_from_manifest(repo: &Path, name: &str, version: &s
     let path = safe_path(&repo, manifest)?;
     let bytes = std::fs::read(&path).map_err(|e| io(&path, e))?;
     let spec: ContextPackSpec = serde_json::from_slice(&bytes).map_err(|e| ContextPackError::Serialize(e.to_string()))?;
-    register_prompt_bundle(&repo, name, version, &spec)
+    mark_unchanged_if_nothing_written(|| register_prompt_bundle(&repo, name, version, &spec))
 }
 
 
@@ -557,6 +563,23 @@ fn is_digest(value: &str) -> bool {
 fn pack_path(repo: &Path, id: &str) -> PathBuf { repo.join(CONTEXT_PACK_DIR).join("manifests").join(format!("{id}.json")) }
 fn object_path(repo: &Path, id: &str) -> PathBuf { repo.join(CONTEXT_PACK_DIR).join("objects").join(id.replace(':', "-") + ".json") }
 
+std::thread_local! {
+    /// How many immutable files this thread has actually written; a call that
+    /// finds every file already stored (byte-identical) leaves it unchanged.
+    static FRESH_WRITES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// Runs `op` and says canon found everything it would store already stored
+/// (see [`crate::json_out::mark_unchanged`]).
+fn mark_unchanged_if_nothing_written<T>(op: impl FnOnce() -> Result<T, ContextPackError>) -> Result<T, ContextPackError> {
+    let before = FRESH_WRITES.with(std::cell::Cell::get);
+    let out = op()?;
+    if FRESH_WRITES.with(std::cell::Cell::get) == before {
+        crate::json_out::mark_unchanged();
+    }
+    Ok(out)
+}
+
 fn write_immutable(path: &Path, bytes: &[u8]) -> Result<(), ContextPackError> {
     if path.exists() {
         let existing = std::fs::read(path).map_err(|e| io(path, e))?;
@@ -566,7 +589,9 @@ fn write_immutable(path: &Path, bytes: &[u8]) -> Result<(), ContextPackError> {
         }
         return Ok(());
     }
-    write_atomic(path, bytes).map_err(|e| io(path, e))
+    write_atomic(path, bytes).map_err(|e| io(path, e))?;
+    FRESH_WRITES.with(|n| n.set(n.get() + 1));
+    Ok(())
 }
 
 fn validate_label(value: &str) -> Result<(), ContextPackError> {
@@ -589,6 +614,18 @@ fn scan_sensitive_bytes(bytes: &[u8], label: &str) -> Result<(), ContextPackErro
     }
     Ok(())
 }
+
+/// `canon context-pack verify --json`'s `data`.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifyReport {
+    /// The pack id that was checked.
+    pub id: String,
+    /// Always `true`: a pack that fails verification is the `CONTEXT_PACK_TAMPERED` error.
+    pub verified: bool,
+}
+
+impl Report for VerifyReport {}
 
 #[cfg(test)]
 mod tests {

@@ -5,7 +5,7 @@
 //! serves the briefs page's two endpoints ([`crate::dashboard_briefs`]).
 //! This module never re-implements snapshot/report generation (design D1) —
 //! it calls straight into [`canon_report::snapshot`], the exact library
-//! entry point [`crate::report`]'s `canon report --snapshot` arm wires.
+//! entry point [`crate::report`]'s `canon report snapshot` arm wires.
 //!
 //! # Where the app comes from ([`resolve_app`])
 //! 1. `<repo>/packages/dashboard/dist` when `<repo>/packages/dashboard/
@@ -54,7 +54,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use canon_model::paths;
-use serde_json::{json, Value};
+use serde_json::Value;
 
 use crate::cli_error::CliError;
 use crate::dashboard_briefs::{bad_request, Reply};
@@ -117,7 +117,7 @@ impl DashboardError {
     /// The refusal `canon dashboard` prints for this failure.
     pub fn to_cli_error(&self) -> CliError {
         match self {
-            DashboardError::Config(_) => CliError::refused("DASHBOARD_CONFIG_INVALID", self.to_string()).hint("fix the dashboard settings in canon.yaml (`canon init --check-config` reports what is wrong)"),
+            DashboardError::Config(_) => CliError::refused("DASHBOARD_CONFIG_INVALID", self.to_string()).hint("fix the dashboard settings in canon.yaml (`canon init --check` reports what is wrong)"),
             DashboardError::NotBuilt(_) => CliError::failed("DASHBOARD_NOT_BUILT", self.to_string())
                 .hint("install the release build (`bun add -g @journeykit/canon`), which carries the app; or, in a canon checkout, build it (`bun install --frozen-lockfile && bun run --cwd packages/dashboard build`) and run `canon dashboard` from that checkout"),
             DashboardError::RepoMissing(_) => CliError::refused("REPO_UNREADABLE", self.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root"),
@@ -143,13 +143,53 @@ pub enum SnapshotState {
 }
 
 impl SnapshotState {
-    fn to_json(&self) -> Value {
+    fn status(&self) -> SnapshotStatus<'_> {
         match self {
-            SnapshotState::Ready => json!({ "available": true, "reason": null, "fix": null }),
-            SnapshotState::Unavailable { reason, fix } => json!({ "available": false, "reason": reason, "fix": fix }),
+            SnapshotState::Ready => SnapshotStatus { available: true, reason: None, fix: None },
+            SnapshotState::Unavailable { reason, fix } => SnapshotStatus { available: false, reason: Some(reason), fix: Some(fix) },
         }
     }
 }
+
+/// `canon dashboard --json`: where the dashboard serves (`DashboardReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardReport {
+    pub url: String,
+    pub briefs_url: String,
+    /// Where the app comes from: the embedded build, or a directory.
+    pub app: String,
+    pub snapshot: String,
+    pub snapshot_available: bool,
+}
+
+impl crate::json_out::Report for DashboardReport {}
+
+/// Whether the snapshot backs the panels page, and how to fix it when not.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SnapshotStatus<'a> {
+    pub available: bool,
+    pub reason: Option<&'a str>,
+    pub fix: Option<&'a str>,
+}
+
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AppStatus {
+    /// `embedded` or `directory`.
+    pub source: &'static str,
+}
+
+/// `GET /api/status` (`DashboardStatusReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardStatusReport<'a> {
+    pub snapshot: SnapshotStatus<'a>,
+    pub app: AppStatus,
+}
+
+impl crate::json_out::Report for DashboardStatusReport<'_> {}
 
 /// Regenerates `dir`'s snapshot unconditionally when `explicit` is
 /// false (the default scratch dir — module doc), else only when `dir`
@@ -165,7 +205,7 @@ fn ensure_snapshot(inputs: &canon_report::ReportInputs, dir: &Path, explicit: bo
         Err(e) => {
             let fix = match e {
                 canon_report::ReportError::DuckDbMissing => "install DuckDB (https://duckdb.org/docs/installation) so the `duckdb` command is on PATH, then run `canon dashboard` again".to_string(),
-                _ => "run `canon report --snapshot <dir>` to see the full error, fix it, then run `canon dashboard` again".to_string(),
+                _ => "run `canon report snapshot <dir>` to see the full error, fix it, then run `canon dashboard` again".to_string(),
             };
             SnapshotState::Unavailable { reason: format!("the snapshot could not be generated: {e}"), fix }
         }
@@ -382,8 +422,8 @@ fn handle_connection(stream: TcpStream, server: &Server) {
     }
     match (head.method.as_str(), head.path.as_str()) {
         ("GET", "/api/status") => {
-            let data = json!({ "snapshot": server.snapshot.to_json(), "app": { "source": if matches!(server.app, AppSource::Embedded(_)) { "embedded" } else { "directory" } } });
-            let body = crate::json_out::envelope("dashboard status", data);
+            let source = if matches!(server.app, AppSource::Embedded(_)) { "embedded" } else { "directory" };
+            let body = crate::json_out::envelope("dashboard status", &DashboardStatusReport { snapshot: server.snapshot.status(), app: AppStatus { source } });
             write_reply(&mut stream, &Reply { status: 200, body });
         }
         ("GET", "/api/briefs") => write_reply(&mut stream, &crate::dashboard_briefs::list(&server.repo)),

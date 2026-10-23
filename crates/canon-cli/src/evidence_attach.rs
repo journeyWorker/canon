@@ -211,7 +211,11 @@ pub struct BindRequest<'a> {
     /// Bind every case of every report (0.18 D1): a task's evidence with
     /// no `--scenario-id` and no `--report-case`.
     pub all_cases: bool,
-    pub verdict: EvidenceVerdict,
+    /// `--verdict` as claimed (an audit's result counts as a claim). `None`:
+    /// with a report bound the verdict is derived from the bound cases
+    /// ([`derived_verdict`]), else `faithful`. A claimed `faithful` over a
+    /// failed or skipped case is refused.
+    pub verdict: Option<EvidenceVerdict>,
     /// The store's size limit for one file, in bytes.
     pub max_bytes: u64,
 }
@@ -243,10 +247,13 @@ impl BoundFile {
 
 /// What [`bind`] produced: the record's attachments and the files
 /// behind them, one entry per distinct digest.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Bound {
     pub attachments: Vec<EvidenceAttachment>,
     pub files: Vec<BoundFile>,
+    /// The verdict the record carries: the claimed one, else what the bound
+    /// cases show, else `faithful`.
+    pub verdict: EvidenceVerdict,
 }
 
 impl Bound {
@@ -317,7 +324,7 @@ pub fn store_files_held<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<HeldS
         return Ok(HeldStore { lock: None, published: Vec::new(), uploaded: 0 });
     };
     let lock = StoreLock::acquire(repo).map_err(|e| (first, e))?;
-    // The backend is read UNDER the lock, so a `canon artifacts migrate`
+    // The backend is read UNDER the lock, so a `canon artifacts move`
     // that finished while this call waited is seen, and no blob is
     // written to a local store the repo no longer uses.
     let store = ArtifactStore::open(repo).map_err(|e| (first, e))?;
@@ -554,7 +561,8 @@ fn read_report_file(repo: &Path, format: ReportFormat, path: &Path, max_bytes: u
 /// nothing (module doc).
 pub fn bind(request: &BindRequest<'_>) -> Result<Bound, BindError> {
     let repo = canonical_repo(request.repo)?;
-    let mut bound = Bound::default();
+    let mut bound = Bound { attachments: Vec::new(), files: Vec::new(), verdict: EvidenceVerdict::Faithful };
+    let mut outcomes: Vec<ReportOutcome> = Vec::new();
 
     for path in request.artifacts {
         let (relative, file) = hash_artifact(&repo, path, request.max_bytes)?;
@@ -575,11 +583,12 @@ pub fn bind(request: &BindRequest<'_>) -> Result<Bound, BindError> {
                 })?
         };
         named_unmatched.retain(|name| !matched.iter().any(|c| names_case(c, name)));
-        if request.verdict == EvidenceVerdict::Faithful {
+        if request.verdict == Some(EvidenceVerdict::Faithful) {
             if let Some(contradiction) = report.contradiction(&matched) {
                 return Err(BindError::Contradiction(format!("{contradiction}; {FAITHFUL_NEEDS_PASSES}")));
             }
         }
+        outcomes.extend(matched.iter().map(|case| case.outcome));
         bound.add_file(BoundFile::on_disk(report.resolved.clone(), report.sha256.clone()));
         bound.attachments.extend(matched.iter().map(|case| report.attachment(case)));
         for file in bind_case_files(&report, &repo, &matched, request.max_bytes, &mut bound.attachments)? {
@@ -593,6 +602,7 @@ pub fn bind(request: &BindRequest<'_>) -> Result<Bound, BindError> {
         )
         .on("--report-case"));
     }
+    bound.verdict = request.verdict.unwrap_or_else(|| derived_verdict(outcomes));
     Ok(bound)
 }
 
@@ -1463,7 +1473,7 @@ mod tests {
             report_cases: &[],
             scenario_id: Some("cart.add.01"),
             all_cases: false,
-            verdict,
+            verdict: Some(verdict),
             max_bytes: 25 * 1024 * 1024,
         }
     }

@@ -168,6 +168,13 @@ impl TierRegistry {
         Ok(receipts.remove(0))
     }
 
+    /// What [`Self::persist`] would find for a `T`, without writing: the
+    /// same routing and tier-availability refusal (`UnroutedKind`,
+    /// `TierUnavailable`), `Ok` when the write would be attempted.
+    pub fn check_persist<T: CanonRecord>(&self) -> Result<(), StoreError> {
+        self.handle(self.policy.tier_for(T::KIND)?).map(drop)
+    }
+
     /// The batching counterpart to [`Self::persist`] (s31 design D2)
     /// for a caller writing MANY records of the SAME kind in one pass
     /// — canon-ingest's per-session events, for one. Resolves

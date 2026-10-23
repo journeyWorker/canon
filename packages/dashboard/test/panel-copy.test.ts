@@ -139,7 +139,7 @@ const SHARED_CLAIMS: Record<string, { note: string; emittedFrom: string; claims:
       "raw `Divergence.status` events",
       "running `opened - resolved` event count",
       "NOT the number open now",
-      "`canon divergence status`",
+      "`canon divergence list`",
     ],
   },
   "flywheel funnel": {
@@ -319,7 +319,7 @@ test("the review burn-down's running column is labelled as an event count, not c
   expect(running?.label).not.toBe("Open (running total)");
   expect(running?.label).toContain("event count");
   expect(running?.description).toContain("NOT the number open now");
-  expect(running?.description).toContain("canon divergence status");
+  expect(running?.description).toContain("canon divergence list");
 });
 
 test("the flywheel funnel states the applied split per distinct strategy, not per run", () => {
@@ -535,7 +535,7 @@ test("the one canonical sentence is identical on every surface that reports fix_
     ["crates/canon-report/src/marts.rs", readFileSync(join(REPO_ROOT, "crates/canon-report/src/marts.rs"), "utf-8")],
     ["crates/canon-store/sql/views.sql", readFileSync(join(REPO_ROOT, "crates/canon-store/sql/views.sql"), "utf-8")],
     ["crates/canon-model/src/records.rs", readFileSync(join(REPO_ROOT, "crates/canon-model/src/records.rs"), "utf-8")],
-    ["crates/canon-cli/src/main.rs", readFileSync(join(REPO_ROOT, "crates/canon-cli/src/main.rs"), "utf-8")],
+    ["crates/canon-cli/src/cli/finding.rs", readFileSync(join(REPO_ROOT, "crates/canon-cli/src/cli/finding.rs"), "utf-8")],
     ["crates/canon-cli/src/finding.rs", readFileSync(join(REPO_ROOT, "crates/canon-cli/src/finding.rs"), "utf-8")],
   ];
   for (const [where, text] of surfaces) {
@@ -924,7 +924,7 @@ const SKILL_CLAIMS: Record<string, string[]> = {
   ],
   "Review burn-down": [
     "a running `opened - resolved` event count, NOT the number open now",
-    "For current state per scenario, run `canon divergence status`",
+    "For current state per scenario, run `canon divergence list`",
   ],
   // s43 round 1 reached this surface within the hour: the skill was
   // written from the panel and faithfully copied "FLOOR" into a third

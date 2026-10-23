@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-1"
+  },
+  "at": "2026-10-23T13:10:15.032741311Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/contract_d5.rs:81-100",
+  "kind": "finding",
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "scenario_ids": [
+    "context.capability.40"
+  ],
+  "schema": 1,
+  "seq": 17,
+  "severity": "should_fix",
+  "summary": "Standards pass: context.capability.40's bound test runs in an init'ed repo (Given says no canon.yaml) and only with --json; 'without --json it exits 2' is unproven. Mutation confirmed: run/top.rs:193 checking fields only under json stays green (context_index.rs:105 covers it but is not bound)",
+  "worktree_dirty": false
+}

@@ -1,11 +1,17 @@
-//! Canon skill bundle materialization.
+//! Canon skill materialization.
 //!
-//! The canonical user-facing source is a read-only bundle rooted at
-//! `SKILL.src.md`. It projects one directory-shaped `canon` skill
-//! (`<root>/skills/canon/SKILL.md` plus `reference/**` and `scripts/**`
-//! sidecars) to Claude (`.claude`), Codex (`.agents`), OMP (`.omp`), and Pi
-//! (`.pi`). Directory-shaped sources (notably `canon/skills-dev`) retain the
-//! legacy per-skill materializer for backwards compatibility.
+//! The guide lives in the binary (0.28 D10, [`crate::guide`]): `canon skills
+//! show` prints it. What `install` projects is a short stub `SKILL.md`
+//! (frontmatter from `SKILL.src.md`, a body that carries the canon version and
+//! points at `canon skills show canon`) plus the `scripts/**` sidecar, as one
+//! directory-shaped `canon` skill (`<root>/skills/canon/`) for Claude
+//! (`.claude`), Codex (`.agents`), OMP (`.omp`), and Pi (`.pi`). `reference/**`
+//! is never projected; a 0.27 projection's reference files are orphans the lock
+//! lists, pruned when their bytes still match it ([`find_orphans`]). The source
+//! is the text embedded in the binary; `--skills-source` or
+//! `CANON_SKILLS_SOURCE` names a developer override directory
+//! ([`resolve_source`]). Directory-shaped sources without `SKILL.src.md`
+//! (notably `canon/skills-dev`) retain the legacy per-skill materializer.
 //!
 //! Canon 0.13.0 and earlier projected Codex to a flattened
 //! `.codex/skills/canon.md` plus `.codex/skills/canon/**`, a directory Codex
@@ -268,6 +274,10 @@ pub struct CanonicalInstallReport {
     pub pruned: Vec<Orphan>,
     /// The same, whose bytes differed: kept.
     pub kept: Vec<Orphan>,
+    /// The projected files whose bytes differ from the bundle (or are missing): what an install writes.
+    pub rewritten: Vec<PathBuf>,
+    /// Whether the install lock differs from the one this install writes.
+    pub lock_changed: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -284,7 +294,7 @@ pub struct SkillStatus {
 pub const FORMATTER_REWRITTEN: &str = "formatter-rewritten";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SkillsCheckReport {
+pub struct SkillsCheckOutcome {
     pub providers: Vec<Provider>,
     pub origin: ProviderOrigin,
     pub source_hash: String,
@@ -498,7 +508,7 @@ fn write_lock(source_dir: &Path, lock: &Lock) -> Result<(), SkillsError> {
     write_file(&source_dir.join(".install-lock.json"), &json)
 }
 
-fn install_legacy(source_dir: &Path, target_dir: &Path) -> Result<InstallReport, SkillsError> {
+fn install_legacy(source_dir: &Path, target_dir: &Path, dry_run: bool) -> Result<InstallReport, SkillsError> {
     let discovered = discover_skills(source_dir)?;
     let previous_lock = load_lock(source_dir)?;
     let mut new_skills = BTreeMap::new();
@@ -517,7 +527,7 @@ fn install_legacy(source_dir: &Path, target_dir: &Path) -> Result<InstallReport,
                 version,
             },
         );
-        for provider in [Provider::Claude, Provider::Codex] {
+        for provider in [Provider::Claude, Provider::Codex].into_iter().filter(|_| !dry_run) {
             write_file_under(
                 target_dir,
                 &provider_skill_root(target_dir, provider)
@@ -533,7 +543,9 @@ fn install_legacy(source_dir: &Path, target_dir: &Path) -> Result<InstallReport,
         });
     }
     let lock = Lock { skills: new_skills };
-    write_lock(source_dir, &lock)?;
+    if !dry_run {
+        write_lock(source_dir, &lock)?;
+    }
     Ok(InstallReport { installed, lock })
 }
 
@@ -580,19 +592,28 @@ fn collect_bundle_files(
     Ok(())
 }
 
-fn canonical_bundle(source_dir: &Path) -> Result<Vec<BundleFile>, SkillsError> {
-    let root = source_dir.join("SKILL.src.md");
-    if !root.is_file() {
-        return Err(SkillsError::CanonicalSourceMissing(
-            source_dir.to_path_buf(),
-        ));
+/// The files `skills install` projects next to nothing else (0.28 D10): the stub
+/// `SKILL.md` (written from `SKILL.src.md`, whose frontmatter it keeps, and
+/// this canon's version) and the `scripts/**` sidecar. The guide itself is not
+/// projected: `canon skills show` prints it from the binary. `source` is the
+/// developer override directory; `None` reads the text embedded in the binary.
+fn canonical_bundle(source: Option<&Path>) -> Result<Vec<BundleFile>, SkillsError> {
+    let mut files = Vec::new();
+    match source {
+        None => {
+            files.push(BundleFile { relative: PathBuf::from("SKILL.src.md"), bytes: crate::guide::stub(crate::guide::core(), CANON_VERSION).into_bytes() });
+            files.extend(crate::guide::scripts().map(|(path, text)| BundleFile { relative: PathBuf::from(path), bytes: text.as_bytes().to_vec() }));
+        }
+        Some(source_dir) => {
+            let root = source_dir.join("SKILL.src.md");
+            if !root.is_file() {
+                return Err(SkillsError::CanonicalSourceMissing(source_dir.to_path_buf()));
+            }
+            let text = read_to_string(&root)?;
+            files.push(BundleFile { relative: PathBuf::from("SKILL.src.md"), bytes: crate::guide::stub(&text, CANON_VERSION).into_bytes() });
+            collect_bundle_files(source_dir, Path::new("scripts"), &mut files)?;
+        }
     }
-    let mut files = vec![BundleFile {
-        relative: PathBuf::from("SKILL.src.md"),
-        bytes: read_bytes(&root)?,
-    }];
-    collect_bundle_files(source_dir, Path::new("reference"), &mut files)?;
-    collect_bundle_files(source_dir, Path::new("scripts"), &mut files)?;
     files.sort_by(|a, b| a.relative.cmp(&b.relative));
     Ok(files)
 }
@@ -847,8 +868,10 @@ impl CanonicalManifest {
     }
 }
 
-/// `HEAD` of the git checkout `source_dir` is in, if it is in one.
-fn source_commit(source_dir: &Path) -> Option<String> {
+/// `HEAD` of the git checkout the override `source` is in, if it is in one;
+/// `None` for the embedded text.
+fn source_commit(source: Option<&Path>) -> Option<String> {
+    let source_dir = source?;
     let output = std::process::Command::new("git")
         .arg("-C")
         .arg(source_dir)
@@ -898,6 +921,7 @@ pub fn owned_path_globs(providers: &[Provider]) -> Vec<String> {
         paths::VOCAB_DIR,
         paths::PLUGINS_DIR,
         paths::INGEST_DIR,
+        paths::MIGRATE_BACKUP_DIR,
         paths::DASHBOARD_SNAPSHOT_DIR,
         paths::AUDIT_GITIGNORE,
         lock_dir,
@@ -1256,6 +1280,12 @@ fn prune_orphans(target_dir: &Path, found: Vec<FoundOrphan<'_>>, selected: &[Pro
     Ok((pruned, kept))
 }
 
+/// What [`prune_orphans`] would return, without removing anything: the
+/// unmodified orphans prune, the modified ones are kept.
+fn preview_prune(found: Vec<FoundOrphan<'_>>) -> (Vec<Orphan>, Vec<Orphan>) {
+    found.into_iter().map(|f| f.orphan).partition(|orphan| !orphan.modified)
+}
+
 /// Filesystem access for the legacy Codex migration. Keys are
 /// [`is_legacy_codex_key`]-validated `/`-separated relative paths.
 ///
@@ -1548,9 +1578,10 @@ pub fn competing_skills(target_dir: &Path) -> Vec<CompetingSkill> {
 /// exists, after the projection is written. With nothing selected and no
 /// install lock, nothing at all is written.
 pub fn install_canonical(
-    source_dir: &Path,
+    source_dir: Option<&Path>,
     target_dir: &Path,
     providers: Option<&str>,
+    dry_run: bool,
 ) -> Result<CanonicalInstallReport, SkillsError> {
     let selection = select_providers(target_dir, providers)?;
     let selected = selection.providers;
@@ -1595,13 +1626,12 @@ pub fn install_canonical(
         // Nothing selected and nothing recorded: there is nothing to lock.
         None => selected.is_empty(),
     };
-    let changed = !lock_current
-        || !removals.is_empty()
-        || writes
-            .iter()
-            .any(|(path, bytes)| fs::read(path).ok().as_deref() != Some(bytes.as_slice()));
+    let rewritten: Vec<PathBuf> = writes.iter().filter(|(path, bytes)| fs::read(path).ok().as_deref() != Some(bytes.as_slice())).map(|(path, _)| path.clone()).collect();
+    let changed = !lock_current || !removals.is_empty() || !rewritten.is_empty();
     let (mut pruned, mut kept) = (Vec::new(), Vec::new());
-    if changed {
+    if changed && dry_run {
+        (pruned, kept) = preview_prune(orphans);
+    } else if changed {
         for (path, bytes) in writes {
             write_bytes_under(target_dir, &path, &bytes)?;
         }
@@ -1615,7 +1645,9 @@ pub fn install_canonical(
     }
     let config_written = match config {
         Some((path, text)) => {
-            write_file(&path, &text)?;
+            if !dry_run {
+                write_file(&path, &text)?;
+            }
             Some(path)
         }
         None => None,
@@ -1628,12 +1660,14 @@ pub fn install_canonical(
         config_written,
         pruned,
         kept,
+        rewritten,
+        lock_changed: !lock_current,
     })
 }
 
-pub fn install(source_dir: &Path, target_dir: &Path) -> Result<InstallReport, SkillsError> {
+pub fn install(source_dir: &Path, target_dir: &Path, dry_run: bool) -> Result<InstallReport, SkillsError> {
     if source_dir.join("SKILL.src.md").is_file() {
-        let report = install_canonical(source_dir, target_dir, None)?;
+        let report = install_canonical(Some(source_dir), target_dir, None, dry_run)?;
         let mut lock = Lock::default();
         lock.skills.insert(
             "canon".into(),
@@ -1651,14 +1685,43 @@ pub fn install(source_dir: &Path, target_dir: &Path) -> Result<InstallReport, Sk
             lock,
         });
     }
-    install_legacy(source_dir, target_dir)
+    install_legacy(source_dir, target_dir, dry_run)
 }
 
+/// The `(major, minor)` of a `X.Y.Z` canon version; `None` when it does not parse.
+fn major_minor(version: &str) -> Option<(u64, u64)> {
+    let mut parts = version.split('.');
+    let major = parts.next()?.parse().ok()?;
+    let minor = parts.next()?.parse().ok()?;
+    Some((major, minor))
+}
+
+/// Whether `target_dir` holds a full skill projection from before the stub (0.27
+/// and earlier, 0.28 D9): the install lock was written by an older canon than
+/// 0.28 (or by one that recorded no version) and is not this binary's own, or
+/// lists a `reference/**` file, while listing projected files at all; or there is no lock and a
+/// provider's projection directory holds `reference/`. Cheap: reads the lock and at most four directories.
+pub fn has_full_projection(target_dir: &Path) -> bool {
+    match load_manifest(target_dir) {
+        Ok(Some(lock)) => {
+            let lists_reference = lock.files.keys().chain(lock.retained_files.keys()).any(|key| key.contains("/skills/canon/reference/"));
+            let older = lock.canon_version.as_deref() != Some(CANON_VERSION) && lock.canon_version.as_deref().is_none_or(|version| major_minor(version).is_some_and(|v| v < STUB_SINCE));
+            // A lock that lists no file has no projection to replace.
+            !lock.files.is_empty() && (lists_reference || older)
+        }
+        Ok(None) => ALL_PROVIDERS.into_iter().any(|provider| provider_bundle_root(target_dir, provider).join("reference").is_dir()),
+        Err(_) => false,
+    }
+}
+
+/// The first release whose installed `SKILL.md` is the stub.
+const STUB_SINCE: (u64, u64) = (0, 28);
+
 pub fn check(
-    source_dir: &Path,
+    source_dir: Option<&Path>,
     target_dir: &Path,
     providers: Option<&str>,
-) -> Result<SkillsCheckReport, SkillsError> {
+) -> Result<SkillsCheckOutcome, SkillsError> {
     let selection = select_providers(target_dir, providers)?;
     let selected = selection.providers;
     let files = canonical_bundle(source_dir)?;
@@ -1692,7 +1755,7 @@ pub fn check(
     let outdated = actual
         .filter(|actual| actual.canon_version != expected.canon_version)
         .map(|actual| OutdatedLock { path: manifest_path(target_dir), installed_by: actual.canon_version });
-    Ok(SkillsCheckReport {
+    Ok(SkillsCheckOutcome {
         providers: selected,
         origin: selection.origin,
         source_hash: expected.source_hash,
@@ -1718,7 +1781,7 @@ pub fn stray_projections(target_dir: &Path, selected: &[Provider]) -> Vec<(Provi
 }
 
 pub fn doctor(
-    source_dir: &Path,
+    source_dir: Option<&Path>,
     target_dir: &Path,
     providers: Option<&str>,
 ) -> Result<Vec<String>, SkillsError> {
@@ -1839,12 +1902,141 @@ pub fn doctor(
     Ok(lines)
 }
 
-pub fn resolve_source(explicit: Option<&Path>) -> PathBuf {
-    explicit
-        .map(Path::to_path_buf)
-        .or_else(|| std::env::var_os(CANONICAL_SOURCE_ENV).map(PathBuf::from))
-        .unwrap_or_else(|| PathBuf::from("canon/skills"))
+/// The developer override directory: `--skills-source`, else `CANON_SKILLS_SOURCE`
+/// when set and not empty; `None` means the text embedded in the binary (0.28 O15).
+pub fn resolve_source(explicit: Option<&Path>) -> Option<PathBuf> {
+    explicit.map(Path::to_path_buf).or_else(|| std::env::var_os(CANONICAL_SOURCE_ENV).filter(|value| !value.is_empty()).map(PathBuf::from))
 }
+
+/// One skill the legacy (pre-bundle) install wrote.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InstalledSkillEntry<'a> {
+    pub name: &'a str,
+    pub version: u64,
+    pub changed: bool,
+}
+
+/// What the legacy install (a source without `SKILL.src.md`) reports.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LegacyInstall<'a> {
+    /// True when `--dry-run` previewed the run without writing.
+    pub dry_run: bool,
+    pub skills: Vec<InstalledSkillEntry<'a>>,
+}
+
+/// An orphan the install pruned.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PrunedEntry {
+    pub path: String,
+    pub provider: &'static str,
+    pub reason: &'static str,
+}
+
+/// An orphan the install kept, with what to do by hand.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct KeptEntry {
+    pub path: String,
+    pub provider: &'static str,
+    pub reason: &'static str,
+    pub hint: String,
+}
+
+/// What the bundle install reports.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BundleInstall {
+    /// True when `--dry-run` previewed the run without writing.
+    pub dry_run: bool,
+    pub providers: Vec<&'static str>,
+    pub selection: String,
+    pub changed: bool,
+    pub config_written: Option<String>,
+    pub pruned: Vec<PrunedEntry>,
+    pub kept: Vec<KeptEntry>,
+    pub owned_paths: Vec<String>,
+}
+
+/// `canon skills install`'s report (`SkillsInstallReport`): the bundle install,
+/// or the legacy one for a source without `SKILL.src.md`.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(untagged)]
+pub enum SkillsInstallReport<'a> {
+    Bundle(BundleInstall),
+    Legacy(LegacyInstall<'a>),
+}
+
+impl crate::json_out::Report for SkillsInstallReport<'_> {}
+
+/// The state of one installed skill file.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillFileStatus {
+    pub path: String,
+    pub state: &'static str,
+    pub provider: &'static str,
+}
+
+/// An orphan `skills check` found.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OrphanEntry {
+    pub path: String,
+    pub provider: &'static str,
+    pub modified: bool,
+    pub reason: &'static str,
+    pub hint: String,
+}
+
+/// An install lock written by another canon version.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OutdatedEntry {
+    pub path: String,
+    pub installed_by: Option<String>,
+    pub message: String,
+}
+
+/// `canon skills check`'s report (`SkillsCheckReport`).
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillsCheckReport {
+    pub clean: bool,
+    pub providers: Vec<&'static str>,
+    pub selection: String,
+    pub manifest_ok: bool,
+    pub statuses: Vec<SkillFileStatus>,
+    pub orphans: Vec<OrphanEntry>,
+    pub remnants: Vec<String>,
+    pub outdated: Option<OutdatedEntry>,
+}
+
+impl crate::json_out::Report for SkillsCheckReport {}
+
+/// `canon skills doctor`'s report (`SkillsDoctorReport`).
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillsDoctorReport<'a> {
+    pub lines: &'a [String],
+}
+
+impl crate::json_out::Report for SkillsDoctorReport<'_> {}
+
+/// `--json` of `canon skills show`: the guide `name` names, as this canon embeds it.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillsShowReport {
+    pub name: String,
+    /// The canon version the guide is embedded in.
+    pub version: &'static str,
+    /// The guide's markdown, as `canon skills show` prints it.
+    pub markdown: std::borrow::Cow<'static, str>,
+}
+
+impl crate::json_out::Report for SkillsShowReport {}
 
 #[cfg(test)]
 mod tests {

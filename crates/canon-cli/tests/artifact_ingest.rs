@@ -1,4 +1,4 @@
-//! End-to-end integration test for `canon ingest artifacts [--repo]
+//! End-to-end integration test for `canon ingest records [--repo]
 //! [--watch]` (S14 `s14-artifact-ingest-cli`), invoking the actually-
 //! built `canon` binary against an offline fixture repo seeded with
 //! BOTH source shapes the driver must feed differently:
@@ -55,6 +55,13 @@ fn run_canon(args: &[&str], cwd: &Path) -> Output {
 
 fn stdout(output: &Output) -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
+}
+
+/// The `--json` failure document's `error` object, rendered.
+fn error_text(output: &Output) -> String {
+    let body: Value = serde_json::from_slice(&output.stdout).expect("--json failure prints one JSON document");
+    assert_eq!(body["ok"], false, "{body}");
+    body["error"].to_string()
 }
 
 fn stderr(output: &Output) -> String {
@@ -209,8 +216,8 @@ fn ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_re
     let repo = build_fixture_repo(tmp.path());
 
     // ── Run the actually-built `canon` binary. ──
-    let output = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo);
-    assert!(output.status.success(), "canon ingest artifacts must exit 0; stderr: {}", stderr(&output));
+    let output = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
+    assert!(output.status.success(), "canon ingest records must exit 0; stderr: {}", stderr(&output));
 
     let payload: Value = data_of(&stdout(&output));
 
@@ -218,9 +225,9 @@ fn ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_re
     let adapters = payload["adapters"].as_array().expect("adapters array");
     let handoff_summary = adapters
         .iter()
-        .find(|a| a["adapter_id"] == "handoff")
+        .find(|a| a["adapterId"] == "handoff")
         .unwrap_or_else(|| panic!("no `handoff` adapter entry in outcome: {payload}"));
-    assert_eq!(handoff_summary["source_kind"], "records", "handoff must be reported as the records-source adapter");
+    assert_eq!(handoff_summary["sourceKind"], "records", "handoff must be reported as the records-source adapter");
     assert_eq!(
         handoff_summary["status"], "read",
         "handoff's records source must have been READ, not `unavailable` \
@@ -228,23 +235,23 @@ fn ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_re
          the records-source input, exactly the ArtifactDispatchOutcome::\
          UnsupportedSource collapse the operator directive forbids): {payload}"
     );
-    let handoff_events = handoff_summary["events_parsed"].as_u64().expect("events_parsed is a number");
+    let handoff_events = handoff_summary["eventsParsed"].as_u64().expect("events_parsed is a number");
     assert_eq!(handoff_events, 3, "created + claimed + done, from the planted handoff's own state transitions: {payload}");
 
     // The ledger PATH-source adapter contributed its one open finding.
-    let ledger_summary = adapters.iter().find(|a| a["adapter_id"] == "ledger").expect("ledger adapter entry");
+    let ledger_summary = adapters.iter().find(|a| a["adapterId"] == "ledger").expect("ledger adapter entry");
     assert_eq!(ledger_summary["status"], "read");
-    assert_eq!(ledger_summary["events_parsed"], 1);
+    assert_eq!(ledger_summary["eventsParsed"], 1);
 
     // Exactly one verdict was derivable (the ledger finding; every
     // handoff event is NonVerdict by design D3 and derives none).
-    assert_eq!(payload["verdicts_derived"], 1, "{payload}");
+    assert_eq!(payload["verdictsDerived"], 1, "{payload}");
 
-    let persisted = payload["trajectories_persisted"].as_array().expect("trajectories_persisted array");
+    let persisted = payload["trajectoriesPersisted"].as_array().expect("trajectories_persisted array");
     assert_eq!(persisted.len(), 1, "one regime-keyed trajectory persisted: {payload}");
-    let regime_key_str = persisted[0]["regime_key"].as_str().expect("regime_key string").to_string();
+    let regime_key_str = persisted[0]["regimeKey"].as_str().expect("regime_key string").to_string();
     assert!(regime_key_str.starts_with("dev/acme-repo/world/"), "regime_key: {regime_key_str}");
-    assert_eq!(payload["strategy_items_rebuilt"], 1, "the distilled tier must also gain exactly one item: {payload}");
+    assert_eq!(payload["strategyItemsRebuilt"], 1, "the distilled tier must also gain exactly one item: {payload}");
 
     // ── (b) a trajectory parquet row was actually WRITTEN, read back
     //        through canon-learn's own public store API. ──
@@ -291,7 +298,7 @@ fn ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_re
 }
 
 /// s42 (`close-the-open-loops`) task 3.2, end to end through the actual
-/// binary: `canon ingest artifacts --run-id <RunId>` stamps that run onto
+/// binary: `canon ingest records --run-id <RunId>` stamps that run onto
 /// the trajectory it writes, and the value survives all the way into
 /// canon-learn's parquet `body` — which is where
 /// `mart_flywheel_funnel`'s attribution stage reads it from.
@@ -309,7 +316,7 @@ fn ingest_artifacts_stamps_the_dispatched_run_it_was_given_and_rejects_one_it_wa
 
     // A well-formed ULID that no `canon dispatch begin` ever minted here.
     let unknown_run = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
-    let rejected = run_canon(&["ingest", "artifacts", "--repo", ".", "--run-id", unknown_run], &repo);
+    let rejected = run_canon(&["ingest", "records", "--repo", ".", "--run-id", unknown_run], &repo);
     assert!(!rejected.status.success(), "an unknown --run-id must fail the whole pass; stdout: {}", stdout(&rejected));
     assert!(
         stderr(&rejected).contains(unknown_run) && stderr(&rejected).contains("dispatch"),
@@ -326,14 +333,14 @@ fn ingest_artifacts_stamps_the_dispatched_run_it_was_given_and_rejects_one_it_wa
     let begun = run_canon(&["dispatch", "begin", "--role", "dev", "--regime", &regime, "--repo", ".", "--json"], &repo);
     assert!(begun.status.success(), "canon dispatch begin must exit 0; stderr: {}", stderr(&begun));
     let begun_payload: Value = data_of(&stdout(&begun));
-    let run_id = begun_payload["run_id"].as_str().expect("run_id string").to_string();
+    let run_id = begun_payload["runId"].as_str().expect("run_id string").to_string();
 
-    let ingested = run_canon(&["ingest", "artifacts", "--repo", ".", "--run-id", &run_id, "--json"], &repo);
-    assert!(ingested.status.success(), "canon ingest artifacts --run-id must exit 0; stderr: {}", stderr(&ingested));
+    let ingested = run_canon(&["ingest", "records", "--repo", ".", "--run-id", &run_id, "--json"], &repo);
+    assert!(ingested.status.success(), "canon ingest records --run-id must exit 0; stderr: {}", stderr(&ingested));
     let payload: Value = data_of(&stdout(&ingested));
-    let persisted = payload["trajectories_persisted"].as_array().expect("trajectories_persisted array");
+    let persisted = payload["trajectoriesPersisted"].as_array().expect("trajectories_persisted array");
     assert_eq!(persisted.len(), 1, "one regime-keyed trajectory persisted: {payload}");
-    let regime_key = RegimeKey::parse(persisted[0]["regime_key"].as_str().expect("regime_key string")).unwrap();
+    let regime_key = RegimeKey::parse(persisted[0]["regimeKey"].as_str().expect("regime_key string")).unwrap();
 
     let trajectory_store = ParquetTrajectoryStore::open(repo.join(".canon/learn").join("trajectories"));
     let rows = trajectory_store.query_by_regime_key(&regime_key).expect("query_by_regime_key must not error");
@@ -346,7 +353,7 @@ fn ingest_artifacts_stamps_the_dispatched_run_it_was_given_and_rejects_one_it_wa
 }
 
 /// S4 tasks.md group 6 (write-time idempotence): a SECOND `canon
-/// ingest artifacts` pass over an UNCHANGED corpus must persist ZERO
+/// ingest records` pass over an UNCHANGED corpus must persist ZERO
 /// new trajectories — `crate::artifact_ingest::run`'s existence check
 /// (`trajectory_content_digest`: the identity-shape version, the
 /// `regime_key`, the ordered `VerdictRow` contents, and the RENDERED
@@ -355,7 +362,7 @@ fn ingest_artifacts_stamps_the_dispatched_run_it_was_given_and_rejects_one_it_wa
 /// double-writing the SAME evidence into `ParquetTrajectoryStore` —
 /// the genuine data-corruption bug this test guards against (an
 /// unbounded re-run would otherwise silently double verdict/mart
-/// counts every time `canon ingest artifacts` is re-invoked over an
+/// counts every time `canon ingest records` is re-invoked over an
 /// unchanged repo, e.g. a cron/CI re-run).
 #[test]
 fn a_second_ingest_over_an_unchanged_corpus_persists_zero_new_trajectories() {
@@ -363,12 +370,12 @@ fn a_second_ingest_over_an_unchanged_corpus_persists_zero_new_trajectories() {
     let repo = build_fixture_repo(tmp.path());
 
     // ── First pass: the baseline write. ──
-    let first = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo);
-    assert!(first.status.success(), "first canon ingest artifacts must exit 0; stderr: {}", stderr(&first));
+    let first = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
+    assert!(first.status.success(), "first canon ingest records must exit 0; stderr: {}", stderr(&first));
     let first_payload: Value = data_of(&stdout(&first));
-    assert_eq!(first_payload["trajectories_persisted"].as_array().unwrap().len(), 1, "{first_payload}");
-    assert_eq!(first_payload["trajectories_skipped_duplicate"], 0, "{first_payload}");
-    let regime_key_str = first_payload["trajectories_persisted"][0]["regime_key"].as_str().unwrap().to_string();
+    assert_eq!(first_payload["trajectoriesPersisted"].as_array().unwrap().len(), 1, "{first_payload}");
+    assert_eq!(first_payload["trajectoriesSkippedDuplicate"], 0, "{first_payload}");
+    let regime_key_str = first_payload["trajectoriesPersisted"][0]["regimeKey"].as_str().unwrap().to_string();
 
     let learn_root = repo.join(".canon/learn");
     let trajectory_store = ParquetTrajectoryStore::open(learn_root.join("trajectories"));
@@ -378,25 +385,25 @@ fn a_second_ingest_over_an_unchanged_corpus_persists_zero_new_trajectories() {
     let first_id = after_first[0].id;
 
     // ── Second pass over the SAME, unchanged corpus. ──
-    let second = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo);
-    assert!(second.status.success(), "second canon ingest artifacts must exit 0; stderr: {}", stderr(&second));
+    let second = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
+    assert!(second.status.success(), "second canon ingest records must exit 0; stderr: {}", stderr(&second));
     let second_payload: Value = data_of(&stdout(&second));
 
     // No NEW trajectory persisted, no verdict double-counted.
     assert_eq!(
-        second_payload["trajectories_persisted"].as_array().unwrap().len(),
+        second_payload["trajectoriesPersisted"].as_array().unwrap().len(),
         0,
         "an unchanged corpus must persist ZERO new trajectories on re-ingest: {second_payload}"
     );
     assert_eq!(
-        second_payload["trajectories_skipped_duplicate"], 1,
+        second_payload["trajectoriesSkippedDuplicate"], 1,
         "the one unchanged trajectory must be reported as a skipped duplicate, never silently dropped: {second_payload}"
     );
     assert_eq!(
-        second_payload["verdicts_derived"], 1,
+        second_payload["verdictsDerived"], 1,
         "the same single verdict is still DERIVED (parsed) every pass — only the PERSIST step dedups: {second_payload}"
     );
-    assert_eq!(second_payload["strategy_items_rebuilt"], 0, "no distilled-tier rebuild needed for an unchanged corpus: {second_payload}");
+    assert_eq!(second_payload["strategyItemsRebuilt"], 0, "no distilled-tier rebuild needed for an unchanged corpus: {second_payload}");
 
     // ── The parquet store itself is unchanged: still exactly ONE row
     //    under this regime_key, the SAME id, the SAME content — a
@@ -424,23 +431,23 @@ fn an_unrouted_handoff_source_degrades_to_unavailable_without_aborting_the_rest_
     std::fs::write(repo.join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n\nartifacts:\n  ledger_root: fixtures/ledger\n").unwrap();
     plant_ledger_code_review_finding(&repo.join("fixtures/ledger"));
 
-    let output = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo);
+    let output = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(output.status.success(), "stderr: {}", stderr(&output));
 
     let payload: Value = data_of(&stdout(&output));
     let adapters = payload["adapters"].as_array().unwrap();
-    let handoff_summary = adapters.iter().find(|a| a["adapter_id"] == "handoff").expect("handoff adapter entry present");
+    let handoff_summary = adapters.iter().find(|a| a["adapterId"] == "handoff").expect("handoff adapter entry present");
     assert_eq!(handoff_summary["status"], "unavailable", "{payload}");
-    assert_eq!(handoff_summary["events_parsed"], 0);
+    assert_eq!(handoff_summary["eventsParsed"], 0);
     assert!(
-        handoff_summary["unavailable_reason"].as_str().is_some_and(|s| !s.is_empty()),
+        handoff_summary["unavailableReason"].as_str().is_some_and(|s| !s.is_empty()),
         "an unavailable records source must carry a non-empty reason: {payload}"
     );
 
     // The ledger PATH-source adapter, and persistence, still ran.
-    let ledger_summary = adapters.iter().find(|a| a["adapter_id"] == "ledger").unwrap();
+    let ledger_summary = adapters.iter().find(|a| a["adapterId"] == "ledger").unwrap();
     assert_eq!(ledger_summary["status"], "read");
-    assert_eq!(payload["trajectories_persisted"].as_array().unwrap().len(), 1, "{payload}");
+    assert_eq!(payload["trajectoriesPersisted"].as_array().unwrap().len(), 1, "{payload}");
 }
 
 /// ReviewS14 finding 1: `canon_cli::artifact_ingest::run` must
@@ -471,15 +478,14 @@ fn a_malformed_learn_config_fails_loud_instead_of_silently_defaulting() {
     )
     .unwrap();
 
-    let output = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo);
+    let output = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(
         !output.status.success(),
         "a malformed `learn:` section must exit nonzero, never silently succeed: stdout: {} stderr: {}",
         stdout(&output),
         stderr(&output)
     );
-    let err = stderr(&output);
-    assert!(err.contains("canon ingest artifacts:"), "stderr must carry the command-prefixed error line: {err}");
+    let err = error_text(&output);
     assert!(
         err.contains("RoleId") || err.to_lowercase().contains("role"),
         "stderr must surface the underlying RoleId grammar error, not a generic failure: {err}"
@@ -498,7 +504,7 @@ fn a_malformed_learn_config_fails_loud_instead_of_silently_defaulting() {
 #[test]
 fn ingest_artifacts_help_smoke() {
     let tmp = tempfile::tempdir().unwrap();
-    let output = run_canon(&["ingest", "artifacts", "--help"], tmp.path());
+    let output = run_canon(&["ingest", "records", "--help"], tmp.path());
     assert!(output.status.success());
     assert!(stdout(&output).contains("--repo"));
     assert!(stdout(&output).contains("--watch"));
@@ -518,32 +524,32 @@ fn native_flywheel_review_and_divergence_resolved_in_same_run_both_produce_traje
     let tmp = tempfile::tempdir().unwrap();
     let repo = build_native_flywheel_repo(tmp.path());
 
-    let output = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo);
+    let output = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(output.status.success(), "stderr: {}", stderr(&output));
     let payload: Value = data_of(&stdout(&output));
 
     let adapters = payload["adapters"].as_array().expect("adapters array");
-    let review_summary = adapters.iter().find(|a| a["adapter_id"] == "review").unwrap_or_else(|| panic!("no `review` adapter entry: {payload}"));
-    assert_eq!(review_summary["source_kind"], "records");
+    let review_summary = adapters.iter().find(|a| a["adapterId"] == "review").unwrap_or_else(|| panic!("no `review` adapter entry: {payload}"));
+    assert_eq!(review_summary["sourceKind"], "records");
     assert_eq!(review_summary["status"], "read", "native_records:true must actually DRIVE `review`, never `disabled`/`unavailable`: {payload}");
-    assert_eq!(review_summary["events_parsed"], 1, "{payload}");
+    assert_eq!(review_summary["eventsParsed"], 1, "{payload}");
 
     let divergence_summary = adapters
         .iter()
-        .find(|a| a["adapter_id"] == "divergence-native")
+        .find(|a| a["adapterId"] == "divergence-native")
         .unwrap_or_else(|| panic!("no `divergence-native` adapter entry: {payload}"));
     assert_eq!(divergence_summary["status"], "read", "{payload}");
-    assert_eq!(divergence_summary["events_parsed"], 1, "{payload}");
+    assert_eq!(divergence_summary["eventsParsed"], 1, "{payload}");
 
     assert_eq!(
-        payload["verdicts_derived"], 2,
+        payload["verdictsDerived"], 2,
         "both the Review and the resolved Divergence must derive exactly one verdict each: {payload}"
     );
 
-    let persisted = payload["trajectories_persisted"].as_array().expect("trajectories_persisted array");
+    let persisted = payload["trajectoriesPersisted"].as_array().expect("trajectories_persisted array");
     assert_eq!(persisted.len(), 2, "neither native record's trajectory may be dropped by the other's dispatch: {payload}");
 
-    let regime_keys: Vec<String> = persisted.iter().map(|p| p["regime_key"].as_str().unwrap().to_string()).collect();
+    let regime_keys: Vec<String> = persisted.iter().map(|p| p["regimeKey"].as_str().unwrap().to_string()).collect();
     let review_regime = regime_keys.iter().find(|k| k.starts_with("content/acme-repo-native/world/")).unwrap_or_else(|| {
         panic!("no regime_key with role `content` (the Review's own actor.role, never a hard-coded `dev`/`design`): {regime_keys:?}")
     });
@@ -592,15 +598,14 @@ fn native_records_true_with_a_raw_path_fails_the_xor_before_any_read() {
     .unwrap();
     plant_ledger_code_review_finding(&repo.join("fixtures/ledger"));
 
-    let output = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo);
+    let output = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(
         !output.status.success(),
         "native_records:true + ledger_root must fail before any read, never silently succeed: stdout: {} stderr: {}",
         stdout(&output),
         stderr(&output)
     );
-    let err = stderr(&output);
-    assert!(err.contains("canon ingest artifacts:"), "stderr must carry the command-prefixed error line: {err}");
+    let err = error_text(&output);
     assert!(err.contains("native_records"), "stderr must name the XOR conflict by field name: {err}");
 
     // The whole point: config validation runs BEFORE any adapter read,
@@ -639,30 +644,30 @@ fn handoff_adapter_is_unaffected_by_the_native_records_switch() {
     .unwrap();
     plant_handoff_in_git(&repo_on.join(".canon/ledger"));
 
-    let off = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo_off);
+    let off = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo_off);
     assert!(off.status.success(), "stderr: {}", stderr(&off));
     let off_payload: Value = data_of(&stdout(&off));
 
-    let on = run_canon(&["ingest", "artifacts", "--repo", ".", "--json"], &repo_on);
+    let on = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo_on);
     assert!(on.status.success(), "stderr: {}", stderr(&on));
     let on_payload: Value = data_of(&stdout(&on));
 
-    let off_handoff = off_payload["adapters"].as_array().unwrap().iter().find(|a| a["adapter_id"] == "handoff").expect("handoff entry (off)");
-    let on_handoff = on_payload["adapters"].as_array().unwrap().iter().find(|a| a["adapter_id"] == "handoff").expect("handoff entry (on)");
+    let off_handoff = off_payload["adapters"].as_array().unwrap().iter().find(|a| a["adapterId"] == "handoff").expect("handoff entry (off)");
+    let on_handoff = on_payload["adapters"].as_array().unwrap().iter().find(|a| a["adapterId"] == "handoff").expect("handoff entry (on)");
     assert_eq!(
         off_handoff, on_handoff,
         "the Handoff adapter's own summary must be BYTE-IDENTICAL whether native_records is off or on: off={off_payload} on={on_payload}"
     );
     assert_eq!(off_handoff["status"], "read");
-    assert_eq!(off_handoff["events_parsed"], 3, "created + claimed + done, from the planted handoff's own state transitions");
+    assert_eq!(off_handoff["eventsParsed"], 3, "created + claimed + done, from the planted handoff's own state transitions");
 
     // The switch DOES visibly change the native adapters' own status —
     // proving it is not simply a no-op, only that it never touches
     // `handoff`.
-    let review_off = off_payload["adapters"].as_array().unwrap().iter().find(|a| a["adapter_id"] == "review").expect("review entry (off)");
+    let review_off = off_payload["adapters"].as_array().unwrap().iter().find(|a| a["adapterId"] == "review").expect("review entry (off)");
     assert_eq!(review_off["status"], "disabled", "native_records is off in repo_off — `review` must be disabled, never read/unavailable");
 
-    let review_on = on_payload["adapters"].as_array().unwrap().iter().find(|a| a["adapter_id"] == "review").expect("review entry (on)");
+    let review_on = on_payload["adapters"].as_array().unwrap().iter().find(|a| a["adapterId"] == "review").expect("review entry (on)");
     assert_eq!(review_on["status"], "read", "native_records is on and `review` is routed in repo_on — it must actually run");
-    assert_eq!(review_on["events_parsed"], 0, "no Review record was planted in repo_on — zero events, but still a genuine READ, not disabled");
+    assert_eq!(review_on["eventsParsed"], 0, "no Review record was planted in repo_on — zero events, but still a genuine READ, not disabled");
 }

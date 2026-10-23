@@ -2,5 +2,5 @@ description: "0.18 D1: `--report swift-testing:<path>` reads the JSON-lines even
 steps:
   - args: [inventory, sync]
     exit: 0
-  - args: [evidence, add, --project-id, root, --all-scenarios, --report, swift-testing:reports/events.jsonl, --kind, test-run, --ref, "swift test --experimental-event-stream-output reports/events.jsonl", --role, implementer, --actor-id, impl-agent]
+  - args: [evidence, add, --project-id, root, --all-scenarios, --report, swift-testing:reports/events.jsonl, --class, test-run, --ref, "swift test --experimental-event-stream-output reports/events.jsonl", --role, implementer, --actor-id, impl-agent]
     exit: 0

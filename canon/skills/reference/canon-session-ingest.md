@@ -15,7 +15,7 @@ no live database. Swap `hot` to postgres (the commented stanza `canon
 init` ships beside the sqlite one) once team-scale multi-agent
 concurrency outgrows sqlite's single-writer mode.
 
-## `canon ingest sessions [--watch] [--interval-secs N] [--home <dir>] [--canon-yaml <path>] [--full] [--all-workspaces]`
+## `canon ingest sessions [--watch] [--interval-secs N] [--home <dir>] [--full] [--all-workspaces]`
 
 ```bash
 canon ingest sessions                   # one pass over this project's sources
@@ -24,6 +24,10 @@ canon ingest sessions --full            # ignore the watermark; re-parse every i
 canon ingest sessions --all-workspaces  # machine-wide scan
 canon ingest sessions --home /custom    # override the scan-root home ($HOME)
 ```
+
+**Done when:** the run summary (below) ends with `malformed records … : 0`
+and `canon query --kind session` lists the sessions; a rerun reports the
+files as `skipped unchanged (watermark)` and writes nothing.
 
 ## The four adapters
 
@@ -179,7 +183,7 @@ canon query --kind event   # filter detail.label == "user_directive"
 Each pass prints the active scope, one line per adapter, then totals:
 
 ```
-scope: project /Users/me/Workspace/canon (2 roots)
+scope: project /path/to/repo (2 roots)
 omp: 3 file(s) scanned, 1 reparsed, 2 skipped unchanged (watermark), 4 row(s) parsed, 0 malformed record(s)
 claude-code: 1 file(s) scanned, 0 reparsed, 1 skipped unchanged (watermark), 0 row(s) parsed, 0 malformed record(s)
 sessions normalized: 4
@@ -208,7 +212,7 @@ events written: 37
 
 ## What this skill does NOT cover
 
-- Artifact/verdict ingestion (`canon ingest artifacts`) — a different
+- Artifact/verdict ingestion (`canon ingest records`) — a different
   pipeline; see the `canon-artifact-ingest` skill.
 - Cost-parity computation — omp/pi's own cost is `0.0`/`Unknown` per the
   ported behavior.

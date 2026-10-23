@@ -46,14 +46,19 @@ fn scratch_repo() -> TempDir {
 /// The value a required argument gets: by command first, then by name.
 fn value_for(command: &str, name: &str, regime: &str) -> String {
     let by_command: BTreeMap<(&str, &str), &str> = BTreeMap::from([
-        (("evidence add", "kind"), "test-run"),
-        (("export", "kind"), "evidence"),
+                (("export", "kind"), "evidence"),
         (("query", "kind"), "evidence"),
-        (("purge", "kind"), "evidence"),
+        (("purge", "kind"), "session"),
         (("change new", "slug"), "another-change"),
-        (("dispatch end", "status"), "succeeded"),
+        (("dispatch end", "run-outcome"), "succeeded"),
         (("subject new", "id"), "demo-two"),
-        (("subject status", "id"), "demo"),
+        (("subject show", "id"), "demo"),
+        (("subject move", "id"), "demo"),
+        (("subject move", "to"), "specced"),
+        (("evidence audit", "audit-result"), "confirmed"),
+        (("subject adopt", "subject-id"), "demo"),
+        (("subject unadopt", "subject-id"), "demo"),
+        (("skills show", "name"), "canon"),
     ]);
     if let Some(value) = by_command.get(&(command, name)) {
         return value.to_string();
@@ -61,7 +66,7 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
     match name {
         "repo" => ".",
         "response" => "response.json",
-        "by" | "approval-by" | "principal" | "actor-id" | "reviewer" => "alice",
+        "approver" | "actor-id" => "alice",
         "note" | "summary" | "reason" | "title" | "name" => "text",
         "slug" | "change-id" | "change_id" => "add-login",
         "subject-id" => "demo",
@@ -70,10 +75,12 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
         "id" => "sha256:00",
         "role" => "reviewer",
         "regime" => regime,
-        "run-id" => ULID,
+        "run-id" | "run_id" => ULID,
+        "bundle" => "demo@v1",
+        "evaluator-digest" => SHA,
         "status" => "ok",
         "project-id" => "app-a",
-        "scenario-id" => "auth.login.01",
+        "scenario-id" | "scenario_id" | "scenario_ids" => "auth.login.01",
         "sha" | "artifact-sha" => SHA,
         "pin" => "abc123",
         "expiry" | "approved-at" | "approval-at" | "before" => "2030-01-01T00:00:00Z",
@@ -90,6 +97,7 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
         "area" => "area",
         "surface" => "auth.login",
         "tag" => "auth.login.02",
+        "shell" => "zsh",
         _ => "x",
     }
     .to_string()
@@ -102,9 +110,10 @@ fn extra_args(command: &str, scratch: &Path) -> Vec<String> {
         "init" => vec!["--repo".into(), path("fresh"), "--providers".into(), "none".into()],
         "demo init" => vec!["--repo".into(), path("demo")],
         // `--role` is optional in the schema (a declared role supplies it), but the sweep declares none.
-        "divergence accept" | "evidence add" | "review add" => vec!["--role".into(), "reviewer".into()],
+        "divergence accept" | "divergence add" | "divergence defer" | "divergence resolve" | "dispatch begin" | "evidence audit" | "review scenario" | "review change" => vec!["--role".into(), "reviewer".into()],
+        "evidence add" => vec!["--role".into(), "reviewer".into(), "--class".into(), "test-run".into(), "--ref".into(), "npm test".into()],
         "ingest sessions" => vec!["--home".into(), path("home")],
-        "skills install" | "skills check" | "skills doctor" => vec!["--target".into(), path("skills-target"), "--source".into(), path("no-skills-source")],
+        "skills install" | "skills check" | "skills doctor" => vec!["--repo".into(), path("skills-target"), "--skills-source".into(), path("no-skills-source")],
         _ => Vec::new(),
     }
 }
@@ -117,8 +126,8 @@ fn every_leaf_command_answers_json_with_one_document_and_a_coded_error() {
     let leaves: Vec<String> = listing["data"]["commands"].as_array().unwrap().iter().map(|c| c["command"].as_str().unwrap().to_string()).collect();
     assert!(leaves.len() > 60, "{leaves:?}");
 
-    let regime = String::from_utf8(run(repo.path(), &["regime-key", "--role", "reviewer", "--repo", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
-    let registry: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|(code, _)| *code).collect();
+    let regime = String::from_utf8(run(repo.path(), &["regime", "show", "--role-segment", "reviewer", "--repo-name", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
+    let registry: Vec<&str> = canon_cli::cli_error::all_codes().iter().map(|info| info.code).collect();
     let skipped: Vec<&str> = SKIPPED.iter().map(|(command, _)| *command).collect();
     let mut problems = Vec::new();
     let mut usage = Vec::new();
@@ -139,7 +148,7 @@ fn every_leaf_command_answers_json_with_one_document_and_a_coded_error() {
         }
 
         let mut args: Vec<String> = leaf.split(' ').map(str::to_string).collect();
-        for positional in schema["arguments"].as_array().unwrap().iter().filter(|a| a["required"] == true) {
+        for positional in schema["operands"].as_array().unwrap().iter().filter(|a| a["required"] == true) {
             args.push(value_for(leaf, positional["name"].as_str().unwrap(), &regime));
         }
         for option in schema["options"].as_array().unwrap().iter().filter(|o| o["required"] == true && o["name"] != "json") {
@@ -211,12 +220,14 @@ fn gate_check_reports_its_violations_as_json_and_keeps_its_exit_code() {
 fn a_clean_gate_is_data_with_exit_zero() {
     let dir = TempDir::new().unwrap();
     ok(dir.path(), &["init", "--providers", "none"]);
+    ok(dir.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     let out = run(dir.path(), &["gate", "check", "--json"]);
     assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
     let body: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(body["data"]["clean"], true);
     assert_eq!(body["data"]["violations"].as_array().unwrap().len(), 0);
-    assert_eq!(body["meta"], serde_json::json!({ "command": "gate check" }));
+    assert_eq!(body["meta"]["command"], "gate check");
+    assert_eq!(body["meta"]["coverage"]["subjects"], 1, "the gate says what it examined: {body}");
 }
 
 #[test]
@@ -227,7 +238,9 @@ fn progress_and_refresh_notices_stay_off_stdout_in_json_mode() {
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     let body: Value = serde_json::from_slice(&out.stdout).expect("one document");
     assert_eq!(body["data"]["scenarioId"], "auth.login.02");
-    assert!(String::from_utf8_lossy(&out.stderr).contains("wrote `@auth.login.02`"), "the human line moved to stderr");
+    assert!(out.stderr.is_empty(), "JSON mode writes nothing to stderr: {}", String::from_utf8_lossy(&out.stderr));
+    let human = run(repo.path(), &["scenario", "new", "auth.login.03", "--title", "Sign off", "--feature", ".canon/specs/kind=feature/area=auth/login.feature"]);
+    assert!(String::from_utf8_lossy(&human.stdout).contains("wrote `@auth.login.03`") || String::from_utf8_lossy(&human.stderr).contains("wrote `@auth.login.03`"), "human mode still narrates");
 
     let out = run(repo.path(), &["inventory", "sync", "--json"]);
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));

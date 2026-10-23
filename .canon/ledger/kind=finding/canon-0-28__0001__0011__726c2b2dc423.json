@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "canon-reviewer-028",
+    "role": "reviewer",
+    "session_id": "canon-reviewer-028-2"
+  },
+  "at": "2026-10-23T15:07:04.390516605Z",
+  "change_id": "canon-0-28",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-gate/src/review_gate.rs:526",
+  "kind": "finding",
+  "resolution_code_tree": "7c7d06847373654dafedac3630eedcda014eea0e",
+  "resolution_sha": "7e95cd1df901a7bcf04861ca597da3414ed794ad",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "addf4e86537b6482ea8be249c265f2fe2f65f9ae",
+  "reviewer": "canon-reviewer-028",
+  "round": 1,
+  "scenario_ids": [
+    "review.add.24"
+  ],
+  "schema": 1,
+  "seq": 11,
+  "severity": "should_fix",
+  "summary": "Standards pass: review.add.24 records only `unavailable`; `indeterminate` and 'no rejection either' are never exercised (mutation confirmed: is_signed() as != Unavailable stays green). Also the gate detail tells the user to record `--outcome signed`, an option 0.28 removed (exit 2 USAGE); the test checks only the message prefix",
+  "worktree_dirty": false
+}

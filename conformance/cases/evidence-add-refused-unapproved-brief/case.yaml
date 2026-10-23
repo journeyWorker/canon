@@ -1,12 +1,12 @@
 description: "0.16 M7: `canon evidence add` exits 1 and stages nothing while a subject it attests for has an enforced, unapproved brief: for a scenario through its `@subject` owner and for a task through the subject adopting its change, printing `unreviewed-promotion <subject>` naming the proposal.md and telling the agent to stop, report the brief and wait for the human's answer; `canon review add` is not refused; `canon status` gives the subject only the human step"
 steps:
-  - args: [evidence, add, --project-id, root, --scenario-id, checkout.pay.01, --kind, test-run, --ref, "cargo test", --role, implementer, --actor-id, impl-agent]
+  - args: [evidence, add, --project-id, root, --scenario-id, checkout.pay.01, --class, test-run, --ref, "cargo test", --role, implementer, --actor-id, impl-agent]
     exit: 1
-  - args: [evidence, add, --task, "c-checkout#1", --kind, test-run, --ref, "cargo test", --role, implementer, --actor-id, impl-agent]
+  - args: [evidence, add, --task-id, "c-checkout#1", --class, test-run, --ref, "cargo test", --role, implementer, --actor-id, impl-agent]
     exit: 1
   - args: [gate, promote]
     exit: 0
-  - args: [review, add, --project-id, root, --scenario-id, checkout.pay.01, --reviewer, reviewer-2, --actor-id, reviewer-2, --role, reviewer, --pin, abc1234, --original-spec-ref, "specs/kind=feature/area=checkout/add.feature"]
+  - args: [review, scenario, checkout.pay.01, --project-id, root, --actor-id, reviewer-2, --role, reviewer, --original-spec-ref, "specs/kind=feature/area=checkout/add.feature"]
     exit: 0
   - args: [status]
     exit: 0

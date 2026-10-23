@@ -3,4 +3,4 @@ canon gate check: 1 violation(s)
 uncovered-cell (1):
   uncovered-cell cart.add — feature surface `cart.add` (root `root`) has no `@case:failure` scenario among its 2 in-scope scenario(s) — its spec covers only other paths; specify what happens on that path
 
-advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --approver <who>`

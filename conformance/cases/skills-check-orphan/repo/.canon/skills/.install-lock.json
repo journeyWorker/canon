@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "canon_version": "0.27.0",
+  "source_hash": "sha256:0",
+  "providers": [
+    "claude"
+  ],
+  "files": {
+    ".claude/skills/canon/SKILL.md": "sha256:c6826bf7601b8d2bf917ba0d4773aa21073a6be8b750c645868f865d4eda2b44",
+    ".claude/skills/canon/reference/retired.md": "sha256:6efe7338de564cbc9c34b9a60e2d89d2328ba07f92aef34778bc7f230ed1f984"
+  }
+}

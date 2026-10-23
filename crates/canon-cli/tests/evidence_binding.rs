@@ -39,7 +39,7 @@ fn attest(repo: &Path, extra: &[&str]) -> Output {
         "cart.add.01",
         "--project-id",
         "root",
-        "--kind",
+        "--class",
         "test-run",
         "--ref",
         "cargo nextest run",
@@ -70,6 +70,7 @@ fn require_mode_holds_a_scenario_to_a_passing_report_and_warn_never_fails() {
         .success());
     let init = canon(repo, &["init", "--repo", "."]);
     assert!(init.status.success(), "{}", text(&init));
+    commit_all(repo);
     let scenario = canon(
         repo,
         &[
@@ -107,7 +108,7 @@ fn require_mode_holds_a_scenario_to_a_passing_report_and_warn_never_fails() {
     // A faithful claim over a FAILED case is refused and stages nothing.
     std::fs::create_dir_all(repo.join("reports")).unwrap();
     std::fs::write(repo.join("reports/junit.xml"), FAILING).unwrap();
-    let contradicted = attest(repo, &["--report", "junit:reports/junit.xml"]);
+    let contradicted = attest(repo, &["--report", "junit:reports/junit.xml", "--verdict", "faithful"]);
     assert_eq!(
         contradicted.status.code(),
         Some(1),
@@ -149,4 +150,11 @@ fn require_mode_holds_a_scenario_to_a_passing_report_and_warn_never_fails() {
         text(&warn)
     );
     assert!(text(&warn).contains("warn cart.add.01"), "{}", text(&warn));
+}
+
+/// Commit the fixture so revision-taking commands have a commit to bind.
+fn commit_all(repo: &std::path::Path) {
+    for args in [&["config", "user.name", "t"][..], &["config", "user.email", "t@example.com"], &["add", "-A"], &["commit", "-q", "-m", "x"]] {
+        assert!(std::process::Command::new("git").args(args).current_dir(repo).status().unwrap().success());
+    }
 }

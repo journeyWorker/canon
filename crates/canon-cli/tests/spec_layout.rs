@@ -40,6 +40,7 @@ fn git(repo: &Path, args: &[&str]) -> Output {
 fn init_repo() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     assert!(git(dir.path(), &["init", "-q"]).status.success());
+    assert!(git(dir.path(), &["commit", "-q", "--allow-empty", "-m", "x"]).status.success());
     ok(dir.path(), &["init", "--repo", ".", "--no-policy"]);
     dir
 }
@@ -111,7 +112,7 @@ fn authoring_init_81_a_fresh_repo_authors_indexes_and_gates_under_canon_specs() 
     assert_eq!(gate.status.code(), Some(1), "{}", stdout(&gate));
     assert!(stdout(&gate).contains("world.hotdeal.01"), "the unevidenced scenario is graded: {}", stdout(&gate));
 
-    let evidence = ok(repo, &["evidence", "add", "--scenario-id", "world.hotdeal.01", "--project-id", "root", "--kind", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor-id", "impl"]);
+    let evidence = ok(repo, &["evidence", "add", "--scenario-id", "world.hotdeal.01", "--project-id", "root", "--class", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor-id", "impl"]);
     assert!(stderr(&evidence).contains(&format!("canon evidence add: refreshed the scenario index from 1 changed feature file(s) ({FEATURE}): 1 record(s) written")), "a writer indexes the scenario: {}", stderr(&evidence));
     let records = scenario_records(repo);
     assert_eq!(records.len(), 1, "{records:?}");
@@ -195,13 +196,14 @@ fn inventory_sync_49_the_pre_0_17_layout_fails_the_gate_closed_and_status_names_
         assert!(records.iter().all(|r| r.get("removed").is_none()), "a refused root writes no tombstone: {records:?}");
 
         let report: serde_json::Value = serde_json::from_slice(&ok(repo, &["status", "--json"]).stdout).unwrap();
-        let next = report["next"].as_array().unwrap();
+        let next = report["meta"]["next"].as_array().unwrap();
         assert_eq!(next.len(), 1, "{report}");
         assert_eq!(next[0]["command"], "canon migrate");
         assert!(next[0]["why"].as_str().unwrap().contains("spec root(s) `root`"), "{report}");
 
         std::fs::rename(repo.join("specs/features/kind=feature"), repo.join("specs/kind=feature")).unwrap();
-        let gate = ok(repo, &["gate", "check"]);
+        // Whatever the gate then finds (an empty corpus is `unverifiable`), it no longer names the old layout.
+        let gate = canon(repo, &["gate", "check"]);
         assert!(!stdout(&gate).contains("pre-0.17"), "{}", stdout(&gate));
     }
 }

@@ -184,6 +184,8 @@ mod tests {
             round: 1,
             reviewer: "reviewer-1".to_string(),
             detail: String::new(),
+            code_tree: None,
+            worktree_dirty: None,
         }
     }
 

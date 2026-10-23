@@ -10,6 +10,8 @@ name = "canon_ingest"
 path = "src/lib.rs"
 
 [dependencies]
+# `MalformedEntry` is part of `canon ingest plans --json`, a typed report.
+schemars = { version = "1.2.1" }
 canon-model.workspace = true
 chrono = { version = "0.4.45", features = ["serde"] }
 rayon = "1.10"

@@ -29,9 +29,11 @@ A chore adds no scenarios and has no flow: this pass does not apply to it.
 
 `canon brief check` no longer lists the coverage rules; `canon status` shows every step with a failure scenario.
 
+**Done when:** `canon brief check <slug> --json` lists neither `brief.flow-uncovered` nor `brief.flow-no-failure` (read `data.findings[]`), and `canon status` shows each flow step with a scenario and a failure scenario.
+
 ## Next
 
-Implement, evidence and review (loop steps 5 to 7). If the brief had to change, the human answers again.
+Implement, evidence and review (loop steps 5 to 7). If the brief had to change, the human answers again with `canon brief approve` (theirs; agent roles are refused).
 
 ## Invariants (every brief pass)
 
@@ -39,4 +41,4 @@ Implement, evidence and review (loop steps 5 to 7). If the brief had to change, 
 - Explaining writes nothing. Asked what a finding means or what a pass would do, answer in chat and leave the brief untouched.
 - No pass requires another as a prerequisite. Run the one the findings or the human point at, in any order.
 - A pass closes only the findings it rechecked: rerun `canon brief check` after the edit and report a finding as closed only when it is gone from that run. Never claim a rule you did not rerun.
-- Write in the brief's language (detected from the text; `language:` in `canon.yaml` overrides it). Edits touch `.canon/changes/<slug>/brief.md` only. A brief edited after approval is not approved: it needs a new human answer and `canon brief approve` again.
+- Write in the brief's language (detected from the text; `language:` in `canon.yaml` overrides it). Edits touch `.canon/changes/<slug>/brief.md` only. A brief edited after approval is not approved: it needs a new human answer and the human's `canon brief approve` again (agent roles are refused).

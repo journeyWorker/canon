@@ -1,10 +1,10 @@
 description: "0.16 D2: in a repo whose canon.yaml has no `write:` key, `canon evidence add --promote` stages and promotes in the same run (exit 0), printing `canon gate promote`'s report and ending its success line `staged and promoted in this run; nothing to promote`; a later `canon gate promote` has nothing staged (exit 0); `--promote` with `--no-promote` is a usage error (exit 2); without a flag the write stays staged for `canon gate promote` (exit 0)"
 steps:
-  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --promote]
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --class, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --promote]
     exit: 0
   - args: [gate, promote]
     exit: 0
-  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --promote, --no-promote]
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --class, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent, --promote, --no-promote]
     exit: 2
-  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --kind, test-run, --ref, "cargo test cart_add -- --nocapture", --role, implementer, --actor-id, impl-agent]
+  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --class, test-run, --ref, "cargo test cart_add -- --nocapture", --role, implementer, --actor-id, impl-agent]
     exit: 0

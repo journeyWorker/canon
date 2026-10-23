@@ -1,5 +1,5 @@
 //! review.add.28 (0.15 D1) through the real binary: `canon inventory sync`
-//! records each scenario's own digest, and `canon review add` pins it, so
+//! records each scenario's own digest, and `canon review scenario` pins it, so
 //! a review goes stale when its scenario, or the context the scenario
 //! inherits, changes — never because a sibling scenario in the same
 //! `.feature` file did.
@@ -63,11 +63,12 @@ fn reviewed_repo() -> tempfile::TempDir {
     let repo = dir.path();
     assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
+    commit_all(repo);
     std::fs::create_dir_all(repo.join(".canon")).unwrap();
     std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_review:\n    scope: []\n").unwrap();
     write_feature(repo, BASE);
     for id in ["cart.add.01", "cart.add.02"] {
-        ok(repo, &["evidence", "add", "--scenario-id", id, "--project-id", "root", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
+        ok(repo, &["evidence", "add", "--scenario-id", id, "--project-id", "root", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
     }
     ok(repo, &["gate", "promote"]);
     assert!(gate(repo, 1).contains("unreviewed-promotion cart.add.01 — no review record"), "require_review covers these scenarios");
@@ -75,7 +76,7 @@ fn reviewed_repo() -> tempfile::TempDir {
         let out = ok(
             repo,
             &[
-                "review", "add", "--project-id", "root", "--scenario-id", id, "--reviewer", "reviewer-2", "--pin", "r1", "--original-spec-ref", FEATURE, "--actor-id",
+                "review", "scenario", id, "--project-id", "root", "--original-spec-ref", FEATURE, "--actor-id",
                 "reviewer-2", "--role", "reviewer", "--session-id", "sess-review",
             ],
         );
@@ -131,7 +132,7 @@ fn record_suite(repo: &Path, report: &str) {
     ok(
         repo,
         &[
-            "evidence", "add", "--project-id", "root", "--all-scenarios", "--report", "junit:reports/junit.xml", "--kind", "test-run", "--ref", "npm test", "--role", "implementer",
+            "evidence", "add", "--project-id", "root", "--all-scenarios", "--report", "junit:reports/junit.xml", "--class", "test-run", "--ref", "npm test", "--role", "implementer",
             "--actor-id", "impl-agent",
         ],
     );
@@ -154,6 +155,7 @@ fn reviewed_against_a_report() -> tempfile::TempDir {
     let repo = dir.path();
     assert!(Command::new("git").args(["init", "-q"]).current_dir(repo).status().unwrap().success());
     ok(repo, &["init", "--repo", ".", "--no-policy"]);
+    commit_all(repo);
     std::fs::create_dir_all(repo.join(".canon")).unwrap();
     std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_review:\n    scope: []\n").unwrap();
     write_feature(repo, BASE);
@@ -162,7 +164,7 @@ fn reviewed_against_a_report() -> tempfile::TempDir {
         ok(
             repo,
             &[
-                "review", "add", "--project-id", "root", "--scenario-id", id, "--reviewer", "reviewer-2", "--pin", "r1", "--original-spec-ref", FEATURE, "--actor-id", "reviewer-2",
+                "review", "scenario", id, "--project-id", "root", "--original-spec-ref", FEATURE, "--actor-id", "reviewer-2",
                 "--role", "reviewer", "--session-id", "sess-review",
             ],
         );
@@ -206,7 +208,7 @@ fn review_add_32_a_changed_verdict_stales_the_review() {
     ok(
         repo,
         &[
-            "evidence", "add", "--project-id", "root", "--scenario-id", "cart.add.02", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent",
+            "evidence", "add", "--project-id", "root", "--scenario-id", "cart.add.02", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent",
             "--verdict", "divergent", "--summary", "the count is off by one",
         ],
     );
@@ -214,4 +216,11 @@ fn review_add_32_a_changed_verdict_stales_the_review() {
     let out = gate(repo, 1);
     assert!(out.contains("unreviewed-promotion cart.add.02 — stale review by `reviewer-2`: its evidence changed"), "{out}");
     assert!(!out.contains("unreviewed-promotion cart.add.01"), "{out}");
+}
+
+/// Commit the fixture so revision-taking commands have a commit to bind.
+fn commit_all(repo: &std::path::Path) {
+    for args in [&["config", "user.name", "t"][..], &["config", "user.email", "t@example.com"], &["add", "-A"], &["commit", "-q", "-m", "x"]] {
+        assert!(std::process::Command::new("git").args(args).current_dir(repo).status().unwrap().success());
+    }
 }
