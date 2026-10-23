@@ -107,7 +107,20 @@ fn every_batch_leaf_answers_a_one_element_batch_with_its_batch_report() {
             _fresh = TempDir::new().unwrap();
             repo = _fresh.path().to_path_buf();
         }
-        let document_text = serde_json::to_string(&Value::Array(vec![input["example"].clone()])).unwrap();
+        let mut document_text = serde_json::to_string(&Value::Array(vec![input["example"].clone()])).unwrap();
+        // These two need state the fixture lacks (an installed plugin, a seeded strategy): build it as the
+        // idempotency check does, and name the ids it built in the document.
+        let _state;
+        if path == "plugin sync" || path == "strategy promote" {
+            let built = case(&path, base.path(), home.path());
+            for (example, actual) in example_argv(node).iter().zip(&built.argv) {
+                if example != actual {
+                    document_text = document_text.replace(example.as_str(), actual);
+                }
+            }
+            repo = built.dir.clone();
+            _state = built;
+        }
         let mut argv = path.split(' ').map(str::to_string).collect::<Vec<_>>();
         argv.extend(["--input".to_string(), document_text, "--json".to_string()]);
         let out = canon_in(&repo, home.path(), &argv, &[]);

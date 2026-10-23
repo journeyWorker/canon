@@ -83,6 +83,66 @@ impl std::fmt::Display for Role {
     }
 }
 
+/// Roles a repo's policy names: the keys of `risk_routing` and every value
+/// under a `role`, `roles`, `required_roles` or `require_roles` key, wherever
+/// it sits in `.canon/policy.yaml`. An unreadable or absent policy names none.
+fn policy_roles(repo: &std::path::Path) -> Vec<String> {
+    fn walk(value: &serde_yaml::Value, out: &mut Vec<String>) {
+        use serde_yaml::Value;
+        match value {
+            Value::Mapping(map) => {
+                for (key, child) in map {
+                    match key.as_str() {
+                        Some("risk_routing") => {
+                            if let Value::Mapping(routes) = child {
+                                out.extend(routes.keys().filter_map(|k| k.as_str().map(str::to_string)));
+                            }
+                        }
+                        Some("role" | "roles" | "required_roles" | "require_roles") => collect_strings(child, out),
+                        _ => {}
+                    }
+                    walk(child, out);
+                }
+            }
+            Value::Sequence(items) => items.iter().for_each(|item| walk(item, out)),
+            _ => {}
+        }
+    }
+    fn collect_strings(value: &serde_yaml::Value, out: &mut Vec<String>) {
+        match value {
+            serde_yaml::Value::String(text) => out.push(text.clone()),
+            serde_yaml::Value::Sequence(items) => items.iter().for_each(|item| collect_strings(item, out)),
+            _ => {}
+        }
+    }
+    let Ok(text) = std::fs::read_to_string(repo.join(canon_model::paths::POLICY_FILE)) else { return Vec::new() };
+    let Ok(document) = serde_yaml::from_str::<serde_yaml::Value>(&text) else { return Vec::new() };
+    let mut out = Vec::new();
+    walk(&document, &mut out);
+    out
+}
+
+/// `--role` is an open slug: a policy may require a role canon does not know.
+/// A value that is none of the four roles and no role the policy names still
+/// runs, with a warning (`meta.warnings`) that names the closest known role.
+pub fn warn_if_unknown(role: &canon_model::RoleId, repo: &std::path::Path) {
+    let value = role.as_str();
+    if Role::parse(value).is_some() {
+        return;
+    }
+    let named = policy_roles(repo);
+    if named.iter().any(|known| known == value) {
+        return;
+    }
+    let known: Vec<&str> = ALL.iter().map(|r| r.as_str()).chain(named.iter().map(String::as_str)).collect();
+    let nearest = crate::suggest::nearest(value, known.iter().copied());
+    let message = match nearest.first() {
+        Some(closest) => format!("role `{value}` is not a known role (planner, implementer, reviewer, orchestrator, or one the policy names); did you mean `{closest}`?"),
+        None => format!("role `{value}` is not a known role (planner, implementer, reviewer, orchestrator, or one the policy names); it is recorded as given"),
+    };
+    crate::json_out::warn(message);
+}
+
 /// Resolve the declared role once, at startup. The `--as` flag wins over
 /// `CANON_ROLE`; an unknown `CANON_ROLE` value is refused unless the flag
 /// overrides it.

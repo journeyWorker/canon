@@ -365,7 +365,9 @@ report's `schemaVersion` starts at `"1.0"`.
   `FINDING_RESOLUTION_SHA_UNEXPECTED` -> `FINDING_RESOLUTION_REV_UNEXPECTED`.
 - Removed: `PURGE_PLAN_REQUIRED`, `FINDING_RESOLUTION_SHA_REQUIRED` and
   `FINDING_UNRESOLVABLE_COMMIT` (an unknown revision is `NO_COMMIT`).
-- Added: `NO_COMMIT`, `UNVERIFIABLE`, `HUMAN_ONLY`, `UNKNOWN_ERROR_CODE`, and the
+- Added: `NO_COMMIT`, `UNVERIFIABLE`, `HUMAN_ONLY`, `UNKNOWN_ERROR_CODE`,
+  `BRIEF_APPROVE_REFUSED` (`brief approve` declined because the brief has
+  blockers, exit `2`; `BRIEF_HAS_BLOCKERS` is now `brief check` only, exit `1`), and the
   `INPUT_*` family (`INPUT_INVALID`, `INPUT_INVALID_TYPE`, `INPUT_UNKNOWN_FIELD`,
   `INPUT_CONFLICT`, `INPUT_UNREADABLE`, `INPUT_TOO_LARGE`, `INPUT_STDIN_CONFLICT`,
   `INPUT_STDIN_TTY`, `INPUT_BATCH_UNSUPPORTED`, `INPUT_ELEMENT_FAILED`).
@@ -398,13 +400,15 @@ Where the 0.28 implementation departs from the plan or the per-leaf table:
   `worktree_dirty`.
 - A repeated `init` is unchanged (exit 0), per replay-safe.
 - `divergence accept` defaults `--role` to `reviewer`.
+- `--role` stays an open slug (owner decision 2026-10-23): policies may require
+  custom roles; an unknown role is a warning with a suggestion, not a refusal.
 - Batch variants exist for 41 write leaves; the destructive leaves and the
   `dashboard` stream refuse a batch (`INPUT_BATCH_UNSUPPORTED`).
 - `evidence approval-payload` and `strategy approval-payload` declare
   replay-safe although they only read.
 - `canon context`'s `policy.*` keys mirror `policy.yaml` (snake_case).
 - Extra error codes beyond the plan: `INPUT_UNREADABLE`, `INPUT_ELEMENT_FAILED`,
-  `HUMAN_ONLY`, `UNKNOWN_ERROR_CODE`, `UNVERIFIABLE`.
+  `HUMAN_ONLY`, `UNKNOWN_ERROR_CODE`, `UNVERIFIABLE`, `BRIEF_APPROVE_REFUSED`.
 - `skills show --full` prints the core guide followed by every reference, each
   after a rule and a comment naming its file.
 

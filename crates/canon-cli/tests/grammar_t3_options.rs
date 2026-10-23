@@ -98,8 +98,8 @@ fn a_value_is_named_from_the_placeholder_list_and_a_flag_names_none() {
 }
 
 /// Every `{a,b}` the per-leaf table writes after an option, in a table row (the shared-options
-/// table and the leaf rows; the prose paragraphs under them describe, and `--role` there names the four
-/// declared roles while the leaves accept any role slug: see the report's deviations).
+/// table and the leaf rows; the prose paragraphs under them describe). `--as` is a closed set; attribution `--role` is an open
+/// slug (owner decision 2026-10-23), so it has no possible values and is never listed here.
 fn closed_options() -> BTreeSet<String> {
     let text = std::fs::read_to_string(repo_root().join("docs/design/cli-commands-0.28.md")).unwrap();
     let mut out = BTreeSet::new();
@@ -422,4 +422,22 @@ fn every_conflict_and_requirement_the_spec_lists_is_enforced_when_parsing() {
     }
     assert!(conflicts > 20 && requires > 5, "the spec lists conflicts ({conflicts}) and requirements ({requires})");
     assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+/// Attribution `--role` is an open slug (owner decision 2026-10-23): policies may require custom
+/// roles, so it lists no possible values; the declared role `--as` is the closed set.
+#[test]
+fn attribution_role_is_open_and_the_declared_role_is_closed() {
+    let mut roles = 0;
+    for (leaf, option) in all_options() {
+        match name(option) {
+            "role" => {
+                roles += 1;
+                assert!(option["possibleValues"].as_array().is_none_or(|v| v.is_empty()), "`{leaf}` --role is an open slug: {option}");
+            }
+            "as" => assert_eq!(strings(&option["possibleValues"]), ["planner", "implementer", "reviewer", "orchestrator"], "`{leaf}` --as"),
+            _ => {}
+        }
+    }
+    assert!(roles >= 8, "the attribution leaves take --role ({roles})");
 }

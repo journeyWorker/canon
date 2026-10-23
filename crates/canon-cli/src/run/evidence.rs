@@ -87,7 +87,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
             } else {
                 project_id
             };
-            let role = match record_role(role, "canon evidence add", json) {
+            let role = match record_role(role, &repo, "canon evidence add", json) {
                 Ok(role) => role,
                 Err(code) => return code,
             };
@@ -163,7 +163,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
                 Ok(id) => Some(id),
                 Err(code) => return code,
             };
-            let role = match record_role(role, "canon evidence audit", json) {
+            let role = match record_role(role, &repo, "canon evidence audit", json) {
                 Ok(role) => role,
                 Err(code) => return code,
             };

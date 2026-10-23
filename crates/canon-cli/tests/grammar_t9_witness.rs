@@ -22,10 +22,7 @@ use serde_json::Value;
 use tempfile::TempDir;
 
 /// The output of a leaf the suite never emits, as (leaf, report name or `failure`, why).
-const UNWITNESSED: &[(&str, &str, &str)] = &[
-    ("plugin sync", "BatchPluginSyncReport", "stateful, coverable: needs an installed plugin; `tests/grammar_t12_refusal.rs` builds one for the single-object run, no test batches it"),
-    ("strategy promote", "BatchStrategyPromoteReport", "stateful, coverable: needs a seeded strategy; `tests/grammar_t12_refusal.rs` seeds one for the single-object run, no test batches it"),
-];
+const UNWITNESSED: &[(&str, &str, &str)] = &[];
 
 /// What one leaf can emit: each declared report, and its failure envelope.
 fn declared() -> Vec<(String, String)> {

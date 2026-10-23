@@ -94,7 +94,7 @@ review-outcome	REVIEW_OUTCOME	outcome of a review
 reviewer-harness	NAME	reviewer's harness
 reviewer-model	NAME	reviewer's model
 reviewer-provider	NAME	reviewer's provider
-role	ROLE	role a record is attributed to
+role	ROLE	role a record is attributed to (open slug; an unknown role warns with the closest known one)
 role-segment	NAME	role segment of a regime key
 round	N	review round
 run-id	RUN_ID	dispatch run

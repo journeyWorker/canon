@@ -346,7 +346,7 @@ fn report_dashboard_08_refuses_a_brief_with_blockers() {
     let policy_before = policy_approval(dir.path());
     let reply = post_approval(&live, &approval_request(&live, "blocked"));
     assert_eq!(reply.code, 409, "{}", reply.body);
-    assert_eq!(reply.json()["error"]["code"], "BRIEF_HAS_BLOCKERS");
+    assert_eq!(reply.json()["error"]["code"], "BRIEF_APPROVE_REFUSED");
     assert!(reply.json()["error"]["hint"].as_str().unwrap().len() > 10);
     assert_eq!(std::fs::read(brief_path(dir.path(), "blocked")).unwrap(), before);
     assert_eq!(policy_approval(dir.path()), policy_before, "no policy approval was recorded");

@@ -67,7 +67,7 @@ fn status_of(code: &str) -> u16 {
     match code {
         "APPROVAL_INCOMPLETE" => 400,
         "BRIEF_NOT_FOUND" => 404,
-        "BRIEF_HAS_BLOCKERS" | "BRIEF_UNAPPROVABLE" | CHANGED_SINCE_PAGE_LOAD => 409,
+        "BRIEF_APPROVE_REFUSED" | "BRIEF_UNAPPROVABLE" | CHANGED_SINCE_PAGE_LOAD => 409,
         _ => 500,
     }
 }
@@ -247,7 +247,7 @@ pub fn approve(repo: &Path, body: &[u8]) -> Reply {
         }
         Err(e) => {
             let status = status_of(e.code);
-            let e = if e.code == "BRIEF_HAS_BLOCKERS" { e.hint("clear the blockers in the brief (`canon brief check` lists them), then reload this page") } else { e };
+            let e = if e.code == "BRIEF_APPROVE_REFUSED" { e.hint("clear the blockers in the brief (`canon brief check` lists them), then reload this page") } else { e };
             Reply::error(status, &e)
         }
     }

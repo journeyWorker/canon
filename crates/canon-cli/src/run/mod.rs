@@ -103,9 +103,10 @@ pub fn run(cli: Cli) -> ExitCode {
 
 /// The attribution `--role` a record carries: the flag, else the declared
 /// role (`--as` / `CANON_ROLE`); required only when neither is set (0.28).
-fn record_role(flag: Option<RoleId>, command: &str, json: bool) -> Result<RoleId, ExitCode> {
+fn record_role(flag: Option<RoleId>, repo: &std::path::Path, command: &str, json: bool) -> Result<RoleId, ExitCode> {
     use crate::role::Role;
     if let Some(role) = flag {
+        crate::role::warn_if_unknown(&role, &crate::context::resolve_repo_root(repo));
         return Ok(role);
     }
     match Role::current(None) {

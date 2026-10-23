@@ -32,7 +32,7 @@ fn run_review(command: &str, scenario_ids: Vec<ScenarioId>, change: Option<Chang
         repo,
         json,
     } = options;
-    let role = match record_role(role, command, json) {
+    let role = match record_role(role, &repo, command, json) {
         Ok(role) => role,
         Err(code) => return code,
     };

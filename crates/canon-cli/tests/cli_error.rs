@@ -260,7 +260,8 @@ fn every_code_declares_its_exit_and_retryability_and_the_d4_families_map_to_two(
         }
     }
     let exit_of = |code: &str| canon_cli::cli_error::code_info(code).unwrap_or_else(|| panic!("{code} is not registered")).exit;
-    assert_eq!(exit_of("BRIEF_HAS_BLOCKERS"), 1, "blockers are a finding");
+    assert_eq!(exit_of("BRIEF_HAS_BLOCKERS"), 1, "`brief check` finding blockers is a finding");
+    assert_eq!(exit_of("BRIEF_APPROVE_REFUSED"), 2, "`brief approve` declining on blockers is a refusal: one code, one exit (D4)");
     assert_eq!(exit_of("GATE_VIOLATIONS"), 1);
     assert_eq!(exit_of("CONFIG_MISSING"), 2);
     assert_eq!(exit_of("USAGE"), 2);

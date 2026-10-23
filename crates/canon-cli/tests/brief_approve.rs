@@ -178,7 +178,7 @@ fn approval_is_refused_while_the_brief_has_blockers_or_the_words_are_empty() {
     std::fs::write(brief_path(repo), &draft).unwrap();
     let out = approve(repo, "Ana", "go");
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
-    assert!(stderr(&out).contains("BRIEF_HAS_BLOCKERS") && stderr(&out).contains("brief.placeholder"), "{}", stderr(&out));
+    assert!(stderr(&out).contains("BRIEF_APPROVE_REFUSED") && stderr(&out).contains("brief.placeholder"), "{}", stderr(&out));
     assert_eq!(std::fs::read_to_string(brief_path(repo)).unwrap(), draft, "a refused approval writes nothing");
     assert!(!repo.join(".canon/policy.approval.json").exists());
 

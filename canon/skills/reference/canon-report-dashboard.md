@@ -156,7 +156,7 @@ clicks Approve: that records exactly what `canon brief approve
 <id> --approver <name> --note <text>` records, the `Approved:` line bound to the
 brief digest and the policy approval. It is refused when the brief changed
 after the page loaded (`BRIEF_CHANGED_SINCE_PAGE_LOAD`: reload) or while it
-has blockers (`BRIEF_HAS_BLOCKERS`). The server is localhost only and
+has blockers (`BRIEF_APPROVE_REFUSED`). The server is localhost only and
 refuses requests from other origins (`DASHBOARD_ORIGIN_REFUSED`).
 
 For an agent the human stop is unchanged: when clean briefs are waiting,

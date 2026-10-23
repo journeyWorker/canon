@@ -19,7 +19,7 @@ pub fn run(cmd: DivergenceCliCommand) -> ExitCode {
     match cmd {
         DivergenceCliCommand::Add(args) => run_divergence_add(args),
         DivergenceCliCommand::Resolve(DivergenceResolveArgs { project_id, scenario_id, rev, round, detail, actor_id, role, repo, json, .. }) => {
-            let role = match record_role(role, "canon divergence resolve", json) {
+            let role = match record_role(role, &repo, "canon divergence resolve", json) {
                 Ok(role) => role,
                 Err(code) => return code,
             };
@@ -34,7 +34,7 @@ pub fn run(cmd: DivergenceCliCommand) -> ExitCode {
             ExitCode::from(crate::divergence::run_resolve(&repo, &project_id, &scenario_id, &commit, round, &actor_id, detail.as_deref().unwrap_or_default(), &actor_id, &role, json) as u8)
         }
         DivergenceCliCommand::Defer(DivergenceDeferArgs { project_id, scenario_id, rev, round, reason, expiry, actor_id, role, repo, json, .. }) => {
-            let role = match record_role(role, "canon divergence defer", json) {
+            let role = match record_role(role, &repo, "canon divergence defer", json) {
                 Ok(role) => role,
                 Err(code) => return code,
             };
@@ -68,7 +68,7 @@ pub fn run(cmd: DivergenceCliCommand) -> ExitCode {
 /// `canon divergence add`.
 fn run_divergence_add(args: DivergenceAddArgs) -> ExitCode {
     let DivergenceAddArgs { project_id, scenario_id, rev, state, reason, expiry, round, detail, actor_id, role, promote, repo, json, .. } = args;
-    let role = match record_role(role, "canon divergence add", json) {
+    let role = match record_role(role, &repo, "canon divergence add", json) {
         Ok(role) => role,
         Err(code) => return code,
     };

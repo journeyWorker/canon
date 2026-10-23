@@ -6,7 +6,7 @@ use std::process::ExitCode;
 pub fn run(cmd: DispatchCommand) -> ExitCode {
     match cmd {
         DispatchCommand::Begin(DispatchBeginArgs { role, regime, actor_id, provider, model, skill_id, skill_digest, manifest, prompt_bundle, task_id, parent_run_id, repo, json, .. }) => {
-            let role = match super::record_role(role, "canon dispatch begin", json) {
+            let role = match super::record_role(role, &repo, "canon dispatch begin", json) {
                 Ok(role) => role,
                 Err(code) => return code,
             };

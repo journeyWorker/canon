@@ -24,7 +24,9 @@ pub fn run(cmd: FindingCommand) -> ExitCode {
             repo,
             json,
             ..
-        }) => ExitCode::from(crate::finding::run_add(
+        }) => {
+            crate::role::warn_if_unknown(&role, &crate::context::resolve_repo_root(&repo));
+            ExitCode::from(crate::finding::run_add(
             &repo,
             &crate::finding::FindingArgs {
                 change_id,
@@ -45,8 +47,10 @@ pub fn run(cmd: FindingCommand) -> ExitCode {
                 promote: promote.flag(),
                 json,
             },
-        ) as u8),
+        ) as u8)
+        }
         FindingCommand::Close(FindingCloseArgs { change_id, round, seq, disposition, resolution_rev, reason, actor_id, role, session_id, promote, repo, json, .. }) => {
+            crate::role::warn_if_unknown(&role, &crate::context::resolve_repo_root(&repo));
             ExitCode::from(crate::finding::run_close(
                 &repo,
                 &crate::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_rev, reason, actor_id, role, session_id, promote: promote.flag(), json },
