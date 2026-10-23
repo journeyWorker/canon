@@ -90,7 +90,7 @@ pub fn spec_pin(scenario: &Scenario) -> (SpecDigest, PinnedSpec) {
 }
 
 /// What a review of `scenario` pins right now: the spec pin and the
-/// evidence's verdicts and checks. `canon review add` writes this.
+/// evidence's verdicts and checks. `canon review scenario` and `canon review change` write this.
 pub fn current_pins(ctx: &GateContext, scenario: &Scenario) -> ReviewPins {
     let (scenario_digest, scenario_digest_scope) = spec_pin(scenario);
     ReviewPins { scenario_digest, scenario_digest_scope, checks: Some(current_checks(ctx, scenario)), evidence: Vec::new() }

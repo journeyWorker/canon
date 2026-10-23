@@ -26,12 +26,124 @@ pub struct FlagRename {
 
 /// Every removed option spelling.
 pub const FLAGS: &[FlagRename] = &[
-    FlagRename { commands: &["brief", "review add", "scenario new"], old: "change", new: "change-id" },
+    FlagRename { commands: &["scenario new"], old: "change", new: "change-id" },
     FlagRename { commands: &["feature new", "scenario new"], old: "project", new: "project-id" },
-    FlagRename { commands: &["change new", "retrieve", "scenario new", "subject adopt"], old: "subject", new: "subject-id" },
+    FlagRename { commands: &["change new", "retrieve", "scenario new"], old: "subject", new: "subject-id" },
     FlagRename { commands: &["feature new", "learn rollback", "scenario new"], old: "actor", new: "actor-id" },
-    FlagRename { commands: &["dispatch end", "ingest artifacts"], old: "run", new: "run-id" },
+    FlagRename { commands: &["ingest artifacts"], old: "run", new: "run-id" },
 ];
+
+/// A leaf's primary object moved into operand position, or a leaf split
+/// (0.28 D1 rules 1-3, the mode splits): the removed `--old` no longer parses
+/// on `command`, and `hint` is the whole new form.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShapeChange {
+    /// The command path (without `canon`) the flags were removed from.
+    pub command: &'static str,
+    /// Removed long names, without the leading `--`.
+    pub old: &'static [&'static str],
+    /// What to type instead.
+    pub hint: &'static str,
+}
+
+/// Every flag 0.28 removed because its value became the operand, or because
+/// the leaf split into others.
+pub const SHAPES: &[ShapeChange] = &[
+    ShapeChange { command: "brief show", old: &["change", "change-id"], hint: "the change is the operand: `canon brief show [<CHANGE_ID>]`" },
+    ShapeChange { command: "brief check", old: &["change", "change-id"], hint: "the change is the operand: `canon brief check [<CHANGE_ID>]`" },
+    ShapeChange { command: "brief approve", old: &["change", "change-id"], hint: "the change is the operand: `canon brief approve [<CHANGE_ID>] --by <NAME> --note <TEXT>`" },
+    ShapeChange { command: "dispatch end", old: &["run", "run-id"], hint: "the run is the operand: `canon dispatch end <RUN_ID> --status <succeeded|failed>`" },
+    ShapeChange { command: "subject adopt", old: &["subject", "subject-id"], hint: "the subject is the operand and the change an option: `canon subject adopt <SUBJECT_ID> --change-id <CHANGE_ID>`" },
+    ShapeChange { command: "subject unadopt", old: &["subject", "subject-id"], hint: "the subject is the operand and the change an option: `canon subject unadopt <SUBJECT_ID> --change-id <CHANGE_ID>`" },
+    ShapeChange { command: "prompt add", old: &["name", "version"], hint: "name and version are one operand: `canon prompt add <NAME@VERSION> --manifest <FILE>`" },
+    ShapeChange { command: "prompt show", old: &["name", "version"], hint: "name and version are one operand: `canon prompt show <NAME@VERSION>`" },
+    ShapeChange { command: "divergence add", old: &["scenario-id"], hint: "the scenario is the operand: `canon divergence add <SCENARIO_ID> ...`" },
+    ShapeChange { command: "divergence defer", old: &["scenario-id"], hint: "the scenario is the operand: `canon divergence defer <SCENARIO_ID> ...`" },
+    ShapeChange { command: "divergence resolve", old: &["scenario-id"], hint: "the scenario is the operand: `canon divergence resolve <SCENARIO_ID> ...`" },
+    ShapeChange { command: "divergence accept", old: &["scenario-id"], hint: "the scenarios are operands: `canon divergence accept <SCENARIO_ID>... ...`" },
+    ShapeChange { command: "finding close", old: &["change-id"], hint: "the change is the operand: `canon finding close <CHANGE_ID> --round <N> --seq <N> --disposition <DISPOSITION>`" },
+    ShapeChange { command: "review scenario", old: &["scenario-id", "scenario-ids-from"], hint: "the scenarios are operands: `canon review scenario <SCENARIO_ID>... --actor-id <ID> --upstream-ref <REF>`" },
+    ShapeChange { command: "review scenario", old: &["reviewer"], hint: "`--actor-id` is the reviewer: `canon review scenario <SCENARIO_ID>... --actor-id <ID> ...`" },
+    ShapeChange { command: "review scenario", old: &["outcome"], hint: "`--outcome` is now `--review-outcome <signed|indeterminate|unavailable>`" },
+    ShapeChange { command: "review scenario", old: &["change-id"], hint: "a chore change is reviewed with `canon review change <CHANGE_ID> ...`" },
+    ShapeChange { command: "review change", old: &["change-id"], hint: "the change is the operand: `canon review change <CHANGE_ID> --actor-id <ID> --upstream-ref <REF>`" },
+    ShapeChange { command: "review change", old: &["reviewer"], hint: "`--actor-id` is the reviewer: `canon review change <CHANGE_ID> --actor-id <ID> ...`" },
+    ShapeChange { command: "review change", old: &["outcome"], hint: "`--outcome` is now `--review-outcome <signed|indeterminate|unavailable>`" },
+    ShapeChange { command: "review change", old: &["scenario-id", "scenario-ids-from"], hint: "scenarios are reviewed with `canon review scenario <SCENARIO_ID>... ...`" },
+    ShapeChange { command: "evidence add", old: &["evaluator-id", "evaluator-version", "evaluator-digest", "audit-result"], hint: "an external evaluator's re-audit is `canon evidence audit <SCENARIO_ID> --ref <REF> --evaluator-id <ID> --evaluator-version <TEXT> --evaluator-digest <SHA256> --audit-result <confirmed|refuted|indeterminate>`" },
+];
+
+/// A command word 0.28 removed because its modes became leaves of their own
+/// (`review add` → `review scenario` / `review change`): `(group path, word, hint)`.
+pub const LEAVES: &[(&str, &str, &str)] = &[(
+    "review",
+    "add",
+    "`review add` was split by what it reviews: `canon review scenario <SCENARIO_ID>...` for scenarios, `canon review change <CHANGE_ID>` for a chore change",
+)];
+
+/// A removed shape an invocation used.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemovedShape {
+    /// The command path the invocation resolved to, e.g. `review add` or `brief check`.
+    pub command: String,
+    /// What was typed, e.g. `--change-id` or `add`.
+    pub used: String,
+    /// What to type instead.
+    pub hint: &'static str,
+}
+
+impl RemovedShape {
+    /// The usage error's message.
+    pub fn message(&self) -> String {
+        format!("{} was removed in 0.28.0", self.used)
+    }
+}
+
+/// The first removed shape in `args` (argv without the program name), read
+/// against the clap tree `root`: a [`SHAPES`] flag the leaf no longer defines,
+/// or a [`LEAVES`] word where its group takes a subcommand. Walks like
+/// [`find`]: the value of an option is skipped, nothing after `--` is read.
+pub fn find_shape(root: &Command, args: &[String]) -> Option<RemovedShape> {
+    let mut root = root.clone();
+    root.build();
+    let mut cmd = &root;
+    let mut path: Vec<String> = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        let token = args[i].as_str();
+        if token == "--" {
+            break;
+        }
+        let here = path.join(" ");
+        if let Some(rest) = token.strip_prefix("--") {
+            let (name, inline) = match rest.split_once('=') {
+                Some((name, value)) => (name, Some(value)),
+                None => (rest, None),
+            };
+            match cmd.get_arguments().find(|a| a.get_long() == Some(name)) {
+                Some(arg) => {
+                    if arg.get_action().takes_values() && inline.is_none() {
+                        i += 1;
+                    }
+                }
+                None => {
+                    if let Some(shape) = SHAPES.iter().find(|s| s.command == here && s.old.contains(&name)) {
+                        return Some(RemovedShape { command: here, used: format!("--{name}"), hint: shape.hint });
+                    }
+                }
+            }
+        } else if token.starts_with('-') {
+            // short flags carry no operand this walk needs
+        } else if let Some(sub) = cmd.find_subcommand(token) {
+            path.push(sub.get_name().to_string());
+            cmd = sub;
+        } else if let Some((_, _, hint)) = LEAVES.iter().find(|(group, word, _)| *group == here && *word == token) {
+            return Some(RemovedShape { command: format!("{here} {token}"), used: token.to_string(), hint });
+        }
+        i += 1;
+    }
+    None
+}
 
 /// The commands whose `--kind` names a record kind. A `<kind>_record` value
 /// of it was the 0.23 spelling.

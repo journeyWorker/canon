@@ -20,12 +20,9 @@ pub struct ContextPackNewArgs {
 /// The flags of `prompt add`.
 #[derive(clap::Args)]
 pub struct PromptAddArgs {
-    /// Bundle name
-    #[arg(long)]
-    pub name: String,
-    /// Bundle version
-    #[arg(long)]
-    pub version: String,
+    /// The bundle to register, `NAME@VERSION`
+    #[arg(value_name = "NAME@VERSION", value_parser = crate::dispatch::parse_prompt_bundle)]
+    pub bundle: crate::context_pack::PromptBundleSelection,
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
@@ -47,12 +44,9 @@ pub enum PromptCommand {
 
 #[derive(Args)]
 pub struct PromptShowArgs {
-    /// Bundle name
-    #[arg(long)]
-    pub name: String,
-    /// Bundle version
-    #[arg(long)]
-    pub version: String,
+    /// The bundle to show, `NAME@VERSION`
+    #[arg(value_name = "NAME@VERSION", value_parser = crate::dispatch::parse_prompt_bundle)]
+    pub bundle: crate::context_pack::PromptBundleSelection,
     /// Repo root (default: nearest ancestor with a canon.yaml)
     #[arg(long, default_value = ".")]
     pub repo: PathBuf,

@@ -1,2 +1,0 @@
-canon evidence add: EVIDENCE_INVALID_ARGUMENT — --all-scenarios needs --project-id: the cases are matched against that spec root's indexed scenarios
-hint: `canon schema evidence add` lists the accepted arguments and their forms

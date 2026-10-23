@@ -465,6 +465,18 @@ pub struct EvidenceArgs {
     pub json: bool,
 }
 
+impl EvidenceArgs {
+    /// The command path this invocation is, for `meta.command` and next steps: an audit is `evidence audit`.
+    fn command(&self) -> &'static str {
+        if self.kind == AUDIT_KIND { "evidence audit" } else { "evidence add" }
+    }
+
+    /// [`Self::command`] as the human lines name it.
+    fn full(&self) -> String {
+        format!("canon {}", self.command())
+    }
+}
+
 /// The `--kind` value that marks an audited outcome (0.15 D3).
 pub const AUDIT_KIND: &str = "audit";
 
@@ -666,30 +678,30 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit("canon evidence add", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again").emit(&args.full(), args.json);
         }
     };
 
     if args.kind.trim().is_empty() || args.evidence_ref.trim().is_empty() {
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--kind and --ref must both be non-empty; an empty companion narrows the gate's typed evidence slice to nothing").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit("canon evidence add", args.json);
+        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--kind and --ref must both be non-empty; an empty companion narrows the gate's typed evidence slice to nothing").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
     if let Err(error) = check_all_scenarios_flags(args) {
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", error.to_string()).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit("canon evidence add", args.json);
+        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", error.to_string()).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
     if let Err(error) = check_artifact_scopes(args) {
-        return error.emit("canon evidence add", args.json);
+        return error.emit(&args.full(), args.json);
     }
     // #104: an id no configured spec root carries is refused before
     // anything is staged, bound or written (`--all-scenarios` included).
     if let Some(project_id) = &args.project_id {
         if let Err(error) = crate::inventory::require_spec_root(&repo, project_id) {
-            return error.emit("canon evidence add", args.json);
+            return error.emit(&args.full(), args.json);
         }
     }
     let audit = match audit_of(args) {
         Ok(audit) => audit,
         Err(error) => {
-            return CliError::refused("EVIDENCE_INVALID_ARGUMENT", error.to_string()).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit("canon evidence add", args.json);
+            return CliError::refused("EVIDENCE_INVALID_ARGUMENT", error.to_string()).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
         }
     };
     let verdict = match &audit {
@@ -698,12 +710,12 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     };
     if let Some(reason) = &args.override_reason {
         if reason.trim().is_empty() || first_row_line_break(reason).is_some() {
-            return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--override-reason must be one non-empty line; it is recorded on the evidence record as the accountable reason").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit("canon evidence add", args.json);
+            return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--override-reason must be one non-empty line; it is recorded on the evidence record as the accountable reason").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
         }
     }
     for surface in &args.surface_ref {
         if let Err(error) = parse_surface_ref(surface) {
-            return CliError::refused("EVIDENCE_INVALID_ARGUMENT", format!("--surface-ref `{surface}` is invalid: {error}")).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit("canon evidence add", args.json);
+            return CliError::refused("EVIDENCE_INVALID_ARGUMENT", format!("--surface-ref `{surface}` is invalid: {error}")).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
         }
     }
     let approval_requested = args.approval_by.is_some()
@@ -717,25 +729,25 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             || args.approval_at.is_none()
             || args.artifact_sha.is_none()
         {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "authenticated approval requires --approval-by, --approval-role human, --approval-signature-file, --approval-at, and --artifact-sha").hint("pass --approval-by, --approval-role human, --approval-signature-file, --approval-at and --artifact-sha together; `canon evidence approval-payload` prints the bytes to sign").emit("canon evidence add", args.json);
+            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "authenticated approval requires --approval-by, --approval-role human, --approval-signature-file, --approval-at, and --artifact-sha").hint("pass --approval-by, --approval-role human, --approval-signature-file, --approval-at and --artifact-sha together; `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
         let approver = args.approval_by.as_deref().unwrap_or_default();
         if approver.trim().is_empty() || approver.trim() != approver || approver.chars().any(|ch| matches!(ch, '\n' | '\r')) {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "approval identity must be a non-empty trimmed single-line value").hint("pass --approval-by, --approval-role human, --approval-signature-file, --approval-at and --artifact-sha together; `canon evidence approval-payload` prints the bytes to sign").emit("canon evidence add", args.json);
+            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "approval identity must be a non-empty trimmed single-line value").hint("pass --approval-by, --approval-role human, --approval-signature-file, --approval-at and --artifact-sha together; `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
         if args.approval_role.as_ref().map_or(true, |role| role.as_str() != "human") {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "only the human approval role can satisfy risk approval").hint("pass --approval-by, --approval-role human, --approval-signature-file, --approval-at and --artifact-sha together; `canon evidence approval-payload` prints the bytes to sign").emit("canon evidence add", args.json);
+            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "only the human approval role can satisfy risk approval").hint("pass --approval-by, --approval-role human, --approval-signature-file, --approval-at and --artifact-sha together; `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
         if args.approval_at.as_deref().and_then(|value| value.parse::<DateTime<Utc>>().ok()).is_none() {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "--approval-at must be an RFC3339 timestamp").hint("pass --approval-by, --approval-role human, --approval-signature-file, --approval-at and --artifact-sha together; `canon evidence approval-payload` prints the bytes to sign").emit("canon evidence add", args.json);
+            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "--approval-at must be an RFC3339 timestamp").hint("pass --approval-by, --approval-role human, --approval-signature-file, --approval-at and --artifact-sha together; `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
         let signature_path = args.approval_signature_file.as_ref().unwrap();
         if !signature_path.is_file() {
-            return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("detached signature file does not exist: {}", signature_path.display())).hint("pass --approval-by, --approval-role human, --approval-signature-file, --approval-at and --artifact-sha together; `canon evidence approval-payload` prints the bytes to sign").emit("canon evidence add", args.json);
+            return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("detached signature file does not exist: {}", signature_path.display())).hint("pass --approval-by, --approval-role human, --approval-signature-file, --approval-at and --artifact-sha together; `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
     }
     if args.summary.is_none() && args.command_result.is_some() {
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--command-result requires --summary; `canon_gate::evidence_note_of` requires `summary`, so a summary-less note is unparseable to the gate rather than partially read").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit("canon evidence add", args.json);
+        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--command-result requires --summary; `canon_gate::evidence_note_of` requires `summary`, so a summary-less note is unparseable to the gate rather than partially read").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
 
     // The document-bound fields, refused before anything is staged
@@ -748,7 +760,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     // which inputs are safe.
     for (flag, value) in [("--summary", args.summary.as_deref()), ("--actor-id", Some(args.actor_id.as_str()))] {
         let Some((offset, separator)) = value.and_then(first_row_line_break) else { continue };
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; it is written into a plan document as ONE checkbox row, so a separator there appends a second row (a `- [x] ` one, if the value says so) that no evidence record backs")).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit("canon evidence add", args.json);
+        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; it is written into a plan document as ONE checkbox row, so a separator there appends a second row (a `- [x] ` one, if the value says so) that no evidence record backs")).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
     if args.all_scenarios {
         return run_add_all(&repo, args, promote);
@@ -760,7 +772,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     // `None`), so staging one would be writing an attestation nothing
     // can ever read back.
     if args.task_id.is_none() && args.scenario_id.is_none() {
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "give --task, --scenario-id, or both; a record with neither carries no coverage subject and no gate can read it back").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit("canon evidence add", args.json);
+        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "give --task, --scenario-id, or both; a record with neither carries no coverage subject and no gate can read it back").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
 
     // A scenario-keyed record needs the COMPOSITE key, because
@@ -768,7 +780,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     // carry the same scenario id. Refused rather than defaulted: there
     // is no safe guess when `specs.roots[]` holds more than one entry.
     if args.scenario_id.is_some() && args.project_id.is_none() {
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--scenario-id needs --project-id; canon keys a scenario by the composite (project_id, scenario_id) and two spec roots may carry the same scenario id").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit("canon evidence add", args.json);
+        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--scenario-id needs --project-id; canon keys a scenario by the composite (project_id, scenario_id) and two spec roots may carry the same scenario id").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
 
     // The SAME plan-corpus admission `canon dispatch begin --task` makes
@@ -777,7 +789,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     // entirely for a scenario-only record: there is no task to admit.
     if let Some(task_id) = &args.task_id {
         if let Err(e) = crate::dispatch::validate_task_binding(&repo, task_id) {
-            return e.to_cli_error().emit("canon evidence add", args.json);
+            return e.to_cli_error().emit(&args.full(), args.json);
         }
     }
 
@@ -799,7 +811,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         // command (0.18 D5, #32): `refused —`, exit 1.
         let violations = scan_note_text(&subject, summary, args.command_result.as_deref());
         if !violations.is_empty() {
-            return fabricated(&violations).emit("canon evidence add", args.json);
+            return fabricated(&violations).emit(&args.full(), args.json);
         }
     }
 
@@ -813,11 +825,11 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             Ok(Some(contract)) if contract.kind != args.kind || contract.evidence_ref != args.evidence_ref => {
                 return CliError::failed("EVIDENCE_CONTRACT_MISMATCH", format!("{} declares a typed evidence contract kind=`{}` ref=`{}`, but this record carries kind=`{}` ref=`{}`; `canon gate task` narrows to records matching the atom exactly, so this one would be refused as an unevidenced flip",
                     task_id, contract.kind, contract.evidence_ref, args.kind, args.evidence_ref
-                )).hint("pass --kind and --ref exactly as the plan task's typed evidence contract declares them").emit("canon evidence add", args.json);
+                )).hint("pass --kind and --ref exactly as the plan task's typed evidence contract declares them").emit(&args.full(), args.json);
             }
             Ok(_) => {}
             Err(e) => {
-                return e.to_cli_error().emit("canon evidence add", args.json);
+                return e.to_cli_error().emit(&args.full(), args.json);
             }
         }
     }
@@ -826,18 +838,18 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     let mut gate_context = match load_gate_context(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon evidence add", args.json);
+            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit(&args.full(), args.json);
         }
     };
     let refusals = brief_refusals(&repo, &gate_context, args.task_id.as_ref(), args.project_id.as_ref().zip(args.scenario_id.as_ref()));
     if let Err(error) = report_brief_refusals(args, &refusals) {
-        return error.emit("canon evidence add", args.json);
+        return error.emit(&args.full(), args.json);
     }
     let brief_override = brief_override_of(args, &refusals);
     // Experimental binding: read (never run) the files the caller names,
     // before anything is staged, so a refused binding leaves no record.
     if !args.report_cases.is_empty() && args.reports.is_empty() {
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--report-case names a case in a --report; none was given").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit("canon evidence add", args.json);
+        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--report-case names a case in a --report; none was given").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
     let bound = match crate::evidence_attach::bind(&crate::evidence_attach::BindRequest {
         repo: &repo,
@@ -853,7 +865,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     }) {
         Ok(bound) => bound,
         Err(error) => {
-            return bind_refusal(&error).emit("canon evidence add", args.json);
+            return bind_refusal(&error).emit(&args.full(), args.json);
         }
     };
 
@@ -907,7 +919,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         }) {
             Ok(binding) => binding,
             Err(error) => {
-                return CliError::refused("EVIDENCE_REFUSED", error.to_string()).hint("fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)").emit("canon evidence add", args.json);
+                return CliError::refused("EVIDENCE_REFUSED", error.to_string()).hint("fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)").emit(&args.full(), args.json);
             }
         };
         record = record.with_surface_ref(surface.clone());
@@ -915,25 +927,25 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         let signature = match std::fs::read(signature_path) {
             Ok(signature) => signature,
             Err(error) => {
-                return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("read detached signature: {error}")).hint("pass --approval-signature-file <path> pointing at a readable armored SSH signature over the bytes `canon evidence approval-payload` prints").emit("canon evidence add", args.json);
+                return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("read detached signature: {error}")).hint("pass --approval-signature-file <path> pointing at a readable armored SSH signature over the bytes `canon evidence approval-payload` prints").emit(&args.full(), args.json);
             }
         };
         let allowed_signers = match canon_gate::policy::allowed_signers_path(&repo) {
             Ok(Some(path)) => path,
             Ok(None) => {
-                return CliError::refused("EVIDENCE_APPROVAL_INVALID", "no policy-pinned allowed_signers verifier is configured").hint("set `approval: { allowed_signers: <path> }` in .canon/policy.yaml and approve the change with `canon policy approve --by <name>`, then record the approval again").emit("canon evidence add", args.json);
+                return CliError::refused("EVIDENCE_APPROVAL_INVALID", "no policy-pinned allowed_signers verifier is configured").hint("set `approval: { allowed_signers: <path> }` in .canon/policy.yaml and approve the change with `canon policy approve --by <name>`, then record the approval again").emit(&args.full(), args.json);
             }
             Err(error) => {
-                return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("approval policy is malformed: {error}")).hint("fix the approval settings in .canon/policy.yaml, then run `canon policy approve --by <name>`").emit("canon evidence add", args.json);
+                return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("approval policy is malformed: {error}")).hint("fix the approval settings in .canon/policy.yaml, then run `canon policy approve --by <name>`").emit(&args.full(), args.json);
             }
         };
         if let Err(error) = verify_risk_approval(&payload, &signature, approver, &allowed_signers) {
-            return CliError::failed("EVIDENCE_APPROVAL_INVALID", error.to_string()).hint("sign the exact bytes `canon evidence approval-payload` prints with a key listed in the policy's allowed_signers, then record the approval again").emit("canon evidence add", args.json);
+            return CliError::failed("EVIDENCE_APPROVAL_INVALID", error.to_string()).hint("sign the exact bytes `canon evidence approval-payload` prints with a key listed in the policy's allowed_signers, then record the approval again").emit(&args.full(), args.json);
         }
         let signature = match String::from_utf8(signature) {
             Ok(signature) => signature,
             Err(_) => {
-                return CliError::refused("EVIDENCE_APPROVAL_INVALID", "detached signature must be UTF-8 armored SSH signature text").hint("sign the bytes `canon evidence approval-payload` prints with `ssh-keygen -Y sign` and pass the armored output as --approval-signature-file").emit("canon evidence add", args.json);
+                return CliError::refused("EVIDENCE_APPROVAL_INVALID", "detached signature must be UTF-8 armored SSH signature text").hint("sign the bytes `canon evidence approval-payload` prints with `ssh-keygen -Y sign` and pass the armored output as --approval-signature-file").emit(&args.full(), args.json);
             }
         };
         record = record.with_approval(EvidenceApproval {
@@ -969,7 +981,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             entry["subject"] = serde_json::json!(subject);
             entry["outcome"] = serde_json::json!(outcome);
             entry["next"] = serde_json::json!(next);
-            crate::json_out::data_with_meta("evidence add", &crate::json_out::untyped(serde_json::json!({ "records": [entry], "staleReviews": [] })), serde_json::json!({ "unchanged": true }));
+            crate::json_out::data_with_meta(args.command(), &crate::json_out::untyped(serde_json::json!({ "records": [entry], "staleReviews": [] })), serde_json::json!({ "unchanged": true }));
         }
         return 0;
     }
@@ -980,11 +992,11 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     let stored = match crate::evidence_attach::store_files(&repo, &bound.files) {
         Ok(stored) => stored,
         Err((file, e)) => {
-            return CliError::refused("EVIDENCE_STORE_FAILED", format!("could not store {} in the artifact store: {e}", file.resolved.display())).hint(e.hint()).emit("canon evidence add", args.json);
+            return CliError::refused("EVIDENCE_STORE_FAILED", format!("could not store {} in the artifact store: {e}", file.resolved.display())).hint(e.hint()).emit(&args.full(), args.json);
         }
     };
     if !bound.files.is_empty() {
-        crate::say!(args.json, "{}", crate::evidence_attach::stored_line(&repo, "canon evidence add", bound.files.len(), stored));
+        crate::say!(args.json, "{}", crate::evidence_attach::stored_line(&repo, &args.full(), bound.files.len(), stored));
     }
 
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
@@ -994,7 +1006,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             // feeds a checkbox flip, a scenario-only one feeds
             // `canon gate check`'s spec-coverage pass. Naming the wrong
             // one would send an operator to a command that cannot apply.
-            let settled = crate::gate::promote_after_stage("canon evidence add", &ledger_root, &receipt.location, promote, args.json);
+            let settled = crate::gate::promote_after_stage(&args.full(), &ledger_root, &receipt.location, promote, args.json);
             crate::say!(args.json, "canon evidence add: {} for {} ({outcome}) — {}, {}", settled.landed(&receipt.location), subject, settled.suffix(), next);
             let stale = print_stale_reviews(&repo, &stale_reviews, matches!(settled, crate::gate::StagedOutcome::Promoted { .. }), args.json);
             if settled.exit_code() == 0 {
@@ -1007,12 +1019,12 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
                     None => crate::next::Scope::Scenarios(vec![subject.clone()]),
                 };
                 let staged = matches!(settled, crate::gate::StagedOutcome::Staged);
-                crate::next::finish(&repo, "evidence add", &scope, staged, args.json, &crate::json_out::untyped(serde_json::json!({ "records": [record], "staleReviews": stale })));
+                crate::next::finish(&repo, args.command(), &scope, staged, args.json, &crate::json_out::untyped(serde_json::json!({ "records": [record], "staleReviews": stale })));
             }
             settled.exit_code()
         }
         Err(e) => {
-            CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon evidence add", args.json)
+            CliError::refused("WRITE_FAILED", e.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit(&args.full(), args.json)
         }
     }
 }
@@ -1464,7 +1476,7 @@ fn stale_review_notices(ctx: &mut GateContext, written: &[EvidenceRecord]) -> Ve
 }
 
 /// One line per review `stale` names (0.18 D2): the reviewer, the
-/// scenario, and the `canon review add` that re-pins it — the same
+/// scenario, and the `canon review scenario` that re-pins it — the same
 /// reviewer, actor, role, session, provenance ref, runtime labels and
 /// artifacts, pinned at
 /// `HEAD` (`<sha>` when the repository has no commit). A record still
@@ -1490,16 +1502,15 @@ fn print_stale_reviews(repo: &Path, stale: &[Review], promoted: bool, json: bool
         .collect()
 }
 
-/// `canon review add` re-pinning `review` at `pin`, as one shell line.
+/// `canon review scenario` re-pinning `review` at `pin`, as one shell line.
 fn repin_command(review: &Review, pin: &str) -> String {
     use canon_gate::audit::shell_quote;
 
     let role = review.envelope.actor.role.as_ref().map_or("reviewer", |r| r.as_str());
     let mut words = vec![
-        "canon review add".to_string(),
+        "canon review scenario".to_string(),
+        shell_quote(review.target()),
         format!("--project-id {}", shell_quote(review.project_id.as_str())),
-        format!("--scenario-id {}", shell_quote(review.target())),
-        format!("--reviewer {}", shell_quote(&review.reviewer)),
         format!("--actor-id {}", shell_quote(&review.envelope.actor.agent_id)),
         format!("--role {}", shell_quote(role)),
         format!("--pin {}", if pin == "<sha>" { pin.to_string() } else { shell_quote(pin) }),

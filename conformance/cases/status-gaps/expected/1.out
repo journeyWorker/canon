@@ -10,10 +10,10 @@ subjects (1):
   building (1):
     cart: 1 scenarios, 1 evidenced, 1 reviewed, 1 open blockers
       brief: approved in .canon/changes/c-cart/brief.md — Journey 2026-10-08 — "approved, go ahead"
-      advisory: that approval has no digest, so it does not follow the brief's text; re-approve with `canon brief approve --change-id c-cart --by <the human> --note "<their words>"` to bind it
+      advisory: that approval has no digest, so it does not follow the brief's text; re-approve with `canon brief approve c-cart --by <the human> --note "<their words>"` to bind it
 
 unowned: none
 
 next:
   # cart: 1 open blocker finding(s) (first: adding an item twice duplicates the line); fix it, commit, then close it
-  canon finding close --change-id c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>
+  canon finding close c-cart --round 1 --seq 1 --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>

@@ -88,7 +88,6 @@ fn attest_binding(repo: &Path, verdict: EvidenceVerdict, binding: Option<&str>) 
 fn accept(repo: &Path, overrides: &[(&str, &str)]) -> Output {
     let mut flags: Vec<(&str, &str)> = vec![
         ("--project-id", "demo"),
-        ("--scenario-id", SCENARIO),
         ("--reason", "the engine drops the event"),
         ("--tracking", TRACKING),
         ("--reviewer", "reviewer-2"),
@@ -96,13 +95,19 @@ fn accept(repo: &Path, overrides: &[(&str, &str)]) -> Output {
         ("--actor-id", "reviewer-2"),
         ("--session-id", "review-session"),
     ];
+    let mut ids: Vec<&str> = vec![SCENARIO];
     for (flag, value) in overrides {
-        match flags.iter_mut().find(|(f, _)| f == flag).filter(|_| *flag != "--scenario-id") {
+        if *flag == "--scenario-id" {
+            ids.push(value);
+            continue;
+        }
+        match flags.iter_mut().find(|(f, _)| f == flag) {
             Some(slot) => slot.1 = value,
             None => flags.push((flag, value)),
         }
     }
     let mut args = vec!["divergence", "accept"];
+    args.extend(ids);
     for (flag, value) in &flags {
         args.extend([*flag, *value]);
     }
@@ -127,7 +132,7 @@ fn a_divergent_verdict_blocks_shipping_and_the_hint_names_both_ways_out() {
     assert_eq!(body["error"]["code"], "SUBJECT_GATE_VIOLATION");
     assert!(body["error"]["message"].as_str().unwrap().contains("uncovered-cell world.demo.01 — verifying → shipped: latest verdict is divergent (by impl-agent)"), "{body}");
     let hint = body["error"]["hint"].as_str().expect("the refusal carries a hint");
-    assert!(hint.contains("re-attest") && hint.contains("canon divergence accept --project-id demo --scenario-id world.demo.01"), "{hint}");
+    assert!(hint.contains("re-attest") && hint.contains("canon divergence accept world.demo.01 --project-id demo"), "{hint}");
 }
 
 /// A reviewer's acceptance lets the subject ship; `status` and `gate check`
@@ -233,7 +238,7 @@ fn refusals_name_the_missing_condition_and_a_batch_writes_nothing() {
     assert_eq!(empty.status.code(), Some(2), "{}", out(&empty));
     assert!(out(&empty).contains("--tracking is empty"), "{}", out(&empty));
 
-    let implementer = canon(repo, &["divergence", "accept", "--project-id", "demo", "--scenario-id", SCENARIO, "--reason", "r", "--tracking", TRACKING, "--reviewer", "r2", "--role", "implementer"]);
+    let implementer = canon(repo, &["divergence", "accept", SCENARIO, "--project-id", "demo", "--reason", "r", "--tracking", TRACKING, "--reviewer", "r2", "--role", "implementer"]);
     assert_eq!(implementer.status.code(), Some(2), "{}", out(&implementer));
     assert!(out(&implementer).contains("reviewer step"), "{}", out(&implementer));
 

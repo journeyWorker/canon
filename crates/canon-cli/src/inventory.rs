@@ -222,6 +222,36 @@ pub fn check_spec_root(roots: &[SpecRoot], project_id: &ProjectId) -> Result<(),
     .expected(ids))
 }
 
+/// The spec root a leaf writes under when `--project-id` is optional (D1):
+/// the one given, else the only root `canon.yaml` configures. With several
+/// roots and none given the leaf refuses with `code`, naming the roots. The
+/// id given is not checked here ([`require_spec_root`] does that).
+pub fn resolve_project_id(repo: &Path, given: Option<&ProjectId>, code: &'static str, command: &str, json: bool) -> Result<ProjectId, i32> {
+    use crate::cli_error::CliError;
+    if let Some(id) = given {
+        return Ok(id.clone());
+    }
+    let roots = match load_spec_roots(&repo.join("canon.yaml")) {
+        Ok(roots) => roots,
+        Err(e) => {
+            return Err(CliError::refused("CONFIG_UNREADABLE", e.to_string())
+                .hint("fix canon.yaml so it parses (`canon init --check-config` reports what is wrong), then run the command again")
+                .emit(command, json));
+        }
+    };
+    match roots.as_slice() {
+        [one] => Ok(one.id.clone()),
+        many => {
+            let ids: Vec<&str> = many.iter().map(|root| root.id.as_str()).collect();
+            Err(CliError::refused(code, format!("canon.yaml configures {} spec roots ({}); `--project-id` names the one to use", ids.len(), ids.join(", ")))
+                .hint(format!("pass `--project-id <one of {}>`", ids.join(", ")))
+                .field("--project-id")
+                .expected(ids)
+                .emit(command, json))
+        }
+    }
+}
+
 /// Rebindable roots inventory-sync reads through (design D3,
 /// spec-ledger-selftest Req 2) — composes over [`GateCtx`]'s own
 /// two-constructor pattern (`from_repo`/`from_fixture`) rather than a

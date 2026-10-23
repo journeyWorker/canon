@@ -33,6 +33,7 @@ const NEEDS_STATE: &[(&str, &str)] = &[
     ("plugin sync", "an installed plugin"),
     ("prompt add", "a prompt bundle manifest file"),
     ("prompt show", "a registered prompt bundle"),
+    ("review change", "a chore change: the scratch repo's add-login is a feature, and a feature is reviewed per scenario"),
 ];
 
 /// Examples that are not run at all.

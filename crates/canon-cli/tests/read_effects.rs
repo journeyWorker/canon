@@ -103,7 +103,7 @@ fn fixture(home: &Path) -> TempDir {
     ok(
         repo,
         home,
-        &["review", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--reviewer", "alice", "--pin", "abc123", "--role", "reviewer", "--session-id", "s2", "--original-spec-ref", "docs/prd.md"],
+        &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "alice", "--pin", "abc123", "--role", "reviewer", "--session-id", "s2", "--original-spec-ref", "docs/prd.md"],
     );
     ok(repo, home, &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "bob", "--summary", "Naming nit"]);
     ok(repo, home, &["gate", "promote"]);

@@ -1,2 +1,2 @@
 canon finding close: FINDING_REASON_REQUIRED — --disposition rejected requires --reason; a rejected finding with no recorded why leaves the next reader nothing to go on
-hint: run `canon finding close --change-id c-cart --round 1 --seq 1 --disposition rejected --reason "<why, one line>"`
+hint: run `canon finding close c-cart --round 1 --seq 1 --disposition rejected --reason "<why, one line>"`

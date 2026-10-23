@@ -152,9 +152,9 @@ fn auto_promotes_every_staged_write_and_no_promote_keeps_one_staged() {
 
     ok(repo, &evidence("game.run.01"));
     ok(repo, &["finding", "add", "--change-id", "c-run", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "r", "--summary", "s"]);
-    ok(repo, &["finding", "close", "--change-id", "c-run", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"]);
+    ok(repo, &["finding", "close", "c-run", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"]);
     let sha = "a".repeat(40);
-    ok(repo, &["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer"]);
+    ok(repo, &["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--reviewer", "r", "--role", "reviewer"]);
     assert_eq!(staged(repo), 0, "nothing waits for a promote");
     assert_eq!((committed(repo, "evidence_record"), committed(repo, "finding"), committed(repo, "divergence")), (1, 2, 1));
 
@@ -217,7 +217,7 @@ fn a_promote_on_write_commits_only_its_own_record() {
 
     let sha = "a".repeat(40);
     let stage = |actor: &str, extra: &[&str]| {
-        let mut args = vec!["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--actor-id", actor];
+        let mut args = vec!["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--actor-id", actor];
         args.extend_from_slice(extra);
         ok(repo, &args)
     };
@@ -247,8 +247,8 @@ fn evidence_add_67_a_promoted_write_names_only_its_committed_record() {
     let writes: [(&str, Vec<&str>); 4] = [
         ("canon evidence add", evidence("game.run.01")),
         ("canon finding add", vec!["finding", "add", "--change-id", "c-run", "--round", "1", "--seq", "1", "--severity", "note", "--reviewer", "r", "--summary", "s"]),
-        ("canon finding close", vec!["finding", "close", "--change-id", "c-run", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"]),
-        ("canon divergence add", vec!["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer"]),
+        ("canon finding close", vec!["finding", "close", "c-run", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"]),
+        ("canon divergence add", vec!["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--reviewer", "r", "--role", "reviewer"]),
     ];
     for (command, args) in writes {
         let text = stdout(&ok(repo, &args));
@@ -265,7 +265,7 @@ fn evidence_add_67_a_promoted_write_names_only_its_committed_record() {
     let kept: [(&str, Vec<&str>, &str); 3] = [
         ("canon evidence add", with(evidence("game.run.01"), &["--summary", "attested again", "--no-promote"]), STAGED),
         ("canon finding add", vec!["finding", "add", "--change-id", "c-run", "--round", "1", "--seq", "2", "--severity", "note", "--reviewer", "r", "--summary", "s", "--no-promote"], STAGED),
-        ("canon divergence add", vec!["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--no-promote"], STAGED),
+        ("canon divergence add", vec!["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--reviewer", "r", "--role", "reviewer", "--no-promote"], STAGED),
     ];
     for (command, args, suffix) in kept {
         let text = stdout(&ok(repo, &args));
@@ -343,7 +343,7 @@ fn an_edited_feature_file_is_reindexed_by_the_next_writer_and_only_that_file() {
     assert!(stdout(&sync).contains("0 record(s) written"), "the refresh wrote what sync would: {}", stdout(&sync));
 }
 
-/// inventory.sync.41: `review add` and `subject status` see a scenario
+/// inventory.sync.41: `review scenario` and `subject status` see a scenario
 /// that was only written, never synced — no `inventory sync` step.
 #[test]
 fn review_add_and_subject_status_need_no_sync_step() {
@@ -352,10 +352,10 @@ fn review_add_and_subject_status_need_no_sync_step() {
     ok(repo, &["subject", "new", "runs", "--domain", "dev", "--title", "Runs", "--actor-id", "lead"]);
     ok(repo, &["scenario", "new", "game.run.01", "--title", "A run ends", "--case", "failure", "--subject-id", "runs"]);
     let review = ok(repo, &[
-        "review", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--reviewer", "rev", "--pin", "p", "--original-spec-ref", "specs/x.feature",
+        "review", "scenario", "game.run.01", "--project-id", "root", "--pin", "p", "--original-spec-ref", "specs/x.feature",
         "--role", "reviewer", "--actor-id", "rev",
     ]);
-    assert!(stderr(&review).contains("canon review add: refreshed the scenario index"), "{}", stderr(&review));
+    assert!(stderr(&review).contains("canon review scenario: refreshed the scenario index"), "{}", stderr(&review));
 
     let feature = files_under(repo.join(".canon/specs/kind=feature")).pop().unwrap();
     let text = std::fs::read_to_string(&feature).unwrap();

@@ -340,7 +340,7 @@ pub fn flow_tag_value(repo: &Path, subject: Option<&canon_model::SubjectId>, cha
     let change = match (change, subject) {
         (Some(change), _) => change.clone(),
         (None, Some(subject)) => newest_change_of(repo, subject)?,
-        (None, None) => resolve_change(repo, None).map(|(change, _)| change).map_err(|e| format!("{} — {}; pass --change-id or --subject-id", e.code, e.message))?,
+        (None, None) => resolve_change(repo, None).map(|(change, _)| change).map_err(|e| format!("{} — {}; name the change as the operand", e.code, e.message))?,
     };
     if crate::brief::canon_brief(repo, &change).is_none() {
         return Err(format!("change `{}` has no brief at {}/{}/brief.md; write it with `canon change new`", change.as_str(), paths::CHANGES_DIR, change.as_str()));
@@ -1788,8 +1788,8 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
         1 => Ok(live.remove(0)),
         _ => Err(CliError::failed(
             "CHANGE_AMBIGUOUS",
-            format!("{} live changes have a brief ({}); pass --change-id <slug>", live.len(), live.iter().map(|(c, _)| c.as_str()).collect::<Vec<_>>().join(", ")),
-        ).hint("pass --change-id <slug> naming one of the listed changes")),
+            format!("{} live changes have a brief ({}); pass the change id as the operand", live.len(), live.iter().map(|(c, _)| c.as_str()).collect::<Vec<_>>().join(", ")),
+        ).hint("pass the change id of one of the listed changes as the operand")),
     }
 }
 

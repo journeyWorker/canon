@@ -30,6 +30,7 @@ pub enum ContextPackCommand {
 #[derive(Args)]
 pub struct ContextPackShowArgs {
     /// Context pack id (sha256:<64 hex digits>)
+    #[arg(value_name = "PACK_ID")]
     pub id: String,
     /// Repo root (default: nearest ancestor with a canon.yaml)
     #[arg(long, default_value = ".")]
@@ -42,6 +43,7 @@ pub struct ContextPackShowArgs {
 #[derive(Args)]
 pub struct ContextPackVerifyArgs {
     /// Context pack id (sha256:<64 hex digits>)
+    #[arg(value_name = "PACK_ID")]
     pub id: String,
     /// Repo root (default: nearest ancestor with a canon.yaml)
     #[arg(long, default_value = ".")]

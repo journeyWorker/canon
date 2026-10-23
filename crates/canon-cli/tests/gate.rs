@@ -1103,17 +1103,17 @@ fn evidence_add_refuses_a_record_with_no_coverage_subject() {
     assert!(stderr(&out).contains("--task, --scenario-id, or both"), "stderr: {}", stderr(&out));
 }
 
-/// The composite key is the scenario's identity; a bare `--scenario-id`
-/// cannot close the join, so it is refused rather than written as a
-/// record the gate would silently ignore.
+/// The composite key is the scenario's identity; with exactly one spec
+/// root the project is implied, so a bare `--scenario-id` still closes
+/// the join and stages one record.
 #[test]
-fn evidence_add_refuses_a_scenario_id_without_a_project_id() {
+fn evidence_add_infers_the_project_id_from_the_only_spec_root() {
     let dir = repo_with_spec_corpus();
     let out = run_canon(&["evidence", "add", "--scenario-id", "core.login.01", "--kind", "test-run", "--ref", "x", "--role", "implementer", "--repo", "."], dir.path());
-    assert_eq!(out.status.code(), Some(2), "stdout: {}", stdout(&out));
-    assert!(stderr(&out).contains("--project-id"), "stderr: {}", stderr(&out));
-    assert!(stdout(&out).is_empty(), "a refused add must not report a staged record: {}", stdout(&out));
-    assert_eq!(evidence_files(&dir.path().join(".canon/ledger")), Vec::<PathBuf>::new(), "a refused add must leave no staged or committed evidence");
+    assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
+    let record = the_only_staged_record(&dir.path().join(".canon/ledger"));
+    assert_eq!(record["project_id"], "core", "{record}");
+    assert_eq!(record["scenario_id"], "core.login.01", "{record}");
 }
 
 /// Every evidence record file under `ledger_root`, staged (`_staging/`)

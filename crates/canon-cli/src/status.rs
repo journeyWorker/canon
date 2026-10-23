@@ -49,7 +49,7 @@
 //! and no `Approved:` line in the canon `brief.md` (the brief is
 //! enforced) gets the one `human` step status ever emits once `canon brief
 //! check` has no blocker left for it (0.22 D4); while it has some, the
-//! subject's step is the planner's `canon brief check --change-id <slug>`,
+//! subject's step is the planner's `canon brief check <slug>`,
 //! `N blocker(s): write the brief`. With no blocker but advisories left
 //! (0.26 D4), a planner step to polish the brief
 //! (`reference/brief-polish.md`) and re-run `canon brief check` comes
@@ -1060,7 +1060,7 @@ fn polish_step(id: &str, brief: &BriefStatus, draft: bool) -> Option<NextStep> {
     Some(NextStep {
         actor: StepActor::Agent,
         role: Some(Role::Planner),
-        command: format!("polish the brief in {} (reference/brief-polish.md), then run `canon brief check --change-id {change}`", brief.report_in()),
+        command: format!("polish the brief in {} (reference/brief-polish.md), then run `canon brief check {change}`", brief.report_in()),
         why: format!("{id}: {} advisory finding(s) remain in `{change}` ({top}); the check is clean of blockers, so the human can answer now, but a polished brief is easier to read; advisories never refuse an approval{draft}", counts.advisories),
     })
 }
@@ -1099,7 +1099,7 @@ fn subject_steps(
             (Some(change), Some(counts)) => next.push(NextStep {
                 actor: StepActor::Agent,
                 role: Some(Role::Planner),
-                command: format!("canon brief check --change-id {change}"),
+                command: format!("canon brief check {change}"),
                 why: format!("{id}: `{draft}` is a pending draft with {} blocker(s): write the brief in {} until `canon brief check` is clean; only then does the human answer it; {id} is not blocked meanwhile", counts.blockers, brief.report_in()),
             }),
             _ => {
@@ -1128,7 +1128,7 @@ fn subject_steps(
             next.push(NextStep {
                 actor: StepActor::Agent,
                 role: Some(Role::Planner),
-                command: format!("canon brief check --change-id {change}"),
+                command: format!("canon brief check {change}"),
                 why: format!("{id}: {} blocker(s): write the brief in {} until `canon brief check` is clean; only then does the human answer it", counts.blockers, brief.report_in()),
             });
             return;
@@ -1257,7 +1257,7 @@ fn subject_steps(
             actor: StepActor::Agent,
             role: Some(Role::Reviewer),
             command: format!(
-                "canon finding close --change-id {} --round {} --seq {} --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
+                "canon finding close {} --round {} --seq {} --disposition fixed --resolution-sha <sha> --actor-id <unit> --session-id <session>",
                 blocker.change_id.as_str(),
                 blocker.round,
                 blocker.seq
@@ -1271,7 +1271,7 @@ fn subject_steps(
             actor: StepActor::Agent,
             role: Some(Role::Reviewer),
             command: format!(
-                "canon review add --project-id <root> --change-id {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<brief>\"",
+                "canon review change {} --project-id <root> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<brief>\"",
                 change.as_str()
             ),
             why: format!("{id}: {why}"),
@@ -1285,7 +1285,7 @@ fn subject_steps(
                 actor: StepActor::Agent,
                 role: Some(Role::Reviewer),
                 command: format!(
-                    "canon review add --project-id {} --scenario-id {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"",
+                    "canon review scenario {1} --project-id {0} --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<feature file>\"",
                     first.project_id.as_str(),
                     first.scenario_id.as_str()
                 ),
@@ -1310,7 +1310,7 @@ fn subject_steps(
     let project_of = |scenario: &str| owned.iter().find(|s| s.scenario_id.as_str() == scenario).map_or("<root-id>", |s| s.project_id.as_str());
     let audit_command = |scenario: &str| {
         format!(
-            "canon evidence add --kind audit --scenario-id {scenario} --project-id {} --evaluator-id <evaluator> --evaluator-version <version> --evaluator-digest <sha256> --audit-result <confirmed|refuted|indeterminate> --ref \"<evaluator run>\" --role auditor --actor-id <evaluator>",
+            "canon evidence audit {scenario} --project-id {} --evaluator-id <evaluator> --evaluator-version <version> --evaluator-digest <sha256> --audit-result <confirmed|refuted|indeterminate> --ref \"<evaluator run>\" --role auditor --actor-id <evaluator>",
             project_of(scenario)
         )
     };

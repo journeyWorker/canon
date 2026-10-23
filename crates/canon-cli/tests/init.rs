@@ -91,7 +91,7 @@ fn init_scaffolds_a_working_config_in_a_fresh_repo() {
         "failure",
         "Independent review",
         "canon brief check",
-        "canon brief approve --change-id <slug> --by <the human> --note",
+        "canon brief approve <slug> --by <the human> --note",
         "Inside an approved scope, never stop for a human",
         "unless the brief says the human ships",
         "a new change is a new scope",

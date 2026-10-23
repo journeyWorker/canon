@@ -51,7 +51,7 @@ pub enum LearnCommand {
 #[derive(Args)]
 pub struct LearnPromoteArgs {
     /// The StrategyId (ULID) to promote
-    #[arg(value_parser = crate::learn::parse_strategy_id)]
+    #[arg(value_name = "STRATEGY_ID", value_parser = crate::learn::parse_strategy_id)]
     pub strategy_id: StrategyId,
     /// Repo root (default: nearest ancestor with a canon.yaml)
     #[arg(long, default_value = ".")]
@@ -75,7 +75,7 @@ pub struct LearnPromoteArgs {
 
 #[derive(Args)]
 pub struct LearnApproveArgs {
-    #[arg(value_parser = crate::learn::parse_strategy_id)]
+    #[arg(value_name = "STRATEGY_ID", value_parser = crate::learn::parse_strategy_id)]
     pub strategy_id: StrategyId,
     #[arg(long)]
     pub evaluation: PathBuf,
@@ -89,7 +89,7 @@ pub struct LearnApproveArgs {
 
 #[derive(Args)]
 pub struct LearnRollbackArgs {
-    #[arg(value_parser = crate::learn::parse_strategy_id)]
+    #[arg(value_name = "STRATEGY_ID", value_parser = crate::learn::parse_strategy_id)]
     pub strategy_id: StrategyId,
     #[arg(long)]
     pub reason: String,

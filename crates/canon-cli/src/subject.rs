@@ -573,11 +573,11 @@ fn unadopt_change(
         change.envelope.schema = RecordKind::Change.schema_version();
         registry.persist(&change).map_err(|e| {
             format!(
-                "subject `{}` no longer lists change `{}`, but the change record could not be written: {e}; complete the unlink with `canon subject unadopt {} --subject-id {}`",
+                "subject `{}` no longer lists change `{}`, but the change record could not be written: {e}; complete the unlink with `canon subject unadopt {} --change-id {}`",
                 subject_id.as_str(),
                 change_id.as_str(),
-                change_id.as_str(),
-                subject_id.as_str()
+                subject_id.as_str(),
+                change_id.as_str()
             )
         })?;
     }
@@ -666,7 +666,7 @@ pub(crate) fn lookup_adoption(repo: &Path, subject_id: &SubjectId, change_id: &C
 /// writes only the side that still lacks the link, and nothing once both
 /// carry it.
 pub(crate) fn adopt_command(change_id: &ChangeId, subject_id: &SubjectId) -> String {
-    format!("canon subject adopt {} --subject-id {}", change_id.as_str(), subject_id.as_str())
+    format!("canon subject adopt {} --change-id {}", subject_id.as_str(), change_id.as_str())
 }
 
 /// A failed [`persist_adoption`]: the store error, and whether the
@@ -931,7 +931,7 @@ pub fn run_status(
             let lines = waivable.iter().map(Violation::line).collect::<Vec<_>>().join("\n");
             let mut fixes = Vec::new();
             if review_gaps && !waivable.iter().all(canon_gate::review_gate::is_reverify) {
-                fixes.push("record an independent review (`canon review add`) and close blocker findings");
+                fixes.push("record an independent review (`canon review scenario`) and close blocker findings");
             }
             if brief_gap.is_some() {
                 fixes.push("get the human's answer to the brief and record it with `canon brief approve`");

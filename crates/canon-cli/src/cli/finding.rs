@@ -123,7 +123,7 @@ pub struct FindingAddArgs {
 #[derive(Args)]
 pub struct FindingCloseArgs {
     /// The change under review — first component of the natural key
-    #[arg(long, value_parser = crate::finding::parse_change_id)]
+    #[arg(value_name = "CHANGE_ID", value_parser = crate::finding::parse_change_id)]
     pub change_id: ChangeId,
     /// Which review round raised it (1-based)
     #[arg(long)]

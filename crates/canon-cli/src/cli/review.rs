@@ -4,73 +4,46 @@ use canon_model::{ChangeId, ProjectId, RoleId, ScenarioId};
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
-/// The flags of `context-pack new`.
-#[derive(clap::Args)]
-pub struct ContextPackNewArgs {
-    /// Repository-relative input manifest
-    #[arg(long)]
-    pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
-    /// Output the complete pack manifest as JSON
-    #[arg(long)]
-    pub json: bool,
-}
-
-/// The flags of `prompt add`.
-#[derive(clap::Args)]
-pub struct PromptAddArgs {
-    /// Bundle name
-    #[arg(long)]
-    pub name: String,
-    /// Bundle version
-    #[arg(long)]
-    pub version: String,
-    /// Repository-relative input manifest
-    #[arg(long)]
-    pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
-    /// Output the complete bundle manifest as JSON
-    #[arg(long)]
-    pub json: bool,
-}
-
-/// The flags of `demo add`.
-#[derive(clap::Args)]
-pub struct DemoAddArgs {
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
-    /// Output JSON instead of the human-readable form
-    #[arg(long)]
-    pub json: bool,
-}
-
 #[derive(Subcommand)]
 pub enum ReviewCommand {
-    /// Write one attributed Review record per scenario (or, with --change-id, one for a chore change) directly to the ledger, nothing to promote (exactly one provenance ref required). A scenario review pins the scenario's digest and what its latest evidence says (verdict and checks); it counts only while both are unchanged. A change review pins the chore's brief
+    /// Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required). A review pins the scenario's digest and what its latest evidence says (verdict and checks); it counts only while both are unchanged. Each scenario must be indexed, or nothing is written (exit 2)
     #[command(group(clap::ArgGroup::new("provenance").args(["upstream_ref", "original_spec_ref"]).required(true).multiple(false)))]
-    Add(ReviewAddArgs),
+    Scenario(ReviewScenarioArgs),
+    /// Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required). The review signs the chore's invariants and checks against the diff and pins the change's brief; an edit to the brief stales it. A chore needs exactly this one review before `subject status --to shipped`
+    #[command(group(clap::ArgGroup::new("provenance").args(["upstream_ref", "original_spec_ref"]).required(true).multiple(false)))]
+    Change(ReviewChangeArgs),
 }
 
+/// The flags of `review scenario`.
 #[derive(Args)]
-pub struct ReviewAddArgs {
-    #[arg(long, value_parser = crate::review::parse_project_id)]
-    pub project_id: ProjectId,
-    /// The reviewed scenario; repeatable, one review per scenario, all or nothing. Each must have a record (`canon inventory sync`), or nothing is written (exit 2)
-    #[arg(long = "scenario-id", value_parser = crate::review::parse_scenario_id)]
+pub struct ReviewScenarioArgs {
+    /// The reviewed scenarios (`<area>.<surface>.<nn>`), one review each, all or nothing. Each must have a record (`canon inventory sync`), or nothing is written (exit 2)
+    #[arg(value_name = "SCENARIO_ID", required = true, value_parser = crate::review::parse_scenario_id)]
     pub scenario_ids: Vec<ScenarioId>,
-    /// Read more scenario ids from a file (`-` for stdin): one per line, `#` starts a comment
-    #[arg(long, value_name = "FILE|-")]
-    pub scenario_ids_from: Option<String>,
-    /// Review a chore change instead of scenarios: its invariants and checks against the diff. Pins the change's brief; an edit to the brief stales it. A chore needs exactly this one review before `--to shipped`
-    #[arg(long, value_name = "SLUG", value_parser = crate::query::parse_change_id, conflicts_with_all = ["scenario_ids", "scenario_ids_from"])]
-    pub change_id: Option<ChangeId>,
+    #[command(flatten)]
+    pub review: ReviewOptions,
+}
+
+/// The flags of `review change`.
+#[derive(Args)]
+pub struct ReviewChangeArgs {
+    /// The chore change to review
+    #[arg(value_name = "CHANGE_ID", value_parser = crate::query::parse_change_id)]
+    pub change_id: ChangeId,
+    #[command(flatten)]
+    pub review: ReviewOptions,
+}
+
+/// The options both review leaves share.
+#[derive(Args)]
+pub struct ReviewOptions {
+    /// Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root
+    #[arg(long, value_parser = crate::review::parse_project_id)]
+    pub project_id: Option<ProjectId>,
+    /// The reviewer's id (recorded as the review's author and as its reviewer; line breaks refused)
     #[arg(long)]
-    pub reviewer: String,
+    pub actor_id: String,
+    /// The commit the review was made at (pinned on the record)
     #[arg(long)]
     pub pin: String,
     /// Provenance ref (mutually exclusive with --original-spec-ref; exactly one required)
@@ -79,9 +52,6 @@ pub struct ReviewAddArgs {
     /// Provenance ref (mutually exclusive with --upstream-ref; exactly one required)
     #[arg(long)]
     pub original_spec_ref: Option<String>,
-    /// The invoking actor's id
-    #[arg(long, default_value = "canon")]
-    pub actor_id: String,
     /// The reviewer's role. Required unless the declared role (--as / CANON_ROLE) is implementer or reviewer, which it then defaults to
     #[arg(long, value_parser = crate::retrieve::parse_role)]
     pub role: Option<RoleId>,
@@ -90,7 +60,7 @@ pub struct ReviewAddArgs {
     pub session_id: Option<canon_model::SessionId>,
     /// How the reviewer's run ended: signed (an approval), indeterminate (ran, reached no verdict) or unavailable (could not run). Only signed counts; the others are recorded as review gaps
     #[arg(long, default_value = "signed", value_parser = crate::review::parse_outcome)]
-    pub outcome: canon_model::ReviewOutcome,
+    pub review_outcome: canon_model::ReviewOutcome,
     /// The reviewer runtime's provider (e.g. anthropic, openai)
     #[arg(long, value_parser = crate::review::parse_runtime_label)]
     pub reviewer_provider: Option<String>,

@@ -1,2 +1,2 @@
-canon review add: UNKNOWN_SPEC_ROOT — `--project-id root` names no spec root configured in canon.yaml (`specs.roots[]`: game); nothing was written
+canon review scenario: UNKNOWN_SPEC_ROOT — `--project-id root` names no spec root configured in canon.yaml (`specs.roots[]`: game); nothing was written
 hint: the only spec root canon.yaml configures is `game`; pass `--project-id game`

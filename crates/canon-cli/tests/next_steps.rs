@@ -126,7 +126,7 @@ fn writes_name_the_step_status_names_for_the_subject_they_touched() {
     let steps = meta_next(&created);
     assert_eq!(steps[0]["actor"], "agent");
     assert_eq!(steps[0]["role"], "planner");
-    assert_eq!(steps[0]["command"], "canon brief check --change-id add-login");
+    assert_eq!(steps[0]["command"], "canon brief check add-login");
     assert!(steps[0]["why"].as_str().unwrap().contains("blocker(s): write the brief"), "{}", steps[0]);
 
     // Once the brief is written clean, the one human stop is the subject's only step.
@@ -153,7 +153,7 @@ fn writes_name_the_step_status_names_for_the_subject_they_touched() {
 
     let review = ok(
         repo,
-        &["review", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--reviewer", "rev", "--actor-id", "rev", "--session-id", "s2", "--role", "reviewer", "--pin", "0123456789abcdef0123456789abcdef01234567", "--original-spec-ref", "login.feature", "--json"],
+        &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "rev", "--session-id", "s2", "--role", "reviewer", "--pin", "0123456789abcdef0123456789abcdef01234567", "--original-spec-ref", "login.feature", "--json"],
     );
     assert_eq!(meta_next(&review)[0], status_step(repo, "demo"), "review add");
 }
@@ -251,7 +251,7 @@ fn a_declared_role_keeps_its_steps_and_counts_the_rest() {
     let reviewer = status_report(repo, Some("reviewer"));
     let steps = reviewer["next"].as_array().unwrap();
     assert!(!steps.is_empty() && steps.iter().all(|s| s["role"] == "reviewer"), "{steps:?}");
-    assert!(steps[0]["command"].as_str().unwrap().starts_with("canon review add"), "{steps:?}");
+    assert!(steps[0]["command"].as_str().unwrap().starts_with("canon review scenario"), "{steps:?}");
     assert_eq!(reviewer["waitingOn"]["implementer"], 1, "{reviewer}");
 
     let text = canon(repo, &["status"], Some("reviewer"));
@@ -332,7 +332,7 @@ fn context_status_81_the_polish_step_comes_before_the_human_stop() {
     assert_eq!(steps.len(), 2, "{steps:?}");
     assert_eq!((steps[0]["actor"].as_str(), steps[0]["role"].as_str()), (Some("agent"), Some("planner")), "{}", steps[0]);
     let command = steps[0]["command"].as_str().unwrap();
-    assert!(command.contains("reference/brief-polish.md") && command.contains("`canon brief check --change-id add-login`"), "{command}");
+    assert!(command.contains("reference/brief-polish.md") && command.contains("`canon brief check add-login`"), "{command}");
     let why = steps[0]["why"].as_str().unwrap();
     assert!(why.contains("1 advisory finding(s)") && why.contains("prose.key-sentence"), "{why}");
     assert_eq!((steps[1]["actor"].as_str(), steps[1]["role"].is_null()), (Some("human"), true), "{}", steps[1]);
@@ -345,7 +345,7 @@ fn context_status_81_the_polish_step_comes_before_the_human_stop() {
     std::fs::write(repo.join(".canon/changes/add-login/brief.md"), brief_with_an_advisory().replace("## Out of scope\n\nSocial sign-in.", "## Out of scope\n\nTBD")).unwrap();
     let blocked = status_steps(repo, "demo");
     assert_eq!(blocked.len(), 1, "{blocked:?}");
-    assert_eq!(blocked[0]["command"], "canon brief check --change-id add-login");
+    assert_eq!(blocked[0]["command"], "canon brief check add-login");
 }
 
 /// context.status.83: with no advisories the human stop is the only step,

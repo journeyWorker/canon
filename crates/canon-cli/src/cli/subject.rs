@@ -95,7 +95,7 @@ pub enum SubjectCommand {
     Adopt(SubjectAdoptArgs),
     /// Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved)
     #[command(
-        after_help = "Examples:\n  canon subject unadopt add-login --subject-id demo\n\nRemoves the link on both sides (the subject's change list and the change's\nsubject list). The change and its brief stay and can be adopted elsewhere, for\nexample by a proposed holding subject. Refused (SUBJECT_UNADOPT_REFUSED) for a\nchange whose brief carries an `Approved:` line: it is the subject's approved\nscope, and for a change a scenario the subject owns is tagged\n`@flow:<change>.*` for (remove or retag it first). A pair that is not linked writes nothing and exits 0."
+        after_help = "Examples:\n  canon subject unadopt demo --change-id add-login\n\nRemoves the link on both sides (the subject's change list and the change's\nsubject list). The change and its brief stay and can be adopted elsewhere, for\nexample by a proposed holding subject. Refused (SUBJECT_UNADOPT_REFUSED) for a\nchange whose brief carries an `Approved:` line: it is the subject's approved\nscope, and for a change a scenario the subject owns is tagged\n`@flow:<change>.*` for (remove or retag it first). A pair that is not linked writes nothing and exits 0."
     )]
     Unadopt(SubjectUnadoptArgs),
     /// Show a subject, or with --to transition its lifecycle status (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason)
@@ -105,7 +105,7 @@ pub enum SubjectCommand {
 #[derive(Args)]
 pub struct SubjectNewArgs {
     /// The subject's kebab-slug id
-    #[arg(value_parser = crate::subject::parse_subject_id)]
+    #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]
     pub id: SubjectId,
     /// The subject's domain (kebab slug)
     #[arg(long)]
@@ -132,12 +132,12 @@ pub struct SubjectNewArgs {
 
 #[derive(Args)]
 pub struct SubjectAdoptArgs {
-    /// The imported Change's id
-    #[arg(value_parser = crate::subject::parse_change_id)]
-    pub change_id: ChangeId,
     /// The subject to adopt the change under
-    #[arg(long, value_parser = crate::subject::parse_subject_id)]
+    #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]
     pub subject_id: SubjectId,
+    /// The imported Change's id
+    #[arg(long, value_parser = crate::subject::parse_change_id)]
+    pub change_id: ChangeId,
     /// Repo root (default: nearest ancestor with a canon.yaml)
     #[arg(long, default_value = ".")]
     pub repo: PathBuf,
@@ -148,12 +148,12 @@ pub struct SubjectAdoptArgs {
 
 #[derive(Args)]
 pub struct SubjectUnadoptArgs {
-    /// The change to take out of the subject
-    #[arg(value_parser = crate::subject::parse_change_id)]
-    pub change_id: ChangeId,
     /// The subject to take the change out of
-    #[arg(long, value_parser = crate::subject::parse_subject_id)]
+    #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]
     pub subject_id: SubjectId,
+    /// The change to take out of the subject
+    #[arg(long, value_parser = crate::subject::parse_change_id)]
+    pub change_id: ChangeId,
     /// Repo root (default: nearest ancestor with a canon.yaml)
     #[arg(long, default_value = ".")]
     pub repo: PathBuf,
@@ -165,7 +165,7 @@ pub struct SubjectUnadoptArgs {
 #[derive(Args)]
 pub struct SubjectStatusArgs {
     /// The subject to show, or transition with --to
-    #[arg(value_parser = crate::subject::parse_subject_id)]
+    #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]
     pub id: SubjectId,
     /// Move the subject to this state (proposed/specced/building/verifying/shipped/retired); without it the subject is shown and nothing is written
     #[arg(long, value_name = "STATE", value_parser = crate::subject::status_parser())]

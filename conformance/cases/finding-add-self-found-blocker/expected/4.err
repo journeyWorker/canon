@@ -3,4 +3,4 @@ canon subject status: review guard for building → verifying (spec_coverage.req
 canon subject status:   ran unreviewed-promotion — every owned scenario needs a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's
 canon subject status:   ran open-blocker — 1 adopted change(s) checked for open blocker findings
 canon subject status: SUBJECT_GATE_VIOLATION — open-blocker c-cart#1.1 — building → verifying: open blocker finding by `impl-agent` on change `c-cart` (subject `cart`): a second add leaves two rows; fix it and `canon finding close --disposition fixed --resolution-sha <sha>`, or close it as rejected or deferred
-hint: record an independent review (`canon review add`) and close blocker findings, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject and `canon gate check` keeps listing these gaps
+hint: record an independent review (`canon review scenario`) and close blocker findings, or pass --override-reason <text> to move anyway; the waiver is recorded on the subject and `canon gate check` keeps listing these gaps

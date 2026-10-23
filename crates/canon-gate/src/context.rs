@@ -145,7 +145,7 @@ pub struct GateContext {
     /// never become a scenario's latest declared verdict.
     pub evidence: Vec<EvidenceRecord>,
     /// AUDITED outcomes (0.15 D3): every well-formed record carrying
-    /// `audit` (`canon evidence add --kind audit`), split out of
+    /// `audit` (`canon evidence audit`), split out of
     /// `evidence` at load. Read by `crate::audit` only.
     pub audits: Vec<EvidenceRecord>,
     /// The spec corpus `canon inventory sync` materializes — the

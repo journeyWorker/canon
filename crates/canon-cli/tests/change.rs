@@ -265,7 +265,7 @@ fn change_new_failing_between_record_writes_prints_a_repair_that_completes_the_l
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     assert!(
         stderr(&out).contains("subject `auth` now lists change `add-login`, but the change record could not be written")
-            && stderr(&out).contains("complete the link with `canon ingest plans && canon subject adopt add-login --subject-id auth`"),
+            && stderr(&out).contains("complete the link with `canon ingest plans && canon subject adopt auth --change-id add-login`"),
         "{}",
         stderr(&out)
     );
@@ -278,7 +278,7 @@ fn change_new_failing_between_record_writes_prints_a_repair_that_completes_the_l
     // The printed repair, run as printed.
     let ingest = run(dir.path(), &["ingest", "plans"]);
     assert!(ingest.status.success(), "{}", stderr(&ingest));
-    let adopt = run(dir.path(), &["subject", "adopt", "add-login", "--subject-id", "auth"]);
+    let adopt = run(dir.path(), &["subject", "adopt", "auth", "--change-id", "add-login"]);
     assert!(adopt.status.success(), "{}", stderr(&adopt));
     assert!(stdout(&adopt).contains("linked change `add-login` to subject `auth`"), "{}", stdout(&adopt));
     let changes = query(dir.path(), "change");
@@ -286,7 +286,7 @@ fn change_new_failing_between_record_writes_prints_a_repair_that_completes_the_l
 
     // Idempotent: a second run writes nothing.
     let before = ledger_file_count(dir.path());
-    let again = run(dir.path(), &["subject", "adopt", "add-login", "--subject-id", "auth"]);
+    let again = run(dir.path(), &["subject", "adopt", "auth", "--change-id", "add-login"]);
     assert!(again.status.success(), "{}", stderr(&again));
     assert!(stdout(&again).contains("already linked") && stdout(&again).contains("nothing written"), "{}", stdout(&again));
     assert_eq!(ledger_file_count(dir.path()), before, "a rerun on a linked pair must write no record");
@@ -344,7 +344,7 @@ fn subject_lifecycle_33_a_change_adopted_by_a_second_subject_belongs_to_both_and
     let created = run(repo, &["change", "new", "refactor-core", "--subject-id", "perception", "--title", "Refactor core"]);
     assert!(created.status.success(), "{}", stderr(&created));
 
-    let adopt = run(repo, &["subject", "adopt", "refactor-core", "--subject-id", "editing"]);
+    let adopt = run(repo, &["subject", "adopt", "editing", "--change-id", "refactor-core"]);
     assert!(adopt.status.success(), "{}", stderr(&adopt));
     assert_eq!(
         without_next(&stdout(&adopt)),

@@ -332,13 +332,13 @@ fn operational_errors_carry_a_string_code_and_the_registry_exit() {
     ok(dir.path(), &["change", "new", "two", "--subject-id", "demo", "--title", "Two"]);
     let (code, report) = check(dir.path(), &[]);
     assert_eq!((code, report["error"]["code"].as_str()), (2, Some("CHANGE_AMBIGUOUS")));
-    let (code, report) = check(dir.path(), &["--change-id", "one"]);
+    let (code, report) = check(dir.path(), &["one"]);
     assert_eq!((code, report["findings"].is_array()), (1, true), "naming the change resolves the ambiguity");
-    let (code, report) = check(dir.path(), &["--change-id", "missing"]);
+    let (code, report) = check(dir.path(), &["missing"]);
     assert_eq!((code, report["error"]["code"].as_str()), (2, Some("BRIEF_NOT_FOUND")));
 
     std::fs::write(dir.path().join("canon.yaml"), std::fs::read_to_string(dir.path().join("canon.yaml")).unwrap() + "language: [ko]\n").unwrap();
-    let (code, report) = check(dir.path(), &["--change-id", "one"]);
+    let (code, report) = check(dir.path(), &["one"]);
     assert_eq!((code, report["error"]["code"].as_str()), (2, Some("CONFIG_UNREADABLE")));
 }
 
@@ -404,13 +404,13 @@ fn a_chore_brief_is_written_and_judged_by_the_chore_rule_set() {
     let brief = std::fs::read_to_string(&path).unwrap();
     assert!(brief.contains("<!-- canon:kind chore -->") && brief.contains("## 불변 조건") && brief.contains("## 분류"), "{brief}");
     assert!(!brief.contains("canon:section flow"), "{brief}");
-    let (code, report) = check(dir.path(), &["--change-id", "bump-client"]);
+    let (code, report) = check(dir.path(), &["bump-client"]);
     assert_eq!(code, 1);
     assert_eq!(rules(&report), vec!["brief.placeholder"; 5], "{report}");
 
     let en = |name: &str, brief: String| {
         std::fs::write(&path, brief).unwrap();
-        check(dir.path(), &["--change-id", name])
+        check(dir.path(), &[name])
     };
     let (code, report) = en("bump-client", chore_brief("`Dependency`."));
     assert_eq!((code, rules(&report)), (0, Vec::<String>::new()), "a clean chore, category case and punctuation aside: {report}");
@@ -431,7 +431,7 @@ fn a_chore_brief_is_written_and_judged_by_the_chore_rule_set() {
     std::fs::write(&path, format!("{}\n{APPROVED}", chore_brief("infra"))).unwrap();
     ok(dir.path(), &["subject", "status", "demo", "--to", "specced"]);
     ok(dir.path(), &["subject", "status", "demo", "--to", "building"]);
-    let (code, report) = check(dir.path(), &["--change-id", "bump-client"]);
+    let (code, report) = check(dir.path(), &["bump-client"]);
     assert_eq!((code, report["phase"].as_str(), rules(&report)), (0, Some("building"), Vec::<String>::new()), "a chore has no flow to cover: {report}");
 
     let out = run(dir.path(), &["change", "new", "x", "--subject-id", "demo", "--kind", "epic", "--title", "x"]);

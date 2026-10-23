@@ -218,15 +218,14 @@ fn context_capability_16_a_removed_flag_spelling_is_refused_with_the_flag_that_r
 
     // The `=` form, a global argument placed before the subcommand, and a flag missing its value.
     for args in [
-        &["brief", "check", "--change=add-login", "--json"][..],
-        &["brief", "check", "--change", "add-login", "--json"],
-        &["brief", "--change", "add-login", "check", "--json"],
-        &["brief", "check", "--change", "--json"],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--change=add-login", "--json"][..],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--change", "add-login", "--json"],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--change", "--json"],
     ] {
         let body = usage_error(&canon_in(repo, args));
         assert_eq!(body["error"]["hint"], "--change was renamed --change-id in 0.24.0; use --change-id", "{args:?}: {body}");
     }
-    let canonical = canon_in(repo, &["brief", "check", "--change-id", "add-login", "--json"]);
+    let canonical = canon_in(repo, &["brief", "check", "add-login", "--json"]);
     let report: Value = serde_json::from_slice(&canonical.stdout).expect("one JSON document");
     assert_eq!(report["data"]["change"], "add-login", "{report}");
     assert!(report["meta"].get("deprecated").is_none(), "{report}");
@@ -235,14 +234,14 @@ fn context_capability_16_a_removed_flag_spelling_is_refused_with_the_flag_that_r
     for (args, old, new) in [
         (&["scenario", "new", "demo.login.01", "--title", "A", "--actor", "alice", "--json"][..], "--actor", "--actor-id"),
         (&["scenario", "new", "demo.login.01", "--title", "A", "--project", "root", "--json"], "--project", "--project-id"),
-        (&["dispatch", "end", "--run", "r1", "--json"], "--run", "--run-id"),
+        (&["ingest", "artifacts", "--run", "r1", "--json"], "--run", "--run-id"),
     ] {
         let body = usage_error(&canon_in(repo, args));
         assert_eq!(body["error"]["hint"], format!("{old} was renamed {new} in 0.24.0; use {new}"), "{args:?}: {body}");
     }
 
     // Without --json the refusal is still exit 2, on stderr, with the hint.
-    let human = canon_in(repo, &["brief", "check", "--change", "add-login"]);
+    let human = canon_in(repo, &["scenario", "new", "demo.login.01", "--title", "A", "--change", "add-login"]);
     assert_eq!(human.status.code(), Some(2));
     assert!(stderr(&human).contains("use --change-id"), "{}", stderr(&human));
 }
@@ -277,7 +276,7 @@ fn context_capability_17_a_removed_kind_value_is_refused_with_the_value_that_rep
 #[test]
 fn context_capability_18_help_and_schema_show_only_the_one_name() {
     let dir = tempfile::tempdir().unwrap();
-    for (args, canonical) in [(&["brief", "approve", "--help"][..], "--change-id"), (&["change", "new", "--help"], "--subject-id"), (&["query", "--help"], "--kind <KIND>"), (&["scenario", "new", "--help"], "--subject-id")] {
+    for (args, canonical) in [(&["brief", "approve", "--help"][..], "CHANGE_ID"), (&["change", "new", "--help"], "--subject-id"), (&["query", "--help"], "--kind <KIND>"), (&["scenario", "new", "--help"], "--subject-id")] {
         let help = stdout(&canon_in(dir.path(), args));
         assert!(help.contains(canonical), "{args:?} help shows the canonical `{canonical}`:\n{help}");
         for old in ["--change ", "--change\n", "--subject ", "--subject\n", "--project ", "--actor ", "--run "] {
@@ -320,20 +319,20 @@ fn context_capability_19_a_token_after_the_separator_or_an_option_value_is_never
     // scan runs: a removed spelling after `--` or as an option's value is not
     // reported.
     for args in [
-        &["brief", "check", "--bogus", "--json", "--", "--change"][..],
-        &["brief", "check", "--bogus", "--change-id", "--change", "--json"],
-        &["brief", "check", "--bogus", "--change-id=--change", "--json"],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--json", "--", "--change"][..],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--change-id", "--change", "--json"],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--change-id=--change", "--json"],
     ] {
         let refused = usage_error(&canon_in(repo, args));
         let hint = refused["error"]["hint"].as_str().unwrap_or_default().to_string();
         assert!(!refused.to_string().contains("was removed") && !hint.contains("--change "), "{args:?}: {refused}");
     }
     // The same line with the spelling as a real flag is reported.
-    let flagged = usage_error(&canon_in(repo, &["brief", "check", "--bogus", "--change", "x", "--json"]));
+    let flagged = usage_error(&canon_in(repo, &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--change", "x", "--json"]));
     assert!(flagged["error"]["hint"].as_str().unwrap().contains("use --change-id"), "{flagged}");
 
     // As a flag it is refused, with a space or an equals sign.
-    for args in [&["brief", "check", "--change=add-login", "--json"][..], &["brief", "check", "--change", "add-login", "--json"]] {
+    for args in [&["scenario", "new", "demo.login.01", "--title", "A", "--change=add-login", "--json"][..], &["scenario", "new", "demo.login.01", "--title", "A", "--change", "add-login", "--json"]] {
         usage_error(&canon_in(repo, args));
     }
 }
@@ -345,7 +344,7 @@ fn context_capability_20_a_removed_spelling_is_refused_only_on_the_commands_that
     let dir = repo_with_change();
     let other = usage_error(&canon_in(dir.path(), &["status", "--subject", "demo", "--json"]));
     assert!(!other.to_string().contains("renamed"), "{other}");
-    let renamed = usage_error(&canon_in(dir.path(), &["brief", "check", "--change", "--json"]));
+    let renamed = usage_error(&canon_in(dir.path(), &["scenario", "new", "demo.login.01", "--title", "A", "--change", "--json"]));
     assert!(renamed["error"]["hint"].as_str().unwrap().contains("use --change-id"), "{renamed}");
 }
 

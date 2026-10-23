@@ -31,6 +31,14 @@ pub fn set_sigpipe(_default: bool) {}
 pub fn usage_error(error: &clap::Error) -> ExitCode {
     let json = argv_wants_json();
     // A spelling 0.24 deprecated and 0.25 removed: the refusal names its replacement (0.25 D6).
+    // A leaf whose primary object moved into operand position, or that split (0.28).
+    if error.use_stderr() {
+        let args: Vec<String> = std::env::args().skip(1).collect();
+        if let Some(shape) = crate::removed::find_shape(&crate::cli::command(), &args) {
+            let command = format!("canon {}", shape.command);
+            return ExitCode::from(CliError::refused("USAGE", shape.message()).hint(shape.hint).field(shape.used.clone()).emit(command.trim(), json) as u8);
+        }
+    }
     if error.use_stderr() {
         let args: Vec<String> = std::env::args().skip(1).collect();
         if let Some(removed) = crate::removed::find(&crate::cli::command(), &args) {

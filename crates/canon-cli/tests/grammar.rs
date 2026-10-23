@@ -99,11 +99,11 @@ fn the_new_forms_run_without_any_deprecation_marker() {
     let pack = ok(dir.path(), &["context-pack", "new", "--manifest", "manifest.json", "--json"]);
     assert!(json_of(&pack)["data"]["id"].as_str().is_some_and(|id| id.starts_with("sha256:")), "{}", stdout(&pack));
     assert!(json_of(&pack)["meta"].get("deprecated").is_none(), "{}", stdout(&pack));
-    ok(dir.path(), &["prompt", "add", "--name", "reviewer", "--version", "v2", "--manifest", "manifest.json", "--json"]);
+    ok(dir.path(), &["prompt", "add", "reviewer@v2", "--manifest", "manifest.json", "--json"]);
 
     let scenario = repo_with_scenario();
     let sha = "a".repeat(40);
-    ok(scenario.path(), &["divergence", "add", "--project-id", "root", "--scenario-id", "game.run.01", "--sha", &sha, "--round", "2", "--reviewer", "r", "--role", "reviewer", "--json"]);
+    ok(scenario.path(), &["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--round", "2", "--reviewer", "r", "--role", "reviewer", "--json"]);
 
     let tmp = tempfile::tempdir().unwrap();
     let demo = tmp.path().join("demo");
@@ -201,7 +201,7 @@ fn canon_role_reviewer_lists_the_reviewers_commands_only() {
     let (out, commands) = schema_listing(&[("CANON_ROLE", "reviewer")], &[]);
     assert_eq!(json_of(&out)["data"]["role"], "reviewer");
     let listed = names(&commands);
-    assert!(listed.contains(&"review add") && listed.contains(&"finding add") && listed.contains(&"brief check"), "{listed:?}");
+    assert!(listed.contains(&"review scenario") && listed.contains(&"finding add") && listed.contains(&"brief check"), "{listed:?}");
     assert!(!listed.contains(&"evidence add") && !listed.contains(&"scenario new") && !listed.contains(&"gate promote"), "{listed:?}");
     assert!(commands.iter().all(|c| c["roles"].as_array().unwrap().contains(&json!("reviewer"))), "every listed command carries the role");
 
@@ -216,7 +216,7 @@ fn canon_role_reviewer_lists_the_reviewers_commands_only() {
 fn the_as_flag_wins_over_canon_role() {
     let (out, commands) = schema_listing(&[("CANON_ROLE", "reviewer")], &["--as", "implementer"]);
     assert_eq!(json_of(&out)["data"]["role"], "implementer");
-    assert!(names(&commands).contains(&"evidence add") && !names(&commands).contains(&"review add"));
+    assert!(names(&commands).contains(&"evidence add") && !names(&commands).contains(&"review scenario"));
 }
 
 #[test]
@@ -224,7 +224,7 @@ fn every_command_declares_its_roles_and_humans_only_commands_declare_none() {
     let (_, all) = schema_listing(&[], &[]);
     let by_name = |name: &str| all.iter().find(|c| c["command"] == name).unwrap_or_else(|| panic!("no `{name}`"));
     assert_eq!(by_name("evidence add")["roles"], json!(["implementer"]));
-    assert_eq!(by_name("review add")["roles"], json!(["reviewer"]));
+    assert_eq!(by_name("review scenario")["roles"], json!(["reviewer"]));
     assert_eq!(by_name("brief approve")["roles"], json!([]));
     assert!(all.iter().all(|c| c["roles"].is_array()));
 }

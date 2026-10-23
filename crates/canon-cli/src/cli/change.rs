@@ -96,7 +96,7 @@ pub enum ChangeCommand {
 #[derive(Args)]
 pub struct ChangeNewArgs {
     /// The change's slug (its change_id)
-    #[arg(value_parser = crate::subject::parse_change_id)]
+    #[arg(value_name = "CHANGE_ID", value_parser = crate::subject::parse_change_id)]
     pub slug: ChangeId,
     /// The existing subject to adopt the change under
     #[arg(long, value_parser = crate::subject::parse_subject_id)]

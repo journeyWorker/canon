@@ -97,7 +97,7 @@ pub enum FeatureCommand {
 #[derive(Args)]
 pub struct FeatureNewArgs {
     /// <area>.<surface> the fresh .feature file scaffolds
-    #[arg(value_parser = crate::scaffold::parse_area_surface)]
+    #[arg(value_name = "SURFACE", value_parser = crate::scaffold::parse_area_surface)]
     pub surface: AreaSurface,
     /// The Feature: header label
     #[arg(long)]

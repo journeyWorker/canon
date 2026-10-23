@@ -2,7 +2,7 @@ description: "0.25 D1 (#96): `canon change new b --subject-id s` into a building
 steps:
   - args: [change, new, b, --subject-id, s, --title, B, --json]
     exit: 0
-  - args: [subject, unadopt, b, --subject-id, s]
+  - args: [subject, unadopt, s, --change-id, b]
     exit: 0
-  - args: [subject, unadopt, b, --subject-id, s]
+  - args: [subject, unadopt, s, --change-id, b]
     exit: 0

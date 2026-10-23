@@ -138,11 +138,11 @@ fn a_fresh_change_is_the_planners_step_until_its_brief_is_clean() {
     let created: Value = serde_json::from_slice(&created.stdout).unwrap();
     let step = &created["meta"]["next"][0];
     assert_eq!((step["actor"].as_str(), step["role"].as_str()), (Some("agent"), Some("planner")), "{step}");
-    assert_eq!(step["command"], "canon brief check --change-id add-login");
+    assert_eq!(step["command"], "canon brief check add-login");
 
     // The planner sees it under its own role; nothing waits on the human yet.
     let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(["status", "--json"]).current_dir(repo).env("CANON_ROLE", "planner").env("CANON_ACTOR", "p").output().unwrap();
     let report: Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert!(report["meta"]["next"].as_array().unwrap().iter().any(|s| s["command"] == "canon brief check --change-id add-login"), "{report}");
+    assert!(report["meta"]["next"].as_array().unwrap().iter().any(|s| s["command"] == "canon brief check add-login"), "{report}");
     assert!(report["meta"]["waitingOn"].get("human").is_none(), "{report}");
 }

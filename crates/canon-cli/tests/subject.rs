@@ -164,7 +164,7 @@ fn adopt_links_the_change_and_the_subject_on_both_sides() {
     seed_change(dir.path(), "s36-demo");
     assert!(run(dir.path(), &["subject", "new", "demo-subject", "--domain", "dev", "--title", "Demo"]).status.success());
 
-    let out = run(dir.path(), &["subject", "adopt", "s36-demo", "--subject-id", "demo-subject"]);
+    let out = run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "s36-demo"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
 
     // Subject side: `change_ids` gained the change (folded to one row).
@@ -188,7 +188,7 @@ fn adopt_links_the_change_and_the_subject_on_both_sides() {
 fn adopt_refuses_an_unknown_change() {
     let dir = repo();
     assert!(run(dir.path(), &["subject", "new", "demo-subject", "--domain", "dev", "--title", "Demo"]).status.success());
-    let out = run(dir.path(), &["subject", "adopt", "no-such-change", "--subject-id", "demo-subject"]);
+    let out = run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "no-such-change"]);
     assert_eq!(out.status.code(), Some(2));
     assert!(stderr(&out).contains("does not exist"), "stderr: {}", stderr(&out));
 }
@@ -207,10 +207,10 @@ fn adopt_is_a_no_op_on_an_already_linked_pair() {
     let dir = repo();
     seed_change(dir.path(), "s36-demo");
     assert!(run(dir.path(), &["subject", "new", "demo-subject", "--domain", "dev", "--title", "Demo"]).status.success());
-    assert!(run(dir.path(), &["subject", "adopt", "s36-demo", "--subject-id", "demo-subject"]).status.success());
+    assert!(run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "s36-demo"]).status.success());
 
     let before = ledger_file_count(dir.path());
-    let again = run(dir.path(), &["subject", "adopt", "s36-demo", "--subject-id", "demo-subject"]);
+    let again = run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "s36-demo"]);
     assert_eq!(again.status.code(), Some(0), "{}", stderr(&again));
     assert!(stdout(&again).contains("already linked to subject `demo-subject`; nothing written"), "{}", stdout(&again));
     assert_eq!(ledger_file_count(dir.path()), before);
@@ -236,23 +236,23 @@ fn adopt_failing_between_its_two_writes_prints_a_repair_that_completes_the_link(
         return;
     }
 
-    let out = run(dir.path(), &["subject", "adopt", "s36-demo", "--subject-id", "demo-subject"]);
+    let out = run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "s36-demo"]);
     std::fs::set_permissions(&ledger_change, std::fs::Permissions::from_mode(0o755)).unwrap();
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     assert!(
         stderr(&out).contains("subject `demo-subject` now lists change `s36-demo`, but the change record could not be written")
-            && stderr(&out).contains("complete the link with `canon subject adopt s36-demo --subject-id demo-subject`"),
+            && stderr(&out).contains("complete the link with `canon subject adopt demo-subject --change-id s36-demo`"),
         "{}",
         stderr(&out)
     );
     let subjects = query_subjects(dir.path(), &[]);
     assert!(subjects["records"][0]["change_ids"].as_array().unwrap().iter().any(|c| c == "s36-demo"));
 
-    let repair = run(dir.path(), &["subject", "adopt", "s36-demo", "--subject-id", "demo-subject"]);
+    let repair = run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "s36-demo"]);
     assert_eq!(repair.status.code(), Some(0), "{}", stderr(&repair));
     let changes: Value = data_of(&run(dir.path(), &["query", "--kind", "change", "--json"]));
     assert!(changes["records"].as_array().unwrap().iter().any(|c| c["subject_ids"] == serde_json::json!(["demo-subject"])), "{changes}");
-    let again = run(dir.path(), &["subject", "adopt", "s36-demo", "--subject-id", "demo-subject"]);
+    let again = run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "s36-demo"]);
     assert!(stdout(&again).contains("nothing written"), "{}", stdout(&again));
 }
 
@@ -524,13 +524,10 @@ fn review_via_cli(repo: &Path, actor: &str, session: Option<&str>) -> Output {
     let pin = format!("pin-{actor}-{}", session.unwrap_or("none"));
     let mut args = vec![
         "review",
-        "add",
+        "scenario",
+        "world.demo.01",
         "--project-id",
         "demo",
-        "--scenario-id",
-        "world.demo.01",
-        "--reviewer",
-        actor,
         "--pin",
         pin.as_str(),
         "--original-spec-ref",
@@ -929,7 +926,7 @@ fn review_add_refuses_an_unsynced_scenario_and_names_inventory_sync() {
     let out = run(
         dir.path(),
         &[
-            "review", "add", "--project-id", "demo", "--scenario-id", "world.demo.99", "--reviewer", "reviewer-2", "--pin", "p1", "--original-spec-ref",
+            "review", "scenario", "world.demo.99", "--project-id", "demo", "--pin", "p1", "--original-spec-ref",
             "specs/demo.feature", "--actor-id", "reviewer-2", "--role", "reviewer",
         ],
     );
@@ -951,8 +948,8 @@ fn an_unavailable_review_is_a_gap_at_the_gate_and_the_status_guard() {
     let out = run(
         dir.path(),
         &[
-            "review", "add", "--project-id", "demo", "--scenario-id", "world.demo.01", "--reviewer", "reviewer-2", "--pin", "p1", "--original-spec-ref",
-            "specs/demo.feature", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--outcome", "unavailable",
+            "review", "scenario", "world.demo.01", "--project-id", "demo", "--pin", "p1", "--original-spec-ref",
+            "specs/demo.feature", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--review-outcome", "unavailable",
         ],
     );
     assert!(out.status.success(), "stderr: {}", stderr(&out));
@@ -1074,7 +1071,7 @@ fn status_brief(repo: &Path) -> Value {
     report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "demo-subject").unwrap()["brief"].clone()
 }
 
-const BRIEF_REFUSAL: &str = "canon subject status: SUBJECT_GATE_VIOLATION — unreviewed-promotion demo-subject — verifying → shipped: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words with `canon brief approve --change-id c-demo --by <the human> --note \"<their words>\"`\n";
+const BRIEF_REFUSAL: &str = "canon subject status: SUBJECT_GATE_VIOLATION — unreviewed-promotion demo-subject — verifying → shipped: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words with `canon brief approve c-demo --by <the human> --note \"<their words>\"`\n";
 
 /// subject.lifecycle.24: with every technical gate passing, a brief
 /// with no `Approved:` line refuses `verifying → shipped`, naming the
@@ -1236,7 +1233,7 @@ const EVIDENCE_REFUSAL: &str = "hint: stop, report the brief to the human and wa
 /// The violation line `canon evidence add` prints for `demo-subject`'s
 /// unapproved brief, attesting `what`.
 fn evidence_brief_line(what: &str) -> String {
-    format!("canon evidence add: BRIEF_UNAPPROVED — unreviewed-promotion demo-subject — evidence for {what}: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line, so the human has not answered it; once they do, record their words with `canon brief approve --change-id c-demo --by <the human> --note \"<their words>\"`\n")
+    format!("canon evidence add: BRIEF_UNAPPROVED — unreviewed-promotion demo-subject — evidence for {what}: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line, so the human has not answered it; once they do, record their words with `canon brief approve c-demo --by <the human> --note \"<their words>\"`\n")
 }
 
 /// evidence.add.68: while the subject's brief is enforced and not
@@ -1385,7 +1382,7 @@ fn write_pointer_brief(repo: &Path, change: &str) {
 
 /// What the refusals ask for when `c-ext`'s canon brief does not exist.
 const EXTERNAL_UNANSWERED: &str = ".canon/changes/c-ext/brief.md does not exist yet: change `c-ext` comes from the external plan openspec/changes/c-ext/proposal.md, which canon reads and never edits, so its approval lives in that canon file";
-const EXTERNAL_RECORD: &str = "create .canon/changes/c-ext/brief.md holding a `Source: openspec/changes/c-ext/proposal.md` line, then record their words with `canon brief approve --change-id c-ext --by <the human> --note \"<their words>\"`";
+const EXTERNAL_RECORD: &str = "create .canon/changes/c-ext/brief.md holding a `Source: openspec/changes/c-ext/proposal.md` line, then record their words with `canon brief approve c-ext --by <the human> --note \"<their words>\"`";
 
 /// evidence.add.72: a subject adopting a change from an external openspec
 /// plan with no canon brief has a brief to answer. `canon evidence add`
@@ -1523,7 +1520,7 @@ fn subject_lifecycle_30_reopening_outside_an_approved_scope_is_refused_naming_th
     let dir = repo();
     seed_shipped(dir.path());
     seed_change(dir.path(), "c-next");
-    assert!(run(dir.path(), &["subject", "adopt", "c-next", "--subject-id", "demo-subject"]).status.success());
+    assert!(run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "c-next"]).status.success());
     write_brief(dir.path(), "c-next", "Status: draft, awaiting the human.\n");
     // A scenario the subject owns is tagged for the draft, so it is the
     // subject's scope rather than a pending draft (subject.lifecycle.38).
@@ -1535,7 +1532,7 @@ fn subject_lifecycle_30_reopening_outside_an_approved_scope_is_refused_naming_th
     )
     .unwrap();
 
-    let refusal = "canon subject status: SUBJECT_GATE_VIOLATION — unreviewed-promotion demo-subject — shipped → verifying: reopening needs the approved scope, and the brief is not approved — .canon/changes/c-next/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words with `canon brief approve --change-id c-next --by <the human> --note \"<their words>\"`\n";
+    let refusal = "canon subject status: SUBJECT_GATE_VIOLATION — unreviewed-promotion demo-subject — shipped → verifying: reopening needs the approved scope, and the brief is not approved — .canon/changes/c-next/brief.md has no `Approved:` line; a human must answer the brief, and only from that answer the agent will record their words with `canon brief approve c-next --by <the human> --note \"<their words>\"`\n";
     let out = reopen(dir.path(), &[]);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
     assert!(stderr(&out).contains(refusal), "{}", stderr(&out));
@@ -1680,7 +1677,7 @@ fn subject_lifecycle_34_a_pre_0_18_change_reads_as_a_one_element_list_and_a_seco
 
     assert_eq!(latest_change(dir.path(), "refactor-core")["subject_ids"], serde_json::json!(["perception"]), "the old key reads as a list");
 
-    let out = run(dir.path(), &["subject", "adopt", "refactor-core", "--subject-id", "editing"]);
+    let out = run(dir.path(), &["subject", "adopt", "editing", "--change-id", "refactor-core"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert!(stdout(&out).contains("the change now belongs to `perception` and `editing`"), "{}", stdout(&out));
     let change = latest_change(dir.path(), "refactor-core");

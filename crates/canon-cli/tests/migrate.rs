@@ -162,7 +162,7 @@ fn old_repo() -> tempfile::TempDir {
     ok(repo, &["subject", "new", "cart", "--domain", "shop", "--title", "Cart"]);
     scaffold(repo, "add-cart", "Add the cart", "", "\n- [ ] 1 Write the cart scenarios\n");
     plant_change(repo, "add-cart", "Add the cart", Some("cart"));
-    ok(repo, &["subject", "adopt", "add-cart", "--subject-id", "cart"]);
+    ok(repo, &["subject", "adopt", "cart", "--change-id", "add-cart"]);
     commit_all(repo, "a 0.16 repo");
     dir
 }
@@ -367,7 +367,7 @@ fn authoring_migrate_05_an_external_approval_moves_into_a_pointer_brief() {
     assert_eq!(read(repo, "openspec/changes/checkout/proposal.md"), proposal, "the external plan is not edited");
     assert!(read(repo, "canon.yaml").contains("    - dialect: openspec\n      root: .\n"), "the source stays");
 
-    ok(repo, &["subject", "adopt", "checkout", "--subject-id", "cart"]);
+    ok(repo, &["subject", "adopt", "cart", "--change-id", "checkout"]);
     let status = ok(repo, &["status"]);
     assert!(status.contains("brief: approved in .canon/changes/checkout/brief.md — ana 2026-10-10 — \"go\""), "{status}");
     let again = ok(repo, &["migrate", "--dry-run"]);

@@ -208,10 +208,10 @@ pub fn chore_violations(repo: &Path, ctx: &GateContext, subject: &Subject) -> Ve
         .collect()
 }
 
-/// The `canon review add --change-id` step a chore's review gap names.
+/// The `canon review change` step a chore's review gap names.
 pub fn chore_review_remedy(change: &ChangeId) -> String {
     format!(
-        "have a reviewer record one review of the chore: `canon review add --project-id <root> --change-id {} --reviewer <reviewer> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<brief>\"`",
+        "have a reviewer record one review of the chore: `canon review change {} --project-id <root> --actor-id <reviewer> --session-id <review-session> --role reviewer --pin <sha> --original-spec-ref \"<brief>\"`",
         change.as_str()
     )
 }
@@ -228,5 +228,5 @@ pub fn hint(violations: &[&Violation]) -> Option<String> {
     if reverify.iter().all(|v| is_scoped_reverify(v)) {
         return Some("record evidence again for the scenarios named, one command each: `canon evidence add --project-id <root> --scenario-id <id> --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" --actor-id <unit> --session-id <session>`; the rest of the suite needs nothing; reviews stay current while a scenario's verdict and checks are unchanged, then ship".to_string());
     }
-    Some("record the suite again for the scenarios named: `canon evidence add --project-id <root> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" --actor-id <unit> --session-id <session>`; reviews stay current while a scenario's verdict and checks are unchanged; a chore also needs its change-level review (`canon review add --change-id <slug>`), then ship".to_string())
+    Some("record the suite again for the scenarios named: `canon evidence add --project-id <root> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref \"<test command>\" --actor-id <unit> --session-id <session>`; reviews stay current while a scenario's verdict and checks are unchanged; a chore also needs its change-level review (`canon review change <slug>`), then ship".to_string())
 }

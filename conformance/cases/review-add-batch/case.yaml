@@ -2,9 +2,9 @@ description: "0.18 D1: `canon review add` with `--scenario-id` repeated and `--s
 steps:
   - args: [inventory, sync]
     exit: 0
-  - args: [review, add, --project-id, root, --scenario-id, cart.add.01, --scenario-id, cart.add.02, --scenario-ids-from, reports/ids.txt, --reviewer, reviewer-2, --pin, r1, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --artifact, reports/cart-badge.png]
+  - args: [review, scenario, cart.add.01, cart.add.02, cart.add.03, --project-id, root, --pin, r1, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --artifact, reports/cart-badge.png]
     exit: 0
-  - args: [review, add, --project-id, root, --scenario-id, cart.add.01, --scenario-id, cart.add.77, --reviewer, reviewer-3, --pin, r1, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor-id, reviewer-3, --role, reviewer]
+  - args: [review, scenario, cart.add.01, cart.add.77, --project-id, root, --pin, r1, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor-id, reviewer-3, --role, reviewer]
     exit: 2
   - args: [query, --kind, review, --json]
     exit: 0

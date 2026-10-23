@@ -5,7 +5,7 @@
 //! `CANON_ROLE` environment variable or the global `--as <role>` flag (the
 //! flag wins). It is guidance, not enforcement: `schema` lists the role's
 //! commands, `status` and `meta.next` keep the role's steps, and `--role` on
-//! `evidence add` / `review add` defaults to it. Unset, every command behaves
+//! `evidence add` / `evidence audit` / `review scenario` / `review change` defaults to it. Unset, every command behaves
 //! as before.
 //!
 //! [`init`] runs once at startup: it resolves the declared role, refuses an

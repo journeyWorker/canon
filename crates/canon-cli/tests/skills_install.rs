@@ -753,7 +753,6 @@ fn skills_install_20_skill_and_block_carry_one_approval_per_scope() {
             "canon brief check",
             ".canon/changes/<slug>/brief.md",
             "Source: <path>",
-            "--change-id <slug> --by <the human> --note \"<their words>\"",
             "Never approve without a human answer",
             "Inside an approved scope, never stop for a human",
             "When no human can answer",

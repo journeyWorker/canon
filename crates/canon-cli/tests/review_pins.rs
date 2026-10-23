@@ -1,5 +1,5 @@
 //! review.add.28 (0.15 D1) through the real binary: `canon inventory sync`
-//! records each scenario's own digest, and `canon review add` pins it, so
+//! records each scenario's own digest, and `canon review scenario` pins it, so
 //! a review goes stale when its scenario, or the context the scenario
 //! inherits, changes — never because a sibling scenario in the same
 //! `.feature` file did.
@@ -75,7 +75,7 @@ fn reviewed_repo() -> tempfile::TempDir {
         let out = ok(
             repo,
             &[
-                "review", "add", "--project-id", "root", "--scenario-id", id, "--reviewer", "reviewer-2", "--pin", "r1", "--original-spec-ref", FEATURE, "--actor-id",
+                "review", "scenario", id, "--project-id", "root", "--pin", "r1", "--original-spec-ref", FEATURE, "--actor-id",
                 "reviewer-2", "--role", "reviewer", "--session-id", "sess-review",
             ],
         );
@@ -162,7 +162,7 @@ fn reviewed_against_a_report() -> tempfile::TempDir {
         ok(
             repo,
             &[
-                "review", "add", "--project-id", "root", "--scenario-id", id, "--reviewer", "reviewer-2", "--pin", "r1", "--original-spec-ref", FEATURE, "--actor-id", "reviewer-2",
+                "review", "scenario", id, "--project-id", "root", "--pin", "r1", "--original-spec-ref", FEATURE, "--actor-id", "reviewer-2",
                 "--role", "reviewer", "--session-id", "sess-review",
             ],
         );

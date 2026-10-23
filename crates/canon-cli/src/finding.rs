@@ -740,7 +740,7 @@ pub struct FindingCloseArgs {
 /// with the one flag it lacks.
 fn reason_shape(args: &FindingCloseArgs) -> String {
     format!(
-        "canon finding close --change-id {} --round {} --seq {} --disposition {} --reason \"<why, one line>\"",
+        "canon finding close {} --round {} --seq {} --disposition {} --reason \"<why, one line>\"",
         args.change_id,
         args.round,
         args.seq,

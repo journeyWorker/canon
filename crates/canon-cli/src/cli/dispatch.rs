@@ -105,7 +105,7 @@ pub struct DispatchBeginArgs {
 #[derive(Args)]
 pub struct DispatchEndArgs {
     /// The RunId (ULID) minted by `canon dispatch begin`
-    #[arg(long, value_parser = crate::dispatch::parse_run_id)]
+    #[arg(value_name = "RUN_ID", value_parser = crate::dispatch::parse_run_id)]
     pub run_id: RunId,
     /// Terminal outcome: succeeded or failed
     #[arg(long, value_parser = crate::dispatch::run_status_parser())]

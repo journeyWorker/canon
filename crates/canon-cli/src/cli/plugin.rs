@@ -96,6 +96,7 @@ pub enum PluginCommand {
 #[derive(Args)]
 pub struct PluginSyncArgs {
     /// A .canon/plugins/<id>/plugin.yaml manifest id (e.g. porting)
+    #[arg(value_name = "PLUGIN_ID")]
     pub plugin_id: String,
     /// Repo root (default: nearest ancestor with a canon.yaml)
     #[arg(long, default_value = ".")]

@@ -112,10 +112,10 @@ fn approving_binds_the_brief_and_any_later_edit_is_refused_until_reapproved() {
     // One word changes: the approval no longer covers this text.
     std::fs::write(brief_path(repo), brief.replace("Social sign-in.", "Social sign-in, later.")).unwrap();
     let status = status_text(repo);
-    assert!(status.contains("brief: not approved") && status.contains("BRIEF_CHANGED_SINCE_APPROVAL") && status.contains("canon brief approve --change-id add-login"), "{status}");
+    assert!(status.contains("brief: not approved") && status.contains("BRIEF_CHANGED_SINCE_APPROVAL") && status.contains("canon brief approve add-login"), "{status}");
     let attest = run(repo, &ATTEST);
     assert_eq!(attest.status.code(), Some(1), "{}", stderr(&attest));
-    assert!(stderr(&attest).contains("BRIEF_CHANGED_SINCE_APPROVAL") && stderr(&attest).contains("canon brief approve --change-id add-login"), "{}", stderr(&attest));
+    assert!(stderr(&attest).contains("BRIEF_CHANGED_SINCE_APPROVAL") && stderr(&attest).contains("canon brief approve add-login"), "{}", stderr(&attest));
     let json: Value = serde_json::from_str(&stdout(&run(repo, &["brief", "show", "--json"]))).unwrap();
     assert_eq!((json["data"]["state"].as_str(), json["data"]["next"][0]["step"].as_str()), (Some("changed-since-approval"), Some("approve")), "{json}");
 
@@ -133,7 +133,7 @@ fn a_digestless_approval_stays_approved_with_a_reapprove_advisory() {
     let repo = dir.path();
     std::fs::write(brief_path(repo), en_brief("Approved: Ana 2026-10-12 — \"go\"\n")).unwrap();
     let status = status_text(repo);
-    assert!(status.contains("brief: approved in") && status.contains("advisory: that approval has no digest") && status.contains("canon brief approve --change-id add-login"), "{status}");
+    assert!(status.contains("brief: approved in") && status.contains("advisory: that approval has no digest") && status.contains("canon brief approve add-login"), "{status}");
     ok(repo, &ATTEST);
 }
 

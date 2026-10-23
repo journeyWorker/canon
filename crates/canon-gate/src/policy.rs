@@ -512,7 +512,7 @@ impl RequireReview {
 
 /// `spec_coverage.require_audit`, resolved (0.15 D3): a deterministic
 /// sample of in-scope scenarios needs an external evaluator's audit
-/// (`canon evidence add --kind audit`) whose latest result is not
+/// (`canon evidence audit`) whose latest result is not
 /// `indeterminate`. Sampling is [`RequireAudit::samples`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RequireAudit {

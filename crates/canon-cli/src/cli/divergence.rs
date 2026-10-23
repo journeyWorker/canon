@@ -54,10 +54,12 @@ pub struct DemoAddArgs {
 /// The flags of `divergence add`.
 #[derive(clap::Args)]
 pub struct DivergenceAddArgs {
-    #[arg(long, value_parser = crate::review::parse_project_id)]
-    pub project_id: ProjectId,
-    #[arg(long, value_parser = crate::review::parse_scenario_id)]
+    /// The scenario (`<area>.<surface>.<nn>`)
+    #[arg(value_name = "SCENARIO_ID", value_parser = crate::review::parse_scenario_id)]
     pub scenario_id: ScenarioId,
+    /// Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root
+    #[arg(long, value_parser = crate::review::parse_project_id)]
+    pub project_id: Option<ProjectId>,
     #[arg(long, value_parser = crate::divergence::parse_sha)]
     pub sha: Sha,
     /// open / still-divergent / resolved / deferred (deferred needs --reason/--expiry)
@@ -118,10 +120,12 @@ pub struct DivergencePromoteArgs {
 
 #[derive(Args)]
 pub struct DivergenceResolveArgs {
-    #[arg(long, value_parser = crate::review::parse_project_id)]
-    pub project_id: ProjectId,
-    #[arg(long, value_parser = crate::review::parse_scenario_id)]
+    /// The scenario (`<area>.<surface>.<nn>`)
+    #[arg(value_name = "SCENARIO_ID", value_parser = crate::review::parse_scenario_id)]
     pub scenario_id: ScenarioId,
+    /// Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root
+    #[arg(long, value_parser = crate::review::parse_project_id)]
+    pub project_id: Option<ProjectId>,
     #[arg(long, value_parser = crate::divergence::parse_sha)]
     pub sha: Sha,
     #[arg(long, default_value_t = 1)]
@@ -144,10 +148,12 @@ pub struct DivergenceResolveArgs {
 
 #[derive(Args)]
 pub struct DivergenceDeferArgs {
-    #[arg(long, value_parser = crate::review::parse_project_id)]
-    pub project_id: ProjectId,
-    #[arg(long, value_parser = crate::review::parse_scenario_id)]
+    /// The scenario (`<area>.<surface>.<nn>`)
+    #[arg(value_name = "SCENARIO_ID", value_parser = crate::review::parse_scenario_id)]
     pub scenario_id: ScenarioId,
+    /// Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root
+    #[arg(long, value_parser = crate::review::parse_project_id)]
+    pub project_id: Option<ProjectId>,
     #[arg(long, value_parser = crate::divergence::parse_sha)]
     pub sha: Sha,
     #[arg(long, default_value_t = 1)]
@@ -172,11 +178,12 @@ pub struct DivergenceDeferArgs {
 
 #[derive(Args)]
 pub struct DivergenceAcceptArgs {
-    #[arg(long, value_parser = crate::review::parse_project_id)]
-    pub project_id: ProjectId,
-    /// The accepted scenario; repeatable, one acceptance per scenario, all or nothing
-    #[arg(long = "scenario-id", required = true, value_parser = crate::review::parse_scenario_id)]
+    /// The accepted scenarios (`<area>.<surface>.<nn>`), one acceptance each, all or nothing
+    #[arg(value_name = "SCENARIO_ID", required = true, value_parser = crate::review::parse_scenario_id)]
     pub scenario_ids: Vec<ScenarioId>,
+    /// Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root
+    #[arg(long, value_parser = crate::review::parse_project_id)]
+    pub project_id: Option<ProjectId>,
     /// Why the gap is accepted
     #[arg(long)]
     pub reason: String,
