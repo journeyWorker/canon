@@ -411,11 +411,11 @@ fn status_next_names_the_command_for_each_gap() {
     assert_eq!(
         commands(&report),
         [
-            "canon scenario new world.demo.03 --title \"<what happens on this path>\" --subject-id demo-subject --case failure --actor-id <unit>",
+            "canon scenario new world.demo.03 --title \"<what happens on this path>\" --subject-id demo-subject --case failure --actor-id <unit> --session-id <session>",
             "canon evidence add --scenario-id world.demo.02 --project-id demo --class test-run --role implementer --actor-id <unit> --session-id <session> --verdict faithful --ref \"<test command>\"",
             "canon finding close c-demo-subject --round 1 --seq 1 --disposition fixed --actor-id <unit> --session-id <session>",
             "canon review scenario world.demo.01 --project-id demo --actor-id <reviewer> --session-id <review-session> --role reviewer --original-spec-ref \"<feature file>\"",
-            "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id empty-subject --case happy --actor-id <unit>",
+            "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id empty-subject --case happy --actor-id <unit> --session-id <session>",
         ]
     );
     assert_eq!(report["nextOmitted"], 0);
@@ -502,15 +502,15 @@ fn status_names_the_spec_root_when_several_are_configured() {
 
     let report = status_json(dir.path());
     let next = commands(&report);
-    let case_step = "canon scenario new world.demo.02 --title \"<what happens on this path>\" --subject-id demo-subject --case failure --actor-id <unit> --project-id demo";
+    let case_step = "canon scenario new world.demo.02 --title \"<what happens on this path>\" --subject-id demo-subject --case failure --actor-id <unit> --session-id <session> --project-id demo";
     assert_eq!(next[0], case_step, "{report}");
-    assert!(next.contains(&"canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id empty-subject --case happy --actor-id <unit> --project-id <root-id>".to_string()), "{report}");
+    assert!(next.contains(&"canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id empty-subject --case happy --actor-id <unit> --session-id <session> --project-id <root-id>".to_string()), "{report}");
     let empty = report["next"].as_array().unwrap().iter().find(|n| n["command"].as_str().unwrap().contains("empty-subject")).unwrap();
     assert!(empty["why"].as_str().unwrap().ends_with("(spec roots: demo, other)"), "{empty}");
 
     let bin_dir = Path::new(env!("CARGO_BIN_EXE_canon")).parent().unwrap().to_path_buf();
     let path = format!("{}:{}", bin_dir.display(), std::env::var("PATH").unwrap_or_default());
-    let out = Command::new("sh").arg("-c").arg(case_step.replace("<unit>", "unit-a")).env("PATH", path).current_dir(dir.path()).output().unwrap();
+    let out = Command::new("sh").arg("-c").arg(case_step.replace("<unit>", "unit-a").replace("<session>", "session-a")).env("PATH", path).current_dir(dir.path()).output().unwrap();
     assert!(out.status.success(), "the suggested command must run once its placeholder is filled: {}", stderr(&out));
     let written = stdout(&out);
     assert!(written.contains("wrote `@world.demo.02` to ") && written.contains("/specs/demo/"), "written under the demo root: {written}");
@@ -533,7 +533,7 @@ fn status_on_a_repo_with_no_subject_points_at_subject_new() {
     write_policy(dir.path(), FULL_POLICY);
     let report = status_json(dir.path());
     assert_eq!(report["subjects"], serde_json::json!([]));
-    assert_eq!(commands(&report), ["canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit>"]);
+    assert_eq!(commands(&report), ["canon subject new <id> --domain <domain> --title \"<title>\" --actor-id <unit> --session-id <session>"]);
 }
 
 /// A verifying subject whose scenarios are all evidenced and reviewed.
@@ -559,7 +559,7 @@ fn context_status_62_ship_is_the_agents_step_once_the_brief_is_approved() {
     write_brief(dir.path(), "c-demo-subject", &format!("{APPROVED}\n"));
 
     let report = status_json(dir.path());
-    assert_eq!(commands(&report), ["canon subject move demo-subject --to shipped --actor-id <unit>"]);
+    assert_eq!(commands(&report), ["canon subject move demo-subject --to shipped --actor-id <unit> --session-id <session>"]);
     let step = &report["next"][0];
     assert_eq!(step["actor"], "agent", "{step}");
     let why = step["why"].as_str().unwrap();
@@ -592,7 +592,7 @@ fn context_status_70_a_shipped_subject_whose_gate_is_red_is_flagged_and_its_step
     let report = status_json(dir.path());
     let red = "1 uncovered-cell (first: world.demo.03), 1 unreviewed-promotion (first: world.demo.03), 1 open-blocker (first: c-demo-subject#1.1)";
     assert_eq!(subject(&report, "demo-subject")["red"], serde_json::json!(red.split(", ").collect::<Vec<_>>()));
-    let reopen = "canon subject move demo-subject --to verifying --reason \"<why it reopens>\" --actor-id <unit>";
+    let reopen = "canon subject move demo-subject --to verifying --reason \"<why it reopens>\" --actor-id <unit> --session-id <session>";
     assert_eq!(commands(&report), [reopen]);
     assert_eq!(
         report["next"][0]["why"],
@@ -634,7 +634,7 @@ fn context_status_70_the_red_flag_follows_the_ship_guard_audits_in_blockers_only
     ledger(dir.path()).write(&audit).unwrap();
     let report = status_json(dir.path());
     assert_eq!(subject(&report, "demo-subject")["red"], serde_json::json!(["1 false-success (first: world.demo.01)"]), "{report}");
-    assert_eq!(commands(&report)[0], "canon subject move demo-subject --to verifying --reason \"<why it reopens>\" --actor-id <unit>");
+    assert_eq!(commands(&report)[0], "canon subject move demo-subject --to verifying --reason \"<why it reopens>\" --actor-id <unit> --session-id <session>");
     let out = run(dir.path(), &["subject", "move", "demo-subject", "--to", "verifying", "--reason", "follow-up: the audit refuted run.01", "--actor-id", "impl-agent"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let out = run(dir.path(), &["subject", "move", "demo-subject", "--to", "shipped"]);
@@ -997,7 +997,7 @@ fn status_with_no_feature_scenarios_points_at_writing_them() {
     let commands = commands(&report);
     assert_eq!(
         commands,
-        ["canon feature new <area>.<surface> --title \"<feature>\" --actor-id <unit>", "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id demo-subject --case happy --actor-id <unit>"],
+        ["canon feature new <area>.<surface> --title \"<feature>\" --actor-id <unit> --session-id <session>", "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id demo-subject --case happy --actor-id <unit> --session-id <session>"],
         "{report}"
     );
     assert!(!commands.iter().any(|c| c.contains("inventory sync")), "{report}");
@@ -1036,7 +1036,7 @@ fn context_status_66_a_proposed_subject_with_an_unapproved_brief_asks_only_the_h
     assert!(human_steps(&report).is_empty(), "{report}");
     assert_eq!(
         commands(&report),
-        ["canon feature new <area>.<surface> --title \"<feature>\" --actor-id <unit>", "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id demo-subject --case happy --actor-id <unit>"],
+        ["canon feature new <area>.<surface> --title \"<feature>\" --actor-id <unit> --session-id <session>", "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id demo-subject --case happy --actor-id <unit> --session-id <session>"],
         "{report}"
     );
 }
@@ -1061,9 +1061,9 @@ fn context_status_67_a_proposed_subject_with_no_brief_keeps_its_steps_and_its_br
     assert_eq!(
         commands(&report),
         [
-            "canon feature new <area>.<surface> --title \"<feature>\" --actor-id <unit>",
-            "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id bare-subject --case happy --actor-id <unit>",
-            "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id draft-subject --case happy --actor-id <unit>",
+            "canon feature new <area>.<surface> --title \"<feature>\" --actor-id <unit> --session-id <session>",
+            "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id bare-subject --case happy --actor-id <unit> --session-id <session>",
+            "canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject-id draft-subject --case happy --actor-id <unit> --session-id <session>",
         ],
         "{report}"
     );

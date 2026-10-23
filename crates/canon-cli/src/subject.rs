@@ -440,7 +440,7 @@ fn domain_membership_violation(repo: &Path, domain: &str) -> Option<String> {
 /// present in the store is a loud refusal (exit `2`), never a silent
 /// second append.
 #[allow(clippy::too_many_arguments)]
-pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, summary: &str, owner_role: &RoleId, actor_id: &str, json: bool) -> i32 {
+pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, summary: &str, owner_role: &RoleId, actor_id: &str, session: Option<&canon_model::SessionId>, json: bool) -> i32 {
     // `domain` shares `SubjectId`'s kebab-slug grammar (design D2: the
     // model validates the SAME shape via `is_kebab_slug`); validate it
     // BEFORE `Subject::new` so a malformed value is a clean refusal
@@ -475,7 +475,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
         }
     }
 
-    let envelope = Envelope::new(1, RecordKind::Subject, Utc::now(), crate::role::attributed(actor_id, Some(owner_role)));
+    let envelope = Envelope::new(1, RecordKind::Subject, Utc::now(), crate::role::attributed(actor_id, Some(owner_role), session));
     let subject = Subject::new(envelope, subject_id.clone(), title, summary, domain, SubjectStatus::Proposed, owner_role.clone());
 
     match registry.persist(&subject) {
@@ -860,6 +860,7 @@ pub fn run_move(
     override_reason: Option<&str>,
     reason: Option<&str>,
     actor_id: &str,
+    session: Option<&canon_model::SessionId>,
     json: bool,
 ) -> i32 {
     for (flag, text, recorded) in [
@@ -1050,7 +1051,7 @@ pub fn run_move(
         let waived: std::collections::BTreeSet<WaivedViolation> =
             waivable.iter().map(|v| WaivedViolation { class: v.class.as_str().to_string(), subject: v.subject.clone() }).collect();
         let count = waived.len();
-        subject.status_override = Some(StatusOverride { to: target, reason: reason.to_string(), waived: waived.into_iter().collect(), actor: crate::role::attributed(actor_id, None) });
+        subject.status_override = Some(StatusOverride { to: target, reason: reason.to_string(), waived: waived.into_iter().collect(), actor: crate::role::attributed(actor_id, None, session) });
         crate::warn_err!(
             "canon subject move: override recorded by `{actor_id}` for the {count} violation(s) above: {reason}; a gap that appears later is not covered"
         );
@@ -1067,10 +1068,10 @@ pub fn run_move(
             "canon subject move: reopened `{}` from shipped, recorded by `{actor_id}`: {reason}; {into}, then scenario, evidence and review; shipping again runs every guard",
             subject_id.as_str()
         );
-        subject.reopen = Some(Reopen { reason: reason.to_string(), change, actor: crate::role::attributed(actor_id, None) });
+        subject.reopen = Some(Reopen { reason: reason.to_string(), change, actor: crate::role::attributed(actor_id, None, session) });
     }
     if let Some(reason) = reason {
-        subject.status_reason = Some(StatusReason { reason: reason.to_string(), actor: crate::role::attributed(actor_id, None) });
+        subject.status_reason = Some(StatusReason { reason: reason.to_string(), actor: crate::role::attributed(actor_id, None, session) });
     }
 
     subject.status = target;

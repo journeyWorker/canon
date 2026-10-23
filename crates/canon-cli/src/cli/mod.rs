@@ -364,6 +364,15 @@ pub struct RevArgs {
     pub rev: String,
 }
 
+/// `--session-id` for a leaf that takes `--actor-id`: the actor's session, recorded as
+/// `actor.session_id` on what the leaf writes. Optional.
+#[derive(clap::Args, Clone, Debug, Default)]
+pub struct SessionArgs {
+    /// The acting session (recorded as actor.session_id); optional
+    #[arg(long, value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
+    pub session_id: Option<canon_model::SessionId>,
+}
+
 /// `--repo <DIR>`, declared once and flattened into every leaf that reads a
 /// repo (0.28 D5). Absent: the nearest ancestor of the current directory
 /// holding a `canon.yaml`, else the current directory. Present: that

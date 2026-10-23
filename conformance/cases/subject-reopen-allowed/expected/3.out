@@ -1,2 +1,2 @@
 canon subject move: checkout → verifying — written directly; nothing to promote
-next: canon subject move checkout --to shipped --actor-id <unit> — checkout: every scenario is evidenced, with no blocker or case gap, and the brief is approved; ship it yourself unless the brief says the human ships
+next: canon subject move checkout --to shipped --actor-id <unit> --session-id <session> — checkout: every scenario is evidenced, with no blocker or case gap, and the brief is approved; ship it yourself unless the brief says the human ships

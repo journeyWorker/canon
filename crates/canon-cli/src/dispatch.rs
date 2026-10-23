@@ -485,6 +485,8 @@ pub struct DispatchBinding {
     /// the configured plan corpus before anything is written — see
     /// [`validate_task_binding`].
     pub task_id: Option<TaskId>,
+    /// The dispatching actor's session (`--session-id`), recorded as `actor.session_id` on the run's envelope.
+    pub session_id: Option<canon_model::SessionId>,
     /// The run that dispatched this one (`Run.parent_run_id`).
     ///
     /// Deliberately NOT existence-checked. A parent may legitimately be
@@ -751,7 +753,10 @@ pub fn begin(
     )?;
     let run_id = RunId::new();
     let now = Utc::now();
-    let actor = Actor::new(agent_id.to_string(), role.clone());
+    let mut actor = Actor::new(agent_id.to_string(), role.clone());
+    if let Some(session) = &binding.session_id {
+        actor = actor.with_session(session.clone());
+    }
     let run =
         Run::new(Envelope::current(RecordKind::Run, now, actor), run_id, None, binding.task_id.clone(), RunStatus::Running, now, None)
             .with_injected_guidance(guidance)
@@ -2570,7 +2575,7 @@ mod begin_tests {
         let task_id = TaskId::parse("demo-change#1.1").expect("a literal task id");
         let parent = RunId::new();
 
-        let binding = DispatchBinding { task_id: Some(task_id.clone()), parent_run_id: Some(parent) };
+        let binding = DispatchBinding { task_id: Some(task_id.clone()), parent_run_id: Some(parent), ..Default::default() };
         let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect("a task that exists in the corpus dispatches");
 
         let manifest = std::fs::read_to_string(&begun.manifest_path).expect("the manifest was written");
@@ -2588,7 +2593,7 @@ mod begin_tests {
     fn an_already_flipped_row_is_still_a_bindable_task() {
         let tmp = repo_with_plan_corpus();
         let task_id = TaskId::parse("demo-change#1.2").expect("a literal task id");
-        let binding = DispatchBinding { task_id: Some(task_id.clone()), parent_run_id: None };
+        let binding = DispatchBinding { task_id: Some(task_id.clone()), parent_run_id: None, ..Default::default() };
         let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect("an already-done task is still a real task");
         assert_eq!(begun.run.task_id, Some(task_id));
     }
@@ -2602,7 +2607,7 @@ mod begin_tests {
         let tasks_md = tmp.path().join("plans").join("demo-change").join("tasks.md");
         let before = std::fs::read_to_string(&tasks_md).expect("the fixture tasks.md");
 
-        let binding = DispatchBinding { task_id: Some(TaskId::parse("demo-change#1.1").expect("a literal task id")), parent_run_id: None };
+        let binding = DispatchBinding { task_id: Some(TaskId::parse("demo-change#1.1").expect("a literal task id")), parent_run_id: None, ..Default::default() };
         begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect("the dispatch succeeds");
 
         assert_eq!(std::fs::read_to_string(&tasks_md).expect("tasks.md still readable"), before, "resolving a task must leave the document byte-identical");
@@ -2613,7 +2618,7 @@ mod begin_tests {
     #[test]
     fn an_unknown_row_fails_loud_naming_the_id_and_persists_no_manifest() {
         let tmp = repo_with_plan_corpus();
-        let binding = DispatchBinding { task_id: Some(TaskId::parse("demo-change#9.9").expect("a literal task id")), parent_run_id: None };
+        let binding = DispatchBinding { task_id: Some(TaskId::parse("demo-change#9.9").expect("a literal task id")), parent_run_id: None, ..Default::default() };
         let err = begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect_err("a row that is not in the document must be rejected");
 
         assert!(matches!(err, DispatchError::TaskNotFound { .. }), "expected TaskNotFound, got {err:?}");
@@ -2627,7 +2632,7 @@ mod begin_tests {
     #[test]
     fn a_change_no_source_carries_fails_loud_naming_the_sources_consulted() {
         let tmp = repo_with_plan_corpus();
-        let binding = DispatchBinding { task_id: Some(TaskId::parse("no-such-change#1.1").expect("a literal task id")), parent_run_id: None };
+        let binding = DispatchBinding { task_id: Some(TaskId::parse("no-such-change#1.1").expect("a literal task id")), parent_run_id: None, ..Default::default() };
         let err = begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect_err("an unknown change must be rejected");
 
         assert!(matches!(err, DispatchError::TaskNotFound { .. }), "expected TaskNotFound, got {err:?}");
@@ -2641,7 +2646,7 @@ mod begin_tests {
     #[test]
     fn a_repo_with_no_plan_sources_reports_distinctly_from_an_unknown_task() {
         let tmp = repo_without_plan_sources();
-        let binding = DispatchBinding { task_id: Some(TaskId::parse("demo-change#1.1").expect("a literal task id")), parent_run_id: None };
+        let binding = DispatchBinding { task_id: Some(TaskId::parse("demo-change#1.1").expect("a literal task id")), parent_run_id: None, ..Default::default() };
         let err = begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect_err("--task-id against no corpus must be rejected");
 
         assert!(matches!(err, DispatchError::NoPlanSources { .. }), "expected NoPlanSources, got {err:?}");
@@ -2662,7 +2667,7 @@ mod begin_tests {
     #[test]
     fn a_nonexistent_superpowers_row_is_rejected_even_though_its_change_doc_exists() {
         let tmp = repo_with_superpowers_corpus();
-        let binding = DispatchBinding { task_id: Some(TaskId::parse("sp-plan#9").expect("a literal task id")), parent_run_id: None };
+        let binding = DispatchBinding { task_id: Some(TaskId::parse("sp-plan#9").expect("a literal task id")), parent_run_id: None, ..Default::default() };
         let err = begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default())
             .expect_err("a section the plan doc does not have is not a bindable task");
 
@@ -2681,7 +2686,7 @@ mod begin_tests {
     fn a_real_superpowers_row_is_bindable_in_the_dialect_that_cannot_flip() {
         let tmp = repo_with_superpowers_corpus();
         let task_id = TaskId::parse("sp-plan#1").expect("a literal task id");
-        let binding = DispatchBinding { task_id: Some(task_id.clone()), parent_run_id: None };
+        let binding = DispatchBinding { task_id: Some(task_id.clone()), parent_run_id: None, ..Default::default() };
         let begun = begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect("a section the plan doc DOES have is bindable");
         assert_eq!(begun.run.task_id, Some(task_id));
     }
@@ -2736,7 +2741,7 @@ mod begin_tests {
             "the fixture's second source must really carry the row this test expects to be DISOWNED, not missing"
         );
 
-        let binding = DispatchBinding { task_id: Some(refused), parent_run_id: None };
+        let binding = DispatchBinding { task_id: Some(refused), parent_run_id: None, ..Default::default() };
         let err =
             begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect_err("a row no import pass would persist is not bindable");
         assert!(matches!(err, DispatchError::TaskNotFound { .. }), "expected TaskNotFound, got {err:?}");
@@ -2756,7 +2761,7 @@ mod begin_tests {
     fn the_first_sources_row_still_binds_when_a_later_source_duplicates_its_change_id() {
         let tmp = repo_with_a_duplicated_change_id();
         let task_id = TaskId::parse("shared-change#1.1").expect("a literal task id");
-        let binding = DispatchBinding { task_id: Some(task_id.clone()), parent_run_id: None };
+        let binding = DispatchBinding { task_id: Some(task_id.clone()), parent_run_id: None, ..Default::default() };
         let begun =
             begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect("the row an import pass DOES persist is bindable");
         assert_eq!(begun.run.task_id, Some(task_id));
@@ -2769,7 +2774,7 @@ mod begin_tests {
     #[test]
     fn a_row_no_source_carries_names_every_source_consulted_across_a_duplicate() {
         let tmp = repo_with_a_duplicated_change_id();
-        let missing = DispatchBinding { task_id: Some(TaskId::parse("shared-change#9.9").expect("a literal task id")), parent_run_id: None };
+        let missing = DispatchBinding { task_id: Some(TaskId::parse("shared-change#9.9").expect("a literal task id")), parent_run_id: None, ..Default::default() };
         let err = begin(tmp.path(), &role(), &regime(), "canon", &missing, &DispatchMetadata::default()).expect_err("a row no source carries must be rejected");
         let message = err.to_string();
         for root in ["first", "second"] {
@@ -3075,7 +3080,7 @@ mod tier_tests {
     }
 
     fn binding_to(task_id: &str, parent: Option<RunId>) -> DispatchBinding {
-        DispatchBinding { task_id: Some(TaskId::parse(task_id).expect("a literal task id")), parent_run_id: parent }
+        DispatchBinding { task_id: Some(TaskId::parse(task_id).expect("a literal task id")), parent_run_id: parent, ..Default::default() }
     }
 
     /// Task 1.1 + 1.4: the acceptance criterion in one test — a

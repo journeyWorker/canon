@@ -31,6 +31,8 @@ pub struct DivergenceAddArgs {
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
     #[arg(long, value_name = "ACTOR_ID")]
     pub actor_id: String,
+    #[command(flatten)]
+    pub session: crate::cli::SessionArgs,
     /// Free-text detail recorded on the version (optional)
     #[arg(long, value_name = "TEXT")]
     pub detail: Option<String>,
@@ -78,6 +80,8 @@ pub struct DivergenceResolveArgs {
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
     #[arg(long, value_name = "ACTOR_ID")]
     pub actor_id: String,
+    #[command(flatten)]
+    pub session: crate::cli::SessionArgs,
     /// Free-text detail recorded on the version (optional)
     #[arg(long, value_name = "TEXT")]
     pub detail: Option<String>,
@@ -109,6 +113,8 @@ pub struct DivergenceDeferArgs {
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
     #[arg(long, value_name = "ACTOR_ID")]
     pub actor_id: String,
+    #[command(flatten)]
+    pub session: crate::cli::SessionArgs,
     /// Why the divergence is deferred
     #[arg(long, value_name = "TEXT")]
     pub reason: String,

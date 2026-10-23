@@ -114,7 +114,7 @@ canon demo review
 ```
 ```text
 # Mint a Run manifest with retrieved guidance and context/policy lineage
-canon dispatch begin --regime <KEY> [--role <ROLE>] [--actor-id <ACTOR_ID>] [--provider <NAME>] [--model <NAME>] [--skill-id <ID>] [--skill-digest <DIGEST>] [--manifest <FILE>] [--prompt-bundle <NAME@VERSION>] [--task-id <TASK_ID>] [--parent-run-id <RUN_ID>] [--input]
+canon dispatch begin --regime <KEY> [--role <ROLE>] [--actor-id <ACTOR_ID>] [--session-id <SESSION_ID>] [--provider <NAME>] [--model <NAME>] [--skill-id <ID>] [--skill-digest <DIGEST>] [--manifest <FILE>] [--prompt-bundle <NAME@VERSION>] [--task-id <TASK_ID>] [--parent-run-id <RUN_ID>] [--input]
 ```
 ```bash
 canon dispatch begin --regime implementer/my-repo/api/abcdef012345 --role implementer
@@ -390,14 +390,14 @@ canon subject adopt demo --change-id add-login
 ```
 ```text
 # Move a subject to another lifecycle state (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason)
-canon subject move <SUBJECT_ID> --to <proposed|specced|building|verifying|shipped|retired> [--override-reason <TEXT>] [--reason <TEXT>] [--actor-id <ACTOR_ID>] [--input]
+canon subject move <SUBJECT_ID> --to <proposed|specced|building|verifying|shipped|retired> [--override-reason <TEXT>] [--reason <TEXT>] [--actor-id <ACTOR_ID>] [--session-id <SESSION_ID>] [--input]
 ```
 ```bash
 canon subject move demo --to specced
 ```
 ```text
 # Author a new subject at status `proposed`
-canon subject new <SUBJECT_ID> --domain <NAME> --title <TEXT> [--summary <TEXT>] [--owner-role <ROLE>] [--actor-id <ACTOR_ID>] [--input]
+canon subject new <SUBJECT_ID> --domain <NAME> --title <TEXT> [--summary <TEXT>] [--owner-role <ROLE>] [--actor-id <ACTOR_ID>] [--session-id <SESSION_ID>] [--input]
 ```
 ```bash
 canon subject new payments --domain dev --title Payments

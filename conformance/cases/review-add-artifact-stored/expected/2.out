@@ -1,4 +1,4 @@
 canon review scenario: pinned cart.add.01 at scenario digest 4f40e229159d and the verdict and checks of its 0 role(s) of evidence; the review counts only while they are unchanged
 canon review scenario: artifact store holds 1 bound file(s) under .canon/artifacts/sha256/ (1 newly stored) — commit them with the ledger
 canon review scenario: wrote kind=review/area=cart/root__cart.add.01__6702f75749a40a8752a93838424d1ed36960ab4a__<digest12>.json (new) — written directly; nothing to promote
-next: canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> — no subject exists yet; a subject is the unit status, review and shipping track (+1 more)
+next: canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> --session-id <session> — no subject exists yet; a subject is the unit status, review and shipping track (+1 more)

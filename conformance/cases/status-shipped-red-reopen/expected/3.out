@@ -11,10 +11,10 @@ subjects (1):
     checkout: 3 scenarios, 2 evidenced, 0 reviewed, 0 open blockers
       brief: approved in .canon/changes/c-checkout/brief.md — Journey 2026-10-11 — "승인. 네 가정대로 진행"
       advisory: that approval has no digest, so it does not follow the brief's text; to bind it, the human re-approves with `canon brief approve c-checkout --approver <their name> --note "<their words>"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role to run it
-      gate: red — 1 uncovered-cell (first: checkout.pay.03); reopen with `canon subject move checkout --to verifying --reason "<why it reopens>" --actor-id <unit>`
+      gate: red — 1 uncovered-cell (first: checkout.pay.03); reopen with `canon subject move checkout --to verifying --reason "<why it reopens>" --actor-id <unit> --session-id <session>`
 
 unowned: none
 
 next:
   # checkout is shipped but its gate is red (1 uncovered-cell (first: checkout.pay.03)); reopen it, keep the follow-up in its approved change `c-checkout` (never `canon change new`), then scenario, evidence and review, and ship it again
-  canon subject move checkout --to verifying --reason "<why it reopens>" --actor-id <unit>
+  canon subject move checkout --to verifying --reason "<why it reopens>" --actor-id <unit> --session-id <session>

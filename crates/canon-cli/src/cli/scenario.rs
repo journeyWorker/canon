@@ -38,6 +38,8 @@ pub struct ScenarioNewArgs {
     /// Agent id written into provenance (env: CANON_ACTOR)
     #[arg(long, env = "CANON_ACTOR", default_value = "canon-scaffold", value_name = "ACTOR_ID")]
     pub actor_id: String,
+    #[command(flatten)]
+    pub session: crate::cli::SessionArgs,
     /// Target .feature file (default: derived from <tag>; must live under a specs.roots[] entry)
     #[arg(long, value_name = "FILE")]
     pub feature: Option<PathBuf>,

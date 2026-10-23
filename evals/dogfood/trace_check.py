@@ -199,7 +199,10 @@ def read_sessions(paths):
         if not sid:
             raise ValueError(f"{path}: missing session id")
         provider = "codex" if header["type"] == "thread.started" else "omp"
+        stem = path.stem
         session = sessions.setdefault(sid, {
+            # A subagent transcript is named for what it was spawned as (`PauseReviewer.jsonl`); the root's name is its timestamp.
+            "name": "" if re.match(r"^\d{4}-\d\d-\d\dT", stem) else stem,
             "id": sid, "provider": provider, "files": [], "cwd": header.get("cwd", ""),
             "parent_file": header.get("parentSession"), "events": [], "turn": 0,
         })
@@ -269,7 +272,9 @@ def read_sessions(paths):
     for session in sessions.values():
         parent = session.pop("parent_file")
         if parent:
-            session["parent"] = file_sessions.get(str(Path(parent).resolve()))
+            # The recorded path is the recording machine's; a transcript copied elsewhere is found by its file name.
+            by_name = {Path(file).name: sid for file, sid in file_sessions.items()}
+            session["parent"] = file_sessions.get(str(Path(parent).resolve())) or by_name.get(Path(parent).name)
         else:
             session["parent"] = None
             for file in session["files"]:
@@ -827,8 +832,11 @@ def analyze(inputs, question_turns=()):
             write["before_brief_stop"] = before
             write["question_only"] = root_turn in question_turns
             turns[write["turn"]]["writes"].append(write)
-            for rule, failed in (("write_before_brief_stop", before and not write["inside_canon"] and not outside_repo(write["path"])),
-                                 ("write_in_question_turn", write["question_only"])):
+            # `<provider skill files>` and the like stand for what canon itself rewrites (`skills install`, `migrate`):
+            # a projection canon owns is not an agent's write.
+            canon_owned = write["path"].startswith("<")
+            for rule, failed in (("write_before_brief_stop", before and not write["inside_canon"] and not outside_repo(write["path"]) and not canon_owned),
+                                 ("write_in_question_turn", write["question_only"] and not canon_owned)):
                 if failed:
                     failures.append({"check": rule, "session": sid, **write})
         for call in session["calls"]:
@@ -842,7 +850,9 @@ def analyze(inputs, question_turns=()):
                     failures.append({"check": "human_only_role_stripped", "session": sid, "command": call["command"],
                                      "turn": call["turn"], "line": call["line"], "file": call["file"]})
         implements = any(w["code"] for w in session["writes"])
-        reviews = any(c["verb"] == "review" and c["action"] in ("scenario", "change") and not c["help"] for c in session["calls"])
+        reviews = (re.search(r"reviewer", session["name"], re.I) is not None
+                   or any(c.get("role") == "reviewer" for c in session["calls"])
+                   or any(c["verb"] == "review" and c["action"] in ("scenario", "change") and not c["help"] for c in session["calls"]))
         if implements:
             implementers.append(sid)
         if reviews:
@@ -880,7 +890,7 @@ def render(report):
              "Implementer sessions: " + (", ".join(report["implementer_sessions"]) or "none observed"),
              "Reviewer sessions: " + (", ".join(report["reviewer_sessions"]) or "none observed")]
     for item in report["wrong_shape_calls"]["items"]:
-        lines.append(f"  wrong shape ({item['class']}, {item['code']}): {item['command']}")
+        lines.append(f"  wrong shape ({item['class']}, {item['code']}): {' '.join(item['command'].split())[:240]}")
     for session in report["sessions"]:
         stop = session["brief_stop"]
         lines.append(f"Session {session['id']} ({session['provider']}): brief stop " + (f"turn {stop['turn']}, line {stop['line']}" if stop else "not observed"))

@@ -5,12 +5,12 @@ use std::process::ExitCode;
 
 pub fn run(cmd: DispatchCommand) -> ExitCode {
     match cmd {
-        DispatchCommand::Begin(DispatchBeginArgs { role, regime, actor_id, provider, model, skill_id, skill_digest, manifest, prompt_bundle, task_id, parent_run_id, repo, json, .. }) => {
+        DispatchCommand::Begin(DispatchBeginArgs { role, regime, actor_id, session, provider, model, skill_id, skill_digest, manifest, prompt_bundle, task_id, parent_run_id, repo, json, .. }) => {
             let role = match super::record_role(role, &repo, "canon dispatch begin", json) {
                 Ok(role) => role,
                 Err(code) => return code,
             };
-            let binding = crate::dispatch::DispatchBinding { task_id, parent_run_id };
+            let binding = crate::dispatch::DispatchBinding { task_id, parent_run_id, session_id: session.session_id };
             let metadata = crate::dispatch::DispatchMetadata {
                 provider,
                 model,

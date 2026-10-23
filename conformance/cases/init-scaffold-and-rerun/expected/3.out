@@ -1,3 +1,3 @@
 canon init: ./canon.yaml already exists — left unchanged; the AGENTS.md block and the canon .gitignore lines are refreshed
 canon init: the canon block in ./AGENTS.md is already current
-next: canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> — no subject exists yet; a subject is the unit status, review and shipping track
+next: canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> --session-id <session> — no subject exists yet; a subject is the unit status, review and shipping track

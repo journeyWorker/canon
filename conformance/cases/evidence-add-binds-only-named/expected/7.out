@@ -12,6 +12,6 @@ unowned (1, no @subject): cart.add.01
 
 next:
   # no subject exists yet; a subject is the unit status, review and shipping track
-  canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit>
+  canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> --session-id <session>
   # 1 scenario(s) carry no @subject tag (first: cart.add.01); add `@subject:<id>` above each in its .feature file, then check again: status re-indexes the edited files itself
   canon status

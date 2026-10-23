@@ -2102,6 +2102,17 @@
         {
           "aliases": [],
           "default": [],
+          "help": "The acting session (recorded as actor.session_id); optional",
+          "kind": "value",
+          "name": "session-id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "SESSION_ID"
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Declared provider metadata (copied verbatim; never inferred from --actor-id)",
           "kind": "value",
           "name": "provider",
@@ -2879,6 +2890,17 @@
         {
           "aliases": [],
           "default": [],
+          "help": "The acting session (recorded as actor.session_id); optional",
+          "kind": "value",
+          "name": "session-id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "SESSION_ID"
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Free-text detail recorded on the version (optional)",
           "kind": "value",
           "name": "detail",
@@ -3109,6 +3131,17 @@
           "repeatable": false,
           "required": true,
           "valueName": "ACTOR_ID"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The acting session (recorded as actor.session_id); optional",
+          "kind": "value",
+          "name": "session-id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "SESSION_ID"
         },
         {
           "aliases": [],
@@ -3463,6 +3496,17 @@
           "repeatable": false,
           "required": true,
           "valueName": "ACTOR_ID"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The acting session (recorded as actor.session_id); optional",
+          "kind": "value",
+          "name": "session-id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "SESSION_ID"
         },
         {
           "aliases": [],
@@ -4920,6 +4964,17 @@
           "repeatable": false,
           "required": false,
           "valueName": "ACTOR_ID"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The acting session (recorded as actor.session_id); optional",
+          "kind": "value",
+          "name": "session-id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "SESSION_ID"
         },
         {
           "aliases": [],
@@ -9821,6 +9876,17 @@
         {
           "aliases": [],
           "default": [],
+          "help": "The acting session (recorded as actor.session_id); optional",
+          "kind": "value",
+          "name": "session-id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "SESSION_ID"
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Target .feature file (default: derived from <tag>; must live under a specs.roots[] entry)",
           "kind": "value",
           "name": "feature",
@@ -11446,6 +11512,17 @@
         {
           "aliases": [],
           "default": [],
+          "help": "The acting session (recorded as actor.session_id); optional",
+          "kind": "value",
+          "name": "session-id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "SESSION_ID"
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
           "kind": "value",
           "name": "repo",
@@ -11650,6 +11727,17 @@
           "repeatable": false,
           "required": false,
           "valueName": "ACTOR_ID"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The acting session (recorded as actor.session_id); optional",
+          "kind": "value",
+          "name": "session-id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "SESSION_ID"
         },
         {
           "aliases": [],
@@ -28507,6 +28595,13 @@
             "number"
           ]
         },
+        "sessionId": {
+          "description": "The acting session (recorded as actor.session_id); optional",
+          "type": [
+            "string",
+            "number"
+          ]
+        },
         "skillDigest": {
           "description": "Declared skill digest; requires --skill-id",
           "type": [
@@ -29086,6 +29181,13 @@
             "string"
           ]
         },
+        "sessionId": {
+          "description": "The acting session (recorded as actor.session_id); optional",
+          "type": [
+            "string",
+            "number"
+          ]
+        },
         "state": {
           "default": "open",
           "description": "The divergence state to record (deferred needs --reason and --expiry)",
@@ -29195,6 +29297,13 @@
           "type": [
             "integer",
             "string"
+          ]
+        },
+        "sessionId": {
+          "description": "The acting session (recorded as actor.session_id); optional",
+          "type": [
+            "string",
+            "number"
           ]
         }
       },
@@ -29403,6 +29512,13 @@
           "type": [
             "integer",
             "string"
+          ]
+        },
+        "sessionId": {
+          "description": "The acting session (recorded as actor.session_id); optional",
+          "type": [
+            "string",
+            "number"
           ]
         }
       },
@@ -30528,6 +30644,13 @@
         },
         "projectId": {
           "description": "Which configured `specs.roots[]` entry to write under, by its id. Required only when the repo configures more than one",
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "sessionId": {
+          "description": "The acting session (recorded as actor.session_id); optional",
           "type": [
             "string",
             "number"
@@ -34457,6 +34580,13 @@
             "number"
           ]
         },
+        "sessionId": {
+          "description": "The acting session (recorded as actor.session_id); optional",
+          "type": [
+            "string",
+            "number"
+          ]
+        },
         "subjectId": {
           "description": "Optional subject id tag to pin above the scenario",
           "type": [
@@ -36718,6 +36848,13 @@
             "number"
           ]
         },
+        "sessionId": {
+          "description": "The acting session (recorded as actor.session_id); optional",
+          "type": [
+            "string",
+            "number"
+          ]
+        },
         "to": {
           "description": "The state to move the subject to (proposed/specced/building/verifying/shipped/retired)",
           "enum": [
@@ -37074,6 +37211,13 @@
         "ownerRole": {
           "default": "implementer",
           "description": "The accountable owning role (default: implementer)",
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "sessionId": {
+          "description": "The acting session (recorded as actor.session_id); optional",
           "type": [
             "string",
             "number"
