@@ -41,7 +41,7 @@ fn query(repo: &Path, kind: &str) -> Vec<Value> {
     let out = run(repo, &["query", "--kind", kind, "--json"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let payload: Value = serde_json::from_str(&stdout(&out)).unwrap();
-    payload["records"].as_array().unwrap().clone()
+    payload["data"]["records"].as_array().unwrap().clone()
 }
 
 #[test]
@@ -368,7 +368,7 @@ fn subject_lifecycle_33_a_change_adopted_by_a_second_subject_belongs_to_both_and
 
     let status: Value = serde_json::from_str(&stdout(&run(repo, &["status", "--json"]))).unwrap();
     for id in ["perception", "editing"] {
-        let summary = status["subjects"].as_array().unwrap().iter().find(|s| s["id"] == id).unwrap();
+        let summary = status["data"]["subjects"].as_array().unwrap().iter().find(|s| s["id"] == id).unwrap();
         assert_eq!(summary["openBlockers"], 1, "{id}: {summary}");
     }
     for id in ["perception", "editing"] {

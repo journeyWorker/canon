@@ -26,6 +26,19 @@ fn json_of(out: &Output, what: &str) -> Value {
     serde_json::from_slice(&out.stdout).unwrap_or_else(|e| panic!("{what}: stdout is not one JSON value ({e}): {}", String::from_utf8_lossy(&out.stdout)))
 }
 
+/// `status --json` as one report: `data` plus the `meta.next` / `meta.waitingOn` it carries.
+fn status_report(repo: &Path, role: Option<&str>) -> Value {
+    let doc = json_of(&canon(repo, &["status", "--json"], role), "status");
+    assert_eq!(doc["ok"], true, "{doc}");
+    let mut report = doc["data"].clone();
+    for key in ["next", "nextOmitted", "waitingOn"] {
+        if !doc["meta"][key].is_null() {
+            report[key] = doc["meta"][key].clone();
+        }
+    }
+    report
+}
+
 fn ok(repo: &Path, args: &[&str]) -> Value {
     json_of(&canon(repo, args, None), &format!("{args:?}"))
 }
@@ -57,7 +70,7 @@ fn repo_with_change() -> (TempDir, Value) {
 
 /// `status --json`'s first step about `subject`.
 fn status_step(repo: &Path, subject: &str) -> Value {
-    let report = json_of(&canon(repo, &["status", "--json"], None), "status");
+    let report = status_report(repo, None);
     report["next"].as_array().unwrap().iter().find(|step| step["why"].as_str().unwrap_or("").starts_with(subject)).cloned().unwrap_or_else(|| panic!("status names no step for {subject}: {}", report["next"]))
 }
 
@@ -201,7 +214,7 @@ fn one_scenario_goes_from_its_brief_to_shipped_on_meta_next_alone() {
         last = ok(repo, &refs);
     }
     println!("{}", ran.join("\n"));
-    let status = json_of(&canon(repo, &["status", "--json"], None), "status");
+    let status = status_report(repo, None);
     let demo = status["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "demo").unwrap();
     assert_eq!(demo["status"], "shipped", "ran:\n{}\n{status}", ran.join("\n"));
     assert!(meta_next(&last).is_empty(), "a shipped subject has no step: {last}");
@@ -229,13 +242,13 @@ fn a_declared_role_keeps_its_steps_and_counts_the_rest() {
     let dir = two_roles_waiting();
     let repo = dir.path();
 
-    let unset = json_of(&canon(repo, &["status", "--json"], None), "status");
+    let unset = status_report(repo, None);
     assert!(unset.get("waitingOn").is_none(), "no role, no counts");
     assert!(unset["next"].as_array().unwrap().iter().all(|s| s.get("role").is_some()), "every step carries its role");
     let roles: Vec<&str> = unset["next"].as_array().unwrap().iter().filter_map(|s| s["role"].as_str()).collect();
     assert!(roles.contains(&"reviewer") && roles.contains(&"implementer"), "{roles:?}");
 
-    let reviewer = json_of(&canon(repo, &["status", "--json"], Some("reviewer")), "status as reviewer");
+    let reviewer = status_report(repo, Some("reviewer"));
     let steps = reviewer["next"].as_array().unwrap();
     assert!(!steps.is_empty() && steps.iter().all(|s| s["role"] == "reviewer"), "{steps:?}");
     assert!(steps[0]["command"].as_str().unwrap().starts_with("canon review add"), "{steps:?}");
@@ -261,7 +274,7 @@ fn brief_with_two_flows() -> String {
 
 /// The step `status` names for `demo` that carries `--flow <flow>`.
 fn flow_step_of(repo: &Path, flow: &str) -> Option<Value> {
-    let report = json_of(&canon(repo, &["status", "--json"], None), "status");
+    let report = status_report(repo, None);
     report["next"].as_array().unwrap().iter().find(|step| step["command"].as_str().unwrap_or("").contains(&format!("--flow {flow} "))).cloned()
 }
 
@@ -302,7 +315,7 @@ fn brief_with_an_advisory() -> String {
 
 /// The steps `status --json` gives about `subject`.
 fn status_steps(repo: &Path, subject: &str) -> Vec<Value> {
-    let report = json_of(&canon(repo, &["status", "--json"], None), "status");
+    let report = status_report(repo, None);
     report["next"].as_array().unwrap().iter().filter(|step| step["why"].as_str().unwrap_or("").starts_with(subject)).cloned().collect()
 }
 

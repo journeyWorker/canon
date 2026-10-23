@@ -224,7 +224,7 @@ fn inventory_sync_materializes_exactly_the_tagged_scenario_identical_to_a_hand_a
         let out = run_canon(&["query", "--kind", "scenario", "--json"], dir);
         assert!(out.status.success(), "canon query failed: {}", stderr(&out));
         let payload: Value = serde_json::from_str(&stdout(&out)).expect("valid JSON on stdout");
-        let records = payload["records"].as_array().cloned().unwrap_or_default();
+        let records = payload["data"]["records"].as_array().cloned().unwrap_or_default();
         assert_eq!(records.len(), 1, "expected exactly one Scenario record, got {records:?}");
         records[0].clone()
     };

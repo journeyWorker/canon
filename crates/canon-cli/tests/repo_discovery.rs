@@ -100,7 +100,7 @@ fn a_nested_directory_of_a_canon_repo_finds_the_root_without_repo() {
         let out = canon(&nested, home.path(), args);
         assert_eq!(out.status.code(), Some(0), "{args:?}: {}", stderr(&out));
         let body: Value = serde_json::from_slice(&out.stdout).unwrap();
-        let subjects = body["subjects"].to_string();
+        let subjects = body["data"]["subjects"].to_string();
         assert!(subjects.contains("demo"), "{args:?} from a nested directory reads the root's ledger: {subjects}");
     }
 

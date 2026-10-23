@@ -291,7 +291,7 @@ fn status_level(dir: &Path) -> serde_json::Value {
     let out = run_canon(&["status", "--json"], dir);
     assert!(out.status.success(), "{}", stderr(&out));
     let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
-    report["policy"]["level"].clone()
+    report["data"]["policy"]["level"].clone()
 }
 
 /// The policy's keys, comments dropped.
@@ -428,7 +428,7 @@ fn init_then_ingest_plans_exits_0_as_a_clean_no_op() {
     assert_eq!(body["meta"]["command"], "ingest plans", "{body}");
     assert!(body["meta"]["next"].is_array(), "a write names what follows: {body}");
     assert_eq!(payload["sources"].as_array().map(Vec::len), Some(0), "no external source and no .canon/changes yet: {payload}");
-    assert_eq!(payload["changes_persisted"], 0, "{payload}");
+    assert_eq!(payload["changesPersisted"], 0, "{payload}");
 }
 
 // ── canon init --check-config ──

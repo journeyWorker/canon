@@ -327,7 +327,7 @@ fn a_flipped_row_aggregates_every_record_and_the_task_store_agrees() {
     let dir = setup(true);
     let repo = dir.path();
     ok(repo, &["ingest", "plans"]);
-    assert_eq!(task_records(repo)["records"][0]["status"], "open");
+    assert_eq!(task_records(repo)["data"]["records"][0]["status"], "open");
 
     for (verdict, summary) in [("faithful", "1 vitest case"), ("not-applicable", "9 vitest cases and 2 smoke checks")] {
         ok(repo, &["evidence", "add", "--task", "cats#1", "--kind", "test-run", "--ref", "npm test", "--role", "implementer", "--verdict", verdict, "--summary", summary]);
@@ -340,7 +340,7 @@ fn a_flipped_row_aggregates_every_record_and_the_task_store_agrees() {
         tasks.contains("- [x] 1 Ship the run — ✅ 2 evidence records (1 faithful, 1 not-applicable); latest: 9 vitest cases and 2 smoke checks"),
         "{tasks}"
     );
-    assert_eq!(task_records(repo)["records"][0]["status"], "done", "`canon query --kind task` agrees with the flipped checkbox");
+    assert_eq!(task_records(repo)["data"]["records"][0]["status"], "done", "`canon query --kind task` agrees with the flipped checkbox");
 }
 
 /// Dogfood nyan-omp: every record carried a task AND a scenario key, so

@@ -156,7 +156,15 @@ fn seed_approved_subject(repo: &Path, id: &str, status: SubjectStatus) {
 fn status_json(repo: &Path) -> Value {
     let out = run(repo, &["status", "--json"]);
     assert_eq!(out.status.code(), Some(0), "status always exits 0; stderr: {}", stderr(&out));
-    let report: Value = serde_json::from_str(&stdout(&out)).expect("status --json prints one JSON object");
+    let doc: Value = serde_json::from_str(&stdout(&out)).expect("status --json prints one JSON object");
+    assert_eq!(doc["ok"], true, "{doc}");
+    let mut report = doc["data"].clone();
+    for key in ["next", "nextOmitted", "waitingOn"] {
+        report[key] = doc["meta"][key].clone();
+    }
+    if report["nextOmitted"].is_null() {
+        report["nextOmitted"] = serde_json::json!(0);
+    }
     for step in report["next"].as_array().unwrap() {
         match step["actor"].as_str() {
             Some("agent") => {}

@@ -578,7 +578,7 @@ fn gate_task_reports_an_unknown_task_id_as_a_usage_failure() {
     write_tasks_md(dir.path(), "it-task-unknown", "- [ ] 1 Do the thing\n");
 
     let output = run_canon(&["gate", "task", "it-task-unknown#99", "--repo", "."], dir.path());
-    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.status.code(), Some(2));
     assert!(stderr(&output).contains("no matching row"), "{}", stderr(&output));
 }
 

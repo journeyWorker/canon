@@ -60,6 +60,7 @@ fn context_exits_zero_with_a_full_surface_even_when_the_corpus_fails_fmt_check()
     let json_output = run_canon(&["context", "--repo", &corpus.to_string_lossy(), "--json"]);
     assert!(json_output.status.success(), "canon context --json must also exit 0 against a violating corpus");
     let json: serde_json::Value = serde_json::from_slice(&json_output.stdout).expect("--json output must parse as JSON");
+    let json = json["data"].clone();
     assert_eq!(json["kinds"].as_object().map(|o| o.len()), Some(14), "JSON surface must list all fourteen kinds");
     assert_eq!(json["cel"].as_object().map(|o| o.len()), Some(14), "JSON surface must carry a per-kind cel section for all fourteen kinds");
     let task_cel = &json["cel"]["task"];
@@ -101,6 +102,7 @@ fn context_from_a_subdirectory_resolves_the_ancestor_repo_root_policy() {
     assert!(output.status.success(), "canon context from a subdirectory must still exit 0; stderr: {}", String::from_utf8_lossy(&output.stderr));
 
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).expect("--json output must parse as JSON");
+    let json = json["data"].clone();
     assert_eq!(
         json["policy"]["clean"].as_bool(),
         Some(true),
@@ -130,10 +132,10 @@ fn context_outline_opens_with_a_status_pointer_and_leaves_json_unchanged() {
     );
 
     let json: serde_json::Value = serde_json::from_slice(&run_canon(&["context", "--repo", &path, "--json"]).stdout).unwrap();
-    let mut keys: Vec<&str> = json.as_object().unwrap().keys().map(String::as_str).collect();
+    let mut keys: Vec<&str> = json["data"].as_object().unwrap().keys().map(String::as_str).collect();
     keys.sort_unstable();
     assert_eq!(keys, ["capabilityVersion", "cel", "enums", "joinKeys", "kinds", "policy", "review", "vocab"], "the header adds nothing to JSON");
-    assert_eq!(json["capabilityVersion"], 5);
+    assert_eq!(json["data"]["capabilityVersion"], 5);
 }
 
 /// 0.14 D7: with no policy file, the header's second line says the gate

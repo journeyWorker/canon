@@ -105,6 +105,22 @@ fn plant_handoff(fixture: &support::Fixture) -> HandoffId {
     id
 }
 
+/// The one `{ok,data,meta}` document on stdout.
+fn doc_of(stdout: &str) -> Value {
+    let body: Value = serde_json::from_str(stdout).expect("valid JSON on stdout");
+    assert_eq!(body["ok"], true, "{body}");
+    body
+}
+
+fn data_of(stdout: &str) -> Value {
+    doc_of(stdout)["data"].clone()
+}
+
+/// `meta.warnings` rendered: where `--json` carries every diagnostic.
+fn warnings_of(output: &std::process::Output) -> String {
+    doc_of(&support::stdout(output))["meta"]["warnings"].to_string()
+}
+
 fn scenario_record<'a>(records: &'a [Value], scenario_id: &str) -> &'a Value {
     records.iter().find(|r| r["scenario_id"] == scenario_id).unwrap_or_else(|| panic!("no scenario `{scenario_id}` in {records:?}"))
 }
@@ -119,7 +135,7 @@ fn a_scenario_with_a_matching_overlay_record_projects_the_declared_fields() {
     let output = fixture.run_canon(&["query", "--kind", "scenario", "--plugin", "porting", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
 
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).expect("valid JSON on stdout");
+    let payload: Value = data_of(&support::stdout(&output));
     let records = payload["records"].as_array().expect("records array");
     let record = scenario_record(records, "world.hotdeal.01");
     assert_eq!(record["overlay"]["porting.coverage"]["covered"], true);
@@ -138,7 +154,7 @@ fn a_scenario_with_no_overlay_record_projects_unmodified() {
     let output = fixture.run_canon(&["query", "--kind", "scenario", "--plugin", "porting", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
 
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).expect("valid JSON on stdout");
+    let payload: Value = data_of(&support::stdout(&output));
     let records = payload["records"].as_array().expect("records array");
     let record = scenario_record(records, "world.hotdeal.02");
     assert!(record.get("overlay").is_none(), "no overlay record exists for this scenario -- no `overlay` key must be injected: {record}");
@@ -157,10 +173,10 @@ fn a_malformed_overlay_record_is_skipped_while_sibling_records_still_project() {
     let output = fixture.run_canon(&["query", "--kind", "scenario", "--plugin", "porting", "--json"]);
     assert!(output.status.success(), "a malformed sibling record must never abort the whole projection -- stderr: {}", support::stderr(&output));
 
-    let stderr = support::stderr(&output);
-    assert!(stderr.contains("E-PLUGIN-BODY-TYPE") || stderr.contains("covered"), "the malformed record must be diagnosed on stderr: {stderr}");
+    let stderr = warnings_of(&output);
+    assert!(stderr.contains("E-PLUGIN-BODY-TYPE") || stderr.contains("covered"), "the malformed record must be diagnosed in meta.warnings: {stderr}");
 
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).expect("valid JSON on stdout");
+    let payload: Value = data_of(&support::stdout(&output));
     let records = payload["records"].as_array().expect("records array");
 
     let malformed_record = scenario_record(records, "world.hotdeal.03");
@@ -185,7 +201,7 @@ fn projection_never_rewrites_the_core_record_on_disk() {
     // Sanity: the projection actually ran and found the overlay match --
     // otherwise this test would trivially pass without exercising
     // anything.
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).expect("valid JSON on stdout");
+    let payload: Value = data_of(&support::stdout(&output));
     let record = scenario_record(payload["records"].as_array().unwrap(), "world.hotdeal.05");
     assert_eq!(record["overlay"]["porting.coverage"]["covered"], true);
 
@@ -211,14 +227,14 @@ fn no_plugin_flag_is_byte_identical_to_the_pre_s16_output_even_with_overlay_data
     assert!(output_after_overlay_data.status.success());
 
     assert_eq!(
-        support::stdout(&output_before_overlay_data),
-        support::stdout(&output_after_overlay_data),
+        data_of(&support::stdout(&output_before_overlay_data)),
+        data_of(&support::stdout(&output_after_overlay_data)),
         "`canon query` without `--plugin` must be byte-identical whether or not overlay data exists on disk"
     );
 
     // And structurally: no s16 surface leaks into the no-`--plugin`
     // payload shape at all.
-    let payload: Value = serde_json::from_str(&support::stdout(&output_after_overlay_data)).unwrap();
+    let payload: Value = data_of(&support::stdout(&output_after_overlay_data));
     assert!(payload.get("plugin").is_none());
     assert!(payload.get("overlays").is_none());
     let record = scenario_record(payload["records"].as_array().unwrap(), "world.hotdeal.06");
@@ -242,18 +258,18 @@ fn a_kind_plugin_core_kind_mismatch_never_projects_and_leaves_core_output_unchan
     assert!(with_mismatched_plugin.status.success());
 
     assert_eq!(
-        support::stdout(&no_plugin),
-        support::stdout(&with_mismatched_plugin),
+        data_of(&support::stdout(&no_plugin)),
+        data_of(&support::stdout(&with_mismatched_plugin)),
         "a core_kind mismatch must leave the core `--kind handoff` output byte-identical to the no-`--plugin` path"
     );
 
-    let stderr = support::stderr(&with_mismatched_plugin);
+    let stderr = warnings_of(&with_mismatched_plugin);
     assert!(
         stderr.contains("core_kind") && stderr.contains("scenario") && stderr.contains("handoff"),
         "a diagnostic naming the core_kind mismatch must be surfaced on stderr: {stderr}"
     );
 
-    let payload: Value = serde_json::from_str(&support::stdout(&with_mismatched_plugin)).unwrap();
+    let payload: Value = data_of(&support::stdout(&with_mismatched_plugin));
     let records = payload["records"].as_array().expect("records array");
     assert!(records.iter().any(|r| r["id"] == handoff_id.to_string()));
     for record in records {
@@ -279,12 +295,12 @@ fn plugin_flag_with_no_projectable_overlay_falls_back_byte_identical_to_no_plugi
     assert!(with_plugin.status.success(), "stderr: {}", support::stderr(&with_plugin));
 
     assert_eq!(
-        support::stdout(&no_plugin),
-        support::stdout(&with_plugin),
+        data_of(&support::stdout(&no_plugin)),
+        data_of(&support::stdout(&with_plugin)),
         "an all-empty projection must fall back byte-identical to the no-`--plugin` output"
     );
 
-    let payload: Value = serde_json::from_str(&support::stdout(&with_plugin)).unwrap();
+    let payload: Value = data_of(&support::stdout(&with_plugin));
     assert!(payload.get("plugin").is_none(), "no plugin metadata may leak when nothing projected: {payload}");
     assert!(payload.get("overlays").is_none());
     let record = scenario_record(payload["records"].as_array().unwrap(), "world.hotdeal.07");
@@ -337,7 +353,7 @@ fn plugin_projects_only_its_own_overlays_never_a_namespace_sibling_plugins() {
     let output = fixture.run_canon(&["query", "--kind", "scenario", "--plugin", "cov-a", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
 
-    let payload: Value = serde_json::from_str(&support::stdout(&output)).unwrap();
+    let payload: Value = data_of(&support::stdout(&output));
     let record = scenario_record(payload["records"].as_array().unwrap(), "world.hotdeal.08");
     assert_eq!(record["overlay"]["shared.alpha"]["covered"], true, "cov-a's own overlay must project: {record}");
     assert!(

@@ -58,7 +58,7 @@ fn retrieve_over_a_seeded_store_returns_the_role_and_regime_snapshot() {
 
     let json_output = run_canon(&["retrieve", "--role", "dev", "--regime", regime.as_str(), "--repo", ".", "--json"], dir.path());
     assert!(json_output.status.success());
-    let guidance: Vec<serde_json::Value> = serde_json::from_slice(&json_output.stdout).expect("--json output must parse as a JSON array");
+    let guidance: Vec<serde_json::Value> = serde_json::from_slice::<serde_json::Value>(&json_output.stdout).expect("--json output must parse as one document")["data"].as_array().expect("data is the guidance array").clone();
     assert_eq!(guidance.len(), 1);
     assert_eq!(guidance[0]["title"], "a validated strategy");
 }
@@ -87,7 +87,7 @@ fn retrieve_respects_a_k_cap_over_the_real_binary() {
 
     let output = run_canon(&["retrieve", "--role", "dev", "--regime", regime.as_str(), "--repo", ".", "--k", "2", "--json"], dir.path());
     assert!(output.status.success());
-    let guidance: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout).unwrap();
+    let guidance: Vec<serde_json::Value> = serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap()["data"].as_array().unwrap().clone();
     assert_eq!(guidance.len(), 2);
 }
 
@@ -150,7 +150,7 @@ fn retrieve_domain_subject_serves_the_subject_scoped_hit() {
     let output =
         run_canon(&["retrieve", "--role", "planning", "--domain", "planning", "--subject-id", "my-subject", "--repo", repo, "--json"], dir.path());
     assert!(output.status.success(), "stderr: {}", stderr(&output));
-    let guidance: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout).expect("--json output must parse as a JSON array");
+    let guidance: Vec<serde_json::Value> = serde_json::from_slice::<serde_json::Value>(&output.stdout).expect("--json output must parse as one document")["data"].as_array().expect("data is the guidance array").clone();
     assert_eq!(guidance.len(), 1);
     assert_eq!(guidance[0]["title"], "subject-scoped");
     assert!(!stderr(&output).contains("fell back"), "no fallback ⇒ no serving note; stderr: {}", stderr(&output));
@@ -173,10 +173,12 @@ fn retrieve_domain_subject_falls_back_to_domain_when_subject_is_empty() {
     let output =
         run_canon(&["retrieve", "--role", "planning", "--domain", "planning", "--subject-id", "my-subject", "--repo", repo, "--json"], dir.path());
     assert!(output.status.success(), "stderr: {}", stderr(&output));
-    let guidance: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout).expect("--json stdout stays a raw JSON array on fallback");
+    let doc: serde_json::Value = serde_json::from_slice(&output.stdout).expect("--json stdout is one document on fallback");
+    let guidance = doc["data"].as_array().expect("data is the guidance array").clone();
     assert_eq!(guidance.len(), 1);
     assert_eq!(guidance[0]["title"], "domain-scoped");
-    assert!(stderr(&output).contains("fell back"), "fallback must note the serving regime on stderr: {}", stderr(&output));
+    assert!(doc["meta"]["warnings"].to_string().contains("fell back"), "fallback must note the serving regime in meta.warnings: {doc}");
+    assert!(stderr(&output).is_empty(), "--json writes nothing to stderr: {}", stderr(&output));
 
     // Human mode surfaces the fallback line on stdout.
     let human =

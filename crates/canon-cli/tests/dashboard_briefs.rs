@@ -473,7 +473,8 @@ fn report_dashboard_04_a_repo_whose_snapshot_cannot_be_generated_is_still_served
     assert!(warnings.len() == 1 && warnings[0].as_str().unwrap().contains("duckdb"), "{}", live.startup);
     assert_eq!(live.startup["data"]["snapshotAvailable"], false);
     let stderr = std::fs::read_to_string(&live.stderr).unwrap();
-    let warning = stderr.lines().find(|l| l.starts_with("canon dashboard: warning: ")).unwrap_or_else(|| panic!("a warning line on stderr: {stderr:?}"));
+    assert!(stderr.is_empty(), "JSON mode writes nothing to stderr: {stderr:?}");
+    let warning = warnings[0].as_str().unwrap();
     assert!(warning.contains("duckdb") && warning.contains("the panels page says so instead of showing panels") && warning.contains("install DuckDB"), "{warning}");
 
     let status = get(&live, "/api/status");

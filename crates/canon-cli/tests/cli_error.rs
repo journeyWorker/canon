@@ -33,9 +33,10 @@ fn json_error(out: &Output) -> Value {
     let body: Value = serde_json::from_str(&stdout(out)).unwrap_or_else(|e| panic!("stdout is not JSON ({e}): {}", stdout(out)));
     let error = body.get("error").unwrap_or_else(|| panic!("no `error` object: {body}")).clone();
     let keys: BTreeSet<&str> = error.as_object().expect("error is an object").keys().map(String::as_str).collect();
-    // `field` and `expected` appear only on a refusal about one argument.
-    let required = BTreeSet::from(["code", "message", "hint", "retryable"]);
-    assert!(required.is_subset(&keys) && keys.is_subset(&BTreeSet::from(["code", "message", "hint", "retryable", "field", "expected"])), "{error}");
+    // `field`, `expected` and `received` appear only on a refusal about one argument.
+    let required = BTreeSet::from(["code", "message", "hint", "retryable", "suggestions"]);
+    assert!(required.is_subset(&keys) && keys.is_subset(&BTreeSet::from(["code", "message", "hint", "retryable", "suggestions", "field", "expected", "received"])), "{error}");
+    assert!(error["suggestions"].is_array(), "{error}");
     assert!(error.get("expected").is_none() || error.get("field").is_some(), "`expected` always comes with `field`: {error}");
     assert!(error["code"].is_string() && error["message"].is_string() && error["retryable"].is_boolean(), "{error}");
     assert!(error["hint"].is_null() || error["hint"].is_string(), "{error}");
@@ -158,11 +159,13 @@ fn json_failures_from_a_command_with_its_own_flag_carry_code_message_hint_and_re
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     let error = json_error(&out);
     assert_eq!((error["code"].as_str(), error["retryable"].as_bool()), (Some("APPROVAL_INCOMPLETE"), Some(false)), "{error}");
-    assert_eq!(human_code(&out), "APPROVAL_INCOMPLETE", "stderr says the same thing: {}", stderr(&out));
+    assert!(stderr(&out).is_empty(), "JSON mode writes nothing to stderr: {}", stderr(&out));
+    let human = run(repo, &["brief", "approve", "--by", "Ana", "--note", " "]);
+    assert_eq!(human_code(&human), "APPROVAL_INCOMPLETE", "human mode says the same thing on stderr: {}", stderr(&human));
 
-    // An operational failure (not a refusal) keeps exit 1.
+    // Exits come from the registry: a missing brief is exit 2.
     let out = run(repo, &["brief", "check", "--change-id", "no-such-change", "--json"]);
-    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     assert_eq!(json_error(&out)["code"], "BRIEF_NOT_FOUND");
 
     let out = run(repo, &["subject", "status", "no-such-subject", "--to", "specced", "--json"]);

@@ -407,12 +407,7 @@ fn subject_lifecycle_35_adopting_an_unapproved_change_warns_only_where_it_matter
             && found[0].contains("cannot ship"),
         "{found:?}"
     );
-    assert_eq!(
-        stderr(&out).matches("warning:").count(),
-        1,
-        "{}",
-        stderr(&out)
-    );
+    assert!(stderr(&out).is_empty(), "JSON mode writes nothing to stderr: {}", stderr(&out));
 
     // `subject adopt` warns the same way; an approved brief does not.
     let other = repo_with_subject("verifying");
@@ -492,7 +487,7 @@ fn subject_lifecycle_36_unadopt_removes_the_link_on_both_sides() {
     assert!(json["meta"]["next"].is_array(), "{json}");
     let records = |kind: &str| -> Vec<Value> {
         serde_json::from_str::<Value>(&stdout(&ok(repo, &["query", "--kind", kind, "--json"])))
-            .unwrap()["records"]
+            .unwrap()["data"]["records"]
             .as_array()
             .cloned()
             .unwrap_or_default()
@@ -769,7 +764,7 @@ fn subject_lifecycle_38_a_pending_drafts_next_step_follows_its_brief_check() {
 
     let steps = |repo: &Path| -> Vec<Value> {
         let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();
-        status["next"].as_array().unwrap().clone()
+        status["meta"]["next"].as_array().unwrap().clone()
     };
     let has = |steps: &[Value], prefix: &str| steps.iter().any(|s| s["command"].as_str().unwrap().starts_with(prefix));
 
@@ -923,7 +918,7 @@ fn context_status_82_a_pending_draft_with_advisories_is_polished_before_it_is_re
     std::fs::write(brief_path(repo, "b"), brief("").replace(" ==**F1 is the happy path.**==", "")).unwrap();
 
     let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();
-    let steps = status["next"].as_array().unwrap();
+    let steps = status["meta"]["next"].as_array().unwrap();
     let position = |needle: &str| steps.iter().position(|s| s["command"].as_str().unwrap().contains(needle));
     let polish = position("reference/brief-polish.md").unwrap_or_else(|| panic!("{steps:?}"));
     let report = position("report the pending draft's brief").unwrap_or_else(|| panic!("{steps:?}"));

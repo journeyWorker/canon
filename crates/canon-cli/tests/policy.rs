@@ -101,7 +101,8 @@ fn gate_check_and_status_advise_until_the_current_policy_is_approved() {
         assert_eq!(gate.status.code(), Some(gate_exit), "gate exit: {}{}", stdout(&gate), stderr(&gate));
         assert_eq!(status.status.code(), Some(0), "status: {}", stderr(&status));
         assert_eq!(json.status.code(), Some(0), "status --json: {}", stderr(&json));
-        let report: serde_json::Value = serde_json::from_str(&stdout(&json)).expect("status --json prints one JSON object");
+        let doc: serde_json::Value = serde_json::from_str(&stdout(&json)).expect("status --json prints one JSON document");
+        let report = &doc["data"];
         let warnings: Vec<&str> = report["warnings"].as_array().unwrap().iter().map(|w| w.as_str().unwrap()).collect();
         let policy_warnings: Vec<&str> = warnings.iter().copied().filter(|w| w.starts_with("policy not approved") || w.starts_with("policy changed")).collect();
         match expect {
