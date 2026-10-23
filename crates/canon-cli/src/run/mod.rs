@@ -121,16 +121,17 @@ fn record_role(flag: Option<RoleId>, repo: &std::path::Path, command: &str, json
 
 /// Human-only acts (0.28 D10): `brief approve`, `policy approve` and
 /// `divergence accept` record a human's decision, so every declared agent
-/// role (`--as` / `CANON_ROLE`) is refused, with a hint addressed to the human
-/// that names the options only they supply. No flag grants it. Without a
-/// declared role the leaf runs as before.
+/// role (`--as` / `CANON_ROLE`) is refused. The hint tells the agent to relay
+/// `human_call` (the exact call, ids filled in) to the human and wait: the
+/// agent never unsets its role to run it. No flag grants it. Without a
+/// declared role (the human's own shell) the leaf runs as before.
 fn human_only(command: &str, human_call: &str, json: bool) -> Result<(), ExitCode> {
     use crate::role::Role;
     let Some(role) = Role::current(None) else { return Ok(()) };
     Err(ExitCode::from(
         CliError::refused("HUMAN_ONLY", format!("`{command}` records a human's decision and is not available to the {role} role"))
             .field("--as")
-            .hint(format!("ask the human to run it themselves, without a declared role (no --as, no CANON_ROLE): `{human_call}`; no flag grants an agent this"))
+            .hint(format!("report this exact call to the human and wait; the human runs it in their own shell: `{human_call}`; never remove your role (`env -u CANON_ROLE`, dropping --as) to run it yourself"))
             .emit(command, json) as u8,
     ))
 }

@@ -858,7 +858,7 @@ fn context_status_64_an_external_change_is_answered_in_a_canon_brief_that_points
     assert!(
         why.contains(".canon/changes/c-live/brief.md does not exist yet")
             && why.contains("create .canon/changes/c-live/brief.md holding a `Source: plans/changes/c-live/proposal.md` line")
-            && why.contains("`canon brief approve c-live --approver <the human> --note"),
+            && why.contains("`canon brief approve c-live --approver <their name> --note"),
         "{why}"
     );
     let text = stdout(&run(dir.path(), &["status"]));

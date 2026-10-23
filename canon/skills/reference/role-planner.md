@@ -5,35 +5,154 @@ brief the human answers once. You build nothing. Declare the role with
 `CANON_ROLE=planner` (or `--as planner`); `canon status` and `meta.next`
 then show your steps and count the rest under `waitingOn`. The approvals are
 the human's: `brief approve`, `policy approve` and `divergence accept` refuse
-every agent role (`HUMAN_ONLY`, `retryable: false`), and no flag grants them.
+every agent role (`HUMAN_ONLY`, `retryable: false`), and no flag grants them. You never run them, and never remove or unset your role (`env -u CANON_ROLE`,
+dropping `--as`) to get past the refusal: report the exact call, slug filled in, and
+wait; the human runs it (or uses `canon dashboard`).
 
 ## Commands
 
-Every line below is generated from the CLI's own spec and runs as written against the
-example story (subject `demo`, change `add-login`, scenario `auth.login.01`): swap in
-your ids. `canon schema <command> --json` lists every option.
+Every leaf of this role is below with its full syntax line (every option the leaf
+has) and an example generated from the CLI's own spec, which runs as written against
+the example story (subject `demo`, change `add-login`, scenario `auth.login.01`): swap
+in your ids. Use only the options on a line; never guess one. Ask `canon schema
+<command> --json` only for a leaf this block does not list, or after a `USAGE` refusal.
 
 <!-- canon:generated commands-planner begin -->
+Every leaf takes `--as <ROLE>` and `--json`; `--repo <DIR>` too, except `completion`, `schema`, `skills show`. `--input <JSON|FILE|->` runs a leaf from one JSON document (an array is a batch) and is only on the lines ending `[--input]`.
+In a syntax line `<X>` is a value, `[x]` optional, `a | b` a choice, `(a | b)` exactly one is required, `[--x <V>]*` may repeat, `<X>+` is one or more, `[--a --b <V>]` go together. An option that is not on the line does not exist: it is refused (`USAGE`).
+
+```text
+# Read the brief against the rules
+canon brief check [<CHANGE_ID>]
+```
 ```bash
-canon brief check                                                                                                # Read the brief against the rules
-canon brief show                                                                                                 # Show where the change stands and the next one to three steps; never edits
-canon change new add-search --subject-id demo --title "Add search"                                               # Write .canon/changes/<slug>/brief.md, import it, and adopt it into a subject
-canon completion zsh                                                                                             # Write the shell completion script for canon (bash, zsh or fish)
-canon context                                                                                                    # Show what you can author here: record kinds, fields, enums, policies
-canon divergence list --as-of 2030-01-01                                                                         # List the current divergence burn-down state
-canon feature new billing.invoice --title Invoices                                                               # Create a fresh .feature file for a new area.surface
-canon finding list --change-id add-login                                                                         # List a change's committed findings at their latest version
-canon format .canon/specs                                                                                        # Validate a spec/artifact corpus against canon's format
-canon gate check                                                                                                 # Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)
-canon query --kind evidence                                                                                      # Read stored records across every storage tier
-canon retrieve --for-role reviewer --domain dev --limit 20                                                       # Fetch role-scoped strategy guidance
-canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature  # Append a tagged scenario stub to its .feature file (created if missing); many at once with `--input`
-canon schema evidence add                                                                                        # Describe canon's own commands
-canon skills show canon --full                                                                                   # Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here
-canon status                                                                                                     # Show where this repo stands: subjects by status, their gaps, and the next commands
-canon subject adopt demo --change-id add-login                                                                   # Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several)
-canon subject new payments --domain dev --title Payments                                                         # Author a new subject at status `proposed`
-canon subject unadopt demo --change-id add-login                                                                 # Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved)
+canon brief check
+```
+```text
+# Show where the change stands and the next one to three steps; never edits
+canon brief show [<CHANGE_ID>]
+```
+```bash
+canon brief show
+```
+```text
+# Write .canon/changes/<slug>/brief.md, import it, and adopt it into a subject
+canon change new <CHANGE_ID> --subject-id <SUBJECT_ID> --title <TEXT> [--change-kind <feature|chore>] [--input]
+```
+```bash
+canon change new add-search --subject-id demo --title "Add search"
+```
+```text
+# Write the shell completion script for canon (bash, zsh or fish)
+canon completion <SHELL>
+```
+```bash
+canon completion zsh
+```
+```text
+# Show what you can author here: record kinds, fields, enums, policies
+canon context [--fields <FIELDS>]
+```
+```bash
+canon context
+```
+```text
+# List the current divergence burn-down state
+canon divergence list [--as-of <TIMESTAMP>] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+```
+```bash
+canon divergence list --as-of 2030-01-01
+```
+```text
+# Create a fresh .feature file for a new area.surface
+canon feature new <SURFACE> --title <TEXT> [--actor-id <ACTOR_ID>] [--project-id <PROJECT_ID>] [--input]
+```
+```bash
+canon feature new billing.invoice --title Invoices
+```
+```text
+# List a change's committed findings at their latest version
+canon finding list --change-id <CHANGE_ID> [--open] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+```
+```bash
+canon finding list --change-id add-login
+```
+```text
+# Validate a spec/artifact corpus against canon's format
+canon format [<DIR>]
+```
+```bash
+canon format .canon/specs
+```
+```text
+# Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)
+canon gate check [--release]
+```
+```bash
+canon gate check
+```
+```text
+# Read stored records across every storage tier
+canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin-id <PLUGIN_ID> | --history] [--change-id <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+```
+```bash
+canon query --kind evidence
+```
+```text
+# Fetch role-scoped strategy guidance
+canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject-id <SUBJECT_ID>] [--limit <N>]
+```
+```bash
+canon retrieve --for-role reviewer --domain dev --limit 20
+```
+```text
+# Append a tagged scenario stub to its .feature file (created if missing); many at once with `--input`
+canon scenario new <SCENARIO_ID> --title <TEXT> [--subject-id <SUBJECT_ID>] [--lane <NAME>] [--case <NAME>] [--flow <FLOW_ID>] [--change-id <CHANGE_ID> (with --flow)] [--actor-id <ACTOR_ID>] [--feature <FILE>] [--project-id <PROJECT_ID>] [--input]
+```
+```bash
+canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature
+```
+```text
+# Describe canon's own commands
+canon schema [<PATH>]* [--errors | --error <CODE>]
+```
+```bash
+canon schema evidence add
+```
+```text
+# Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here
+canon skills show <NAME> [--full]
+```
+```bash
+canon skills show canon --full
+```
+```text
+# Show where this repo stands: subjects by status, their gaps, and the next commands
+canon status [--fields <FIELDS>]
+```
+```bash
+canon status
+```
+```text
+# Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several)
+canon subject adopt <SUBJECT_ID> --change-id <CHANGE_ID> [--dry-run] [--input]
+```
+```bash
+canon subject adopt demo --change-id add-login
+```
+```text
+# Author a new subject at status `proposed`
+canon subject new <SUBJECT_ID> --domain <NAME> --title <TEXT> [--summary <TEXT>] [--owner-role <ROLE>] [--actor-id <ACTOR_ID>] [--input]
+```
+```bash
+canon subject new payments --domain dev --title Payments
+```
+```text
+# Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved)
+canon subject unadopt <SUBJECT_ID> --change-id <CHANGE_ID> [--dry-run] [--input]
+```
+```bash
+canon subject unadopt demo --change-id add-login
 ```
 <!-- canon:generated commands-planner end -->
 
@@ -120,11 +239,12 @@ ids); the human step comes after it. A policy that no longer matches its approva
    grades the work against.
 5. **The human records the answer.** `brief approve` is the human's leaf: run
    by an agent role it is refused (`HUMAN_ONLY`) with a hint addressed to the
-   human. Give the human the call, in their own shell and with no declared
-   role: `canon brief approve add-login --approver <their name> --note "<their
-   own words>"`; `--approver` and `--note` are theirs to supply, or they
-   approve in the dashboard. Never approve in their name, never drop your
-   declared role to run it, and never edit the policy to make the gate pass.
+   human. Report the exact call, slug filled in, and wait: `canon brief approve
+   add-login --approver <their name> --note "<their own words>"`; the human
+   runs it in their own shell (`--approver` and `--note` are theirs to supply)
+   or approves in the dashboard. Never approve in their name, never remove or
+   unset your role (`env -u CANON_ROLE`, dropping `--as`) to run it, and never
+   edit the policy to make the gate pass.
    `canon brief show <slug>` then reports `state: approved`. A brief edited
    after its approval is not approved (`BRIEF_CHANGED_SINCE_APPROVAL`): it
    needs a new answer and a new `brief approve` by the human. A follow-up that

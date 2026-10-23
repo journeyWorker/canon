@@ -1,7 +1,7 @@
 {
   "version": 1,
   "canon_version": "0.28.0",
-  "source_hash": "sha256:e387ce1a4b6bfea418dc4f56e4623b1103e483260bf077f7d0777a857ae3c815",
+  "source_hash": "sha256:fff15092e4041e9c0f76aec71c50e26193b0609cff5089437d9799d1f9173f35",
   "providers": [
     "claude",
     "codex",
@@ -9,13 +9,13 @@
     "pi"
   ],
   "files": {
-    ".agents/skills/canon/SKILL.md": "sha256:407d1075ded11a58176279dfc19868aeb08efca075476ebe2ec23492a87b1e3d",
+    ".agents/skills/canon/SKILL.md": "sha256:2caf6f8706ec78270374288e9b9a10b4992b3eb4a2cd3fe4cc274943b1bb6fe6",
     ".agents/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:e918eeff1ed4697c0b15c92b9f10bce86eb8c4c833f6084d8e6c93c833f434e4",
-    ".claude/skills/canon/SKILL.md": "sha256:407d1075ded11a58176279dfc19868aeb08efca075476ebe2ec23492a87b1e3d",
+    ".claude/skills/canon/SKILL.md": "sha256:2caf6f8706ec78270374288e9b9a10b4992b3eb4a2cd3fe4cc274943b1bb6fe6",
     ".claude/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:e918eeff1ed4697c0b15c92b9f10bce86eb8c4c833f6084d8e6c93c833f434e4",
-    ".omp/skills/canon/SKILL.md": "sha256:407d1075ded11a58176279dfc19868aeb08efca075476ebe2ec23492a87b1e3d",
+    ".omp/skills/canon/SKILL.md": "sha256:2caf6f8706ec78270374288e9b9a10b4992b3eb4a2cd3fe4cc274943b1bb6fe6",
     ".omp/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:e918eeff1ed4697c0b15c92b9f10bce86eb8c4c833f6084d8e6c93c833f434e4",
-    ".pi/skills/canon/SKILL.md": "sha256:407d1075ded11a58176279dfc19868aeb08efca075476ebe2ec23492a87b1e3d",
+    ".pi/skills/canon/SKILL.md": "sha256:2caf6f8706ec78270374288e9b9a10b4992b3eb4a2cd3fe4cc274943b1bb6fe6",
     ".pi/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:e918eeff1ed4697c0b15c92b9f10bce86eb8c4c833f6084d8e6c93c833f434e4"
   }
 }

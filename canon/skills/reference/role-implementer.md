@@ -10,41 +10,196 @@ planner and the human own that. The only waiver is `--override-reason
 the human's answer: canon records it on the evidence, echoes it in
 `data.overrides[]` and lists it in `status` for the human. Never use it to
 skip the wait yourself. `brief approve`, `policy approve` and `divergence
-accept` are the human's; they refuse you (`HUMAN_ONLY`).
+accept` are the human's; they refuse you (`HUMAN_ONLY`). You never run them, and never remove or unset your role (`env -u CANON_ROLE`,
+dropping `--as`) to get past the refusal: report the exact call, slug filled in, and
+wait; the human runs it (or uses `canon dashboard`).
 
 ## Commands
 
-Every line below is generated from the CLI's own spec and runs as written against the
-example story (subject `demo`, change `add-login`, scenario `auth.login.01`): swap in
-your ids. `canon schema <command> --json` lists every option.
+Every leaf of this role is below with its full syntax line (every option the leaf
+has) and an example generated from the CLI's own spec, which runs as written against
+the example story (subject `demo`, change `add-login`, scenario `auth.login.01`): swap
+in your ids. Use only the options on a line; never guess one. Ask `canon schema
+<command> --json` only for a leaf this block does not list, or after a `USAGE` refusal.
 
 <!-- canon:generated commands-implementer begin -->
+Every leaf takes `--as <ROLE>` and `--json`; `--repo <DIR>` too, except `completion`, `schema`, `skills show`. `--input <JSON|FILE|->` runs a leaf from one JSON document (an array is a batch) and is only on the lines ending `[--input]`.
+In a syntax line `<X>` is a value, `[x]` optional, `a | b` a choice, `(a | b)` exactly one is required, `[--x <V>]*` may repeat, `<X>+` is one or more, `[--a --b <V>]` go together. An option that is not on the line does not exist: it is refused (`USAGE`).
+
+```text
+# Write the shell completion script for canon (bash, zsh or fish)
+canon completion <SHELL>
+```
 ```bash
-canon completion zsh                                                                                                                                                                                                                      # Write the shell completion script for canon (bash, zsh or fish)
-canon context                                                                                                                                                                                                                             # Show what you can author here: record kinds, fields, enums, policies
-canon context-pack add --manifest .canon/context-manifest.json                                                                                                                                                                            # Create an immutable context pack from a repository-local JSON manifest
-canon context-pack show sha256:0000000000000000000000000000000000000000000000000000000000000000                                                                                                                                           # Show a context pack after verifying its manifest and content objects
-canon context-pack verify sha256:0000000000000000000000000000000000000000000000000000000000000000                                                                                                                                         # Verify a context pack's manifest and immutable content objects
-canon divergence add auth.login.01 --actor-id alice --role reviewer                                                                                                                                                                       # Add a divergence candidate, staged with no run_seq yet (commit it with `canon gate promote --kind divergence`, or in the same run with --promote / `write
-canon divergence defer auth.login.01 --actor-id alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer                                                                                                      # Directly record a deferred divergence (requires --reason/--expiry)
-canon divergence list --as-of 2030-01-01                                                                                                                                                                                                  # List the current divergence burn-down state
-canon divergence resolve auth.login.01 --actor-id alice --role reviewer                                                                                                                                                                   # Directly record a resolved divergence
-canon evidence add --scenario-id auth.login.01 --class test-run --ref "npm test" --role implementer                                                                                                                                       # Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write
-canon evidence approval-payload --scenario-id auth.login.01 --project-id root --approver alice --approval-at 2030-01-01T00:00:00Z                                                                                                         # Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1`
-canon evidence audit auth.login.01 --ref audit-report.json --evaluator-id eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer  # Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator)
-canon feature new billing.invoice --title Invoices                                                                                                                                                                                        # Create a fresh .feature file for a new area.surface
-canon finding list --change-id add-login                                                                                                                                                                                                  # List a change's committed findings at their latest version
-canon format .canon/specs                                                                                                                                                                                                                 # Validate a spec/artifact corpus against canon's format
-canon gate check                                                                                                                                                                                                                          # Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)
-canon gate promote --kind evidence                                                                                                                                                                                                        # Promote staged records (evidence, findings, divergences) to the committed ledger
-canon inventory sync                                                                                                                                                                                                                      # Validate each spec root, then materialize scenario index records
-canon query --kind evidence                                                                                                                                                                                                               # Read stored records across every storage tier
-canon retrieve --for-role reviewer --domain dev --limit 20                                                                                                                                                                                # Fetch role-scoped strategy guidance
-canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature                                                                                                                           # Append a tagged scenario stub to its .feature file (created if missing); many at once with `--input`
-canon schema evidence add                                                                                                                                                                                                                 # Describe canon's own commands
-canon skills show canon --full                                                                                                                                                                                                            # Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here
-canon status                                                                                                                                                                                                                              # Show where this repo stands: subjects by status, their gaps, and the next commands
-canon task done add-login#1                                                                                                                                                                                                               # Flip one task checkbox, gated on real evidence (fails closed)
+canon completion zsh
+```
+```text
+# Show what you can author here: record kinds, fields, enums, policies
+canon context [--fields <FIELDS>]
+```
+```bash
+canon context
+```
+```text
+# Create an immutable context pack from a repository-local JSON manifest
+canon context-pack add --manifest <FILE> [--input]
+```
+```bash
+canon context-pack add --manifest .canon/context-manifest.json
+```
+```text
+# Show a context pack after verifying its manifest and content objects
+canon context-pack show <PACK_ID>
+```
+```bash
+canon context-pack show sha256:0000000000000000000000000000000000000000000000000000000000000000
+```
+```text
+# Verify a context pack's manifest and immutable content objects
+canon context-pack verify <PACK_ID>
+```
+```bash
+canon context-pack verify sha256:0000000000000000000000000000000000000000000000000000000000000000
+```
+```text
+# Add a divergence candidate, staged with no run_seq yet
+canon divergence add <SCENARIO_ID> --actor-id <ACTOR_ID> [--project-id <PROJECT_ID>] [--rev <REV>] [--state <open|still-divergent|resolved|deferred>] [--reason <TEXT>] [--expiry <TIMESTAMP>] [--round <N>] [--detail <TEXT>] [--role <ROLE>] [--promote | --no-promote] [--input]
+```
+```bash
+canon divergence add auth.login.01 --actor-id alice --role reviewer
+```
+```text
+# Directly record a deferred divergence (requires --reason/--expiry)
+canon divergence defer <SCENARIO_ID> --actor-id <ACTOR_ID> --reason <TEXT> --expiry <TIMESTAMP> [--project-id <PROJECT_ID>] [--rev <REV>] [--round <N>] [--role <ROLE>] [--input]
+```
+```bash
+canon divergence defer auth.login.01 --actor-id alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer
+```
+```text
+# List the current divergence burn-down state
+canon divergence list [--as-of <TIMESTAMP>] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+```
+```bash
+canon divergence list --as-of 2030-01-01
+```
+```text
+# Directly record a resolved divergence
+canon divergence resolve <SCENARIO_ID> --actor-id <ACTOR_ID> [--project-id <PROJECT_ID>] [--rev <REV>] [--round <N>] [--detail <TEXT>] [--role <ROLE>] [--input]
+```
+```bash
+canon divergence resolve auth.login.01 --actor-id alice --role reviewer
+```
+```text
+# Record one attributed EvidenceRecord for a task or scenario
+canon evidence add [--task-id <TASK_ID>] [--project-id <PROJECT_ID>] [--class <CLASS>] [--ref <TEXT>] [--verdict <faithful|not-applicable|divergent>] [--summary <TEXT>] [--command-result <TEXT>] [--scenario-id <SCENARIO_ID>] [--run-id <RUN_ID>] [--surface-ref <PATH_OR_EFFECT>]* [--actor-id <ACTOR_ID>] [--role <ROLE>] [--session-id <SESSION_ID>] [--approver <NAME>] [--approval-role <human>] [--signature-file <FILE>] [--approval-at <TIMESTAMP>] [--rev <REV>] [--artifact <PATH>]* [--report <FORMAT:PATH>]* [--report-case <NAME>]* [--all-scenarios] [--max-artifact-mib <N>] [--override-reason <TEXT>] [--promote | --no-promote] [--input]
+```
+```bash
+canon evidence add --scenario-id auth.login.01 --class test-run --ref "npm test" --role implementer
+```
+```text
+# Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1`
+canon evidence approval-payload --approver <NAME> --approval-at <TIMESTAMP> [--task-id <TASK_ID>] [--project-id <PROJECT_ID>] [--scenario-id <SCENARIO_ID>] [--run-id <RUN_ID>] [--rev <REV>] [--surface-ref <PATH_OR_EFFECT>]*
+```
+```bash
+canon evidence approval-payload --scenario-id auth.login.01 --project-id root --approver alice --approval-at 2030-01-01T00:00:00Z
+```
+```text
+# Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator)
+canon evidence audit <SCENARIO_ID> --ref <TEXT> --evaluator-id <ID> --evaluator-version <TEXT> --evaluator-digest <DIGEST> --audit-result <confirmed|refuted|indeterminate> [--project-id <PROJECT_ID>] [--summary <TEXT>] [--command-result <TEXT>] [--run-id <RUN_ID>] [--actor-id <ACTOR_ID>] [--role <ROLE>] [--session-id <SESSION_ID>] [--rev <REV>] [--artifact <PATH>]* [--report <FORMAT:PATH>]* [--report-case <NAME>]* [--max-artifact-mib <N>] [--override-reason <TEXT>] [--promote | --no-promote] [--input]
+```
+```bash
+canon evidence audit auth.login.01 --ref audit-report.json --evaluator-id eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer
+```
+```text
+# Create a fresh .feature file for a new area.surface
+canon feature new <SURFACE> --title <TEXT> [--actor-id <ACTOR_ID>] [--project-id <PROJECT_ID>] [--input]
+```
+```bash
+canon feature new billing.invoice --title Invoices
+```
+```text
+# List a change's committed findings at their latest version
+canon finding list --change-id <CHANGE_ID> [--open] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+```
+```bash
+canon finding list --change-id add-login
+```
+```text
+# Validate a spec/artifact corpus against canon's format
+canon format [<DIR>]
+```
+```bash
+canon format .canon/specs
+```
+```text
+# Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)
+canon gate check [--release]
+```
+```bash
+canon gate check
+```
+```text
+# Promote staged records (evidence, findings, divergences) to the committed ledger
+canon gate promote [--kind <evidence|finding|divergence>] [--dry-run] [--input]
+```
+```bash
+canon gate promote --kind evidence
+```
+```text
+# Validate each spec root, then materialize scenario index records
+canon inventory sync [--spec-root <DIR>] [--dry-run] [--input]
+```
+```bash
+canon inventory sync
+```
+```text
+# Read stored records across every storage tier
+canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin-id <PLUGIN_ID> | --history] [--change-id <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+```
+```bash
+canon query --kind evidence
+```
+```text
+# Fetch role-scoped strategy guidance
+canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject-id <SUBJECT_ID>] [--limit <N>]
+```
+```bash
+canon retrieve --for-role reviewer --domain dev --limit 20
+```
+```text
+# Append a tagged scenario stub to its .feature file (created if missing); many at once with `--input`
+canon scenario new <SCENARIO_ID> --title <TEXT> [--subject-id <SUBJECT_ID>] [--lane <NAME>] [--case <NAME>] [--flow <FLOW_ID>] [--change-id <CHANGE_ID> (with --flow)] [--actor-id <ACTOR_ID>] [--feature <FILE>] [--project-id <PROJECT_ID>] [--input]
+```
+```bash
+canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature
+```
+```text
+# Describe canon's own commands
+canon schema [<PATH>]* [--errors | --error <CODE>]
+```
+```bash
+canon schema evidence add
+```
+```text
+# Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here
+canon skills show <NAME> [--full]
+```
+```bash
+canon skills show canon --full
+```
+```text
+# Show where this repo stands: subjects by status, their gaps, and the next commands
+canon status [--fields <FIELDS>]
+```
+```bash
+canon status
+```
+```text
+# Flip one task checkbox, gated on real evidence (fails closed)
+canon task done <TASK_ID> [--input]
+```
+```bash
+canon task done add-login#1
 ```
 <!-- canon:generated commands-implementer end -->
 

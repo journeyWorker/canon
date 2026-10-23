@@ -49,7 +49,9 @@ pub fn run(cmd: DivergenceCliCommand) -> ExitCode {
             ExitCode::from(crate::divergence::run_defer(&repo, &project_id, &scenario_id, &commit, round, &actor_id, &reason, expiry, &actor_id, &role, json) as u8)
         }
         DivergenceCliCommand::Accept(DivergenceAcceptArgs { project_id, scenario_ids, reason, tracking, expiry, actor_id, role, session_id, repo, json, .. }) => {
-            if let Err(code) = human_only("canon divergence accept", "canon divergence accept <SCENARIO_ID>... --actor-id <NAME> --reason \"<why>\" --tracking <ISSUE_URL>", json) {
+            let ids: Vec<String> = scenario_ids.iter().map(ToString::to_string).collect();
+            let call = format!("canon divergence accept {} --actor-id <their name> --reason \"<why>\" --tracking <ISSUE_URL>", ids.join(" "));
+            if let Err(code) = human_only("canon divergence accept", &call, json) {
                 return code;
             }
             let project_id = match project_for(&repo, project_id, "canon divergence accept", json) {

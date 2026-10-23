@@ -1022,7 +1022,7 @@ pub fn run_move(
                 fixes.push("record an independent review (`canon review scenario`) and close blocker findings".to_string());
             }
             if brief_gap.is_some() {
-                fixes.push("get the human's answer to the brief and record it with `canon brief approve`".to_string());
+                fixes.push("get the human's answer to the brief; the human records it with `canon brief approve` in their own shell".to_string());
             }
             let reverify: Vec<&Violation> = waivable.iter().filter(|v| canon_gate::review_gate::is_reverify(v)).collect();
             if reverify.iter().any(|v| !canon_gate::review_gate::is_scoped_reverify(v)) {
@@ -1353,7 +1353,7 @@ fn brief_gap(repo: &Path, subject: &Subject, changes: &[ChangeId], transition: &
         FailureClass::UnreviewedPromotion,
         id,
         format!(
-            "{transition}: brief not approved — {}; a human must answer the brief, and only from that answer the agent will {}",
+            "{transition}: brief not approved — {}; a human must answer the brief; {}",
             brief.unanswered(),
             brief.record()
         ),

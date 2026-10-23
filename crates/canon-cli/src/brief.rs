@@ -233,23 +233,24 @@ impl BriefStatus {
         }
     }
 
-    /// The re-approval advice for a digest-less approval line.
+    /// The re-approval advice for a digest-less or changed approval: the human's call, never the agent's.
     pub fn record_digest_hint(&self) -> String {
-        format!("re-approve with `canon brief approve {} --approver <the human> --note \"<their words>\"`", self.change.as_deref().unwrap_or("<change>"))
+        format!(
+            "the human re-approves with `canon brief approve {} --approver <their name> --note \"<their words>\"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role to run it",
+            self.change.as_deref().unwrap_or("<change>")
+        )
     }
 
-    /// How the agent records the human's answer, for an enforced brief.
+    /// How the human's answer is recorded, for an enforced brief: the human runs the call.
     pub fn record(&self) -> String {
         let brief = self.brief.as_deref().unwrap_or_default();
         if self.changed {
             return self.record_digest_hint();
         }
+        let call = format!("`canon brief approve {} --approver <their name> --note \"<their words>\"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role to run it", self.change.as_deref().unwrap_or("<change>"));
         match (self.brief_exists, &self.source) {
-            (false, Some(source)) => format!(
-                "create {brief} holding a `Source: {source}` line, then record their words with `canon brief approve {} --approver <the human> --note \"<their words>\"`",
-                self.change.as_deref().unwrap_or("<change>")
-            ),
-            _ => format!("record their words with `canon brief approve {} --approver <the human> --note \"<their words>\"`", self.change.as_deref().unwrap_or("<change>")),
+            (false, Some(source)) => format!("create {brief} holding a `Source: {source}` line; when they answer, the human records it with {call}"),
+            _ => format!("when they answer, the human records it with {call}"),
         }
     }
 }

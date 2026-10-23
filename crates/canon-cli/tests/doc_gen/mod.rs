@@ -8,7 +8,7 @@
 //! `.mdx` JSX comments (`{/* … */}`). Everything between them is replaced;
 //! everything outside is hand-written. Names:
 //!
-//! - `commands-<role>`: the role's leaves with one runnable example each
+//! - `commands-<role>`: the role's leaves, each with its full syntax line and one runnable example
 //!   (`canon/skills/reference/role-<role>.md`);
 //! - `cli-<group>` (`cli-top` for the top-level leaves): one table per command
 //!   group (`packages/website/src/content/docs/{,ko/}cli.mdx`);
@@ -184,19 +184,121 @@ pub fn cli_table(spec: &Value, group: &str, ko: bool) -> String {
     out
 }
 
-/// The **Commands** block of a role's reference: one runnable example per leaf of the role.
-pub fn role_commands(spec: &Value, role: &str) -> String {
-    let mut rows: Vec<(String, String)> = leaves(spec)
-        .filter(|l| l["roles"].as_array().is_some_and(|r| r.iter().any(|x| x == role)))
-        .map(|l| (example(l), short(l["about"].as_str().expect("about")).to_string()))
-        .collect();
-    rows.sort();
-    let width = rows.iter().map(|(e, _)| e.len()).max().unwrap_or(0);
-    let mut out = String::from("```bash\n");
-    for (example, about) in rows {
-        let _ = writeln!(out, "{example:width$}  # {about}");
+/// Options every leaf lists (or most do) and the role block states once at its top.
+const SHARED: [&str; 3] = ["repo", "json", "input"];
+
+fn options_of(leaf: &Value) -> &[Value] {
+    leaf["options"].as_array().map(|a| a.as_slice()).unwrap_or_default()
+}
+
+fn names_of<'a>(o: &'a Value, key: &str) -> Vec<&'a str> {
+    o[key].as_array().map(|a| a.as_slice()).unwrap_or_default().iter().filter_map(Value::as_str).map(|n| n.trim_start_matches("--")).collect()
+}
+
+fn find_option<'a>(leaf: &'a Value, name: &str) -> Option<&'a Value> {
+    options_of(leaf).iter().find(|o| o["name"] == name)
+}
+
+/// `--name <VALUE>` (a closed set shows its members), or `--name` for a flag.
+fn atom(o: &Value) -> String {
+    let name = o["name"].as_str().expect("option name");
+    if o["kind"] != "value" {
+        return format!("--{name}");
     }
-    out.push_str("```\n");
+    let set: Vec<&str> = o["possibleValues"].as_array().map(|a| a.as_slice()).unwrap_or_default().iter().filter_map(Value::as_str).collect();
+    if set.is_empty() { format!("--{name} <{}>", o["valueName"].as_str().unwrap_or("VALUE")) } else { format!("--{name} <{}>", set.join("|")) }
+}
+
+fn is_required(leaf: &Value, o: &Value) -> bool {
+    let name = o["name"].as_str().unwrap_or_default();
+    o["required"] == true || leaf["requiredOneOf"].as_array().map(|a| a.as_slice()).unwrap_or_default().iter().any(|g| g.as_array().is_some_and(|g| g.iter().any(|n| n.as_str().is_some_and(|n| n.trim_start_matches("--") == name))))
+}
+
+/// The syntax line of a leaf: operands, required options, then the optional ones with
+/// their value names and closed sets; the shared `--repo/--json/--input` are left to the
+/// block's header (`--input` is flagged on the lines that take it).
+fn syntax_line(leaf: &Value) -> String {
+    let mut parts: Vec<String> = vec![format!("canon {}", leaf["command"].as_str().expect("command"))];
+    for o in leaf["operands"].as_array().map(|a| a.as_slice()).unwrap_or_default() {
+        let word = format!("<{}>", o["kind"].as_str().unwrap_or("VALUE"));
+        let (required, repeatable) = (o["required"] == true, o["repeatable"] == true);
+        parts.push(match (required, repeatable) {
+            (true, false) => word,
+            (true, true) => format!("{word}+"),
+            (false, false) => format!("[{word}]"),
+            (false, true) => format!("[{word}]*"),
+        });
+    }
+    let opts: Vec<&Value> = options_of(leaf).iter().filter(|o| !SHARED.contains(&o["name"].as_str().unwrap_or_default())).collect();
+    for o in opts.iter().filter(|o| o["required"] == true) {
+        parts.push(atom(o));
+    }
+    for group in leaf["requiredOneOf"].as_array().map(|a| a.as_slice()).unwrap_or_default() {
+        let alts: Vec<String> = group.as_array().expect("group").iter().filter_map(|n| find_option(leaf, n.as_str().expect("name").trim_start_matches("--"))).map(atom).collect();
+        parts.push(format!("({})", alts.join(" | ")));
+    }
+    let mut used: Vec<&str> = Vec::new();
+    for o in opts.iter().filter(|o| !is_required(leaf, o)) {
+        let name = o["name"].as_str().expect("option name");
+        if used.contains(&name) {
+            continue;
+        }
+        let follows = |a: &str, b: &str| find_option(leaf, a).is_some_and(|x| names_of(x, "conflictsWith").contains(&b));
+        let rivals: Vec<&str> = names_of(o, "conflictsWith").into_iter().filter(|r| follows(r, name) && find_option(leaf, r).is_some_and(|x| !is_required(leaf, x))).collect();
+        let clique = !rivals.is_empty() && rivals.iter().all(|a| rivals.iter().all(|b| a == b || follows(a, b)));
+        let partners: Vec<&str> = names_of(o, "requires").into_iter().filter(|r| find_option(leaf, r).is_some_and(|x| !is_required(leaf, x) && names_of(x, "requires").contains(&name))).collect();
+        let repeat = if o["repeatable"] == true { "*" } else { "" };
+        if clique {
+            let mut members = vec![atom(o)];
+            members.extend(rivals.iter().filter_map(|r| find_option(leaf, r)).map(atom));
+            used.extend(rivals.iter().copied());
+            parts.push(format!("[{}]{repeat}", members.join(" | ")));
+        } else if !partners.is_empty() {
+            let mut members = vec![atom(o)];
+            members.extend(partners.iter().filter_map(|r| find_option(leaf, r)).map(atom));
+            used.extend(partners.iter().copied());
+            parts.push(format!("[{}]{repeat}", members.join(" ")));
+        } else if let Some(needs) = names_of(o, "requires").first() {
+            parts.push(format!("[{} (with --{needs})]{repeat}", atom(o)));
+        } else {
+            parts.push(format!("[{}]{repeat}", atom(o)));
+        }
+        used.push(name);
+    }
+    if find_option(leaf, "input").is_some() {
+        parts.push("[--input]".into());
+    }
+    parts.join(" ")
+}
+
+/// `short(about)` without a dangling parenthesis or code span: cut back to the last ` (` when the clause is unbalanced.
+fn gist(about: &str) -> &str {
+    let s = short(about);
+    if s.matches('`').count() % 2 == 1 || s.matches('(').count() != s.matches(')').count() { s.rfind(" (").map_or(s, |at| &s[..at]) } else { s }
+}
+
+/// The **Commands** block of a role's reference: every leaf of the role with its full
+/// syntax (each option, value names, closed sets) and one runnable example.
+pub fn role_commands(spec: &Value, role: &str) -> String {
+    let mut mine: Vec<&Value> = leaves(spec).filter(|l| l["roles"].as_array().is_some_and(|r| r.iter().any(|x| x == role))).collect();
+    mine.sort_by_key(|l| l["command"].as_str().unwrap_or_default());
+    let no_repo: Vec<String> = mine.iter().filter(|l| find_option(l, "repo").is_none()).map(|l| format!("`{}`", l["command"].as_str().unwrap_or_default())).collect();
+    let mut out = String::from("Every leaf takes `--as <ROLE>` and `--json`");
+    if no_repo.is_empty() {
+        out.push_str(" and `--repo <DIR>`");
+    } else {
+        let _ = write!(out, "; `--repo <DIR>` too, except {}", no_repo.join(", "));
+    }
+    out.push_str(". `--input <JSON|FILE|->` runs a leaf from one JSON document (an array is a batch) and is only on the lines ending `[--input]`.\n");
+    out.push_str("In a syntax line `<X>` is a value, `[x]` optional, `a | b` a choice, `(a | b)` exactly one is required, `[--x <V>]*` may repeat, `<X>+` is one or more, `[--a --b <V>]` go together. An option that is not on the line does not exist: it is refused (`USAGE`).\n\n");
+    for leaf in mine {
+        let about = gist(leaf["about"].as_str().expect("about"));
+        let _ = writeln!(out, "```text\n# {about}\n{}", syntax_line(leaf));
+        if leaf["effect"] == "destructive" {
+            out.push_str("# a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts\n");
+        }
+        let _ = writeln!(out, "```\n```bash\n{}\n```", example(leaf));
+    }
     out
 }
 

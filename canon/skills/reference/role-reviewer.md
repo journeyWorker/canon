@@ -5,36 +5,161 @@ You are the independent second look. Declare the role with
 `review change` and `finding add` then defaults to `reviewer`. The human's
 acts refuse you (`HUMAN_ONLY`): `brief approve`, `policy approve` and
 `divergence accept`. Name what the human has to decide in your report; never
-look for a flag that grants it.
+look for a flag that grants it. You never run them, and never remove or unset your role (`env -u CANON_ROLE`,
+dropping `--as`) to get past the refusal: report the exact call, slug filled in, and
+wait; the human runs it (or uses `canon dashboard`).
 
 ## Commands
 
-Every line below is generated from the CLI's own spec and runs as written against the
-example story (subject `demo`, change `add-login`, scenario `auth.login.01`): swap in
-your ids. `canon schema <command> --json` lists every option.
+Every leaf of this role is below with its full syntax line (every option the leaf
+has) and an example generated from the CLI's own spec, which runs as written against
+the example story (subject `demo`, change `add-login`, scenario `auth.login.01`): swap
+in your ids. Use only the options on a line; never guess one. Ask `canon schema
+<command> --json` only for a leaf this block does not list, or after a `USAGE` refusal.
 
 <!-- canon:generated commands-reviewer begin -->
+Every leaf takes `--as <ROLE>` and `--json`; `--repo <DIR>` too, except `completion`, `schema`, `skills show`. `--input <JSON|FILE|->` runs a leaf from one JSON document (an array is a batch) and is only on the lines ending `[--input]`.
+In a syntax line `<X>` is a value, `[x]` optional, `a | b` a choice, `(a | b)` exactly one is required, `[--x <V>]*` may repeat, `<X>+` is one or more, `[--a --b <V>]` go together. An option that is not on the line does not exist: it is refused (`USAGE`).
+
+```text
+# Read the brief against the rules
+canon brief check [<CHANGE_ID>]
+```
 ```bash
-canon brief check                                                                                                                     # Read the brief against the rules
-canon brief show                                                                                                                      # Show where the change stands and the next one to three steps; never edits
-canon completion zsh                                                                                                                  # Write the shell completion script for canon (bash, zsh or fish)
-canon context                                                                                                                         # Show what you can author here: record kinds, fields, enums, policies
-canon divergence add auth.login.01 --actor-id alice --role reviewer                                                                   # Add a divergence candidate, staged with no run_seq yet (commit it with `canon gate promote --kind divergence`, or in the same run with --promote / `write
-canon divergence defer auth.login.01 --actor-id alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer  # Directly record a deferred divergence (requires --reason/--expiry)
-canon divergence list --as-of 2030-01-01                                                                                              # List the current divergence burn-down state
-canon divergence resolve auth.login.01 --actor-id alice --role reviewer                                                               # Directly record a resolved divergence
-canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --actor-id alice --summary "Token is logged"          # Record one code-review finding (promoted in the same run under `write
-canon finding close add-login --round 1 --seq 1 --disposition rejected --reason "works as designed"                                   # Move an already-committed finding's disposition (promoted in the same run under `write
-canon finding list --change-id add-login                                                                                              # List a change's committed findings at their latest version
-canon format .canon/specs                                                                                                             # Validate a spec/artifact corpus against canon's format
-canon gate check                                                                                                                      # Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)
-canon query --kind evidence                                                                                                           # Read stored records across every storage tier
-canon retrieve --for-role reviewer --domain dev --limit 20                                                                            # Fetch role-scoped strategy guidance
-canon review change add-login --actor-id alice --role reviewer --original-spec-ref docs/prd.md                                        # Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required)
-canon review scenario auth.login.01 --actor-id alice --role reviewer --original-spec-ref docs/prd.md                                  # Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required)
-canon schema evidence add                                                                                                             # Describe canon's own commands
-canon skills show canon --full                                                                                                        # Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here
-canon status                                                                                                                          # Show where this repo stands: subjects by status, their gaps, and the next commands
+canon brief check
+```
+```text
+# Show where the change stands and the next one to three steps; never edits
+canon brief show [<CHANGE_ID>]
+```
+```bash
+canon brief show
+```
+```text
+# Write the shell completion script for canon (bash, zsh or fish)
+canon completion <SHELL>
+```
+```bash
+canon completion zsh
+```
+```text
+# Show what you can author here: record kinds, fields, enums, policies
+canon context [--fields <FIELDS>]
+```
+```bash
+canon context
+```
+```text
+# Add a divergence candidate, staged with no run_seq yet
+canon divergence add <SCENARIO_ID> --actor-id <ACTOR_ID> [--project-id <PROJECT_ID>] [--rev <REV>] [--state <open|still-divergent|resolved|deferred>] [--reason <TEXT>] [--expiry <TIMESTAMP>] [--round <N>] [--detail <TEXT>] [--role <ROLE>] [--promote | --no-promote] [--input]
+```
+```bash
+canon divergence add auth.login.01 --actor-id alice --role reviewer
+```
+```text
+# Directly record a deferred divergence (requires --reason/--expiry)
+canon divergence defer <SCENARIO_ID> --actor-id <ACTOR_ID> --reason <TEXT> --expiry <TIMESTAMP> [--project-id <PROJECT_ID>] [--rev <REV>] [--round <N>] [--role <ROLE>] [--input]
+```
+```bash
+canon divergence defer auth.login.01 --actor-id alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer
+```
+```text
+# List the current divergence burn-down state
+canon divergence list [--as-of <TIMESTAMP>] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+```
+```bash
+canon divergence list --as-of 2030-01-01
+```
+```text
+# Directly record a resolved divergence
+canon divergence resolve <SCENARIO_ID> --actor-id <ACTOR_ID> [--project-id <PROJECT_ID>] [--rev <REV>] [--round <N>] [--detail <TEXT>] [--role <ROLE>] [--input]
+```
+```bash
+canon divergence resolve auth.login.01 --actor-id alice --role reviewer
+```
+```text
+# Record one code-review finding
+canon finding add --change-id <CHANGE_ID> --round <N> --seq <N> --severity <blocker|should-fix|note> --actor-id <ACTOR_ID> --summary <TEXT> [--disposition <open|fixed|rejected|deferred>] [--rev <REV>] [--resolution-rev <REV>] [--introduced-rev <REV>] [--file-ref <TEXT>] [--scenario-id <SCENARIO_ID>]* [--role <ROLE>] [--session-id <SESSION_ID>] [--promote | --no-promote] [--input]
+```
+```bash
+canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --actor-id alice --summary "Token is logged"
+```
+```text
+# Move an already-committed finding's disposition
+canon finding close <CHANGE_ID> --round <N> --seq <N> --disposition <open|fixed|rejected|deferred> [--resolution-rev <REV>] [--reason <TEXT>] [--actor-id <ACTOR_ID>] [--role <ROLE>] [--session-id <SESSION_ID>] [--promote | --no-promote] [--input]
+```
+```bash
+canon finding close add-login --round 1 --seq 1 --disposition rejected --reason "works as designed"
+```
+```text
+# List a change's committed findings at their latest version
+canon finding list --change-id <CHANGE_ID> [--open] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+```
+```bash
+canon finding list --change-id add-login
+```
+```text
+# Validate a spec/artifact corpus against canon's format
+canon format [<DIR>]
+```
+```bash
+canon format .canon/specs
+```
+```text
+# Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)
+canon gate check [--release]
+```
+```bash
+canon gate check
+```
+```text
+# Read stored records across every storage tier
+canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin-id <PLUGIN_ID> | --history] [--change-id <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+```
+```bash
+canon query --kind evidence
+```
+```text
+# Fetch role-scoped strategy guidance
+canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject-id <SUBJECT_ID>] [--limit <N>]
+```
+```bash
+canon retrieve --for-role reviewer --domain dev --limit 20
+```
+```text
+# Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required)
+canon review change <CHANGE_ID> --actor-id <ACTOR_ID> (--upstream-ref <TEXT> | --original-spec-ref <TEXT>) [--project-id <PROJECT_ID>] [--rev <REV>] [--role <ROLE>] [--session-id <SESSION_ID>] [--review-outcome <signed|indeterminate|unavailable>] [--reviewer-provider <NAME>] [--reviewer-model <NAME>] [--reviewer-harness <NAME>] [--artifact <PATH>]* [--max-artifact-mib <N>] [--input]
+```
+```bash
+canon review change add-login --actor-id alice --role reviewer --original-spec-ref docs/prd.md
+```
+```text
+# Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required)
+canon review scenario <SCENARIO_ID>+ --actor-id <ACTOR_ID> (--upstream-ref <TEXT> | --original-spec-ref <TEXT>) [--project-id <PROJECT_ID>] [--rev <REV>] [--role <ROLE>] [--session-id <SESSION_ID>] [--review-outcome <signed|indeterminate|unavailable>] [--reviewer-provider <NAME>] [--reviewer-model <NAME>] [--reviewer-harness <NAME>] [--artifact <PATH>]* [--max-artifact-mib <N>] [--input]
+```
+```bash
+canon review scenario auth.login.01 --actor-id alice --role reviewer --original-spec-ref docs/prd.md
+```
+```text
+# Describe canon's own commands
+canon schema [<PATH>]* [--errors | --error <CODE>]
+```
+```bash
+canon schema evidence add
+```
+```text
+# Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here
+canon skills show <NAME> [--full]
+```
+```bash
+canon skills show canon --full
+```
+```text
+# Show where this repo stands: subjects by status, their gaps, and the next commands
+canon status [--fields <FIELDS>]
+```
+```bash
+canon status
 ```
 <!-- canon:generated commands-reviewer end -->
 
@@ -43,7 +168,8 @@ canon status                                                                    
 user-visible behavior. `--rev` is the commit you reviewed (default `HEAD`;
 any git revision, a short sha included). With `write.promote: manual`,
 follow `finding add` and `finding close` with `canon gate promote --as
-reviewer --json`. `canon schema review scenario --json` lists every option.
+reviewer --json`. `review scenario` has no `--summary` or note option: what you
+found goes in `finding add --summary`.
 
 The forms you reach for most (the story's ids; swap in yours):
 
@@ -147,9 +273,10 @@ so it refuses every agent role (`HUMAN_ONLY`), you included. What you do:
 confirm the evidence really is divergent and the limit is outside this
 change, then report to the human the scenario ids, the reason, the
 tracking reference and an expiry when the limit should be gone by a date.
-The human runs `canon divergence accept <ids> --actor-id <name> --reason
-"<why>" --tracking <ref>` themselves, from a session that did not attest the
-evidence (`DIVERGENCE_ACCEPT_REFUSED` otherwise). Never suggest it to skip
+Give the exact call, ids filled in: the human runs `canon divergence accept
+<ids> --actor-id <name> --reason "<why>" --tracking <ref>` themselves in their
+own shell, from a session that did not attest the evidence
+(`DIVERGENCE_ACCEPT_REFUSED` otherwise); you never run it or unset your role to. Never suggest it to skip
 a fix the implementer can make in this change. The acceptance pins that
 evidence: new evidence for the scenario, or its expiry, ends it, and the
 human accepts (or the implementer fixes) again. An accepted gap counts as

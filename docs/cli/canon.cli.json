@@ -13247,7 +13247,7 @@
     {
       "code": "HUMAN_ONLY",
       "exit": 2,
-      "fix": "Ask the human to run the command themselves, supplying the options only they can give (--approver and --note); no flag grants it to an agent.",
+      "fix": "Report the exact call, ids filled in, to the human and wait: the human runs it in their own shell (or on the dashboard for a brief), supplying the options only they can give (--approver and --note). Never remove your role (`env -u CANON_ROLE`, dropping --as) to run it yourself; no flag grants it to an agent.",
       "meaning": "this leaf records a human's decision (`brief approve`, `policy approve`, `divergence accept`), so every agent role (planner, implementer, reviewer, orchestrator declared with --as or CANON_ROLE) is refused",
       "retryable": false
     },
