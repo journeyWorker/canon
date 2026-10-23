@@ -113,6 +113,8 @@ use canon_model::{RegimeKey, RoleId};
 use canon_store::registry::TierRegistry;
 use canon_store::write_atomic;
 use chrono::{DateTime, TimeDelta, Utc};
+use schemars::JsonSchema;
+use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -773,6 +775,81 @@ pub fn begin(
     Ok(Begun { tier: persist_run(&repo, &run), run_id, manifest_path, run })
 }
 
+/// `canon dispatch begin`: the run opened. Binding keys are absent when unset;
+/// `lineage` only when the manifest records it; `tierDegraded` only when the
+/// tier write degraded.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DispatchBeginReport<'a> {
+    pub run_id: String,
+    /// The run manifest written.
+    pub manifest: String,
+    /// The strategies injected into the run (ledger records, their own schema).
+    pub injected_guidance: &'a [canon_model::records::StrategyRef],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lineage: Option<&'a RunLineage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_id: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_run_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tier_degraded: Option<&'a str>,
+}
+
+impl crate::reports::Report for DispatchBeginReport<'_> {}
+
+/// `canon dispatch end`: the run closed. `tierDegraded` is present only when the
+/// tier write degraded.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DispatchEndReport<'a> {
+    pub run_id: String,
+    pub manifest: String,
+    /// The outcome the run was closed with (`succeeded`, `failed`, …).
+    pub status: &'static str,
+    pub ended_at: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tier_degraded: Option<&'a str>,
+}
+
+impl crate::reports::Report for DispatchEndReport<'_> {}
+
+/// How many edges of the plan-vs-actual diff fell into each class.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct EdgeCounts {
+    pub satisfied: usize,
+    #[serde(rename = "declared-not-observed")]
+    pub declared_not_observed: usize,
+    #[serde(rename = "observed-not-declared")]
+    pub observed_not_declared: usize,
+}
+
+/// One edge of the plan-vs-actual diff.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EdgeEntry<'a> {
+    pub from: &'a str,
+    pub to: &'a str,
+    /// `satisfied`, `declared-not-observed` or `observed-not-declared`.
+    pub class: &'static str,
+}
+
+/// `canon dispatch diff`: the declared plan DAG against the observed execution graph.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DispatchDiffReport<'a> {
+    /// Distinct edges the plan declares.
+    pub declared: usize,
+    /// Distinct edges the runs' lineage shows.
+    pub observed: usize,
+    pub counts: EdgeCounts,
+    /// The union of both sides, one entry per distinct edge, in task order.
+    pub edges: Vec<EdgeEntry<'a>>,
+    pub notes: &'a [String],
+}
+
+impl crate::reports::Report for DispatchDiffReport<'_> {}
+
 /// `canon dispatch begin`'s CLI wrapper: `0` on a written manifest, `2`
 /// on a usage failure (role/regime mismatch, a task naming no task /
 /// plan corpus, or a skill digest without an id), `1` on a
@@ -794,27 +871,7 @@ pub fn run_begin(
 ) -> ExitCode {
     match begin(repo, role, regime_key, agent_id, binding, metadata) {
         Ok(begun) => {
-            if json {
-                // Binding keys remain absent when unset; lineage is
-                // present only when the manifest records it.
-                let mut summary = serde_json::Map::new();
-                summary.insert("run_id".to_string(), serde_json::json!(begun.run_id.to_string()));
-                summary.insert("manifest".to_string(), serde_json::json!(begun.manifest_path.display().to_string()));
-                summary.insert("injected_guidance".to_string(), serde_json::json!(begun.run.injected_guidance));
-                if let Some(lineage) = &begun.run.lineage {
-                    summary.insert("lineage".to_string(), serde_json::json!(lineage));
-                }
-                if let Some(task_id) = &begun.run.task_id {
-                    summary.insert("task_id".to_string(), serde_json::json!(task_id.as_str()));
-                }
-                if let Some(parent) = begun.run.parent_run_id {
-                    summary.insert("parent_run_id".to_string(), serde_json::json!(parent.to_string()));
-                }
-                if let Some(reason) = begun.tier.degrade_reason() {
-                    summary.insert("tier_degraded".to_string(), serde_json::json!(reason));
-                }
-                crate::next::finish(repo, "dispatch begin", &crate::next::Scope::Repo, false, true, &crate::json_out::untyped(serde_json::Value::Object(summary)));
-            } else {
+            if !json {
                 println!(
                     "dispatch {} begun for {} — recorded {} guidance item(s) -> {}",
                     begun.run_id,
@@ -828,8 +885,17 @@ pub fn run_begin(
                 if let Some(parent) = begun.run.parent_run_id {
                     println!("  dispatched by run {parent}");
                 }
-                crate::next::finish(repo, "dispatch begin", &crate::next::Scope::Repo, false, false, &crate::json_out::untyped(serde_json::Value::Null));
             }
+            let report = DispatchBeginReport {
+                run_id: begun.run_id.to_string(),
+                manifest: begun.manifest_path.display().to_string(),
+                injected_guidance: &begun.run.injected_guidance,
+                lineage: begun.run.lineage.as_ref(),
+                task_id: begun.run.task_id.as_ref().map(TaskId::as_str),
+                parent_run_id: begun.run.parent_run_id.map(|parent| parent.to_string()),
+                tier_degraded: begun.tier.degrade_reason(),
+            };
+            crate::next::finish(repo, "dispatch begin", &crate::next::Scope::Repo, false, json, &report);
             // stderr in BOTH render modes, so stdout stays a clean
             // report — `run_diff`'s own note discipline, applied to
             // the one degrade a dispatch can carry.
@@ -1281,25 +1347,17 @@ pub fn end(repo: &Path, run_id: RunId, status: RunStatus) -> Result<Ended, Dispa
 pub fn run_end(repo: &Path, run_id: RunId, status: RunStatus, json: bool) -> ExitCode {
     match end(repo, run_id, status) {
         Ok(ended) => {
-            if json {
-                // A `Map` rather than one `json!` literal, for the
-                // reason `run_begin` builds its own the same way: the
-                // s42 degrade key is OMITTED on the healthy path, so
-                // an existing consumer's parse of a successful close
-                // is unchanged.
-                let mut summary = serde_json::Map::new();
-                summary.insert("run_id".to_string(), serde_json::json!(ended.run_id.to_string()));
-                summary.insert("manifest".to_string(), serde_json::json!(ended.manifest_path.display().to_string()));
-                summary.insert("status".to_string(), serde_json::json!(status_slug(ended.run.status)));
-                summary.insert("ended_at".to_string(), serde_json::json!(ended.run.ended_at));
-                if let Some(reason) = ended.tier.degrade_reason() {
-                    summary.insert("tier_degraded".to_string(), serde_json::json!(reason));
-                }
-                crate::next::finish(repo, "dispatch end", &crate::next::Scope::Repo, false, true, &crate::json_out::untyped(serde_json::Value::Object(summary)));
-            } else {
+            if !json {
                 println!("dispatch {} ended `{}` -> {}", ended.run_id, status_slug(ended.run.status), ended.manifest_path.display());
-                crate::next::finish(repo, "dispatch end", &crate::next::Scope::Repo, false, false, &crate::json_out::untyped(serde_json::Value::Null));
             }
+            let report = DispatchEndReport {
+                run_id: ended.run_id.to_string(),
+                manifest: ended.manifest_path.display().to_string(),
+                status: status_slug(ended.run.status),
+                ended_at: ended.run.ended_at,
+                tier_degraded: ended.tier.degrade_reason(),
+            };
+            crate::next::finish(repo, "dispatch end", &crate::next::Scope::Repo, false, json, &report);
             if let Some(reason) = ended.tier.degrade_reason() {
                 crate::warn_err!(
                     "canon dispatch end: the close of run {} was NOT persisted to its routed tier ({reason}) — the tier still holds whatever `dispatch begin` left there (the `running` version, or nothing if that write degraded too); the closed manifest at {} is the current record",
@@ -1872,27 +1930,18 @@ fn format_human(diff: &PlanActualDiff) -> String {
 /// filter, which is why no per-class array is duplicated here.
 /// `counts` is keyed by the SAME [`EdgeClass::as_str`] vocabulary each
 /// edge's `class` carries, so `counts[edge.class]` is a valid lookup.
-fn format_json(diff: &PlanActualDiff) -> String {
-    let mut counts = serde_json::Map::new();
-    for class in EdgeClass::ALL {
-        counts.insert(class.as_str().to_string(), serde_json::json!(diff.count(class)));
+fn diff_report(diff: &PlanActualDiff) -> DispatchDiffReport<'_> {
+    DispatchDiffReport {
+        declared: diff.declared,
+        observed: diff.observed,
+        counts: EdgeCounts {
+            satisfied: diff.count(EdgeClass::Satisfied),
+            declared_not_observed: diff.count(EdgeClass::DeclaredNotObserved),
+            observed_not_declared: diff.count(EdgeClass::ObservedNotDeclared),
+        },
+        edges: diff.edges.iter().map(|classified| EdgeEntry { from: classified.edge.from.as_str(), to: classified.edge.to.as_str(), class: classified.class.as_str() }).collect(),
+        notes: &diff.notes,
     }
-    let payload = serde_json::json!({
-        "declared": diff.declared,
-        "observed": diff.observed,
-        "counts": counts,
-        "edges": diff
-            .edges
-            .iter()
-            .map(|classified| serde_json::json!({
-                "from": classified.edge.from.as_str(),
-                "to": classified.edge.to.as_str(),
-                "class": classified.class.as_str(),
-            }))
-            .collect::<Vec<_>>(),
-        "notes": diff.notes,
-    });
-    serde_json::to_string_pretty(&payload).expect("serde_json::Value always serializes")
 }
 
 /// `canon dispatch diff [--repo <dir>] [--json]` (task 2.3): render the
@@ -1921,8 +1970,7 @@ fn format_json(diff: &PlanActualDiff) -> String {
 pub fn run_diff(repo: &Path, json: bool) -> ExitCode {
     let report = diff(repo);
     if json {
-        let data: serde_json::Value = serde_json::from_str(&format_json(&report)).expect("the diff report is one JSON value");
-        crate::json_out::data_with_meta("dispatch diff", &crate::json_out::untyped(data), crate::json_out::warnings_meta(&report.notes.iter().map(|note| format!("canon dispatch diff: {note}")).collect::<Vec<_>>()));
+        crate::json_out::data_with_meta("dispatch diff", &diff_report(&report), crate::json_out::warnings_meta(&report.notes.iter().map(|note| format!("canon dispatch diff: {note}")).collect::<Vec<_>>()));
         return ExitCode::SUCCESS;
     }
     for note in &report.notes {
@@ -2133,7 +2181,7 @@ mod tests {
 
     #[test]
     fn the_json_shape_keys_counts_by_the_same_class_vocabulary_each_edge_carries() {
-        let payload: Value = serde_json::from_str(&format_json(&one_of_each_class())).expect("--json emits valid JSON");
+        let payload: Value = serde_json::to_value(diff_report(&one_of_each_class())).expect("--json emits valid JSON");
 
         assert_eq!(payload["declared"], 2);
         assert_eq!(payload["observed"], 2);
@@ -2169,7 +2217,7 @@ mod tests {
         let forward = PlanActualDiff::new(declared_edges(&forward_tasks), observed_edges(&forward_runs), Vec::new());
         let reverse = PlanActualDiff::new(declared_edges(&reverse_tasks), observed_edges(&reverse_runs), Vec::new());
         assert_eq!(format_human(&forward), format_human(&reverse));
-        assert_eq!(format_json(&forward), format_json(&reverse));
+        assert_eq!(serde_json::to_string(&diff_report(&forward)).unwrap(), serde_json::to_string(&diff_report(&reverse)).unwrap());
 
         let rendered: Vec<String> = forward.edges.iter().map(|classified| format!("{} -> {}", classified.edge.from, classified.edge.to)).collect();
         assert_eq!(

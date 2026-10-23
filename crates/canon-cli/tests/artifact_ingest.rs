@@ -333,7 +333,7 @@ fn ingest_artifacts_stamps_the_dispatched_run_it_was_given_and_rejects_one_it_wa
     let begun = run_canon(&["dispatch", "begin", "--role", "dev", "--regime", &regime, "--repo", ".", "--json"], &repo);
     assert!(begun.status.success(), "canon dispatch begin must exit 0; stderr: {}", stderr(&begun));
     let begun_payload: Value = data_of(&stdout(&begun));
-    let run_id = begun_payload["run_id"].as_str().expect("run_id string").to_string();
+    let run_id = begun_payload["runId"].as_str().expect("run_id string").to_string();
 
     let ingested = run_canon(&["ingest", "records", "--repo", ".", "--run-id", &run_id, "--json"], &repo);
     assert!(ingested.status.success(), "canon ingest records --run-id must exit 0; stderr: {}", stderr(&ingested));

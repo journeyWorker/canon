@@ -223,6 +223,8 @@ use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::{RawWrite, Tier};
 use chrono::{DateTime, Utc};
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
@@ -626,6 +628,72 @@ fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<(Vec<u8>,
     Ok((payload, surface, effects))
 }
 
+/// `canon evidence approval-payload --json`: the bytes an external signer signs.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidenceApprovalPayloadReport {
+    /// The payload bytes, hex-encoded.
+    pub payload_hex: String,
+    /// The payload as text; `null` when it is not UTF-8.
+    pub payload: Option<String>,
+    pub surface: Vec<String>,
+    pub effects: Vec<String>,
+}
+
+impl crate::reports::Report for EvidenceApprovalPayloadReport {}
+
+/// One record `canon evidence add` wrote, or found already written.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidenceRecordEntry {
+    #[serde(flatten)]
+    pub landing: crate::retry::Landing,
+    /// The task or scenario id the record is about.
+    pub subject: String,
+    /// `verdict <verdict>` or `audit <result>`.
+    pub outcome: String,
+    /// The step that follows (a single-subject add).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next: Option<String>,
+    /// `true` when an identical record already existed and nothing was written.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unchanged: Option<bool>,
+}
+
+/// A case of `--all-scenarios` that was not recorded: its scenario is not indexed.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SkippedCase {
+    pub scenario_id: String,
+    pub case: String,
+    pub reason: &'static str,
+}
+
+/// A review the new evidence makes stale, with the command that re-pins it.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct StaleReview {
+    pub reviewer: String,
+    pub scenario_id: String,
+    pub repin: String,
+}
+
+/// `canon evidence add` and `canon evidence audit`: the records written.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidenceAddReport {
+    pub records: Vec<EvidenceRecordEntry>,
+    /// `--all-scenarios` only: cases skipped because their scenario is not indexed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skipped: Option<Vec<SkippedCase>>,
+    /// `--all-scenarios` only: cases that carry no scenario id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cases_without_scenario_id: Option<usize>,
+    pub stale_reviews: Vec<StaleReview>,
+}
+
+impl crate::reports::Report for EvidenceAddReport {}
+
 /// Emit only the exact signable bytes to stdout; never stage or sign.
 pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> i32 {
     use std::io::Write;
@@ -640,7 +708,7 @@ pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> i32 {
             let hex: String = payload.iter().map(|byte| format!("{byte:02x}")).collect();
             crate::json_out::data(
                 "evidence approval-payload",
-                &crate::json_out::untyped(serde_json::json!({ "payloadHex": hex, "payload": String::from_utf8(payload).ok(), "surface": surface, "effects": effects })));
+                &EvidenceApprovalPayloadReport { payload_hex: hex, payload: String::from_utf8(payload).ok(), surface, effects });
             0
         }
         Ok((payload, _, _)) => match std::io::stdout().lock().write_all(&payload) {
@@ -977,11 +1045,8 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     if let Some(existing) = repeat_of_latest(&ledger_root, &body) {
         crate::say!(args.json, "canon evidence add: unchanged — an identical record for {subject} ({outcome}) is already {}; nothing written", existing.describe());
         if args.json {
-            let mut entry = existing.json();
-            entry["subject"] = serde_json::json!(subject);
-            entry["outcome"] = serde_json::json!(outcome);
-            entry["next"] = serde_json::json!(next);
-            crate::json_out::data_with_meta(args.command(), &crate::json_out::untyped(serde_json::json!({ "records": [entry], "staleReviews": [] })), serde_json::json!({ "unchanged": true }));
+            let entry = EvidenceRecordEntry { landing: existing.landing(), subject: subject.clone(), outcome: outcome.clone(), next: Some(next.clone()), unchanged: None };
+            crate::json_out::data_with_meta(args.command(), &EvidenceAddReport { records: vec![entry], skipped: None, cases_without_scenario_id: None, stale_reviews: Vec::new() }, serde_json::json!({ "unchanged": true }));
         }
         return 0;
     }
@@ -1010,16 +1075,13 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             crate::say!(args.json, "canon evidence add: {} for {} ({outcome}) — {}, {}", settled.landed(&receipt.location), subject, settled.suffix(), next);
             let stale = print_stale_reviews(&repo, &stale_reviews, matches!(settled, crate::gate::StagedOutcome::Promoted { .. }), args.json);
             if settled.exit_code() == 0 {
-                let mut record = settled.json(&receipt.location);
-                record["subject"] = serde_json::json!(subject);
-                record["outcome"] = serde_json::json!(outcome);
-                record["next"] = serde_json::json!(next);
+                let record = EvidenceRecordEntry { landing: settled.landing(&receipt.location), subject: subject.clone(), outcome: outcome.clone(), next: Some(next.clone()), unchanged: None };
                 let scope = match &args.task_id {
                     Some(_) => crate::next::Scope::Repo,
                     None => crate::next::Scope::Scenarios(vec![subject.clone()]),
                 };
                 let staged = matches!(settled, crate::gate::StagedOutcome::Staged);
-                crate::next::finish(&repo, args.command(), &scope, staged, args.json, &crate::json_out::untyped(serde_json::json!({ "records": [record], "staleReviews": stale })));
+                crate::next::finish(&repo, args.command(), &scope, staged, args.json, &EvidenceAddReport { records: vec![record], skipped: None, cases_without_scenario_id: None, stale_reviews: stale });
             }
             settled.exit_code()
         }
@@ -1269,11 +1331,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
     for ((record, id), repeat) in records.iter().zip(&scenario_ids).zip(&repeats) {
         if let Some(existing) = repeat {
             crate::say!(args.json, "canon evidence add: unchanged — an identical record for {} (verdict {}) is already {}; nothing written", id.as_str(), verdict_slug(record.verdict), existing.describe());
-            let mut entry = existing.json();
-            entry["subject"] = serde_json::json!(id.as_str());
-            entry["outcome"] = serde_json::json!(format!("verdict {}", verdict_slug(record.verdict)));
-            entry["unchanged"] = serde_json::json!(true);
-            unchanged.push(entry);
+            unchanged.push(EvidenceRecordEntry { landing: existing.landing(), subject: id.as_str().to_string(), outcome: format!("verdict {}", verdict_slug(record.verdict)), next: None, unchanged: Some(true) });
         }
     }
     let (records, bodies, scenario_ids): (Vec<EvidenceRecord>, Vec<serde_json::Value>, Vec<ScenarioId>) =
@@ -1282,7 +1340,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         if args.json {
             crate::json_out::data_with_meta(
                 "evidence add",
-                &crate::json_out::untyped(serde_json::json!({ "records": unchanged, "skipped": [], "casesWithoutScenarioId": batch.without_id, "staleReviews": [] })),
+                &EvidenceAddReport { records: unchanged, skipped: Some(Vec::new()), cases_without_scenario_id: Some(batch.without_id), stale_reviews: Vec::new() },
                 serde_json::json!({ "unchanged": true }));
         }
         return 0;
@@ -1314,23 +1372,20 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
             verdict_slug(record.verdict),
             settled.suffix()
         );
-        let mut entry = settled.json(&location.staged);
-        entry["subject"] = serde_json::json!(id.as_str());
-        entry["outcome"] = serde_json::json!(format!("verdict {}", verdict_slug(record.verdict)));
-        written.push(entry);
+        written.push(EvidenceRecordEntry { landing: settled.landing(&location.staged), subject: id.as_str().to_string(), outcome: format!("verdict {}", verdict_slug(record.verdict)), next: None, unchanged: None });
     }
     written.extend(unchanged);
     let mut skipped = Vec::new();
     for (id, case) in &batch.unindexed {
         crate::say!(json, "canon evidence add: skipped {id} — not an indexed scenario of spec root `{}` (case `{case}`); index it (`canon inventory sync`) or fix the test name", project_id.as_str());
-        skipped.push(serde_json::json!({ "scenarioId": id, "case": case, "reason": "not an indexed scenario" }));
+        skipped.push(SkippedCase { scenario_id: id.to_string(), case: case.to_string(), reason: "not an indexed scenario" });
     }
     if batch.without_id > 0 {
         crate::say!(json, "canon evidence add: skipped {} case(s) that carry no scenario id", batch.without_id);
     }
     let stale = print_stale_reviews(repo, &stale_reviews, promote, json);
     let scope = crate::next::Scope::Scenarios(scenario_ids.iter().map(|id| id.as_str().to_string()).collect());
-    crate::next::finish(repo, "evidence add", &scope, !promote, json, &crate::json_out::untyped(serde_json::json!({ "records": written, "skipped": skipped, "casesWithoutScenarioId": batch.without_id, "staleReviews": stale })));
+    crate::next::finish(repo, "evidence add", &scope, !promote, json, &EvidenceAddReport { records: written, skipped: Some(skipped), cases_without_scenario_id: Some(batch.without_id), stale_reviews: stale });
     0
 }
 
@@ -1481,7 +1536,7 @@ fn stale_review_notices(ctx: &mut GateContext, written: &[EvidenceRecord]) -> Ve
 /// artifacts, pinned at
 /// `HEAD` (`<sha>` when the repository has no commit). A record still
 /// staged makes the review stale once it is promoted.
-fn print_stale_reviews(repo: &Path, stale: &[Review], promoted: bool, json: bool) -> Vec<serde_json::Value> {
+fn print_stale_reviews(repo: &Path, stale: &[Review], promoted: bool, json: bool) -> Vec<StaleReview> {
     if stale.is_empty() {
         return Vec::new();
     }
@@ -1497,7 +1552,7 @@ fn print_stale_reviews(repo: &Path, stale: &[Review], promoted: bool, json: bool
                 review.reviewer,
                 review.target()
             );
-            serde_json::json!({ "reviewer": review.reviewer, "scenarioId": review.target(), "repin": repin })
+            StaleReview { reviewer: review.reviewer.to_string(), scenario_id: review.target().to_string(), repin }
         })
         .collect()
 }

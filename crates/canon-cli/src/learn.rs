@@ -58,7 +58,8 @@ use canon_learn::{
     demote_strategy, evaluate_now, plan_promotion, promote_strategy, promote_strategy_approved, rollback_strategy_authenticated,
 };
 use chrono::Utc;
-use serde_json::json;
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
@@ -196,7 +197,7 @@ pub fn run_promote_with_evidence(
                 crate::say!(json, "promoted {strategy_id} -> {}", path.display());
             }
             if json {
-                crate::json_out::data("strategy promote", &crate::json_out::untyped(json!({ "strategyId": strategy_id.to_string(), "path": path.display().to_string(), "dryRun": dry_run, "advisories": warnings.iter().map(|w| w.to_string()).collect::<Vec<_>>() })));
+                crate::json_out::data("strategy promote", &StrategyPromoteReport { strategy_id: strategy_id.to_string(), path: path.display().to_string(), dry_run, advisories: warnings.iter().map(|w| w.to_string()).collect() });
             }
             ExitCode::SUCCESS
         }
@@ -211,6 +212,52 @@ fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, String> {
     let text = std::fs::read_to_string(path).map_err(|error| error.to_string())?;
     serde_json::from_str(&text).map_err(|error| error.to_string())
 }
+
+/// `canon strategy promote`: what was (or, with `--dry-run`, would be) promoted.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct StrategyPromoteReport {
+    pub strategy_id: String,
+    /// The git-tracked strategy file.
+    pub path: String,
+    pub dry_run: bool,
+    /// Advisory lint findings; they never change the exit code.
+    pub advisories: Vec<String>,
+}
+
+impl crate::reports::Report for StrategyPromoteReport {}
+
+/// `canon strategy rollback`: the rollback record.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct StrategyRollbackReport {
+    pub strategy_id: String,
+    pub actor: String,
+    pub reason: String,
+    pub rolled_back_at: chrono::DateTime<Utc>,
+    pub evaluation_digest: Option<String>,
+    pub approval_digest: Option<String>,
+    pub contradicting_trajectory_id: Option<String>,
+    pub outcome_provenance: String,
+}
+
+impl crate::reports::Report for StrategyRollbackReport {}
+
+impl From<&canon_learn::RollbackRecord> for StrategyRollbackReport {
+    fn from(record: &canon_learn::RollbackRecord) -> Self {
+        Self {
+            strategy_id: record.strategy_id.to_string(),
+            actor: record.actor.clone(),
+            reason: record.reason.clone(),
+            rolled_back_at: record.rolled_back_at,
+            evaluation_digest: record.evaluation_digest.clone(),
+            approval_digest: record.approval_digest.clone(),
+            contradicting_trajectory_id: record.contradicting_trajectory_id.as_ref().map(ToString::to_string),
+            outcome_provenance: record.outcome_provenance.clone(),
+        }
+    }
+}
+
 
 /// `canon strategy approval-payload --json`: the payload an external signer signs.
 #[derive(serde::Serialize, schemars::JsonSchema)]
@@ -332,8 +379,8 @@ pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: 
     match rollback_strategy_authenticated(&store, *strategy_id, reason, actor, contradicting, &repo.join(&config.strategies_root), &signature, approved_at) {
         Ok(record) => {
             if json {
-                let data = serde_json::to_value(&record).expect("rollback record serializes");
-                crate::next::finish(&repo, "strategy rollback", &crate::next::Scope::Repo, false, true, &crate::json_out::untyped(data));
+                let data = StrategyRollbackReport::from(&record);
+                crate::next::finish(&repo, "strategy rollback", &crate::next::Scope::Repo, false, true, &data);
             } else {
                 println!("{}", serde_json::to_string(&record).expect("rollback record serializes"));
             }

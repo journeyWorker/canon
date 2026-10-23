@@ -86,9 +86,9 @@ fn divergence_status_projects_each_scenario_row() {
     ok(dir.path(), &["divergence", "add", "auth.login.01", "--project-id", "root", "--sha", SHA, "--actor-id", "alice", "--role", "reviewer"]);
     let all = body(&run(dir.path(), &["divergence", "list", "--json"]));
     assert!(all["data"]["scenarios"][0].as_object().unwrap().len() >= 3, "{all}");
-    let out = run(dir.path(), &["divergence", "list", "--json", "--fields", "scenario_id,state"]);
+    let out = run(dir.path(), &["divergence", "list", "--json", "--fields", "scenarioId,state"]);
     let shown = body(&out);
-    assert_eq!(shown["data"]["scenarios"], serde_json::json!([{ "scenario_id": "auth.login.01", "state": "open" }]));
+    assert_eq!(shown["data"]["scenarios"], serde_json::json!([{ "scenarioId": "auth.login.01", "state": "open" }]));
     assert_eq!(shown["data"]["summary"], all["data"]["summary"], "the summary is not a row and is kept");
     let out = run(dir.path(), &["divergence", "list", "--json", "--fields", "nope"]);
     assert_eq!(body(&out)["error"]["code"], "UNKNOWN_FIELD");

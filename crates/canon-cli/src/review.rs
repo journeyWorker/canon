@@ -65,6 +65,8 @@ use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
 use chrono::Utc;
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
@@ -153,6 +155,35 @@ fn requested_scenarios(args: &ReviewAddArgs) -> Vec<ScenarioId> {
     }
     unique
 }
+
+/// One review `canon review scenario` or `canon review change` wrote, or found already written.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewEntry {
+    /// The ledger path of the review record.
+    pub location: Option<String>,
+    /// Whether an identical record was already stored (a write).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deduped: Option<bool>,
+    /// The scenario an unchanged repeat is about.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scenario_id: Option<String>,
+    /// `true` when an identical review already existed and nothing was written.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unchanged: Option<bool>,
+}
+
+/// `canon review scenario` and `canon review change`: the reviews written.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewReport {
+    pub outcome: &'static str,
+    pub reviews: Vec<ReviewEntry>,
+    /// Attached files stored in the artifact store.
+    pub blobs_stored: usize,
+}
+
+impl crate::reports::Report for ReviewReport {}
 
 /// `canon review scenario` and `canon review change` (module doc). Both
 /// provenance refs `None` or both `Some`, and any scenario without a record,
@@ -296,8 +327,8 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     let reviews: Vec<(Review, String)> = reviews.into_iter().zip(&repeats).filter(|(_, repeat)| repeat.is_none()).map(|(review, _)| review).collect();
     if reviews.is_empty() {
         if args.json {
-            let wrote: Vec<serde_json::Value> = unchanged.iter().map(|(scenario, existing)| serde_json::json!({ "location": existing.committed, "scenarioId": scenario, "unchanged": true })).collect();
-            crate::json_out::data_with_meta(args.command(), &crate::json_out::untyped(serde_json::json!({ "outcome": args.outcome.as_str(), "reviews": wrote, "blobsStored": 0 })), serde_json::json!({ "unchanged": true }));
+            let wrote: Vec<ReviewEntry> = unchanged.iter().map(|(scenario, existing)| ReviewEntry { location: existing.committed.clone(), deduped: None, scenario_id: Some(scenario.clone()), unchanged: Some(true) }).collect();
+            crate::json_out::data_with_meta(args.command(), &ReviewReport { outcome: args.outcome.as_str(), reviews: wrote, blobs_stored: 0 }, serde_json::json!({ "unchanged": true }));
         }
         return 0;
     }
@@ -329,13 +360,13 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     for (location, deduped) in &written {
         crate::say!(args.json, "{cmd}: wrote {location} ({}) — {}", if *deduped { "deduped" } else { "new" }, crate::write_mode::DIRECT);
     }
-    let mut wrote: Vec<serde_json::Value> = written.iter().map(|(location, deduped)| serde_json::json!({ "location": location, "deduped": deduped })).collect();
-    wrote.extend(unchanged.iter().map(|(scenario, existing)| serde_json::json!({ "location": existing.committed, "scenarioId": scenario, "unchanged": true })));
+    let mut wrote: Vec<ReviewEntry> = written.iter().map(|(location, deduped)| ReviewEntry { location: Some(location.clone()), deduped: Some(*deduped), scenario_id: None, unchanged: None }).collect();
+    wrote.extend(unchanged.iter().map(|(scenario, existing)| ReviewEntry { location: existing.committed.clone(), deduped: None, scenario_id: Some(scenario.clone()), unchanged: Some(true) }));
     let scope = match &args.change {
         Some(change) => crate::next::Scope::Change(change.as_str().to_string()),
         None => crate::next::Scope::Scenarios(scenario_ids.iter().map(|id| id.as_str().to_string()).collect()),
     };
-    crate::next::finish(&repo, args.command(), &scope, false, args.json, &crate::json_out::untyped(serde_json::json!({ "outcome": args.outcome.as_str(), "reviews": wrote, "blobsStored": stored })));
+    crate::next::finish(&repo, args.command(), &scope, false, args.json, &ReviewReport { outcome: args.outcome.as_str(), reviews: wrote, blobs_stored: stored });
     0
 }
 

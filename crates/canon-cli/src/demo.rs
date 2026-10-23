@@ -15,6 +15,8 @@
 
 use std::path::{Path, PathBuf};
 
+use schemars::JsonSchema;
+use serde::Serialize;
 use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceVerdict, RecordKind, RoleId, ScenarioId};
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
@@ -101,10 +103,31 @@ pub fn run_demo_init(repo: &Path, json: bool) -> i32 {
     if json {
         crate::json_out::data(
             "demo init",
-            &crate::json_out::untyped(serde_json::json!({ "repo": repo.display().to_string(), "scenario": DEMO_SCENARIO, "next": ["canon gate check", "canon demo review", "canon gate check"] })));
+            &DemoInitReport { repo: repo.display().to_string(), scenario: DEMO_SCENARIO, next: &["canon gate check", "canon demo review", "canon gate check"] });
     }
     0
 }
+
+/// `canon demo init`: the demo repo scaffolded and the commands that flip it.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DemoInitReport {
+    pub repo: String,
+    pub scenario: &'static str,
+    pub next: &'static [&'static str],
+}
+
+impl crate::reports::Report for DemoInitReport {}
+
+/// `canon demo review`: the reviewer evidence recorded.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DemoReviewReport {
+    pub scenario: &'static str,
+    pub next: &'static [&'static str],
+}
+
+impl crate::reports::Report for DemoReviewReport {}
 
 /// `canon demo review [--repo <dir>]`: record the missing reviewer evidence
 /// for [`DEMO_SCENARIO`], clearing the `uncovered-cell` the seeded dev
@@ -127,7 +150,7 @@ pub fn run_demo_review(repo: &Path, json: bool) -> i32 {
     crate::say!(json, "");
     crate::say!(json, "      canon gate check      # GREEN: clean");
     if json {
-        crate::json_out::data("demo review", &crate::json_out::untyped(serde_json::json!({ "scenario": DEMO_SCENARIO, "next": ["canon gate check"] })));
+        crate::json_out::data("demo review", &DemoReviewReport { scenario: DEMO_SCENARIO, next: &["canon gate check"] });
     }
     0
 }

@@ -97,9 +97,46 @@ use canon_model::{validate_evidence_batch, Actor, ChangeId, Envelope, RawRecord,
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use chrono::Utc;
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
+
+/// One violation of `canon gate check`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GateViolation<'a> {
+    pub class: &'a str,
+    pub subject: &'a str,
+    pub message: &'a str,
+    /// The grep-stable wire line: `<class> <subject> — <message>`.
+    pub line: String,
+}
+
+/// A condition `canon gate check` reports without failing on it.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GateAdvisory {
+    /// `spec_coverage_off`, `policy_approval`, `evidence_binding`, `review_waivers`, `accepted_divergence`, `unmigrated_review`, `brief_overrides` or `unstored_attachments`.
+    pub kind: String,
+    pub message: String,
+    pub items: Vec<String>,
+}
+
+/// `canon gate check`: violations and advisories. On exit 1 the report stays in `data`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GateCheckReport<'a> {
+    pub clean: bool,
+    /// Present (`true`) when nothing was examined, so a vacuous pass does not read as clean.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unverifiable: Option<bool>,
+    pub violations: Vec<GateViolation<'a>>,
+    pub advisories: Vec<GateAdvisory>,
+}
+
+impl crate::reports::Report for GateCheckReport<'_> {}
 
 /// `canon gate check [--repo] [--release]` (task 1.9, the dispatcher):
 /// assembles `canon_gate::check_set(release)` (coverage/ledger/staleness/
@@ -144,8 +181,8 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
         .collect::<Vec<_>>();
     // An approval that no longer holds fails closed (0.22 D3); a policy never approved is only an advisory below.
     let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).chain(unrefreshable).chain(reverify).chain(crate::policy_approval::violation(&repo)).collect());
-    let mut advisories: Vec<serde_json::Value> = Vec::new();
-    let advisory = |kind: &str, message: String, items: Vec<String>| serde_json::json!({ "kind": kind, "message": message, "items": items });
+    let mut advisories: Vec<GateAdvisory> = Vec::new();
+    let advisory = |kind: &str, message: String, items: Vec<String>| GateAdvisory { kind: kind.to_string(), message, items };
     let coverage = gate_coverage(&repo, &gate_context);
     let unverifiable = report.is_clean() && coverage.examined_nothing();
     if unverifiable {
@@ -200,27 +237,28 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
             unstored.iter().map(|a| a.line()).collect(),
         ));
     }
-    let violations: Vec<serde_json::Value> = report
+    let violations: Vec<GateViolation> = report
         .violations
         .iter()
-        .map(|v| serde_json::json!({ "class": v.class.as_str(), "subject": v.subject, "message": v.detail, "line": v.line() }))
+        .map(|v| GateViolation { class: v.class.as_str(), subject: &v.subject, message: &v.detail, line: v.line() })
         .collect();
-    let mut data = serde_json::json!({ "clean": report.is_clean(), "violations": violations, "advisories": advisories });
+    let mut data = GateCheckReport { clean: report.is_clean(), unverifiable: None, violations, advisories };
     if unverifiable {
         // Nothing was examined: a vacuous pass must not read as clean (D3).
-        crate::coverage::mark_unverifiable(&mut data);
+        data.clean = false;
+        data.unverifiable = Some(true);
         return crate::coverage::unverifiable_error("canon gate check", "no scenario, subject, change or evidence record", "run `canon inventory sync` after authoring specs, or `canon context` to see what can be authored, then run `canon gate check` again")
-            .emit_with_data_and_meta("canon gate check", json, &crate::json_out::untyped(data), coverage.meta());
+            .emit_with_data_and_meta("canon gate check", json, &data, coverage.meta());
     }
     if report.is_clean() {
         if json {
-            crate::json_out::data_with_meta("gate check", &crate::json_out::untyped(data), coverage.meta());
+            crate::json_out::data_with_meta("gate check", &data, coverage.meta());
         }
         return 0;
     }
     CliError::failed("GATE_VIOLATIONS", format!("{} violation(s)", report.violations.len()))
         .hint("fix each violation named in data.violations, then run `canon gate check` again")
-        .emit_with_data_and_meta("canon gate check", json, &crate::json_out::untyped(data), coverage.meta())
+        .emit_with_data_and_meta("canon gate check", json, &data, coverage.meta())
 }
 
 /// What the gate looked at: the configured spec roots with the scenarios
@@ -427,6 +465,20 @@ fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
     Err(format!("no plan source locates {task_id} (consulted: {})", consulted.join("; ")))
 }
 
+/// `canon task done`: the task row flipped, or already done.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskDoneReport<'a> {
+    pub task_id: &'a str,
+    /// False when the row was already `[x]`.
+    pub flipped: bool,
+    /// The task document written; absent when nothing was flipped.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub document: Option<String>,
+}
+
+impl crate::reports::Report for TaskDoneReport<'_> {}
+
 /// `canon task done <task_id> [--repo]` (task 3.2's CLI wiring, extended
 /// by S10 part2 task 4.4, made dialect-agnostic by s35 `gate-plan-
 /// dialect-seam`): resolves the task's plan document via the configured
@@ -565,7 +617,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
         // row, never a fresh flip).
         crate::say!(json, "canon task done: {task_id} already done (idempotent no-op)");
         if json {
-            crate::json_out::data("task done", &crate::json_out::untyped(serde_json::json!({ "taskId": task_id.as_str(), "flipped": false })));
+            crate::json_out::data("task done", &TaskDoneReport { task_id: task_id.as_str(), flipped: false, document: None });
         }
         return 0;
     }
@@ -581,7 +633,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
             }
             refresh_task_status(&repo, &task_id.change_id());
             let change = crate::next::Scope::Change(task_id.change_id().as_str().to_string());
-            crate::next::finish(&repo, "task done", &change, false, json, &crate::json_out::untyped(serde_json::json!({ "taskId": task_id.as_str(), "flipped": true, "document": document_path.display().to_string() })));
+            crate::next::finish(&repo, "task done", &change, false, json, &TaskDoneReport { task_id: task_id.as_str(), flipped: true, document: Some(document_path.display().to_string()) });
             0
         }
         TaskFlipDecision::Blocked { violations } => {
@@ -865,6 +917,37 @@ pub(crate) fn evidence_staging_dir(ledger_root: &Path) -> PathBuf {
     ledger_root.join("_staging")
 }
 
+/// One staged record `canon gate promote` committed or recovered.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PromotedEntry {
+    pub kind: &'static str,
+    pub label: String,
+    /// The ledger path it landed at.
+    pub target: String,
+}
+
+/// One staged record `canon gate promote` refused.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RefusedEntry {
+    pub class: &'static str,
+    pub subject: String,
+    pub message: String,
+}
+
+/// `canon gate promote`: what left staging. On exit 1 (`PROMOTE_REFUSED`) the report stays in `data`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GatePromoteReport {
+    pub dry_run: bool,
+    pub promoted: Vec<PromotedEntry>,
+    pub recovered: Vec<PromotedEntry>,
+    pub refused: Vec<RefusedEntry>,
+}
+
+impl crate::reports::Report for GatePromoteReport {}
+
 /// `canon gate promote [--repo] [--dry-run]` (task 2.2/2.3's CLI wiring;
 /// s43 extends it to every kind in `canon_gate::STAGED_KINDS`):
 /// `_staging/` → committed, with a monotonic per-(role, surface)
@@ -891,20 +974,20 @@ pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: b
     match promoted {
         Ok(report) => {
             crate::say_raw!(json, "{}", format_promote_report(&report, dry_run));
-            let data = promote_json(&report, dry_run);
+            let data = promote_report(&report, dry_run);
             if report.is_clean() {
                 if dry_run {
                     if json {
-                        crate::json_out::data("gate promote", &crate::json_out::untyped(data));
+                        crate::json_out::data("gate promote", &data);
                     }
                 } else {
-                    crate::next::finish(&repo, "gate promote", &crate::next::Scope::Repo, false, json, &crate::json_out::untyped(data));
+                    crate::next::finish(&repo, "gate promote", &crate::next::Scope::Repo, false, json, &data);
                 }
                 0
             } else {
                 CliError::failed("PROMOTE_REFUSED", format!("{} staged record(s) refused", report.refused.len()))
                     .hint("each refusal is named in data.refused; fix the staged record or re-add it, then run `canon gate promote` again")
-                    .emit_with_data("canon gate promote", json, &crate::json_out::untyped(data))
+                    .emit_with_data("canon gate promote", json, &data)
             }
         }
         Err(e) => {
@@ -914,16 +997,16 @@ pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: b
 }
 
 /// The `--json` data for one [`PromoteReport`].
-pub(crate) fn promote_json(report: &PromoteReport, dry_run: bool) -> serde_json::Value {
-    let landed = |list: &[Promoted]| -> Vec<serde_json::Value> {
-        list.iter().map(|p| serde_json::json!({ "kind": p.kind.as_str(), "label": p.label(), "target": p.target.display().to_string() })).collect()
+pub(crate) fn promote_report(report: &PromoteReport, dry_run: bool) -> GatePromoteReport {
+    let landed = |list: &[Promoted]| -> Vec<PromotedEntry> {
+        list.iter().map(|p| PromotedEntry { kind: p.kind.as_str(), label: p.label(), target: p.target.display().to_string() }).collect()
     };
-    serde_json::json!({
-        "dryRun": dry_run,
-        "promoted": landed(&report.promoted),
-        "recovered": landed(&report.recovered),
-        "refused": report.refused.iter().map(|r| serde_json::json!({ "class": r.violation.class.as_str(), "subject": r.violation.subject, "message": r.violation.detail })).collect::<Vec<_>>(),
-    })
+    GatePromoteReport {
+        dry_run,
+        promoted: landed(&report.promoted),
+        recovered: landed(&report.recovered),
+        refused: report.refused.iter().map(|r| RefusedEntry { class: r.violation.class.as_str(), subject: r.violation.subject.clone(), message: r.violation.detail.clone() }).collect(),
+    }
 }
 
 /// Where a staged write ended up once its command decided whether to
@@ -962,12 +1045,12 @@ impl StagedOutcome {
 
     /// The `--json` record of where the write landed: `staged` is the staged
     /// location, `committed` the ledger path once promoted (`null` otherwise).
-    pub(crate) fn json(&self, staged: &str) -> serde_json::Value {
+    pub(crate) fn landing(&self, staged: &str) -> crate::retry::Landing {
         let committed = match self {
-            Self::Promoted { target } => Some(target.as_str()),
+            Self::Promoted { target } => Some(target.clone()),
             Self::Staged | Self::Refused => None,
         };
-        serde_json::json!({ "staged": staged, "committed": committed })
+        crate::retry::Landing { staged: Some(staged.to_string()), committed }
     }
 
     /// The exit code: a refused promotion is refused-by-policy.
@@ -997,7 +1080,7 @@ pub(crate) fn promote_after_stage(command: &str, ledger_root: &Path, location: &
         Err(refusal) => {
             crate::say_raw!(json, "{}", refusal.lines);
             match refusal.data {
-                Some(data) => refusal.error.emit_with_data(command, json, &crate::json_out::untyped(data)),
+                Some(data) => refusal.error.emit_with_data(command, json, &data),
                 None => refusal.error.emit(command, json),
             };
             StagedOutcome::Refused
@@ -1011,7 +1094,7 @@ pub(crate) fn promote_after_stage(command: &str, ledger_root: &Path, location: &
 pub(crate) struct PromoteRefusal {
     pub(crate) lines: String,
     pub(crate) error: CliError,
-    pub(crate) data: Option<serde_json::Value>,
+    pub(crate) data: Option<GatePromoteReport>,
 }
 
 /// [`promote_after_stage`]'s promotion, without its reporting: the committed
@@ -1026,7 +1109,7 @@ pub(crate) fn try_promote(ledger_root: &Path, location: &str) -> Result<String, 
                 lines: format_candidate_lines(&report, false),
                 error: CliError::failed("PROMOTE_REFUSED", "staged, but promotion refused the record; it stays staged")
                     .hint("the refusal is named in data.refused; fix it and run `canon gate promote`"),
-                data: Some(promote_json(&report, false)),
+                data: Some(promote_report(&report, false)),
             }),
         },
         Err(e) => Err(PromoteRefusal { lines: String::new(), error: CliError::failed("PROMOTE_FAILED", format!("staged, but promoting it failed: {e}")).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`"), data: None }),
@@ -1108,6 +1191,18 @@ fn promotable_kinds() -> String {
     STAGED_KINDS.iter().map(|staged| crate::query::kind_cli_name(staged.kind)).collect::<Vec<_>>().join(", ")
 }
 
+/// `canon gate install-hooks`: whether the hooks changed.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GateInstallHooksReport {
+    /// True when `--dry-run` previewed the install without writing.
+    pub dry_run: bool,
+    pub installed: bool,
+    pub pre_commit_script_written: bool,
+}
+
+impl crate::reports::Report for GateInstallHooksReport {}
+
 /// `canon gate install-hooks [--repo] [--event] [--matcher] [--command]
 /// [--timeout]` (task 4.1's CLI wiring, design decision 8): idempotent,
 /// diff-only merge of one hook-seam entry into BOTH
@@ -1163,7 +1258,7 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
         crate::say!(json, "canon gate install-hooks: no diff, nothing written");
     }
     if json {
-        crate::json_out::data("gate install-hooks", &crate::json_out::untyped(serde_json::json!({ "dryRun": dry_run, "installed": changed, "preCommitScriptWritten": script_written })));
+        crate::json_out::data("gate install-hooks", &GateInstallHooksReport { dry_run, installed: changed, pre_commit_script_written: script_written });
     }
     0
 }

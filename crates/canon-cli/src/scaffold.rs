@@ -59,7 +59,11 @@ use canon_model::family::FamilyKind;
 use canon_model::{Actor, ChangeId, ProjectId, ScenarioId, SubjectId};
 use chrono::{DateTime, Utc};
 
+use schemars::JsonSchema;
+use serde::Serialize;
+
 use crate::cli_error::CliError;
+use crate::reports::Report;
 use crate::context::resolve_repo_root;
 use crate::inventory::{SpecRoot, SyncCtx};
 
@@ -457,6 +461,77 @@ fn provenance_meta() -> serde_json::Value {
     serde_json::json!({ "note": PROVENANCE_NOTE })
 }
 
+/// `canon scenario new <tag>`: the scenario written.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioNewReport<'a> {
+    pub scenario_id: &'a str,
+    /// The feature file it was written to.
+    pub feature: String,
+}
+
+impl Report for ScenarioNewReport<'_> {}
+
+/// One scenario written by `canon scenario new --from`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WrittenLine {
+    /// The 1-based line of the input.
+    pub line: usize,
+    pub id: String,
+    pub path: String,
+}
+
+/// `canon scenario new --from`: every scenario of the batch, written.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioNewBatchReport {
+    pub items: Vec<WrittenLine>,
+}
+
+impl Report for ScenarioNewBatchReport {}
+
+/// Why one input line of `canon scenario new --from` was refused.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RefusedLineError<'a> {
+    pub code: &'a str,
+    pub message: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hint: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub field: Option<&'a str>,
+}
+
+/// One refused input line of `canon scenario new --from`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RefusedLine<'a> {
+    pub line: usize,
+    pub id: Option<&'a str>,
+    pub error: RefusedLineError<'a>,
+}
+
+/// The `data` of a refused `canon scenario new --from`: every refused line; nothing was written.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioNewRefusal<'a> {
+    pub items: Vec<RefusedLine<'a>>,
+}
+
+impl Report for ScenarioNewRefusal<'_> {}
+
+/// `canon feature new`: the feature file created.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FeatureNewReport<'a> {
+    pub feature: String,
+    /// The command that adds its first scenario.
+    pub next: &'a str,
+}
+
+impl Report for FeatureNewReport<'_> {}
+
 /// `canon scenario new <tag> --title <label> [--feature <path>]
 /// [--project-id <id>]` (task 5.1; s19 `derived-validated-scenario-feature`
 /// makes `--feature` optional, design D1-D3). Returns the process exit
@@ -490,7 +565,7 @@ pub fn run_scenario_new(repo: &Path, spec: &ScenarioSpec, actor: &Actor, at: Dat
     crate::say!(json, "canon scenario new: wrote `@{}` to {} — {}", tag.as_str(), feature_path.display(), crate::write_mode::DIRECT);
     crate::say!(json, "canon scenario new: {PROVENANCE_NOTE}");
     let scope = crate::next::Scope::Scenarios(vec![tag.as_str().to_string()]);
-    crate::next::finish_with_meta(&repo_root, "scenario new", &scope, false, json, &crate::json_out::untyped(serde_json::json!({ "scenarioId": tag.as_str(), "feature": feature_path.display().to_string() })), provenance_meta());
+    crate::next::finish_with_meta(&repo_root, "scenario new", &scope, false, json, &ScenarioNewReport { scenario_id: tag.as_str(), feature: feature_path.display().to_string() }, provenance_meta());
     0
 }
 
@@ -555,15 +630,12 @@ struct BadLine {
 }
 
 impl BadLine {
-    fn to_json(&self) -> serde_json::Value {
-        let mut error = serde_json::json!({ "code": self.error.code, "message": self.error.message });
-        if let Some(hint) = &self.error.hint {
-            error["hint"] = serde_json::json!(hint);
+    fn to_report(&self) -> RefusedLine<'_> {
+        RefusedLine {
+            line: self.line,
+            id: self.id.as_deref(),
+            error: RefusedLineError { code: self.error.code, message: &self.error.message, hint: self.error.hint.as_deref(), field: self.error.field.as_deref() },
         }
-        if let Some(field) = &self.error.field {
-            error["field"] = serde_json::json!(field);
-        }
-        serde_json::json!({ "line": self.line, "id": self.id, "error": error })
     }
 }
 
@@ -638,14 +710,14 @@ pub fn run_scenario_batch(repo: &Path, source: &str, actor: &Actor, at: DateTime
         }
         let refusal = CliError::refused("SCAFFOLD_INVALID_ARGUMENT", format!("{} of {} line(s) invalid; nothing written", bad.len(), lines.len())).hint("fix the listed lines and run the batch again");
         crate::human_err!("{}", refusal.human(COMMAND));
-        return refusal.emit_with_data(COMMAND, json, &crate::json_out::untyped(serde_json::json!({ "items": bad.iter().map(BadLine::to_json).collect::<Vec<_>>() })));
+        return refusal.emit_with_data(COMMAND, json, &ScenarioNewRefusal { items: bad.iter().map(BadLine::to_report).collect() });
     }
 
     let mut pending = Vec::new();
     let mut items = Vec::new();
     let mut ids = Vec::new();
     for (line, spec, planned) in good {
-        items.push(serde_json::json!({ "line": line, "id": spec.tag.as_str(), "path": planned.feature_path.display().to_string() }));
+        items.push(WrittenLine { line, id: spec.tag.as_str().to_string(), path: planned.feature_path.display().to_string() });
         ids.push(spec.tag.as_str().to_string());
         stage(&mut pending, planned, &spec, &prov_line);
     }
@@ -653,11 +725,11 @@ pub fn run_scenario_batch(repo: &Path, source: &str, actor: &Actor, at: DateTime
         return e.emit(COMMAND, json);
     }
     for item in &items {
-        crate::say!(json, "{COMMAND}: wrote `@{}` to {}", item["id"].as_str().unwrap_or_default(), item["path"].as_str().unwrap_or_default());
+        crate::say!(json, "{COMMAND}: wrote `@{}` to {}", item.id, item.path);
     }
     crate::say!(json, "{COMMAND}: wrote {} scenario(s) — {}", items.len(), crate::write_mode::DIRECT);
     crate::say!(json, "{COMMAND}: {PROVENANCE_NOTE}");
-    crate::next::finish_with_meta(&repo_root, "scenario new", &crate::next::Scope::Scenarios(ids), false, json, &crate::json_out::untyped(serde_json::json!({ "items": items })), provenance_meta());
+    crate::next::finish_with_meta(&repo_root, "scenario new", &crate::next::Scope::Scenarios(ids), false, json, &ScenarioNewBatchReport { items }, provenance_meta());
     0
 }
 
@@ -752,7 +824,7 @@ pub fn run_feature_new(
                         actor: crate::status::StepActor::Agent,
                         role: Some(crate::role::Role::Planner),
                     };
-                    crate::json_out::data_with_next("feature new", &crate::json_out::untyped(serde_json::json!({ "feature": feature_path.display().to_string(), "next": next })), &crate::next::After::fixed(vec![step]));
+                    crate::json_out::data_with_next("feature new", &FeatureNewReport { feature: feature_path.display().to_string(), next: &next }, &crate::next::After::fixed(vec![step]));
                 }
                 0
             }
