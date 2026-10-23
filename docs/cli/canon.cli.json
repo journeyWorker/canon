@@ -3485,6 +3485,7 @@
           "meaning": "refused: the invocation or its inputs are wrong and fixable; nothing was written"
         }
       ],
+      "idempotency": "replay-safe",
       "inputs": [],
       "name": "approval-payload",
       "nodeKind": "leaf",

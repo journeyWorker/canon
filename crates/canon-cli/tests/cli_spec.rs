@@ -86,8 +86,13 @@ fn a_node_is_a_leaf_xor_a_group_and_a_leaf_says_everything_an_agent_needs() {
                 for operand in node["operands"].as_array().expect("operands") {
                     assert!(operand["description"].as_str().is_some_and(|d| !d.is_empty()), "`{command}`: operand {} has no description", operand["name"]);
                 }
-                let writes = node["effect"] != "read";
-                assert_eq!(node.get("idempotency").is_some(), writes, "leaf `{command}`: idempotency belongs to writing leaves only");
+                // A writing leaf declares how a repeat behaves; a read only where its table row does (the approval payloads).
+                let declaring_reads = ["evidence approval-payload", "learn approve"];
+                if node["effect"] == "read" {
+                    assert_eq!(node.get("idempotency").is_some(), declaring_reads.contains(&command), "read leaf `{command}`: unexpected idempotency declaration");
+                } else {
+                    assert!(node.get("idempotency").is_some(), "writing leaf `{command}` declares no idempotency");
+                }
                 if let Some(idempotency) = node.get("idempotency") {
                     assert!(["replay-safe", "content-keyed", "appends", "once"].contains(&idempotency.as_str().expect("a word")), "`{command}`: {idempotency}");
                 }

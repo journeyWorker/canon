@@ -62,7 +62,7 @@ pub struct OperandMeta {
 /// The spec facts of one leaf.
 pub struct LeafFacts {
     pub path: &'static str,
-    /// `None` for a read: it changes nothing, so a repeat has no effect to declare.
+    /// Required for a writing leaf; a read has one only where the per-leaf table declares it.
     pub idempotency: Option<Idempotency>,
     pub outputs: &'static [OutputMeta],
     pub operands: &'static [OperandMeta],
@@ -135,7 +135,7 @@ pub const FACTS: &[LeafFacts] = &[
     leaf("divergence resolve").idem(Appends).out(&[report("DivergenceResolveReport")]),
     leaf("divergence status").out(&[report("DivergenceListReport")]),
     leaf("evidence add").idem(ContentKeyed).out(&[report("EvidenceAddReport")]),
-    leaf("evidence approval-payload").out(&[artifact("application/octet-stream", "EvidenceApprovalPayloadReport")]),
+    leaf("evidence approval-payload").idem(ReplaySafe).out(&[artifact("application/octet-stream", "EvidenceApprovalPayloadReport")]),
     leaf("evidence vault").idem(ReplaySafe).out(&[report("ArtifactsStoreReport")]),
     leaf("export").idem(ReplaySafe).out(&[artifact("application/json", "ExportReport")]),
     leaf("feature new").idem(Once).out(&[report("FeatureNewReport")]),
@@ -153,7 +153,7 @@ pub const FACTS: &[LeafFacts] = &[
     leaf("ingest sessions").idem(ReplaySafe).out(&[report("IngestSessionsReport")]),
     leaf("init").idem(ReplaySafe).out(&[report("InitReport")]),
     leaf("inventory sync").idem(ReplaySafe).out(&[report("InventorySyncReport")]),
-    // 0.28 reads this leaf (`strategy approval-payload`); the spec omits the idempotency of a read.
+    // 0.28 reads this leaf (`strategy approval-payload`); its table row declares replay-safe.
     leaf("learn approve").idem(ReplaySafe).out(&[artifact("application/octet-stream", "StrategyApprovalPayloadReport")]).operands(&[operand("strategy_id", "The StrategyId (ULID) whose approval payload is printed")]),
     leaf("learn promote").idem(ReplaySafe).out(&[report("StrategyPromoteReport")]),
     leaf("learn rollback").idem(ReplaySafe).out(&[report("StrategyRollbackReport")]).operands(&[operand("strategy_id", "The StrategyId (ULID) to roll back")]),

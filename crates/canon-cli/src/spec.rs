@@ -388,8 +388,7 @@ fn leaf_of(path: &str, cmd: &Command, reports: &[crate::reports::ReportSchema]) 
     Leaf {
         effect,
         effect_note: meta.and_then(|m| m.effect_note),
-        // A read changes nothing, so a repeat has no effect to declare.
-        idempotency: facts.and_then(|f| f.idempotency).filter(|_| effect != Effect::Read),
+        idempotency: facts.and_then(|f| f.idempotency),
         roles: meta.map_or_else(Vec::new, |m| m.roles.to_vec()),
         supports_json,
         operands,
