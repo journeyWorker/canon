@@ -74,10 +74,11 @@ canon policy approve --approver <who> [--note <text>] [--repo <dir>]
 
 A human approves the policy after reviewing `.canon/policy.yaml`, in the
 same answer that approves a subject's brief (0.16; see the skill's working
-loop). `canon brief approve` records both in one call, so the agent does
-not run this command next to it. Run `canon policy approve` alone for a
-policy-only change, as the human, or as the agent right after that answer
-(`canon policy approve --approver <the human> --note "<their words>"`). It
+loop). `canon brief approve` records both in one call. `canon policy
+approve` is a human-only leaf: with a role declared (`--as` or `CANON_ROLE`)
+it is refused with `HUMAN_ONLY` (exit 2, not retryable), and no flag grants
+it to an agent. The human runs it themselves, for a policy-only change or
+after the brief answer, supplying `--approver` and `--note`. It
 writes `.canon/policy.approval.json` directly (nothing to promote):
 
 ```json
@@ -91,8 +92,12 @@ writes `.canon/policy.approval.json` directly (nothing to promote):
 
 Commit it with the policy: the file is tracked, and neither canon's
 `.gitignore` nor the one `canon init` writes ignores it. Running the
-command again replaces the record. With no `.canon/policy.yaml` it is
+command again replaces the one approval file (replay-safe). With no
+`.canon/policy.yaml` it is
 refused (exit `2`), and so is an empty `--approver`.
+
+**Done when:** `canon policy show` reports `approval: approved` and
+`canon gate check` no longer prints `policy not approved`.
 
 While a policy exists with no approval, `canon gate check` prints after
 its result:
@@ -105,7 +110,7 @@ Once the policy's bytes no longer match the approved digest, or the
 approval file cannot be read, the gate fails closed instead:
 
 ```
-unreviewed-promotion policy — policy changed since approval: .canon/policy.yaml is sha256:<now>, but `<who>` approved sha256:<then> at <time>; … (--override-reason does not waive it); the human re-approves the policy in force with `canon policy approve --by <human> --note "<words>"`, or restore the approved .canon/policy.yaml (and .canon/policy.approval.json) from git
+unreviewed-promotion policy — policy changed since approval: .canon/policy.yaml is sha256:<now>, but `<who>` approved sha256:<then> at <time>; … (--override-reason does not waive it); the human re-approves the policy in force with `canon policy approve --approver <human> --note "<words>"`, or restore the approved .canon/policy.yaml (and .canon/policy.approval.json) from git
 ```
 
 `canon gate check` exits `1`; `canon subject move` (the ship guard and
@@ -113,12 +118,11 @@ the reopen) refuses with `POLICY_CHANGED_SINCE_APPROVAL`, or
 `POLICY_APPROVAL_UNREADABLE` for an unreadable approval, and
 `--override-reason` does not waive either. A policy never approved stays
 an advisory. `canon status` prints the same text as a `warning:` line (and
-in `--json` `warnings`). canon cannot tell whether a human or an agent
-ran `policy approve`, so the record names who approved which bytes and
-the gate fails when that no longer holds. An agent never edits the policy
+in `--json` `warnings`). The record names who approved which bytes and
+the gate fails when that no longer holds, whoever ran `policy approve`.
+An agent never edits the policy
 to pass the gate: it stops and asks the human, who re-approves or restores
-it. An agent runs `canon policy approve` only to record a human's answer,
-never without one and never on its own behalf.
+it.
 
 ## `canon policy show [--json]`
 

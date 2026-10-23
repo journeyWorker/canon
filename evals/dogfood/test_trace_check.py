@@ -11,6 +11,15 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 class TraceCheckTests(unittest.TestCase):
+    def test_read_and_write_calls_come_from_the_spec_effect(self):
+        effects = trace_check.EFFECTS
+        for words in (["gate", "check"], ["status"], ["brief", "show", "add-login"], ["subject", "show", "demo"], ["schema", "evidence", "add"]):
+            self.assertEqual(effects[trace_check.leaf_of(words)], "read", words)
+        for words in (["evidence", "add", "--x"], ["subject", "move", "demo"], ["task", "done", "a#1"], ["purge"]):
+            self.assertNotEqual(effects[trace_check.leaf_of(words)], "read", words)
+        self.assertEqual(trace_check.leaf_of(["gate", "task"]), ())  # a removed spelling is not a leaf
+        self.assertEqual(trace_check.leaf_of(["brief"]), ())  # a bare group is not runnable
+
     def report(self, *names, question_turns=()):
         return trace_check.analyze([str(FIXTURES / name) for name in names], question_turns)
 

@@ -76,6 +76,9 @@ timeout}]}` entry into BOTH `<repo>/.claude/settings.json` and
 `<repo>/.codex/hooks.json`, additive and idempotent — see the
 `canon-gate` skill for `install-hooks`'s full contract.
 
+**Done when:** the hook entry is in both `settings.json` and `hooks.json`;
+running `canon gate install-hooks` again changes nothing.
+
 ## Replay vs. live retrieval
 
 A run manifest records `injected_guidance` — a full SNAPSHOT (each entry

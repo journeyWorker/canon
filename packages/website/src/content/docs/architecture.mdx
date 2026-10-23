@@ -63,7 +63,7 @@ toolchain required.
   structural-shape checker — extends what a query can project without
   widening canon-model's frozen record-kind set.
 - **canon-report** — the generated-never-edited markdown status report over
-  canon-store's DuckDB view layer, plus the `--snapshot` Parquet export the
+  canon-store's DuckDB view layer, plus the `canon report snapshot` Parquet export the
   dashboard reads. The report contains 10 marts; the dashboard intentionally
   renders 7 panels. See [CLI surface](/cli/#surface).
 
@@ -125,6 +125,22 @@ The provider-neutral adapter protocol is validated at the boundary, not
 enforced as a sandbox. Canon records and gates evidence; it is **not a general
 agent runtime** and does not schedule or execute declared plans.
 
+## One grammar, one spec
+
+The command line is defined once, in `docs/cli/canon.cli.json`: every command,
+its operands and options, effect (`read`, `write` or `destructive`), roles,
+exits, error codes and an example. The parser, `canon schema`, the generated
+tables in the [CLI reference](/cli/), the removed-spelling hints and the guide
+are all produced from it, so they cannot disagree. Every command answers with
+one envelope, `{ok, data, meta}` (or `{ok: false, error, meta}`) under
+`--json`; `meta.next` names the next step and `meta.unchanged` marks a repeated
+write. Write commands take `--input` (an object, or an array/NDJSON batch) and
+destructive ones preview unless given `--commit --plan-digest`.
+
+The guide an agent follows lives in the binary too: `canon skills show canon`
+prints the version-matched text, and the `SKILL.md` that `canon skills install`
+writes into a repo is only a stub that points there.
+
 ## Packaging
 
 canon follows a proven Rust-core→npm packaging pattern (adapted from a
@@ -150,7 +166,7 @@ Every repo canon operates on carries its own config at the repo root:
 ```
 
 `canon init` scaffolds a working `canon.yaml` skeleton; `canon init
---check-config` validates one that already exists. See
+--check` validates one that already exists. See
 [CLI reference](/cli/) for the full command surface, or
 [The canon concept](/concepts/canon/) for why the repo, not the process, is
 the unit of state.

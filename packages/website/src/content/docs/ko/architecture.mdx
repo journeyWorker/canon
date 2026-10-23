@@ -65,6 +65,13 @@ canon은 **하나의 Rust 코어**를 단일 책임 크레이트로 나눈 뒤, 
   포함되고 대시보드는 의도적으로 7개 패널만 렌더링합니다.
   [CLI surface](/ko/cli/#surface)를 참고하세요.
 - **canon-cli** — 위 모든 것이 연결되는 단일 엔트리포인트 바이너리입니다.
+  CLI 문법은 하나이고 명세 하나(`docs/cli/canon.cli.json`)에서 생성됩니다: clap
+  정의, `canon schema`, [CLI 레퍼런스](/ko/cli/)의 표, 에이전트 가이드가 모두 같은
+  명세를 따릅니다. 모든 `--json` 출력은 `{ok, data, meta}` 봉투 하나이고,
+  쓰기 명령은 `--input`(JSON 객체, 배열/NDJSON은 배치)을 받으며, 파괴적
+  명령은 미리보기가 기본이고 `--commit --plan-digest`로 실행합니다. 에이전트
+  가이드는 바이너리에 들어 있어 `canon skills show <name>`으로 출력하고, 레포에
+  설치되는 `SKILL.md`는 그곳으로 보내는 짧은 스텁입니다.
 
 ## 스토리지 티어
 
@@ -143,6 +150,6 @@ canon이 동작하는 모든 레포는 레포 루트에 자신의 설정을 둡�
 ```
 
 `canon init`은 동작하는 `canon.yaml` 스켈레톤을 생성하고, `canon init
---check-config`는 이미 존재하는 설정을 검증합니다. 전체 명령어 표면은
+--check`는 이미 존재하는 설정을 검증합니다. 전체 명령어 표면은
 [CLI 레퍼런스](/ko/cli/)를, 왜 프로세스가 아니라 레포가 상태의 단위인지는
 [canon 개념](/ko/concepts/canon/)을 참고하세요.

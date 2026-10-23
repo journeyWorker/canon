@@ -1,22 +1,34 @@
 # `canon/skills/` — canonical user-facing skill bundle
 
-The user-facing companion skill is authored once in `SKILL.src.md`. Canon's
-installer projects that source as one `canon` skill for each selected provider;
-references and scripts remain lazy-loadable sidecars.
+The user-facing companion skill is authored once, here, and embedded into the
+`canon` binary at build time (`crates/canon-cli/build.rs`, read through
+`guide.rs`). Since 0.28 the guide is not projected into a consumer repo: the
+installed `SKILL.md` is a short stub, and `canon skills show <name>` prints the
+guide that matches the running binary, so it cannot drift from the commands.
 
 ```
 canon/skills/
-  SKILL.src.md                         # read-only authored source
-  reference/<topic>.md                 # preserved actionable guidance
-  reference/role-<role>.md             # planner, implementer, reviewer, orchestrator: loaded by role
-  reference/brief-<pass>.md            # five brief refinement passes, linked only from role-planner.md
-  scripts/canon-retrieve-pre-dispatch.sh
+  SKILL.src.md                         # the core guide: `canon skills show canon`; its frontmatter is copied into the stub
+  reference/<topic>.md                 # topic guides: `canon skills show canon-gate`, ...
+  reference/role-<role>.md             # planner, implementer, reviewer, orchestrator: `canon skills show role-planner`, ...
+  reference/brief-<pass>.md            # five brief refinement passes: `canon skills show brief-polish`, ...
+  scripts/canon-retrieve-pre-dispatch.sh   # projected next to the stub
 ```
 
+A guide name is `canon` (the core guide, `SKILL.src.md`) or the stem of a
+`reference/<stem>.md` file. `canon skills show <name>` prints one;
+`canon skills show canon --full` prints the core guide followed by every
+reference. Guide text therefore never points at a `reference/<file>.md` path
+(it does not exist in the consumer's repo): it says `canon skills show <stem>`.
+Every command a guide prints is parsed against the generated CLI spec
+(`docs/cli/canon.cli.json`) by `crates/canon-cli/tests/docs_lint.rs`, and
+blocks between `canon:generated … begin/end` markers are regenerated from that
+spec: edit the spec's source, not the block.
+
 The 17 topic references retain the former companion-skill bodies without their
-repeated YAML frontmatter (`canon-review.md` is new in 0.12). The umbrella
-source routes an agent to a topic; it does not replace Canon's explicit CLI
-commands or internal Rust modules.
+repeated YAML frontmatter (`canon-review.md` is new in 0.12). The core guide
+routes an agent to a topic; it does not replace Canon's explicit CLI commands or
+internal Rust modules.
 
 ## Materialization
 
@@ -28,22 +40,26 @@ canon skills check                                # read-only drift check
 canon skills doctor                               # diagnostics, no deletion
 ```
 
-Claude receives:
+Each selected harness receives a stub `SKILL.md` and the `scripts/**` sidecars;
+the guides themselves are not copied. The stub is `SKILL.src.md`'s frontmatter
+(`name`, `description`: that is what makes the harness route build requests to
+the skill) plus a short body: what canon is, the loop in five lines, and
+`canon skills show canon` for the full guide. It names the canon version that
+wrote it, so `canon skills check` reports a stub another canon wrote and
+`canon skills install` rewrites it.
 
-- `.claude/skills/canon/SKILL.md`
-- `.claude/skills/canon/reference/**`
-- `.claude/skills/canon/scripts/**`
+- Claude: `.claude/skills/canon/SKILL.md` and `.claude/skills/canon/scripts/**`
+- Codex: `.agents/skills/canon/SKILL.md` and `.agents/skills/canon/scripts/**`
+  (Codex scans `.agents/skills` from the working directory up to the repository
+  root, and never reads `.codex/skills`)
+- OMP: `.omp/skills/canon/SKILL.md` and `.omp/skills/canon/scripts/**`
+- Pi: `.pi/skills/canon/SKILL.md` and `.pi/skills/canon/scripts/**`
 
-Codex receives `.agents/skills/canon/SKILL.md` plus matching
-`.agents/skills/canon/reference/**` and `scripts/**` sidecars: Codex scans
-`.agents/skills` from the working directory up to the repository root, and
-never reads `.codex/skills`. OMP and Pi are directory-shaped, verbatim
-projections too:
-
-- `.omp/skills/canon/SKILL.md`, `.omp/skills/canon/reference/**`, and
-  `.omp/skills/canon/scripts/**`
-- `.pi/skills/canon/SKILL.md`, `.pi/skills/canon/reference/**`, and
-  `.pi/skills/canon/scripts/**`
+A repo upgraded from 0.27 holds a full `SKILL.md` and a `reference/**` tree:
+`canon migrate` (preview), then `canon migrate --commit --plan-digest <digest>`
+with the digest it printed, replaces them with the stub (backing the old files
+up under `.canon/migrate-backup/`), and `canon skills install` refreshes the
+rest.
 
 OMP/Pi projections are project-local passive bundles. The
 `canon-retrieve-pre-dispatch.sh` script is provided only as a sidecar; no OMP

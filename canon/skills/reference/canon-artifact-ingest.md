@@ -19,6 +19,10 @@ Source roots resolve from `canon.yaml`'s `artifacts.sources` config
 hardcoded path; ordinarily the consumer repo's own roots. Unconfigured =
 no scan for that family.
 
+**Done when:** the pass exits `0` and reports no malformed artifact;
+`canon query --kind trajectory` lists the new trajectories. A rerun over an
+unchanged corpus writes nothing (`trajectories_skipped_duplicate`).
+
 ## The four adapters
 
 Each reads one artifact family and emits a normalized event keyed by that

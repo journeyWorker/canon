@@ -123,6 +123,10 @@ An unknown `strategy_id` fails nonzero. A candidate's lifecycle defaults to
 The old public writer is retained only for already-`active` items; it is not a
 way to activate new or legacy candidates.
 
+**Done when:** `canon strategy promote <strategy_id>` exits `0` and
+`canon retrieve` returns the strategy for its regime (a quarantined
+candidate stays out of retrieval).
+
 ### The eligibility gates: `crn` vs `occurrence`
 
 A role's eligibility gate is a `canon.yaml` `learn:`-section choice:

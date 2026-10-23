@@ -8,7 +8,7 @@ that the checker validates against it.
 
 ## Run `canon context` FIRST
 
-Before authoring any atom, run `canon context` (or `--json`) and read its
+Before authoring any atom, run `canon context --fields vocab` (or `--json`) and read its
 `vocab` section: it lists every declarable directive + enum for the repo
 plus a content-hash version. Authoring against a directive/enum
 `canon context` does not list means the checker will reject it — the

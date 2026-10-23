@@ -34,6 +34,7 @@ pub fn doc_files() -> Vec<PathBuf> {
     let mut out = vec![root.join("README.md")];
     walk(&root.join("canon/skills"), "md", &mut out);
     walk(&root.join("packages/website/src/content/docs"), "mdx", &mut out);
+    walk(&root.join("examples"), "md", &mut out);
     out.sort();
     out
 }
@@ -43,6 +44,9 @@ pub fn walk(dir: &Path, ext: &str, out: &mut Vec<PathBuf>) {
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
+            if path.file_name().is_some_and(|n| n == "node_modules") {
+                continue;
+            }
             walk(&path, ext, out);
         } else if path.extension().is_some_and(|e| e == ext) {
             out.push(path);
@@ -84,6 +88,26 @@ fn short(about: &str) -> &str {
     }
     let cut = [". ", ": "].iter().filter_map(|m| about.find(m)).min().unwrap_or(about.len());
     about[..cut].trim_end_matches('.')
+}
+
+/// `text` safe in MDX prose: outside backtick spans `<`, `>`, `{` and `}` are entities.
+fn mdx_safe(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut code = false;
+    for c in text.chars() {
+        match c {
+            '`' => {
+                code = !code;
+                out.push(c);
+            }
+            '<' if !code => out.push_str("&lt;"),
+            '>' if !code => out.push_str("&gt;"),
+            '{' if !code => out.push_str("&#123;"),
+            '}' if !code => out.push_str("&#125;"),
+            c => out.push(c),
+        }
+    }
+    out
 }
 
 fn cell(text: &str) -> String {
@@ -152,10 +176,10 @@ fn effect_label(leaf: &Value, ko: bool) -> &'static str {
 pub fn cli_table(spec: &Value, group: &str, ko: bool) -> String {
     let header = if ko { "| 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |" } else { "| Command | Operands | Required options | Effect | Example |" };
     let about = spec["commands"].as_array().expect("commands").iter().find(|n| n["nodeKind"] == "group" && n["command"] == group).and_then(|n| n["about"].as_str()).unwrap_or("Commands without a group word");
-    let mut out = format!("{}.\n\n{header}\n|---|---|---|---|---|\n", short(about));
+    let mut out = format!("{}.\n\n{header}\n|---|---|---|---|---|\n", mdx_safe(short(about)));
     for leaf in leaves(spec).filter(|l| group_of(l) == group) {
         let command = leaf["command"].as_str().expect("command");
-        let _ = writeln!(out, "| `canon {command}` | {} | {} | {}: {} | `{}` |", operand_cell(leaf), required_cell(leaf), effect_label(leaf, ko), cell(short(leaf["about"].as_str().expect("about"))), cell(&example(leaf)));
+        let _ = writeln!(out, "| `canon {command}` | {} | {} | {}: {} | `{}` |", operand_cell(leaf), required_cell(leaf), effect_label(leaf, ko), cell(&mdx_safe(short(leaf["about"].as_str().expect("about")))), cell(&example(leaf)));
     }
     out
 }

@@ -202,6 +202,9 @@ approval:
 있습니다. 유효한 paired evidence와 이 signature가 없으면 quarantine
 candidate는 계속 quarantine 상태입니다. `--force`는 없습니다.
 
+**Done when:** `canon strategy promote`가 exit `0`으로 끝나면 전략이 git 티어에서 active입니다.
+결과는 그 출력의 `data`와 `.canon/strategies/`의 파일에서 읽습니다.
+
 일반적인 모순 trajectory는 이미 active인 전략을 demote합니다. 기본은
 기존 git 파일에 `status: demoted`와 `reason:`을 소프트 플래그하며,
 `demotion.hard_delete: true`이면 파일을 삭제합니다. 이것은 인증된

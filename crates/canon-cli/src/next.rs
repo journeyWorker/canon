@@ -45,7 +45,7 @@ use crate::status::{self, NextStep, StatusReport, StepActor, NEXT_LIMIT};
 pub struct NextEntry {
     /// A canon command line when `actor` is `agent`; what to get from the human when it is `human`.
     pub command: String,
-    /// `command` split into its words (`["canon", "gate", "check"]`); empty when `command` is not a canon command line.
+    /// `command` split into its words (`["canon", "gate", "check"]`); empty when `command` is not a canon command line, or still holds a `<placeholder>` for what only the agent knows (T14: `argv` is always runnable).
     pub argv: Vec<String>,
     pub why: String,
     pub actor: StepActor,
@@ -55,9 +55,14 @@ pub struct NextEntry {
 
 impl From<&NextStep> for NextEntry {
     fn from(step: &NextStep) -> Self {
-        let argv = if step.actor == StepActor::Agent && step.command.starts_with("canon ") { split_argv(&step.command) } else { Vec::new() };
+        let argv = if step.actor == StepActor::Agent && step.command.starts_with("canon ") && !has_placeholder(&step.command) { split_argv(&step.command) } else { Vec::new() };
         Self { command: step.command.clone(), argv, why: step.why.clone(), actor: step.actor, role: step.role }
     }
+}
+
+/// Whether `command` still holds a `<placeholder>`: a `<` opening a word and a later `>`.
+pub fn has_placeholder(command: &str) -> bool {
+    command.match_indices('<').any(|(at, _)| command[at + 1..].starts_with(|c: char| c.is_ascii_alphabetic()) && command[at..].contains('>'))
 }
 
 /// `command` split into words the way a POSIX shell would: whitespace

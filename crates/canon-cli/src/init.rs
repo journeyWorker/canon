@@ -282,6 +282,8 @@ The loop:
 7. Independent review: a different session (a separate process with its own session id, never this session under another label; without a subagent tool, start one), one that can run the checks it signs off, records `canon review scenario` (or `canon review change` for a chore) and `canon finding add`, on every change; a reviewer that cannot run the tests says so and does not sign off.
 8. Transition: `canon subject move`, with `canon gate check` clean; move to `shipped` yourself once its guard passes, unless the brief says the human ships. The ship guard and `canon evidence add` refuse while the brief is unapproved or was edited after approval, and shipping also needs every flow step covered by a scenario with a failure case; they are backstops, the stop is at step 1.
 
+Done when `canon gate check` exits 0 and `canon status` names no next step for the subject (`canon subject show <id>` reads where it stands).
+
 Inside an approved scope, never stop for a human: fixes, follow-ups and review rounds stay in the approved change, never `canon change new` (a new change is a new scope), and go straight to scenario, implement, evidence and review; a follow-up that adds or changes a step of the brief edits it, which needs a new answer. `tasks.md` is an optional work note nothing gates on. When no human can answer one of the brief's questions, write your assumption into the brief and proceed on it; that covers the brief's questions and work inside an approved scope, never the approval. `.canon/policy.yaml` is what the gate grades against.
 <!-- canon:end -->";
 

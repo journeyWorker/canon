@@ -3,7 +3,9 @@
 You turn a request into an approved scope: a subject, a change and a PRD
 brief the human answers once. You build nothing. Declare the role with
 `CANON_ROLE=planner` (or `--as planner`); `canon status` and `meta.next`
-then show your steps and count the rest under `waitingOn`.
+then show your steps and count the rest under `waitingOn`. The approvals are
+the human's: `brief approve`, `policy approve` and `divergence accept` refuse
+every agent role (`HUMAN_ONLY`, `retryable: false`), and no flag grants them.
 
 ## Commands
 
@@ -13,7 +15,7 @@ your ids. `canon schema <command> --json` lists every option.
 
 <!-- canon:generated commands-planner begin -->
 ```bash
-canon brief check                                                                                                # Read the brief against the rules: blocker and advisory findings (exit 0 clean, 2 blockers, 1 error)
+canon brief check                                                                                                # Read the brief against the rules
 canon brief show                                                                                                 # Show where the change stands and the next one to three steps; never edits
 canon change new add-search --subject-id demo --title "Add search"                                               # Write .canon/changes/<slug>/brief.md, import it, and adopt it into a subject
 canon completion zsh                                                                                             # Write the shell completion script for canon (bash, zsh or fish)
@@ -25,8 +27,9 @@ canon format .canon/specs                                                       
 canon gate check                                                                                                 # Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)
 canon query --kind evidence                                                                                      # Read stored records across every storage tier
 canon retrieve --for-role reviewer --domain dev --limit 20                                                       # Fetch role-scoped strategy guidance
-canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature  # Append a tagged scenario stub to its .feature file (created if missing), or many with --from
+canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature  # Append a tagged scenario stub to its .feature file (created if missing); many at once with `--input`
 canon schema evidence add                                                                                        # Describe canon's own commands
+canon skills show canon --full                                                                                   # Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here
 canon status                                                                                                     # Show where this repo stands: subjects by status, their gaps, and the next commands
 canon subject adopt demo --change-id add-login                                                                   # Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several)
 canon subject new payments --domain dev --title Payments                                                         # Author a new subject at status `proposed`
@@ -35,11 +38,14 @@ canon subject unadopt demo --change-id add-login                                
 <!-- canon:generated commands-planner end -->
 
 After the first `status`, follow `meta.next` of each write. `brief check`
-lists blockers and advisories; bare `canon brief show --as planner` names the next
-steps. While the brief has blockers, `status` and `change new`'s `meta.next`
+lists blockers and advisories and exits 1 when it finds blockers; `canon
+brief show --as planner` names the next steps. The change is an optional
+operand of both (`canon brief check add-login`); without it they read the
+repo's only live change. While the brief has blockers, `status` and
+`change new`'s `meta.next`
 send you to write it (`write the brief: canon brief check <slug>
 lists N blockers`); then, while prose advisories remain, to the polish pass
-(`polish the brief in <path> (reference/brief-polish.md), then run canon
+(`polish the brief in <path> (canon skills show brief-polish), then run canon
 brief check <slug>`, with the advisory count and the top rule
 ids); the human step comes after it. A policy that no longer matches its approval fails closed
 (`POLICY_CHANGED_SINCE_APPROVAL`): never edit it; the human re-approves.
@@ -83,11 +89,12 @@ ids); the human step comes after it. A policy that no longer matches its approva
    edits the plan.
 3. **Check it.** `brief check` (read-only) lists findings: fix every blocker
    (structure) before you stop. Four optional refinement passes, each
-   standing alone and none needing another first:
-   - `reference/brief-shape.md`: structure (sections, order, leftover template text).
-   - `reference/brief-clarify.md`: open questions.
-   - `reference/brief-harden.md`: flow and step detail agree.
-   - `reference/brief-align.md`: scenarios cover the flow.
+   standing alone and none needing another first; the text of each is
+   `canon skills show <name>`:
+   - `brief-shape`: structure (sections, order, leftover template text).
+   - `brief-clarify`: open questions.
+   - `brief-harden`: flow and step detail agree.
+   - `brief-align`: scenarios cover the flow.
 
    **Compress, then polish.** Before the human reads it, shorten the brief.
    A human reads it once, so every sentence has to earn its place:
@@ -98,7 +105,7 @@ ids); the human step comes after it. A policy that no longer matches its approva
 
    Then, when `brief check` reports prose advisories (`prose.*`; `status` and
    `meta.next` name the step), the polish pass is required before the human
-   stop: follow `reference/brief-polish.md` and rerun `brief check` until
+   stop: follow `canon skills show brief-polish` and rerun `brief check` until
    the advisories are gone or each remaining one is waived with a reason.
    It never blocks approval, but you do not hand the human a brief with
    unexamined advisories.
@@ -111,16 +118,30 @@ ids); the human step comes after it. A policy that no longer matches its approva
    that report. The one answer approves the brief and the policy
    (`.canon/policy.yaml`, written by `canon init`), which is what the gate
    grades the work against.
-5. **Record the answer** with `brief approve`. Never approve without a human answer, and never edit the policy to make
-   the gate pass. A brief edited after its approval is not approved
-   (`BRIEF_CHANGED_SINCE_APPROVAL`): it needs a new answer and a new
-   `canon brief approve`. A follow-up that adds or changes a step of the
-   brief is a scope change and needs a new answer.
+5. **The human records the answer.** `brief approve` is the human's leaf: run
+   by an agent role it is refused (`HUMAN_ONLY`) with a hint addressed to the
+   human. Give the human the call, in their own shell and with no declared
+   role: `canon brief approve add-login --approver <their name> --note "<their
+   own words>"`; `--approver` and `--note` are theirs to supply, or they
+   approve in the dashboard. Never approve in their name, never drop your
+   declared role to run it, and never edit the policy to make the gate pass.
+   `canon brief show <slug>` then reports `state: approved`. A brief edited
+   after its approval is not approved (`BRIEF_CHANGED_SINCE_APPROVAL`): it
+   needs a new answer and a new `brief approve` by the human. A follow-up that
+   adds or changes a step of the brief is a scope change and needs a new
+   answer.
 
 When no human can answer one of the brief's questions, write the question
 into Questions and assumptions, state the assumption you will build on, and
 say so in your report. That applies to the brief's questions, never to the
 approval.
+
+**Done when:** `canon brief check add-login` exits 0 (no blockers, and the
+prose advisories are gone or waived with a reason) and `canon brief show
+add-login` reports `state: ready`: the brief is handed to the human and you
+stop. The scope is approved when the same command reports `state:
+approved`; read it in `data.state` of `canon brief show add-login --json`.
+Nothing else starts before that.
 
 ## Non-behavior work is a chore
 
@@ -128,12 +149,14 @@ A refactor, dependency, build, CI or infra change that alters nothing a user
 can observe: `change new --change-kind chore`. Its brief is short (intent,
 category, invariants, checks, out of scope) and approved like any brief, one
 human stop. A chore adds no scenarios: the
-implementer runs the subject's suite again and binds it with
-`canon evidence add --all-scenarios`, then the reviewer records one
+implementer runs the subject's suite again where the code changed and binds
+it with `canon evidence add --all-scenarios` (a docs-only chore changes no
+code and needs no new evidence), then the reviewer records one
 change-level review of the chore (`canon review change <slug>`). On a
 shipped subject `change new` prints the reopen command for the orchestrator
 (`subject move <id> --to verifying --reason "<why>"`); the subject cannot
-ship again until the suite is evidenced after the chore's approval. Work that
+ship again until the chore's change-level review exists and every scenario
+whose code changed is evidenced after the chore's approval. Work that
 changes behavior is never a chore: it is a feature change.
 
 ### A migration is cut in phases

@@ -67,9 +67,14 @@ fn committed(repo: &Path, kind: &str) -> Vec<serde_json::Value> {
     records_under(repo, &format!("kind={kind}"))
 }
 
-const STAGED: &str = "— run `canon gate promote` to commit it";
-const DIRECT: &str = "— written directly; nothing to promote";
-const PROMOTED: &str = "— staged and promoted in this run; nothing to promote";
+/// Where a write left its record: kept staged (`--no-promote`), or in the committed ledger (promoted in the run, or written directly).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Landed {
+    Staged,
+    Committed,
+}
+const STAGED: Landed = Landed::Staged;
+const PROMOTED: Landed = Landed::Committed;
 
 /// `--session-id` on `evidence add` and `review add` fills each record's
 /// `actor.session_id`, and survives promotion.
@@ -130,22 +135,26 @@ fn a_session_id_outside_the_grammar_is_refused_and_nothing_is_written() {
     assert!(committed(repo, "evidence_record").is_empty() && committed(repo, "review").is_empty());
 }
 
-/// D6 (F16): every write command ends its success line with the same
-/// suffix for the same write mode, so an operator knows whether a
-/// promote is due. `canon init` writes `write: { promote: auto }` (0.16
-/// D2), so a staged write says it promoted itself unless `--no-promote`
-/// keeps it staged.
+/// D6 (F16): every write command leaves its record where its write mode says,
+/// so an operator knows whether a promote is due. `canon init` writes
+/// `write: { promote: auto }` (0.16 D2), so a staged write promotes itself
+/// unless `--no-promote` keeps it staged; the direct writers never stage.
 #[test]
-fn every_write_command_says_whether_it_staged_or_wrote_directly() {
+fn every_write_command_stages_or_writes_directly_as_its_mode_says() {
     let dir = setup();
     let repo = dir.path();
     let direct = |args: &[&str]| {
-        let out = ok(repo, args);
-        assert!(out.lines().any(|l| l.ends_with(DIRECT)), "canon {args:?} wrote directly and must say so:\n{out}");
+        ok(repo, args);
+        assert!(records_under(repo, "_staging").is_empty(), "canon {args:?} writes directly and must stage nothing");
     };
-    let staged = |args: &[&str], suffix: &str| {
-        let out = ok(repo, args);
-        assert!(out.lines().any(|l| l.contains(suffix)), "canon {args:?} staged and must name its promote:\n{out}");
+    let staged = |args: &[&str], landed: Landed| {
+        let before = records_under(repo, "_staging").len();
+        ok(repo, args);
+        let after = records_under(repo, "_staging").len();
+        match landed {
+            Landed::Staged => assert!(after > before, "canon {args:?} with --no-promote must leave its record staged"),
+            Landed::Committed => assert_eq!(after, before, "canon {args:?} must promote its record in the run"),
+        }
     };
 
     direct(&["feature", "new", "game.run", "--title", "Runs"]);
@@ -173,7 +182,7 @@ fn every_write_command_says_whether_it_staged_or_wrote_directly() {
 
     staged(
         &["divergence", "add", "game.run.01", "--project-id", "root", "--actor-id", "r", "--role", "reviewer", "--no-promote"],
-        "— run `canon gate promote` to commit it",
+        STAGED,
     );
     staged(&["divergence", "add", "game.run.01", "--project-id", "root", "--round", "2", "--actor-id", "r", "--role", "reviewer"], PROMOTED);
     staged(&["divergence", "resolve", "game.run.01", "--project-id", "root", "--round", "3", "--actor-id", "r", "--role", "reviewer"], PROMOTED);

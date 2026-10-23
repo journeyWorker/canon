@@ -78,6 +78,9 @@ the adapter's `unmapped` drop counts, and `malformed` (structurally
 broken constructs). A source whose content is byte-identical to its last
 successful run is `skipped_unchanged` — re-importing writes zero records.
 
+**Done when:** `canon ingest plans` exits `0` with `malformed` and
+`changes_unwritten` at `0` for every source; step 3 lists the imported rows.
+
 ## 3. Read the imported rows
 
 ```bash

@@ -927,7 +927,7 @@ fn context_status_82_a_pending_draft_with_advisories_is_polished_before_it_is_re
     let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();
     let steps = status["meta"]["next"].as_array().unwrap();
     let position = |needle: &str| steps.iter().position(|s| s["command"].as_str().unwrap().contains(needle));
-    let polish = position("reference/brief-polish.md").unwrap_or_else(|| panic!("{steps:?}"));
+    let polish = position("canon skills show brief-polish").unwrap_or_else(|| panic!("{steps:?}"));
     let report = position("report the pending draft's brief").unwrap_or_else(|| panic!("{steps:?}"));
     assert_eq!(report, polish + 1, "{steps:?}");
     assert_eq!(steps[polish]["role"], "planner");

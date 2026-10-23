@@ -108,6 +108,16 @@ one of them prints `NOT refreshed`, the corpus has a format violation
 duplicate id; `canon inventory sync` (or `canon format <root>`) names it.
 Fix it and the next command indexes the files (see `canon-inventory`).
 
+Many scenarios at once: `--input` takes inline JSON, a file or `-`. An
+array (or NDJSON) is a batch, validated whole before anything is written;
+each element holds `operands` (the scenario tag) and the other options as
+camelCase keys. `canon schema scenario new --json` shows the input schema
+and an example. There is no `--from`.
+
+```text
+canon scenario new --input '[{"operands":["checkout.cart.01"],"title":"Adding an item raises the count","subjectId":"checkout-core","lane":"behavior","case":"happy"},{"operands":["checkout.cart.04"],"title":"Adding an out-of-stock item is refused","subjectId":"checkout-core","lane":"behavior","case":"failure"}]'
+```
+
 - `--actor-id <id>` (or `CANON_ACTOR` in the environment) puts YOUR id on the
   provenance line. Default is `canon-scaffold`.
 - **Keep the `# canon:` lines when you fill in the scenario.** Dropping one
@@ -134,6 +144,10 @@ Fix it and the next command indexes the files (see `canon-inventory`).
   root's sync aborts.
 - Steps are yours to write; the scaffold's `Given a step` is a
   placeholder, not a spec.
+
+**Done when:** `canon status` shows no `@subject`-less scenario (`data.unowned`
+is empty) and no `NOT refreshed` line appears; the new scenarios then
+wait for evidence, which `canon gate check` reports.
 
 ## Anti-patterns, by name
 

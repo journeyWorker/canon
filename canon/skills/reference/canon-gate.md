@@ -58,6 +58,16 @@ bytes no longer match the approved digest, or the approval cannot be read,
 the gate fails closed: the violation is reported and the exit is `1` (see
 `canon-policy`).
 
+On a repository that still holds 0.27 canon state, `canon gate check` (like
+`canon status` and `canon context`) warns and puts `canon migrate --json`
+first in `meta.next`: run `canon migrate` (a preview), then `canon migrate
+--commit --plan-digest <digest from the preview>`, then `canon skills
+install`. Read the whole result with `--json`: `data.violations` lists the
+failures by class and `meta.next` the steps.
+
+**Done when:** `canon gate check` exits `0` with no violation; `canon status`
+repeats the result and names what is still open.
+
 The gate is a read command: it writes nothing. A scenario index that is
 stale (a `.feature` file added, edited or deleted since the last sync) is
 graded as the refresh would leave it, built in memory from the changed
@@ -119,9 +129,9 @@ A present section, even `require_evidence: false` or a malformed one
 
 - **Unimplemented** — no `EvidenceRecord` carries the scenario's
   `(project_id, scenario_id)`. Author one with
-  `canon evidence add --scenario-id <id> --project-id <root-id>`; both
-  flags are required together, because two spec roots may carry the same
-  scenario id. `--summary` is allowed here too (scanned for fabrication
+  `canon evidence add --scenario-id <id> --project-id <root-id>`; the
+  root id is needed once more than one spec root is configured, because
+  two roots may carry the same scenario id. `--summary` is allowed here too (scanned for fabrication
   markers like a task's); it is a row suffix only when the record also
   names a `--task-id`. A record carrying both `--task-id` and `--scenario-id`
   is one attestation answering both joins: it counts for the task cell
@@ -205,8 +215,10 @@ purpose, so enabling nothing changes no existing verdict.
 canon divergence accept cart.add.01 --project-id root --reason "known gap" --tracking "issue#12" --expiry 2026-12-31 --actor-id reviewer-2 --role reviewer --session-id review-session-1
 ```
 
-A reviewer accepts a scenario whose latest evidence is `divergent` as a
-known gap limited by something outside the change; never to skip a fix.
+Accepting a scenario whose latest evidence is `divergent` as a known gap
+limited by something outside the change is a human-only act: with a role
+declared (`--as`, `CANON_ROLE`) the leaf is refused with `HUMAN_ONLY`. It is
+never a way to skip a fix.
 Refused (`DIVERGENCE_ACCEPT_REFUSED`) unless the latest verdict is
 divergent and the session and actor differ from the evidence's. The record
 pins that evidence: new evidence for the scenario, or `--expiry` passing,
@@ -325,6 +337,12 @@ brief_override:
     - { class: unreviewed-promotion, subject: demo-subject }
   actor: { agent_id: lead }   # from --actor-id
 ```
+
+Under `--json` the same waiver is `data.overrides[]` (`code` of the waived
+refusal, `reason` verbatim), so a caller sees what its `--override-reason`
+let through; a repeat of an identical record is `unchanged`
+(`meta.unchanged`) and records no second override. `--override-reason`
+exists on `subject move` too (see `canon-subject`).
 
 A blank or multi-line reason exits 2; an override when nothing refused is
 not recorded. `canon status` lists each such record as a `warning:`, and
@@ -504,6 +522,23 @@ and are refused with `--all-scenarios`.
 A task's evidence with `--report` and no `--scenario-id` binds EVERY case
 in the report, so a `faithful` verdict needs all of them to pass.
 
+Many records at once without a report: `--input` takes inline JSON, a file
+or `-`; an array (or NDJSON) is a batch, validated element by element before
+the first write (a refusal writes nothing, exit 2). Keys are the option
+names in camelCase plus `operands`: one object per scenario, with
+`scenarioId`, `class`, `ref` and `role`. `canon schema evidence add --json`
+shows the input schema and an example. Each element reports `written`,
+`unchanged` or `failed` in `data.items[]`.
+
+`--rev <rev>` names the commit the evidence ran against (default `HEAD`).
+Evidence for uncommitted code is recorded with its `codeTree` and
+`worktreeDirty`; outside git, or with no commit, the add is refused with
+`NO_COMMIT`.
+
+**Done when:** `canon gate check` shows no violation for the scenarios you
+recorded evidence for; each record's own output line says whether it was
+written or `unchanged`.
+
 ### A write that makes a review stale says so (0.18)
 
 When new evidence (one record or a batch) supersedes the evidence a
@@ -511,16 +546,19 @@ current pinned review saw, `canon evidence add` prints one line per
 review it makes stale (its verdict or checks differ from what the review saw), with the command that re-pins it:
 
 ```stderr
-canon evidence add: review by `reviewer-2` of cart.add.01 is now stale (this record's verdict or checks differ from what it saw); re-pin it: canon review scenario cart.add.01 --project-id root --actor-id reviewer-2 --role reviewer --pin <HEAD sha> --original-spec-ref specs/kind=feature/area=cart/add.feature
+canon evidence add: review by `reviewer-2` of cart.add.01 is now stale (this record's verdict or checks differ from what it saw); re-pin it: canon review scenario cart.add.01 --project-id root --actor-id reviewer-2 --role reviewer --original-spec-ref specs/kind=feature/area=cart/add.feature
 ```
 
 The decision is the gate's own (the same stale-review rule `canon gate
 check` reports). The command repeats the review's reviewer, actor, role,
-session, provenance ref, runtime labels and artifacts, pinned at `HEAD` (`<sha>`
-when the repository has no commit). A record that is only staged says
+session, provenance ref, runtime labels and artifacts, at the default
+`--rev` (`HEAD`). A record that is only staged says
 the review "goes stale once this evidence is promoted": promote first,
-then re-pin. The reviewer re-reviews before re-pinning; several
-scenarios re-pin in one `canon review scenario` (see `canon-review`).
+then re-review. The reviewer re-reviews before re-pinning; several
+scenarios re-review in one `canon review scenario` (see `canon-review`).
+
+**Done when:** `canon gate check` reports no stale review for the scenarios
+you recorded evidence for; the re-review's own output says `pinned`.
 
 ## Bound evidence stays provable (the artifact store)
 

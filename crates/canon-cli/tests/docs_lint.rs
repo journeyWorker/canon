@@ -477,3 +477,26 @@ fn the_extractor_reads_what_the_convention_says() {
     let agents = extract(canon_cli::init::AGENTS_BLOCK, false, "AGENTS block");
     assert!(agents.len() >= 8, "the AGENTS block yields {} commands", agents.len());
 }
+
+/// A guide is read through `canon skills show`, and the consumer's repo holds no `reference/` tree, so no guide
+/// points at a `reference/<file>.md` path; it names `canon skills show <name>` instead. Every name it shows exists.
+#[test]
+fn the_guides_point_at_skills_show_and_every_name_exists() {
+    let names: BTreeSet<String> = canon_cli::guide::names().iter().map(|n| n.to_string()).collect();
+    let mut problems = Vec::new();
+    for (path, text) in canon_cli::guide::files() {
+        if !path.ends_with(".md") {
+            continue;
+        }
+        if text.contains("reference/") {
+            problems.push(format!("{path}: names a reference/ path"));
+        }
+        for (at, _) in text.match_indices("canon skills show ") {
+            let name: String = text[at + 18..].chars().take_while(|c| c.is_ascii_lowercase() || *c == '-').collect();
+            if !name.is_empty() && !name.ends_with('-') && !names.contains(&name) {
+                problems.push(format!("{path}: `canon skills show {name}` is not a guide"));
+            }
+        }
+    }
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}

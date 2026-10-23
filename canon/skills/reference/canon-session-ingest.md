@@ -25,6 +25,10 @@ canon ingest sessions --all-workspaces  # machine-wide scan
 canon ingest sessions --home /custom    # override the scan-root home ($HOME)
 ```
 
+**Done when:** the run summary (below) ends with `malformed records … : 0`
+and `canon query --kind session` lists the sessions; a rerun reports the
+files as `skipped unchanged (watermark)` and writes nothing.
+
 ## The four adapters
 
 Registered in order: **`omp`** (omp/pi sessions), **`hermes`**,
@@ -179,7 +183,7 @@ canon query --kind event   # filter detail.label == "user_directive"
 Each pass prints the active scope, one line per adapter, then totals:
 
 ```
-scope: project /Users/me/Workspace/canon (2 roots)
+scope: project /path/to/repo (2 roots)
 omp: 3 file(s) scanned, 1 reparsed, 2 skipped unchanged (watermark), 4 row(s) parsed, 0 malformed record(s)
 claude-code: 1 file(s) scanned, 0 reparsed, 1 skipped unchanged (watermark), 0 row(s) parsed, 0 malformed record(s)
 sessions normalized: 4

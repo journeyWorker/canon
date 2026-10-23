@@ -14,8 +14,26 @@ import sys
 
 
 SHELLS = {"sh", "bash", "zsh", "dash"}
-READ_ONLY = {"status", "context", "retrieve", "report", "dashboard", "help", "version"}
-READ_ACTIONS = {"check", "show", "list", "doctor", "verify", "diff", "explain"}
+# 0.28 D9: whether a canon call writes comes from the command spec's `effect`, not a verb list.
+SPEC_PATH = Path(__file__).resolve().parents[2] / "docs" / "cli" / "canon.cli.json"
+
+
+def load_effects(path=SPEC_PATH):
+    """`{command path tuple: effect}` for every leaf of the generated spec (`read`, `write` or `destructive`)."""
+    with open(path, encoding="utf-8") as stream:
+        spec = json.load(stream)
+    return {tuple(node["path"]): node["effect"] for node in spec["commands"] if node["nodeKind"] == "leaf"}
+
+
+EFFECTS = load_effects()
+
+
+def leaf_of(words):
+    """The longest leaf command path that starts `words`, or `()` for a spelling the spec does not know."""
+    for size in range(min(len(words), 3), 0, -1):
+        if tuple(words[:size]) in EFFECTS:
+            return tuple(words[:size])
+    return ()
 
 
 def text(content):
@@ -383,9 +401,9 @@ def shell_activity(command, cwd, result):
                           "command": shlex.join(argv),
                           # `canon review add --help` reads usage; it records nothing.
                           "help": "--help" in args or "-h" in args})
-            if "--help" not in args and "--version" not in args and verb not in READ_ONLY and action not in READ_ACTIONS:
-                if not (verb in ("brief", "finding", "subject", "skills", "gate") and not action):
-                    writes.append((f".canon/<{verb}{' ' + action if action else ''}>", current_cwd))
+            leaf = leaf_of(words)
+            if "--help" not in args and "--version" not in args and leaf and EFFECTS[leaf] != "read":
+                writes.append((f".canon/<{' '.join(leaf)}>", current_cwd))
             if verb == "init":
                 writes.extend((p, current_cwd) for p in ("canon.yaml", "AGENTS.md"))
             if verb == "skills" and action == "install":

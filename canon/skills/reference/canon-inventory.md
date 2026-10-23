@@ -7,13 +7,14 @@ records every downstream stage joins against.
 ## You rarely run it yourself
 
 Since 0.16 the commands that read the index see added, edited and deleted
-`.feature` files without a sync step. `canon evidence add`, `canon review
+`.feature` files without a sync step. `canon evidence add`, `canon evidence
+audit`, `canon artifacts store`, `canon divergence accept`, `canon review
 scenario` and `canon subject move` refresh the index on disk first, with the
 same code this command runs, scoped to the changed files, and say so in one
 stderr line:
 
 ```stderr
-canon evidence add: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
+canon artifacts store: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
 ```
 
 `canon status` and `canon gate check` are read commands and write nothing:
@@ -123,6 +124,13 @@ Per configured root, in order:
 The scenario index shape is deliberately general: `title` +
 `source_digest`, nothing else. It carries no coverage field — coverage
 stays `canon gate check`'s own authority (see `canon-gate`).
+
+`--dry-run` runs the same validation and reports what would be written
+without writing. A rerun that finds every digest unchanged writes nothing.
+
+**Done when:** `canon inventory sync` exits `0` with no violation or sync
+error for the root, and `canon query --kind scenario` lists the scenarios;
+`canon status` then reads the index without a `NOT refreshed` line.
 
 ## `specs.roots[]` config (`canon.yaml`)
 

@@ -138,6 +138,9 @@ canon query --kind trajectory --json
 있지 않고, 부분 실패(목적지 쓰기는 성공, 원본 삭제는 실패) 후 다시
 실행하면 같은 레코드를 다시 선택하지만 목적지 쓰기는 no-op이 됩니다.
 
+**Done when:** `canon tier age --commit --plan-digest <digest>`가 exit `0`으로 끝나고
+그다음 미리보기(`canon tier age`)가 이동할 항목이 없다고 보여 주면 끝입니다.
+
 한 종류가 현재 두 단에 걸쳐 있는 경우(일부는 에이징됨, 일부는 아님)도
 정확히 읽힙니다: `canon query`가 두 단을 `at` 기준으로 병합하며, 크로스
 티어 JOIN은 없습니다.
@@ -206,6 +209,10 @@ canon artifacts move --tier cold --commit --plan-digest 0123456789abcdef
 없습니다. 스토어 이전은 레포 소유자가 정할 일이며, 바이트를 로컬로 되돌리는 것은
 지원하지 않습니다.
 
+**Done when:** `canon artifacts move --tier cold --commit --plan-digest <digest>`가
+exit `0`으로 끝나고 `canon artifacts verify --full`과 `canon gate check`가 통과하면
+끝입니다.
+
 ## DuckDB 뷰 읽기
 
 `crates/canon-store/sql/views.sql`은 로컬에서 오프라인으로 읽을 수 있는
@@ -230,8 +237,8 @@ CANON_R2_ROOT=/path/to/local/r2/root/canon \
 그리고 티어 쓰기만이 유일하게 승인된 변경자입니다. 리포트에서 직접 읽을
 수 없는 단(Postgres는 항상; S3/cold는 로컬 미러가 없는 한)으로
 라우팅된 종류도 유실되지 않습니다 — `canon query --kind <kind>`로
-계속 조회할 수 있고, `canon report`는 이 공백을 축소 집계하지 않고
-명시적으로 알립니다. 0.18부터 `canon report`는 sqlite `hot` 파일을
+계속 조회할 수 있고, `canon report build`가 만드는 리포트는 이 공백을 축소 집계하지 않고
+명시적으로 알립니다. 0.18부터 리포트는 sqlite `hot` 파일을
 직접 읽습니다(로컬 파일이고 자격 증명이 필요 없음). 그래서 `canon init`의
 기본 라우팅에서도 task 열이 채워집니다.
 

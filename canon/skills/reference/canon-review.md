@@ -31,7 +31,7 @@ The order an agent follows to claim a subject done:
      --summary "unbounded subprocess wait" --session-id review-session-1
    # ... fix, commit ...
    canon finding close c-demo --round 1 --seq 1 \
-     --disposition fixed --resolution-sha 9fceb02d0ae598e95dc970b74767f19372d5564e
+     --disposition fixed --resolution-rev HEAD
    ```
 
    Under `write.promote: manual` (or no `write:` key), run
@@ -45,7 +45,7 @@ The order an agent follows to claim a subject done:
    canon review scenario world.demo.01 --project-id root \
      --actor-id reviewer-2 --role reviewer \
      --session-id review-session-1 \
-     --pin "$(git rev-parse HEAD)" --upstream-ref "pr#41"
+     --rev HEAD --upstream-ref "pr#41"
    ```
 
    `review scenario` writes directly; there is nothing to promote. If the
@@ -59,6 +59,10 @@ The order an agent follows to claim a subject done:
 4. **Move the subject**: `canon subject move <id> --to verifying`, later
    `shipped`. See `canon-subject`.
 
+**Done when:** `canon gate check` exits 0 (no `unreviewed-promotion`, no
+`open-blocker`) and `canon status` shows the subject with every scenario
+reviewed and `openBlockers: 0` (`data.subjects[]`).
+
 ## `canon finding add` / `canon finding close`
 
 A Finding's natural key is `(change_id, round, seq)`: the change under
@@ -71,9 +75,9 @@ work collapsed into one identity.
 canon finding add --change-id <c> --round <n> --seq <n> \
   --severity blocker|should-fix|note --disposition open \
   --actor-id <who> --summary "<one line>" \
-  [--reviewed-sha <sha>] [--file-ref path/to/file.rs:120-134] [--scenario-id <id>] [--session-id <id>]
+  [--rev <rev>] [--resolution-rev <rev>] [--introduced-rev <rev>] [--file-ref path/to/file.rs:120-134] [--scenario-id <id>] [--session-id <id>]
 canon finding close <c> --round <n> --seq <n> \
-  --disposition fixed --resolution-sha <sha> [--actor-id <id>] [--session-id <id>]   # or rejected / deferred / open
+  --disposition fixed --resolution-rev <rev> [--actor-id <id>] [--session-id <id>]   # or rejected / deferred / open
 canon finding close <c> --round <n> --seq <n> \
   --disposition rejected|deferred --reason "<why, one line>"
 ```
@@ -102,13 +106,23 @@ appends a second version at the same natural key — the first stays. Its
 `--actor-id` and `--session-id` name who authored the transition; the
 raiser's stay on the first version.
 
-Every sha flag (`--reviewed-sha`, `--resolution-sha`, `--introduced-by`)
-takes a full 40-character sha or a short one (4 or more lowercase hex
-characters). A short sha is resolved with `git rev-parse --verify
-<sha>^{commit}` in the repo, and the record stores the full sha. It is
-refused (exit `2`) when it names no commit, when more than one commit
-starts with it (pass more characters), when it only resolves by peeling a
-tag, or outside a git work tree.
+Every commit option (`--rev`, `--resolution-rev`, `--introduced-rev`)
+takes any git revision (`HEAD~1`, a branch, a tag, a full or short sha),
+resolved with `git rev-parse --verify <rev>^{commit}`; the record stores
+the full sha. `--rev` (the commit the round reviewed) defaults to `HEAD`,
+and so does `--resolution-rev` on a `fixed` close; `--introduced-rev` has
+no default and is only sourced, never guessed. A revision that names no
+commit is refused (exit `2`). A finding recorded against uncommitted code
+is allowed: the record carries the `codeTree` it saw and `worktreeDirty`.
+Outside git, or in a repository with no commit, the write is refused with
+`NO_COMMIT`.
+
+Many findings at once: `--input` takes inline JSON, a file or `-`; an array
+(or NDJSON) is a batch validated before any write. Keys are the option
+names in camelCase (`changeId`, `actorId`, `resolutionRev`); `canon schema
+finding add --json` shows the input schema and an example. An identical
+repeat is `unchanged` (`meta.unchanged`) and writes nothing; a different
+finding under an occupied key is `FINDING_SEQ_OCCUPIED`.
 
 ### A defect the author found in its own work
 
@@ -117,8 +131,8 @@ review, with `--actor-id` set to your own id; never ask
 the reviewer to record it later under theirs. Nothing refuses a finding
 whose reviewer is also the implementer, and an open `blocker` the author
 raised blocks under `block_on_findings` exactly like a reviewer's.
-`--introduced-by` names the commit that introduced the defect, not who
-found it: `--introduced-by self` is a usage error (exit 2) that points at
+`--introduced-rev` names the commit that introduced the defect, not who
+found it: `--introduced-rev self` is a usage error (exit 2) that points at
 `--actor-id`.
 
 ### Severities
@@ -140,7 +154,7 @@ text in the summary, not a field.
 | Disposition | Meaning |
 |---|---|
 | `open` | Raised and not yet dealt with. The default on `finding add`; `finding close --disposition open` reopens. |
-| `fixed` | Fixed by a commit. Requires `--resolution-sha <sha>` naming a commit this repo holds; only `fixed` may carry one. |
+| `fixed` | Fixed by a commit. Carries `--resolution-rev <rev>` (default `HEAD`) naming a commit this repo holds; only `fixed` may carry one. |
 | `rejected` | The reviewer's point was considered and declined. Needs `--reason`. |
 | `deferred` | Accepted, but postponed to later work. Needs `--reason`. |
 
@@ -155,12 +169,12 @@ fixed finding reopened with `--disposition open` counts as open again.
 
 ```text
 canon review scenario <scenario-id> [<scenario-id>] --project-id <root-id> \
-  --actor-id <who> --pin <sha-or-ref> --role <role> \
+  --actor-id <who> [--rev <rev>] --role <role> \
   (--upstream-ref <ref> | --original-spec-ref <ref>) [--session-id <id>] \
   [--review-outcome signed|indeterminate|unavailable] \
   [--reviewer-provider <p>] [--reviewer-model <m>] [--reviewer-harness <h>] \
   [--artifact <path>] [--artifact <path>] [--max-artifact-mib <MiB>]
-canon review change <slug> --project-id <root> --actor-id <who> --pin <sha-or-ref> \
+canon review change <slug> --project-id <root> --actor-id <who> [--rev <rev>] \
   --role reviewer (--upstream-ref <ref> | --original-spec-ref <ref>)   # a chore, below
 ```
 
@@ -170,10 +184,24 @@ may carry the same scenario id. Exactly one provenance ref is required.
 `--actor-id` is the reviewer and is required; `--session-id` fills `actor.session_id`.
 A Review carries no verdict about the behavior; the `verifying → shipped`
 ship gate still refuses missing or `Divergent` evidence verdicts on its
-own (a `Divergent` one passes only while a reviewer's `canon divergence
+own (a `Divergent` one passes only while a human's `canon divergence
 accept` holds). It is written directly to the ledger, with no staging step, and says
 so: `canon review scenario: wrote <path> (new) — written directly; nothing to
 promote`.
+
+`--rev` is the commit the review is about: any git revision, default
+`HEAD`. The review records the full sha and the `codeTree` of the code it
+saw (the tree with `.canon/`, the spec roots and `code.exclude` removed), and
+`worktreeDirty` when that code is uncommitted. Reviewing uncommitted code is
+allowed, and committing it afterwards leaves the review current as long as
+the code tree is the same; changing the code makes it stale. Outside git, or
+with no commit, the write is refused with `NO_COMMIT`. An identical review
+written again is `unchanged` (`meta.unchanged` under `--json`) and adds no
+record.
+
+**Done when:** `canon gate check` reports no `unreviewed-promotion` for the
+scenarios you reviewed; a review that does not count shows up there with
+its reason.
 
 ### Several scenarios in one call (0.18)
 
@@ -415,7 +443,7 @@ subject's `change_ids` (`canon subject adopt`). The subject string is
 `<change_id>#<round>.<seq>`:
 
 ```
-open-blocker c-demo#1.1 — open blocker finding by `reviewer-2` on change `c-demo` (subject `demo-subject`): unbounded subprocess wait; fix it and `canon finding close c-demo --round 1 --seq 1 --disposition fixed --resolution-sha <sha>`, or close it as rejected or deferred
+open-blocker c-demo#1.1 — open blocker finding by `reviewer-2` on change `c-demo` (subject `demo-subject`): unbounded subprocess wait; fix it and `canon finding close <change> --round <n> --seq <n> --disposition fixed`, or close it as rejected or deferred
 ```
 
 Findings on changes no in-scope subject has adopted do not block.
