@@ -1177,7 +1177,7 @@ fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Plan,
         Ok(outcome) => {
             crate::say_raw!(json, "{}", crate::inventory::format_human(&outcome));
             CliError::failed("MIGRATE_INDEX_FAILED", "the files moved, but the scenario index rebuild found the problems; fix them, then run `canon inventory sync`").hint("run `canon inventory sync` and fix what it reports")
-                .emit_with_data("canon migrate", json, &MigrateReport { steps: log.into_lines(), index_records_written: None, index: Some(crate::inventory::format_json(&outcome)), plan })
+                .emit_with_data("canon migrate", json, &MigrateReport { steps: log.into_lines(), index_records_written: None, index: Some(serde_json::to_value(crate::inventory::format_json(&outcome)).expect("a report serializes")), plan })
         }
         Err(e) => {
             CliError::refused("MIGRATE_INDEX_FAILED", format!("the files moved, but the scenario index was not rebuilt: {e}; run `canon inventory sync`")).hint("run `canon inventory sync` and fix what it reports").emit("canon migrate", json)

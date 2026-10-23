@@ -14,7 +14,7 @@ use clap::Command;
 use serde::Serialize;
 
 /// What running a writing leaf a second time with the same arguments does.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Idempotency {
     /// A repeat is a no-op, reported `unchanged`.
@@ -28,7 +28,7 @@ pub enum Idempotency {
 }
 
 /// The form a leaf's output takes on stdout.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum OutputKind {
     /// An enveloped report.

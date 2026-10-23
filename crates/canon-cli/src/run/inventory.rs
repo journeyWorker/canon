@@ -35,13 +35,13 @@ fn run_inventory_sync(repo: &std::path::Path, spec_root: Option<&std::path::Path
             }
             coverage.count("scenarios", outcome.roots.iter().map(|r| r.scanned).sum());
             if outcome.is_clean() {
-                crate::next::finish_with_meta(repo, "inventory sync", &crate::next::Scope::Repo, false, json, &crate::json_out::untyped(data), coverage.meta());
+                crate::next::finish_with_meta(repo, "inventory sync", &crate::next::Scope::Repo, false, json, &data, coverage.meta());
                 ExitCode::SUCCESS
             } else {
                 let missing_provenance = outcome.roots.iter().flat_map(|root| &root.violations).any(|v| v.class == canon_fmt::FmtFailureClass::MissingProvenance);
                 let hint = with_provenance_fix("data.roots names each violation; fix them, then run `canon inventory sync` again", missing_provenance);
                 let error = CliError::failed("INVENTORY_ABORTED", "a spec root was aborted on violations or duplicate scenarios; nothing was written for it").hint(hint);
-                ExitCode::from(error.emit_with_data_and_meta("canon inventory sync", json, &crate::json_out::untyped(data), coverage.meta()) as u8)
+                ExitCode::from(error.emit_with_data_and_meta("canon inventory sync", json, &data, coverage.meta()) as u8)
             }
         }
         Err(err) => {

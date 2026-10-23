@@ -1815,7 +1815,7 @@ pub fn check_text(repo: &Path, change: ChangeId, path: &Path, text: &str) -> Res
 
 /// One flow step of a brief: its id (`F1`), its text with the list marker
 /// dropped, and its line.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct FlowStep {
     pub id: String,
     pub text: String,
@@ -1826,7 +1826,7 @@ pub struct FlowStep {
 /// (never by heading text, so the `ko` headings read the same), with its
 /// heading and the body lines after it. Fenced code and HTML comments are
 /// not part of a body, as in every other reading of the brief.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BriefSection {
     pub key: String,

@@ -29,7 +29,7 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
         match crate::ingest::run(canon_yaml, &home, true, full, all_workspaces, dry_run) {
             Ok(outcome) if json => {
                 // One document per pass (one per poll under `--watch`); the human summary is for human mode.
-                crate::json_out::data("ingest sessions", &crate::json_out::untyped(crate::ingest::summary_json(&outcome)));
+                crate::json_out::data("ingest sessions", &crate::ingest::summary_json(&outcome));
             }
             Ok(outcome) => {
                 print!("{}", crate::ingest::format_human(&outcome));

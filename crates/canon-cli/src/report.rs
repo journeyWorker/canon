@@ -101,6 +101,46 @@ pub fn default_report_path(repo: &Path) -> PathBuf {
     repo.join(canon_report::render::DEFAULT_REPORT_PATH)
 }
 
+/// `canon report build`: where the report was written (`ReportBuildReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportBuildReport {
+    /// The report file written.
+    pub path: String,
+}
+
+impl crate::json_out::Report for ReportBuildReport {}
+
+/// `canon report check`: whether the report file is current (`ReportCheckReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportCheckReport {
+    /// `fresh`, `missing` or `drift`.
+    pub state: &'static str,
+    /// The report file compared.
+    pub path: String,
+}
+
+impl crate::json_out::Report for ReportCheckReport {}
+
+/// One parquet table a snapshot wrote.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SnapshotTable<'a> {
+    pub table: &'a str,
+    pub file: &'a str,
+}
+
+/// `canon report snapshot <dir>`: the tables written (`ReportSnapshotReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportSnapshotReport<'a> {
+    pub directory: String,
+    pub tables: Vec<SnapshotTable<'a>>,
+}
+
+impl crate::json_out::Report for ReportSnapshotReport<'_> {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -26,8 +26,8 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
                     crate::say!(json, "{} v{} — {}", skill.name, skill.version, status);
                 }
                 if json {
-                    let skills: Vec<_> = report.installed.iter().map(|s| serde_json::json!({ "name": s.name, "version": s.version, "changed": s.changed })).collect();
-                    crate::json_out::data("skills install", &crate::json_out::untyped(serde_json::json!({ "dryRun": dry_run, "skills": skills })));
+                    let skills = report.installed.iter().map(|s| crate::skills::InstalledSkillEntry { name: &s.name, version: s.version, changed: s.changed }).collect();
+                    crate::json_out::data("skills install", &crate::skills::SkillsInstallReport::Legacy(crate::skills::LegacyInstall { dry_run, skills }));
                 }
                 ExitCode::SUCCESS
             }
@@ -69,18 +69,17 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
                 crate::say!(json, "{line}");
             }
             if json {
-                crate::json_out::data(
-                    "skills install",
-                    &crate::json_out::untyped(serde_json::json!({
-                        "dryRun": dry_run,
-                        "providers": report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>(),
-                        "selection": selection.describe(),
-                        "changed": report.changed,
-                        "configWritten": report.config_written.as_ref().map(|p| p.display().to_string()),
-                        "pruned": report.pruned.iter().map(|o| serde_json::json!({ "path": o.path.display().to_string(), "provider": o.provider.as_str(), "reason": o.reason() })).collect::<Vec<_>>(),
-                        "kept": report.kept.iter().map(|o| serde_json::json!({ "path": o.path.display().to_string(), "provider": o.provider.as_str(), "reason": o.reason(), "hint": o.by_hand() })).collect::<Vec<_>>(),
-                        "ownedPaths": owned,
-                    })));
+                let data = crate::skills::BundleInstall {
+                    dry_run,
+                    providers: report.providers.iter().map(|p| p.as_str()).collect(),
+                    selection: selection.describe(),
+                    changed: report.changed,
+                    config_written: report.config_written.as_ref().map(|p| p.display().to_string()),
+                    pruned: report.pruned.iter().map(|o| crate::skills::PrunedEntry { path: o.path.display().to_string(), provider: o.provider.as_str(), reason: o.reason() }).collect(),
+                    kept: report.kept.iter().map(|o| crate::skills::KeptEntry { path: o.path.display().to_string(), provider: o.provider.as_str(), reason: o.reason(), hint: o.by_hand() }).collect(),
+                    owned_paths: owned,
+                };
+                crate::json_out::data("skills install", &crate::skills::SkillsInstallReport::Bundle(data));
             }
             ExitCode::SUCCESS
         }
@@ -102,21 +101,21 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
             for orphan in &report.orphans { crate::say!(json, "{} — orphan ({}; the install lock lists it, but this canon's bundle no longer ships it; {}; {})", orphan.path.display(), orphan.provider.as_str(), orphan.reason(), orphan.fix(&report.providers)); }
             if let Some(outdated) = &report.outdated { crate::say!(json, "{} — outdated ({})", outdated.path.display(), outdated.describe(&report.providers)); }
             let clean = report.manifest_ok && report.orphans.is_empty() && report.remnants.is_empty() && report.outdated.is_none() && report.statuses.iter().all(|status| status.state == "ok");
-            let data = serde_json::json!({
-                "clean": clean,
-                "providers": report.providers.iter().map(|p| p.as_str()).collect::<Vec<_>>(),
-                "selection": selection.describe(),
-                "manifestOk": report.manifest_ok,
-                "statuses": report.statuses.iter().map(|s| serde_json::json!({ "path": s.path.display().to_string(), "state": s.state, "provider": s.provider.as_str() })).collect::<Vec<_>>(),
-                "orphans": report.orphans.iter().map(|o| serde_json::json!({ "path": o.path.display().to_string(), "provider": o.provider.as_str(), "modified": o.modified, "reason": o.reason(), "hint": o.fix(&report.providers) })).collect::<Vec<_>>(),
-                "remnants": report.remnants.iter().map(|r| r.display().to_string()).collect::<Vec<_>>(),
-                "outdated": report.outdated.as_ref().map(|o| serde_json::json!({ "path": o.path.display().to_string(), "installedBy": o.installed_by, "message": o.describe(&report.providers) })),
-            });
+            let data = crate::skills::SkillsCheckReport {
+                clean,
+                providers: report.providers.iter().map(|p| p.as_str()).collect(),
+                selection: selection.describe(),
+                manifest_ok: report.manifest_ok,
+                statuses: report.statuses.iter().map(|s| crate::skills::SkillFileStatus { path: s.path.display().to_string(), state: s.state, provider: s.provider.as_str() }).collect(),
+                orphans: report.orphans.iter().map(|o| crate::skills::OrphanEntry { path: o.path.display().to_string(), provider: o.provider.as_str(), modified: o.modified, reason: o.reason(), hint: o.fix(&report.providers) }).collect(),
+                remnants: report.remnants.iter().map(|r| r.display().to_string()).collect(),
+                outdated: report.outdated.as_ref().map(|o| crate::skills::OutdatedEntry { path: o.path.display().to_string(), installed_by: o.installed_by.clone(), message: o.describe(&report.providers) }),
+            };
             let mut coverage = crate::coverage::Coverage::new();
             coverage.count("providers", report.providers.len()).count("skillFiles", report.statuses.len());
             if clean {
                 if json {
-                    crate::json_out::data_with_meta("skills check", &crate::json_out::untyped(data), coverage.meta());
+                    crate::json_out::data_with_meta("skills check", &data, coverage.meta());
                 }
                 ExitCode::SUCCESS
             } else {
@@ -124,7 +123,7 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
                 let by_hand: Vec<String> = report.orphans.iter().filter(|o| o.modified).map(|o| o.path.display().to_string()).collect();
                 let hint = if by_hand.is_empty() { format!("run `{fix}`") } else { format!("run `{fix}`, which prunes the orphans whose bytes still match the install lock; it keeps the modified ones ({}), so remove those by hand", by_hand.join(", ")) };
                 let orphaned = if report.orphans.is_empty() { String::new() } else { format!("; orphaned (no longer shipped by the bundle): {}", report.orphans.iter().map(|o| o.path.display().to_string()).collect::<Vec<_>>().join(", ")) };
-                ExitCode::from(CliError::failed("SKILLS_DRIFT", format!("an installed skill is missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version{orphaned}")).hint(hint).emit_with_data_and_meta("canon skills check", json, &crate::json_out::untyped(data), coverage.meta()) as u8)
+                ExitCode::from(CliError::failed("SKILLS_DRIFT", format!("an installed skill is missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version{orphaned}")).hint(hint).emit_with_data_and_meta("canon skills check", json, &data, coverage.meta()) as u8)
             }
         }
         Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).hint("check that the target directory is writable; `canon skills doctor` diagnoses the installation").emit("canon skills check", json) as u8) }
@@ -137,7 +136,7 @@ fn run_skills_doctor(source: Option<&std::path::Path>, target: &std::path::Path,
         Ok(lines) => {
             for line in &lines { crate::say!(json, "{line}"); }
             if json {
-                crate::json_out::data("skills doctor", &crate::json_out::untyped(serde_json::json!({ "lines": lines })));
+                crate::json_out::data("skills doctor", &crate::skills::SkillsDoctorReport { lines: &lines });
             }
             ExitCode::SUCCESS
         }

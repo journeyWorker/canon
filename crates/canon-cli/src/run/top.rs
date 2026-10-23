@@ -50,7 +50,7 @@ pub(super) fn run_query(
                 };
                 let _ = crate::retention::audit_query(repo, kind, since, include_sensitive, outcome.records.len());
                 if json {
-                    print_paged("query", &crate::query::format_json_with_sensitive(&outcome, include_sensitive), &[]);
+                    print_query(&crate::query::report(&outcome, include_sensitive), outcome.page.as_ref(), &[]);
                 } else {
                     print!("{}", crate::query::format_human_with_sensitive(&outcome, include_sensitive));
                 }
@@ -75,12 +75,12 @@ pub(super) fn run_query(
             let diagnostics: Vec<String> = plugin_outcome.diagnostics.iter().map(|msg| format!("canon query --plugin {plugin_id}: {msg}")).collect();
             if plugin_outcome.projections.is_empty() {
                 if json {
-                    print_paged("query", &crate::query::format_json_with_sensitive(&outcome, include_sensitive), &diagnostics);
+                    print_query(&crate::query::report(&outcome, include_sensitive), outcome.page.as_ref(), &diagnostics);
                 } else {
                     print!("{}", crate::query::format_human_with_sensitive(&outcome, include_sensitive));
                 }
             } else if json {
-                print_paged("query", &crate::query::format_json_with_overlay_and_sensitive(&outcome, &plugin_id, &plugin_outcome.projections, include_sensitive), &diagnostics);
+                print_query(&crate::query::report_with_overlay(&outcome, &plugin_id, &plugin_outcome.projections, include_sensitive), outcome.page.as_ref(), &diagnostics);
             } else {
                 print!("{}", crate::query::format_human_with_overlay_and_sensitive(&outcome, &plugin_id, &plugin_outcome.projections, include_sensitive));
             }
@@ -151,22 +151,22 @@ pub(super) fn run_fmt(dir: Option<&std::path::Path>, repo: &crate::cli::RepoArgs
     }
     coverage.count("files", report.files_checked);
     crate::say_raw!(json, "{}", crate::fmt::format_human(&report));
-    let mut data = crate::fmt::format_json(&report);
-    if report.is_clean() && coverage.examined_nothing() {
-        crate::coverage::mark_unverifiable(&mut data);
+    let unverifiable = report.is_clean() && coverage.examined_nothing();
+    let data = crate::fmt::format_json(&report, unverifiable);
+    if unverifiable {
         let error = crate::coverage::unverifiable_error("canon format", "0 files", "author a spec with `canon feature new`, or pass the corpus directory: `canon format <DIR>`");
-        return ExitCode::from(error.emit_with_data_and_meta("canon format", json, &crate::json_out::untyped(data), coverage.meta()) as u8);
+        return ExitCode::from(error.emit_with_data_and_meta("canon format", json, &data, coverage.meta()) as u8);
     }
     if report.is_clean() {
         if json {
-            crate::json_out::data_with_meta("format", &crate::json_out::untyped(data), coverage.meta());
+            crate::json_out::data_with_meta("format", &data, coverage.meta());
         }
         ExitCode::SUCCESS
     } else {
         let missing_provenance = report.violations.iter().any(|v| v.class == canon_fmt::FmtFailureClass::MissingProvenance);
         let hint = with_provenance_fix("fix each violation named in data.violations, then run `canon format` again", missing_provenance);
         let error = CliError::failed("FORMAT_VIOLATIONS", format!("{} violation(s) in {} checked file(s)", report.violations.len(), report.files_checked)).hint(hint);
-        ExitCode::from(error.emit_with_data_and_meta("canon format", json, &crate::json_out::untyped(data), coverage.meta()) as u8)
+        ExitCode::from(error.emit_with_data_and_meta("canon format", json, &data, coverage.meta()) as u8)
     }
 }
 
@@ -251,7 +251,7 @@ pub(super) fn run_regime_show(role: &str, repo: &str, area: &str, hash: &str, js
     match RegimeKey::parse(regime_key(role, repo, area, hash)) {
         Ok(valid) => {
             if json {
-                crate::json_out::data("regime show", &crate::json_out::untyped(serde_json::json!({ "regimeKey": valid.as_str() })));
+                crate::json_out::data("regime show", &crate::retrieve::RegimeShowReport { regime_key: valid.as_str() });
             } else {
                 println!("{}", valid.as_str());
             }
@@ -311,8 +311,8 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
             Ok(manifest) => {
                 crate::say!(json, "canon report snapshot: wrote {} table(s) to {}", manifest.tables.len(), dir.display());
                 if json {
-                    let tables: Vec<_> = manifest.tables.iter().map(|t| serde_json::json!({ "table": t.table, "file": t.file })).collect();
-                    crate::json_out::data_with_meta("report snapshot", &crate::json_out::untyped(serde_json::json!({ "directory": dir.display().to_string(), "tables": tables })), crate::json_out::warnings_meta(&report_warnings));
+                    let tables: Vec<_> = manifest.tables.iter().map(|t| crate::report::SnapshotTable { table: &t.table, file: &t.file }).collect();
+                    crate::json_out::data_with_meta("report snapshot", &crate::report::ReportSnapshotReport { directory: dir.display().to_string(), tables }, crate::json_out::warnings_meta(&report_warnings));
                 }
                 ExitCode::SUCCESS
             }
@@ -333,15 +333,15 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
                     canon_report::CheckOutcome::Missing => "missing",
                     canon_report::CheckOutcome::Drift => "drift",
                 };
-                let data = serde_json::json!({ "state": state, "path": report_path.display().to_string() });
+                let data = crate::report::ReportCheckReport { state, path: report_path.display().to_string() };
                 if outcome.exit_code() == 0 {
                     if json {
-                        crate::json_out::data_with_meta("report check", &crate::json_out::untyped(data), crate::json_out::warnings_meta(&report_warnings));
+                        crate::json_out::data_with_meta("report check", &data, crate::json_out::warnings_meta(&report_warnings));
                     }
                     ExitCode::SUCCESS
                 } else {
                     let error = CliError::failed("REPORT_STALE", format!("the report is {state}")).hint("regenerate it with `canon report build`");
-                    ExitCode::from(error.emit_with_data("canon report check", json, &crate::json_out::untyped(data)) as u8)
+                    ExitCode::from(error.emit_with_data("canon report check", json, &data) as u8)
                 }
             }
             Err(err) => {
@@ -354,7 +354,7 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
         Ok(_content) => {
             crate::say!(json, "canon report build: wrote {}", report_path.display());
             if json {
-                crate::json_out::data_with_meta("report build", &crate::json_out::untyped(serde_json::json!({ "path": report_path.display().to_string() })), crate::json_out::warnings_meta(&report_warnings));
+                crate::json_out::data_with_meta("report build", &crate::report::ReportBuildReport { path: report_path.display().to_string() }, crate::json_out::warnings_meta(&report_warnings));
             }
             ExitCode::SUCCESS
         }
@@ -385,14 +385,14 @@ pub(super) fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path:
             crate::say!(json, "canon dashboard: serving {}", bound.url());
             if json {
                 // The one document: where it serves. The server then runs until the process is stopped.
-                let data = serde_json::json!({
-                    "url": bound.url(),
-                    "briefsUrl": bound.briefs_url(),
-                    "app": bound.app.describe(),
-                    "snapshot": bound.snapshot_dir.display().to_string(),
-                    "snapshotAvailable": bound.snapshot == crate::dashboard::SnapshotState::Ready,
-                });
-                crate::json_out::data_with_meta("dashboard", &crate::json_out::untyped(data), serde_json::json!({ "warnings": warnings }));
+                let data = crate::dashboard::DashboardReport {
+                    url: bound.url(),
+                    briefs_url: bound.briefs_url(),
+                    app: bound.app.describe(),
+                    snapshot: bound.snapshot_dir.display().to_string(),
+                    snapshot_available: bound.snapshot == crate::dashboard::SnapshotState::Ready,
+                };
+                crate::json_out::data_with_meta("dashboard", &data, crate::json_out::warnings_meta(&warnings));
             }
             bound.serve_forever();
             ExitCode::SUCCESS
@@ -401,19 +401,18 @@ pub(super) fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path:
     }
 }
 
-/// Prints one rendered paged document (`{…, "meta": {page}}`, as `query` and
-/// `export` render it) as the envelope: the page state moves into `meta`, beside
-/// the command's `warnings`.
-fn print_paged(command: &str, rendered: &str, warnings: &[String]) {
-    let payload: serde_json::Value = serde_json::from_str(rendered).expect("a rendered document is JSON");
-    let (data, mut meta) = crate::json_out::split_meta(payload);
-    if !warnings.is_empty() {
-        if !meta.is_object() {
-            meta = serde_json::json!({});
-        }
-        meta["warnings"] = serde_json::json!(warnings);
+/// Prints one query document as the envelope: the page state goes into `meta`,
+/// beside the command's `warnings`.
+fn print_query(report: &crate::query::QueryReport, page: Option<&crate::paging::PageMeta>, warnings: &[String]) {
+    let mut meta = serde_json::Map::new();
+    if let Some(page) = page {
+        page.insert_into(&mut meta);
     }
-    crate::json_out::data_with_meta(command, &crate::json_out::untyped(data), meta);
+    if !warnings.is_empty() {
+        meta.insert("warnings".to_string(), serde_json::to_value(warnings).expect("strings serialize"));
+    }
+    let meta = if meta.is_empty() { serde_json::Value::Null } else { serde_json::Value::Object(meta) };
+    crate::json_out::data_with_meta("query", report, meta);
 }
 
 /// `canon completion <SHELL>`: text mode prints the script itself, so

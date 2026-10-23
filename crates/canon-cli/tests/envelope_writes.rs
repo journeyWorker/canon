@@ -48,10 +48,10 @@ fn export_json_is_the_manifest_as_data_with_its_page_in_meta_and_a_next_step() {
     // With --out the manifest is the file; stdout names it.
     let file = repo.join("manifest.json");
     let written = body(&canon(repo, &["export", "--kind", "evidence", "--output", file.to_str().unwrap(), "--json"]));
-    assert_eq!(written["data"]["out"], file.display().to_string(), "{written}");
+    assert_eq!(written["data"]["output"], file.display().to_string(), "{written}");
     let manifest: Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
     assert_eq!(manifest["schema"], "canon.retention.export", "the file is the manifest itself");
-    assert_eq!(written["data"]["recordCount"], manifest["record_count"], "{written}");
+    assert_eq!(written["data"]["recordCount"], manifest["recordCount"], "{written}");
 }
 
 struct Signing {

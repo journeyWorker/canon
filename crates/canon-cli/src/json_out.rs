@@ -114,6 +114,27 @@ struct Failure<'a, R: ?Sized> {
     meta: Meta,
 }
 
+/// A ledger record embedded verbatim in a report: a JSON object that keeps its
+/// own snake_case schema (`crates/canon-model/schemas/<kind>.schema.json`),
+/// possibly redacted or cut to the `--fields` asked for, so the report's schema
+/// cannot pin its members.
+#[derive(Debug, Clone, Serialize)]
+#[serde(transparent)]
+pub struct LedgerRecord(pub Value);
+
+impl JsonSchema for LedgerRecord {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "LedgerRecord".into()
+    }
+
+    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "object",
+            "description": "A ledger record, verbatim: it keeps its own schema (`crates/canon-model/schemas/<kind>.schema.json`), minus anything redacted or left out by `--fields`"
+        })
+    }
+}
+
 /// A payload with no schema yet. TEMPORARY: the slices that type the
 /// `json!`-built payloads (plan S3a–e) remove it; nothing new may use it.
 #[derive(Debug, Clone, Serialize)]

@@ -36,7 +36,7 @@ use crate::role::Role;
 use crate::spec::{self, Node};
 
 /// What running a command does to the repo and the machine.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Effect {
     /// Writes nothing (stdout/stderr only).
@@ -58,7 +58,7 @@ impl Effect {
 }
 
 /// One exit code a command can return, with its meaning.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, schemars::JsonSchema)]
 pub struct ExitMeta {
     pub code: u8,
     pub meaning: &'static str,
@@ -244,21 +244,41 @@ pub fn check_metadata(root: &Command, meta: &[CommandMeta]) -> Vec<String> {
     problems
 }
 
-#[derive(Serialize)]
-struct ListEntry {
+/// One command in `canon schema`'s listing.
+#[derive(Serialize, schemars::JsonSchema)]
+pub struct ListEntry {
     command: String,
     effect: Effect,
     roles: Vec<Role>,
     about: Option<String>,
 }
 
-#[derive(Serialize)]
-struct ListSchema {
+/// `canon schema` with no command: the commands, filtered to a role.
+#[derive(Serialize, schemars::JsonSchema)]
+pub struct ListSchema {
     /// The role the listing was filtered to; absent when it lists every command.
     #[serde(skip_serializing_if = "Option::is_none")]
     role: Option<Role>,
     commands: Vec<ListEntry>,
 }
+
+/// `canon schema --errors`: every error code.
+#[derive(Serialize, schemars::JsonSchema)]
+pub struct ErrorList {
+    errors: Vec<spec::ErrorRow>,
+}
+
+/// `canon schema`'s report (`SchemaReport`): the command listing, one command's
+/// node of the generated spec, or the error registry.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(untagged)]
+pub enum SchemaReport<'a> {
+    Commands(ListSchema),
+    Command(&'a spec::Node),
+    Errors(ErrorList),
+}
+
+impl crate::json_out::Report for SchemaReport<'_> {}
 
 /// Why a command path did not resolve.
 #[derive(Debug, PartialEq, Eq)]
@@ -416,7 +436,7 @@ pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool, error: O
             let role = as_role;
             let commands = list_entries(&nodes, &under, role);
             if json {
-                crate::json_out::data("schema", &crate::json_out::untyped(serde_json::to_value(ListSchema { role, commands }).expect("schema serializes")));
+                crate::json_out::data("schema", &SchemaReport::Commands(ListSchema { role, commands }));
             } else {
                 let width = commands.iter().map(|c| c.command.len()).max().unwrap_or(0);
                 for c in &commands {
@@ -429,7 +449,7 @@ pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool, error: O
             let key = path.join(" ");
             let node = nodes.iter().find(|n| n.command == key).expect("a resolved leaf is a node of the tree it came from");
             if json {
-                crate::json_out::data("schema", &crate::json_out::untyped(serde_json::to_value(node).expect("schema serializes")));
+                crate::json_out::data("schema", &SchemaReport::Command(node));
             } else {
                 print_human(node);
             }
@@ -442,7 +462,7 @@ pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool, error: O
 fn print_errors(json: bool) {
     let entries = spec::error_rows();
     if json {
-        crate::json_out::data("schema", &crate::json_out::untyped(serde_json::json!({ "errors": entries })));
+        crate::json_out::data("schema", &SchemaReport::Errors(ErrorList { errors: entries }));
     } else {
         let width = entries.iter().map(|e| e.code.len()).max().unwrap_or(0);
         for e in &entries {
