@@ -127,15 +127,15 @@ fn context_outline_opens_with_a_status_pointer_and_leaves_json_unchanged() {
 
     let text = stdout(&run_canon(&["context", "--repo", &path]));
     assert!(
-        text.starts_with("status: run `canon status` for this repo's subjects, gaps and next commands\n\ncapabilityVersion: 5\n"),
+        text.starts_with("status: run `canon status` for this repo's subjects, gaps and next commands\n\ncapabilityVersion: 6\n"),
         "an enforcing policy gets the pointer alone:\n{text}"
     );
 
     let json: serde_json::Value = serde_json::from_slice(&run_canon(&["context", "--repo", &path, "--json"]).stdout).unwrap();
     let mut keys: Vec<&str> = json["data"].as_object().unwrap().keys().map(String::as_str).collect();
     keys.sort_unstable();
-    assert_eq!(keys, ["capabilityVersion", "cel", "enums", "joinKeys", "kinds", "policy", "review", "vocab"], "the header adds nothing to JSON");
-    assert_eq!(json["data"]["capabilityVersion"], 5);
+    assert_eq!(keys, ["capabilityVersion", "cel", "commands", "enums", "families", "joinKeys", "kinds", "policy", "review", "vocab"], "the header adds nothing to JSON");
+    assert_eq!(json["data"]["capabilityVersion"], 6);
 }
 
 /// 0.14 D7: with no policy file, the header's second line says the gate
@@ -152,7 +152,7 @@ fn context_header_warns_when_no_policy_enforces_coverage() {
             "status: run `canon status` for this repo's subjects, gaps and next commands",
             "warning: no policy: .canon/policy.yaml not found, so `canon gate check` requires no evidence, failure cases or review here",
             "",
-            "capabilityVersion: 5",
+            "capabilityVersion: 6",
         ],
         "{text}"
     );

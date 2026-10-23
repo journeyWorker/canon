@@ -58,7 +58,7 @@ pub fn report_schemas() -> Vec<ReportSchema> {
         entry::<brief_check::BriefShowReport>("brief show", "BriefShowReport"),
         entry::<brief_approve::Approved>("brief approve", "BriefApproveReport"),
         entry::<completion::CompletionReport>("completion", "CompletionReport"),
-        entry::<context::AuthoringSurface>("context", "ContextReport"),
+        entry::<context::ContextReport>("context", "ContextReport"),
         entry::<context_pack::ContextPack>("context-pack new", "ContextPackAddReport"),
         entry::<context_pack::ContextPack>("context-pack show", "ContextPackShowReport"),
         entry::<context_pack::VerifyReport>("context-pack verify", "ContextPackVerifyReport"),

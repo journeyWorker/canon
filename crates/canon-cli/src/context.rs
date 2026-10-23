@@ -14,7 +14,7 @@
 //!   `SchemaRegistry::load`/`PolicyResolution::resolve`), then hand the ONE
 //!   resolved value to either renderer — never a second resolution path per
 //!   output mode.
-//! - The `AuthoringSurface` BTreeMap-everywhere/sorted-array determinism
+//! - The `ContextReport` BTreeMap-everywhere/sorted-array determinism
 //!   contract (design D3) is `authoring_surface`'s own doc comment, ported
 //!   verbatim in spirit — ported from the donor's `authoring_surface`.
 //! - `render_outline` mirrors `context_outline`'s compact, per-section
@@ -38,15 +38,15 @@
 //!    `canon-vocab`'s own checker calls to validate a typed task-atom/
 //!    handoff-body file (`crate::gate`'s typed evidence path, task 4.4,
 //!    calls it again fresh at gate time for the identical reason) — so
-//!    [`AuthoringSurface::vocab`] can never diverge from what a typed
+//!    [`ContextReport::vocab`] can never diverge from what a typed
 //!    atom is actually checked against.
 //! 3. **Deterministic output** — every map below is a `BTreeMap` (key-sorted
 //!    by construction) and every array is sorted or built from an already-
 //!    sorted source; `render_json`/`render_outline` both read the one
-//!    resolved [`AuthoringSurface`] value, never re-resolving anything.
+//!    resolved [`ContextReport`] value, never re-resolving anything.
 //!    [`canon_vocab::CapabilitySnapshot`] holds the same discipline
 //!    end-to-end (every map a `BTreeMap`), so embedding it verbatim in
-//!    [`AuthoringSurface`] introduces no new non-determinism.
+//!    [`ContextReport`] introduces no new non-determinism.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -77,22 +77,28 @@ use crate::cli_error::CliError;
 /// `policy.spec_coverage`, `policy.evidence_binding`, and
 /// `review.requireReview` became typed JSON objects instead of one-line
 /// summaries.
-const CURRENT_CAPABILITY_VERSION: u32 = 5;
+///
+/// Bumped to `6` (0.28): `commands` (the command index, from the generated
+/// spec) and `families` joined the surface, the evidence kind is named
+/// `evidence` (what `--kind` takes), and each kind carries its schema link.
+const CURRENT_CAPABILITY_VERSION: u32 = 6;
 
 /// Resolution-time options beyond the repo root itself. Empty today —
 /// `canon context` takes only `--repo`/`--json`, and `--json` selects a
-/// RENDERER, never a resolution input (design D5) — kept as [`resolve_surface`]'s
-/// own parameter (mirroring `run_context`'s `providers`/`project` opts) so a
-/// future resolution-scoped flag (e.g. a `--kind` filter) never has to
-/// change `resolve_surface`'s call shape, only this struct.
+/// RENDERER, never a resolution input (design D5). `role` is `--as`: it
+/// narrows `commands` to that role's leaves and nothing else — `CANON_ROLE`
+/// never reaches the context.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct ContextOptions {}
+pub struct ContextOptions {
+    pub role: Option<crate::role::Role>,
+}
 
 /// The Hive-style partition layout one record kind's git-tier files follow —
 /// design D3's `partition: LayoutDescriptor`, built from
 /// [`RecordKind::partition_template`]/[`RecordKind::is_area_scoped`] (S1's
 /// own registry — never a second, hand-written layout table).
 #[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct PartitionLayout {
     /// The path template, e.g. `kind={kind}/{id}.json` or
     /// `kind={kind}/area={area}/{id}.json`.
@@ -104,6 +110,7 @@ pub struct PartitionLayout {
 /// One record kind's authoring shape: the fields an agent must supply, the
 /// partition it lands in, and its current schema version.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct KindSurface {
     /// This kind's CURRENT format generation, read straight from
     /// [`canon_model::RecordKind::schema_version`] — never a
@@ -117,6 +124,37 @@ pub struct KindSurface {
     /// whole top-level shape) mapped to whether it is required.
     pub envelope_fields: BTreeMap<String, bool>,
     pub partition: PartitionLayout,
+    /// The kind's JSON Schema, relative to the repository root of canon itself.
+    pub schema: String,
+}
+
+/// One artifact family (the files under `spec/`: ledger, divergences,
+/// inventory, feature provenance, policy) and the record kinds that share its
+/// name.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FamilySurface {
+    /// `FamilyKind::as_str()`.
+    pub family: String,
+    /// The family's JSON Schema, next to the record kinds' schemas.
+    pub schema: String,
+    /// The record kinds (as `--kind` names them) whose wire name is this family's.
+    pub record_kinds: Vec<String>,
+}
+
+/// One command a caller may run: a leaf of the generated spec, compact.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandSurface {
+    /// The canonical space-separated path, e.g. `evidence add`.
+    pub command: String,
+    /// `read`, `write` or `destructive`.
+    pub effect: &'static str,
+    /// The roles whose steps use the command; empty means humans only.
+    pub roles: Vec<crate::role::Role>,
+    pub about: Option<String>,
+    /// One runnable invocation.
+    pub example: Option<&'static str>,
 }
 
 /// One `policy.yaml` field's authoring-time shape: either a fixed value or
@@ -269,7 +307,7 @@ pub struct VocabularySurface {
 /// allowlist — folded in verbatim from the SAME `canon_policy::bindings_for`
 /// call `canon-policy`'s own write-time validator uses (`canon-policy`
 /// lib.rs's own forward reference: "S12's `resolve_surface`/
-/// `AuthoringSurface` gain a `policy` section populated by
+/// `ContextReport` gain a `policy` section populated by
 /// `bindings::bindings_for`"), so this can never disagree with what a
 /// `policy.yaml` CEL expression is actually checked against — invariant 2,
 /// extended to the CEL surface.
@@ -313,11 +351,17 @@ pub struct ReviewSurface {
 /// source (invariant 3).
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct AuthoringSurface {
+pub struct ContextReport {
     pub capability_version: u32,
-    /// By `RecordKind::as_str()` (S1's twelve closed kinds — S11's
-    /// registry, D1 of the S11 design).
+    /// By the name `--kind` takes ([`crate::query::kind_cli_name`]): every
+    /// `RecordKind::ALL` member. The wire string (`evidence_record`) stays
+    /// storage.
     pub kinds: BTreeMap<String, KindSurface>,
+    /// Every artifact family, in `FamilyKind::ALL` order.
+    pub families: Vec<FamilySurface>,
+    /// Every leaf of the command spec (filtered to the `--as` role's leaves
+    /// when one is given), sorted by command.
+    pub commands: Vec<CommandSurface>,
     /// By enum type name (the schema registry's own `$defs` — never a
     /// hand-maintained second list); each value is that enum's sorted
     /// member set.
@@ -332,7 +376,7 @@ pub struct AuthoringSurface {
     pub vocab: VocabularySurface,
     /// Issue #2's review vocabulary and requirement ([`ReviewSurface`]).
     pub review: ReviewSurface,
-    /// S13 5.1/5.2/5.3 (design D6): by `RecordKind::as_str()`, the SAME
+    /// S13 5.1/5.2/5.3 (design D6): by the same kind names, the SAME
     /// key set `kinds` uses — the CEL binding surface (`record.<field>`
     /// types + allowlisted functions) `policy.yaml`'s own write-time
     /// validator checks a CEL expression against, never a second
@@ -346,7 +390,7 @@ pub struct AuthoringSurface {
     pub policy_warning: Option<String>,
 }
 
-impl Report for AuthoringSurface {}
+impl Report for ContextReport {}
 
 /// `--repo <dir>` root resolution (design D7, task 1.4): a bare `canon
 /// context` (`--repo` omitted — clap's `default_value = "."`) or an
@@ -450,7 +494,7 @@ pub fn resolve_canon_yaml(repo: &Path) -> PathBuf {
 /// Phase 1 (design D1): resolve the project's schema registry + policy
 /// exactly as `canon fmt`/`canon gate` do — [`SchemaRegistry::load`] +
 /// [`PolicyResolution::resolve`] and NOTHING else (invariant 2) — then fold
-/// the result into one [`AuthoringSurface`] value. Never touches a corpus
+/// the result into one [`ContextReport`] value. Never touches a corpus
 /// (no `canon fmt` walk, no `canon gate` evidence read — invariant 1);
 /// infallible, matching `run_context`'s own "parse + fold exactly as
 /// `compile` does ... `fold_env` is pure/total" contract (ported from
@@ -463,7 +507,7 @@ pub fn resolve_canon_yaml(repo: &Path) -> PathBuf {
 /// root argument (`canon fmt`'s `root`, `canon gate`'s
 /// `GateCtx::from_repo`) is likewise handed an already-resolved path, not
 /// a bare CLI flag.
-pub fn resolve_surface(repo: &Path, _opts: ContextOptions) -> AuthoringSurface {
+pub fn resolve_surface(repo: &Path, opts: ContextOptions) -> ContextReport {
     // Invariant 2: the one shared registry call every command uses.
     let registry = SchemaRegistry::load();
     // Invariant 2: the one shared policy-resolution call every command
@@ -478,9 +522,11 @@ pub fn resolve_surface(repo: &Path, _opts: ContextOptions) -> AuthoringSurface {
     let kinds = collect_kinds(&registry);
     let review = summarize_review(&policy, &kinds);
 
-    AuthoringSurface {
+    ContextReport {
         capability_version: CURRENT_CAPABILITY_VERSION,
         kinds,
+        families: collect_families(),
+        commands: collect_commands(opts.role),
         enums: collect_enums(&registry),
         join_keys: collect_join_keys(),
         policy: summarize_policy(&policy),
@@ -509,7 +555,7 @@ fn summarize_review(policy: &PolicyResolution, kinds: &BTreeMap<String, KindSurf
     ReviewSurface {
         finding_severities: crate::finding::SEVERITY_VALUES.iter().map(|s| s.to_string()).collect(),
         finding_dispositions: crate::finding::DISPOSITION_VALUES.iter().map(|s| s.to_string()).collect(),
-        review_fields: kinds.get(canon_model::RecordKind::Review.as_str()).map(|k| k.envelope_fields.clone()).unwrap_or_default(),
+        review_fields: kinds.get(crate::query::kind_cli_name(canon_model::RecordKind::Review)).map(|k| k.envelope_fields.clone()).unwrap_or_default(),
         require_review,
     }
 }
@@ -599,9 +645,45 @@ fn collect_kinds(registry: &SchemaRegistry) -> BTreeMap<String, KindSurface> {
             .map(|props| props.keys().map(|name| (name.clone(), required.contains(name.as_str()))).collect())
             .unwrap_or_default();
         let partition = PartitionLayout { template: kind.partition_template().to_string(), area_scoped: kind.is_area_scoped() };
-        kinds.insert(kind.as_str().to_string(), KindSurface { schema_version: kind.schema_version(), envelope_fields, partition });
+        let schema = format!("{SCHEMA_DIR}/{}.schema.json", kind.as_str());
+        kinds.insert(crate::query::kind_cli_name(kind).to_string(), KindSurface { schema_version: kind.schema_version(), envelope_fields, partition, schema });
     }
     kinds
+}
+
+/// Where canon's own JSON Schemas live, for the `schema` links.
+const SCHEMA_DIR: &str = "crates/canon-model/schemas";
+
+/// `families`: every [`canon_model::family::FamilyKind`], with the record
+/// kinds that carry its name (`run`, `review` and `divergence` are both).
+fn collect_families() -> Vec<FamilySurface> {
+    use canon_model::family::FamilyKind;
+    FamilyKind::ALL
+        .iter()
+        .map(|family| FamilySurface {
+            family: family.as_str().to_string(),
+            schema: format!("{SCHEMA_DIR}/family-{}.schema.json", family.as_str()),
+            record_kinds: canon_model::RecordKind::ALL.iter().filter(|k| k.as_str() == family.as_str()).map(|k| crate::query::kind_cli_name(*k).to_string()).collect(),
+        })
+        .collect()
+}
+
+/// `commands`: the leaves of the generated spec ([`crate::spec::nodes`]), so
+/// the index can never name a command the parser lacks. `role` keeps only the
+/// leaves that role's steps use.
+fn collect_commands(role: Option<crate::role::Role>) -> Vec<CommandSurface> {
+    let mut root = crate::cli::command();
+    root.build();
+    crate::spec::nodes(&root)
+        .into_iter()
+        .filter_map(|node| {
+            let leaf = node.leaf?;
+            if role.is_some_and(|r| !leaf.roles.contains(&r)) {
+                return None;
+            }
+            Some(CommandSurface { command: node.command, effect: leaf.effect.as_str(), roles: leaf.roles, about: node.about, example: leaf.examples.first().copied() })
+        })
+        .collect()
 }
 
 /// `enums` (design D3/task 2.3): every enum-shaped `$defs` entry across
@@ -646,7 +728,7 @@ fn collect_cel(registry: &SchemaRegistry) -> BTreeMap<String, CelSurface> {
             .collect();
         let functions: Vec<String> =
             bindings.callable_function_names().into_iter().filter_map(|name| bindings.function(&name).map(ToString::to_string)).collect();
-        cel.insert(kind.as_str().to_string(), CelSurface { fields, functions });
+        cel.insert(crate::query::kind_cli_name(kind).to_string(), CelSurface { fields, functions });
     }
     cel
 }
@@ -757,18 +839,18 @@ fn summarize_field<T: Serialize>(field: &PolicyField<T>) -> PolicyFieldSurface {
 /// branch (ported from the donor's `run_context`). Every leaf
 /// value that could plausibly fail to serialize is already normalized by
 /// [`summarize_field`], so the fallback below is defensive-only.
-pub fn render_json(surface: &AuthoringSurface) -> String {
+pub fn render_json(surface: &ContextReport) -> String {
     serde_json::to_string_pretty(surface).unwrap_or_else(|e| format!("{{\"error\": \"failed to serialize authoring surface: {e}\"}}"))
 }
 
 /// [`render_json`] keeping only the named top-level sections (`--fields`).
-pub fn render_json_fields(surface: &AuthoringSurface, fields: &[String]) -> String {
+pub fn render_json_fields(surface: &ContextReport, fields: &[String]) -> String {
     let shown = serde_json::to_value(surface).and_then(|value| serde_json::to_string_pretty(&crate::paging::project(&value, fields)));
     shown.unwrap_or_else(|e| format!("{{\"error\": \"failed to serialize authoring surface: {e}\"}}"))
 }
 
 /// The top-level sections of the `--json` surface, which `--fields` may name.
-pub const SURFACE_FIELDS: [&str; 8] = ["capabilityVersion", "kinds", "enums", "joinKeys", "policy", "vocab", "review", "cel"];
+pub const SURFACE_FIELDS: [&str; 10] = ["capabilityVersion", "kinds", "families", "commands", "enums", "joinKeys", "policy", "vocab", "review", "cel"];
 
 /// Phase 2, default mode (design D5): a compact, per-section outline — name
 /// counts + name lists, then one indented summary line per entry — for
@@ -777,119 +859,152 @@ pub const SURFACE_FIELDS: [&str; 8] = ["capabilityVersion", "kinds", "enums", "j
 /// status` (this outline says what CAN be authored, never where the repo
 /// stands) and, when no `spec_coverage` section is in force, the policy
 /// warning, then a blank line before `capabilityVersion:`.
-pub fn render_outline(surface: &AuthoringSurface) -> String {
+pub fn render_outline(surface: &ContextReport, fields: Option<&[String]>) -> String {
+    let want = |name: &str| fields.is_none_or(|f| f.iter().any(|x| x == name));
     let mut out = String::new();
     let _ = writeln!(out, "status: run `canon status` for this repo's subjects, gaps and next commands");
     if let Some(warning) = &surface.policy_warning {
         let _ = writeln!(out, "warning: {warning}");
     }
     let _ = writeln!(out);
-    let _ = writeln!(out, "capabilityVersion: {}", surface.capability_version);
-
-    let _ = writeln!(out, "kinds ({}): {}", surface.kinds.len(), surface.kinds.keys().cloned().collect::<Vec<_>>().join(", "));
-    for (name, kind) in &surface.kinds {
-        let _ = writeln!(
-            out,
-            "  {name}: schema={} fields={} partition={}{}",
-            kind.schema_version,
-            kind.envelope_fields.len(),
-            kind.partition.template,
-            if kind.partition.area_scoped { " [area-scoped]" } else { "" },
-        );
+    if want("capabilityVersion") {
+        let _ = writeln!(out, "capabilityVersion: {}", surface.capability_version);
     }
 
-    let _ = writeln!(out, "enums ({}): {}", surface.enums.len(), surface.enums.keys().cloned().collect::<Vec<_>>().join(", "));
-    for (name, members) in &surface.enums {
-        let _ = writeln!(out, "  {name}: {}", members.join(", "));
-    }
-
-    let _ = writeln!(out, "joinKeys ({}): {}", surface.join_keys.len(), surface.join_keys.keys().cloned().collect::<Vec<_>>().join(", "));
-    for (key, grammar) in &surface.join_keys {
-        let _ = writeln!(out, "  {key}: {grammar}");
-    }
-
-    let _ = writeln!(out, "policy:");
-    write_field_map(&mut out, "trust_required", &surface.policy.trust_required);
-    write_field_map(&mut out, "trust_sample", &surface.policy.trust_sample);
-    let _ = writeln!(
-        out,
-        "  staleness: max_commits_behind={} surface_scoped={}",
-        render_field_compact(&surface.policy.staleness.max_commits_behind),
-        render_field_compact(&surface.policy.staleness.surface_scoped),
-    );
-    write_field_map(&mut out, "risk_routing", &surface.policy.risk_routing);
-    let _ = writeln!(out, "  risk_tiers ({}):", surface.policy.risk_tiers.len());
-    for (name, tier) in &surface.policy.risk_tiers {
-        let _ = writeln!(
-            out,
-            "    {name}: rank={} paths={} effects={} min_human_approvals={}",
-            tier.rank,
-            tier.paths.join(","),
-            tier.effects.join(","),
-            tier.min_human_approvals
-        );
-    }
-    let _ = match &surface.policy.spec_coverage {
-        Some(section) => writeln!(out, "  spec_coverage: {}", section.outline()),
-        // Printed even when absent: "this repo has not opted in" is the
-        // fact an author most needs before writing a `.feature` file.
-        None => writeln!(out, "  spec_coverage: <absent — spec-corpus coverage is not enforced here>"),
-    };
-    if let Some(section) = &surface.policy.evidence_binding {
-        let _ = writeln!(out, "  experimental.evidence_binding: {}", section.outline());
-    }
-    let _ = writeln!(out, "  clean: {}", surface.policy.clean);
-    let _ = writeln!(out, "  diagnostics ({}):", surface.policy.diagnostics.len());
-    for diag in &surface.policy.diagnostics {
-        let _ = writeln!(out, "    {diag}");
-    }
-    let _ = writeln!(out, "review:");
-    let _ = writeln!(out, "  findingSeverities: {}", surface.review.finding_severities.join(", "));
-    let _ = writeln!(out, "  findingDispositions: {}", surface.review.finding_dispositions.join(", "));
-    let fields: Vec<String> = surface.review.review_fields.iter().map(|(name, required)| format!("{name}{}", if *required { "*" } else { "" })).collect();
-    let _ = writeln!(out, "  reviewFields: {}", fields.join(", "));
-    let _ = match &surface.review.require_review {
-        Some(rr) => writeln!(out, "  require_review: {}", require_review_line(&rr.scope, rr.distinct_actor, rr.block_on_findings)),
-        None => writeln!(out, "  require_review: <absent — review is not required before a subject is claimed done>"),
-    };
-    let _ = writeln!(out, "vocab:");
-    let _ = writeln!(
-        out,
-        "  directives ({}): {}",
-        surface.vocab.snapshot.directives.len(),
-        surface.vocab.snapshot.directives.keys().cloned().collect::<Vec<_>>().join(", ")
-    );
-    for (tag, decl) in &surface.vocab.snapshot.directives {
-        let attrs: Vec<String> = decl.attrs.iter().map(|a| format!("{}{}", a.name, if a.required { "*" } else { "" })).collect();
-        let _ = writeln!(out, "    ::{tag}: {}", attrs.join(", "));
-    }
-    let _ = writeln!(
-        out,
-        "  enums ({}): {}",
-        surface.vocab.snapshot.enums.len(),
-        surface.vocab.snapshot.enums.keys().cloned().collect::<Vec<_>>().join(", ")
-    );
-    for (name, members) in &surface.vocab.snapshot.enums {
-        let _ = writeln!(out, "    {name}: {}", members.join(", "));
-    }
-    let _ = writeln!(
-        out,
-        "  evidenceKinds ({}): {}",
-        surface.vocab.snapshot.evidence_kinds.len(),
-        surface.vocab.snapshot.evidence_kinds.join(", ")
-    );
-    let _ = writeln!(out, "  diagnostics ({}):", surface.vocab.diagnostics.len());
-    for diag in &surface.vocab.diagnostics {
-        let _ = writeln!(out, "    {diag}");
-    }
-    let _ = writeln!(out, "cel:");
-    for (kind, cel) in &surface.cel {
-        let _ = writeln!(out, "  {kind}:");
-        let _ = writeln!(out, "    fields ({}): {}", cel.fields.len(), cel.fields.keys().cloned().collect::<Vec<_>>().join(", "));
-        for (field, ty) in &cel.fields {
-            let _ = writeln!(out, "      {field}: {ty}");
+    if want("kinds") {
+        let _ = writeln!(out, "kinds ({}): {}", surface.kinds.len(), surface.kinds.keys().cloned().collect::<Vec<_>>().join(", "));
+        for (name, kind) in &surface.kinds {
+            let _ = writeln!(
+                out,
+                "  {name}: schema={} fields={} partition={}{}",
+                kind.schema_version,
+                kind.envelope_fields.len(),
+                kind.partition.template,
+                if kind.partition.area_scoped { " [area-scoped]" } else { "" },
+            );
         }
-        let _ = writeln!(out, "    functions ({}): {}", cel.functions.len(), cel.functions.join(", "));
+    }
+
+    if want("families") {
+        let _ = writeln!(out, "families ({}):", surface.families.len());
+        for family in &surface.families {
+            let _ = writeln!(out, "  {}: schema={} recordKinds={}", family.family, family.schema, family.record_kinds.join(","));
+        }
+    }
+    if want("commands") {
+        let _ = writeln!(out, "commands ({}):", surface.commands.len());
+        let width = surface.commands.iter().map(|c| c.command.len()).max().unwrap_or(0);
+        for c in &surface.commands {
+            let _ = writeln!(out, "  {:<width$}  {:<11} {}", c.command, c.effect, c.about.as_deref().unwrap_or(""));
+        }
+    }
+    if want("enums") {
+        let _ = writeln!(out, "enums ({}): {}", surface.enums.len(), surface.enums.keys().cloned().collect::<Vec<_>>().join(", "));
+        for (name, members) in &surface.enums {
+            let _ = writeln!(out, "  {name}: {}", members.join(", "));
+        }
+    }
+
+    if want("joinKeys") {
+        let _ = writeln!(out, "joinKeys ({}): {}", surface.join_keys.len(), surface.join_keys.keys().cloned().collect::<Vec<_>>().join(", "));
+        for (key, grammar) in &surface.join_keys {
+            let _ = writeln!(out, "  {key}: {grammar}");
+        }
+    }
+
+    if want("policy") {
+        let _ = writeln!(out, "policy:");
+        write_field_map(&mut out, "trust_required", &surface.policy.trust_required);
+        write_field_map(&mut out, "trust_sample", &surface.policy.trust_sample);
+        let _ = writeln!(
+            out,
+            "  staleness: max_commits_behind={} surface_scoped={}",
+            render_field_compact(&surface.policy.staleness.max_commits_behind),
+            render_field_compact(&surface.policy.staleness.surface_scoped),
+        );
+        write_field_map(&mut out, "risk_routing", &surface.policy.risk_routing);
+        let _ = writeln!(out, "  risk_tiers ({}):", surface.policy.risk_tiers.len());
+        for (name, tier) in &surface.policy.risk_tiers {
+            let _ = writeln!(
+                out,
+                "    {name}: rank={} paths={} effects={} min_human_approvals={}",
+                tier.rank,
+                tier.paths.join(","),
+                tier.effects.join(","),
+                tier.min_human_approvals
+            );
+        }
+        let _ = match &surface.policy.spec_coverage {
+            Some(section) => writeln!(out, "  spec_coverage: {}", section.outline()),
+            // Printed even when absent: "this repo has not opted in" is the
+            // fact an author most needs before writing a `.feature` file.
+            None => writeln!(out, "  spec_coverage: <absent — spec-corpus coverage is not enforced here>"),
+        };
+        if let Some(section) = &surface.policy.evidence_binding {
+            let _ = writeln!(out, "  experimental.evidence_binding: {}", section.outline());
+        }
+        let _ = writeln!(out, "  clean: {}", surface.policy.clean);
+        let _ = writeln!(out, "  diagnostics ({}):", surface.policy.diagnostics.len());
+        for diag in &surface.policy.diagnostics {
+            let _ = writeln!(out, "    {diag}");
+        }
+    }
+
+    if want("review") {
+        let _ = writeln!(out, "review:");
+        let _ = writeln!(out, "  findingSeverities: {}", surface.review.finding_severities.join(", "));
+        let _ = writeln!(out, "  findingDispositions: {}", surface.review.finding_dispositions.join(", "));
+        let fields: Vec<String> = surface.review.review_fields.iter().map(|(name, required)| format!("{name}{}", if *required { "*" } else { "" })).collect();
+        let _ = writeln!(out, "  reviewFields: {}", fields.join(", "));
+        let _ = match &surface.review.require_review {
+            Some(rr) => writeln!(out, "  require_review: {}", require_review_line(&rr.scope, rr.distinct_actor, rr.block_on_findings)),
+            None => writeln!(out, "  require_review: <absent — review is not required before a subject is claimed done>"),
+        };
+    }
+
+    if want("vocab") {
+        let _ = writeln!(out, "vocab:");
+        let _ = writeln!(
+            out,
+            "  directives ({}): {}",
+            surface.vocab.snapshot.directives.len(),
+            surface.vocab.snapshot.directives.keys().cloned().collect::<Vec<_>>().join(", ")
+        );
+        for (tag, decl) in &surface.vocab.snapshot.directives {
+            let attrs: Vec<String> = decl.attrs.iter().map(|a| format!("{}{}", a.name, if a.required { "*" } else { "" })).collect();
+            let _ = writeln!(out, "    ::{tag}: {}", attrs.join(", "));
+        }
+        let _ = writeln!(
+            out,
+            "  enums ({}): {}",
+            surface.vocab.snapshot.enums.len(),
+            surface.vocab.snapshot.enums.keys().cloned().collect::<Vec<_>>().join(", ")
+        );
+        for (name, members) in &surface.vocab.snapshot.enums {
+            let _ = writeln!(out, "    {name}: {}", members.join(", "));
+        }
+        let _ = writeln!(
+            out,
+            "  evidenceKinds ({}): {}",
+            surface.vocab.snapshot.evidence_kinds.len(),
+            surface.vocab.snapshot.evidence_kinds.join(", ")
+        );
+        let _ = writeln!(out, "  diagnostics ({}):", surface.vocab.diagnostics.len());
+        for diag in &surface.vocab.diagnostics {
+            let _ = writeln!(out, "    {diag}");
+        }
+    }
+
+    if want("cel") {
+        let _ = writeln!(out, "cel:");
+        for (kind, cel) in &surface.cel {
+            let _ = writeln!(out, "  {kind}:");
+            let _ = writeln!(out, "    fields ({}): {}", cel.fields.len(), cel.fields.keys().cloned().collect::<Vec<_>>().join(", "));
+            for (field, ty) in &cel.fields {
+                let _ = writeln!(out, "      {field}: {ty}");
+            }
+            let _ = writeln!(out, "    functions ({}): {}", cel.functions.len(), cel.functions.join(", "));
+        }
     }
 
     out
@@ -953,9 +1068,9 @@ pub fn selftest() -> Result<usize, Vec<String>> {
     if failures.is_empty() { Ok(passed) } else { Err(failures) }
 }
 
-fn check_json_outline_agreement(surface: &AuthoringSurface) -> Result<(), String> {
+fn check_json_outline_agreement(surface: &ContextReport) -> Result<(), String> {
     let json: serde_json::Value = serde_json::from_str(&render_json(surface)).map_err(|e| e.to_string())?;
-    let outline = render_outline(surface);
+    let outline = render_outline(surface, None);
     for name in surface.kinds.keys() {
         if json["kinds"].get(name).is_none() {
             return Err(format!("JSON missing kind `{name}`"));
@@ -1030,7 +1145,7 @@ mod tests {
         let dir = fixture_repo(Some("trust_sample:\n  p1: 0.2\n"));
         let surface = resolve_surface(dir.path(), ContextOptions::default());
         let json: serde_json::Value = serde_json::from_str(&render_json(&surface)).unwrap();
-        let outline = render_outline(&surface);
+        let outline = render_outline(&surface, None);
 
         for name in surface.kinds.keys() {
             assert!(json["kinds"].get(name).is_some(), "JSON missing kind `{name}`");
@@ -1090,7 +1205,7 @@ mod tests {
         assert_eq!(surface.cel.keys().collect::<Vec<_>>(), surface.kinds.keys().collect::<Vec<_>>(), "cel must cover the SAME kind set as `kinds`");
         for kind in registry.kinds() {
             let expected = canon_policy::bindings_for(kind, &registry);
-            let actual = &surface.cel[kind.as_str()];
+            let actual = &surface.cel[crate::query::kind_cli_name(kind)];
 
             let expected_fields: BTreeMap<String, String> = expected
                 .field_names()
@@ -1120,7 +1235,7 @@ mod tests {
         let dir = fixture_repo(None);
         let surface = resolve_surface(dir.path(), ContextOptions::default());
         let json: serde_json::Value = serde_json::from_str(&render_json(&surface)).unwrap();
-        let outline = render_outline(&surface);
+        let outline = render_outline(&surface, None);
 
         assert!(!surface.cel.is_empty(), "fixture expectation: at least one kind's cel surface resolved");
         for (kind, cel) in &surface.cel {
@@ -1217,7 +1332,7 @@ mod tests {
         seed_vocab(dir.path());
         let surface = resolve_surface(dir.path(), ContextOptions::default());
         let json: serde_json::Value = serde_json::from_str(&render_json(&surface)).unwrap();
-        let outline = render_outline(&surface);
+        let outline = render_outline(&surface, None);
 
         for tag in surface.vocab.snapshot.directives.keys() {
             assert!(json["vocab"]["snapshot"]["directives"].get(tag).is_some(), "JSON missing vocab directive `{tag}`");
@@ -1254,7 +1369,7 @@ mod tests {
         assert_eq!(json["policy"]["risk_tiers"]["high"]["paths"][0], "src/auth/**");
         assert_eq!(json["policy"]["risk_tiers"]["high"]["effects"][0], "secret-access");
         assert_eq!(json["policy"]["risk_tiers"]["high"]["min_human_approvals"], 1);
-        let outline = render_outline(&surface);
+        let outline = render_outline(&surface, None);
         assert!(outline.contains("risk_tiers (1):"));
         assert!(outline.contains("high: rank=3"));
 
@@ -1262,7 +1377,7 @@ mod tests {
         let absent_surface = resolve_surface(absent.path(), ContextOptions::default());
         let absent_json: serde_json::Value = serde_json::from_str(&render_json(&absent_surface)).unwrap();
         assert_eq!(absent_json["policy"]["risk_tiers"], serde_json::json!({}));
-        assert!(render_outline(&absent_surface).contains("risk_tiers (0):"));
+        assert!(render_outline(&absent_surface, None).contains("risk_tiers (0):"));
     }
 
     /// A broken `spec_coverage` section must read as INVALID in the
@@ -1276,7 +1391,7 @@ mod tests {
         let section = surface.policy.spec_coverage.as_ref().expect("a present section is never reported absent");
         assert!(matches!(section, SpecCoverageSurface::Invalid { invalid } if invalid.contains("Not-A-Case")), "{section:?}");
         assert!(!surface.policy.clean, "a poisoned section makes the policy unclean");
-        assert!(render_outline(&surface).contains("spec_coverage: INVALID — "));
+        assert!(render_outline(&surface, None).contains("spec_coverage: INVALID — "));
         let json: serde_json::Value = serde_json::from_str(&render_json(&surface)).unwrap();
         let invalid = json["policy"]["spec_coverage"].as_object().expect("an invalid section is an object");
         assert_eq!(invalid.keys().collect::<Vec<_>>(), ["invalid"]);
@@ -1285,7 +1400,7 @@ mod tests {
 
         let valid = fixture_repo(Some("spec_coverage:\n  require_evidence: true\n  exclude_lanes: [process]\n  require_cases: [failure]\n"));
         let surface = resolve_surface(valid.path(), ContextOptions::default());
-        assert!(render_outline(&surface).contains("\n  spec_coverage: require_evidence=true scope=<every scenario> exclude_lanes=process require_cases=failure\n"));
+        assert!(render_outline(&surface, None).contains("\n  spec_coverage: require_evidence=true scope=<every scenario> exclude_lanes=process require_cases=failure\n"));
     }
 
     /// D4: `spec_coverage`, `evidence_binding`, and `review.requireReview`
@@ -1299,7 +1414,7 @@ mod tests {
         let surface = resolve_surface(dir.path(), ContextOptions::default());
         assert!(surface.policy.clean, "{:?}", surface.policy.diagnostics);
         let json: serde_json::Value = serde_json::from_str(&render_json(&surface)).unwrap();
-        assert_eq!(json["capabilityVersion"], 5);
+        assert_eq!(json["capabilityVersion"], 6);
         assert_eq!(
             json["policy"]["spec_coverage"],
             serde_json::json!({
@@ -1316,7 +1431,7 @@ mod tests {
         );
         assert_eq!(json["review"]["requireReview"], serde_json::json!({"scope": ["verifying", "shipped"], "distinctActor": true, "blockOnFindings": true}));
 
-        let outline = render_outline(&surface);
+        let outline = render_outline(&surface, None);
         for line in [
             "  spec_coverage: require_evidence=true scope=building, verifying exclude_lanes=process require_cases=failure require_review=(scope=verifying, shipped distinct_actor=true block_on_findings=true)\n",
             "  experimental.evidence_binding: mode=warn strength=report case=failure lane=e2e, unit scope=verifying\n",
@@ -1339,7 +1454,7 @@ mod tests {
             })
         );
         assert_eq!(json["policy"]["evidence_binding"], serde_json::json!({"mode": "off", "strength": "artifact", "case": [], "lane": [], "scope": []}));
-        let outline = render_outline(&surface);
+        let outline = render_outline(&surface, None);
         assert!(outline.contains("\n  spec_coverage: require_evidence=false scope=<every scenario> require_review=(scope=<every scenario> distinct_actor=true block_on_findings=true)\n"), "{outline}");
         assert!(outline.contains("\n  experimental.evidence_binding: mode=off strength=artifact\n"), "{outline}");
     }
@@ -1352,7 +1467,7 @@ mod tests {
         let invalid = json["policy"]["evidence_binding"]["invalid"].as_str().expect("an invalid section is {\"invalid\": ...}");
         assert!(invalid.contains("`strict`"), "{invalid}");
         assert_eq!(json["policy"]["evidence_binding"].as_object().unwrap().len(), 1);
-        assert!(render_outline(&surface).contains(&format!("\n  experimental.evidence_binding: INVALID — {invalid}\n")));
+        assert!(render_outline(&surface, None).contains(&format!("\n  experimental.evidence_binding: INVALID — {invalid}\n")));
         assert!(json["policy"]["spec_coverage"].is_null());
 
         let absent = fixture_repo(Some("trust_required:\n  p1: human\n"));

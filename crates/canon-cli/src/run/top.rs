@@ -189,24 +189,24 @@ pub(super) fn run_init(repo: &std::path::Path, check_config: bool, options: crat
 /// via [`crate::context::resolve_repo_root`] (design D7, task 1.4) —
 /// the `--repo`-omitted/`--repo .` nearest-`canon.yaml` ancestor walk —
 /// before [`crate::context::resolve_surface`] ever reads it.
-pub(super) fn run_context(repo: &std::path::Path, json: bool, fields: Option<Vec<String>>) -> ExitCode {
+pub(super) fn run_context(repo: &std::path::Path, json: bool, fields: Option<Vec<String>>, role: Option<crate::role::Role>) -> ExitCode {
     if let Some(requested) = &fields {
         if let Err(e) = crate::paging::check_known("canon context", requested, &crate::context::SURFACE_FIELDS) {
             return ExitCode::from(e.emit("canon context", json) as u8);
         }
     }
     let repo = crate::context::resolve_repo_root(repo);
-    let surface = crate::context::resolve_surface(&repo, crate::context::ContextOptions::default());
+    let surface = crate::context::resolve_surface(&repo, crate::context::ContextOptions { role });
     if json {
         match &fields {
             Some(requested) => {
                 let projected = crate::paging::project(&serde_json::to_value(&surface).expect("the surface serializes"), requested);
-                crate::json_out::data("context", &crate::json_out::Projected::<crate::context::AuthoringSurface>::new(projected));
+                crate::json_out::data("context", &crate::json_out::Projected::<crate::context::ContextReport>::new(projected));
             }
             None => crate::json_out::data("context", &surface),
         }
     } else {
-        print!("{}", crate::context::render_outline(&surface));
+        print!("{}", crate::context::render_outline(&surface, fields.as_deref()));
     }
     ExitCode::SUCCESS
 }

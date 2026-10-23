@@ -48,7 +48,7 @@ pub enum Effect {
 }
 
 impl Effect {
-    fn as_str(self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         match self {
             Effect::Read => "read",
             Effect::Write => "write",

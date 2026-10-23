@@ -12622,7 +12622,7 @@
           "type": "object"
         },
         "CelSurface": {
-          "description": "One record kind's CEL binding surface (S13 5.1/5.2/5.3, design D6):\nevery field a `policy.yaml` CEL expression bound to this kind may\nreference off the `record` variable, plus the fixed pure-function\nallowlist — folded in verbatim from the SAME `canon_policy::bindings_for`\ncall `canon-policy`'s own write-time validator uses (`canon-policy`\nlib.rs's own forward reference: \"S12's `resolve_surface`/\n`AuthoringSurface` gain a `policy` section populated by\n`bindings::bindings_for`\"), so this can never disagree with what a\n`policy.yaml` CEL expression is actually checked against — invariant 2,\nextended to the CEL surface.",
+          "description": "One record kind's CEL binding surface (S13 5.1/5.2/5.3, design D6):\nevery field a `policy.yaml` CEL expression bound to this kind may\nreference off the `record` variable, plus the fixed pure-function\nallowlist — folded in verbatim from the SAME `canon_policy::bindings_for`\ncall `canon-policy`'s own write-time validator uses (`canon-policy`\nlib.rs's own forward reference: \"S12's `resolve_surface`/\n`ContextReport` gain a `policy` section populated by\n`bindings::bindings_for`\"), so this can never disagree with what a\n`policy.yaml` CEL expression is actually checked against — invariant 2,\nextended to the CEL surface.",
           "properties": {
             "fields": {
               "additionalProperties": {
@@ -12642,6 +12642,47 @@
           "required": [
             "fields",
             "functions"
+          ],
+          "type": "object"
+        },
+        "CommandSurface": {
+          "description": "One command a caller may run: a leaf of the generated spec, compact.",
+          "properties": {
+            "about": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "command": {
+              "description": "The canonical space-separated path, e.g. `evidence add`.",
+              "type": "string"
+            },
+            "effect": {
+              "description": "`read`, `write` or `destructive`.",
+              "type": "string"
+            },
+            "example": {
+              "description": "One runnable invocation.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "roles": {
+              "description": "The roles whose steps use the command; empty means humans only.",
+              "items": {
+                "$ref": "#/$defs/Role"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "command",
+            "effect",
+            "roles",
+            "about",
+            "example"
           ],
           "type": "object"
         },
@@ -12715,10 +12756,36 @@
           ],
           "description": "`experimental.evidence_binding`, keyed like `policy.yaml` (`case`,\n`lane`, `scope`; each empty means unfiltered). Untagged like\n[`SpecCoverageSurface`]."
         },
+        "FamilySurface": {
+          "description": "One artifact family (the files under `spec/`: ledger, divergences,\ninventory, feature provenance, policy) and the record kinds that share its\nname.",
+          "properties": {
+            "family": {
+              "description": "`FamilyKind::as_str()`.",
+              "type": "string"
+            },
+            "recordKinds": {
+              "description": "The record kinds (as `--kind` names them) whose wire name is this family's.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "schema": {
+              "description": "The family's JSON Schema, next to the record kinds' schemas.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "family",
+            "schema",
+            "recordKinds"
+          ],
+          "type": "object"
+        },
         "KindSurface": {
           "description": "One record kind's authoring shape: the fields an agent must supply, the\npartition it lands in, and its current schema version.",
           "properties": {
-            "envelope_fields": {
+            "envelopeFields": {
               "additionalProperties": {
                 "type": "boolean"
               },
@@ -12728,7 +12795,11 @@
             "partition": {
               "$ref": "#/$defs/PartitionLayout"
             },
-            "schema_version": {
+            "schema": {
+              "description": "The kind's JSON Schema, relative to the repository root of canon itself.",
+              "type": "string"
+            },
+            "schemaVersion": {
               "description": "This kind's CURRENT format generation, read straight from\n[`canon_model::RecordKind::schema_version`] — never a\nhand-maintained copy, so `canon context` can never advertise a\ngeneration no writer stamps (`s38-evidence-bearing-memory`).",
               "format": "uint32",
               "minimum": 0,
@@ -12736,9 +12807,10 @@
             }
           },
           "required": [
-            "schema_version",
-            "envelope_fields",
-            "partition"
+            "schemaVersion",
+            "envelopeFields",
+            "partition",
+            "schema"
           ],
           "type": "object"
         },
@@ -12772,7 +12844,7 @@
         "PartitionLayout": {
           "description": "The Hive-style partition layout one record kind's git-tier files follow —\ndesign D3's `partition: LayoutDescriptor`, built from\n[`RecordKind::partition_template`]/[`RecordKind::is_area_scoped`] (S1's\nown registry — never a second, hand-written layout table).",
           "properties": {
-            "area_scoped": {
+            "areaScoped": {
               "description": "Whether `template` requires the `area={area}/` segment.",
               "type": "boolean"
             },
@@ -12783,7 +12855,7 @@
           },
           "required": [
             "template",
-            "area_scoped"
+            "areaScoped"
           ],
           "type": "object"
         },
@@ -13062,6 +13134,15 @@
           ],
           "type": "object"
         },
+        "Role": {
+          "enum": [
+            "planner",
+            "implementer",
+            "reviewer",
+            "orchestrator"
+          ],
+          "type": "string"
+        },
         "SpecCoverageSurface": {
           "anyOf": [
             {
@@ -13288,8 +13369,15 @@
           "additionalProperties": {
             "$ref": "#/$defs/CelSurface"
           },
-          "description": "S13 5.1/5.2/5.3 (design D6): by `RecordKind::as_str()`, the SAME\nkey set `kinds` uses — the CEL binding surface (`record.<field>`\ntypes + allowlisted functions) `policy.yaml`'s own write-time\nvalidator checks a CEL expression against, never a second\nindependently-derived projection (invariant 2).",
+          "description": "S13 5.1/5.2/5.3 (design D6): by the same kind names, the SAME\nkey set `kinds` uses — the CEL binding surface (`record.<field>`\ntypes + allowlisted functions) `policy.yaml`'s own write-time\nvalidator checks a CEL expression against, never a second\nindependently-derived projection (invariant 2).",
           "type": "object"
+        },
+        "commands": {
+          "description": "Every leaf of the command spec (filtered to the `--as` role's leaves\nwhen one is given), sorted by command.",
+          "items": {
+            "$ref": "#/$defs/CommandSurface"
+          },
+          "type": "array"
         },
         "enums": {
           "additionalProperties": {
@@ -13300,6 +13388,13 @@
           },
           "description": "By enum type name (the schema registry's own `$defs` — never a\nhand-maintained second list); each value is that enum's sorted\nmember set.",
           "type": "object"
+        },
+        "families": {
+          "description": "Every artifact family, in `FamilyKind::ALL` order.",
+          "items": {
+            "$ref": "#/$defs/FamilySurface"
+          },
+          "type": "array"
         },
         "joinKeys": {
           "additionalProperties": {
@@ -13312,7 +13407,7 @@
           "additionalProperties": {
             "$ref": "#/$defs/KindSurface"
           },
-          "description": "By `RecordKind::as_str()` (S1's twelve closed kinds — S11's\nregistry, D1 of the S11 design).",
+          "description": "By the name `--kind` takes ([`crate::query::kind_cli_name`]): every\n`RecordKind::ALL` member. The wire string (`evidence_record`) stays\nstorage.",
           "type": "object"
         },
         "policy": {
@@ -13330,6 +13425,8 @@
       "required": [
         "capabilityVersion",
         "kinds",
+        "families",
+        "commands",
         "enums",
         "joinKeys",
         "policy",
@@ -13337,7 +13434,7 @@
         "review",
         "cel"
       ],
-      "title": "AuthoringSurface",
+      "title": "ContextReport",
       "type": "object"
     },
     "IngestPlansReport": {

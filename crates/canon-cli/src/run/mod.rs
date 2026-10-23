@@ -40,6 +40,7 @@ pub fn run(cli: Cli) -> ExitCode {
     if matches!(cli.command, Command::Dashboard(_)) {
         entry::set_sigpipe(false);
     }
+    let declared_role = cli.declared_role;
     match cli.command {
         Command::Policy { action } => policy::run(action),
         Command::Demo { action } => demo::run(action),
@@ -78,7 +79,7 @@ pub fn run(cli: Cli) -> ExitCode {
             ExitCode::from(crate::retention::run_purge(&repo, kind, before, mode, json))
         }
         Command::Format(FormatArgs { dir, repo, json }) => run_fmt(dir.as_deref(), &repo, json),
-        Command::Context(ContextArgs { repo, json, fields }) => run_context(&repo, json, fields),
+        Command::Context(ContextArgs { repo, json, fields }) => run_context(&repo, json, fields, declared_role),
         Command::Status(StatusArgs { repo, json, fields }) => ExitCode::from(crate::status::run(&repo, json, fields.as_deref()) as u8),
         Command::Init(InitArgs { repo, check_config, no_agents_md, policy, no_policy, providers, language, json }) => {
             let policy = (!no_policy).then(|| policy.unwrap_or(crate::policy_level::PolicyLevel::Strict));
