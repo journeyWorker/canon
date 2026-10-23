@@ -1052,28 +1052,28 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
     };
 
     if args.json {
-        let rows: Vec<serde_json::Value> = findings
+        let rows: Vec<FindingRowView> = findings
             .iter()
             .map(|f| {
-                let row = serde_json::json!({
-                    "round": f.round,
-                    "seq": f.seq,
-                    "severity": severity_slug(f.severity),
-                    "disposition": f.disposition().as_str(),
-                    "reviewer": f.reviewer,
-                    "summary": f.summary,
-                    "resolution_sha": f.resolution_sha().map(|sha| sha.as_str()),
-                    "file_ref": f.file_ref,
-                    "reason": f.reason,
-                });
+                let row = FindingRow {
+                    round: f.round,
+                    seq: f.seq,
+                    severity: severity_slug(f.severity),
+                    disposition: f.disposition().as_str(),
+                    reviewer: &f.reviewer,
+                    summary: &f.summary,
+                    resolution_sha: f.resolution_sha().map(|sha| sha.as_str()),
+                    file_ref: f.file_ref.as_deref(),
+                    reason: f.reason.as_deref(),
+                };
                 match &args.fields {
-                    Some(fields) => crate::paging::project(&row, fields),
-                    None => row,
+                    Some(fields) => FindingRowView::Projected(row.project(fields)),
+                    None => FindingRowView::Full(row),
                 }
             })
             .collect();
-        let data = serde_json::json!({ "change_id": args.change_id.as_str(), "findings": rows });
-        crate::json_out::data_with_meta("finding list", &crate::json_out::untyped(data), meta.to_json());
+        let data = FindingListReport { change_id: args.change_id.as_str(), findings: rows };
+        crate::json_out::data_with_meta("finding list", &data, meta.to_json());
     } else if findings.is_empty() {
         let which = if args.open { "open findings" } else { "findings" };
         println!("canon finding list: no committed {which} on change `{}`", args.change_id);
@@ -1090,7 +1090,81 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
 }
 
 /// The JSON fields of one `finding list` row, which `--fields` may name.
-const LIST_FIELDS: [&str; 9] = ["round", "seq", "severity", "disposition", "reviewer", "summary", "resolution_sha", "file_ref", "reason"];
+const LIST_FIELDS: [&str; 9] = ["round", "seq", "severity", "disposition", "reviewer", "summary", "resolutionSha", "fileRef", "reason"];
+
+/// One row of `finding list`.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FindingRow<'a> {
+    round: u32,
+    seq: u32,
+    severity: &'static str,
+    disposition: &'static str,
+    reviewer: &'a str,
+    summary: &'a str,
+    resolution_sha: Option<&'a str>,
+    file_ref: Option<&'a str>,
+    reason: Option<&'a str>,
+}
+
+impl<'a> FindingRow<'a> {
+    /// The members `--fields` asked for.
+    fn project(self, fields: &[String]) -> ProjectedFindingRow<'a> {
+        let has = |name: &str| fields.iter().any(|f| f == name);
+        ProjectedFindingRow {
+            round: has("round").then_some(self.round),
+            seq: has("seq").then_some(self.seq),
+            severity: has("severity").then_some(self.severity),
+            disposition: has("disposition").then_some(self.disposition),
+            reviewer: has("reviewer").then_some(self.reviewer),
+            summary: has("summary").then_some(self.summary),
+            resolution_sha: has("resolutionSha").then_some(self.resolution_sha),
+            file_ref: has("fileRef").then_some(self.file_ref),
+            reason: has("reason").then_some(self.reason),
+        }
+    }
+}
+
+/// A `finding list` row cut to the `--fields` asked for.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectedFindingRow<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    round: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    seq: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    severity: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    disposition: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reviewer: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    summary: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    resolution_sha: Option<Option<&'a str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file_ref: Option<Option<&'a str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<Option<&'a str>>,
+}
+
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(untagged)]
+pub enum FindingRowView<'a> {
+    Full(FindingRow<'a>),
+    Projected(ProjectedFindingRow<'a>),
+}
+
+/// `canon finding list`'s report (`FindingListReport`); the page state travels in `meta`.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FindingListReport<'a> {
+    change_id: &'a str,
+    findings: Vec<FindingRowView<'a>>,
+}
+
+impl crate::json_out::Report for FindingListReport<'_> {}
 
 /// One header row and one row per finding, columns padded to their
 /// widest cell; the summary, last, is never padded and carries the

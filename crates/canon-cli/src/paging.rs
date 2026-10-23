@@ -58,7 +58,8 @@ impl Page {
 }
 
 /// What a page says about the rest of the result.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct PageMeta {
     pub returned: usize,
     /// Every record the command matched, across all pages.

@@ -329,30 +329,48 @@ pub fn format_human(outcome: &PluginSyncOutcome) -> String {
     out
 }
 
+/// One spec root of `canon plugin sync`'s report.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginSyncRootReport<'a> {
+    pub root_id: &'a str,
+    pub root: String,
+    pub overlay: &'a str,
+    pub candidates: usize,
+    pub written: usize,
+    pub deduped: usize,
+    pub errors: &'a [String],
+}
+
+/// `canon plugin sync`'s report (`PluginSyncReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginSyncReport<'a> {
+    pub plugin_id: &'a str,
+    pub clean: bool,
+    pub written: usize,
+    pub deduped: usize,
+    pub roots: Vec<PluginSyncRootReport<'a>>,
+}
+
+impl crate::json_out::Report for PluginSyncReport<'_> {}
+
 /// The `--json` data for [`PluginSyncOutcome`].
-pub fn format_json(outcome: &PluginSyncOutcome) -> serde_json::Value {
-    let roots: Vec<serde_json::Value> = outcome
+pub fn format_json(outcome: &PluginSyncOutcome) -> PluginSyncReport<'_> {
+    let roots = outcome
         .roots
         .iter()
-        .map(|root| {
-            serde_json::json!({
-                "rootId": root.root_id,
-                "root": root.root.display().to_string(),
-                "overlay": root.overlay,
-                "candidates": root.candidates,
-                "written": root.written,
-                "deduped": root.deduped,
-                "errors": root.errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
-            })
+        .map(|root| PluginSyncRootReport {
+            root_id: &root.root_id,
+            root: root.root.display().to_string(),
+            overlay: &root.overlay,
+            candidates: root.candidates,
+            written: root.written,
+            deduped: root.deduped,
+            errors: &root.errors,
         })
         .collect();
-    serde_json::json!({
-        "pluginId": outcome.plugin_id,
-        "clean": outcome.is_clean(),
-        "written": outcome.total_written(),
-        "deduped": outcome.total_deduped(),
-        "roots": roots,
-    })
+    PluginSyncReport { plugin_id: &outcome.plugin_id, clean: outcome.is_clean(), written: outcome.total_written(), deduped: outcome.total_deduped(), roots }
 }
 
 #[cfg(test)]

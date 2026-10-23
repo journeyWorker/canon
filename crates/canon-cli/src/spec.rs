@@ -82,7 +82,25 @@ pub fn env_var_names() -> impl Iterator<Item = &'static str> {
     ENV_VARS.iter().map(|v| v.name)
 }
 
+/// One JSON Schema document (draft 2020-12): the shape of a leaf's `--input` body.
 #[derive(Serialize)]
+#[serde(transparent)]
+pub struct InputSchema(pub Value);
+
+impl schemars::JsonSchema for InputSchema {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "InputSchema".into()
+    }
+
+    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": ["object", "boolean"],
+            "description": "A JSON Schema document (draft 2020-12)"
+        })
+    }
+}
+
+#[derive(Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum NodeKind {
     Leaf,
@@ -90,7 +108,7 @@ pub enum NodeKind {
 }
 
 /// One operand of a leaf.
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Operand {
     /// The clap id.
@@ -108,7 +126,7 @@ pub struct Operand {
 }
 
 /// How many values an operand takes; `max` is absent when unbounded.
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub struct Arity {
     pub min: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -116,7 +134,7 @@ pub struct Arity {
 }
 
 /// One option of a leaf (or a global one).
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OptionSpec {
     /// The long name, without `--`.
@@ -144,7 +162,7 @@ pub struct OptionSpec {
 }
 
 /// One output of a leaf: what it prints and the schema of that.
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Output {
     pub kind: OutputKind,
@@ -158,7 +176,7 @@ pub struct Output {
 }
 
 /// The part of a node only a leaf has.
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Leaf {
     pub effect: Effect,
@@ -179,12 +197,12 @@ pub struct Leaf {
     pub error_codes: Vec<&'static str>,
     pub outputs: Vec<Output>,
     /// JSON input documents of the leaf (`--input`).
-    pub inputs: Vec<Value>,
+    pub inputs: Vec<InputSchema>,
     pub examples: Vec<&'static str>,
 }
 
 /// One node of the command tree: a leaf, or a group that only holds children.
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Node {
     /// The canonical space-separated path, e.g. `evidence add`.
@@ -442,7 +460,7 @@ fn global_options(root: &Command) -> Vec<OptionSpec> {
 }
 
 /// One error code of the registry.
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub struct ErrorRow {
     pub code: &'static str,
     pub meaning: &'static str,

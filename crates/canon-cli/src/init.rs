@@ -351,7 +351,7 @@ struct InitLog {
     /// Whether [`InitLog::finish`] prints the JSON document; `canon demo init`
     /// runs `init` inside its own command and prints one of its own.
     emit_data: bool,
-    steps: Vec<serde_json::Value>,
+    steps: Vec<InitStep>,
 }
 
 impl InitLog {
@@ -361,16 +361,53 @@ impl InitLog {
 
     fn step(&mut self, step: &str, detail: impl Into<String>, line: String) {
         crate::say!(self.json, "{line}");
-        self.steps.push(serde_json::json!({ "step": step, "detail": detail.into() }));
+        self.steps.push(InitStep { step: step.to_string(), detail: detail.into() });
     }
 
     fn finish(self, repo: &Path) -> i32 {
         if self.emit_data {
-            crate::next::finish(repo, "init", &crate::next::Scope::Repo, false, self.json, &crate::json_out::untyped(serde_json::json!({ "steps": self.steps })));
+            crate::next::finish(repo, "init", &crate::next::Scope::Repo, false, self.json, &InitReport { steps: self.steps });
         }
         0
     }
 }
+
+/// One step `canon init` took.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InitStep {
+    pub step: String,
+    pub detail: String,
+}
+
+/// `canon init`'s report (`InitReport`): what it did, step by step.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InitReport {
+    pub steps: Vec<InitStep>,
+}
+
+impl crate::json_out::Report for InitReport {}
+
+/// One `canon.yaml` section `init --check-config` examined.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InitCheckSection {
+    pub section: String,
+    /// `pass`, `fail`, `warn` or `not-configured`.
+    pub status: String,
+    pub detail: String,
+}
+
+/// `canon init --check-config`'s report (`InitCheckReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InitCheckReport {
+    pub ok: bool,
+    pub sections: Vec<InitCheckSection>,
+}
+
+impl crate::json_out::Report for InitCheckReport {}
 
 /// What `canon init` writes besides `canon.yaml` (the opt-out flags).
 #[derive(Debug, Clone)]
@@ -821,23 +858,23 @@ pub fn run_check_config(repo: &Path, json: bool) -> i32 {
     }
 
     crate::say_raw!(json, "{report}");
-    let sections: Vec<serde_json::Value> = report
+    let sections: Vec<InitCheckSection> = report
         .lines()
         .filter_map(|line| {
             let (status, rest) = line.strip_prefix('[')?.split_once("] ")?;
             let section = rest.split([' ', ':']).next().unwrap_or(rest);
             let status = if status == "not configured" { "not-configured" } else { status };
-            Some(serde_json::json!({ "section": section, "status": status.to_ascii_lowercase(), "detail": rest }))
+            Some(InitCheckSection { section: section.to_string(), status: status.to_ascii_lowercase(), detail: rest.to_string() })
         })
         .collect();
-    let data = serde_json::json!({ "ok": all_ok, "sections": sections });
+    let data = InitCheckReport { ok: all_ok, sections };
     if all_ok {
         if json {
-            crate::json_out::data("init", &crate::json_out::untyped(data));
+            crate::json_out::data("init", &data);
         }
         0
     } else {
-        CliError::failed("CONFIG_UNREADABLE", "a present canon.yaml section fails its loader").hint("data.sections names each failing section").emit_with_data("canon init --check-config", json, &crate::json_out::untyped(data))
+        CliError::failed("CONFIG_UNREADABLE", "a present canon.yaml section fails its loader").hint("data.sections names each failing section").emit_with_data("canon init --check-config", json, &data)
     }
 }
 

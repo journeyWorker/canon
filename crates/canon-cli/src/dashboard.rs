@@ -54,7 +54,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use canon_model::paths;
-use serde_json::{json, Value};
+use serde_json::Value;
 
 use crate::cli_error::CliError;
 use crate::dashboard_briefs::{bad_request, Reply};
@@ -143,13 +143,53 @@ pub enum SnapshotState {
 }
 
 impl SnapshotState {
-    fn to_json(&self) -> Value {
+    fn status(&self) -> SnapshotStatus<'_> {
         match self {
-            SnapshotState::Ready => json!({ "available": true, "reason": null, "fix": null }),
-            SnapshotState::Unavailable { reason, fix } => json!({ "available": false, "reason": reason, "fix": fix }),
+            SnapshotState::Ready => SnapshotStatus { available: true, reason: None, fix: None },
+            SnapshotState::Unavailable { reason, fix } => SnapshotStatus { available: false, reason: Some(reason), fix: Some(fix) },
         }
     }
 }
+
+/// `canon dashboard --json`: where the dashboard serves (`DashboardReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardReport {
+    pub url: String,
+    pub briefs_url: String,
+    /// Where the app comes from: the embedded build, or a directory.
+    pub app: String,
+    pub snapshot: String,
+    pub snapshot_available: bool,
+}
+
+impl crate::json_out::Report for DashboardReport {}
+
+/// Whether the snapshot backs the panels page, and how to fix it when not.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SnapshotStatus<'a> {
+    pub available: bool,
+    pub reason: Option<&'a str>,
+    pub fix: Option<&'a str>,
+}
+
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AppStatus {
+    /// `embedded` or `directory`.
+    pub source: &'static str,
+}
+
+/// `GET /api/status` (`DashboardStatusReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardStatusReport<'a> {
+    pub snapshot: SnapshotStatus<'a>,
+    pub app: AppStatus,
+}
+
+impl crate::json_out::Report for DashboardStatusReport<'_> {}
 
 /// Regenerates `dir`'s snapshot unconditionally when `explicit` is
 /// false (the default scratch dir — module doc), else only when `dir`
@@ -382,8 +422,8 @@ fn handle_connection(stream: TcpStream, server: &Server) {
     }
     match (head.method.as_str(), head.path.as_str()) {
         ("GET", "/api/status") => {
-            let data = json!({ "snapshot": server.snapshot.to_json(), "app": { "source": if matches!(server.app, AppSource::Embedded(_)) { "embedded" } else { "directory" } } });
-            let body = crate::json_out::envelope("dashboard status", &crate::json_out::untyped(data));
+            let source = if matches!(server.app, AppSource::Embedded(_)) { "embedded" } else { "directory" };
+            let body = crate::json_out::envelope("dashboard status", &DashboardStatusReport { snapshot: server.snapshot.status(), app: AppStatus { source } });
             write_reply(&mut stream, &Reply { status: 200, body });
         }
         ("GET", "/api/briefs") => write_reply(&mut stream, &crate::dashboard_briefs::list(&server.repo)),

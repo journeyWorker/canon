@@ -284,7 +284,7 @@ pub struct SkillStatus {
 pub const FORMATTER_REWRITTEN: &str = "formatter-rewritten";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SkillsCheckReport {
+pub struct SkillsCheckOutcome {
     pub providers: Vec<Provider>,
     pub origin: ProviderOrigin,
     pub source_hash: String,
@@ -1658,7 +1658,7 @@ pub fn check(
     source_dir: &Path,
     target_dir: &Path,
     providers: Option<&str>,
-) -> Result<SkillsCheckReport, SkillsError> {
+) -> Result<SkillsCheckOutcome, SkillsError> {
     let selection = select_providers(target_dir, providers)?;
     let selected = selection.providers;
     let files = canonical_bundle(source_dir)?;
@@ -1692,7 +1692,7 @@ pub fn check(
     let outdated = actual
         .filter(|actual| actual.canon_version != expected.canon_version)
         .map(|actual| OutdatedLock { path: manifest_path(target_dir), installed_by: actual.canon_version });
-    Ok(SkillsCheckReport {
+    Ok(SkillsCheckOutcome {
         providers: selected,
         origin: selection.origin,
         source_hash: expected.source_hash,
@@ -1845,6 +1845,119 @@ pub fn resolve_source(explicit: Option<&Path>) -> PathBuf {
         .or_else(|| std::env::var_os(CANONICAL_SOURCE_ENV).map(PathBuf::from))
         .unwrap_or_else(|| PathBuf::from("canon/skills"))
 }
+
+/// One skill the legacy (pre-bundle) install wrote.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InstalledSkillEntry<'a> {
+    pub name: &'a str,
+    pub version: u64,
+    pub changed: bool,
+}
+
+/// What the legacy install (a source without `SKILL.src.md`) reports.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LegacyInstall<'a> {
+    pub skills: Vec<InstalledSkillEntry<'a>>,
+}
+
+/// An orphan the install pruned.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PrunedEntry {
+    pub path: String,
+    pub provider: &'static str,
+    pub reason: &'static str,
+}
+
+/// An orphan the install kept, with what to do by hand.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct KeptEntry {
+    pub path: String,
+    pub provider: &'static str,
+    pub reason: &'static str,
+    pub hint: String,
+}
+
+/// What the bundle install reports.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BundleInstall {
+    pub providers: Vec<&'static str>,
+    pub selection: String,
+    pub changed: bool,
+    pub config_written: Option<String>,
+    pub pruned: Vec<PrunedEntry>,
+    pub kept: Vec<KeptEntry>,
+    pub owned_paths: Vec<String>,
+}
+
+/// `canon skills install`'s report (`SkillsInstallReport`): the bundle install,
+/// or the legacy one for a source without `SKILL.src.md`.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(untagged)]
+pub enum SkillsInstallReport<'a> {
+    Bundle(BundleInstall),
+    Legacy(LegacyInstall<'a>),
+}
+
+impl crate::json_out::Report for SkillsInstallReport<'_> {}
+
+/// The state of one installed skill file.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillFileStatus {
+    pub path: String,
+    pub state: &'static str,
+    pub provider: &'static str,
+}
+
+/// An orphan `skills check` found.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OrphanEntry {
+    pub path: String,
+    pub provider: &'static str,
+    pub modified: bool,
+    pub reason: &'static str,
+    pub hint: String,
+}
+
+/// An install lock written by another canon version.
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct OutdatedEntry {
+    pub path: String,
+    pub installed_by: Option<String>,
+    pub message: String,
+}
+
+/// `canon skills check`'s report (`SkillsCheckReport`).
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillsCheckReport {
+    pub clean: bool,
+    pub providers: Vec<&'static str>,
+    pub selection: String,
+    pub manifest_ok: bool,
+    pub statuses: Vec<SkillFileStatus>,
+    pub orphans: Vec<OrphanEntry>,
+    pub remnants: Vec<String>,
+    pub outdated: Option<OutdatedEntry>,
+}
+
+impl crate::json_out::Report for SkillsCheckReport {}
+
+/// `canon skills doctor`'s report (`SkillsDoctorReport`).
+#[derive(Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillsDoctorReport<'a> {
+    pub lines: &'a [String],
+}
+
+impl crate::json_out::Report for SkillsDoctorReport<'_> {}
 
 #[cfg(test)]
 mod tests {

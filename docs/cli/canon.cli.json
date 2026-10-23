@@ -1375,8 +1375,8 @@
         {
           "kind": "stream",
           "report": "DashboardReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/DashboardReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -4113,8 +4113,8 @@
           "kind": "artifact",
           "mediaType": "application/json",
           "report": "ExportReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/ExportReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -4907,8 +4907,8 @@
         {
           "kind": "report",
           "report": "FindingListReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/FindingListReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -4999,8 +4999,8 @@
         {
           "kind": "report",
           "report": "FormatReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/FormatReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -5807,8 +5807,8 @@
         {
           "kind": "report",
           "report": "IngestSessionsReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/IngestSessionsReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -5981,8 +5981,8 @@
         {
           "kind": "report",
           "report": "InitReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/InitReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -6079,8 +6079,8 @@
         {
           "kind": "report",
           "report": "InventorySyncReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/InventorySyncReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -6778,8 +6778,8 @@
         {
           "kind": "report",
           "report": "PluginSyncReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/PluginSyncReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -7527,8 +7527,8 @@
         {
           "kind": "report",
           "report": "QueryReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/QueryReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -7630,8 +7630,8 @@
         {
           "kind": "report",
           "report": "RegimeShowReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/RegimeShowReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -7727,8 +7727,8 @@
         {
           "kind": "report",
           "report": "ReportBuildReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/ReportBuildReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -8711,8 +8711,8 @@
         {
           "kind": "report",
           "report": "SchemaReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/SchemaReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -8884,8 +8884,8 @@
         {
           "kind": "report",
           "report": "SkillsCheckReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/SkillsCheckReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -8970,8 +8970,8 @@
         {
           "kind": "report",
           "report": "SkillsDoctorReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/SkillsDoctorReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -9061,8 +9061,8 @@
         {
           "kind": "report",
           "report": "SkillsInstallReport",
-          "schemaRef": null,
-          "schemaVersion": null
+          "schemaRef": "#/schemas/SkillsInstallReport",
+          "schemaVersion": "1.0"
         }
       ],
       "path": [
@@ -13340,6 +13340,794 @@
       "title": "AuthoringSurface",
       "type": "object"
     },
+    "DashboardBriefsReport": {
+      "$defs": {
+        "BriefFinding": {
+          "description": "One finding of a pending brief, as the page shows it.",
+          "properties": {
+            "blocksApproval": {
+              "description": "Whether this finding stops an approval.",
+              "type": "boolean"
+            },
+            "hint": {
+              "type": "string"
+            },
+            "line": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "message": {
+              "description": "The excerpt the finding points at.",
+              "type": "string"
+            },
+            "rule": {
+              "type": "string"
+            },
+            "section": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "severity": {
+              "$ref": "#/$defs/Severity"
+            }
+          },
+          "required": [
+            "severity",
+            "rule",
+            "line",
+            "message",
+            "hint",
+            "section",
+            "blocksApproval"
+          ],
+          "type": "object"
+        },
+        "BriefSection": {
+          "description": "One marked section of a brief as a reader shows it: found by marker\n(never by heading text, so the `ko` headings read the same), with its\nheading and the body lines after it. Fenced code and HTML comments are\nnot part of a body, as in every other reading of the brief.",
+          "properties": {
+            "body": {
+              "description": "The body lines, a blank line between paragraphs.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "heading": {
+              "description": "The heading's text, `#` marks dropped.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "key": {
+              "type": "string"
+            },
+            "line": {
+              "description": "The marker's line.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "role": {
+              "type": "string"
+            },
+            "steps": {
+              "description": "The steps of the `flow` section; empty for any other.",
+              "items": {
+                "$ref": "#/$defs/FlowStep"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "key",
+            "role",
+            "heading",
+            "line",
+            "body",
+            "steps"
+          ],
+          "type": "object"
+        },
+        "Counts": {
+          "description": "The finding counts `canon status` shows.",
+          "properties": {
+            "advisories": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "blockers": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "blockers",
+            "advisories"
+          ],
+          "type": "object"
+        },
+        "FlowStep": {
+          "description": "One flow step of a brief: its id (`F1`), its text with the list marker\ndropped, and its line.",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "line": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "text",
+            "line"
+          ],
+          "type": "object"
+        },
+        "PendingBrief": {
+          "description": "One brief still waiting for the human's answer.",
+          "properties": {
+            "approvable": {
+              "type": "boolean"
+            },
+            "brief": {
+              "description": "The brief file, relative to the repo root.",
+              "type": "string"
+            },
+            "changeId": {
+              "type": "string"
+            },
+            "changedSinceApproval": {
+              "type": "boolean"
+            },
+            "counts": {
+              "$ref": "#/$defs/Counts"
+            },
+            "findings": {
+              "items": {
+                "$ref": "#/$defs/BriefFinding"
+              },
+              "type": "array"
+            },
+            "language": {
+              "type": "string"
+            },
+            "languageNote": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "languageSource": {
+              "type": "string"
+            },
+            "legacy": {
+              "type": "boolean"
+            },
+            "sections": {
+              "items": {
+                "$ref": "#/$defs/BriefSection"
+              },
+              "type": "array"
+            },
+            "sha256": {
+              "type": "string"
+            },
+            "subjects": {
+              "description": "The subjects that adopted the change.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "changeId",
+            "subjects",
+            "brief",
+            "text",
+            "sha256",
+            "language",
+            "languageSource",
+            "languageNote",
+            "changedSinceApproval",
+            "legacy",
+            "sections",
+            "findings",
+            "counts",
+            "approvable"
+          ],
+          "type": "object"
+        },
+        "Severity": {
+          "description": "A finding's severity.",
+          "enum": [
+            "blocker",
+            "advisory"
+          ],
+          "type": "string"
+        },
+        "UnreadableBrief": {
+          "description": "A brief the page could not read.",
+          "properties": {
+            "changeId": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "changeId",
+            "message"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:DashboardBriefsReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`GET /api/briefs` (`DashboardBriefsReport`).",
+      "properties": {
+        "briefs": {
+          "items": {
+            "$ref": "#/$defs/PendingBrief"
+          },
+          "type": "array"
+        },
+        "unreadable": {
+          "items": {
+            "$ref": "#/$defs/UnreadableBrief"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "briefs",
+        "unreadable"
+      ],
+      "title": "DashboardBriefsReport",
+      "type": "object"
+    },
+    "DashboardReport": {
+      "$id": "urn:canon:report:DashboardReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon dashboard --json`: where the dashboard serves (`DashboardReport`).",
+      "properties": {
+        "app": {
+          "description": "Where the app comes from: the embedded build, or a directory.",
+          "type": "string"
+        },
+        "briefsUrl": {
+          "type": "string"
+        },
+        "snapshot": {
+          "type": "string"
+        },
+        "snapshotAvailable": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "briefsUrl",
+        "app",
+        "snapshot",
+        "snapshotAvailable"
+      ],
+      "title": "DashboardReport",
+      "type": "object"
+    },
+    "DashboardStatusReport": {
+      "$defs": {
+        "AppStatus": {
+          "properties": {
+            "source": {
+              "description": "`embedded` or `directory`.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "source"
+          ],
+          "type": "object"
+        },
+        "SnapshotStatus": {
+          "description": "Whether the snapshot backs the panels page, and how to fix it when not.",
+          "properties": {
+            "available": {
+              "type": "boolean"
+            },
+            "fix": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "available",
+            "reason",
+            "fix"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:DashboardStatusReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`GET /api/status` (`DashboardStatusReport`).",
+      "properties": {
+        "app": {
+          "$ref": "#/$defs/AppStatus"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/SnapshotStatus"
+        }
+      },
+      "required": [
+        "snapshot",
+        "app"
+      ],
+      "title": "DashboardStatusReport",
+      "type": "object"
+    },
+    "ExportReport": {
+      "$defs": {
+        "ExportManifest": {
+          "description": "The `canon.retention.export` manifest: what `export` writes to stdout or\n`--output`, and what `--json` envelopes (without `meta`, which then travels\nin the envelope's `meta`).",
+          "properties": {
+            "after": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "before": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "contentDigests": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "meta": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PageMeta"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The page state; only in the manifest file or stdout document."
+            },
+            "recordCount": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "records": {
+              "items": {
+                "$ref": "#/$defs/ExportRecordView"
+              },
+              "type": "array"
+            },
+            "schema": {
+              "type": "string"
+            },
+            "sensitive": {
+              "type": "boolean"
+            },
+            "sensitiveRecords": {
+              "description": "Present only with `--include-sensitive`: the full records, verbatim.",
+              "items": {
+                "$ref": "#/$defs/LedgerRecord"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "sourceScope": {
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "schema",
+            "version",
+            "kind",
+            "sourceScope",
+            "before",
+            "after",
+            "recordCount",
+            "contentDigests",
+            "records",
+            "sensitive"
+          ],
+          "type": "object"
+        },
+        "ExportRecord": {
+          "description": "One exported record: identity and digest, never the content.",
+          "properties": {
+            "at": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "at",
+            "id",
+            "digest"
+          ],
+          "type": "object"
+        },
+        "ExportRecordView": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExportRecord"
+            },
+            {
+              "$ref": "#/$defs/ProjectedExportRecord"
+            }
+          ]
+        },
+        "ExportWritten": {
+          "description": "What `--json --output` returns: the file holds the manifest, this names it.",
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "output": {
+              "type": "string"
+            },
+            "recordCount": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "output",
+            "kind",
+            "recordCount"
+          ],
+          "type": "object"
+        },
+        "LedgerRecord": {
+          "description": "A ledger record, verbatim: it keeps its own schema (`crates/canon-model/schemas/<kind>.schema.json`), minus anything redacted or left out by `--fields`",
+          "type": "object"
+        },
+        "PageMeta": {
+          "description": "What a page says about the rest of the result.",
+          "properties": {
+            "hasMore": {
+              "type": "boolean"
+            },
+            "nextCursor": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "returned": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "total": {
+              "description": "Every record the command matched, across all pages.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "returned",
+            "total",
+            "hasMore",
+            "nextCursor"
+          ],
+          "type": "object"
+        },
+        "ProjectedExportRecord": {
+          "description": "An exported record cut to the `--fields` asked for.",
+          "properties": {
+            "at": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "digest": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:ExportReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ExportManifest"
+        },
+        {
+          "$ref": "#/$defs/ExportWritten"
+        }
+      ],
+      "description": "`canon export --json` (`ExportReport`): the manifest, or with `--output` the\nfile it was written to.",
+      "title": "ExportReport"
+    },
+    "FindingListReport": {
+      "$defs": {
+        "FindingRow": {
+          "description": "One row of `finding list`.",
+          "properties": {
+            "disposition": {
+              "type": "string"
+            },
+            "fileRef": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "resolutionSha": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reviewer": {
+              "type": "string"
+            },
+            "round": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "seq": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "severity": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "round",
+            "seq",
+            "severity",
+            "disposition",
+            "reviewer",
+            "summary",
+            "resolutionSha",
+            "fileRef",
+            "reason"
+          ],
+          "type": "object"
+        },
+        "FindingRowView": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FindingRow"
+            },
+            {
+              "$ref": "#/$defs/ProjectedFindingRow"
+            }
+          ]
+        },
+        "ProjectedFindingRow": {
+          "description": "A `finding list` row cut to the `--fields` asked for.",
+          "properties": {
+            "disposition": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "fileRef": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "resolutionSha": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reviewer": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "round": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "seq": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "severity": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:FindingListReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon finding list`'s report (`FindingListReport`); the page state travels in `meta`.",
+      "properties": {
+        "changeId": {
+          "type": "string"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/FindingRowView"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "changeId",
+        "findings"
+      ],
+      "title": "FindingListReport",
+      "type": "object"
+    },
+    "FormatReport": {
+      "$defs": {
+        "ViolationEntry": {
+          "description": "One format violation as `--json` shows it.",
+          "properties": {
+            "class": {
+              "description": "The failure class (`missing-provenance`, …).",
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "class",
+            "path",
+            "message"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:FormatReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon format`'s report (`FormatReport`).",
+      "properties": {
+        "clean": {
+          "type": "boolean"
+        },
+        "filesChecked": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unverifiable": {
+          "description": "Present (true) when nothing was examined, so a clean result is not a pass.",
+          "type": "boolean"
+        },
+        "violations": {
+          "items": {
+            "$ref": "#/$defs/ViolationEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "clean",
+        "filesChecked",
+        "violations"
+      ],
+      "title": "FormatReport",
+      "type": "object"
+    },
     "IngestPlansReport": {
       "$defs": {
         "Actor": {
@@ -13925,6 +14713,678 @@
       "title": "ArtifactIngestOutcome",
       "type": "object"
     },
+    "IngestSessionsReport": {
+      "$defs": {
+        "AdapterCounts": {
+          "description": "One adapter's scan counts in `ingest sessions`' report.",
+          "properties": {
+            "client": {
+              "type": "string"
+            },
+            "filesScanned": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "malformedRecords": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reparsed": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "rowsParsed": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "skippedUnchanged": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "client",
+            "filesScanned",
+            "reparsed",
+            "skippedUnchanged",
+            "rowsParsed",
+            "malformedRecords"
+          ],
+          "type": "object"
+        },
+        "RunId": {
+          "description": "ULID (Crockford base32, 26 chars) — joins: run ↔ events ↔ manifest",
+          "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+          "type": "string"
+        },
+        "SessionId": {
+          "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+          "type": "string"
+        },
+        "Unwritten": {
+          "description": "The metadata-only account of what an ingest pass could not persist.",
+          "properties": {
+            "adapters": {
+              "items": {
+                "$ref": "#/$defs/UnwrittenAdapter"
+              },
+              "type": "array"
+            },
+            "counts": {
+              "$ref": "#/$defs/UnwrittenCounts"
+            },
+            "events": {
+              "items": {
+                "$ref": "#/$defs/UnwrittenEvent"
+              },
+              "type": "array"
+            },
+            "failure": {
+              "$ref": "#/$defs/UnwrittenFailure"
+            },
+            "runs": {
+              "items": {
+                "$ref": "#/$defs/UnwrittenRun"
+              },
+              "type": "array"
+            },
+            "scope": {
+              "type": "string"
+            },
+            "sessions": {
+              "items": {
+                "$ref": "#/$defs/UnwrittenSession"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "scope",
+            "adapters",
+            "counts",
+            "sessions",
+            "runs",
+            "events",
+            "failure"
+          ],
+          "type": "object"
+        },
+        "UnwrittenAdapter": {
+          "description": "One adapter's scan counts in the unwritten metadata.",
+          "properties": {
+            "clientId": {
+              "type": "string"
+            },
+            "filesScanned": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "malformedRecords": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reparsed": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "rowsParsed": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "skippedUnchanged": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "clientId",
+            "filesScanned",
+            "reparsed",
+            "rowsParsed",
+            "malformedRecords",
+            "skippedUnchanged"
+          ],
+          "type": "object"
+        },
+        "UnwrittenCounts": {
+          "description": "The counts of the unwritten metadata.",
+          "properties": {
+            "events": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "eventsWritten": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "malformedRecords": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "rowsSkipped": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "runs": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "runsWritten": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "sessions": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "sessionsNormalized": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "sessions",
+            "runs",
+            "events",
+            "sessionsNormalized",
+            "runsWritten",
+            "eventsWritten",
+            "malformedRecords",
+            "rowsSkipped"
+          ],
+          "type": "object"
+        },
+        "UnwrittenEvent": {
+          "description": "One event that was not persisted: its place and digest, never its detail.",
+          "properties": {
+            "at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "runId": {
+              "$ref": "#/$defs/RunId"
+            },
+            "seq": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "runId",
+            "seq",
+            "at",
+            "label",
+            "digest"
+          ],
+          "type": "object"
+        },
+        "UnwrittenFailure": {
+          "description": "Why the pass did not reach a durable tier.",
+          "properties": {
+            "class": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "class",
+            "reason"
+          ],
+          "type": "object"
+        },
+        "UnwrittenRun": {
+          "description": "One run that was not persisted.",
+          "properties": {
+            "digest": {
+              "type": "string"
+            },
+            "parentRunId": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/RunId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "runId": {
+              "$ref": "#/$defs/RunId"
+            },
+            "sessionId": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SessionId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "runId",
+            "sessionId",
+            "parentRunId",
+            "digest"
+          ],
+          "type": "object"
+        },
+        "UnwrittenSession": {
+          "description": "One session that was not persisted: identity and digest, no content.",
+          "properties": {
+            "client": {
+              "type": "string"
+            },
+            "digest": {
+              "type": "string"
+            },
+            "projectKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sessionId": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "workspaceKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "workspaceLabel": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "sessionId",
+            "client",
+            "workspaceKey",
+            "workspaceLabel",
+            "projectKey",
+            "digest"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:IngestSessionsReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon ingest sessions`' report (`IngestSessionsReport`): the counts the\nhuman summary prints, plus `unwritten` (the metadata of what could not be\npersisted) when the store's tiers were unreachable.",
+      "properties": {
+        "adapters": {
+          "items": {
+            "$ref": "#/$defs/AdapterCounts"
+          },
+          "type": "array"
+        },
+        "degradeReason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "eventsWritten": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "malformedRecords": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rowsSkipped": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "runsWritten": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "sessionsNormalized": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unwritten": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Unwritten"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "scope",
+        "adapters",
+        "sessionsNormalized",
+        "malformedRecords",
+        "rowsSkipped",
+        "runsWritten",
+        "eventsWritten",
+        "degradeReason",
+        "unwritten"
+      ],
+      "title": "IngestSessionsReport",
+      "type": "object"
+    },
+    "InitCheckReport": {
+      "$defs": {
+        "InitCheckSection": {
+          "description": "One `canon.yaml` section `init --check-config` examined.",
+          "properties": {
+            "detail": {
+              "type": "string"
+            },
+            "section": {
+              "type": "string"
+            },
+            "status": {
+              "description": "`pass`, `fail`, `warn` or `not-configured`.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "section",
+            "status",
+            "detail"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:InitCheckReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon init --check-config`'s report (`InitCheckReport`).",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/InitCheckSection"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "ok",
+        "sections"
+      ],
+      "title": "InitCheckReport",
+      "type": "object"
+    },
+    "InitReport": {
+      "$defs": {
+        "InitStep": {
+          "description": "One step `canon init` took.",
+          "properties": {
+            "detail": {
+              "type": "string"
+            },
+            "step": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "step",
+            "detail"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:InitReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon init`'s report (`InitReport`): what it did, step by step.",
+      "properties": {
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/InitStep"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "steps"
+      ],
+      "title": "InitReport",
+      "type": "object"
+    },
+    "InventorySyncReport": {
+      "$defs": {
+        "InventoryRootReport": {
+          "description": "One spec root of `canon inventory sync`'s report.",
+          "properties": {
+            "clean": {
+              "type": "boolean"
+            },
+            "id": {
+              "type": "string"
+            },
+            "removed": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "root": {
+              "type": "string"
+            },
+            "scanned": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "syncErrors": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "tagDiagnostics": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "violations": {
+              "description": "The format violations that aborted the root.",
+              "items": {
+                "$ref": "#/$defs/ViolationEntry"
+              },
+              "type": "array"
+            },
+            "written": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "root",
+            "clean",
+            "scanned",
+            "written",
+            "removed",
+            "violations",
+            "syncErrors",
+            "tagDiagnostics"
+          ],
+          "type": "object"
+        },
+        "ViolationEntry": {
+          "description": "One format violation as `--json` shows it.",
+          "properties": {
+            "class": {
+              "description": "The failure class (`missing-provenance`, …).",
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "class",
+            "path",
+            "message"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:InventorySyncReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon inventory sync`'s report (`InventorySyncReport`).",
+      "properties": {
+        "clean": {
+          "type": "boolean"
+        },
+        "roots": {
+          "items": {
+            "$ref": "#/$defs/InventoryRootReport"
+          },
+          "type": "array"
+        },
+        "totalWritten": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "clean",
+        "totalWritten",
+        "roots"
+      ],
+      "title": "InventorySyncReport",
+      "type": "object"
+    },
+    "PluginSyncReport": {
+      "$defs": {
+        "PluginSyncRootReport": {
+          "description": "One spec root of `canon plugin sync`'s report.",
+          "properties": {
+            "candidates": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "deduped": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "errors": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "overlay": {
+              "type": "string"
+            },
+            "root": {
+              "type": "string"
+            },
+            "rootId": {
+              "type": "string"
+            },
+            "written": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "rootId",
+            "root",
+            "overlay",
+            "candidates",
+            "written",
+            "deduped",
+            "errors"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:PluginSyncReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon plugin sync`'s report (`PluginSyncReport`).",
+      "properties": {
+        "clean": {
+          "type": "boolean"
+        },
+        "deduped": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pluginId": {
+          "type": "string"
+        },
+        "roots": {
+          "items": {
+            "$ref": "#/$defs/PluginSyncRootReport"
+          },
+          "type": "array"
+        },
+        "written": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "pluginId",
+        "clean",
+        "written",
+        "deduped",
+        "roots"
+      ],
+      "title": "PluginSyncReport",
+      "type": "object"
+    },
     "PromptAddReport": {
       "$defs": {
         "ContentRef": {
@@ -14147,6 +15607,207 @@
       "title": "PromptBundleVersion",
       "type": "object"
     },
+    "QueryReport": {
+      "$defs": {
+        "LedgerRecord": {
+          "description": "A ledger record, verbatim: it keeps its own schema (`crates/canon-model/schemas/<kind>.schema.json`), minus anything redacted or left out by `--fields`",
+          "type": "object"
+        },
+        "QueryRollup": {
+          "properties": {
+            "done": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "total": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "done",
+            "total"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:QueryReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon query --json`'s report (`QueryReport`): the page state travels in\n`meta` ([`QueryOutcome::page`]), not here.",
+      "properties": {
+        "count": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "overlays": {
+          "description": "The overlay identities actually projected.",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "plugin": {
+          "description": "The resolved plugin id (`--plugin-id`) when its overlays were projected.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "records": {
+          "items": {
+            "$ref": "#/$defs/LedgerRecord"
+          },
+          "type": "array"
+        },
+        "rollup": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QueryRollup"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`--kind task`: tasks done of tasks listed."
+        },
+        "since": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "violations": {
+          "description": "Records the tiers reported as violations and the query left out.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "since",
+        "count",
+        "violations",
+        "records"
+      ],
+      "title": "QueryReport",
+      "type": "object"
+    },
+    "RegimeShowReport": {
+      "$id": "urn:canon:report:RegimeShowReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon regime-key`: the validated key (`RegimeShowReport`).",
+      "properties": {
+        "regimeKey": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "regimeKey"
+      ],
+      "title": "RegimeShowReport",
+      "type": "object"
+    },
+    "ReportBuildReport": {
+      "$id": "urn:canon:report:ReportBuildReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon report` (write mode): where the report was written (`ReportBuildReport`).",
+      "properties": {
+        "mode": {
+          "description": "Always `write`.",
+          "type": "string"
+        },
+        "report": {
+          "description": "The report file.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "report"
+      ],
+      "title": "ReportBuildReport",
+      "type": "object"
+    },
+    "ReportCheckReport": {
+      "$id": "urn:canon:report:ReportCheckReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon report --check`: whether the report file is current (`ReportCheckReport`).",
+      "properties": {
+        "mode": {
+          "description": "Always `check`.",
+          "type": "string"
+        },
+        "report": {
+          "type": "string"
+        },
+        "state": {
+          "description": "`fresh`, `missing` or `drift`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "state",
+        "report"
+      ],
+      "title": "ReportCheckReport",
+      "type": "object"
+    },
+    "ReportSnapshotReport": {
+      "$defs": {
+        "SnapshotTable": {
+          "description": "One parquet table a snapshot wrote.",
+          "properties": {
+            "file": {
+              "type": "string"
+            },
+            "table": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "table",
+            "file"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:ReportSnapshotReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon report --snapshot <dir>`: the tables written (`ReportSnapshotReport`).",
+      "properties": {
+        "directory": {
+          "type": "string"
+        },
+        "mode": {
+          "description": "Always `snapshot`.",
+          "type": "string"
+        },
+        "tables": {
+          "items": {
+            "$ref": "#/$defs/SnapshotTable"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "mode",
+        "directory",
+        "tables"
+      ],
+      "title": "ReportSnapshotReport",
+      "type": "object"
+    },
     "RetrieveReport": {
       "$defs": {
         "StrategyRef": {
@@ -14178,6 +15839,560 @@
       },
       "title": "RetrieveReport",
       "type": "array"
+    },
+    "SchemaReport": {
+      "$defs": {
+        "Arity": {
+          "description": "How many values an operand takes; `max` is absent when unbounded.",
+          "properties": {
+            "max": {
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "min": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "min"
+          ],
+          "type": "object"
+        },
+        "Effect": {
+          "description": "What running a command does to the repo and the machine.",
+          "oneOf": [
+            {
+              "const": "read",
+              "description": "Writes nothing (stdout/stderr only).",
+              "type": "string"
+            },
+            {
+              "const": "write",
+              "description": "Writes or stages files or records; nothing existing is destroyed.",
+              "type": "string"
+            },
+            {
+              "const": "destructive",
+              "description": "Permanently removes data.",
+              "type": "string"
+            }
+          ]
+        },
+        "ErrorList": {
+          "description": "`canon schema --errors`: every error code.",
+          "properties": {
+            "errors": {
+              "items": {
+                "$ref": "#/$defs/ErrorRow"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "errors"
+          ],
+          "type": "object"
+        },
+        "ErrorRow": {
+          "description": "One error code of the registry.",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "exit": {
+              "description": "The exit code a command that fails with it returns.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "meaning": {
+              "type": "string"
+            },
+            "retryable": {
+              "description": "Whether running the same command again, unchanged, can succeed.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "code",
+            "meaning",
+            "exit",
+            "retryable"
+          ],
+          "type": "object"
+        },
+        "ExitMeta": {
+          "description": "One exit code a command can return, with its meaning.",
+          "properties": {
+            "code": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "meaning": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "meaning"
+          ],
+          "type": "object"
+        },
+        "Idempotency": {
+          "description": "What running a writing leaf a second time with the same arguments does.",
+          "oneOf": [
+            {
+              "const": "replay-safe",
+              "description": "A repeat is a no-op, reported `unchanged`.",
+              "type": "string"
+            },
+            {
+              "const": "content-keyed",
+              "description": "Identical content is a no-op; different content under the same key is refused.",
+              "type": "string"
+            },
+            {
+              "const": "appends",
+              "description": "Every call adds a record.",
+              "type": "string"
+            },
+            {
+              "const": "once",
+              "description": "A repeat is refused with exit 2 and changes nothing.",
+              "type": "string"
+            }
+          ]
+        },
+        "InputSchema": {
+          "description": "A JSON Schema document (draft 2020-12)",
+          "type": [
+            "object",
+            "boolean"
+          ]
+        },
+        "ListEntry": {
+          "description": "One command in `canon schema`'s listing.",
+          "properties": {
+            "about": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "command": {
+              "type": "string"
+            },
+            "effect": {
+              "$ref": "#/$defs/Effect"
+            },
+            "roles": {
+              "items": {
+                "$ref": "#/$defs/Role"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "command",
+            "effect",
+            "roles",
+            "about"
+          ],
+          "type": "object"
+        },
+        "ListSchema": {
+          "description": "`canon schema` with no command: the commands, filtered to a role.",
+          "properties": {
+            "commands": {
+              "items": {
+                "$ref": "#/$defs/ListEntry"
+              },
+              "type": "array"
+            },
+            "role": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Role"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The role the listing was filtered to; absent when it lists every command."
+            }
+          },
+          "required": [
+            "commands"
+          ],
+          "type": "object"
+        },
+        "Node": {
+          "description": "One node of the command tree: a leaf, or a group that only holds children.",
+          "properties": {
+            "about": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "aliases": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "children": {
+              "description": "A group's children, as commands.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "command": {
+              "description": "The canonical space-separated path, e.g. `evidence add`.",
+              "type": "string"
+            },
+            "effect": {
+              "$ref": "#/$defs/Effect"
+            },
+            "effectNote": {
+              "description": "What the command does when invoked with fewer effects than `effect` says.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "errorCodes": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "examples": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "exits": {
+              "items": {
+                "$ref": "#/$defs/ExitMeta"
+              },
+              "type": "array"
+            },
+            "idempotency": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Idempotency"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Absent for a read."
+            },
+            "inputs": {
+              "description": "JSON input documents of the leaf (`--input`).",
+              "items": {
+                "$ref": "#/$defs/InputSchema"
+              },
+              "type": "array"
+            },
+            "name": {
+              "type": "string"
+            },
+            "nodeKind": {
+              "$ref": "#/$defs/NodeKind"
+            },
+            "operands": {
+              "items": {
+                "$ref": "#/$defs/Operand"
+              },
+              "type": "array"
+            },
+            "options": {
+              "items": {
+                "$ref": "#/$defs/OptionSpec"
+              },
+              "type": "array"
+            },
+            "outputs": {
+              "items": {
+                "$ref": "#/$defs/Output"
+              },
+              "type": "array"
+            },
+            "path": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "requiredOneOf": {
+              "description": "Option sets of which exactly one is required.",
+              "items": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "roles": {
+              "description": "The roles whose steps use the command; empty means humans only.",
+              "items": {
+                "$ref": "#/$defs/Role"
+              },
+              "type": "array"
+            },
+            "supportsJson": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "command",
+            "path",
+            "name",
+            "nodeKind",
+            "aliases",
+            "about"
+          ],
+          "type": "object"
+        },
+        "NodeKind": {
+          "enum": [
+            "leaf",
+            "group"
+          ],
+          "type": "string"
+        },
+        "Operand": {
+          "description": "One operand of a leaf.",
+          "properties": {
+            "arity": {
+              "$ref": "#/$defs/Arity"
+            },
+            "default": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "description": "The placeholder the operand is written as (`CHANGE_ID`).",
+              "type": "string"
+            },
+            "name": {
+              "description": "The clap id.",
+              "type": "string"
+            },
+            "possibleValues": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "repeatable": {
+              "type": "boolean"
+            },
+            "required": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name",
+            "kind",
+            "arity",
+            "required",
+            "repeatable",
+            "possibleValues"
+          ],
+          "type": "object"
+        },
+        "OptionSpec": {
+          "description": "One option of a leaf (or a global one).",
+          "properties": {
+            "aliases": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "conflictsWith": {
+              "description": "Options that cannot be given with this one, as `--name`.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "default": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "env": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "help": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "description": "`flag` (no value), `count`, or `value`.",
+              "type": "string"
+            },
+            "name": {
+              "description": "The long name, without `--`.",
+              "type": "string"
+            },
+            "possibleValues": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "repeatable": {
+              "type": "boolean"
+            },
+            "required": {
+              "type": "boolean"
+            },
+            "requires": {
+              "description": "Options that must be given with this one, as `--name`.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "short": {
+              "maxLength": 1,
+              "minLength": 1,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "valueName": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "kind",
+            "aliases",
+            "required",
+            "repeatable",
+            "possibleValues",
+            "default",
+            "help"
+          ],
+          "type": "object"
+        },
+        "Output": {
+          "description": "One output of a leaf: what it prints and the schema of that.",
+          "properties": {
+            "kind": {
+              "$ref": "#/$defs/OutputKind"
+            },
+            "mediaType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "report": {
+              "description": "The report's name; for an artifact the report that envelopes it under `--json`.",
+              "type": "string"
+            },
+            "schemaRef": {
+              "description": "`#/schemas/<report>`; absent while the report has no schema.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "schemaVersion": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "report",
+            "schemaRef",
+            "schemaVersion"
+          ],
+          "type": "object"
+        },
+        "OutputKind": {
+          "description": "The form a leaf's output takes on stdout.",
+          "oneOf": [
+            {
+              "const": "report",
+              "description": "An enveloped report.",
+              "type": "string"
+            },
+            {
+              "const": "artifact",
+              "description": "Raw bytes on stdout without `--json`; `--json` envelopes them.",
+              "type": "string"
+            },
+            {
+              "const": "stream",
+              "description": "A long-running stdout.",
+              "type": "string"
+            }
+          ]
+        },
+        "Role": {
+          "enum": [
+            "planner",
+            "implementer",
+            "reviewer",
+            "orchestrator"
+          ],
+          "type": "string"
+        }
+      },
+      "$id": "urn:canon:report:SchemaReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ListSchema"
+        },
+        {
+          "$ref": "#/$defs/Node"
+        },
+        {
+          "$ref": "#/$defs/ErrorList"
+        }
+      ],
+      "description": "`canon schema`'s report (`SchemaReport`): the command listing, one command's\nnode of the generated spec, or the error registry.",
+      "title": "SchemaReport"
     },
     "SelftestReport": {
       "$defs": {
@@ -14234,6 +16449,307 @@
       ],
       "title": "SelftestSummary",
       "type": "object"
+    },
+    "SkillsCheckReport": {
+      "$defs": {
+        "OrphanEntry": {
+          "description": "An orphan `skills check` found.",
+          "properties": {
+            "hint": {
+              "type": "string"
+            },
+            "modified": {
+              "type": "boolean"
+            },
+            "path": {
+              "type": "string"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "provider",
+            "modified",
+            "reason",
+            "hint"
+          ],
+          "type": "object"
+        },
+        "OutdatedEntry": {
+          "description": "An install lock written by another canon version.",
+          "properties": {
+            "installedBy": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "installedBy",
+            "message"
+          ],
+          "type": "object"
+        },
+        "SkillFileStatus": {
+          "description": "The state of one installed skill file.",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "state",
+            "provider"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:SkillsCheckReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon skills check`'s report (`SkillsCheckReport`).",
+      "properties": {
+        "clean": {
+          "type": "boolean"
+        },
+        "manifestOk": {
+          "type": "boolean"
+        },
+        "orphans": {
+          "items": {
+            "$ref": "#/$defs/OrphanEntry"
+          },
+          "type": "array"
+        },
+        "outdated": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OutdatedEntry"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "providers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "remnants": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "selection": {
+          "type": "string"
+        },
+        "statuses": {
+          "items": {
+            "$ref": "#/$defs/SkillFileStatus"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "clean",
+        "providers",
+        "selection",
+        "manifestOk",
+        "statuses",
+        "orphans",
+        "remnants",
+        "outdated"
+      ],
+      "title": "SkillsCheckReport",
+      "type": "object"
+    },
+    "SkillsDoctorReport": {
+      "$id": "urn:canon:report:SkillsDoctorReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon skills doctor`'s report (`SkillsDoctorReport`).",
+      "properties": {
+        "lines": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "lines"
+      ],
+      "title": "SkillsDoctorReport",
+      "type": "object"
+    },
+    "SkillsInstallReport": {
+      "$defs": {
+        "BundleInstall": {
+          "description": "What the bundle install reports.",
+          "properties": {
+            "changed": {
+              "type": "boolean"
+            },
+            "configWritten": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kept": {
+              "items": {
+                "$ref": "#/$defs/KeptEntry"
+              },
+              "type": "array"
+            },
+            "ownedPaths": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "providers": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "pruned": {
+              "items": {
+                "$ref": "#/$defs/PrunedEntry"
+              },
+              "type": "array"
+            },
+            "selection": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "providers",
+            "selection",
+            "changed",
+            "configWritten",
+            "pruned",
+            "kept",
+            "ownedPaths"
+          ],
+          "type": "object"
+        },
+        "InstalledSkillEntry": {
+          "description": "One skill the legacy (pre-bundle) install wrote.",
+          "properties": {
+            "changed": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string"
+            },
+            "version": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "name",
+            "version",
+            "changed"
+          ],
+          "type": "object"
+        },
+        "KeptEntry": {
+          "description": "An orphan the install kept, with what to do by hand.",
+          "properties": {
+            "hint": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "provider",
+            "reason",
+            "hint"
+          ],
+          "type": "object"
+        },
+        "LegacyInstall": {
+          "description": "What the legacy install (a source without `SKILL.src.md`) reports.",
+          "properties": {
+            "skills": {
+              "items": {
+                "$ref": "#/$defs/InstalledSkillEntry"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "skills"
+          ],
+          "type": "object"
+        },
+        "PrunedEntry": {
+          "description": "An orphan the install pruned.",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "provider",
+            "reason"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:SkillsInstallReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BundleInstall"
+        },
+        {
+          "$ref": "#/$defs/LegacyInstall"
+        }
+      ],
+      "description": "`canon skills install`'s report (`SkillsInstallReport`): the bundle install,\nor the legacy one for a source without `SKILL.src.md`.",
+      "title": "SkillsInstallReport"
     },
     "StatusReport": {
       "$defs": {

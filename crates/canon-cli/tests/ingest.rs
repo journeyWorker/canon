@@ -76,7 +76,7 @@ fn unrouted_default_run_prints_the_normalized_json_fallback_without_the_json_fla
     let payload: Value = serde_json::from_str(&stdout[json_start..]).expect("valid JSON on stdout even without --json");
     let sessions = payload["sessions"].as_array().expect("metadata session summaries");
     assert_eq!(sessions.len(), 1, "only the isolated fixture home's one session, no ambient env leakage: {stdout}");
-    assert_eq!(sessions[0]["session_id"], "cli_ing_ses_1", "the only normalized output must not be discarded");
+    assert_eq!(sessions[0]["sessionId"], "cli_ing_ses_1", "the only normalized output must not be discarded");
     assert!(payload["events"].is_array(), "metadata fallback must include event summaries");
     assert!(payload["failure"]["class"].is_string(), "metadata fallback must include stable failure class");
     assert!(!stdout.contains("secret directive prose"), "metadata-only fallback must omit directive text: {stdout}");

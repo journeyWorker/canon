@@ -1005,88 +1005,169 @@ pub fn format_json(outcome: &IngestOutcome) -> Option<String> {
     outcome.unwritten.as_ref().map(|sessions| serde_json::to_string_pretty(&degraded_metadata(outcome, sessions)).expect("metadata JSON always serializes"))
 }
 
-/// The `--json` data for one ingest pass: the counts the human summary
-/// prints, plus `unwritten` (the [`format_json`] metadata, or `null`) when the
-/// store's tiers were unreachable.
-pub fn summary_json(outcome: &IngestOutcome) -> serde_json::Value {
-    let adapters: Vec<serde_json::Value> = outcome
-        .adapters
-        .iter()
-        .map(|a| {
-            serde_json::json!({
-                "client": a.client_id,
-                "filesScanned": a.files_scanned,
-                "reparsed": a.reparsed,
-                "skippedUnchanged": a.skipped_unchanged,
-                "rowsParsed": a.rows_parsed,
-                "malformedRecords": a.malformed_records,
-            })
-        })
-        .collect();
-    serde_json::json!({
-        "scope": outcome.scope_summary,
-        "adapters": adapters,
-        "sessionsNormalized": outcome.sessions_normalized,
-        "malformedRecords": outcome.malformed_records,
-        "rowsSkipped": outcome.skipped_rows,
-        "runsWritten": outcome.runs_written,
-        "eventsWritten": outcome.events_written,
-        "degradeReason": outcome.degrade_reason,
-        "unwritten": outcome.unwritten.as_ref().map(|sessions| degraded_metadata(outcome, sessions)),
-    })
+/// One adapter's scan counts in `ingest sessions`' report.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AdapterCounts<'a> {
+    pub client: &'a str,
+    pub files_scanned: usize,
+    pub reparsed: usize,
+    pub skipped_unchanged: usize,
+    pub rows_parsed: usize,
+    pub malformed_records: usize,
 }
 
-fn degraded_metadata(outcome: &IngestOutcome, sessions: &[NormalizedSession]) -> serde_json::Value {
-    let session_entries: Vec<serde_json::Value> = sessions
+/// `canon ingest sessions`' report (`IngestSessionsReport`): the counts the
+/// human summary prints, plus `unwritten` (the metadata of what could not be
+/// persisted) when the store's tiers were unreachable.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct IngestSessionsReport<'a> {
+    pub scope: &'a str,
+    pub adapters: Vec<AdapterCounts<'a>>,
+    pub sessions_normalized: usize,
+    pub malformed_records: usize,
+    pub rows_skipped: usize,
+    pub runs_written: usize,
+    pub events_written: usize,
+    pub degrade_reason: Option<&'a str>,
+    pub unwritten: Option<Unwritten<'a>>,
+}
+
+impl crate::json_out::Report for IngestSessionsReport<'_> {}
+
+/// One adapter's scan counts in the unwritten metadata.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UnwrittenAdapter<'a> {
+    pub client_id: &'a str,
+    pub files_scanned: usize,
+    pub reparsed: usize,
+    pub rows_parsed: usize,
+    pub malformed_records: usize,
+    pub skipped_unchanged: usize,
+}
+
+/// The counts of the unwritten metadata.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UnwrittenCounts {
+    pub sessions: usize,
+    pub runs: usize,
+    pub events: usize,
+    pub sessions_normalized: usize,
+    pub runs_written: usize,
+    pub events_written: usize,
+    pub malformed_records: usize,
+    pub rows_skipped: usize,
+}
+
+/// One session that was not persisted: identity and digest, no content.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UnwrittenSession<'a> {
+    pub session_id: &'a canon_model::SessionId,
+    pub client: &'a str,
+    pub workspace_key: Option<&'a str>,
+    pub workspace_label: Option<&'a str>,
+    pub project_key: Option<&'a str>,
+    pub digest: String,
+}
+
+/// One run that was not persisted.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UnwrittenRun<'a> {
+    pub run_id: &'a canon_model::RunId,
+    pub session_id: Option<&'a canon_model::SessionId>,
+    pub parent_run_id: Option<&'a canon_model::RunId>,
+    pub digest: String,
+}
+
+/// One event that was not persisted: its place and digest, never its detail.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UnwrittenEvent<'a> {
+    pub run_id: &'a canon_model::RunId,
+    pub seq: u64,
+    pub at: chrono::DateTime<chrono::Utc>,
+    pub label: &'a str,
+    pub digest: String,
+}
+
+/// Why the pass did not reach a durable tier.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UnwrittenFailure<'a> {
+    pub class: &'a str,
+    pub reason: &'a str,
+}
+
+/// The metadata-only account of what an ingest pass could not persist.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Unwritten<'a> {
+    pub scope: &'a str,
+    pub adapters: Vec<UnwrittenAdapter<'a>>,
+    pub counts: UnwrittenCounts,
+    pub sessions: Vec<UnwrittenSession<'a>>,
+    pub runs: Vec<UnwrittenRun<'a>>,
+    pub events: Vec<UnwrittenEvent<'a>>,
+    pub failure: UnwrittenFailure<'a>,
+}
+
+/// The `--json` data for one ingest pass.
+pub fn summary_json(outcome: &IngestOutcome) -> IngestSessionsReport<'_> {
+    IngestSessionsReport {
+        scope: &outcome.scope_summary,
+        adapters: outcome
+            .adapters
+            .iter()
+            .map(|a| AdapterCounts { client: a.client_id, files_scanned: a.files_scanned, reparsed: a.reparsed, skipped_unchanged: a.skipped_unchanged, rows_parsed: a.rows_parsed, malformed_records: a.malformed_records })
+            .collect(),
+        sessions_normalized: outcome.sessions_normalized,
+        malformed_records: outcome.malformed_records,
+        rows_skipped: outcome.skipped_rows,
+        runs_written: outcome.runs_written,
+        events_written: outcome.events_written,
+        degrade_reason: outcome.degrade_reason.as_deref(),
+        unwritten: outcome.unwritten.as_ref().map(|sessions| degraded_metadata(outcome, sessions)),
+    }
+}
+
+fn degraded_metadata<'a>(outcome: &'a IngestOutcome, sessions: &'a [NormalizedSession]) -> Unwritten<'a> {
+    let session_entries: Vec<UnwrittenSession> = sessions
         .iter()
         .map(|normalized| {
-            let body = serde_json::to_value(&normalized.session).expect("Session always serializes");
-            serde_json::json!({
-                "session_id": normalized.session.session_id,
-                "client": normalized.session.client,
-                "workspace_key": normalized.session.workspace_key,
-                "workspace_label": normalized.session.workspace_label,
-                "project_key": normalized.session.project_key,
-                "digest": content_digest12(&body),
+            let session = &normalized.session;
+            let body = serde_json::to_value(session).expect("Session always serializes");
+            UnwrittenSession {
+                session_id: &session.session_id,
+                client: &session.client,
+                workspace_key: session.workspace_key.as_deref(),
+                workspace_label: session.workspace_label.as_deref(),
+                project_key: session.project_key.as_deref(),
+                digest: content_digest12(&body),
+            }
+        })
+        .collect();
+    let run_entries: Vec<UnwrittenRun> = sessions
+        .iter()
+        .flat_map(|normalized| {
+            normalized.runs().map(|run| {
+                let body = serde_json::to_value(run).expect("Run always serializes");
+                UnwrittenRun { run_id: &run.run_id, session_id: run.session_id.as_ref(), parent_run_id: run.parent_run_id.as_ref(), digest: content_digest12(&body) }
             })
         })
         .collect();
-    let run_entries: Vec<serde_json::Value> = sessions
+    let event_entries: Vec<UnwrittenEvent> = sessions
         .iter()
-        .flat_map(|normalized| normalized.runs().map(|run| {
-            let body = serde_json::to_value(run).expect("Run always serializes");
-            serde_json::json!({
-                "run_id": run.run_id,
-                "session_id": run.session_id,
-                "parent_run_id": run.parent_run_id,
-                "digest": content_digest12(&body),
+        .flat_map(|normalized| {
+            normalized.events.iter().map(|event| {
+                let body = serde_json::to_value(event).expect("Event always serializes");
+                UnwrittenEvent { run_id: &event.run_id, seq: event.seq, at: event.envelope.at, label: &event.label, digest: content_digest12(&body) }
             })
-        }))
-        .collect();
-    let event_entries: Vec<serde_json::Value> = sessions
-        .iter()
-        .flat_map(|normalized| normalized.events.iter().map(|event| {
-            let body = serde_json::to_value(event).expect("Event always serializes");
-            serde_json::json!({
-                "run_id": event.run_id,
-                "seq": event.seq,
-                "at": event.envelope.at,
-                "label": event.label,
-                "digest": content_digest12(&body),
-            })
-        }))
-        .collect();
-    let adapters: Vec<serde_json::Value> = outcome
-        .adapters
-        .iter()
-        .map(|adapter| serde_json::json!({
-            "client_id": adapter.client_id,
-            "files_scanned": adapter.files_scanned,
-            "reparsed": adapter.reparsed,
-            "rows_parsed": adapter.rows_parsed,
-            "malformed_records": adapter.malformed_records,
-            "skipped_unchanged": adapter.skipped_unchanged,
-        }))
+        })
         .collect();
     let failure_class = outcome.degrade_class.unwrap_or("degraded");
     let failure_reason = outcome.degrade_reason.as_deref().unwrap_or(match failure_class {
@@ -1094,27 +1175,35 @@ fn degraded_metadata(outcome: &IngestOutcome, sessions: &[NormalizedSession]) ->
         "unrouted" => "session/run/event routing is incomplete",
         _ => "session ingest did not reach a durable tier",
     });
-    serde_json::json!({
-        "scope": outcome.scope_summary,
-        "adapters": adapters,
-        "counts": {
-            "sessions": session_entries.len(),
-            "runs": run_entries.len(),
-            "events": event_entries.len(),
-            "sessions_normalized": outcome.sessions_normalized,
-            "runs_written": outcome.runs_written,
-            "events_written": outcome.events_written,
-            "malformed_records": outcome.malformed_records,
-            "rows_skipped": outcome.skipped_rows,
+    Unwritten {
+        scope: &outcome.scope_summary,
+        adapters: outcome
+            .adapters
+            .iter()
+            .map(|adapter| UnwrittenAdapter {
+                client_id: adapter.client_id,
+                files_scanned: adapter.files_scanned,
+                reparsed: adapter.reparsed,
+                rows_parsed: adapter.rows_parsed,
+                malformed_records: adapter.malformed_records,
+                skipped_unchanged: adapter.skipped_unchanged,
+            })
+            .collect(),
+        counts: UnwrittenCounts {
+            sessions: session_entries.len(),
+            runs: run_entries.len(),
+            events: event_entries.len(),
+            sessions_normalized: outcome.sessions_normalized,
+            runs_written: outcome.runs_written,
+            events_written: outcome.events_written,
+            malformed_records: outcome.malformed_records,
+            rows_skipped: outcome.skipped_rows,
         },
-        "sessions": session_entries,
-        "runs": run_entries,
-        "events": event_entries,
-        "failure": {
-            "class": failure_class,
-            "reason": failure_reason,
-        },
-    })
+        sessions: session_entries,
+        runs: run_entries,
+        events: event_entries,
+        failure: UnwrittenFailure { class: failure_class, reason: failure_reason },
+    }
 }
 
 #[cfg(test)]
@@ -1594,13 +1683,13 @@ mod tests {
 
         let json = format_json(&outcome).unwrap();
         let payload: serde_json::Value = serde_json::from_str(&json).unwrap();
-        let by_id = |id: &str| payload["sessions"].as_array().unwrap().iter().find(|s| s["session_id"] == id).cloned();
+        let by_id = |id: &str| payload["sessions"].as_array().unwrap().iter().find(|s| s["sessionId"] == id).cloned();
 
         let expected_project_key = fixture.project_a.to_string_lossy().replace('\\', "/");
         let a = by_id("ing_ses_a").expect("project A's own session is ingested");
-        assert_eq!(a["project_key"], expected_project_key);
+        assert_eq!(a["projectKey"], expected_project_key);
         let wt = by_id("ing_ses_a_wt").expect("the linked worktree's session is ingested");
-        assert_eq!(wt["project_key"], expected_project_key, "the worktree session carries the MAIN worktree's project_key (spec: aggregation by project)");
+        assert_eq!(wt["projectKey"], expected_project_key, "the worktree session carries the MAIN worktree's project_key (spec: aggregation by project)");
         assert!(by_id("ing_ses_b").is_none(), "the foreign project's session must be excluded: {json}");
         assert!(!json.contains("do the a thing"), "default degraded JSON must not contain directive text: {json}");
         assert!(payload["events"].as_array().unwrap().iter().all(|event| event["label"] != "user_directive"));

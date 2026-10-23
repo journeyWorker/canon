@@ -21,8 +21,9 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use canon_model::{paths, ChangeId};
-use serde::Deserialize;
-use serde_json::{json, Value};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::brief::approval_of;
 use crate::brief_approve::{approval_blockers, sha256_hex};
@@ -106,12 +107,12 @@ pub fn list(repo: &Path) -> Reply {
         let bytes = match std::fs::read(&path) {
             Ok(bytes) => bytes,
             Err(e) => {
-                unreadable.push(json!({ "changeId": change.as_str(), "message": format!("cannot read the brief: {e}") }));
+                unreadable.push(UnreadableBrief { change_id: change.as_str().to_string(), message: format!("cannot read the brief: {e}") });
                 continue;
             }
         };
         let Ok(text) = String::from_utf8(bytes.clone()) else {
-            unreadable.push(json!({ "changeId": change.as_str(), "message": "the brief is not UTF-8 text" }));
+            unreadable.push(UnreadableBrief { change_id: change.as_str().to_string(), message: "the brief is not UTF-8 text".to_string() });
             continue;
         };
         let approval = approval_of(&text);
@@ -124,41 +125,95 @@ pub fn list(repo: &Path) -> Reply {
         };
         let counts = checked.evaluation.counts();
         let blocking = approval_blockers(&checked.evaluation.findings);
-        let findings: Vec<Value> = checked
+        let findings: Vec<BriefFinding> = checked
             .evaluation
             .findings
             .iter()
-            .map(|f| {
-                json!({
-                    "severity": f.severity.as_str(),
-                    "rule": f.rule,
-                    "line": f.line,
-                    "message": f.excerpt,
-                    "hint": f.hint,
-                    "section": f.section,
-                    "blocksApproval": blocking.iter().any(|b| std::ptr::eq(*b, f)),
-                })
+            .map(|f| BriefFinding {
+                severity: f.severity,
+                rule: f.rule.clone(),
+                line: f.line,
+                message: f.excerpt.clone(),
+                hint: f.hint.clone(),
+                section: f.section.clone(),
+                blocks_approval: blocking.iter().any(|b| std::ptr::eq(*b, f)),
             })
             .collect();
-        briefs.push(json!({
-            "changeId": change.as_str(),
-            "subjects": subjects.get(change.as_str()).cloned().unwrap_or_default(),
-            "brief": checked.brief,
-            "text": text,
-            "sha256": sha256_hex(&bytes),
-            "language": checked.language.tag,
-            "languageSource": checked.language_source.as_str(),
-            "languageNote": checked.language_note,
-            "changedSinceApproval": matches!(approval, crate::brief::Approval::Changed { .. }),
-            "legacy": checked.evaluation.legacy,
-            "sections": parse_sections(&text),
-            "findings": findings,
-            "counts": { "blockers": counts.blockers, "advisories": counts.advisories },
-            "approvable": blocking.is_empty(),
-        }));
+        let sections = parse_sections(&text);
+        briefs.push(PendingBrief {
+            change_id: change.as_str().to_string(),
+            subjects: subjects.get(change.as_str()).cloned().unwrap_or_default(),
+            brief: checked.brief,
+            sha256: sha256_hex(&bytes),
+            language: checked.language.tag,
+            language_source: checked.language_source.as_str(),
+            language_note: checked.language_note,
+            changed_since_approval: matches!(approval, crate::brief::Approval::Changed { .. }),
+            legacy: checked.evaluation.legacy,
+            sections,
+            findings,
+            counts,
+            approvable: blocking.is_empty(),
+            text,
+        });
     }
-    Reply::ok(crate::json_out::envelope("dashboard briefs", &crate::json_out::untyped(json!({ "briefs": briefs, "unreadable": unreadable }))))
+    Reply::ok(crate::json_out::envelope("dashboard briefs", &DashboardBriefsReport { briefs, unreadable }))
 }
+
+/// A brief the page could not read.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UnreadableBrief {
+    pub change_id: String,
+    pub message: String,
+}
+
+/// One finding of a pending brief, as the page shows it.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BriefFinding {
+    pub severity: crate::brief_check::Severity,
+    pub rule: String,
+    pub line: usize,
+    /// The excerpt the finding points at.
+    pub message: String,
+    pub hint: String,
+    pub section: Option<String>,
+    /// Whether this finding stops an approval.
+    pub blocks_approval: bool,
+}
+
+/// One brief still waiting for the human's answer.
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingBrief {
+    pub change_id: String,
+    /// The subjects that adopted the change.
+    pub subjects: Vec<String>,
+    /// The brief file, relative to the repo root.
+    pub brief: String,
+    pub text: String,
+    pub sha256: String,
+    pub language: String,
+    pub language_source: &'static str,
+    pub language_note: Option<String>,
+    pub changed_since_approval: bool,
+    pub legacy: bool,
+    pub sections: Vec<crate::brief_check::BriefSection>,
+    pub findings: Vec<BriefFinding>,
+    pub counts: crate::brief_check::Counts,
+    pub approvable: bool,
+}
+
+/// `GET /api/briefs` (`DashboardBriefsReport`).
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardBriefsReport {
+    pub briefs: Vec<PendingBrief>,
+    pub unreadable: Vec<UnreadableBrief>,
+}
+
+impl crate::json_out::Report for DashboardBriefsReport {}
 
 /// The `POST /api/briefs/approve` body.
 #[derive(Deserialize)]

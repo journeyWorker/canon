@@ -947,27 +947,52 @@ pub fn format_human(outcome: &SyncOutcome) -> String {
     out
 }
 
+/// One spec root of `canon inventory sync`'s report.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InventoryRootReport<'a> {
+    pub id: &'a str,
+    pub root: String,
+    pub clean: bool,
+    pub scanned: usize,
+    pub written: usize,
+    pub removed: usize,
+    /// The format violations that aborted the root.
+    pub violations: Vec<crate::fmt::ViolationEntry<'a>>,
+    pub sync_errors: Vec<String>,
+    pub tag_diagnostics: Vec<String>,
+}
+
+/// `canon inventory sync`'s report (`InventorySyncReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InventorySyncReport<'a> {
+    pub clean: bool,
+    pub total_written: usize,
+    pub roots: Vec<InventoryRootReport<'a>>,
+}
+
+impl crate::json_out::Report for InventorySyncReport<'_> {}
+
 /// The `--json` data for [`SyncOutcome`]: one entry per root, with the
 /// violations and sync errors that aborted it.
-pub fn format_json(outcome: &SyncOutcome) -> serde_json::Value {
-    let roots: Vec<serde_json::Value> = outcome
+pub fn format_json(outcome: &SyncOutcome) -> InventorySyncReport<'_> {
+    let roots = outcome
         .roots
         .iter()
-        .map(|root| {
-            serde_json::json!({
-                "id": root.id,
-                "root": root.root.display().to_string(),
-                "clean": root.is_clean(),
-                "scanned": root.scanned,
-                "written": root.written,
-                "removed": root.removed,
-                "violations": root.violations.iter().map(|v| serde_json::json!({ "class": v.class.as_str(), "path": v.path.display().to_string(), "message": v.detail })).collect::<Vec<_>>(),
-                "syncErrors": root.sync_errors.iter().map(|e| e.to_string()).collect::<Vec<_>>(),
-                "tagDiagnostics": root.tag_diagnostics.iter().map(|d| d.to_string()).collect::<Vec<_>>(),
-            })
+        .map(|root| InventoryRootReport {
+            id: root.id.as_str(),
+            root: root.root.display().to_string(),
+            clean: root.is_clean(),
+            scanned: root.scanned,
+            written: root.written,
+            removed: root.removed,
+            violations: root.violations.iter().map(crate::fmt::ViolationEntry::of).collect(),
+            sync_errors: root.sync_errors.iter().map(|e| e.to_string()).collect(),
+            tag_diagnostics: root.tag_diagnostics.iter().map(|d| d.to_string()).collect(),
         })
         .collect();
-    serde_json::json!({ "clean": outcome.is_clean(), "totalWritten": outcome.total_written(), "roots": roots })
+    InventorySyncReport { clean: outcome.is_clean(), total_written: outcome.total_written(), roots }
 }
 
 /// One root's stale part of the scenario index ([`stale_roots`]).

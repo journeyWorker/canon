@@ -1378,10 +1378,10 @@ fn finding_list_json_carries_the_same_rows() {
     assert_eq!(
         json["data"],
         serde_json::json!({
-            "change_id": "s43-findings-are-records",
+            "changeId": "s43-findings-are-records",
             "findings": [
-                {"round": 1, "seq": 1, "severity": "blocker", "disposition": "rejected", "reviewer": "rev-a", "summary": "teardown races HMR", "resolution_sha": null, "file_ref": null, "reason": "by design"},
-                {"round": 1, "seq": 2, "severity": "should-fix", "disposition": "open", "reviewer": "rev-b", "summary": "the count was typed by hand", "resolution_sha": null, "file_ref": null, "reason": null},
+                {"round": 1, "seq": 1, "severity": "blocker", "disposition": "rejected", "reviewer": "rev-a", "summary": "teardown races HMR", "resolutionSha": null, "fileRef": null, "reason": "by design"},
+                {"round": 1, "seq": 2, "severity": "should-fix", "disposition": "open", "reviewer": "rev-b", "summary": "the count was typed by hand", "resolutionSha": null, "fileRef": null, "reason": null},
             ]
         })
     );

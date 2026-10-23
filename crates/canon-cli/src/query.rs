@@ -32,6 +32,8 @@ use canon_store::tier::{StoreError, TierQuery};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
+use crate::json_out::{LedgerRecord, Report};
+
 use crate::context::resolve_canon_yaml;
 use crate::paging::{self, Page, PageMeta};
 use crate::cli_error::CliError;
@@ -596,23 +598,55 @@ fn change_record(raw: &RawRecord) -> Value {
     record
 }
 
-/// `--json`: machine-readable output — event bodies are redacted by default.
-/// The full merged record bodies are emitted only when the caller has
-/// already passed `--include-sensitive` through policy validation.
-pub fn format_json(outcome: &QueryOutcome) -> String {
-    format_json_with_sensitive(outcome, false)
+/// `canon query --json`'s report (`QueryReport`): the page state travels in
+/// `meta` ([`QueryOutcome::page`]), not here.
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryReport {
+    pub kind: &'static str,
+    pub since: Option<String>,
+    pub count: usize,
+    /// Records the tiers reported as violations and the query left out.
+    pub violations: usize,
+    /// The resolved plugin id (`--plugin-id`) when its overlays were projected.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plugin: Option<String>,
+    /// The overlay identities actually projected.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overlays: Option<Vec<String>>,
+    pub records: Vec<LedgerRecord>,
+    /// `--kind task`: tasks done of tasks listed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollup: Option<QueryRollup>,
 }
 
-pub fn format_json_with_sensitive(outcome: &QueryOutcome, include_sensitive: bool) -> String {
-    let mut payload = serde_json::json!({
-        "kind": outcome.kind.as_str(),
-        "since": outcome.since.map(|s| s.to_rfc3339()),
-        "count": outcome.records.len(),
-        "violations": outcome.violation_count,
-        "records": outcome.records.iter().map(|r| shape_record(outcome, query_record(outcome.kind, r, include_sensitive))).collect::<Vec<_>>(),
-    });
-    finish_json(&mut payload, outcome);
-    serde_json::to_string_pretty(&payload).expect("serde_json::Value always serializes")
+impl Report for QueryReport {}
+
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
+pub struct QueryRollup {
+    pub done: usize,
+    pub total: usize,
+}
+
+/// Event bodies are redacted by default; the full merged record bodies appear
+/// only when the caller has already passed `--include-sensitive` through policy
+/// validation.
+pub fn report(outcome: &QueryOutcome, include_sensitive: bool) -> QueryReport {
+    let records = outcome.records.iter().map(|r| LedgerRecord(shape_record(outcome, query_record(outcome.kind, r, include_sensitive)))).collect();
+    base_report(outcome, records)
+}
+
+fn base_report(outcome: &QueryOutcome, records: Vec<LedgerRecord>) -> QueryReport {
+    QueryReport {
+        kind: outcome.kind.as_str(),
+        since: outcome.since.map(|s| s.to_rfc3339()),
+        count: outcome.records.len(),
+        violations: outcome.violation_count,
+        plugin: None,
+        overlays: None,
+        records,
+        rollup: outcome.rollup.map(|(done, total)| QueryRollup { done, total }),
+    }
 }
 
 /// `--fields`' projection of one JSON record, a no-op without `--fields`.
@@ -620,18 +654,6 @@ fn shape_record(outcome: &QueryOutcome, record: Value) -> Value {
     match &outcome.fields {
         Some(fields) => paging::project(&record, fields),
         None => record,
-    }
-}
-
-/// The JSON tail both formatters share: the `--kind task` rollup and the
-/// page `meta`.
-fn finish_json(payload: &mut Value, outcome: &QueryOutcome) {
-    let object = payload.as_object_mut().expect("payload is always a JSON object");
-    if let Some((done, total)) = outcome.rollup {
-        object.insert("rollup".to_string(), serde_json::json!({"done": done, "total": total}));
-    }
-    if let Some(page) = &outcome.page {
-        object.insert("meta".to_string(), page.to_json());
     }
 }
 
@@ -817,7 +839,7 @@ pub fn run_with_plugin(
     Ok((outcome, plugin_outcome))
 }
 
-/// `--json`, `--plugin <id>` variant of [`format_json`] (task 3.3):
+/// `--json`, `--plugin <id>` variant of [`report`] (task 3.3):
 /// identical `kind`/`since`/`count`/`violations` fields PLUS
 /// `"plugin"` (the resolved plugin id) and `"overlays"` (the overlay
 /// identities actually projected); each record in `"records"` gains an
@@ -826,24 +848,13 @@ pub fn run_with_plugin(
 /// key, and NO `"overlay"` key at all when no projection matched
 /// (spec.md: "no default or guessed value is invented"). Never called
 /// by `main.rs::run_query` unless `projections` is non-empty — the
-/// empty case calls [`format_json`] verbatim instead.
-pub fn format_json_with_overlay(outcome: &QueryOutcome, plugin_id: &str, projections: &[OverlayProjection]) -> String {
-    format_json_with_overlay_and_sensitive(outcome, plugin_id, projections, false)
-}
-
-pub fn format_json_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id: &str, projections: &[OverlayProjection], include_sensitive: bool) -> String {
-    let records: Vec<Value> = outcome.records.iter().map(|raw| shape_record(outcome, merge_overlay_fields(outcome.kind, raw, projections, include_sensitive))).collect();
-    let mut payload = serde_json::json!({
-        "kind": outcome.kind.as_str(),
-        "since": outcome.since.map(|s| s.to_rfc3339()),
-        "count": outcome.records.len(),
-        "violations": outcome.violation_count,
-        "plugin": plugin_id,
-        "overlays": projections.iter().map(|p| p.identity.clone()).collect::<Vec<_>>(),
-        "records": records,
-    });
-    finish_json(&mut payload, outcome);
-    serde_json::to_string_pretty(&payload).expect("serde_json::Value always serializes")
+/// empty case calls [`report`] verbatim instead.
+pub fn report_with_overlay(outcome: &QueryOutcome, plugin_id: &str, projections: &[OverlayProjection], include_sensitive: bool) -> QueryReport {
+    let records = outcome.records.iter().map(|raw| LedgerRecord(shape_record(outcome, merge_overlay_fields(outcome.kind, raw, projections, include_sensitive)))).collect();
+    let mut report = base_report(outcome, records);
+    report.plugin = Some(plugin_id.to_string());
+    report.overlays = Some(projections.iter().map(|p| p.identity.clone()).collect());
+    report
 }
 
 fn merge_overlay_fields(kind: RecordKind, raw: &RawRecord, projections: &[OverlayProjection], include_sensitive: bool) -> Value {
@@ -867,7 +878,7 @@ fn merge_overlay_fields(kind: RecordKind, raw: &RawRecord, projections: &[Overla
 /// `--plugin <id>` variant of [`format_human`] (task 3.3): the same
 /// header line plus `--plugin <id>`, and a 4th `OVERLAY` table column
 /// — a compact JSON object per matched record (identical shape to
-/// [`format_json_with_overlay`]'s per-record `"overlay"` key), `-`
+/// [`report_with_overlay`]'s per-record `"overlay"` key), `-`
 /// when no projection matched. `AT`/`ID`/`DIGEST` are computed from
 /// each record's OWN untouched [`RawRecord`] (never a merged copy), so
 /// the digest column always reflects the record's REAL on-disk content
@@ -953,21 +964,21 @@ mod tests {
     #[test]
     fn json_query_redacts_event_text_and_credentials_by_default() {
         let outcome = event_outcome();
-        let payload: Value = serde_json::from_str(&format_json(&outcome)).unwrap();
+        let payload = serde_json::to_value(report(&outcome, false)).unwrap();
         let detail = &payload["records"][0]["detail"];
 
         assert!(detail.get("text").is_none(), "event text must be omitted by default: {payload}");
         assert_eq!(detail["api_key"], "[REDACTED]");
         assert_eq!(detail["nested"]["raw"], "[REDACTED]");
         assert_eq!(detail["nested"]["safe"], "retained");
-        assert!(!format_json(&outcome).contains("credential-value"));
-        assert!(!format_json(&outcome).contains("secret prose"));
+        assert!(!payload.to_string().contains("credential-value"));
+        assert!(!payload.to_string().contains("secret prose"));
     }
 
     #[test]
     fn json_query_includes_event_detail_only_for_authorized_projection() {
         let outcome = event_outcome();
-        let payload: Value = serde_json::from_str(&format_json_with_sensitive(&outcome, true)).unwrap();
+        let payload = serde_json::to_value(report(&outcome, true)).unwrap();
         let detail = &payload["records"][0]["detail"];
 
         assert_eq!(detail["text"], "directive contains secret prose");

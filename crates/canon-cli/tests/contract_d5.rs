@@ -105,7 +105,7 @@ fn export_projects_each_record_but_keeps_the_manifest_digests() {
     let mut record_keys = keys(&shown["records"][0]);
     record_keys.sort();
     assert_eq!(record_keys, ["digest", "id"]);
-    assert_eq!(shown["content_digests"], all["content_digests"], "the manifest's digests do not depend on the projection");
+    assert_eq!(shown["contentDigests"], all["contentDigests"], "the manifest's digests do not depend on the projection");
     let out = run(dir.path(), &["export", "--kind", "evidence", "--fields", "nope", "--json"]);
     assert_eq!(out.status.code(), Some(2));
     assert_eq!(body(&out)["error"]["code"], "UNKNOWN_FIELD");

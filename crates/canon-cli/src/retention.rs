@@ -338,12 +338,95 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
     }
 }
 
-fn redacted_metadata(kind: RecordKind, raw: &canon_model::evidence::RawRecord) -> Value {
-    let digest = canon_store::partition::content_digest12(&raw.0);
-    let at = raw_record_at(raw).to_rfc3339();
-    let id = canon_store::partition::resolve_partition(kind, &raw.0).ok().map(|p| p.natural_key);
-    json!({"kind": kind.as_str(), "at": at, "id": id, "digest": digest})
+/// One exported record: identity and digest, never the content.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportRecord {
+    pub kind: &'static str,
+    pub at: String,
+    pub id: Option<String>,
+    pub digest: String,
 }
+
+impl ExportRecord {
+    fn of(kind: RecordKind, raw: &canon_model::evidence::RawRecord) -> Self {
+        let digest = canon_store::partition::content_digest12(&raw.0);
+        let at = raw_record_at(raw).to_rfc3339();
+        let id = canon_store::partition::resolve_partition(kind, &raw.0).ok().map(|p| p.natural_key);
+        Self { kind: kind.as_str(), at, id, digest }
+    }
+
+    /// The members `--fields` asked for.
+    fn project(self, fields: &[String]) -> ProjectedExportRecord {
+        let has = |name: &str| fields.iter().any(|f| f == name);
+        ProjectedExportRecord { kind: has("kind").then_some(self.kind), at: has("at").then_some(self.at), id: has("id").then_some(self.id), digest: has("digest").then_some(self.digest) }
+    }
+}
+
+/// An exported record cut to the `--fields` asked for.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectedExportRecord {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<Option<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub digest: Option<String>,
+}
+
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(untagged)]
+pub enum ExportRecordView {
+    Full(ExportRecord),
+    Projected(ProjectedExportRecord),
+}
+
+/// The `canon.retention.export` manifest: what `export` writes to stdout or
+/// `--output`, and what `--json` envelopes (without `meta`, which then travels
+/// in the envelope's `meta`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportManifest {
+    pub schema: &'static str,
+    pub version: u32,
+    pub kind: &'static str,
+    pub source_scope: &'static str,
+    pub before: Option<String>,
+    pub after: Option<String>,
+    pub record_count: usize,
+    pub content_digests: Vec<String>,
+    pub records: Vec<ExportRecordView>,
+    pub sensitive: bool,
+    /// Present only with `--include-sensitive`: the full records, verbatim.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sensitive_records: Option<Vec<crate::json_out::LedgerRecord>>,
+    /// The page state; only in the manifest file or stdout document.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta: Option<crate::paging::PageMeta>,
+}
+
+/// What `--json --output` returns: the file holds the manifest, this names it.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportWritten {
+    pub output: String,
+    pub kind: &'static str,
+    pub record_count: usize,
+}
+
+/// `canon export --json` (`ExportReport`): the manifest, or with `--output` the
+/// file it was written to.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(untagged)]
+pub enum ExportReport {
+    Manifest(ExportManifest),
+    Written(ExportWritten),
+}
+
+impl crate::json_out::Report for ExportReport {}
 
 /// The fields of one exported record, which `--fields` may name.
 const RECORD_FIELDS: [&str; 4] = ["kind", "at", "id", "digest"];
@@ -374,32 +457,32 @@ pub fn run_export(
             &format!("export:{}", kind.as_str()),
             rows,
             |raw| {
-                let metadata = redacted_metadata(kind, raw);
-                format!("{}|{}|{}", metadata["at"].as_str().unwrap_or_default(), metadata["id"].as_str().unwrap_or_default(), metadata["digest"].as_str().unwrap_or_default())
+                let record = ExportRecord::of(kind, raw);
+                format!("{}|{}|{}", record.at, record.id.as_deref().unwrap_or_default(), record.digest)
             },
             page,
         )
         .map_err(ExportFailure::Cursor)?;
-        let metadata: Vec<Value> = rows.iter().map(|raw| redacted_metadata(kind, raw)).collect();
-        let mut manifest = json!({
-            "schema": "canon.retention.export",
-            "version": 1,
-            "kind": kind.as_str(),
-            "source_scope": "routed_and_aging_destinations",
-            "before": before.map(|t| t.to_rfc3339()),
-            "after": after.map(|t| t.to_rfc3339()),
-            "record_count": rows.len(),
-            "content_digests": metadata.iter().filter_map(|m| m.get("digest").cloned()).collect::<Vec<_>>(),
-            "records": match fields {
-                Some(requested) => metadata.iter().map(|m| crate::paging::project(m, requested)).collect::<Vec<_>>(),
-                None => metadata,
-            },
-            "sensitive": include_sensitive,
-            "meta": meta.to_json(),
-        });
-        if include_sensitive {
-            manifest.as_object_mut().expect("manifest object").insert("sensitive_records".to_string(), Value::Array(rows.iter().map(|r| r.0.clone()).collect()));
-        }
+        let records: Vec<ExportRecord> = rows.iter().map(|raw| ExportRecord::of(kind, raw)).collect();
+        let content_digests = records.iter().map(|m| m.digest.clone()).collect();
+        let records = match fields {
+            Some(requested) => records.into_iter().map(|r| ExportRecordView::Projected(r.project(requested))).collect(),
+            None => records.into_iter().map(ExportRecordView::Full).collect(),
+        };
+        let mut manifest = ExportManifest {
+            schema: "canon.retention.export",
+            version: 1,
+            kind: kind.as_str(),
+            source_scope: "routed_and_aging_destinations",
+            before: before.map(|t| t.to_rfc3339()),
+            after: after.map(|t| t.to_rfc3339()),
+            record_count: rows.len(),
+            content_digests,
+            records,
+            sensitive: include_sensitive,
+            sensitive_records: include_sensitive.then(|| rows.iter().map(|r| crate::json_out::LedgerRecord(r.0.clone())).collect()),
+            meta: Some(meta.clone()),
+        };
         let encoded = serde_json::to_vec_pretty(&manifest)?;
         if let Some(path) = out {
             #[cfg(unix)]
@@ -417,12 +500,12 @@ pub fn run_export(
         append_access_audit(repo, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, rows.len(), 0)?;
         if json_output {
             // The manifest is the result; with `--out` it went to the file, and the result names it.
-            let (manifest, page_meta) = crate::json_out::split_meta(manifest);
+            manifest.meta = None;
             let data = match out {
-                Some(path) => json!({ "out": path.display().to_string(), "kind": kind.as_str(), "recordCount": rows.len() }),
-                None => manifest,
+                Some(path) => ExportReport::Written(ExportWritten { output: path.display().to_string(), kind: kind.as_str(), record_count: rows.len() }),
+                None => ExportReport::Manifest(manifest),
             };
-            crate::next::finish_with_meta(repo, "export", &crate::next::Scope::Repo, false, true, &crate::json_out::untyped(data), page_meta);
+            crate::next::finish_with_meta(repo, "export", &crate::next::Scope::Repo, false, true, &data, meta.to_json());
         }
         if out.is_some() && !json_output { crate::human_err!("canon export: wrote {} record(s)", rows.len()); }
         // The manifest itself is JSON on stdout, so the human cursor line
@@ -479,7 +562,7 @@ mod tests {
             "event_id": "evt-1",
             "detail": {"text": "secret"},
         }));
-        let metadata = redacted_metadata(RecordKind::Event, &raw);
+        let metadata = serde_json::to_value(ExportRecord::of(RecordKind::Event, &raw)).unwrap();
         assert!(metadata.get("detail").is_none());
         assert!(metadata.get("digest").is_some());
     }

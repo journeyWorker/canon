@@ -357,6 +357,15 @@ pub struct RetrieveReport<'a>(pub &'a [StrategyRef]);
 
 impl crate::json_out::Report for RetrieveReport<'_> {}
 
+/// `canon regime-key`: the validated key (`RegimeShowReport`).
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RegimeShowReport<'a> {
+    pub regime_key: &'a str,
+}
+
+impl crate::json_out::Report for RegimeShowReport<'_> {}
+
 #[cfg(test)]
 mod tests {
     use canon_learn::StrategyStore;
