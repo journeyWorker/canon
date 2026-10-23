@@ -98,3 +98,5 @@ vendors/
 # --report` stores the bytes it binds in .canon/artifacts, so the
 # working-tree copy is a regenerable output.
 examples/platformer/reports/
+# the snapshot `canon dashboard` and `canon report snapshot` regenerate -- derived, never committed.
+.canon/dashboard-snapshot/
