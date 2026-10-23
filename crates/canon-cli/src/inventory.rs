@@ -393,6 +393,16 @@ impl SyncOutcome {
 /// run, so it never interleaves with another sync or a reader's
 /// [`refresh_stale_index`].
 pub fn run_sync(repo: &Path, spec_root: Option<&Path>) -> Result<SyncOutcome, InventoryError> {
+    let outcome = rebuild(repo, spec_root)?;
+    if outcome.is_clean() && outcome.total_written() == 0 {
+        crate::json_out::mark_unchanged();
+    }
+    Ok(outcome)
+}
+
+/// [`run_sync`] as one step of a larger command (`canon migrate`): the same
+/// sync, without marking the whole run unchanged when this step wrote nothing.
+pub fn rebuild(repo: &Path, spec_root: Option<&Path>) -> Result<SyncOutcome, InventoryError> {
     sync_repo(repo, spec_root, false)
 }
 

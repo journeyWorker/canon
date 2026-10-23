@@ -17,6 +17,8 @@ pub struct PromptAddArgs {
     /// Output the complete bundle manifest as JSON
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Subcommand)]

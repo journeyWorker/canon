@@ -274,6 +274,107 @@ fn repeating_review_add_returns_the_existing_review_and_writes_nothing() {
     assert_eq!(files_under(dir.path(), "review"), 2);
 }
 
+// ---- 4b. every replay-safe or content-keyed leaf: an identical repeat is unchanged -----------
+
+/// Every file of the repo with its bytes, except git's own, the hot store's
+/// SQLite side files and the access-audit log (a run that read records
+/// appends to it by design, and says so).
+fn tree(dir: &Path) -> std::collections::BTreeMap<std::path::PathBuf, Vec<u8>> {
+    fn walk(root: &Path, dir: &Path, out: &mut std::collections::BTreeMap<std::path::PathBuf, Vec<u8>>) {
+        for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name == ".git" || name.ends_with("-shm") || name.ends_with("-wal") || path.ends_with(".canon/audit") {
+                continue;
+            }
+            if path.is_dir() {
+                walk(root, &path, out);
+            } else {
+                out.insert(path.strip_prefix(root).unwrap().to_path_buf(), std::fs::read(&path).unwrap());
+            }
+        }
+    }
+    let mut out = std::collections::BTreeMap::new();
+    walk(dir, dir, &mut out);
+    out
+}
+
+/// Runs `args` (plus `--json`) twice: both exit 0, the second says
+/// `meta.unchanged` and leaves the tree as the first left it.
+fn repeats_unchanged(dir: &Path, args: &[&str]) {
+    let mut argv = args.to_vec();
+    argv.push("--json");
+    let first = run(dir, &argv);
+    assert_eq!(first.status.code(), Some(0), "{args:?}: {}{}", String::from_utf8_lossy(&first.stdout), String::from_utf8_lossy(&first.stderr));
+    let after_first = tree(dir);
+    let again = run(dir, &argv);
+    assert_eq!(again.status.code(), Some(0), "{args:?} again: {}{}", String::from_utf8_lossy(&again.stdout), String::from_utf8_lossy(&again.stderr));
+    assert_eq!(body(&again)["meta"]["unchanged"], true, "{args:?}: {}", String::from_utf8_lossy(&again.stdout));
+    assert!(tree(dir) == after_first, "{args:?}: the repeat changed the tree");
+}
+
+/// A destructive leaf is previewed, then committed with the preview's digest.
+fn commit_repeats_unchanged(dir: &Path, args: &[&str]) {
+    let digest = |dir: &Path| {
+        let mut preview = args.to_vec();
+        preview.push("--json");
+        body(&run(dir, &preview))["data"]["planDigest"].as_str().unwrap().to_string()
+    };
+    let first = digest(dir);
+    let mut commit = args.to_vec();
+    commit.extend(["--commit", "--plan-digest", first.as_str()]);
+    ok(dir, &commit);
+    let second = digest(dir);
+    let mut commit = args.to_vec();
+    commit.extend(["--commit", "--plan-digest", second.as_str()]);
+    repeats_unchanged(dir, &commit);
+}
+
+#[test]
+fn an_identical_repeat_of_a_write_leaf_is_unchanged_and_writes_nothing() {
+    let dir = repo();
+    let home = TempDir::new().unwrap();
+    let d = dir.path();
+    let sha = SHA;
+    std::fs::write(d.join("README.md"), "hello\n").unwrap();
+    std::fs::write(
+        d.join(".canon/context-manifest.json"),
+        r#"{"manifestVersion":1,"capabilityVersion":1,"selectedDocs":["README.md"],"examples":[],"toolSchemas":[],"injectedGuidance":[]}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        d.join(".canon/prompt-manifest.json"),
+        r#"{"manifestVersion":1,"capabilityVersion":1,"selectedDocs":[],"prompt":"README.md","examples":[],"toolSchemas":[],"injectedGuidance":[]}"#,
+    )
+    .unwrap();
+    let home_dir = home.path().to_str().unwrap();
+    for args in [
+        &["inventory", "sync"][..],
+        &["init", "--providers", "none"],
+        &["gate", "install-hooks"],
+        &["gate", "promote"],
+        &["report", "build"],
+        &["report", "snapshot", "snapshot-out"],
+        &["subject", "adopt", "demo", "--change-id", "add-login"],
+        &["artifacts", "store"],
+        &["policy", "approve", "--approver", "alice", "--note", "reviewed"],
+        &["context-pack", "add", "--manifest", ".canon/context-manifest.json"],
+        &["prompt", "add", "reviewer@v1", "--manifest", ".canon/prompt-manifest.json"],
+        &["divergence", "add", "auth.login.01", "--sha", sha, "--actor-id", "alice", "--role", "reviewer"],
+        &["export", "--kind", "evidence", "--output", "evidence.json"],
+        &["ingest", "records"],
+        &["ingest", "plans"],
+        &["ingest", "sessions", "--home", home_dir],
+    ] {
+        repeats_unchanged(d, args);
+    }
+    // Unlinking comes last: it takes the adoption the cases above rely on away.
+    repeats_unchanged(d, &["subject", "unadopt", "demo", "--change-id", "add-login"]);
+    for args in [&["ledger", "compact"][..], &["migrate"], &["tier", "age"], &["purge", "--kind", "session", "--before", "2020-01-01T00:00:00Z"], &["artifacts", "move", "--tier", "local"]] {
+        commit_repeats_unchanged(d, args);
+    }
+}
+
 // ---- 5. exit-code exceptions -----------------------------------------------
 
 #[test]

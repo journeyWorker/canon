@@ -11,7 +11,7 @@ pub fn run(cmd: PromptCommand) -> ExitCode {
 }
 
 fn run_prompt_add(args: PromptAddArgs) -> ExitCode {
-    let PromptAddArgs { bundle, manifest, repo, json } = args;
+    let PromptAddArgs { bundle, manifest, repo, json, .. } = args;
     let repo = crate::context::resolve_repo_root(&repo);
     match crate::context_pack::register_prompt_bundle_from_manifest(&repo, &bundle.name, &bundle.version, &manifest) {
         Ok(bundle) => {

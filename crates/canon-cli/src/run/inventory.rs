@@ -7,7 +7,7 @@ use std::process::ExitCode;
 
 pub fn run(cmd: InventoryCommand) -> ExitCode {
     match cmd {
-        InventoryCommand::Sync(InventorySyncArgs { repo, spec_root, dry_run, json }) => run_inventory_sync(&repo, spec_root.as_deref(), dry_run.dry_run, json),
+        InventoryCommand::Sync(InventorySyncArgs { repo, spec_root, dry_run, json, .. }) => run_inventory_sync(&repo, spec_root.as_deref(), dry_run.dry_run, json),
     }
 }
 

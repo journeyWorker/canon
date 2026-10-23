@@ -119,16 +119,18 @@ fn init_rerun_keeps_canon_yaml_and_policy_and_refreshes_only_the_agents_md_block
 }
 
 #[test]
-fn init_rerun_with_no_agents_md_refuses_to_overwrite_an_existing_canon_yaml() {
+fn init_rerun_with_no_agents_md_leaves_an_existing_canon_yaml_alone_and_reports_unchanged() {
     let dir = tempfile::tempdir().unwrap();
     write(dir.path(), "canon.yaml", "# a hand-authored config\ntiers:\n  git:\n    root: .canon/ledger\n");
     write(dir.path(), ".gitignore", CANON_GITIGNORE);
     let before = std::fs::read(dir.path().join("canon.yaml")).unwrap();
 
     let out = run_canon(&["init", "--repo", ".", "--no-agents-md"], dir.path());
-    assert_eq!(out.status.code(), Some(2), "with nothing to refresh, a rerun is the overwrite refusal");
-    assert!(stderr(&out).contains("canon.yaml"), "{}", stderr(&out));
-    assert_eq!(std::fs::read(dir.path().join("canon.yaml")).unwrap(), before, "the existing file's bytes must be byte-identical before and after the refused init");
+    assert_eq!(out.status.code(), Some(0), "with nothing to refresh, a rerun is a no-op: {}", stderr(&out));
+    let json = run_canon(&["init", "--repo", ".", "--no-agents-md", "--json"], dir.path());
+    let body: serde_json::Value = serde_json::from_slice(&json.stdout).unwrap();
+    assert_eq!(body["meta"]["unchanged"], true, "{body}");
+    assert_eq!(std::fs::read(dir.path().join("canon.yaml")).unwrap(), before, "the existing file's bytes must be byte-identical before and after the rerun");
     assert!(!dir.path().join("AGENTS.md").exists());
     assert_eq!(std::fs::read_to_string(dir.path().join(".gitignore")).unwrap(), CANON_GITIGNORE);
 }
@@ -172,7 +174,7 @@ fn authoring_init_97_a_rerun_adds_the_missing_canon_gitignore_lines() {
     assert!(!other.path().join("AGENTS.md").exists());
     assert_eq!(std::fs::read_to_string(other.path().join(".gitignore")).unwrap().lines().filter(|line| !line.starts_with('#')).collect::<Vec<_>>(), CANON_GITIGNORE.lines().collect::<Vec<_>>());
     let again = run_canon(&["init", "--repo", ".", "--no-agents-md"], other.path());
-    assert_eq!(again.status.code(), Some(2), "nothing left to refresh: {}", stdout(&again));
+    assert_eq!(again.status.code(), Some(0), "nothing left to refresh is a no-op: {}", stdout(&again));
 }
 
 #[test]

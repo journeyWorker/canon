@@ -307,7 +307,7 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
     }
 
     if let Some(dir) = snapshot_dir {
-        return match canon_report::snapshot(&inputs, dir) {
+        return match crate::report::snapshot(&inputs, dir) {
             Ok(manifest) => {
                 crate::say!(json, "canon report snapshot: wrote {} table(s) to {}", manifest.tables.len(), dir.display());
                 if json {
@@ -350,7 +350,7 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
         };
     }
 
-    match canon_report::write_report(&inputs, &report_path) {
+    match crate::report::build(&inputs, &report_path) {
         Ok(_content) => {
             crate::say!(json, "canon report build: wrote {}", report_path.display());
             if json {

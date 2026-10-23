@@ -324,7 +324,7 @@ struct RawPlanSource {
 /// One `scan(digest) -> gate -> parse -> collision-filter -> persist`
 /// pass over every configured plan source, in config/one-shot order
 /// (module doc).
-pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: bool) -> Result<PlansOutcome, PlansError> {
+fn run_pass(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: bool) -> Result<PlansOutcome, PlansError> {
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = repo.join("canon.yaml");
 
@@ -488,6 +488,21 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: b
         let _ = cursors.write(&cursor);
     }
 
+    Ok(outcome)
+}
+
+/// One `canon ingest plans` pass ([`run_pass`]); a pass in which every source
+/// was already imported (skipped unchanged, or persisting nothing) and nothing
+/// was left unwritten is marked unchanged ([`crate::json_out::mark_unchanged`]).
+pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: bool) -> Result<PlansOutcome, PlansError> {
+    let outcome = run_pass(repo, dialect, source, dry_run)?;
+    let nothing_new = outcome.unwritten_changes.is_empty()
+        && outcome.unwritten_tasks.is_empty()
+        && outcome.non_clean_sources.is_empty()
+        && outcome.sources.iter().all(|src| src.skipped_unchanged || (src.changes_persisted == 0 && src.tasks_persisted == 0));
+    if nothing_new {
+        crate::json_out::mark_unchanged();
+    }
     Ok(outcome)
 }
 

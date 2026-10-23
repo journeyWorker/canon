@@ -201,6 +201,18 @@ pub fn run_stage(
     };
     let candidate = candidate(project_id, scenario_id, sha, status, round, reviewer, detail, Actor::new(actor_id, role.clone()), Utc::now());
 
+    // The scenario's newest divergence already says exactly this: a repeat
+    // writes nothing and reports the record that is there.
+    let body = serde_json::to_value(&candidate).expect("a Divergence always serializes");
+    let same_scenario = |stored: &serde_json::Value| ["project_id", "scenario_id"].iter().all(|key| stored.get(key) == body.get(key));
+    if let Some(existing) = crate::retry::repeats_latest(&gate_ctx.ledger_root, Some(&crate::gate::evidence_staging_dir(&gate_ctx.ledger_root)), RecordKind::Divergence.as_str(), &body, same_scenario, None) {
+        crate::say!(json, "canon divergence add: unchanged — an identical divergence for {} is already {}; nothing written", scenario_id.as_str(), existing.describe());
+        crate::json_out::mark_unchanged();
+        if json {
+            crate::json_out::data("divergence add", &DivergenceAddReport { landing: existing.landing() });
+        }
+        return 0;
+    }
     let location = match stage(&gate_ctx.ledger_root, &candidate) {
         Ok(location) => location,
         Err(e) => {

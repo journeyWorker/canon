@@ -34,6 +34,16 @@ pub use crate::reports::Report;
 use crate::cli_error::{CliError, ErrorBody};
 use crate::next::{After, NextEntry};
 
+static UNCHANGED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// A write that found its work already done with identical content (a repeat
+/// of a `replay-safe` or `content-keyed` leaf, D10) says so with this before
+/// it prints its report: the success envelope then carries
+/// `meta.unchanged: true`, and a batch reports the element `unchanged`.
+pub fn mark_unchanged() {
+    UNCHANGED.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// `meta.schemaVersion` of a document that carries no typed report (a failure without `data`).
 pub const DEFAULT_SCHEMA_VERSION: &str = "1.0";
 
@@ -71,6 +81,10 @@ pub struct Meta {
     /// Conditions that make the result weaker than it looks.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub warnings: Option<Vec<String>>,
+    /// `true` when a repeat found its record already present with identical
+    /// content and wrote nothing (D10; a batch item's `unchanged` status).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unchanged: Option<bool>,
     /// Command-specific keys: paging (`returned`, `total`, `hasMore`, `nextCursor`), `unchanged`, `provenance`.
     #[serde(flatten)]
     pub extra: Map<String, Value>,
@@ -289,6 +303,7 @@ fn build_meta(command: &str, schema_version: &str, after: Option<&After>, extra:
         }
     }
     let warnings = (!warnings.is_empty()).then_some(warnings);
+    let unchanged = (extra.remove("unchanged").and_then(|v| v.as_bool()).unwrap_or(false) | UNCHANGED.load(std::sync::atomic::Ordering::Relaxed)).then_some(true);
     let (next, next_omitted, waiting_on) = match after {
         Some(after) => (Some(after.entries()), (after.omitted > 0).then_some(after.omitted), after.waiting_on.clone()),
         None => (writes(&command).then(Vec::new), None, None),
@@ -302,6 +317,7 @@ fn build_meta(command: &str, schema_version: &str, after: Option<&After>, extra:
         next_omitted,
         waiting_on,
         warnings,
+        unchanged,
         extra,
     }
 }

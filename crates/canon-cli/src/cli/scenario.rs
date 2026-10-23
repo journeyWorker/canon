@@ -6,8 +6,7 @@ use std::path::PathBuf;
 
 #[derive(Subcommand)]
 pub enum ScenarioCommand {
-    /// Append a tagged scenario stub to its .feature file (created if missing), or many with --from
-    #[command(group(clap::ArgGroup::new("scenario_source").args(["from", "tag"]).required(true).multiple(false)))]
+    /// Append a tagged scenario stub to its .feature file (created if missing); many at once with `--input`
     New(ScenarioNewArgs),
 }
 
@@ -15,18 +14,10 @@ pub enum ScenarioCommand {
 pub struct ScenarioNewArgs {
     /// <area>.<surface>.<nn> scenario tag
     #[arg(value_name = "SCENARIO_ID", value_parser = crate::scaffold::parse_scenario_tag)]
-    pub tag: Option<ScenarioId>,
-    /// Write many scenarios from NDJSON (a file, or `-` for stdin): one JSON object per line,
-    /// blank lines and `#` comments skipped. A line carries this command's fields by long flag
-    /// name: id (the tag), title, subject, lane, case, flow, change, feature, project, e.g.
-    /// {"id":"auth.login.02","title":"Sign out","subject":"demo","case":"failure","flow":"F1"}.
-    /// Every line is checked first; one bad line writes nothing and `data.items` lists each
-    /// `{line, id, error}`. Otherwise `data.items` lists each `{line, id, path}`
-    #[arg(long, value_name = "FILE|-", conflicts_with_all = ["title", "subject_id", "lane", "case", "flow", "change_id", "feature", "project_id"])]
-    pub from: Option<String>,
+    pub tag: ScenarioId,
     /// The Scenario: header label
-    #[arg(long, required_unless_present = "from")]
-    pub title: Option<String>,
+    #[arg(long)]
+    pub title: String,
     /// Optional subject id tag to pin above the scenario
     #[arg(long, value_parser = crate::subject::parse_subject_id)]
     pub subject_id: Option<SubjectId>,
@@ -58,4 +49,6 @@ pub struct ScenarioNewArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }

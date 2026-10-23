@@ -87,7 +87,10 @@ pub fn apply(loaded: tiers::LoadedTiers, planned: &[AgeRuleReport]) -> Result<Ve
             let candidates = planned.iter().find(|p| p.kind == r.kind).map_or(0, |p| p.candidates);
             AgeRuleReport { kind: r.kind, source, destination: rule.to, after: rule.after, candidates, moved: r.moved, already_aged: r.already_aged }
         })
-        .collect();
+        .collect::<Vec<AgeRuleReport>>();
+    if reports.iter().all(|report| report.moved == 0) {
+        crate::json_out::mark_unchanged();
+    }
     Ok(reports)
 }
 

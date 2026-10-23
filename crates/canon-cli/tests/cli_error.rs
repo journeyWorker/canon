@@ -123,11 +123,15 @@ fn query_scope_errors_and_unknown_kinds_have_codes_in_json_mode() {
 }
 
 #[test]
-fn init_over_a_finished_repo_is_refused() {
+fn init_over_a_finished_repo_is_unchanged_and_demo_init_over_it_is_refused() {
     let dir = TempDir::new().unwrap();
     let repo = dir.path();
     ok(repo, &["init", "--providers", "none"]);
-    let out = run(repo, &["init", "--providers", "none", "--no-agents-md"]);
+    let out = run(repo, &["init", "--providers", "none", "--no-agents-md", "--json"]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    let shown: Value = serde_json::from_str(&stdout(&out)).unwrap();
+    assert_eq!(shown["meta"]["unchanged"], true, "{shown}");
+    let out = run(repo, &["demo", "init", "--repo", "."]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert_eq!(human_code(&out), "INIT_CONFIG_EXISTS");
 }

@@ -82,24 +82,6 @@ pub fn env_var_names() -> impl Iterator<Item = &'static str> {
     ENV_VARS.iter().map(|v| v.name)
 }
 
-/// One JSON Schema document (draft 2020-12): the shape of a leaf's `--input` body.
-#[derive(Serialize)]
-#[serde(transparent)]
-pub struct InputSchema(pub Value);
-
-impl schemars::JsonSchema for InputSchema {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
-        "InputSchema".into()
-    }
-
-    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        schemars::json_schema!({
-            "type": ["object", "boolean"],
-            "description": "A JSON Schema document (draft 2020-12)"
-        })
-    }
-}
-
 #[derive(Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum NodeKind {
@@ -167,12 +149,15 @@ pub struct OptionSpec {
 pub struct Output {
     pub kind: OutputKind,
     /// The report's name; for an artifact the report that envelopes it under `--json`.
-    pub report: &'static str,
+    pub report: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub media_type: Option<&'static str>,
     /// `#/schemas/<report>`; absent while the report has no schema.
     pub schema_ref: Option<String>,
     pub schema_version: Option<&'static str>,
+    /// The report of a leaf run with an array or NDJSON as `--input` (`Batch<Name>Report`, D7).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub batch: bool,
 }
 
 /// The part of a node only a leaf has.
@@ -197,7 +182,7 @@ pub struct Leaf {
     pub error_codes: Vec<&'static str>,
     pub outputs: Vec<Output>,
     /// JSON input documents of the leaf (`--input`).
-    pub inputs: Vec<InputSchema>,
+    pub inputs: Vec<crate::input::InputDoc>,
     pub examples: Vec<&'static str>,
 }
 
@@ -380,7 +365,8 @@ fn leaf_of(path: &str, cmd: &Command, reports: &[crate::reports::ReportSchema]) 
         .collect();
     let options: Vec<OptionSpec> = cmd.get_arguments().filter(|a| !a.is_positional() && !a.is_global_set() && !is_builtin(a)).map(|a| option_spec(cmd, a, &conflicts)).collect();
     let supports_json = options.iter().any(|o| o.name == "json");
-    let outputs = facts
+    let batch_supported = crate::input::batch_supported(path);
+    let mut outputs: Vec<Output> = facts
         .map(|f| f.outputs)
         .unwrap_or_default()
         .iter()
@@ -388,13 +374,25 @@ fn leaf_of(path: &str, cmd: &Command, reports: &[crate::reports::ReportSchema]) 
             let schema = reports.iter().find(|r| r.name == o.report);
             Output {
                 kind: o.kind,
-                report: o.report,
+                report: o.report.to_string(),
                 media_type: o.media_type,
                 schema_ref: schema.map(|r| format!("#/schemas/{}", r.name)),
                 schema_version: schema.map(|r| r.schema_version),
+                batch: false,
             }
         })
         .collect();
+    if batch_supported {
+        let batch: Vec<Output> = outputs
+            .iter()
+            .filter_map(|o| {
+                let name = format!("Batch{}", o.report);
+                let schema = reports.iter().find(|r| r.name == name)?;
+                Some(Output { kind: OutputKind::Report, schema_ref: Some(format!("#/schemas/{name}")), schema_version: Some(schema.schema_version), report: name, media_type: None, batch: true })
+            })
+            .collect();
+        outputs.extend(batch);
+    }
     Leaf {
         effect,
         effect_note: meta.and_then(|m| m.effect_note),
@@ -411,7 +409,7 @@ fn leaf_of(path: &str, cmd: &Command, reports: &[crate::reports::ReportSchema]) 
         exits: meta.map_or(STANDARD_EXITS, |m| m.exits).to_vec(),
         error_codes: error_codes(path),
         outputs,
-        inputs: Vec::new(),
+        inputs: crate::input::inputs(path, cmd),
         examples: example_for(path).into_iter().collect(),
     }
 }
@@ -509,9 +507,14 @@ fn with_id(mut schema: Value, id: String) -> Value {
     schema
 }
 
-/// The JSON Schema of every report, keyed by report name.
-fn schemas() -> Value {
+/// The JSON Schema of every report and every `--input` document, keyed by name.
+fn schemas(nodes: &[Node]) -> Value {
     let mut map = serde_json::Map::new();
+    for input in nodes.iter().filter_map(|n| n.leaf.as_ref()).flat_map(|l| &l.inputs) {
+        let name = input.schema_ref.trim_start_matches("#/schemas/").to_string();
+        let id = format!("urn:canon:input:{name}");
+        map.insert(name, with_id(input.schema.clone(), id));
+    }
     for report in crate::reports::report_schemas() {
         let id = format!("urn:canon:report:{}", report.name);
         map.insert(report.name, with_id(report.schema, id));
@@ -531,6 +534,7 @@ fn envelopes() -> Value {
 pub fn generate() -> Value {
     let mut root = crate::cli::command();
     root.build();
+    let nodes = nodes(&root);
     json!({
         "_doNotEdit": "GENERATED from the clap tree and the tables beside it: do not edit. Regenerate with `CANON_BLESS_CLI_SPEC=1 cargo test -p canon-cli --test cli_spec`.",
         "specVersion": SPEC_VERSION,
@@ -545,8 +549,8 @@ pub fn generate() -> Value {
         "envelopes": envelopes(),
         "errors": error_rows(),
         "removed": removed_rows(),
-        "commands": nodes(&root),
-        "schemas": schemas(),
+        "commands": nodes,
+        "schemas": schemas(&nodes),
         "records": records(),
     })
 }

@@ -34,6 +34,8 @@ pub struct InitArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Args)]
@@ -45,6 +47,8 @@ pub struct MigrateArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Args)]
@@ -169,6 +173,8 @@ pub struct ExportArgs {
     pub fields: Option<Vec<String>>,
     #[command(flatten)]
     pub dry_run: crate::cli::DryRunArgs,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Args)]
@@ -183,6 +189,8 @@ pub struct PurgeArgs {
     pub repo: crate::cli::RepoArgs,
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Args)]
@@ -198,6 +206,8 @@ pub struct DashboardArgs {
     /// Print one JSON document naming the address it serves (`data.url`), then serve until stopped; the human lines go to stderr
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Args)]

@@ -543,8 +543,6 @@ pub struct FindingCloseReport<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub from: Option<&'static str>,
     pub disposition: &'static str,
-    /// `true` when the finding already had this disposition and nothing was staged.
-    pub unchanged: bool,
 }
 
 impl crate::reports::Report for FindingCloseReport<'_> {}
@@ -721,6 +719,24 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     };
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
     let committed = GitTier::new(&ledger_root);
+    // An identical add repeated (same key, same content, whoever the clock
+    // says) is a repeat: nothing is staged and the existing record is reported.
+    let same_finding = |stored: &serde_json::Value| resolve_partition(RecordKind::Finding, stored).is_ok_and(|key| key.natural_key == natural_key);
+    if let Some(existing) = crate::retry::repeats_latest(&ledger_root, Some(&evidence_staging_dir(&ledger_root)), RecordKind::Finding.as_str(), &body, same_finding, None) {
+        crate::say!(args.json, "canon finding add: unchanged — an identical finding (`{}`, round {}, seq {}) is already {}; nothing written", args.change_id, args.round, args.seq, existing.describe());
+        crate::json_out::mark_unchanged();
+        let record = FindingAddReport {
+            landing: existing.landing(),
+            change_id: args.change_id.as_str(),
+            round: args.round,
+            seq: args.seq,
+            severity: severity_slug(args.severity),
+            disposition: args.disposition.as_str(),
+            unsourced: args.introduced_by.is_none(),
+        };
+        crate::next::finish(&repo, "finding add", &crate::next::Scope::Change(args.change_id.as_str().to_string()), false, args.json, &record);
+        return 0;
+    }
     match occupied_by(&natural_key, &staging, &committed) {
         Ok(Some(occupant)) => {
             return CliError::refused("FINDING_SEQ_OCCUPIED", format!("{} is already occupied by a {occupant} finding (`{}`, round {}, seq {}); pick the next free --seq rather than authoring a second record under one finding's identity. To move THAT finding's disposition instead, use `canon finding close`.",
@@ -963,7 +979,8 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
             args.seq,
             args.disposition.as_str()
         );
-        let noop = FindingCloseReport { landing: None, change_id: args.change_id.as_str(), round: args.round, seq: args.seq, from: None, disposition: args.disposition.as_str(), unchanged: true };
+        crate::json_out::mark_unchanged();
+        let noop = FindingCloseReport { landing: None, change_id: args.change_id.as_str(), round: args.round, seq: args.seq, from: None, disposition: args.disposition.as_str() };
         crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), false, args.json, &noop);
         return 0;
     }
@@ -1041,7 +1058,6 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
                     seq: args.seq,
                     from: Some(existing.disposition().as_str()),
                     disposition: args.disposition.as_str(),
-                    unchanged: false,
                 };
                 crate::next::finish(&repo, "finding close", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, &record);
             }

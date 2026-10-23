@@ -180,6 +180,9 @@ pub fn run_compact(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> i32 
         Ok(kinds) => kinds,
         Err(e) => return e.emit(CMD, json),
     };
+    if kinds.iter().all(|k| k.moved == 0) {
+        crate::json_out::mark_unchanged();
+    }
     for line in lines(&repo_dir, false, &kinds) {
         crate::say!(json, "{line}");
     }

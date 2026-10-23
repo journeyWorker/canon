@@ -29,4 +29,6 @@ pub struct ChangeNewArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }

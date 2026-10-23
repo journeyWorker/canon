@@ -45,6 +45,8 @@ pub struct SubjectNewArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Args)]
@@ -62,6 +64,8 @@ pub struct SubjectAdoptArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Args)]
@@ -79,6 +83,8 @@ pub struct SubjectUnadoptArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Args)]
@@ -115,4 +121,6 @@ pub struct SubjectMoveArgs {
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }

@@ -15,25 +15,10 @@ use crate::removed_028::{Kind, Row, ROWS};
 /// of it was the 0.23 spelling.
 pub const KIND_COMMANDS: &[&str] = &["export", "purge", "query"];
 
-/// The command a removed `scenario new --from` line key belongs to.
-const BATCH_COMMAND: &str = "scenario new";
-
 /// The canonical `--kind` value a removed `<kind>_record` one stood for.
 fn kind_replacement(old: &str) -> Option<&'static str> {
     let stem = old.strip_suffix("_record")?;
     crate::query::parse_kind(stem).ok().map(crate::query::kind_cli_name)
-}
-
-/// The key of a `scenario new --from` line that replaced the removed `old`
-/// (a 0.24 rename: `--change` is `--change-id`).
-pub fn batch_key_replacement(old: &str) -> Option<&'static str> {
-    let flag = format!("--{old}");
-    ROWS.iter().find(|row| row.kind == Kind::Option && row.old == flag && row.scope.contains(&BATCH_COMMAND)).map(|row| row.new.trim_start_matches("--"))
-}
-
-/// The hint for a removed `scenario new --from` key.
-pub fn batch_key_hint(old: &str, new: &str) -> String {
-    format!("`{old}` was renamed `{new}` in 0.24.0; use `{new}`")
 }
 
 /// A removed spelling an invocation used.

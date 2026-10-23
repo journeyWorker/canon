@@ -265,7 +265,7 @@ fn evidence_add_67_a_promoted_write_names_only_its_committed_record() {
     let kept: [(&str, Vec<&str>, &str); 3] = [
         ("canon evidence add", with(evidence("game.run.01"), &["--summary", "attested again", "--no-promote"]), STAGED),
         ("canon finding add", vec!["finding", "add", "--change-id", "c-run", "--round", "1", "--seq", "2", "--severity", "note", "--actor-id", "r", "--summary", "s", "--no-promote"], STAGED),
-        ("canon divergence add", vec!["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--actor-id", "r", "--role", "reviewer", "--no-promote"], STAGED),
+        ("canon divergence add", vec!["divergence", "add", "game.run.01", "--project-id", "root", "--sha", &sha, "--actor-id", "r", "--role", "reviewer", "--detail", "looked again", "--no-promote"], STAGED),
     ];
     for (command, args, suffix) in kept {
         let text = stdout(&ok(repo, &args));

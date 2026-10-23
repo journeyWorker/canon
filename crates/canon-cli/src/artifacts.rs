@@ -297,6 +297,9 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
                 Ok(commit) => commit,
                 Err(e) => return e.emit("canon artifacts move", json),
             };
+            if commit {
+                crate::json_out::mark_unchanged();
+            }
             crate::say!(json, "{CMD}: the artifact store is already local; nothing to move");
             let report = ArtifactsMoveReport { backend: "local".into(), blobs: 0, uploaded: 0, already_in_store: 0, removed_local: 0, config_written: false, gitignore_added: false, skipped: Vec::new(), plan: if commit { plan.committed() } else { plan } };
             if json {
@@ -487,6 +490,9 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
     }
     for name in &skipped {
         crate::say!(json, "  left in place (not a blob): {name}");
+    }
+    if uploaded == 0 && removed == 0 && !config_written && !gitignore_added {
+        crate::json_out::mark_unchanged();
     }
     let report = ArtifactsMoveReport { backend: to.to_string(), blobs: blobs.len(), uploaded, already_in_store: already, removed_local: removed, config_written, gitignore_added, skipped, plan: plan.committed() };
     crate::next::finish(&repo, "artifacts move", &crate::next::Scope::Repo, false, json, &report);

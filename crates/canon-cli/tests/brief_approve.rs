@@ -128,6 +128,29 @@ fn approving_binds_the_brief_and_any_later_edit_is_refused_until_reapproved() {
 }
 
 #[test]
+fn the_same_approval_repeated_is_unchanged_and_a_different_one_is_written() {
+    let dir = repo_with_clean_brief();
+    let repo = dir.path();
+    let approve_json = |note: &str| {
+        let out = run(repo, &["brief", "approve", "--approver", "Ana", "--note", note, "--json"]);
+        assert!(out.status.success(), "{}", stderr(&out));
+        serde_json::from_slice::<Value>(&out.stdout).unwrap()
+    };
+    let first = approve_json("Go.");
+    assert!(first["meta"].get("unchanged").is_none(), "{first}");
+    let (brief, approval) = (std::fs::read(brief_path(repo)).unwrap(), std::fs::read(repo.join(".canon/policy.approval.json")).unwrap());
+
+    let again = approve_json("Go.");
+    assert_eq!(again["meta"]["unchanged"], true, "{again}");
+    assert_eq!(std::fs::read(brief_path(repo)).unwrap(), brief, "the repeat leaves the brief alone");
+    assert_eq!(std::fs::read(repo.join(".canon/policy.approval.json")).unwrap(), approval, "and the policy approval");
+
+    let other = approve_json("Go, with a changed answer.");
+    assert!(other["meta"].get("unchanged").is_none(), "{other}");
+    assert_ne!(std::fs::read(brief_path(repo)).unwrap(), brief, "another answer is a new approval");
+}
+
+#[test]
 fn a_digestless_approval_stays_approved_with_a_reapprove_advisory() {
     let dir = repo_with_clean_brief();
     let repo = dir.path();

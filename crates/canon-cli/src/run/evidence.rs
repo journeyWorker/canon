@@ -63,6 +63,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
             promote,
             repo,
             json,
+            ..
         }) => {
             let kind = class.unwrap_or_else(|| "test-run".to_string());
             let evidence_ref = evidence_ref.unwrap_or_else(|| reports.iter().map(|(_, path)| path.display().to_string()).collect::<Vec<_>>().join(","));
@@ -148,6 +149,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
             promote,
             repo,
             json,
+            ..
         }) => {
             let project_id = match project_for(&repo, project_id, "canon evidence audit", json) {
                 Ok(id) => Some(id),

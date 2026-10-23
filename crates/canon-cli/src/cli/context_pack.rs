@@ -14,6 +14,8 @@ pub struct ContextPackAddArgs {
     /// Output the complete pack manifest as JSON
     #[arg(long)]
     pub json: bool,
+    #[command(flatten)]
+    pub input: crate::cli::InputArgs,
 }
 
 #[derive(Subcommand)]

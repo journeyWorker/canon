@@ -277,7 +277,10 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
         };
         let matched = registry_matched + learn_counts.map_or(0, |(matched, _)| matched);
         let deleted = registry_deleted + learn_counts.map_or(0, |(_, deleted)| deleted);
-        if commit {
+        if commit && matched == 0 && deleted == 0 {
+            // Nothing was in the removal set, so nothing was read or deleted: no audit line, an unchanged run.
+            crate::json_out::mark_unchanged();
+        } else if commit {
             append_access_audit(repo, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted)?;
         }
         let report = purge_report(&outcome, learn_counts, if commit { plan.committed() } else { plan });
@@ -497,7 +500,11 @@ pub fn run_export(
             next_cursor_line = meta.human_line();
             return Ok(());
         }
-        if let Some(path) = out {
+        if out.is_some_and(|path| fs::read(path).is_ok_and(|held| held == encoded)) {
+            // The file already holds exactly this manifest: left alone (the access audit
+            // line is still appended, O7), and the run is unchanged.
+            crate::json_out::mark_unchanged();
+        } else if let Some(path) = out {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::OpenOptionsExt;

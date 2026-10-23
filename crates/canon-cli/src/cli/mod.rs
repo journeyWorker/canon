@@ -325,6 +325,17 @@ pub struct DryRunArgs {
     pub dry_run: bool,
 }
 
+/// `--input <JSON|FILE|->`, declared once and flattened into every writing and
+/// destructive leaf (0.28 D7; never a read leaf). The value is read before the
+/// command line reaches clap: [`crate::input::expand`] turns the document into
+/// ordinary `--kebab=value` arguments, so a handler never sees this field.
+#[derive(clap::Args, Clone, Debug, Default)]
+pub struct InputArgs {
+    /// The arguments as JSON: an object (one run) or an array / NDJSON file or `-` (a batch); keys are the option names in camelCase, `operands` an array
+    #[arg(long, value_name = "JSON|FILE|-")]
+    pub input: Option<String>,
+}
+
 /// `--commit --plan-digest <DIGEST>`, flattened into exactly the five
 /// destructive leaves (`purge`, `artifacts move`, `migrate`, `ledger compact`,
 /// `tier age`; 0.28 D6). The bare run is the preview: it prints the plan with

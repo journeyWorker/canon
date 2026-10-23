@@ -1723,6 +1723,9 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
     if !missing.is_empty() {
         crate::say!(json, "the bytes behind a file not stored are gone; `canon gate check` reports a latest record bound to one as stale-evidence — re-run and re-attest it with `canon evidence add`");
     }
+    if stored.is_empty() && missing.is_empty() {
+        crate::json_out::mark_unchanged();
+    }
     if json {
         crate::json_out::data("artifacts store", &ArtifactsStoreReport { dry_run, bound_files: files.len(), stored: &stored, already_stored: already, not_stored: &missing });
     }

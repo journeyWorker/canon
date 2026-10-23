@@ -7,7 +7,7 @@ use std::process::ExitCode;
 
 pub fn run(cmd: TierCommand) -> ExitCode {
     match cmd {
-        TierCommand::Age(TierAgeArgs { safety, repo, json }) => run_tier_age(&repo, &safety.mode(), json),
+        TierCommand::Age(TierAgeArgs { safety, repo, json, .. }) => run_tier_age(&repo, &safety.mode(), json),
     }
 }
 

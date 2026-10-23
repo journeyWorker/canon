@@ -470,6 +470,7 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_
             } else if wrote {
                 format!("canon subject adopt: {link} change `{}` to subject `{}` — {mode}", change_id.as_str(), subject_id.as_str())
             } else {
+                crate::json_out::mark_unchanged();
                 format!("canon subject adopt: change `{}` is already linked to subject `{}`; nothing written", change_id.as_str(), subject_id.as_str())
             };
             let warnings: Vec<String> = crate::brief::adoption_warning(repo, &subject, change_id)
@@ -496,6 +497,7 @@ pub fn run_unadopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dr
                 let (unlink, mode) = if dry_run { ("would unlink", "dry run, nothing written") } else { ("unlinked", crate::write_mode::DIRECT) };
                 format!("canon subject unadopt: {unlink} change `{}` from subject `{}` — {mode}", change_id.as_str(), subject_id.as_str())
             } else {
+                crate::json_out::mark_unchanged();
                 format!("canon subject unadopt: change `{}` is not linked to subject `{}`; nothing written", change_id.as_str(), subject_id.as_str())
             };
             report_subject(repo, &subject, "unadopt", dry_run, json, &human);
