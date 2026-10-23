@@ -65,8 +65,8 @@ pub fn run(cli: Cli) -> ExitCode {
         Command::Skills { action } => skills::run(action),
         Command::Tier { action } => tier::run(action),
         Command::Ledger { action } => ledger::run(action),
-        Command::Query(QueryArgs { kind, since, repo, canon_yaml, json, plugin, history, change_id, status, domain, include_sensitive, page, fields }) => {
-            run_query(&repo, canon_yaml.as_deref(), kind, since, json, plugin, history, change_id, status, domain, include_sensitive, page.page(), fields)
+        Command::Query(QueryArgs { kind, since, repo, json, plugin, history, change_id, status, domain, include_sensitive, page, fields }) => {
+            run_query(&repo, kind, since, json, plugin, history, change_id, status, domain, include_sensitive, page.page(), fields)
         }
         Command::Export(ExportArgs { kind, before, after, out, repo, json, include_sensitive, page, fields }) => ExitCode::from(crate::retention::run_export(&repo, kind, before, after, out.as_deref(), json, include_sensitive, &page.page(), fields.as_deref())),
         Command::Purge(PurgeArgs { kind, before, repo, plan, confirm, json }) => {
@@ -77,7 +77,7 @@ pub fn run(cli: Cli) -> ExitCode {
             };
             ExitCode::from(crate::retention::run_purge(&repo, kind, before, mode, json))
         }
-        Command::Format(FormatArgs { check: _, root, repo, json }) => run_fmt(&root, repo.as_deref(), json),
+        Command::Format(FormatArgs { dir, repo, json }) => run_fmt(dir.as_deref(), &repo, json),
         Command::Context(ContextArgs { repo, json, fields }) => run_context(&repo, json, fields),
         Command::Status(StatusArgs { repo, json, fields }) => ExitCode::from(crate::status::run(&repo, json, fields.as_deref()) as u8),
         Command::Init(InitArgs { repo, check_config, no_agents_md, policy, no_policy, providers, language, json }) => {
@@ -92,7 +92,7 @@ pub fn run(cli: Cli) -> ExitCode {
         Command::Retrieve(RetrieveArgs { role, regime, domain, subject_id, k, repo, json }) => run_retrieve(&repo, &role, regime.as_ref(), domain.as_deref(), subject_id.as_ref(), k, json),
         Command::Report(ReportArgs { repo, check, snapshot, json }) => run_report(&repo, check, snapshot.as_deref(), json),
         Command::Dashboard(DashboardArgs { repo, snapshot, port, json }) => run_dashboard(&repo, snapshot.as_deref(), port, json),
-        Command::RegimeKey(RegimeKeyArgs { role, repo, area, hash, json }) => run_regime_key(&role, &repo, &area, &hash, json),
+        Command::RegimeKey(RegimeKeyArgs { role, repo_name, area, hash, json }) => run_regime_key(&role, &repo_name, &area, &hash, json),
         Command::Selftest(SelftestArgs { json }) => crate::selftest::run_selftest(json),
         Command::Schema(SchemaArgs { path, json, errors, all }) => ExitCode::from(crate::schema::run(&crate::cli::command(), &path, json, errors, all)),
     }

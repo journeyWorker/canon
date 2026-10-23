@@ -394,7 +394,6 @@ fn rollup_for(kind: RecordKind, records: &[RawRecord]) -> Option<(usize, usize)>
 #[allow(clippy::too_many_arguments)]
 pub fn run(
     repo: &Path,
-    canon_yaml: Option<&Path>,
     kind: RecordKind,
     since: Option<DateTime<Utc>>,
     change_id: Option<&ChangeId>,
@@ -402,7 +401,7 @@ pub fn run(
     domain: Option<&str>,
     history: bool,
 ) -> Result<QueryOutcome, QueryError> {
-    let canon_yaml_path = resolve_canon_yaml(repo, canon_yaml);
+    let canon_yaml_path = resolve_canon_yaml(repo);
     let loaded = tiers::build_lenient_tiers_for_kind_read(&canon_yaml_path, kind)?;
     let archive = if history && canon_store::archive::is_archived_kind(kind) { loaded.git.as_ref().and_then(GitTier::archive_tier) } else { None };
     let registry = TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite);
@@ -785,7 +784,6 @@ fn scenario_key(raw: &RawRecord) -> Option<(ProjectId, ScenarioId)> {
 /// eliminating any risk of the two silently drifting into each other.
 pub fn run_with_plugin(
     repo: &Path,
-    canon_yaml: Option<&Path>,
     kind: RecordKind,
     since: Option<DateTime<Utc>>,
     plugin_id: &str,
@@ -793,7 +791,7 @@ pub fn run_with_plugin(
     status: Option<&str>,
     domain: Option<&str>,
 ) -> Result<(QueryOutcome, PluginQueryOutcome), QueryError> {
-    let canon_yaml_path = resolve_canon_yaml(repo, canon_yaml);
+    let canon_yaml_path = resolve_canon_yaml(repo);
     let loaded = tiers::build_lenient_tiers_for_kind_read(&canon_yaml_path, kind)?;
     let project_dir = tiers::project_dir(&canon_yaml_path).to_path_buf();
     let git_root = loaded.git.as_ref().map(|g| g.root().to_path_buf());

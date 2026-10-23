@@ -72,11 +72,10 @@ pub fn argv_wants_json() -> bool {
 }
 
 /// A command that needs canon state refuses, `CONFIG_MISSING`, when `--repo`
-/// (absent or `.`: the nearest ancestor of cwd with a `canon.yaml`; anything
-/// else: that directory as given) holds no `canon.yaml`. The exceptions are
-/// [`crate::context::CONFIG_EXEMPT`]; `--canon-yaml`, where a command takes
-/// one, names the file itself and the command reports a missing one; and
-/// `canon format` without `--repo`, which validates the corpus it is handed.
+/// (absent: the nearest ancestor of cwd with a `canon.yaml`; present: that
+/// directory as given) holds no `canon.yaml`. The exceptions are
+/// [`crate::context::CONFIG_EXEMPT`], and `canon format <DIR>` without
+/// `--repo`, which validates the corpus it is handed.
 pub fn refuse_without_config(parsed: &clap::ArgMatches) -> Option<ExitCode> {
     let mut names = Vec::new();
     let mut leaf = parsed;
@@ -88,11 +87,12 @@ pub fn refuse_without_config(parsed: &clap::ArgMatches) -> Option<ExitCode> {
     if !crate::context::needs_config(&command) {
         return None;
     }
-    let repo = leaf.try_get_one::<PathBuf>("repo").ok().flatten()?;
-    if leaf.try_get_one::<PathBuf>("canon_yaml").ok().flatten().is_some() {
+    // A leaf without `--repo` (`schema`, `selftest`, ...) names no repo to check.
+    let repo = leaf.try_get_one::<PathBuf>("repo").ok()?;
+    if command == "format" && leaf.try_get_one::<PathBuf>("dir").ok().flatten().is_some() && repo.is_none() {
         return None;
     }
     let json = leaf.try_get_one::<bool>("json").ok().flatten().copied().unwrap_or(false);
-    let error = crate::context::require_config(repo).err()?;
+    let error = crate::context::require_config(repo.map(PathBuf::as_path)).err()?;
     Some(ExitCode::from(error.emit(&format!("canon {command}"), json) as u8))
 }

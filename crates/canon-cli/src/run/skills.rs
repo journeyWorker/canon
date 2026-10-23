@@ -6,9 +6,9 @@ use std::process::ExitCode;
 
 pub fn run(cmd: SkillsCommand) -> ExitCode {
     match cmd {
-        SkillsCommand::Install(SkillsInstallArgs { source, target, providers, json }) => run_skills_install(source.as_deref(), &target, providers.as_deref(), json),
-        SkillsCommand::Check(SkillsCheckArgs { source, target, providers, json }) => run_skills_check(source.as_deref(), &target, providers.as_deref(), json),
-        SkillsCommand::Doctor(SkillsDoctorArgs { source, target, providers, json }) => run_skills_doctor(source.as_deref(), &target, providers.as_deref(), json),
+        SkillsCommand::Install(SkillsInstallArgs { source, repo, providers, json }) => run_skills_install(source.as_deref(), &repo, providers.as_deref(), json),
+        SkillsCommand::Check(SkillsCheckArgs { source, repo, providers, json }) => run_skills_check(source.as_deref(), &repo, providers.as_deref(), json),
+        SkillsCommand::Doctor(SkillsDoctorArgs { source, repo, providers, json }) => run_skills_doctor(source.as_deref(), &repo, providers.as_deref(), json),
     }
 }
 
@@ -100,9 +100,11 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
                 "remnants": report.remnants.iter().map(|r| r.display().to_string()).collect::<Vec<_>>(),
                 "outdated": report.outdated.as_ref().map(|o| serde_json::json!({ "path": o.path.display().to_string(), "installedBy": o.installed_by, "message": o.describe(&report.providers) })),
             });
+            let mut coverage = crate::coverage::Coverage::new();
+            coverage.count("providers", report.providers.len()).count("skillFiles", report.statuses.len());
             if clean {
                 if json {
-                    crate::json_out::data("skills check", data);
+                    crate::json_out::data_with_meta("skills check", data, coverage.meta());
                 }
                 ExitCode::SUCCESS
             } else {
@@ -110,7 +112,7 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
                 let by_hand: Vec<String> = report.orphans.iter().filter(|o| o.modified).map(|o| o.path.display().to_string()).collect();
                 let hint = if by_hand.is_empty() { format!("run `{fix}`") } else { format!("run `{fix}`, which prunes the orphans whose bytes still match the install lock; it keeps the modified ones ({}), so remove those by hand", by_hand.join(", ")) };
                 let orphaned = if report.orphans.is_empty() { String::new() } else { format!("; orphaned (no longer shipped by the bundle): {}", report.orphans.iter().map(|o| o.path.display().to_string()).collect::<Vec<_>>().join(", ")) };
-                ExitCode::from(CliError::failed("SKILLS_DRIFT", format!("an installed skill is missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version{orphaned}")).hint(hint).emit_with_data("canon skills check", json, data) as u8)
+                ExitCode::from(CliError::failed("SKILLS_DRIFT", format!("an installed skill is missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version{orphaned}")).hint(hint).emit_with_data_and_meta("canon skills check", json, data, coverage.meta()) as u8)
             }
         }
         Err(err) => { ExitCode::from(CliError::failed("SKILLS_FAILED", err.to_string()).hint("check that the target directory is writable; `canon skills doctor` diagnoses the installation").emit("canon skills check", json) as u8) }

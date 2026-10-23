@@ -8,7 +8,7 @@ use std::process::ExitCode;
 
 pub fn run(cmd: IngestCommand) -> ExitCode {
     match cmd {
-        IngestCommand::Sessions(IngestSessionsArgs { watch, interval_secs, home, canon_yaml, full, all_workspaces, json }) => run_ingest_sessions(&canon_yaml, home.as_deref(), watch, interval_secs, full, all_workspaces, json),
+        IngestCommand::Sessions(IngestSessionsArgs { watch, interval_secs, home, repo, full, all_workspaces, json }) => run_ingest_sessions(&repo.join("canon.yaml"), home.as_deref(), watch, interval_secs, full, all_workspaces, json),
         IngestCommand::Artifacts(IngestArtifactsArgs { watch, interval_secs, repo, json, run_id }) => run_ingest_artifacts(&repo, watch, interval_secs, json, run_id.as_ref()),
         IngestCommand::Plans(IngestPlansArgs { dialect, source, repo, json }) => run_ingest_plans(&repo, dialect.as_deref(), source.as_deref(), json),
     }

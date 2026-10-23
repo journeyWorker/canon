@@ -12,9 +12,8 @@ pub struct ContextPackNewArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete pack manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -32,9 +31,8 @@ pub struct PromptAddArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete bundle manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -43,9 +41,8 @@ pub struct PromptAddArgs {
 /// The flags of `demo add`.
 #[derive(clap::Args)]
 pub struct DemoAddArgs {
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -79,9 +76,8 @@ pub struct DivergenceAddArgs {
     pub role: RoleId,
     #[command(flatten)]
     pub promote: PromoteArgs,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -97,9 +93,8 @@ pub enum PluginCommand {
 pub struct PluginSyncArgs {
     /// A .canon/plugins/<id>/plugin.yaml manifest id (e.g. porting)
     pub plugin_id: String,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Sync exactly one ad hoc root, overriding canon.yaml's specs.roots[]
     #[arg(long)]
     pub spec_root: Option<PathBuf>,

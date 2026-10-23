@@ -36,9 +36,8 @@ pub struct InitArgs {
 
 #[derive(Args)]
 pub struct MigrateArgs {
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Print the plan and write nothing
     #[arg(long)]
     pub dry_run: bool,
@@ -49,9 +48,8 @@ pub struct MigrateArgs {
 
 #[derive(Args)]
 pub struct StatusArgs {
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -62,9 +60,8 @@ pub struct StatusArgs {
 
 #[derive(Args)]
 pub struct ContextArgs {
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -75,14 +72,11 @@ pub struct ContextArgs {
 
 #[derive(Args)]
 pub struct FormatArgs {
-    /// Validate and report violations (the default; kept for compatibility)
-    #[arg(long)]
-    pub check: bool,
-    /// Corpus root, e.g. a consumer repo's spec/ directory
-    pub root: PathBuf,
-    /// Repo root the corpus is resolved under (default: root used as-is)
-    #[arg(long)]
-    pub repo: Option<PathBuf>,
+    /// Corpus directory, e.g. a consumer repo's spec/ directory (default: every configured specs.roots[] entry). A relative path resolves under --repo when given, else the current directory
+    #[arg(value_name = "DIR")]
+    pub dir: Option<PathBuf>,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -105,9 +99,8 @@ pub struct RetrieveArgs {
     /// Top-k cap (default: canon's DEFAULT_K)
     #[arg(short, long)]
     pub k: Option<usize>,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -119,8 +112,8 @@ pub struct RegimeKeyArgs {
     #[arg(long)]
     pub role: String,
     /// The <repo> segment (canonicalized)
-    #[arg(long)]
-    pub repo: String,
+    #[arg(long = "repo-name", value_name = "NAME")]
+    pub repo_name: String,
     /// The <area> segment (canonicalized)
     #[arg(long)]
     pub area: String,
@@ -140,12 +133,8 @@ pub struct QueryArgs {
     /// Only records with at >= <since> (RFC3339/ISO-8601)
     #[arg(long, value_parser = crate::query::parse_since)]
     pub since: Option<DateTime<Utc>>,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
-    /// Explicit canon.yaml path (overrides --repo resolution)
-    #[arg(long)]
-    pub canon_yaml: Option<PathBuf>,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -185,8 +174,8 @@ pub struct ExportArgs {
     pub after: Option<DateTime<Utc>>,
     #[arg(long)]
     pub out: Option<PathBuf>,
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     #[arg(long)]
     pub json: bool,
     #[arg(long)]
@@ -204,8 +193,8 @@ pub struct PurgeArgs {
     pub kind: RecordKind,
     #[arg(long, value_parser = crate::query::parse_since)]
     pub before: DateTime<Utc>,
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Print the removal set and its `planDigest`; delete nothing
     #[arg(long, conflicts_with = "confirm")]
     pub plan: bool,
@@ -218,9 +207,8 @@ pub struct PurgeArgs {
 
 #[derive(Args)]
 pub struct ReportArgs {
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Byte-diff against .canon/REPORT.md (0 clean, 1 drift); --snapshot wins if both given
     #[arg(long)]
     pub check: bool,
@@ -234,9 +222,8 @@ pub struct ReportArgs {
 
 #[derive(Args)]
 pub struct DashboardArgs {
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Snapshot dir to serve (default: regenerated fresh each run)
     #[arg(long)]
     pub snapshot: Option<PathBuf>,

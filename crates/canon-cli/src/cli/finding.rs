@@ -12,9 +12,8 @@ pub struct ContextPackNewArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete pack manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -32,9 +31,8 @@ pub struct PromptAddArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete bundle manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -43,9 +41,8 @@ pub struct PromptAddArgs {
 /// The flags of `demo add`.
 #[derive(clap::Args)]
 pub struct DemoAddArgs {
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -112,9 +109,8 @@ pub struct FindingAddArgs {
     pub session_id: Option<canon_model::SessionId>,
     #[command(flatten)]
     pub promote: PromoteArgs,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -151,9 +147,8 @@ pub struct FindingCloseArgs {
     pub session_id: Option<canon_model::SessionId>,
     #[command(flatten)]
     pub promote: PromoteArgs,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -170,9 +165,8 @@ pub struct FindingListArgs {
     /// Print `{change_id, findings: [...], meta}` as JSON
     #[arg(long)]
     pub json: bool,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     #[command(flatten)]
     pub page: crate::paging::PageFlags,
     /// With --json, keep only these finding fields (comma-separated): round, seq, severity, disposition, reviewer, summary, resolution_sha, file_ref

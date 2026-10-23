@@ -6,12 +6,12 @@ use std::process::ExitCode;
 
 pub fn run(cmd: TierCommand) -> ExitCode {
     match cmd {
-        TierCommand::Age(TierAgeArgs { dry_run, repo, canon_yaml, json }) => run_tier_age(&repo, canon_yaml.as_deref(), dry_run, json),
+        TierCommand::Age(TierAgeArgs { dry_run, repo, json }) => run_tier_age(&repo, dry_run, json),
     }
 }
 
-fn run_tier_age(repo: &std::path::Path, canon_yaml: Option<&std::path::Path>, dry_run: bool, json: bool) -> ExitCode {
-    let canon_yaml_path = crate::context::resolve_canon_yaml(repo, canon_yaml);
+fn run_tier_age(repo: &std::path::Path, dry_run: bool, json: bool) -> ExitCode {
+    let canon_yaml_path = crate::context::resolve_canon_yaml(repo);
     match crate::tier::run(&canon_yaml_path, dry_run) {
         Ok(reports) => {
             crate::say_raw!(json, "{}", crate::tier::format_report(&reports, dry_run));

@@ -89,11 +89,7 @@ pub struct CommandMeta {
     pub roles: &'static [Role],
 }
 
-const fn row(path: &'static str, effect: Effect, roles: &'static [Role]) -> CommandMeta {
-    CommandMeta { path, effect, effect_note: None, exits: STANDARD_EXITS, roles }
-}
-
-/// A row whose exits differ from [`STANDARD_EXITS`], as its module documents.
+/// One row: every row names its own exits, taken from the leaf's table row.
 const fn row_exits(path: &'static str, effect: Effect, exits: &'static [ExitMeta], roles: &'static [Role]) -> CommandMeta {
     CommandMeta { path, effect, effect_note: None, exits, roles }
 }
@@ -105,9 +101,13 @@ impl CommandMeta {
     }
 }
 
-/// A command that writes only when it succeeds and has no operational lane:
-/// every failure is a refusal.
-const REFUSES: &[ExitMeta] = &[exit(0, "success"), exit(2, "refused or failed; nothing is left written")];
+/// Success, and a refusal where the leaf needs canon state: every failure of
+/// the leaf is a refusal.
+const REFUSABLE: &[ExitMeta] = &[exit(0, "success"), exit(2, "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written")];
+/// The same for a leaf that reads or writes no canon state.
+const REFUSABLE_NO_REPO: &[ExitMeta] = &[exit(0, "success"), exit(2, "refused: an argument or input that is missing, unreadable or invalid; nothing is written")];
+/// A destructive leaf: the bare run previews, `--commit --plan-digest` acts.
+const DESTRUCTIVE_EXITS: &[ExitMeta] = &[exit(0, "previewed, or committed, or nothing to do"), exit(2, "refused: CONFIG_MISSING, an invalid input, or PLAN_CHANGED; nothing is removed")];
 
 use Effect::{Destructive, Read, Write};
 use Role::{Implementer as I, Orchestrator as O, Planner as P, Reviewer as R};
@@ -117,77 +117,77 @@ const HUMAN: &[Role] = &[];
 
 /// One row per leaf command, canonical path first.
 pub const META: &[CommandMeta] = &[
-    row("adapter authorize", Read, &[O]),
-    row("adapter validate", Read, &[O]),
-    row_exits("artifacts migrate", Write, &[exit(0, "migrated, already migrated, or a dry run: nothing to do is success"), exit(2, "refused: the target is not an s3 tier, a blob does not match its name, the store is unreachable, or a write failed; nothing is removed until every blob verified")], &[O]),
-    row_exits("artifacts verify", Read, &[exit(0, "every bound file is stored (or, local store only, still proven by the working tree)"), exit(1, "a bound file is missing from the store or altered: data.problems names each"), exit(2, "refused: canon.yaml cannot be read or the store cannot be used or reached; an unreachable store is never a pass")], &[O]),
-    row("brief approve", Write, HUMAN),
-    row_exits("brief show", Read, &[exit(0, "shown: the state and the next one to three steps"), exit(1, "operational error, with a stable error code"), exit(2, "refused: no live change and none named (NO_BRIEF), no such change, or no canon.yaml at --repo (CONFIG_MISSING)")], &[P, R]),
-    row_exits("brief check", Read, &[exit(0, "clean (advisories allowed)"), exit(1, "operational error, with a stable error code"), exit(2, "blocker findings, or no canon.yaml at --repo (CONFIG_MISSING)")], &[P, R]),
-    row_exits("change new", Write, REFUSES, &[P]),
-    row_exits("context", Read, &[exit(0, "always: it describes what can be authored and never gates; an unreadable canon.yaml or policy degrades to the built-in surface, with the reason in policy.diagnostics")], EVERYONE),
-    row("context-pack new", Write, &[O, I]),
-    row("context-pack show", Read, &[O, I]),
-    row("context-pack verify", Read, &[O, I]),
-    row("dashboard", Write, &[O]),
-    row_exits("demo add", Write, REFUSES, &[O]),
-    row_exits("demo init", Write, REFUSES, &[O]),
-    row("dispatch begin", Write, &[O]),
-    row_exits("dispatch diff", Read, &[exit(0, "always, including when the observed graph differs from the declared plan or a side cannot be read (a note on stderr and in `notes`): it reports, it never gates"), exit(2, "refused: no canon.yaml at --repo (CONFIG_MISSING)")], &[O]),
-    row("dispatch end", Write, &[O]),
-    row_exits("divergence accept", Write, REFUSES, &[R]),
-    row("divergence add", Write, &[I, R]),
-    row("divergence defer", Write, &[I, R]),
-    row("divergence promote", Write, &[I, O]),
-    row("divergence resolve", Write, &[I, R]),
-    row_exits("divergence status", Read, &[exit(0, "always on a successful read: a capability query, never a gate"), exit(2, "refused: canon.yaml is missing or unreadable, or the ledger cannot be read")], EVERYONE),
-    row_exits("evidence add", Write, &[exit(0, "staged"), exit(1, "gate-red: a fabrication marker, an invalid typed atom, a contradicting report, or an unapproved brief refuses the record; nothing is staged"), exit(2, "usage or infrastructure: a malformed flag combination, an unknown task, no plan corpus, a write failure; nothing is staged")], &[I]),
-    row("evidence approval-payload", Read, &[I, O]),
-    row_exits("evidence vault", Write, &[exit(0, "the pass ran, whatever it could store: files it could not store are listed in `notStored`, not an error; their bytes are gone, so no retry could clear a failing exit (`canon gate check` reports the stale evidence)"), exit(2, "refused: the ledger cannot be read or a write failed")], &[O]),
-    row("export", Write, &[O]),
-    row_exits("feature new", Write, REFUSES, &[P, I]),
-    row_exits("finding add", Write, REFUSES, &[R]),
-    row_exits("finding close", Write, REFUSES, &[R]),
-    row_exits("finding list", Read, &[exit(0, "whether or not any finding matched"), exit(2, "refused: canon.yaml is missing or unreadable, or the ledger cannot be read")], EVERYONE),
-    row_exits("format", Read, &[exit(0, "clean"), exit(1, "the corpus has violations"), exit(2, "refused: the corpus root is not a directory, or --repo holds no canon.yaml")], EVERYONE),
-    row_exits("gate check", Read, &[exit(0, "clean"), exit(1, "the gate found violations, including a policy that changed since its approval"), exit(2, "the gate could not run: bad --repo or an unreadable ledger or config")], EVERYONE),
-    row("gate install-hooks", Write, &[O]),
-    row("gate promote", Write, &[I]),
-    row_exits("gate selftest", Read, &[exit(0, "every fixture is clean"), exit(1, "a fixture failed")], &[O]),
-    row_exits("gate task", Write, &[exit(0, "the task row was flipped"), exit(1, "gate-red: the row is not ready to flip; nothing is written"), exit(2, "usage or infrastructure: an unknown task, unreadable plan or config; nothing is written")], &[I]),
-    row("ingest artifacts", Write, &[O]),
-    row("ingest plans", Write, &[O]),
-    row("ingest sessions", Write, &[O]),
-    row_exits("init", Write, REFUSES, &[O]),
-    row("inventory sync", Write, &[I, O]),
-    row("learn approve", Write, &[O]),
-    row("learn promote", Write, &[O]),
-    row("learn rollback", Write, &[O]),
-    row_exits("ledger compact", Write, &[exit(0, "compacted, or nothing to move"), exit(1, "a move failed; what moved stays moved, the rest is untouched"), exit(2, "refused: the ledger has no archive, or canon.yaml is unreadable")], &[O]),
-    row_exits("migrate", Write, &[exit(0, "migrated, or nothing to do"), exit(1, "migrated, but the index rebuild found the corpus unclean"), exit(2, "refused or failed; nothing is written")], &[O]),
-    row("plugin sync", Write, &[O]),
-    row_exits("policy approve", Write, REFUSES, HUMAN),
-    row("policy show", Read, &[O]),
-    row("prompt add", Write, &[O]),
-    row("prompt show", Read, &[O]),
-    row("purge", Destructive, &[O]),
-    row("query", Read, EVERYONE).note("appends one line per run to the read-access audit log .canon/audit/access.jsonl, which `canon init` gitignores and which is never committed; changes nothing else"),
-    row("regime-key", Read, &[O]),
-    row("report", Write, &[O]).note("with --check it only compares the report on disk with a fresh render and writes nothing"),
-    row("retrieve", Read, EVERYONE),
-    row_exits("review add", Write, REFUSES, &[R]),
-    row_exits("scenario new", Write, REFUSES, &[P, I]),
-    row_exits("schema", Read, &[exit(0, "success"), exit(2, "refused: the command path does not resolve")], EVERYONE),
-    row_exits("selftest", Read, &[exit(0, "every suite is clean"), exit(1, "a suite failed")], &[O]),
-    row("skills check", Read, &[O]),
-    row("skills doctor", Read, &[O]),
-    row("skills install", Write, &[O]),
-    row_exits("status", Read, &[exit(0, "always once canon.yaml is found: a problem reading the repo is a warning"), exit(2, "refused: no canon.yaml at --repo (CONFIG_MISSING)"), exit(1, "the report could not be serialized (--json)")], EVERYONE),
-    row_exits("subject adopt", Write, REFUSES, &[P, O]),
-    row_exits("subject new", Write, REFUSES, &[P, O]),
-    row_exits("subject status", Write, &[exit(0, "the transition was recorded, or the subject was shown (no --to)"), exit(1, "an evidence, brief, review or policy-approval guard blocked the transition; the record is unchanged"), exit(2, "refused: an off-chain step, a missing reason, or a store failure")], &[O]).note("reads without --to: `subject status <id>` shows the subject and writes nothing"),
-    row_exits("subject unadopt", Write, REFUSES, &[P, O]),
-    row("tier age", Write, &[O]),
+    row_exits("adapter authorize", Read, &[exit(0, "authorized"), exit(1, "not authorized: the report stays in data"), exit(2, "refused: the response file is missing or unreadable")], &[O]),
+    row_exits("adapter validate", Read, &[exit(0, "valid envelope"), exit(1, "invalid envelope"), exit(2, "refused: the response file is missing or unreadable")], &[O]),
+    row_exits("artifacts migrate", Destructive, DESTRUCTIVE_EXITS, &[O]),
+    row_exits("artifacts verify", Read, &[exit(0, "every bound file is stored (or, local store only, still proven by the working tree)"), exit(1, "a bound file is missing from the store or altered: data.problems names each"), exit(2, "refused: canon.yaml cannot be read or the store cannot be used or reached")], &[O]),
+    row_exits("brief approve", Write, REFUSABLE, HUMAN),
+    row_exits("brief show", Read, REFUSABLE, &[P, R]),
+    row_exits("brief check", Read, &[exit(0, "clean (advisories allowed)"), exit(1, "blocker findings"), exit(2, "refused: no such change, no live change (NO_BRIEF), or CONFIG_MISSING")], &[P, R]),
+    row_exits("change new", Write, REFUSABLE, &[P]),
+    row_exits("context", Read, &[exit(0, "success: it describes what can be authored and never gates"), exit(2, "refused: UNKNOWN_FIELD")], EVERYONE),
+    row_exits("context-pack new", Write, REFUSABLE, &[O, I]),
+    row_exits("context-pack show", Read, &[exit(0, "shown"), exit(1, "the pack is tampered (CONTEXT_PACK_TAMPERED)"), exit(2, "refused: CONFIG_MISSING, or no such pack")], &[O, I]),
+    row_exits("context-pack verify", Read, &[exit(0, "verified"), exit(1, "the pack is tampered"), exit(2, "refused: CONFIG_MISSING, or no such pack")], &[O, I]),
+    row_exits("dashboard", Write, REFUSABLE, &[O]).note("regenerates .canon/dashboard-snapshot; POST /api/briefs/approve rewrites a brief"),
+    row_exits("demo add", Write, REFUSABLE, &[O]),
+    row_exits("demo init", Write, REFUSABLE, &[O]),
+    row_exits("dispatch begin", Write, REFUSABLE, &[O]),
+    row_exits("dispatch diff", Read, REFUSABLE, &[O]),
+    row_exits("dispatch end", Write, REFUSABLE, &[O]),
+    row_exits("divergence accept", Write, REFUSABLE, HUMAN).note("refreshes stale scenario-index records first"),
+    row_exits("divergence add", Write, REFUSABLE, &[I, R]),
+    row_exits("divergence defer", Write, REFUSABLE, &[I, R]),
+    row_exits("divergence promote", Write, &[exit(0, "promoted, recovered or nothing staged"), exit(1, "PROMOTE_REFUSED: the report stays in data"), exit(2, "refused: CONFIG_MISSING, or an unreadable ledger")], &[I]),
+    row_exits("divergence resolve", Write, REFUSABLE, &[I, R]),
+    row_exits("divergence status", Read, REFUSABLE, EVERYONE),
+    row_exits("evidence add", Write, &[exit(0, "staged, committed or unchanged"), exit(1, "refused by the gate: a fabrication marker, an invalid typed atom, a contradicting report, an unapproved brief, or EVIDENCE_BATCH_REFUSED; nothing is staged"), exit(2, "refused: CONFIG_MISSING, a malformed flag combination, an unknown task, or no plan corpus; nothing is staged")], &[I]).note("refreshes stale scenario-index records first"),
+    row_exits("evidence approval-payload", Read, REFUSABLE, &[I, O]),
+    row_exits("evidence vault", Write, REFUSABLE, &[O]).note("refreshes stale scenario-index records first"),
+    row_exits("export", Write, REFUSABLE, &[O]).note("writes the --output file (mode 0600) and one audit line"),
+    row_exits("feature new", Write, REFUSABLE, &[P, I]),
+    row_exits("finding add", Write, REFUSABLE, &[R]),
+    row_exits("finding close", Write, REFUSABLE, &[R]),
+    row_exits("finding list", Read, REFUSABLE, EVERYONE),
+    row_exits("format", Read, &[exit(0, "clean"), exit(1, "the corpus has violations, or has 0 files (unverifiable)"), exit(2, "refused: the corpus root is not a directory, or CONFIG_MISSING")], EVERYONE),
+    row_exits("gate check", Read, &[exit(0, "clean"), exit(1, "the gate found violations, or nothing was examined (unverifiable)"), exit(2, "refused: CONFIG_MISSING, or an unreadable ledger or config")], EVERYONE),
+    row_exits("gate install-hooks", Write, REFUSABLE, &[O]),
+    row_exits("gate promote", Write, &[exit(0, "promoted, recovered or nothing staged"), exit(1, "PROMOTE_REFUSED: the report stays in data"), exit(2, "refused: CONFIG_MISSING, or an unreadable ledger")], &[I]),
+    row_exits("gate selftest", Read, &[exit(0, "every fixture is clean"), exit(1, "a fixture failed")], &[O]).note("scratch directories in the system temp dir, removed on exit"),
+    row_exits("gate task", Write, &[exit(0, "the task row was flipped, or already was"), exit(1, "GATE_TASK_BLOCKED: the row is not ready to flip; nothing is written"), exit(2, "refused: CONFIG_MISSING, an unknown task, or an unreadable plan")], &[I]),
+    row_exits("ingest artifacts", Write, REFUSABLE, &[O]),
+    row_exits("ingest plans", Write, &[exit(0, "ingested"), exit(1, "INGEST_SOURCE_UNUSABLE: every source is unusable"), exit(2, "refused: CONFIG_MISSING, or an invalid argument")], &[O]),
+    row_exits("ingest sessions", Write, REFUSABLE, &[O]),
+    row_exits("init", Write, &[exit(0, "initialized, or (--check) every section passes"), exit(1, "--check: a section failed"), exit(2, "refused: an invalid argument or an unusable directory; nothing is written")], &[O]).note("--check writes nothing"),
+    row_exits("inventory sync", Write, &[exit(0, "synced, or unchanged"), exit(1, "violations or duplicates in a root (INVENTORY_ABORTED); nothing is written for it"), exit(2, "refused: CONFIG_MISSING, or an invalid argument")], &[I, O]),
+    row_exits("learn approve", Read, REFUSABLE, &[O]),
+    row_exits("learn promote", Write, &[exit(0, "promoted, or a dry run"), exit(1, "promotion blocked: the report names why"), exit(2, "refused: CONFIG_MISSING, or an argument error")], &[O]),
+    row_exits("learn rollback", Write, REFUSABLE, &[O]),
+    row_exits("ledger compact", Destructive, DESTRUCTIVE_EXITS, &[O]),
+    row_exits("migrate", Destructive, &[exit(0, "previewed, migrated, or nothing to do"), exit(1, "migrated, but the index rebuild found the corpus unclean"), exit(2, "refused: an invalid input, PLAN_CHANGED, or uncommitted changes under a moved path; nothing is written")], &[O]),
+    row_exits("plugin sync", Write, &[exit(0, "synced, or deduped"), exit(1, "per-candidate write errors (PLUGIN_SYNC_ERRORS)"), exit(2, "refused: CONFIG_MISSING, or the plugin does not resolve")], &[O]),
+    row_exits("policy approve", Write, REFUSABLE, HUMAN),
+    row_exits("policy show", Read, REFUSABLE, &[O]),
+    row_exits("prompt add", Write, &[exit(0, "added, or unchanged"), exit(1, "CONTEXT_OBJECT_CONFLICT: different content under one name@version"), exit(2, "refused: CONFIG_MISSING, or an invalid manifest or label")], &[O]),
+    row_exits("prompt show", Read, REFUSABLE, &[O]),
+    row_exits("purge", Destructive, DESTRUCTIVE_EXITS, &[O]).note("writes one audit line"),
+    row_exits("query", Read, REFUSABLE, EVERYONE).note("appends one line to .canon/audit/access.jsonl; a refused run writes none"),
+    row_exits("regime-key", Read, REFUSABLE_NO_REPO, &[O]),
+    row_exits("report", Write, &[exit(0, "built, or (--check) fresh"), exit(1, "REPORT_FAILED, or (--check) the report is missing or has drifted (REPORT_STALE)"), exit(2, "refused: CONFIG_MISSING, or an invalid argument")], &[O]).note("with --check it only compares the report on disk with a fresh render and writes nothing; scratch files go under the system temp dir"),
+    row_exits("retrieve", Read, REFUSABLE, EVERYONE),
+    row_exits("review add", Write, REFUSABLE, &[R]).note("scenario half: refreshes stale scenario-index records first"),
+    row_exits("scenario new", Write, REFUSABLE, &[P, I]),
+    row_exits("schema", Read, REFUSABLE_NO_REPO, EVERYONE),
+    row_exits("selftest", Read, &[exit(0, "every suite is clean"), exit(1, "a suite failed"), exit(2, "refused: unknown suite")], &[O]).note("scratch directories in the system temp dir, removed on exit"),
+    row_exits("skills check", Read, &[exit(0, "clean"), exit(1, "drift (SKILLS_DRIFT)"), exit(2, "refused: an invalid argument")], &[O]),
+    row_exits("skills doctor", Read, &[exit(0, "always: diagnostics only")], &[O]),
+    row_exits("skills install", Write, REFUSABLE, &[O]),
+    row_exits("status", Read, &[exit(0, "success, whatever it finds"), exit(1, "unverifiable: nothing was examined"), exit(2, "refused: CONFIG_MISSING, or UNKNOWN_FIELD")], EVERYONE),
+    row_exits("subject adopt", Write, REFUSABLE, &[P, O]),
+    row_exits("subject new", Write, REFUSABLE, &[P, O]),
+    row_exits("subject status", Write, &[exit(0, "the transition was recorded, or the subject was shown (no --to)"), exit(1, "SUBJECT_GATE_VIOLATION: an evidence, brief, review or policy-approval guard blocked the transition; the record is unchanged"), exit(2, "refused: an invalid transition, a missing reason, an unknown subject, or CONFIG_MISSING")], &[O]).note("reads without --to: `subject status <id>` shows the subject and writes nothing; with --to it refreshes stale scenario-index records first"),
+    row_exits("subject unadopt", Write, REFUSABLE, &[P, O]),
+    row_exits("tier age", Destructive, DESTRUCTIVE_EXITS, &[O]),
 ];
 
 /// Canonical paths of every leaf command under `cmd`, sorted.
@@ -441,20 +441,11 @@ fn arg_schema(arg: &clap::Arg) -> ArgSchema {
     }
 }
 
-/// What an option holds when it is not given. A `--repo` whose default is `.`
-/// does not mean the current directory: `.` (given or not) is resolved to the
-/// nearest ancestor of it that has a `canon.yaml`
-/// ([`crate::context::resolve_repo_root`]), so the schema says that.
+/// What an option holds when it is not given. `--repo` has no default: absent,
+/// it means the nearest ancestor directory holding a `canon.yaml` (D5).
 fn default_values(arg: &clap::Arg) -> Vec<String> {
-    let values: Vec<String> = arg.get_default_values().iter().map(|v| v.to_string_lossy().into_owned()).collect();
-    if arg.get_id() == "repo" && values == ["."] {
-        return vec![NEAREST_CONFIG_DIR.to_string()];
-    }
-    values
+    arg.get_default_values().iter().map(|v| v.to_string_lossy().into_owned()).collect()
 }
-
-/// The reported default of a `--repo` that is `.` (see [`default_values`]).
-const NEAREST_CONFIG_DIR: &str = "nearest ancestor directory with a canon.yaml";
 
 fn command_schema(canonical: &[String], cmd: &Command) -> CommandSchema {
     let key = canonical.join(" ");
@@ -665,11 +656,11 @@ mod tests {
 
     #[test]
     fn drift_is_reported_both_ways() {
-        let meta = [row("format", Read, EVERYONE), row("ghost", Read, EVERYONE)];
+        let meta = [row_exits("format", Read, REFUSABLE, EVERYONE), row_exits("ghost", Read, REFUSABLE, EVERYONE)];
         let problems = check_metadata(&tree(), &meta);
         assert!(problems.iter().any(|p| p.contains("`evidence add`") && p.contains("no metadata row")));
         assert!(problems.iter().any(|p| p.contains("`ghost`")));
-        assert!(check_metadata(&tree(), &[row("format", Read, EVERYONE), row("evidence add", Write, &[I])]).is_empty());
+        assert!(check_metadata(&tree(), &[row_exits("format", Read, REFUSABLE, EVERYONE), row_exits("evidence add", Write, REFUSABLE, &[I])]).is_empty());
     }
 
     #[test]

@@ -9,9 +9,8 @@ pub struct ContextPackNewArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete pack manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -29,9 +28,8 @@ pub struct PromptAddArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete bundle manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -40,9 +38,8 @@ pub struct PromptAddArgs {
 /// The flags of `demo add`.
 #[derive(clap::Args)]
 pub struct DemoAddArgs {
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -64,9 +61,8 @@ pub enum GateCommand {
 
 #[derive(Args)]
 pub struct GateCheckArgs {
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Additionally engage the release-scoped trust check
     #[arg(long)]
     pub release: bool,
@@ -79,9 +75,8 @@ pub struct GateCheckArgs {
 pub struct GateTaskArgs {
     /// The task id (<change_id>#<n>)
     pub task_id: String,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -89,9 +84,8 @@ pub struct GateTaskArgs {
 
 #[derive(Args)]
 pub struct GatePromoteArgs {
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Preview without writing anything
     #[arg(long)]
     pub dry_run: bool,
@@ -102,9 +96,8 @@ pub struct GatePromoteArgs {
 
 #[derive(Args)]
 pub struct GateInstallHooksArgs {
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// The hook event name (e.g. PreToolUse, Stop)
     #[arg(long, default_value = "PreToolUse")]
     pub event: String,

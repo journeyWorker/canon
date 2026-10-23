@@ -100,8 +100,8 @@ use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 use crate::language::{Language, Resolved, Shipped, Tally};
 
-/// Exit code for blocker findings (mirrors `canon change new`'s refusal).
-const EXIT_BLOCKERS: i32 = 2;
+/// Exit code for blocker findings: the check's own finding (D4: exit 1), not a refusal.
+const EXIT_BLOCKERS: i32 = 1;
 
 /// A finding's severity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -1971,7 +1971,7 @@ pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
             Ok(mut value) => {
                 if counts.blockers > 0 {
                     // One document: the findings keep their fields and gain the shared `error`.
-                    let error = CliError::refused("BRIEF_HAS_BLOCKERS", format!("{} blocker(s) in {}", counts.blockers, checked.brief)).hint("fix each blocker in `findings`, then run `canon brief check` again");
+                    let error = CliError::failed("BRIEF_HAS_BLOCKERS", format!("{} blocker(s) in {}", counts.blockers, checked.brief)).hint("fix each blocker in `findings`, then run `canon brief check` again");
                     eprintln!("{}", error.human("canon brief check"));
                     value["error"] = error.to_json()["error"].clone();
                 }

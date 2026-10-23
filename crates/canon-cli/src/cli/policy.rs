@@ -1,7 +1,6 @@
 //! `canon policy` — the clap tree of the group.
 
 use clap::{Args, Subcommand};
-use std::path::PathBuf;
 
 #[derive(Subcommand)]
 pub enum PolicyCommand {
@@ -19,9 +18,8 @@ pub struct PolicyApproveArgs {
     /// Why, or what was reviewed
     #[arg(long)]
     pub note: Option<String>,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -29,9 +27,8 @@ pub struct PolicyApproveArgs {
 
 #[derive(Args)]
 pub struct PolicyShowArgs {
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,

@@ -179,7 +179,7 @@ fn input_validation_refusals_name_the_field_and_the_accepted_values() {
     let e = error_of(dir.path(), &["finding", "close", "--change-id", "add-login", "--round", "1", "--seq", "1", "--disposition", "fixed"]);
     assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("FINDING_RESOLUTION_SHA_REQUIRED"), Some("--resolution-sha")));
 
-    let regime = String::from_utf8(run(dir.path(), &["regime-key", "--role", "implementer", "--repo", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
+    let regime = String::from_utf8(run(dir.path(), &["regime-key", "--role", "implementer", "--repo-name", "r", "--area", "a", "--hash", "abcdef012345"]).stdout).unwrap().trim().to_string();
     let e = error_of(dir.path(), &["dispatch", "begin", "--role", "reviewer", "--regime", &regime]);
     assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("DISPATCH_ROLE_REGIME_MISMATCH"), Some("--role")));
     assert_eq!(strings(&e["expected"]), ["implementer"]);
@@ -309,15 +309,17 @@ fn dispatch_diff_exits_zero_whatever_it_finds() {
     assert!(body(&out)["counts"].is_object());
 }
 
+/// A leaf that never gates, and one that cannot exit 1, say so in their schema:
+/// the exit rows are the leaf's own, not a shared default.
 #[test]
-fn the_exceptions_say_why_in_their_schema_exit_meanings() {
+fn the_exceptions_declare_only_the_exits_they_have() {
     let dir = TempDir::new().unwrap();
-    for (command, needle) in [(vec!["context"], "never gates"), (vec!["dispatch", "diff"], "never gates"), (vec!["evidence", "vault"], "notStored")] {
+    for (command, exits) in [(vec!["context"], vec![0, 2]), (vec!["dispatch", "diff"], vec![0, 2]), (vec!["evidence", "vault"], vec![0, 2]), (vec!["gate", "check"], vec![0, 1, 2])] {
         let mut args = vec!["schema"];
         args.extend(&command);
         args.push("--json");
         let schema = body(&run(dir.path(), &args))["data"].clone();
-        let meanings: Vec<&str> = schema["exits"].as_array().unwrap().iter().map(|e| e["meaning"].as_str().unwrap()).collect();
-        assert!(meanings.iter().any(|m| m.contains(needle)), "{command:?}: {meanings:?}");
+        let declared: Vec<u64> = schema["exits"].as_array().unwrap().iter().map(|e| e["code"].as_u64().unwrap()).collect();
+        assert_eq!(declared, exits, "{command:?}");
     }
 }

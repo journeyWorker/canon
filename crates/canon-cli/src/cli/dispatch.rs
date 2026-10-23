@@ -10,9 +10,8 @@ pub struct ContextPackNewArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete pack manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -30,9 +29,8 @@ pub struct PromptAddArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete bundle manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -41,9 +39,8 @@ pub struct PromptAddArgs {
 /// The flags of `demo add`.
 #[derive(clap::Args)]
 pub struct DemoAddArgs {
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -94,9 +91,8 @@ pub struct DispatchBeginArgs {
     /// RunId (ULID) of the run that dispatched this one
     #[arg(long, value_parser = crate::dispatch::parse_run_id)]
     pub parent_run: Option<RunId>,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -110,9 +106,8 @@ pub struct DispatchEndArgs {
     /// Terminal outcome: succeeded or failed
     #[arg(long, value_parser = crate::dispatch::run_status_parser())]
     pub status: RunStatus,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -120,9 +115,8 @@ pub struct DispatchEndArgs {
 
 #[derive(Args)]
 pub struct DispatchDiffArgs {
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,

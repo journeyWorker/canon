@@ -9,9 +9,8 @@ pub struct ContextPackNewArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete pack manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -29,9 +28,8 @@ pub struct PromptAddArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete bundle manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -53,9 +51,8 @@ pub struct PromptShowArgs {
     /// Bundle version
     #[arg(long)]
     pub version: String,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete bundle manifest as JSON
     #[arg(long)]
     pub json: bool,

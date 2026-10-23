@@ -899,11 +899,14 @@ fn status_warns_when_no_policy_enforces_coverage() {
 }
 
 #[test]
-fn status_reports_an_unreadable_canon_yaml_and_still_exits_zero() {
+fn status_reports_an_unreadable_canon_yaml_and_is_unverifiable() {
     let dir = TempDir::new().unwrap();
     std::fs::write(dir.path().join("canon.yaml"), "tiers: [not, a, map]\n").unwrap();
 
-    let report = status_json(dir.path());
+    // Nothing could be counted: the report is still printed, and the exit is 1 (D3), never a silent 0.
+    let out = run(dir.path(), &["status", "--json"]);
+    assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
+    let report: Value = serde_json::from_str(&stdout(&out)).expect("status --json prints one JSON object");
     assert!(report["warnings"].as_array().unwrap().iter().any(|w| w.as_str().unwrap().starts_with("cannot read this repo's ledger: parsing `")), "{report}");
     assert_eq!(commands(&report), ["canon init --check-config"]);
 }

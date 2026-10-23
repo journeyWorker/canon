@@ -9,9 +9,8 @@ pub struct ContextPackNewArgs {
     /// Repository-relative input manifest
     #[arg(long)]
     pub manifest: PathBuf,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete pack manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -31,9 +30,8 @@ pub enum ContextPackCommand {
 pub struct ContextPackShowArgs {
     /// Context pack id (sha256:<64 hex digits>)
     pub id: String,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output the complete pack manifest as JSON
     #[arg(long)]
     pub json: bool,
@@ -43,9 +41,8 @@ pub struct ContextPackShowArgs {
 pub struct ContextPackVerifyArgs {
     /// Context pack id (sha256:<64 hex digits>)
     pub id: String,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output a JSON verification result
     #[arg(long)]
     pub json: bool,

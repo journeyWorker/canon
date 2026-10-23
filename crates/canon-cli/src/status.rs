@@ -178,6 +178,11 @@ pub struct StatusReport {
     /// Change id → the subjects joined to it.
     #[serde(skip)]
     pub change_subjects: BTreeMap<String, Vec<String>>,
+    /// Whether the ledger was read at all. False when canon.yaml or the
+    /// ledger could not be loaded: nothing was examined (D3), so the run is
+    /// `unverifiable` rather than a report of empty counts.
+    #[serde(skip)]
+    pub examined: bool,
 }
 
 /// Where audits stand (0.15 D3).
@@ -396,7 +401,35 @@ pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> i32 {
     } else {
         print!("{}", render(&report));
     }
+    // A ledger that could not be read gave the report nothing to count (D3): `unverifiable`, never a silent pass.
+    if status_coverage(&repo, &report).examined_nothing() {
+        let error = crate::coverage::unverifiable_error("canon status", "nothing: canon.yaml or the ledger could not be read", "fix what `warnings` names (`canon init --check-config` reports what is wrong in canon.yaml), then run `canon status` again");
+        eprintln!("{}", error.human("canon status"));
+        return error.exit;
+    }
     0
+}
+
+/// What the report counted: the subjects and scenarios it joined, under the
+/// spec roots `canon.yaml` configures.
+pub fn status_coverage(repo: &Path, report: &StatusReport) -> crate::coverage::Coverage {
+    let mut coverage = crate::coverage::Coverage::new();
+    match crate::inventory::load_spec_roots(&repo.join("canon.yaml")) {
+        Ok(roots) => {
+            for root in roots {
+                coverage.root(root.id.as_str(), root.root.strip_prefix(repo).unwrap_or(&root.root).display().to_string(), 0);
+            }
+        }
+        Err(err) => {
+            coverage.skip("specs.roots", err.to_string());
+        }
+    }
+    coverage.count("subjects", report.subjects.len()).count("scenarios", report.scenario_owner.len() + report.unowned.len());
+    coverage.count("ledgers", usize::from(report.examined));
+    if !report.examined {
+        coverage.skip("ledger", "canon.yaml or the ledger could not be read");
+    }
+    coverage
 }
 
 impl StatusReport {
@@ -472,7 +505,9 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
             warnings.extend(crate::policy_approval::advisory(repo));
             warnings.push(format!("cannot read this repo's ledger: {e}"));
             next.push(NextStep { command: "canon init --check-config".into(), why: "canon.yaml must load before anything can be counted".into(), actor: StepActor::Agent, role: Some(Role::Orchestrator) });
-            return finish(repo, &policy, warnings, Vec::new(), Vec::new(), None, next);
+            let mut report = finish(repo, &policy, warnings, Vec::new(), Vec::new(), None, next);
+            report.examined = false;
+            return report;
         }
     };
 
@@ -721,6 +756,7 @@ fn finish(
         all_next,
         scenario_owner: BTreeMap::new(),
         change_subjects: BTreeMap::new(),
+        examined: true,
     }
 }
 

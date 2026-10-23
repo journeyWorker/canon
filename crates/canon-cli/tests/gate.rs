@@ -43,13 +43,19 @@ fn write_canon_yaml(dir: &Path) {
 
 // ── canon gate check ──
 
+/// A repo with no scenario, subject, change or evidence gave the gate nothing
+/// to be right about: `unverifiable`, exit 1, never clean (D3).
 #[test]
-fn gate_check_exits_clean_on_an_empty_repo() {
+fn gate_check_on_an_empty_repo_is_unverifiable_not_clean() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(dir.path());
-    let output = run_canon(&["gate", "check", "--repo", "."], dir.path());
-    assert!(output.status.success(), "empty repo must gate green; stderr: {}", stderr(&output));
-    assert!(stdout(&output).contains("clean"), "{}", stdout(&output));
+    let output = run_canon(&["gate", "check", "--repo", ".", "--json"], dir.path());
+    assert_eq!(output.status.code(), Some(1), "stdout: {}\nstderr: {}", stdout(&output), stderr(&output));
+    let body: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("one JSON document");
+    assert_eq!(body["error"]["code"], "UNVERIFIABLE");
+    assert_eq!(body["data"]["unverifiable"], true);
+    assert_eq!(body["data"]["clean"], false);
+    assert_eq!(body["meta"]["coverage"]["scenarios"], 0, "{body}");
 }
 
 /// A present `canon.yaml` canon cannot parse is a usage error naming the
@@ -134,7 +140,7 @@ fn gate_check_fails_on_an_unknown_top_level_policy_key() {
 
     std::fs::write(dir.path().join(".canon/policy.yaml"), "trust_required:\n  test-run: agent\nquery:\n  allow_sensitive: false\n").unwrap();
     let output = run_canon(&["gate", "check", "--repo", "."], dir.path());
-    assert!(output.status.success(), "known keys must gate green; stdout: {}", stdout(&output));
+    assert!(!stdout(&output).contains("uncovered-cell"), "known keys raise no violation; stdout: {}", stdout(&output));
 }
 
 #[test]

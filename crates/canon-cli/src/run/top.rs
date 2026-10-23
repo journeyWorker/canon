@@ -17,7 +17,6 @@ use std::process::ExitCode;
 #[allow(clippy::too_many_arguments)]
 pub(super) fn run_query(
     repo: &std::path::Path,
-    canon_yaml: Option<&std::path::Path>,
     kind: RecordKind,
     since: Option<DateTime<Utc>>,
     json: bool,
@@ -35,26 +34,21 @@ pub(super) fn run_query(
     // fault here is a clean, nothing-read `2`, never a store error.
     if let Err(e) = crate::query::validate_scope(kind, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
         e.to_cli_error().emit("canon query", json);
-        let _ = crate::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
         return ExitCode::from(2);
     }
 
     if let Err(err) = crate::retention::validate_sensitive(repo, include_sensitive) {
         CliError::refused("QUERY_INVALID_ARGUMENT", err.to_string()).hint("`canon schema query` lists the accepted arguments and their forms").emit("canon query", json);
-        let _ = crate::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
         return ExitCode::from(2);
     }
     let Some(plugin_id) = plugin else {
-        return match crate::query::run(repo, canon_yaml, kind, since, change_id.as_ref(), status.as_deref(), domain.as_deref(), history) {
+        return match crate::query::run(repo, kind, since, change_id.as_ref(), status.as_deref(), domain.as_deref(), history) {
             Ok(outcome) => {
                 let outcome = match crate::query::page_outcome(outcome, &page, fields, false) {
                     Ok(outcome) => outcome,
-                    Err(err) => {
-                        let _ = crate::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
-                        return ExitCode::from(err.emit("canon query", json) as u8);
-                    }
+                    Err(err) => return ExitCode::from(err.emit("canon query", json) as u8),
                 };
-                let _ = crate::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, outcome.records.len());
+                let _ = crate::retention::audit_query(repo, kind, since, include_sensitive, outcome.records.len());
                 if json {
                     println!("{}", crate::query::format_json_with_sensitive(&outcome, include_sensitive));
                 } else {
@@ -63,22 +57,18 @@ pub(super) fn run_query(
                 ExitCode::SUCCESS
             }
             Err(err) => {
-                let _ = crate::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
                 ExitCode::from(CliError::failed("QUERY_FAILED", err.to_string()).hint("run `canon inventory sync` to rebuild the index, then run the query again").emit("canon query", json) as u8)
             }
         };
     };
 
-    match crate::query::run_with_plugin(repo, canon_yaml, kind, since, &plugin_id, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
+    match crate::query::run_with_plugin(repo, kind, since, &plugin_id, change_id.as_ref(), status.as_deref(), domain.as_deref()) {
         Ok((outcome, plugin_outcome)) => {
             let outcome = match crate::query::page_outcome(outcome, &page, fields, true) {
                 Ok(outcome) => outcome,
-                Err(err) => {
-                    let _ = crate::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
-                    return ExitCode::from(err.emit("canon query", json) as u8);
-                }
+                Err(err) => return ExitCode::from(err.emit("canon query", json) as u8),
             };
-            let _ = crate::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, outcome.records.len());
+            let _ = crate::retention::audit_query(repo, kind, since, include_sensitive, outcome.records.len());
             for msg in &plugin_outcome.diagnostics {
                 eprintln!("canon query --plugin {plugin_id}: {msg}");
             }
@@ -96,7 +86,6 @@ pub(super) fn run_query(
             ExitCode::SUCCESS
         }
         Err(err) => {
-            let _ = crate::retention::audit_query(repo, canon_yaml, kind, since, include_sensitive, 0);
             ExitCode::from(CliError::failed("QUERY_FAILED", err.to_string()).hint("run `canon inventory sync` to rebuild the index, then run the query again").emit("canon query", json) as u8)
         }
     }
@@ -112,36 +101,71 @@ pub(super) fn with_provenance_fix(base: &str, missing_provenance: bool) -> Strin
     }
 }
 
-/// `repo: None` (every existing invocation) leaves `root` untouched --
-/// zero new function calls, byte-identical to pre-s26 (design D1). `repo:
-/// Some(r)` resolves the corpus actually checked as
-/// `resolve_repo_root(r).join(root)` -- `root` stays the corpus-relative
-/// suffix, `--repo` supplies the base.
-pub(super) fn run_fmt(root: &std::path::Path, repo: Option<&std::path::Path>, json: bool) -> ExitCode {
-    let resolved_root = match repo {
-        Some(r) => crate::context::resolve_repo_root(r).join(root),
-        None => root.to_path_buf(),
+/// `canon format [<DIR>]`: validates the corpus under `DIR`, or under every
+/// configured `specs.roots[]` entry when none is given. A relative `DIR`
+/// resolves under `--repo` when that is given, else the current directory.
+/// Exit 1 = violations, or a corpus with no file to check (`unverifiable`);
+/// exit 2 = `DIR` is not a directory, or the configured roots cannot be read.
+pub(super) fn run_fmt(dir: Option<&std::path::Path>, repo: &crate::cli::RepoArgs, json: bool) -> ExitCode {
+    let mut coverage = crate::coverage::Coverage::new();
+    let mut report = canon_fmt::FmtReport::default();
+    let mut check = |id: &str, shown: String, root: &std::path::Path, coverage: &mut crate::coverage::Coverage| {
+        let one = crate::fmt::run(root);
+        coverage.root(id, shown, one.files_checked);
+        report.files_checked += one.files_checked;
+        report.violations.extend(one.violations);
     };
-    // A corpus root that is not a directory holds no files to find wrong: it must not read as clean.
-    if !resolved_root.is_dir() {
-        let error = CliError::refused("REPO_UNREADABLE", format!("`{}` is not a directory, so there is no corpus to check", resolved_root.display()))
-            .field("root")
-            .hint("pass the corpus root, e.g. `canon format .canon/specs`, relative to the current directory or to --repo");
-        return ExitCode::from(error.emit("canon format", json) as u8);
+    match dir {
+        Some(dir) => {
+            let resolved = match repo.given() {
+                Some(_) if !dir.is_absolute() => repo.join(dir),
+                _ => dir.to_path_buf(),
+            };
+            // A corpus root that is not a directory holds no files to find wrong: it must not read as clean.
+            if !resolved.is_dir() {
+                let error = CliError::refused("REPO_UNREADABLE", format!("`{}` is not a directory, so there is no corpus to check", resolved.display()))
+                    .field("dir")
+                    .hint("pass the corpus directory, e.g. `canon format .canon/specs`, relative to the current directory or to --repo");
+                return ExitCode::from(error.emit("canon format", json) as u8);
+            }
+            check("dir", dir.display().to_string(), &resolved, &mut coverage);
+        }
+        None => {
+            let roots = match crate::inventory::load_spec_roots(&repo.join("canon.yaml")) {
+                Ok(roots) => roots,
+                Err(err) => {
+                    let error = CliError::refused("CONFIG_UNREADABLE", err.to_string()).hint("fix `specs.roots` in canon.yaml (`canon init --check-config` reports what is wrong), or pass the corpus directory: `canon format <DIR>`");
+                    return ExitCode::from(error.emit("canon format", json) as u8);
+                }
+            };
+            for root in roots {
+                let shown = root.root.strip_prefix(&**repo).unwrap_or(&root.root).display().to_string();
+                if root.root.is_dir() {
+                    check(root.id.as_str(), shown, &root.root, &mut coverage);
+                } else {
+                    coverage.skip(shown, format!("spec root `{}` is not a directory", root.id.as_str()));
+                }
+            }
+        }
     }
-    let report = crate::fmt::run(&resolved_root);
+    coverage.count("files", report.files_checked);
     crate::say_raw!(json, "{}", crate::fmt::format_human(&report));
-    let data = crate::fmt::format_json(&report);
+    let mut data = crate::fmt::format_json(&report);
+    if report.is_clean() && coverage.examined_nothing() {
+        crate::coverage::mark_unverifiable(&mut data);
+        let error = crate::coverage::unverifiable_error("canon format", "0 files", "author a spec with `canon feature new`, or pass the corpus directory: `canon format <DIR>`");
+        return ExitCode::from(error.emit_with_data_and_meta("canon format", json, data, coverage.meta()) as u8);
+    }
     if report.is_clean() {
         if json {
-            crate::json_out::data("format", data);
+            crate::json_out::data_with_meta("format", data, coverage.meta());
         }
         ExitCode::SUCCESS
     } else {
         let missing_provenance = report.violations.iter().any(|v| v.class == canon_fmt::FmtFailureClass::MissingProvenance);
         let hint = with_provenance_fix("fix each violation named in data.violations, then run `canon format` again", missing_provenance);
         let error = CliError::failed("FORMAT_VIOLATIONS", format!("{} violation(s) in {} checked file(s)", report.violations.len(), report.files_checked)).hint(hint);
-        ExitCode::from(error.emit_with_data("canon format", json, data) as u8)
+        ExitCode::from(error.emit_with_data_and_meta("canon format", json, data, coverage.meta()) as u8)
     }
 }
 

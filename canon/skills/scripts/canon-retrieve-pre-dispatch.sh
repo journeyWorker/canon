@@ -106,7 +106,7 @@ if [ -z "$REGIME" ]; then
   # it still equals the assembled key's leading segment). Malformed
   # segments make `canon regime-key` exit nonzero -> `|| true` -> empty
   # REGIME -> the silent no-op just below.
-  REGIME="$(canon regime-key --role "$ROLE" --repo "$REPO_RAW" --area "$AREA_RAW" --hash "$HASH" 2>/dev/null || true)"
+  REGIME="$(canon regime-key --role "$ROLE" --repo-name "$REPO_RAW" --area "$AREA_RAW" --hash "$HASH" 2>/dev/null || true)"
   [ -n "$REGIME" ] || exit 0
 fi
 

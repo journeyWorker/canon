@@ -7,7 +7,7 @@ Options:
       --by <BY>                Who approved (the human, not the agent)
       --note <NOTE>            The human's own words
       --change-id <CHANGE_ID>  The change to read (default: the repo's only live change)
-      --repo <REPO>            Repo root (default: nearest ancestor with a canon.yaml) [default: .]
+      --repo <DIR>             The repo to act on (default: the nearest ancestor directory holding a canon.yaml)
       --json                   Output JSON instead of the human-readable form
   -h, --help                   Print help
   -V, --version                Print version

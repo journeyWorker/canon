@@ -56,8 +56,8 @@ fn actor() -> String {
 /// had only read (0.15 D6, dogfood eval 2 G14). The event now goes to
 /// the repository whose `canon.yaml` was read, and to no directory at
 /// all when there is none.
-fn audit_path(repo: &Path, canon_yaml: Option<&Path>) -> Option<PathBuf> {
-    let yaml = resolve_canon_yaml(repo, canon_yaml);
+fn audit_path(repo: &Path) -> Option<PathBuf> {
+    let yaml = resolve_canon_yaml(repo);
     if !yaml.is_file() {
         return None;
     }
@@ -72,7 +72,6 @@ fn audit_path(repo: &Path, canon_yaml: Option<&Path>) -> Option<PathBuf> {
 #[allow(clippy::too_many_arguments)]
 pub fn append_access_audit(
     repo: &Path,
-    canon_yaml: Option<&Path>,
     operation: &str,
     kind: Option<RecordKind>,
     scope: &str,
@@ -80,7 +79,7 @@ pub fn append_access_audit(
     matched: usize,
     deleted: usize,
 ) -> Result<(), RetentionError> {
-    let Some(path) = audit_path(repo, canon_yaml) else {
+    let Some(path) = audit_path(repo) else {
         return Ok(());
     };
     if let Some(parent) = path.parent() {
@@ -133,7 +132,7 @@ fn ensure_sensitive(repo: &Path, requested: bool) -> Result<(), RetentionError> 
 }
 
 fn loaded_registry(repo: &Path, kind: RecordKind) -> Result<(PathBuf, TierRegistry), RetentionError> {
-    let yaml = resolve_canon_yaml(repo, None);
+    let yaml = resolve_canon_yaml(repo);
     let loaded = tiers::build_lenient_tiers_for_kind(&yaml, kind)?;
     let registry = TierRegistry::new(loaded.policy, loaded.git, loaded.pg, loaded.r2, loaded.sqlite);
     Ok((yaml, registry))
@@ -276,7 +275,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
         value.as_object_mut().expect("purge manifest object").insert("planDigest".to_string(), json!(digest));
         let matched = registry_matched + learn_matched;
         let deleted = registry_deleted + learn_deleted;
-        append_access_audit(repo, None, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted)?;
+        append_access_audit(repo, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted)?;
         let summary = if confirmed {
             format!("canon purge --kind {}: {} matched, {} deleted", crate::query::kind_cli_name(kind), matched, deleted)
         } else {
@@ -306,7 +305,6 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
     match result {
         Ok(()) => 0,
         Err(RetentionError::PlanChanged { expected, actual }) => {
-            let _ = append_access_audit(repo, None, "purge", Some(kind), "routed_and_aging_destinations", false, 0, 0);
             CliError::refused("PLAN_CHANGED", format!("the plan digest {expected} no longer matches the data (now {actual}); nothing was deleted"))
                 .hint(format!("run `canon purge --kind {} --before {} --plan` again and review it", crate::query::kind_cli_name(kind), before.to_rfc3339()))
                 .emit("canon purge", json_output) as u8
@@ -317,7 +315,10 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: Opt
                 RetentionError::PartialPurge { matched, deleted, .. } => (*matched, *deleted),
                 _ => (0, 0),
             };
-            let _ = append_access_audit(repo, None, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted);
+            // A refusal that read and deleted nothing leaves no audit line (O7).
+            if matched > 0 || deleted > 0 {
+                let _ = append_access_audit(repo, "purge", Some(kind), "routed_and_aging_destinations", false, matched, deleted);
+            }
             let error = CliError::refused("RETENTION_PURGE_FAILED", err.to_string()).hint("run `canon purge --plan` again to see what remains, then confirm with `--confirm <planDigest>`");
             let partial = match &err {
                 RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) | RetentionError::PartialPurge { matched, deleted, .. } => {
@@ -413,7 +414,7 @@ pub fn run_export(
         } else if !json_output {
             println!("{}", String::from_utf8_lossy(&encoded));
         }
-        append_access_audit(repo, None, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, rows.len(), 0)?;
+        append_access_audit(repo, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, rows.len(), 0)?;
         if json_output {
             // The manifest is the result; with `--out` it went to the file, and the result names it.
             let (manifest, page_meta) = crate::json_out::split_meta(manifest);
@@ -436,12 +437,11 @@ pub fn run_export(
             }
             0
         }
+        // A refused export read and wrote nothing: no audit line (O7).
         Err(ExportFailure::Cursor(err)) => {
-            let _ = append_access_audit(repo, None, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, 0, 0);
             err.emit("canon export", json_output) as u8
         }
         Err(ExportFailure::Retention(err)) => {
-            let _ = append_access_audit(repo, None, "export", Some(kind), "routed_and_aging_destinations", include_sensitive, 0, 0);
             CliError::refused("RETENTION_EXPORT_FAILED", err.to_string()).hint("check that the destination is writable and the ledger is readable, then run `canon export` again").emit("canon export", json_output) as u8
         }
     }
@@ -522,23 +522,23 @@ mod tests {
     fn audit_file_is_created_restrictively() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("canon.yaml"), "").unwrap();
-        append_access_audit(dir.path(), None, "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
+        append_access_audit(dir.path(), "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
         use std::os::unix::fs::PermissionsExt;
-        let mode = fs::metadata(audit_path(dir.path(), None).unwrap()).unwrap().permissions().mode() & 0o777;
+        let mode = fs::metadata(audit_path(dir.path()).unwrap()).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o600);
     }
 
     #[test]
     fn no_canon_yaml_means_no_audit_write() {
         let dir = tempfile::tempdir().unwrap();
-        append_access_audit(dir.path(), None, "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
+        append_access_audit(dir.path(), "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
         assert!(fs::read_dir(dir.path()).unwrap().next().is_none(), "a directory without canon.yaml must be left untouched");
     }
 }
 
 /// The access event for one `canon query`, scoped like every other
-/// event ([`audit_path`]): `canon_yaml` is the query's own
-/// `--canon-yaml` override, when it has one.
-pub fn audit_query(repo: &Path, canon_yaml: Option<&Path>, kind: RecordKind, since: Option<DateTime<Utc>>, sensitive: bool, matched: usize) -> Result<(), RetentionError> {
-    append_access_audit(repo, canon_yaml, "query", Some(kind), if since.is_some() { "since" } else { "all" }, sensitive, matched, 0)
+/// event ([`audit_path`]). Written only for a query that reached the store: a
+/// refused one leaves no line (O7).
+pub fn audit_query(repo: &Path, kind: RecordKind, since: Option<DateTime<Utc>>, sensitive: bool, matched: usize) -> Result<(), RetentionError> {
+    append_access_audit(repo, "query", Some(kind), if since.is_some() { "since" } else { "all" }, sensitive, matched, 0)
 }

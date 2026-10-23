@@ -232,7 +232,7 @@ fn authoring_brief_check_04_other_cjk_scripts_are_named_and_get_no_prose_rules()
     let dir = repo_with_change(None);
     write_brief(dir.path(), &swap(&ja, "<!-- canon:section out-of-scope role=context -->\n", ""));
     let (code, report) = check(dir.path());
-    assert_eq!(code, 2, "{report}");
+    assert_eq!(code, 1, "{report}");
     assert_eq!(report["language"], "ja");
     assert!(rules(&report).contains(&"brief.section-missing".to_string()), "{report}");
     assert!(stdout(&run(dir.path(), &["brief", "check"])).contains("language: ja (detected)"));

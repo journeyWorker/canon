@@ -129,11 +129,21 @@ impl CliError {
     /// mode the one document carries `error` (the branch point), `data` (the
     /// detail) and `meta`.
     pub fn emit_with_data(&self, command: &str, json: bool, data: serde_json::Value) -> i32 {
+        self.emit_with_data_and_meta(command, json, data, serde_json::Value::Null)
+    }
+
+    /// [`CliError::emit_with_data`] with extra `meta` keys beside `command`
+    /// (`coverage`, …).
+    pub fn emit_with_data_and_meta(&self, command: &str, json: bool, data: serde_json::Value, extra_meta: serde_json::Value) -> i32 {
         debug_assert!(is_registered(self.code), "error code {} is not in cli_error::all_codes()", self.code);
         if json {
             let mut body = self.to_json();
             body["data"] = data;
-            body["meta"] = json!({ "command": command.strip_prefix("canon ").unwrap_or(command) });
+            let mut meta = json!({ "command": command.strip_prefix("canon ").unwrap_or(command) });
+            if let (Some(meta), Some(extra)) = (meta.as_object_mut(), extra_meta.as_object()) {
+                meta.extend(extra.iter().map(|(k, v)| (k.clone(), v.clone())));
+            }
+            body["meta"] = meta;
             println!("{body}");
         }
         self.exit
@@ -311,6 +321,7 @@ const CODES: &[(&str, &str)] = &[
     ("UNKNOWN_FIELD", "`--fields` names a field the records do not have"),
     ("UNKNOWN_ROLE", "`CANON_ROLE` holds a value that is not a role (planner, implementer, reviewer, orchestrator)"),
     ("UNKNOWN_SPEC_ROOT", "`--project-id` names no spec root configured in canon.yaml, so nothing was written"),
+    ("UNVERIFIABLE", "a check examined nothing, so it cannot report clean: data.unverifiable is true and meta.coverage says what was looked at"),
     ("USAGE", "the command line did not parse: an unknown flag or subcommand, or a missing or malformed argument"),
     ("WRITE_FAILED", "a file or ledger record could not be written"),
 ];

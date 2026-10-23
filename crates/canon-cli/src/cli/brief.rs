@@ -1,7 +1,6 @@
 //! `canon brief` — read, check and approve a change's brief.
 
 use clap::{Args, Subcommand};
-use std::path::PathBuf;
 
 use canon_model::ChangeId;
 
@@ -23,9 +22,8 @@ pub struct BriefShowArgs {
     /// The change to read (default: the repo's only live change)
     #[arg(value_parser = crate::subject::parse_change_id)]
     pub change_id: Option<ChangeId>,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -37,9 +35,8 @@ pub struct BriefCheckArgs {
     /// The change to read (default: the repo's only live change)
     #[arg(long, value_parser = crate::subject::parse_change_id)]
     pub change_id: Option<ChangeId>,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -57,9 +54,8 @@ pub struct BriefApproveArgs {
     /// The change to read (default: the repo's only live change)
     #[arg(long, value_parser = crate::subject::parse_change_id)]
     pub change_id: Option<ChangeId>,
-    /// Repo root (default: nearest ancestor with a canon.yaml)
-    #[arg(long, default_value = ".")]
-    pub repo: PathBuf,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,

@@ -34,6 +34,9 @@ fn initialized_repo() -> tempfile::TempDir {
     assert!(git.success());
     let init = run_canon(&["init", "--no-agents-md"], dir.path());
     assert_eq!(init.status.code(), Some(0), "stderr: {}", stderr(&init));
+    // One subject, so the gate has something to examine (an empty corpus is `unverifiable`, never clean).
+    let subject = run_canon(&["subject", "new", "demo", "--domain", "dev", "--title", "Demo"], dir.path());
+    assert_eq!(subject.status.code(), Some(0), "stderr: {}", stderr(&subject));
     dir
 }
 

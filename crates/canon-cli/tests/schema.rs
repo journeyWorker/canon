@@ -56,7 +56,7 @@ fn exits_follow_each_commands_own_contract() {
         args.push("--json");
         json(&args)["exits"].as_array().unwrap().iter().map(|e| e["code"].as_u64().unwrap()).collect::<Vec<_>>()
     };
-    assert_eq!(exits(&["context"]), [0]);
+    assert_eq!(exits(&["context"]), [0, 2]);
     assert_eq!(exits(&["dispatch", "diff"]), [0, 2]);
     assert_eq!(exits(&["finding", "list"]), [0, 2]);
     assert_eq!(exits(&["evidence", "vault"]), [0, 2]);
@@ -82,15 +82,20 @@ fn enum_options_list_their_values_and_defaults() {
     let v = json(&["schema", "init", "--json"]);
     let policy = v["options"].as_array().unwrap().iter().find(|o| o["name"] == "policy").unwrap().clone();
     assert!(policy["possibleValues"].as_array().unwrap().iter().any(|p| p == "strict"));
+    // `init` sets up the directory as given (default `.`); every other leaf has no `--repo` default: absent means discovery.
     let repo = v["options"].as_array().unwrap().iter().find(|o| o["name"] == "repo").unwrap().clone();
-    assert_eq!(repo["default"][0], "nearest ancestor directory with a canon.yaml", "`.` is resolved to the nearest canon.yaml, so the schema must not report it as the default");
+    assert_eq!(repo["default"][0], ".");
+    let gate = json(&["schema", "gate", "check", "--json"]);
+    let repo = gate["options"].as_array().unwrap().iter().find(|o| o["name"] == "repo").unwrap().clone();
+    assert!(repo["default"].as_array().unwrap().is_empty(), "{repo}");
 }
 
+/// The `fmt` alias is gone: it is not a command.
 #[test]
-fn an_alias_resolves_to_the_canonical_command() {
-    let v = json(&["schema", "fmt", "--json"]);
-    assert_eq!(v["command"], "format");
-    assert_eq!(v["aliases"][0], "fmt");
+fn the_removed_fmt_alias_does_not_resolve() {
+    let out = canon(&["schema", "fmt"]);
+    assert_eq!(out.status.code(), Some(2));
+    assert!(json(&["schema", "format", "--json"])["aliases"].as_array().unwrap().is_empty());
 }
 
 /// Dogfood eval 8: an agent quoted the path as one word.

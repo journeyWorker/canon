@@ -397,7 +397,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
     if let Some(violation) = domain_membership_violation(&repo, domain) {
         return CliError::refused("SUBJECT_INVALID_ARGUMENT", violation.to_string()).hint("`canon schema subject new` lists the accepted arguments and their forms").emit("canon subject new", json);
     }
-    let canon_yaml_path = resolve_canon_yaml(&repo, None);
+    let canon_yaml_path = resolve_canon_yaml(&repo);
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
         Ok(r) => r,
         Err(e) => {
@@ -551,7 +551,7 @@ fn unadopt_change(
             format!("remove or retag the `@flow:{}.*` tags on those scenarios first, then run `canon subject unadopt` again", change_id.as_str()),
         ));
     }
-    let canon_yaml_path = resolve_canon_yaml(&resolved, None);
+    let canon_yaml_path = resolve_canon_yaml(&resolved);
     let registry = registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject])
         .map_err(|e| e.to_string())?;
     let now = Utc::now();
@@ -632,7 +632,7 @@ pub(crate) fn adopt_change(repo: &Path, change_id: &ChangeId, subject_id: &Subje
 /// subject side.
 pub(crate) fn change_owners(repo: &Path, change: &Change) -> Result<Vec<SubjectId>, String> {
     let repo = resolve_repo_root(repo);
-    let registry = registry_for(&resolve_canon_yaml(&repo, None), &[RecordKind::Subject]).map_err(|e| e.to_string())?;
+    let registry = registry_for(&resolve_canon_yaml(&repo), &[RecordKind::Subject]).map_err(|e| e.to_string())?;
     let mut owners = change.subject_ids.clone();
     let mut listing: Vec<SubjectId> = latest_records(&registry, RecordKind::Subject)
         .map_err(|e| e.to_string())?
@@ -651,7 +651,7 @@ pub(crate) fn change_owners(repo: &Path, change: &Change) -> Result<Vec<SubjectI
 /// write uses.
 pub(crate) fn lookup_adoption(repo: &Path, subject_id: &SubjectId, change_id: &ChangeId) -> Result<(Option<Subject>, Option<Change>), String> {
     let repo = resolve_repo_root(repo);
-    let canon_yaml_path = resolve_canon_yaml(&repo, None);
+    let canon_yaml_path = resolve_canon_yaml(&repo);
     let registry = registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject]).map_err(|e| e.to_string())?;
     Ok((find_subject(&registry, subject_id)?, find_change(&registry, change_id)?))
 }
@@ -725,7 +725,7 @@ pub(crate) fn persist_adoption(repo: &Path, mut change: Change, mut subject: Sub
     }
 
     let repo = resolve_repo_root(repo);
-    let canon_yaml_path = resolve_canon_yaml(&repo, None);
+    let canon_yaml_path = resolve_canon_yaml(&repo);
     let registry = registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject])
         .map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
 
@@ -779,7 +779,7 @@ pub fn run_status(
     }
 
     let repo = resolve_repo_root(repo);
-    let canon_yaml_path = resolve_canon_yaml(&repo, None);
+    let canon_yaml_path = resolve_canon_yaml(&repo);
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
         Ok(r) => r,
         Err(e) => {
@@ -1002,7 +1002,7 @@ pub fn run_show(repo: &Path, subject_id: &SubjectId, override_reason: Option<&st
         }
     }
     let repo = resolve_repo_root(repo);
-    let canon_yaml_path = resolve_canon_yaml(&repo, None);
+    let canon_yaml_path = resolve_canon_yaml(&repo);
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
         Ok(r) => r,
         Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject status", json),

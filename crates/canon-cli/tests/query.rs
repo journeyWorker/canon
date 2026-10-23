@@ -176,57 +176,6 @@ fn query_explicit_non_default_repo_is_used_as_is_no_walk() {
     );
 }
 
-/// s18 `uniform-repo-resolution` spec: "An explicit --canon-yaml still
-/// resolves the literal path from any cwd" — the pre-this-change,
-/// back-compat behavior: no ancestor walk, no dependency on `--repo`.
-#[test]
-fn query_explicit_canon_yaml_still_resolves_the_literal_path_from_any_cwd() {
-    let snapshot = tempfile::tempdir().unwrap();
-    let canon_yaml_path = snapshot.path().join("snapshot-canon.yaml");
-    std::fs::write(&canon_yaml_path, "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n").unwrap();
-    let cwd = tempfile::tempdir().unwrap(); // unrelated to `snapshot`, no ancestor relation
-
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_canon"))
-        .args(["query", "--kind", "change", "--canon-yaml"])
-        .arg(&canon_yaml_path)
-        .current_dir(cwd.path())
-        .output()
-        .expect("spawn canon binary");
-    assert!(
-        output.status.success(),
-        "--canon-yaml must resolve its literal path regardless of cwd, unaffected by any ancestor walk; stderr: {}",
-        support::stderr(&output)
-    );
-}
-
-/// s18 `uniform-repo-resolution` spec: "--canon-yaml wins when both flags
-/// are supplied and would resolve differently" — `--repo <a>` names a
-/// `canon.yaml` with NO routing for `change` (an unrouted-kind query
-/// error), `--canon-yaml <b>/canon.yaml` names a DIFFERENT, well-routed
-/// file; the command must succeed, proving `--canon-yaml`'s file was read,
-/// never `--repo`'s.
-#[test]
-fn query_canon_yaml_wins_over_repo_when_both_supplied_and_would_resolve_differently() {
-    let repo_a = tempfile::tempdir().unwrap();
-    std::fs::write(repo_a.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n").unwrap();
-    let repo_b = tempfile::tempdir().unwrap();
-    let canon_yaml_b = repo_b.path().join("canon.yaml");
-    std::fs::write(&canon_yaml_b, "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n").unwrap();
-
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_canon"))
-        .args(["query", "--kind", "change", "--repo"])
-        .arg(repo_a.path())
-        .arg("--canon-yaml")
-        .arg(&canon_yaml_b)
-        .output()
-        .expect("spawn canon binary");
-    assert!(
-        output.status.success(),
-        "--canon-yaml must win over --repo when both are supplied and would resolve differently; stderr: {}",
-        support::stderr(&output)
-    );
-}
-
 /// s18 `uniform-repo-resolution` spec: "A missing canon.yaml at every
 /// ancestor still fails loud, named" — a genuinely unconfigured cwd never
 /// silently succeeds with an empty result.
@@ -278,27 +227,24 @@ fn read_commands_leave_a_directory_without_canon_yaml_unchanged() {
 }
 
 /// The access audit lands in the repository whose `canon.yaml` was read
-/// — through `--repo` or `--canon-yaml` — never in the directory the
-/// command happened to run from.
+/// — through `--repo` — never in the directory the command happened to run
+/// from.
 #[test]
 fn query_audits_into_the_repo_it_read_never_into_the_cwd() {
     let repo = tempfile::tempdir().unwrap();
     std::fs::write(repo.path().join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  change: local\n").unwrap();
     let cwd = tempfile::tempdir().unwrap();
 
-    for flag in ["--repo", "--canon-yaml"] {
-        let target = if flag == "--repo" { repo.path().to_path_buf() } else { repo.path().join("canon.yaml") };
-        let output = std::process::Command::new(env!("CARGO_BIN_EXE_canon"))
-            .args(["query", "--kind", "change", flag])
-            .arg(&target)
-            .current_dir(cwd.path())
-            .output()
-            .expect("spawn canon binary");
-        assert!(output.status.success(), "{flag}: {}", support::stderr(&output));
-        assert_eq!(tree(cwd.path()), Vec::<String>::new(), "{flag}: the cwd must be left unchanged");
-    }
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(["query", "--kind", "change", "--repo"])
+        .arg(repo.path())
+        .current_dir(cwd.path())
+        .output()
+        .expect("spawn canon binary");
+    assert!(output.status.success(), "--repo: {}", support::stderr(&output));
+    assert_eq!(tree(cwd.path()), Vec::<String>::new(), "--repo: the cwd must be left unchanged");
     let audit = std::fs::read_to_string(repo.path().join(".canon/audit/access.jsonl")).expect("the target repo carries the audit");
-    assert_eq!(audit.lines().count(), 2, "one event per query: {audit}");
+    assert_eq!(audit.lines().count(), 1, "one event per query: {audit}");
 }
 
 // ── s19 `query-scope-filters`: --change-id/--status + rollup + deterministic sort ──
@@ -603,7 +549,7 @@ fn a_resynced_scenario_reads_as_one_current_record() {
     assert_eq!(raw.records.len(), 2, "a re-sync keeps both generations: the current one in the ledger, the prior one in the archive");
     assert_eq!(canon_store::tier::Tier::read(&tier, &canon_store::tier::TierQuery::kind(canon_model::RecordKind::Scenario)).unwrap().records.len(), 1);
 
-    let outcome = canon_cli::query::run(dir.path(), None, canon_model::RecordKind::Scenario, None, None, None, None, false).expect("query the scenario corpus");
+    let outcome = canon_cli::query::run(dir.path(), canon_model::RecordKind::Scenario, None, None, None, None, false).expect("query the scenario corpus");
     assert_eq!(outcome.records.len(), 1, "`canon query --kind scenario` must fold to the CURRENT record, the way the gate already does");
     assert_eq!(
         outcome.records[0].0.get("title").and_then(|t| t.as_str()),
