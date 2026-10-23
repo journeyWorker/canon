@@ -5,7 +5,7 @@ that anyone other than the author looked at the work. Canon records that
 second look as two ledger kinds — a **Finding** per issue a reviewer
 raises, and a **Review** per scenario a reviewer signs off — and the
 opt-in `spec_coverage.require_review` policy makes `canon gate check` and
-`canon subject status` hold a subject until both are in order.
+`canon subject move` hold a subject until both are in order.
 
 Both records are attestations: canon never checks a finding's summary
 against the code, or that a reviewer actually read the scenario. What the
@@ -17,7 +17,8 @@ state they are in.
 The order an agent follows to claim a subject done:
 
 1. **Test-run evidence** per owned scenario (`canon evidence add
-   --scenario-id <id> --project-id <root-id> ... --session-id <session>`;
+   --scenario-id <id> --project-id <root-id> --session-id <session>` and the
+   rest of its options;
    final when it returns under `write: { promote: auto }`, which
    `canon init` writes, and followed by `canon gate promote` only under
    `write.promote: manual`). See `canon-gate`.
@@ -26,11 +27,11 @@ The order an agent follows to claim a subject done:
 
    ```bash
    canon finding add --change-id c-demo --round 1 --seq 1 \
-     --severity blocker --disposition open --reviewer reviewer-2 \
+     --severity blocker --disposition open --actor-id reviewer-2 \
      --summary "unbounded subprocess wait" --session-id review-session-1
    # ... fix, commit ...
-   canon finding close --change-id c-demo --round 1 --seq 1 \
-     --disposition fixed --resolution-sha "$(git rev-parse HEAD)"
+   canon finding close c-demo --round 1 --seq 1 \
+     --disposition fixed --resolution-sha 9fceb02d0ae598e95dc970b74767f19372d5564e
    ```
 
    Under `write.promote: manual` (or no `write:` key), run
@@ -41,21 +42,21 @@ The order an agent follows to claim a subject done:
    the evidence is in (the review pins what it saw):
 
    ```bash
-   canon review add --project-id root --scenario-id world.demo.01 \
-     --reviewer reviewer-2 --actor-id reviewer-2 --role reviewer \
+   canon review scenario world.demo.01 --project-id root \
+     --actor-id reviewer-2 --role reviewer \
      --session-id review-session-1 \
      --pin "$(git rev-parse HEAD)" --upstream-ref "pr#41"
    ```
 
-   `review add` writes directly; there is nothing to promote. If the
+   `review scenario` writes directly; there is nothing to promote. If the
    reviewer could not reach a verdict, record that instead of signing:
-   `--outcome indeterminate` (or `unavailable` when it could not run).
+   `--review-outcome indeterminate` (or `unavailable` when it could not run).
    Changing the scenario or re-attesting it afterwards makes the review
    stale; review it again. A reviewer of user-visible behavior attaches
    the screenshots or recordings it looked at with `--artifact <path>`
    (below).
 
-4. **Move the subject**: `canon subject status <id> --to verifying`, later
+4. **Move the subject**: `canon subject move <id> --to verifying`, later
    `shipped`. See `canon-subject`.
 
 ## `canon finding add` / `canon finding close`
@@ -66,14 +67,14 @@ round. `seq` is never auto-assigned; `finding add` refuses an occupied
 key, because two different findings under one key are two reviewers'
 work collapsed into one identity.
 
-```bash
+```text
 canon finding add --change-id <c> --round <n> --seq <n> \
   --severity blocker|should-fix|note --disposition open \
-  --reviewer <who> --summary "<one line>" \
-  [--reviewed-sha <sha>] [--file-ref path/to/file.rs:120-134] [--scenario-id <id> …] [--actor-id <id>] [--session-id <id>]
-canon finding close --change-id <c> --round <n> --seq <n> \
-  --disposition fixed --resolution-sha <sha> [--session-id <id>]   # or rejected / deferred / open
-canon finding close --change-id <c> --round <n> --seq <n> \
+  --actor-id <who> --summary "<one line>" \
+  [--reviewed-sha <sha>] [--file-ref path/to/file.rs:120-134] [--scenario-id <id>] [--session-id <id>]
+canon finding close <c> --round <n> --seq <n> \
+  --disposition fixed --resolution-sha <sha> [--actor-id <id>] [--session-id <id>]   # or rejected / deferred / open
+canon finding close <c> --round <n> --seq <n> \
   --disposition rejected|deferred --reason "<why, one line>"
 ```
 
@@ -112,13 +113,13 @@ tag, or outside a git work tree.
 ### A defect the author found in its own work
 
 Record it like any other finding, at the moment you find it and before
-review, with `--reviewer` and `--actor-id` set to your own id; never ask
+review, with `--actor-id` set to your own id; never ask
 the reviewer to record it later under theirs. Nothing refuses a finding
 whose reviewer is also the implementer, and an open `blocker` the author
 raised blocks under `block_on_findings` exactly like a reviewer's.
 `--introduced-by` names the commit that introduced the defect, not who
 found it: `--introduced-by self` is a usage error (exit 2) that points at
-`--reviewer`.
+`--actor-id`.
 
 ### Severities
 
@@ -150,55 +151,53 @@ Every reader takes the **latest version per natural key**
 uses. A blocker raised `open` and later closed `fixed` counts as fixed; a
 fixed finding reopened with `--disposition open` counts as open again.
 
-## `canon review add`
+## `canon review scenario`
 
-```bash
-canon review add --project-id <root-id> --scenario-id <id> [--scenario-id <id>]... \
-  [--scenario-ids-from <file|->] \
-  --reviewer <who> --pin <sha-or-ref> --role <role> \
-  (--upstream-ref <ref> | --original-spec-ref <ref>) [--actor-id <id>] [--session-id <id>] \
-  [--outcome signed|indeterminate|unavailable] \
+```text
+canon review scenario <scenario-id> [<scenario-id>] --project-id <root-id> \
+  --actor-id <who> --pin <sha-or-ref> --role <role> \
+  (--upstream-ref <ref> | --original-spec-ref <ref>) [--session-id <id>] \
+  [--review-outcome signed|indeterminate|unavailable] \
   [--reviewer-provider <p>] [--reviewer-model <m>] [--reviewer-harness <h>] \
-  [--artifact <path>]... [--max-artifact-mib <MiB>]
-canon review add --project-id <root> --change-id <slug> --reviewer <who> --pin <sha-or-ref> \
-  --role reviewer (--upstream-ref <ref> | --original-spec-ref <ref>) …   # a chore, below
+  [--artifact <path>] [--artifact <path>] [--max-artifact-mib <MiB>]
+canon review change <slug> --project-id <root> --actor-id <who> --pin <sha-or-ref> \
+  --role reviewer (--upstream-ref <ref> | --original-spec-ref <ref>)   # a chore, below
 ```
 
 One attributed Review record per scenario, joined on
 `(project_id, scenario_id)` — both are required because two spec roots
 may carry the same scenario id. Exactly one provenance ref is required.
-`--actor-id` defaults to `canon`; `--session-id` fills `actor.session_id`.
+`--actor-id` is the reviewer and is required; `--session-id` fills `actor.session_id`.
 A Review carries no verdict about the behavior; the `verifying → shipped`
 ship gate still refuses missing or `Divergent` evidence verdicts on its
 own (a `Divergent` one passes only while a reviewer's `canon divergence
 accept` holds). It is written directly to the ledger, with no staging step, and says
-so: `canon review add: wrote <path> (new) — written directly; nothing to
+so: `canon review scenario: wrote <path> (new) — written directly; nothing to
 promote`.
 
 ### Several scenarios in one call (0.18)
 
-`--scenario-id` is repeatable, and `--scenario-ids-from <file>` (`-` reads
-stdin) adds one id per line; `#` starts a comment and blank lines are
-skipped. One reviewer, pin, provenance ref and set of artifacts cover
+The scenario operand is repeatable, and an `--input` array (see
+`canon schema review scenario`) batches several calls. One reviewer, pin, provenance ref and set of artifacts cover
 every review; each review pins its own scenario and evidence, and each
 gets its own `pinned` and `wrote` line. The artifacts are stored once.
-It is all or nothing: a scenario with no record, or a line in the file
+It is all or nothing: a scenario with no record, or an operand
 that is not a scenario id, refuses the call (exit 2) and writes no review.
 This is also the batch re-pin after `canon evidence add` reports reviews
 it made stale (see `canon-gate`).
 
-### A chore is reviewed as a change (`--change-id`, 0.23)
+### A chore is reviewed as a change (`review change`, 0.23)
 
 A chore adds no scenarios, and recording the suite again after it leaves
 every scenario review current (a review pins the evidence's verdict and
 checks, so the same verdicts from the same cases change nothing). What the
 chore needs instead is one change-level review: the reviewer signs its
-invariants and checks against the diff with `canon review add --change-id
-<slug> …`, in place of `--scenario-id`. The review pins the chore's brief
+invariants and checks against the diff with `canon review change
+<slug>`, in place of `review scenario`. The review pins the chore's brief
 (its digest, less the `Approved:` line), so an edit to the brief stales it,
 and `--to shipped` refuses a chore with no signed, current change-level
 review (`spec_coverage.require_review.distinct_actor` asks it of a reviewer
-and session that did not attest the subject's evidence). `--change-id` takes a
+and session that did not attest the subject's evidence). `review change` takes a
 chore's slug and refuses a feature change.
 
 ### What the reviewer looked at (artifacts)
@@ -218,8 +217,8 @@ review records each distinct file once, in the order given:
 "artifacts": [{"path": "reports/title.png", "sha256": "<64 hex>"}]
 ```
 
-The field is absent when no `--artifact` is given. `review add` prints
-`canon review add: artifact store holds <n> bound file(s) under
+The field is absent when no `--artifact` is given. `review scenario` prints
+`canon review scenario: artifact store holds <n> bound file(s) under
 .canon/artifacts/sha256/ (<k> newly stored) — commit them with the
 ledger`.
 
@@ -227,13 +226,13 @@ ledger`.
 review (the latest per `(project_id, scenario_id, reviewer)`, unless it
 went stale against its scenario) by the evidence rule (see `canon-gate`,
 "Bound evidence stays provable"). A missing blob whose working-tree file
-still matches is an advisory naming `canon evidence vault`, which stores
+still matches is an advisory naming `canon artifacts store`, which stores
 it back. A missing blob with a changed or missing working-tree file, or
 an altered blob, is `stale-evidence` on the review's scenario, naming
 the review:
 
 ```
-stale-evidence world.demo.01 — review by `reviewer-2` (actor `reviewer-2`, 2026-10-11T09:00:00Z) bound file `reports/title.png` recorded sha256 <hex>; stored blob .canon/artifacts/sha256/<hex>: missing; working tree: <other hex> — the bound bytes are gone, look again and re-record the review with `canon review add --artifact <path>`
+stale-evidence world.demo.01 — review by `reviewer-2` (actor `reviewer-2`, 2026-10-11T09:00:00Z) bound file `reports/title.png` recorded sha256 <hex>; stored blob .canon/artifacts/sha256/<hex>: missing; working tree: <other hex> — the bound bytes are gone, look again and re-record the review with `canon review scenario <scenario-id> --artifact <path>`
 ```
 
 The reviewer's later review replaces the earlier one, so its files are
@@ -245,7 +244,7 @@ screenshot shows.
 
 ### What the review saw (pins)
 
-`review add` reads the corpus and records `pins` on the review; the
+`review scenario` reads the corpus and records `pins` on the review; the
 reviewer never types them:
 
 - `scenario_digest` — the scenario record's `scenario_digest`: a sha256
@@ -268,7 +267,7 @@ reviewer never types them:
   verdict from the same checks again leaves the review current. A scenario
   with no evidence yet is pinned with an empty list.
 
-It prints `canon review add: pinned <id> at scenario digest <12 hex> and the
+It prints `canon review scenario: pinned <id> at scenario digest <12 hex> and the
 verdict and checks of its <n> role(s) of evidence; …` (`at source digest` for
 a file pin). A
 scenario with no record (never synced) is refused with exit 2 and nothing
@@ -284,15 +283,15 @@ final.
 
 ### The reviewer's outcome and runtime
 
-`--outcome` records how the reviewer's run ended: `signed` (the default:
+`--review-outcome` records how the reviewer's run ended: `signed` (the default:
 an approval), `indeterminate` (it ran and reached no verdict) or
 `unavailable` (it could not run). Only `signed` counts; the other two
 are recorded so a failed review is visible, never mistaken for a
-sign-off or a rejection, and `review add` says so. `--reviewer-provider`,
+sign-off or a rejection, and `review scenario` says so. `--reviewer-provider`,
 `--reviewer-model` and `--reviewer-harness` record the runtime that
 produced the review, as given. An empty or padded label is a usage error.
 
-`--session-id` (on `evidence add`, `review add`, `finding add` and
+`--session-id` (on `evidence add`, `review scenario`, `finding add` and
 `finding close`) takes one opaque token: non-empty, no surrounding
 whitespace, no control characters. Anything else is a usage error
 (exit 2) and nothing is written.
@@ -361,8 +360,8 @@ A review written before 0.23 pins something the gate no longer compares: a
 count until `canon migrate` rewrites it to what the evidence says (see
 `canon-gate`). A review that was current under the rule it was written under
 becomes a current review; one that was stale stays stale, and its scenario
-needs a new `canon review add`, which pins what it saw and replaces the
-reviewer's earlier one. The gate, `canon status` and `canon subject status`
+needs a new `canon review scenario`, which pins what it saw and replaces the
+reviewer's earlier one. The gate, `canon status` and `canon subject move`
 print one advisory naming how many scenarios are waiting for `canon
 migrate`. In CI, check out full history (`fetch-depth: 0`) for the job that
 runs `canon migrate`, or a pre-0.15 review whose commit is missing is pinned
@@ -376,7 +375,7 @@ counting: a current signed review failing only `distinct_actor`, then a
 stale review, then non-signed outcomes.
 
 ```
-unreviewed-promotion world.demo.01 — no review record for this scenario; spec_coverage.require_review wants an independent review (`canon review add`) once its subject is claimed done
+unreviewed-promotion world.demo.01 — no review record for this scenario; spec_coverage.require_review wants an independent review (`canon review scenario`) once its subject is claimed done
 ```
 
 or, when the only reviews are self-reviews:
@@ -397,13 +396,13 @@ review (`its spec changed`, `its evidence changed`, `its spec and its
 evidence changed`):
 
 ```
-unreviewed-promotion world.demo.01 — stale review by `reviewer-2`: its evidence changed (the latest evidence records are not the pinned ones) since the review; a pinned review counts only while what it saw is current — review it again (`canon review add`)
+unreviewed-promotion world.demo.01 — stale review by `reviewer-2`: its evidence changed (the latest evidence records are not the pinned ones) since the review; a pinned review counts only while what it saw is current — review it again (`canon review scenario`)
 ```
 
 or, when every latest review recorded no sign-off:
 
 ```
-unreviewed-promotion world.demo.01 — no signed review: the latest review recorded no sign-off (`reviewer-2` indeterminate); an indeterminate or unavailable review is a gap, never an approval — run the review again and record `--outcome signed`
+unreviewed-promotion world.demo.01 — no signed review: the latest review recorded no sign-off (`reviewer-2` indeterminate); an indeterminate or unavailable review is a gap, never an approval — run the review again and record `--review-outcome signed`
 ```
 
 A non-signed review is a gap even without `distinct_actor`.
@@ -416,7 +415,7 @@ subject's `change_ids` (`canon subject adopt`). The subject string is
 `<change_id>#<round>.<seq>`:
 
 ```
-open-blocker c-demo#1.1 — open blocker finding by `reviewer-2` on change `c-demo` (subject `demo-subject`): unbounded subprocess wait; fix it and `canon finding close --disposition fixed --resolution-sha <sha>`, or close it as rejected or deferred
+open-blocker c-demo#1.1 — open blocker finding by `reviewer-2` on change `c-demo` (subject `demo-subject`): unbounded subprocess wait; fix it and `canon finding close c-demo --round 1 --seq 1 --disposition fixed --resolution-sha <sha>`, or close it as rejected or deferred
 ```
 
 Findings on changes no in-scope subject has adopted do not block.
@@ -435,11 +434,11 @@ review waivers: 1 advisory(ies) — not failing the gate:
 
 ## The status guard
 
-With `require_review` present, `canon subject status <id> --to <state>`
+With `require_review` present, `canon subject move <id> --to <state>`
 prints on stderr which review checks it ran or skipped:
 
-```
-canon subject status: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
+```stderr
+canon subject move: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
   ran unreviewed-promotion — every owned scenario needs a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's
   ran open-blocker — 1 adopted change(s) checked for open blocker findings
 ```

@@ -117,11 +117,11 @@ rung's degrade reason also names the env var to set (s29 D6).
 ## `canon tier age` and `canon query`
 
 ```bash
-# Preview what would move — read-only, writes/deletes nothing.
-canon tier age --dry-run
-
-# Apply every aging: rule once (destructive move+delete).
+# Preview what would move — read-only, writes/deletes nothing; prints a plan digest.
 canon tier age
+
+# Apply every aging: rule once (destructive move+delete) against that digest.
+canon tier age --commit --plan-digest 9f2c1d7a4be03856c1e9d0a7b3f48256e1d09c7a4b3f2816d5e0a9c7b4f3e281
 
 # Fan out a kind's read across every rung it may currently live in
 # (its routed rung AND its aging destination, if any), merged by `at`.
@@ -156,9 +156,9 @@ their cost follows the number of keys, not the number of edits.
 canon query --kind evidence --history
 
 # Bring a ledger written before 0.23 to one file per key (idempotent;
-# `canon migrate` runs it). --dry-run reports and writes nothing.
-canon ledger compact --dry-run
+# `canon migrate` runs it). The bare run reports and writes nothing.
 canon ledger compact
+canon ledger compact --commit --plan-digest 9f2c1d7a4be03856c1e9d0a7b3f48256e1d09c7a4b3f2816d5e0a9c7b4f3e281
 ```
 
 A version is superseded when it is no longer the current record of any
@@ -169,7 +169,7 @@ while a rule reads it unfolded (a `flagged` overlay, a `reviewed`
 lifecycle tag, a brief override, an approval at the current evidence).
 The few rules that genuinely need history read the archive explicitly:
 `risk_routing` coverage, `canon divergence accept`'s independence check,
-the release trust check, and `canon gate task`.
+the release trust check, and `canon task done`.
 
 The write lands first and the move follows, so a crash between the two
 leaves a readable ledger (every fold still picks the latest) that the
@@ -189,8 +189,8 @@ artifact_store: { backend: local }                        # the default
 ```
 
 `local` is `.canon/artifacts/sha256/`: git-tracked and credential-free.
-With an object-store tier, `canon evidence add`, `canon review add` and
-`canon evidence vault` upload each blob by digest under
+With an object-store tier, `canon evidence add`, `canon review scenario` and
+`canon artifacts store` upload each blob by digest under
 `<prefix>sha256/<digest>` and keep nothing locally. The gate and
 `canon artifacts verify [--full]` ask the store (one HEAD per distinct
 digest against the size and sha256 written at upload; `--full` downloads and
@@ -198,11 +198,11 @@ re-hashes) and refuse, never pass, when the store cannot be reached.
 
 ```bash
 canon artifacts verify --full
-canon artifacts migrate --to cold --dry-run   # preview moving an existing local store
-canon artifacts migrate --to cold
+canon artifacts move --tier cold   # preview moving an existing local store
+canon artifacts move --tier cold --commit --plan-digest 9f2c1d7a4be03856c1e9d0a7b3f48256e1d09c7a4b3f2816d5e0a9c7b4f3e281
 ```
 
-`migrate` hashes, uploads and reads back every local blob, and only then
+`artifacts move` hashes, uploads and reads back every local blob, and only then
 writes the `artifact_store:` block, removes the local copies and ignores
 `.canon/artifacts/`. Commit the removals, `.gitignore` and `canon.yaml`. It
 is resumable (a stopped run leaves a repo the gate still passes) and a
@@ -229,7 +229,7 @@ CANON_R2_ROOT=/path/to/local/r2/root/canon \
     -c "SELECT * FROM mart_records_by_kind;"
 ```
 
-These views never write back to a rung — `canon fmt`, `canon migrate`,
+These views never write back to a rung — `canon format`, `canon migrate`,
 and tier writes are the only sanctioned mutators. A kind routed to a
 rung that isn't directly report-readable (Postgres always;
 S3/cold unless a local mirror happens to exist) isn't lost. Since 0.18

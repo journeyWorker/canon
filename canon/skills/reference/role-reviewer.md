@@ -1,31 +1,40 @@
 # Role: reviewer
 
 You are the independent second look. Declare the role with
-`CANON_ROLE=reviewer` (or `--as reviewer`); `--role` on `review add` then
+`CANON_ROLE=reviewer` (or `--as reviewer`); `--role` on `review scenario` then
 defaults to `reviewer`.
 
 ## Commands
 
-Every line is complete; fill the `<placeholders>`. `<root-id>` is the `id` of
-a `specs.roots[]` entry in `canon.yaml` (`root` by default).
+Every line below is generated from the CLI's own spec and runs as written against the
+example story (subject `demo`, change `add-login`, scenario `auth.login.01`): swap in
+your ids. `canon schema <command> --json` lists every option.
 
+<!-- canon:generated commands-reviewer begin -->
 ```bash
-canon brief check --change-id <slug> --as reviewer --json
-canon gate check --as reviewer --json                 # once, before review add
-canon finding add --change-id <slug> --round <n> --seq <n> --severity <blocker|should-fix|note> --reviewer <me> --actor-id <me> --session-id <session> --summary "<defect>" --scenario-id <id> --scenario-id <id> --as reviewer --json   # one --scenario-id per scenario the defect is about
-canon finding list --change-id <slug> --open --as reviewer --json
-canon finding close --change-id <slug> --round <n> --seq <n> --disposition fixed --resolution-sha <sha> --as reviewer --json
-canon finding close --change-id <slug> --round <n> --seq <n> --disposition rejected|deferred --reason "<why, one line>" --as reviewer --json   # --reason is required here (FINDING_REASON_REQUIRED); optional for fixed
-canon review add --project-id <root-id> --scenario-id <id> --scenario-id <id> --reviewer <me> --actor-id <me> --role reviewer --session-id <session> --pin <sha> --upstream-ref <ref> --as reviewer --json
-canon review add --project-id <root-id> --scenario-ids-from - --reviewer <me> --actor-id <me> --role reviewer --session-id <session> --pin <sha> --upstream-ref <ref> --as reviewer --json   # ids on stdin, one per line
-canon review add --project-id <root-id> --change-id <chore-slug> --reviewer <me> --actor-id <me> --role reviewer --session-id <session> --pin <sha> --upstream-ref <ref> --as reviewer --json   # a chore: one change-level review of its invariants and checks against the diff
-canon divergence accept --project-id <root-id> --scenario-id <id> --reason "<why the gap stays>" --tracking <issue-url-or-ref> [--expiry YYYY-MM-DD] --reviewer <me> --actor-id <me> --session-id <session> --as reviewer --json
-canon artifacts verify --full --as reviewer --json    # the files the evidence and reviews bind are in the artifact store; refuses when an object store is unreachable
-canon query --kind evidence --history --as reviewer --json   # every version, not only the current record
-canon query --kind evidence --history --scenario-id <id> --as reviewer --json   # one scenario's red-then-green pair
+canon brief check                                                                                                                                                                    # Read the brief against the rules: blocker and advisory findings (exit 0 clean, 2 blockers, 1 error)
+canon brief show                                                                                                                                                                     # Show where the change stands and the next one to three steps; never edits
+canon completion zsh                                                                                                                                                                 # Write the shell completion script for canon (bash, zsh or fish)
+canon context                                                                                                                                                                        # Show what you can author here: record kinds, fields, enums, policies
+canon divergence add auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --actor-id alice --role reviewer                                                                   # Add a divergence candidate, staged with no run_seq yet (commit it with `canon gate promote --kind divergence`, or in the same run with --promote / `write
+canon divergence defer auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --actor-id alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer  # Directly record a deferred divergence (requires --reason/--expiry)
+canon divergence list --as-of 2030-01-01                                                                                                                                             # List the current divergence burn-down state
+canon divergence resolve auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --actor-id alice --role reviewer                                                               # Directly record a resolved divergence
+canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --actor-id alice --summary "Token is logged"                                                         # Record one code-review finding (promoted in the same run under `write
+canon finding close add-login --round 1 --seq 1 --disposition rejected --reason "works as designed"                                                                                  # Move an already-committed finding's disposition (promoted in the same run under `write
+canon finding list --change-id add-login                                                                                                                                             # List a change's committed findings at their latest version
+canon format .canon/specs                                                                                                                                                            # Validate a spec/artifact corpus against canon's format
+canon gate check                                                                                                                                                                     # Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)
+canon query --kind evidence                                                                                                                                                          # Read stored records across every storage tier
+canon retrieve --for-role reviewer --domain dev --limit 20                                                                                                                           # Fetch role-scoped strategy guidance
+canon review change add-login --actor-id alice --pin abc123 --role reviewer --original-spec-ref docs/prd.md                                                                          # Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required)
+canon review scenario auth.login.01 --actor-id alice --pin abc123 --role reviewer --original-spec-ref docs/prd.md                                                                    # Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required)
+canon schema evidence add                                                                                                                                                            # Describe canon's own commands
+canon status                                                                                                                                                                         # Show where this repo stands: subjects by status, their gaps, and the next commands
 ```
+<!-- canon:generated commands-reviewer end -->
 
-`review add` needs `--upstream-ref <ref>` or `--original-spec-ref <path>`;
+`review scenario` needs `--upstream-ref <ref>` or `--original-spec-ref <path>`;
 add `--artifact <path>` (repeatable) for user-visible behavior. A short
 `<sha>` is fine. With `write.promote: manual`, follow `finding add` and
 `finding close` with `canon gate promote --as reviewer --json`.
@@ -38,9 +47,9 @@ goes stale when the verdict or the checks differ or the scenario changes.
 Reviews written before 0.23 do not count until `canon migrate` re-pins them
 (an advisory names it); that is the orchestrator's step, not yours.
 
-Run `gate check` once, before `review add`: its `unreviewed-promotion`
+Run `gate check` once, before `review scenario`: its `unreviewed-promotion`
 violations are the subjects and scenarios that need your review. Do not loop
-it. After `review add`, read its `meta.next` instead of calling `gate check`
+it. After `review scenario`, read its `meta.next` instead of calling `gate check`
 or `status` again.
 
 ## Separate session
@@ -117,7 +126,7 @@ ship guard and stays listed as `accepted-divergence` in `status` and
   `deferred`, give the reason in one line with `--reason "<why>"`: the close
   is refused without it (`FINDING_REASON_REQUIRED`), and `finding list` shows
   it as `[reason: …]` so the next reader sees why it was not fixed.
-- Sign off in one batch with `review add`, all or nothing. It writes
+- Sign off in one batch with `review scenario`, all or nothing. It writes
   directly; nothing to promote. canon stores and re-checks attached bytes
   and never compares images.
 - Pass `--scenario-id` for each scenario a finding is about. A blocker you
@@ -131,8 +140,8 @@ ship guard and stays listed as `accepted-divergence` in `status` and
   evidence changes a verdict or the checks and so stales your review, look
   again before you re-pin.
   A chore has no scenarios: review it with one change-level review, `canon
-  review add --project-id <root-id> --change-id <slug> --reviewer <me> --role
-  reviewer --pin <sha> --upstream-ref <ref> …`. It signs the chore's
+  review change <slug> --project-id <root-id> --actor-id <me> --role
+  reviewer --pin <sha> --upstream-ref <ref>`. It signs the chore's
   invariants and checks against the diff and pins its brief, so editing the
   brief stales it. The chore also needs evidence recorded after its approval
   (the implementer's `--all-scenarios` run) before it ships.

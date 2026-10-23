@@ -85,7 +85,7 @@ import { Steps } from "@astrojs/starlight/components";
    `<root>/kind=feature/area=<area>/<surface>.feature`에 있습니다:
 
    ```bash
-   bunx @journeykit/canon fmt --check .canon/specs
+   bunx @journeykit/canon format .canon/specs
    ```
 
    코퍼스를 canon의 아티팩트-패밀리 스키마와 레이아웃 디스크립터에
@@ -102,7 +102,7 @@ import { Steps } from "@astrojs/starlight/components";
    bunx @journeykit/canon inventory sync
    ```
 
-   설정된 각 root에 대해 동일한 `fmt --check` 검사를 다시 수행한
+   설정된 각 root에 대해 동일한 `format` 검사를 다시 수행한
    뒤, `<root>/kind=feature/area=<area>/<surface>.feature`를 순회하며 `(project_id,
    scenario_id)`쌍마다 하나의 `Scenario` 레저 레코드를 upsert
    합니다. 위반이 발생하면 해당 root 전체가 중단됩니다 — 부분
@@ -137,7 +137,7 @@ import { Steps } from "@astrojs/starlight/components";
    `@lane:behavior`, id 태그가 옵니다. `# canon:` 줄은 절대 손으로
    쓰거나 옮기지 마세요 — 스캐폴드가 그 줄의 유일한 출처입니다. 레저
    레코드는 쓰지 않습니다. Gherkin 본문은 직접 채워 넣은 다음, 인덱싱을
-   위해 1번 워크스루의 `fmt --check`와 `inventory sync`를 실행하세요.
+   위해 1번 워크스루의 `format`와 `inventory sync`를 실행하세요.
    canonical `canon` 스킬의 지연 로드 참조
    `reference/canon-authoring.md`(`canon skills install`)가 구성 규칙입니다:
    파일 하나에 surface 하나, 시나리오 하나에 관찰 가능한 행동 하나,
@@ -146,10 +146,9 @@ import { Steps } from "@astrojs/starlight/components";
 2. **리뷰 부착.**
 
    ```bash
-   bunx @journeykit/canon review add \
+   bunx @journeykit/canon review scenario auth.login.01 \
      --project-id root \
-     --scenario-id auth.login.01 \
-     --reviewer alice \
+     --actor-id alice \
      --pin "$(git rev-parse HEAD)" \
      --original-spec-ref .canon/specs/kind=feature/area=auth/login.feature \
      --role dev
@@ -186,7 +185,7 @@ import { Steps } from "@astrojs/starlight/components";
    `.canon/REPORT.md`에 렌더링합니다 — 생성된 파일이며 절대 손으로
    편집하지 않습니다. scope status와 subjects는 리포트/스냅샷 출력에
    포함되지만 대시보드 패널은 아닙니다. `canon gate check`를 CI에
-   연결하는 것과 같은 방식으로 `canon report --check`를 연결해
+   연결하는 것과 같은 방식으로 `canon report check`를 연결해
    커밋된 파일을 현재 입력과 byte-diff하세요.
 
 </Steps>
@@ -286,7 +285,7 @@ superpowers `writing-plans` 플랜 문서를 `Change`/`Task` 코어
    ```
 
    가져온 레코드는 평범한 코어 레코드입니다 — `canon query`는
-   손으로 작성한 `canon gate task`와 구별할 수 없으며(구별할 수
+   손으로 작성한 `canon task done`와 구별할 수 없으며(구별할 수
    없어야 합니다). 이 미러는 조회 가능할 뿐 절대 권위 있는
    소스가 아닙니다: `canon gate check`는 증거(`Review`/
    `EvidenceRecord`)만 읽을 뿐, 플랜에서 가져온 `Change`/`Task`
@@ -351,10 +350,10 @@ superpowers `writing-plans` 플랜 문서를 `Change`/`Task` 코어
 4. **라이프사이클 구동.**
 
    ```bash
-   bunx @journeykit/canon subject status checkout-revamp --to specced
-   bunx @journeykit/canon subject status checkout-revamp --to building
-   bunx @journeykit/canon subject status checkout-revamp --to verifying
-   bunx @journeykit/canon subject status checkout-revamp --to shipped
+   bunx @journeykit/canon subject move checkout-revamp --to specced
+   bunx @journeykit/canon subject move checkout-revamp --to building
+   bunx @journeykit/canon subject move checkout-revamp --to verifying
+   bunx @journeykit/canon subject move checkout-revamp --to shipped
    ```
 
    `verifying → shipped` 단계는 증거 게이팅됩니다: 서브젝트가 시나리오를
@@ -370,7 +369,7 @@ superpowers `writing-plans` 플랜 문서를 `Change`/`Task` 코어
    제시합니다:
 
    ```bash
-   bunx @journeykit/canon subject status checkout-revamp --to verifying \
+   bunx @journeykit/canon subject move checkout-revamp --to verifying \
      --reason "follow-up: totals round per line" --actor-id impl
    ```
 
@@ -402,9 +401,9 @@ superpowers `writing-plans` 플랜 문서를 `Change`/`Task` 코어
 | Voice | 한 일 | canon 표면 |
 |---|---|---|
 | planning | 구현 플랜 작성 (superpowers `writing-plans` 포맷) | 플랜 문서 → `canon ingest plans --dialect superpowers`로 미러링 |
-| design | 새 behavior 시나리오 8개 작성 | `canon context` → `canon scenario new` × 8 → `canon fmt --check` (위반 0건) |
-| dev | 16개 시나리오 레저를 대상으로 구현, 플랜 체크박스 반영 | `canon query --kind scenario`, `canon retrieve --role dev` |
-| test | 16개 시나리오 전부 독립적으로 검증, 증명 가능한 결함 2건 수정 | `canon review add` × 16 (attested, 검증된 sha에 고정) |
+| design | 새 behavior 시나리오 8개 작성 | `canon context` → `canon scenario new` × 8 → `canon format` (위반 0건) |
+| dev | 16개 시나리오 레저를 대상으로 구현, 플랜 체크박스 반영 | `canon query --kind scenario`, `canon retrieve --for-role dev` |
+| test | 16개 시나리오 전부 독립적으로 검증, 증명 가능한 결함 2건 수정 | `canon review scenario` × 16 (attested, 검증된 sha에 고정) |
 | review | 확인된 ship-blocker 8건을 divergence로 기록 | `canon divergence add`/`promote` × 8 → `resolve` × 6 |
 
 플랜 문서는 로드맵이고, (`canon inventory sync`로 구체화된)
@@ -414,7 +413,7 @@ superpowers `writing-plans` 플랜 문서를 `Change`/`Task` 코어
 
 ```
 dev claims done   → plan checkboxes → canon ingest plans   (mirror, never trusted)
-test proves done  → canon review add per scenario           (evidence)
+test proves done  → canon review scenario per scenario           (evidence)
 review disagrees  → canon divergence add/promote          (tracked, run_seq-ordered)
 fix lands         → re-verify → attest → divergence resolve (burndown to zero)
                   → canon gate check: clean (0 violations)

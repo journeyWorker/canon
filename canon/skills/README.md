@@ -135,7 +135,7 @@ from the canonical user-facing bundle. It is not a normal install source.
 Maintainers developing Canon MAY materialize it explicitly:
 
 ```bash
-canon skills install --source canon/skills-dev --target .
+canon skills install --skills-source canon/skills-dev
 ```
 
 That source keeps its own `.install-lock.json` and materializes individual

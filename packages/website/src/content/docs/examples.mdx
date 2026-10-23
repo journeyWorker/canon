@@ -83,7 +83,7 @@ Scaffold `canon.yaml`, then validate and index a spec corpus.
    `specs.roots[]` names (`.canon/specs` by default; it is git-tracked):
 
    ```bash
-   bunx @journeykit/canon fmt --check .canon/specs
+   bunx @journeykit/canon format .canon/specs
    ```
 
    Checks the corpus against canon's artifact-family schemas and layout
@@ -99,7 +99,7 @@ Scaffold `canon.yaml`, then validate and index a spec corpus.
    bunx @journeykit/canon inventory sync
    ```
 
-   Re-validates each configured root with the same `fmt --check` pass,
+   Re-validates each configured root with the same `format` pass,
    then walks `<root>/kind=feature/area=<area>/<surface>.feature` and upserts one `Scenario`
    ledger record per `(project_id, scenario_id)`. A violation aborts
    the WHOLE root — zero records written for it, never a partial sync.
@@ -132,7 +132,7 @@ the status report.
    `@subject:auth-core`, `@lane:behavior`, and the id tag. Never
    hand-type or move a `# canon:` line — the scaffold is the one place
    it comes from. Writes no ledger record; you still fill in the Gherkin
-   body, then run `fmt --check` and `inventory sync` from walkthrough 1
+   body, then run `format` and `inventory sync` from walkthrough 1
    to index it. The canonical `canon` skill's lazy
    `reference/canon-authoring.md` guidance (`canon skills install`)
    is the organizing rule: one surface per file, one observable
@@ -141,10 +141,9 @@ the status report.
 2. **Attest a review.**
 
    ```bash
-   bunx @journeykit/canon review add \
+   bunx @journeykit/canon review scenario auth.login.01 \
      --project-id root \
-     --scenario-id auth.login.01 \
-     --reviewer alice \
+     --actor-id alice \
      --pin "$(git rev-parse HEAD)" \
      --original-spec-ref .canon/specs/kind=feature/area=auth/login.feature \
      --role dev
@@ -221,8 +220,8 @@ Fold agent-CLI transcripts into tiered storage, then read them back.
    bunx @journeykit/canon dashboard
    ```
 
-   Regenerates a fresh Parquet snapshot (`canon report --snapshot`
-   under the hood, into `.canon/dashboard-snapshot`) and serves the
+   Regenerates a fresh Parquet snapshot (`canon report snapshot .canon/dashboard-snapshot`
+   under the hood) and serves the
    built `packages/dashboard` app locally, pointed at it. The snapshot
    contains all 10 report marts, including `mart_run_observability` and
    scope/subjects status; the dashboard intentionally renders 7 panels,
@@ -276,7 +275,7 @@ records — no hand-authoring required.
 
    Imported rows are ordinary core records — `canon query` cannot tell
    (and must not be able to tell) them apart from a hand-authored
-   `canon gate task`. This mirror is queryable, never authoritative:
+   `canon task done`. This mirror is queryable, never authoritative:
    `canon gate check` reads evidence (`Review`/`EvidenceRecord`), never
    plan-imported `Change`/`Task` rows — flipping a plan checkbox alone
    can never turn the gate red or green.
@@ -338,10 +337,10 @@ guidance, then drive it through its evidence-gated lifecycle.
 4. **Drive the lifecycle.**
 
    ```bash
-   bunx @journeykit/canon subject status checkout-revamp --to specced
-   bunx @journeykit/canon subject status checkout-revamp --to building
-   bunx @journeykit/canon subject status checkout-revamp --to verifying
-   bunx @journeykit/canon subject status checkout-revamp --to shipped
+   bunx @journeykit/canon subject move checkout-revamp --to specced
+   bunx @journeykit/canon subject move checkout-revamp --to building
+   bunx @journeykit/canon subject move checkout-revamp --to verifying
+   bunx @journeykit/canon subject move checkout-revamp --to shipped
    ```
 
    The `verifying → shipped` step is evidence-gated: it succeeds only
@@ -358,7 +357,7 @@ guidance, then drive it through its evidence-gated lifecycle.
    names this command:
 
    ```bash
-   bunx @journeykit/canon subject status checkout-revamp --to verifying \
+   bunx @journeykit/canon subject move checkout-revamp --to verifying \
      --reason "follow-up: totals round per line" --actor-id impl
    ```
 
@@ -390,10 +389,10 @@ canon voice, each using the real CLI:
 | Voice | What they did | canon surface |
 |---|---|---|
 | planning | wrote the implementation plan (superpowers `writing-plans` format) | plan doc → mirrored by `canon ingest plans --dialect superpowers` |
-| design | authored the 8 new behavior scenarios | `canon context` → `canon scenario new` × 8 → `canon fmt --check` (0 violations) |
-| dev | implemented against the 16-scenario ledger, flipped plan checkboxes | `canon query --kind scenario`, `canon retrieve --role dev` |
-| test | independently verified all 16 scenarios, fixed 2 provable defects | `canon review add` × 16 (attested, pinned to the verified sha) |
-| review | filed 8 confirmed ship-blockers as divergences | `canon divergence add`/`promote` × 8 → `resolve` × 6 |
+| design | authored the 8 new behavior scenarios | `canon context` → `canon scenario new` × 8 → `canon format` (0 violations) |
+| dev | implemented against the 16-scenario ledger, flipped plan checkboxes | `canon query --kind scenario`, `canon retrieve --for-role dev` |
+| test | independently verified all 16 scenarios, fixed 2 provable defects | `canon review scenario` × 16 (attested, pinned to the verified sha) |
+| review | filed 8 confirmed ship-blockers as divergences | `canon divergence add`/`canon gate promote --kind divergence` × 8 → `resolve` × 6 |
 
 The plan doc is a roadmap; the 16-scenario `.feature` corpus
 (materialized by `canon inventory sync`) is the acceptance authority
@@ -401,7 +400,7 @@ dev and test actually worked against — the two never merge:
 
 ```
 dev claims done   → plan checkboxes → canon ingest plans   (mirror, never trusted)
-test proves done  → canon review add per scenario           (evidence)
+test proves done  → canon review scenario per scenario           (evidence)
 review disagrees  → canon divergence add/promote          (tracked, run_seq-ordered)
 fix lands         → re-verify → attest → divergence resolve (burndown to zero)
                   → canon gate check: clean (0 violations)

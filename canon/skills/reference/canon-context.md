@@ -43,8 +43,8 @@ an immutable content-addressed registry and records only metadata and digests
 in the pack manifest.
 
 ```bash
-canon context-pack new --manifest .canon/context-manifest.json
-canon context-pack new --manifest .canon/context-manifest.json --repo ../my-repo --json
+canon context-pack add --manifest .canon/context-manifest.json
+canon context-pack add --manifest .canon/context-manifest.json --repo ../my-repo --json
 canon context-pack show sha256:<pack-digest> --repo . --json
 canon context-pack verify sha256:<pack-digest>
 ```
@@ -87,9 +87,9 @@ Version prompt inputs separately when several runs should share the same
 prompt files:
 
 ```bash
-canon prompt add --name reviewer --version v1 \
+canon prompt add reviewer@v1 \
   --manifest .canon/reviewer-prompt.json
-canon prompt show --name reviewer --version v1 --json
+canon prompt show reviewer@v1 --json
 ```
 
 Prompt registration uses the same immutable content registry. `prompt show`
@@ -97,7 +97,7 @@ verifies the selected bundle and returns its metadata/digests; neither concise
 output form includes captured prompt bytes.
 
 - **A capability query, never validation:** `canon context` ALWAYS exits
-  `0` with the full surface — even when `canon format --check` or
+  `0` with the full surface — even when `canon format` or
   `canon gate` would report diagnostics against the same repo. It reads
   only the schema/policy/vocabulary registry, never the corpus or the
   evidence ledger.
@@ -154,7 +154,7 @@ AND `canon format`'s diagnostics from one edit site, never two.
 
 ## Reading an "expected one of: …" validator error
 
-When `canon format --check` rejects an out-of-domain enum value it emits:
+When `canon format` rejects an out-of-domain enum value it emits:
 
 ```
 `not-a-real-kind` is not a valid value for `kind` of `run` (expected one of: run, review, divergence, …)
@@ -167,7 +167,7 @@ same schema, no hand-maintained second copy.
 
 ## What this skill does NOT cover
 
-- `canon format --check`'s full violation taxonomy — see `canon-fmt`;
+- `canon format`'s full violation taxonomy — see `canon-fmt`;
   this skill only covers reading its enum diagnostic against the surface.
 - Authoring a typed task atom / handoff body — see
   `canon-vocab`; `canon context`'s `vocab`/`cel` sections

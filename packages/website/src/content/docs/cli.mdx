@@ -17,190 +17,336 @@ an empty repo as clean. `init`, `migrate`, `demo`, `context`, `regime-key`,
 machine-readable document on stdout instead of the default human-readable
 table/summary; see [Driving canon from an agent](#driving-canon-from-an-agent).
 
-## Try it
+## Command reference
 
-A self-contained first-run demo — see a gate fail, add evidence, watch it pass.
-No prior setup required.
+The tables below are generated from canon's command spec (`docs/cli/canon.cli.json`), one per command group. `canon schema <command> --json` prints the same facts for one command.
 
-| Command | What it does |
-|---|---|
-| `canon demo init [--repo <dir>]` | Scaffold a throwaway evidence loop: the real `canon init` config, a `reviewer`-requiring `policy.yaml`, and one seeded `dev` evidence record — leaving `canon gate check` red with `uncovered-cell auth.login.01`. Refuses to overwrite an existing `canon.yaml`. |
-| `canon demo add [--repo <dir>]` | Record the missing independent-`reviewer` evidence for the demo scenario, turning the same `canon gate check` green. |
+### Top-level commands
 
-## Setup
+{/* canon:generated cli-top begin */}
+Commands without a group word.
 
-Scaffold a repo's config, inspect what it resolves to, and materialize the
-single provider-aware `canon` companion skill. Canon's CLI commands remain
-explicit; the skill only routes an agent to lazy references.
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon completion` | `<shell>` | none | read: Write the shell completion script for canon (bash, zsh or fish) | `canon completion zsh` |
+| `canon context` | none | none | read: Show what you can author here: record kinds, fields, enums, policies | `canon context` |
+| `canon dashboard` | none | none | write: Serve the local status dashboard | `canon dashboard` |
+| `canon export` | none | `--kind <KIND>` | write: Export a redacted retention manifest without deleting records | `canon export --kind evidence --output evidence.json` |
+| `canon format` | `<dir>` (optional) | none | read: Validate a spec/artifact corpus against canon's format | `canon format .canon/specs` |
+| `canon init` | none | none | write: Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home) | `canon init` |
+| `canon migrate` | none | none | destructive (preview, then `--commit --plan-digest`): Bring a repo from an earlier canon up to date | `canon migrate` |
+| `canon purge` | none | `--kind <KIND>`, `--before <BEFORE>` | destructive (preview, then `--commit --plan-digest`): Remove allowlisted records older than a cutoff | `canon purge --kind session --before 2020-01-01T00:00:00Z` |
+| `canon query` | none | `--kind <KIND>` | read: Read stored records across every storage tier | `canon query --kind evidence` |
+| `canon retrieve` | none | `--for-role <ROLE>` | read: Fetch role-scoped strategy guidance | `canon retrieve --for-role reviewer --domain dev --limit 20` |
+| `canon schema` | `<path>` (optional) (repeatable) | none | read: Describe canon's own commands | `canon schema evidence add` |
+| `canon selftest` | none | none | read: Run canon's built-in fixture self-tests | `canon selftest --suite trust-spine-gate` |
+| `canon status` | none | none | read: Show where this repo stands: subjects by status, their gaps, and the next commands | `canon status` |
+{/* canon:generated cli-top end */}
 
-| Command | Description |
-|---|---|
-| `canon init [--repo <dir>] [--no-agents-md] [--policy light\|standard\|strict \| --no-policy] [--providers <list>] [--language <tag>]` | Scaffold a fresh, working `canon.yaml` (`tiers:`/`routing:`, `specs:` with the default spec root `{id: root, root: .canon/specs}` holding `<root>/kind=feature/area=<area>/<surface>.feature`, a `plans:` section with `sources: []` preceded by comments — canon's own changes live in `.canon/changes/` and need no entry, and commented `openspec` (`root: .`) and `superpowers` (`root: docs/superpowers/plans`) examples show how to list external plans, which canon only reads; no `openspec/changes/` is created — and `write: { promote: auto }`, so staged writes promote themselves — see `canon gate promote`) at `<repo>/canon.yaml`, a starter `.canon/policy.yaml` at the `--policy` level (default `strict`: `spec_coverage` with `require_evidence`, `require_cases: [failure]`, `require_review: {}`; `standard` leaves out the review and `light` also the failure case, carrying them as commented lines to uncomment when raising the level; the first line `# canon policy level: <level>` names it — a human reviews it and approves it with `canon policy approve --by <who>`), and a canon block in `AGENTS.md` between `<!-- canon:begin -->`/`<!-- canon:end -->` (file created if absent; text outside the markers never touched; markers count only as standalone lines outside code fences, and anything but one begin/end pair is refused, exit `2`, before any write). `--no-agents-md`/`--no-policy` skip those two; an unknown level, or `--policy` with `--no-policy`, exits `2` before any write. A fresh init also adds any missing `.gitignore` line for `.canon/hot.db*`, `.canon/audit/` (the query/export/purge access log) and `.canon/ledger/kind=scenario/` (the derived scenario index; the commands that write records rebuild it); no line covers `.canon/specs`, which is authored and git-tracked. Never overwrites an existing `canon.yaml` or `policy.yaml`: a rerun only refreshes the `AGENTS.md` block (exit `0`; with `--no-agents-md` there is nothing to do and it refuses, exit `2`), so an existing repo's `canon.yaml` and `.gitignore` are unchanged; a rerun never asks for harnesses and does not apply `--providers`. A fresh init also picks the harnesses the canon skill is installed for (0.17): `--providers claude,codex` (any of `claude`, `codex`, `omp`, `pi`; `none` for none) answers; otherwise, on a terminal, it asks, with the harnesses whose `.claude`, `.codex`, `.omp` or `.pi` directory exists checked (`.agents` alone does not select Codex); otherwise it takes the detected ones. It records the answer as `skills: { providers: [...] }` in `canon.yaml` and installs the skill from the default source, as `canon skills install` does, printing `installed the canon skill for <list> (<dirs>)`. With no terminal, no flag and nothing detected it records only a commented example, installs nothing, and names `canon skills install --providers=<list>`. An unknown name is refused before anything is written (exit `2`); a missing skill source keeps the recorded choice and exits `2` naming the install to run. `--language <tag>` records `language:` in `canon.yaml`, the language briefs are written in (0.19): templates and prose rules ship for `en` and `ko`; any other tag gets `en` headings and the structure rules only. It is validated before anything is written and is not applied to an existing `canon.yaml`; `init --check-config` reports it. |
-| `canon policy approve --by <who> [--note <text>] [--repo <dir>]` | Record that a human reviewed `.canon/policy.yaml`: writes `.canon/policy.approval.json` (pretty JSON with `policy_digest` — `sha256:<hex>` of the policy bytes — `approved_by`, `approved_at` in RFC3339 UTC, and `note` or `null`). Written directly; nothing to promote. The file is git-tracked, so commit it. Re-running replaces the record. Refused (exit `2`) when there is no `.canon/policy.yaml` or `--by` is empty. While a policy was never approved, `gate check` and `status` print an advisory and the exit code does not change; a policy that changed after its approval, or whose approval cannot be read, fails closed (see `canon policy show`). |
-| `canon policy show [--repo <dir>] [--json]` | Print the policy's path and current digest, and its approval: `approved`, `changed` (the bytes differ from the approved digest), `unreadable` (the approval file does not parse) or `unapproved`, with the approver, time and approved digest. For `changed` and `unreadable` it adds `gate: fails closed (…)` and the way out. **Fails closed:** `gate check` then exits `1`, and `canon subject status` (the ship guard and the reopen) refuses with `POLICY_CHANGED_SINCE_APPROVAL` (or `POLICY_APPROVAL_UNREADABLE`); `--override-reason` does not waive it. The human re-approves the policy in force with `canon policy approve`, or restores the approved file from git; an agent never edits the policy to pass the gate. Read-only. |
-| `canon init --check-config [--repo <dir>]` | Read-only validate an existing `canon.yaml`, chaining the same strict loaders `inventory sync`/`ingest plans`/`tier age` use. The `write:` section reports `[PASS] write (promote: auto)` (or `manual`), `[not configured] write (promote: manual)` when absent, or `[FAIL] write: …` when malformed. The `skills:` section reports `[PASS] skills (providers: …)`, `[not configured] skills (…)` when absent, or `[FAIL] skills: …` for another shape or an unknown provider. |
-| `canon migrate [--dry-run] [--repo <dir>]` | Move a repo that canon 0.16 or earlier set up onto the 0.17 layout. It prints the plan, then applies it; `--dry-run` stops after the plan. It is idempotent: a second run finds nothing to move. A spec root's `features/kind=feature/` moves to `<root>/kind=feature/` (`git mv` when tracked). A root at the repo-level `specs` moves to `.canon/specs`, and `canon.yaml` records `former_roots: [specs]`, so reviews pinned before the move still find their scenarios. Changes `canon change new` wrote under `openspec/changes/` move to `.canon/changes/<slug>/` (`proposal.md` → `brief.md`) and are re-imported under the same change id. A change counts only when it is still in that command's scaffold and its first stored version was adopted; every other change stays and is named. `canon init`'s `{ dialect: openspec, root: . }` source goes once nothing is left under it. An `Approved:` line in an external `proposal.md` is copied into a canon pointer `brief.md` with `Source:`, and the proposal is not edited. It also writes `skills.providers` from the install lock, adds missing canon `.gitignore` lines and rebuilds the scenario index. `canon.yaml` keeps every other byte, comments and CRLF included. Refused (exit `2`, nothing written) on uncommitted changes under a path it moves, an existing destination, or a `canon.yaml` edit it cannot make safely. A rerun of `canon init` on an existing repo also adds the missing `.gitignore` lines. |
-| `canon context [--repo <dir>] [--json]` | Emit the resolved authoring surface: record kinds + envelope fields, enum domains, join-key grammars, partition layout, policy-derived requirements, capability version. A capability *query* — always exits 0, even when `fmt --check`/`gate` would report diagnostics. The human outline opens with a pointer to `canon status` and, when no `spec_coverage` policy is in force, a `warning:` line; `--json` is unchanged. |
-| `canon status [--repo <dir>] [--json]` | Where the repo stands and what to run next: the canon version and the policy in force (or a warning that the gate enforces nothing), with its level — the policy's `# canon policy level:` line when it names `light`, `standard` or `strict`, else the level its `spec_coverage` section matches exactly, else `custom` (`policy.level` in `--json`, `null` without a policy); a `light` or `standard` level also says how to raise it — subjects grouped by status with their scenario, evidence, review and open-blocker counts and missing required cases, the scenarios no subject owns, and a `next:` list of at most five concrete commands. Counts come from the same joins `gate check` and `subject status` use, and status fails closed: a corpus kind routed off the `local` rung leaves only the routing repair, and an unusable `spec_coverage` section puts its repair first and withholds every move-on suggestion. With several spec roots, suggested `canon scenario new` commands carry `--project-id`. For each `building`, `verifying` or `shipped` subject, and each `proposed` subject whose newest adopted change has a brief, it shows whether the brief is approved (`brief: approved in <brief> — <words>` or `brief: not approved (…)`): an `Approved:` line, outside HTML comments and code fences, in `.canon/changes/<change>/brief.md` for the subject's newest adopted change, and only there (no record kind). A change from an external plan has its brief in that same canon file, holding a `Source: <path>` line that points at the external document; an `Approved:` line inside an external `proposal.md` is not read, and until the canon file exists an external openspec `proposal.md` under the plan sources still makes the brief one to answer. Fixes live as tasks in the approved change, so an older change's approval does not cover a newly adopted one. While `canon brief check` has blockers the step is the planner's (`write the brief: canon brief check --change-id <slug> lists N blockers`); once the brief is clean, an unapproved brief makes the step addressed to a human the subject's only step, whatever its status (`human: stop and report the brief in <brief>; build and attest nothing for <id> until the human answers (one answer approves brief and policy)`, naming the canon `brief.md`, or the external proposal when no canon brief exists yet; `"actor": "human"` in `--json`): no `feature new`, `scenario new`, evidence, review or ship step before the human answers, and its reason says `canon evidence add` refuses the subject's scenarios and tasks until the `Approved:` line is recorded, and where to record it (for an external plan, the `brief.md` to create with its `Source:` line). Every other step is the agent's, including `canon subject status <id> --to shipped` once the ship guard would pass. When the policy has no approval record, or changed since it was approved, a `warning:` line says so (also in `--json` `warnings`). Each evidence record attested under a brief `--override-reason` (see `canon evidence add`) is listed as a `warning:` line naming what it attests, the actor, the time, the subject and the reason. A read — exits 0 once `canon.yaml` is found (`CONFIG_MISSING`, exit `2`, without one) and writes nothing: a stale scenario index is read as `canon inventory sync` would leave it, built in memory. `--json` is a stable shape versioned by `statusVersion` (`3` since 0.17: subjects carry `brief`, `{approved, enforced, change?, brief?, briefExists, source?, approval?}`; its `proposal` field was removed and `brief`, `briefExists` and `source` were added. Version `2`, since 0.16, added `actor` to each `next` entry, whose `command` is a canon command only for `agent`, and the `brief` object). With `spec_coverage.require_audit` it shows an `audits` section (sampled, confirmed, owed, refuted) and suggests `canon evidence add --kind audit …`; recorded `--drop-attachment` drops list under `dropped bindings (N):` (`drops[]` in `--json`). |
-| `canon context-pack new --manifest <repo-relative.json> [--repo <dir>] [--json]` | Create an immutable, content-addressed context snapshot from the explicitly selected files in a repository-local JSON manifest. Concise output prints only the pack id; `--json` prints manifest metadata and digests. |
-| `canon context-pack show <id> [--repo <dir>] [--json]` | Verify and show a stored pack. `show` rechecks the manifest and every immutable content object before returning; concise output does not include captured bytes. |
-| `canon context-pack verify <id> [--repo <dir>] [--json]` | Verify a pack without returning captured content. Exits nonzero when the pack is missing, stale, or tampered. |
-| `canon adapter validate --response <path> [--repo <dir>] [--json]` | Read-only validation of a provider-neutral protocol-v1 response. Core fields are strict (`run_id`, provider/model, context-pack id, status, capabilities, safe evidence refs, and nonnegative ordered telemetry); provider data is opaque under `extensions`. JSON output is a redacted normalized summary with extension key names only. `--repo` optionally checks the context pack join; no provider is executed and capability declarations are not enforcement. |
-| `canon prompt add --name <name> --version <version> --manifest <repo-relative.json> [--repo <dir>] [--json]` | Register a versioned prompt bundle from an explicit repository-local manifest in the immutable content registry. |
-| `canon prompt show --name <name> --version <version> [--repo <dir>] [--json]` | Select and verify a registered prompt bundle version; default output is concise metadata, while `--json` includes snapshot metadata and digests. |
-| `canon skills install [--source <dir>] [--target <dir>] [--providers=claude,codex,omp,pi\|none]` | Project one canonical `canon` skill. Claude receives `.claude/skills/canon/SKILL.md`; Codex receives `.agents/skills/canon/SKILL.md` (the directory Codex scans for skills); OMP receives `.omp/skills/canon/SKILL.md`; and Pi receives `.pi/skills/canon/SKILL.md`. Every selected provider receives lazy `reference/**` and `scripts/**` sidecars. OMP/Pi are project-local passive bundles; their retrieve pre-dispatch script is a sidecar, not a native hook. Provider selection is deterministic: `--providers`, else `canon.yaml`'s `skills.providers`, else the providers the install lock records (a repo set up before 0.17), else the harnesses whose `.claude`, `.codex`, `.omp` or `.pi` directory exists (`.agents` alone does not select Codex). Nothing undetected is ever added: with nothing detected it installs nothing and names `--providers`. An explicit `--providers` also rewrites `skills.providers` in an existing `canon.yaml`, keeping every other byte, and never creates one. A legacy `.codex/skills/canon.md` + `.codex/skills/canon/**` projection from canon 0.13.0 or earlier is removed file by file when its bytes still match the install lock; edited or user files stay, and `.codex/skills` is removed only if it ends up empty. The install lock (`.canon/skills/.install-lock.json`) records `canon_version`, the canon that wrote it, and `source_commit`, the `HEAD` of the git checkout the source is in (omitted outside one); a rerun with an unchanged bundle and the same canon leaves it byte-identical. It prunes projected files the bundle no longer ships when their bytes match the lock; a modified one is kept and reported as `kept:`. |
-| `canon skills check [--source <dir>] [--target <dir>] [--providers=claude,codex,omp,pi]` | Selects providers as `install` does and, without `--providers`, first prints `providers: <list> (<where they came from>)`. Read-only report of missing or stale canonical projections, the target-owned content manifest, any leftover legacy `.codex/skills` Codex projection (with its fix command), and an install lock another canon wrote: `<lock> — outdated (installed by canon X, this canon is Y — run canon skills install --providers=…)`, or "an unknown canon version" for a lock from before 0.16, which records none. Exits 1 on any of them. A projected file the bundle no longer ships is an orphan: `check` exits 1 (`SKILLS_DRIFT`) naming each. |
-| `canon skills doctor [--source <dir>] [--target <dir>] [--providers=claude,codex,omp,pi]` | Human-readable provider, drift, outdated-lock (`outdated:`) and legacy-remnant diagnostics across all four managed roots and the legacy `.codex/skills` root, naming the fix command. It also lists other skills in `.claude/skills`, `.agents/skills`, `.omp/skills` and `.pi/skills` whose frontmatter `description` claims build work (one sentence holds both a build verb — build, implement, create, make, scaffold, develop or code, in any form — and a build object — site, website, app, application, game, feature, frontend, ui, page, component, tool, library, service, api, cli, server, backend, project, prototype, product, program or script, singular or plural; so "Build websites and apps" claims build work and "Manage feature branches" does not) as `competing-skill:` lines warning that if an agent picks one for build work, canon's loop will not run. Those lines are advisory: they never make the projections unhealthy or change the exit code, and canon never edits another skill or deletes user files. It also adds a `stray:` line for each canon projection (`.claude/skills/canon`, `.agents/skills/canon`, `.omp/skills/canon`, `.pi/skills/canon`) whose provider is not selected, naming the `rm -r` that removes it and the install command that selects it; also advisory, and `check` ignores it. Without `--providers` its first line names where the providers came from, and with nothing selected or detected it prints `no-providers:` with the flag to pass instead of `status: healthy`. Orphans print as `orphan:` lines. |
+### `canon adapter`
 
-Canon contributors may use the legacy `canon skills install --source
-canon/skills-dev --target .` materializer; it is not part of the consumer
-installation flow.
+{/* canon:generated cli-adapter begin */}
+Validate a provider-neutral adapter response without executing a provider.
 
-## Subjects
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon adapter authorize` | none | `--response <RESPONSE>` | read: Authorize declared capabilities against repository policy (preflight only) | `canon adapter authorize --response adapter-response.json --repo .` |
+| `canon adapter validate` | none | `--response <RESPONSE>` | read: Read and validate one provider-neutral response envelope | `canon adapter validate --response adapter-response.json` |
+{/* canon:generated cli-adapter end */}
 
-Author and drive the durable product unit — canon's 13th record kind —
-through its lifecycle, and adopt imported plan changes under it. See
-[The Canon Concept](/concepts/canon/#subjects) for the subject-write-first
-loop; "feature docs" always means Gherkin `.feature` files, a "subject"
-is the management record.
+### `canon artifacts`
 
-| Command | Description |
-|---|---|
-| `canon subject new <id> --domain <d> --title <t> [--summary <s>] [--owner-role <r>] [--repo <dir>] [--json]` | Author a `Subject` (kebab-slug `<id>` is the durable `subject_id` join key). `--domain` is a vocabulary-defined kebab slug — base set `planning`/`design`/`dev`/`data`/`test`, extended per-repo via `.canon/vocab`. Starts at status `proposed`; `--owner-role` defaults to `implementer`. Envelope + policy validated at write. |
-| `canon change new <slug> --subject-id <id> --title <t> [--kind feature\|chore] [--repo <dir>]` | Write canon's own change dir `.canon/changes/<slug>/`: `brief.md` (the PRD brief in `canon.yaml`'s `language:`: `# <title>`, then the sections Intent, Desired outcome, User flow, Step detail, Acceptance, Questions and assumptions and Out of scope, each behind a `<!-- canon:section <key> role=… -->` marker and holding a `canon:hint` comment until written, and a comment naming `canon brief approve` as where the human's answer is recorded; the Intent section's first paragraph is the title). It writes no `tasks.md`: a `tasks.md` is an optional work note nothing gates on, and an existing one is still read. `--kind chore` writes the short chore brief instead (Intent, Category `refactor\|dependency\|build\|ci\|infra`, Invariants, Checks, Out of scope; no flow): for work that changes how the subject is built or kept, never what it does. Read them with the native `canon` plan adapter `canon ingest plans` uses, and record the change adopted into the subject through the same write as `canon subject adopt` — no plans source and no `canon.yaml` edit needed. Prints `canon change new: wrote .canon/changes/<slug>/brief.md` and ``canon change new: recorded change `<slug>` adopted into subject `<id>` — …``; its records carry the actor `canon-plan-import-canon`. A failure before any record is written leaves nothing behind (the files are staged under `.canon/` and published only once they parse). The subject and change records cannot be written atomically: if the change record fails after the subject record, it exits `2`, keeps the change dir and the subject record, and prints the repair `canon ingest plans && canon subject adopt <slug> --subject-id <id>`, which is safe to rerun. Refuses (exit `2`, nothing written) an unknown subject, or a slug that already has a `.canon/changes/<slug>` dir (active or archived) or a change record. On a `building`, `verifying` or `shipped` subject it warns (stderr and JSON `meta.warnings`) until the brief is approved; evidence for existing scenarios is not frozen, since a scenario answers to the changes its `@flow:<change>.<F-id>` tags name. |
-| `canon brief [--change-id <slug>] [--repo <dir>] [--json]` | Print a change's brief state (`draft`, `ready`, `approved`, `legacy`) and the next one to three steps (`shape`, `clarify`, `harden`, `align`, `polish`, `approve`), derived from the findings of `canon brief check`; while prose advisories remain, `polish` comes before `approve`. Without `--change-id` it reads the repo's only live change. It never edits. |
-| `canon brief check [--change-id <slug>] [--repo <dir>] [--json]` | Read the brief against the rules; read-only. Exit `0` clean (advisories allowed), `2` blocker findings, `1` an operational error with a stable string `error.code` (`NO_BRIEF`, `CHANGE_AMBIGUOUS`, `BRIEF_NOT_FOUND`, `BRIEF_UNREADABLE`, `CONFIG_UNREADABLE`, `SPEC_ROOTS_UNREADABLE`). Sections are found by their marker comment, never by heading text. Blockers (`brief.*`): a missing, duplicate or out-of-order section; a flow with no steps or a duplicate step id; step-detail subheadings that do not match the flow ids in order; leftover placeholders (a `canon:hint` comment, an empty section, `TODO`/`TBD`); once the subject is `building` or later, a flow step no scenario tagged `@flow:<change>.<F-id>` points at, or one with no `@case:failure` scenario; a malformed waiver. Advisories (`prose.*`, for `en` and `ko`; the language is detected from the text's letters, and `language:` in `canon.yaml` overrides it; the output has one `language: ko (detected)` line and `--json` carries `language`, `languageSource` and, when the text looks like another language than the configured one, `languageNote`): closed phrase lists (`evaluative`, `connective`, `contrast`, `colloquial`, `degree`), `ai-vocabulary`, `code-citation`, `parenthetical`, `decision-history` and `ko-ending` in normative sections, Intent and Questions (`decision-history` not in Questions), and `sentence-length`, `paragraph-length` and a normative section without exactly one `==**key sentence**==` in normative sections only, and `length`, a character budget per section and for the whole brief (waive the latter with section key `brief`); a brief with no markers (every brief before 0.19) is `brief.legacy`. `<!-- canon:waive <rule-id> <section-key> "<reason>" -->` waives one rule in one section (add `match="<text>"` to waive only findings whose matched text contains it) and is listed in the output. The ship guard of `canon subject status` runs the blocker rules; `canon status` shows the finding counts. |
-| `canon brief approve --by <who> --note <words> [--change-id <slug>] [--repo <dir>] [--json]` | Record the human's answer to the brief in one call: writes `Approved: <who> <when> — "<words>" (brief sha256:<digest>)` into the brief (the digest covers the brief without its `Approved:` lines) and records the policy approval, as `canon policy approve` would. Refused (exit `2`) while `canon brief check` has structure blockers, and for an empty `--by` or `--note`; the coverage rules (`brief.flow-uncovered`, `brief.flow-no-failure`) gate shipping, never approval. A brief edited afterwards reads as not approved (`BRIEF_CHANGED_SINCE_APPROVAL`) in `status`, `evidence add` and the ship guard until a human answers again and the command runs again; an `Approved:` line with no digest (before 0.19) stays approved, with an advisory to re-approve. Run it only from the human's answer: canon cannot tell a human from an agent. |
-| `canon subject adopt <change_id> --subject-id <id> [--repo <dir>] [--json]` | Link an imported plan `Change` (from `canon ingest plans`) to a `Subject`: appends the subject to `Change.subject_ids` and the change to the subject's `change_ids`. A change may belong to several subjects (0.18): adopting it under a second subject adds that subject, never re-points, and prints ``linked change `refactor-core` to subject `editing` as well; the change now belongs to `perception` and `editing` ``. A change written before 0.18 names one `subject_id`; it reads as a one-element `subject_ids`. Every reader (the gate's open-blocker rule, the status guard, `canon status`, the brief) joins a subject to its changes from both sides, so a blocker on a shared change gates every subject it belongs to. Writes only the side that lacks the link (a linked pair: nothing written, exit `0`). The subject is written first; if the change write then fails it exits `2` and prints `canon subject adopt <change_id> --subject-id <id>` to complete the link. Warns (stderr and JSON `meta.warnings`) when the subject is `building`, `verifying` or `shipped` and the change's brief is not approved. |
-| `canon subject unadopt <change_id> --subject-id <id> [--repo <dir>] [--json]` | Take a change back out of a subject: removes the link on both records and keeps the change and its brief, so a draft can be adopted elsewhere (a `proposed` holding subject). Refused with `SUBJECT_UNADOPT_REFUSED` for a change whose brief carries an `Approved:` line; an unlinked pair is a no-op. |
-| `canon subject status <id> --to <state> [--override-reason <text>] [--reason <text>] [--actor-id <id>] [--repo <dir>] [--json]` | Policy-gated transition along `proposed → specced → building → verifying → shipped` (plus `shipped → verifying` to reopen, and any → `retired`). `verifying → shipped` additionally requires the subject to own at least one scenario — one whose `@subject:<id>` tag `canon inventory sync` has indexed — and every owned scenario to carry a latest non-Divergent verdict; a violation prints by failure class, exits `1`, and leaves the record unchanged (fail closed). With `spec_coverage.require_review` set, it also prints on stderr which review checks it ran or skipped, and a move into a `require_review.scope` status with gaps (`unreviewed-promotion`, `open-blocker`) is refused the same way. `--override-reason "<one line>"` waives only those two classes — never ship-gate verdict or case gaps — and records `status_override` (`to`, `reason`, `waived`: the exact `{class, subject}` violations it let through, `actor` from `--actor-id`, default `canon`) on the new record. A gap it did not record, such as a blocker raised later, still fails the gate; a blank or multi-line reason exits `2`. The waiver clears on the subject's next status write. Without `require_review`, nothing changes. Moving to `shipped` also refuses `false-success` (a scenario whose latest audit is `refuted`) and, when `require_audit.scope` covers `shipped`, an owed sampled audit. **Reopen (0.18):** `shipped → verifying --reason "<one line>"` reopens a shipped subject for follow-up work and records `reopen` (`reason`, the approved `change` the work goes into, `actor`). It needs no human inside the approved scope (the newest adopted change's brief is approved, or there is none to answer); otherwise it exits `1` naming the brief to approve, and `--override-reason` does not waive it. `--reason` is required there; on any other transition it is optional and recorded as `status_reason` (`reason`, `actor`). The review guard skips a reopen; shipping again runs every guard. `canon status` flags a shipped subject whose gate went red (`gate: red — …; reopen with …`) and names this command as its step. |
+{/* canon:generated cli-artifacts begin */}
+Check or move the evidence artifact store (local, or an object-store tier).
 
-`verifying → shipped` also needs the subject's brief approved where a
-brief exists, by the same check `canon status` uses for its `brief:` line:
-the subject's newest adopted change must carry an `Approved:` line, outside
-HTML comments and code fences, in its `.canon/changes/<change>/brief.md`,
-written by `canon brief approve`, and a digest on that line must still match
-the brief's text (a brief edited after its approval is refused as
-`BRIEF_CHANGED_SINCE_APPROVAL`). It also needs `canon brief check` free of
-blockers, which includes every flow step covered by a scenario with a
-failure case. A brief exists when that canon `brief.md` does, or, for a
-change from an external plan, when an openspec `proposal.md` under the plan
-sources does (the canon `brief.md` is then still to be created, with a
-`Source:` line pointing at that proposal; an `Approved:` line in the
-proposal itself is not read). It runs with or without a policy. Without the
-approval the move is refused as `unreviewed-promotion <subject>`, naming the
-canon `brief.md` (and, for an external plan, the `Source:` line to write)
-and saying a human must answer the brief; the agent records the answer with
-`canon brief approve`, only from that answer.
-`--override-reason` waives it like a review gap and records
-`{class: unreviewed-promotion, subject: <subject>}` in the waiver. With no
-adopted change, or a newest change with neither a canon `brief.md` nor an
-external `proposal.md`, there is no brief to answer: the move prints an
-advisory that the brief is not approved and is not refused, and `status`
-shows the brief as an advisory with no human step
-(`subjects[].brief.enforced: false`). A brief that says the
-human ships changes who runs the move, not the check. This refusal is a
-backstop: while the brief is unapproved, `canon evidence add` already
-refuses the subject's scenarios and tasks, and the agent stops at the brief
-before either fires.
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon artifacts move` | none | `--tier <TIER>` | destructive (preview, then `--commit --plan-digest`): Move the local artifact blobs to an object-store tier, verify them, and remove the local copies | `canon artifacts move --tier cold` |
+| `canon artifacts store` | none | none | write: Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/) | `canon artifacts store` |
+| `canon artifacts verify` | none | none | read: Check that the artifact store holds every file the latest evidence and current reviews bind (--full re-hashes the stored bytes) | `canon artifacts verify` |
+{/* canon:generated cli-artifacts end */}
 
-## Corpus
+### `canon brief`
 
-Validate and grow a Gherkin `.feature` spec corpus.
+{/* canon:generated cli-brief begin */}
+Check a change's brief (PRD format) and see the next steps; never edits.
 
-| Command | Description |
-|---|---|
-| `canon format <ROOT> [--repo <dir>]` (alias `canon fmt`) | Validate a corpus root (e.g. `spec/`) against the artifact-family schemas + layout descriptors. Validating is the only mode, so `--check` is now the default and is accepted only for compatibility. A spec root still on the pre-0.17 layout (any `.feature` file under `<root>/features/`) is one `layout-grammar` violation at path `features`, naming `canon migrate`, which moves `features/kind=feature/` to `<root>/kind=feature/`. |
-| `canon inventory sync [--repo <dir>] [--spec-root <dir>]` | Validate each configured `specs.roots[]` entry with `canon-fmt`, then materialize one `Scenario` ledger-index record per `(project_id, scenario_id)`. `--spec-root` overrides `canon.yaml` for one ad hoc root. The index is derived from the `.feature` files, so `subject status`, `review add` and `evidence add` rebuild a stale index themselves before reading it, and `gate check` and `status`, which write nothing, grade it as that rebuild would leave it, in memory (a scenario with no record, or a record whose source digest differs from the file): same code, only the changed files materialized, validation still over the whole root. The ones that rebuild print one stderr line — `canon evidence add: refreshed the scenario index from 1 changed feature file(s) (…): 1 record(s) written` — and nothing when the index is fresh; a root that fails to sync is named as `NOT refreshed` with a pointer back here, and the command still runs; but `gate check` then fails with `uncovered-cell <root>`, `subject status … shipped` refuses with the same violation, and `status` lists this sync as its only step. A root on the pre-0.17 layout (a `.feature` file under `<root>/features/`) aborts here (exit `1`, 0 writes), and a reader's refresh skips it without writing tombstones and names `canon migrate` instead. Nothing is written in a directory without `canon.yaml`. Run `inventory sync` to index explicitly and to list the violations. |
-| `canon scenario new <TAG> --title <label> [--subject-id <id>] [--flow <F-id>] [--change-id <slug>] [--lane <v>] [--case <v>] [--actor-id <id>] [--feature <path>] [--repo <dir>]` | Append (creating if absent) a `.feature` stub for a `<area>.<surface>.<nn>` tag: a `# canon:` provenance line directly above the tags, then `@subject:<id>` / `@flow:<change>.<F-id>` / `@lane:<v>` / `@case:<v>` if given (`--flow F1` points the scenario at that step of the change's brief; the change is `--change-id`, else the subject's newest adopted change, else the only live change), then the id tag and header. `--actor-id` (or `CANON_ACTOR`) names the provenance actor, default `canon-scaffold`; `--lane` and `--case` are checked against the repo's `lane`/`case` vocabularies. Writes no ledger record. Refused (exit `2`, nothing written) while the spec root is on the pre-0.17 layout; run `canon migrate` first. |
-| `canon scenario new --from <file\|-> [--actor-id <id>] [--repo <dir>]` | Many scenarios in one call (0.21): `--from` reads NDJSON, one JSON object per line (`-` is stdin; blank lines and `#` comments are skipped), with the single form's fields by their long flag names: `{"id":"auth.login.02","title":"Sign out","subject-id":"demo","flow":"F1","case":"failure"}` (`id`, `title`, `subject-id`, `lane`, `case`, `flow`, `change-id`, `feature`, `project-id`). It excludes `<TAG>` and the single-form flags. Every line is checked first, as the single form checks it, plus an id repeated in the batch. All or nothing: any bad line exits `2`, writes nothing and returns `error` with `data.items: [{line, id, error: {code, message, field?}}]`, one entry per bad line. Otherwise it writes what N single calls would write, under one provenance timestamp, and returns `data.items: [{line, id, path}]` and one `meta.next`. |
-| `canon feature new <SURFACE> --title <label> [--actor-id <id>] [--repo <dir>]` | Scaffold a fresh, zero-scenario `.feature` file for a not-yet-started `<area>.<surface>`. Fails loud rather than overwriting an existing file. Refused (exit `2`, nothing written) while the spec root is on the pre-0.17 layout; run `canon migrate` first. |
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon brief approve` | `<change-id>` (optional) | `--approver <APPROVER>`, `--note <NOTE>` | write: Record the human's approval of the brief, bound to its text; refused while `brief check` has blockers | `canon brief approve add-search --approver alice --note "approved as written"` |
+| `canon brief check` | `<change-id>` (optional) | none | read: Read the brief against the rules: blocker and advisory findings (exit 0 clean, 2 blockers, 1 error) | `canon brief check` |
+| `canon brief show` | `<change-id>` (optional) | none | read: Show where the change stands and the next one to three steps; never edits | `canon brief show` |
+{/* canon:generated cli-brief end */}
 
-## Ingest
+### `canon change`
 
-Fold agent-CLI sessions, evidence artifacts, and foreign plan dialects into
-tiered storage.
+{/* canon:generated cli-change begin */}
+Write a plan change (.canon/changes/<slug>/brief.md) and adopt it into a subject.
 
-| Command | Description |
-|---|---|
-| `canon ingest sessions [--watch] [--interval-secs <n>] [--home <dir>] [--canon-yaml <path>] [--full] [--all-workspaces]` | Scan every registered session-store adapter (`omp`/`pi`, Claude Code, Codex, Hermes), normalize into `Session`/`Run`/`Event` records — including `user_directive` events captured from user turns — persist through canon-store. Defaults to THIS PROJECT's sessions (main worktree + every linked `git worktree` root); `--all-workspaces` restores the machine-wide scan. `--watch` polls (default 30s) with a per-FILE watermark so only changed transcripts reparse; `--full` ignores the watermark. |
-| `canon ingest artifacts [--watch] [--interval-secs <n>] [--repo <dir>] [--json]` | Run the artifact/verdict half of the join spine: ledger/divergence/openspec-task path adapters plus the handoff records-source, derive verdicts, fold into regime-keyed trajectories, persist via canon-learn. Unlike `sessions`, a repeated `--watch` pass is not yet write-idempotent. |
-| `canon ingest plans [--dialect <name> --source <dir>] [--repo <dir>] [--json]` | Import plans into canon-model's Change/Task records, both keyed `task_id = <change_id>#<n>` through the same join: canon's own `.canon/changes/` first (the native `canon` dialect, read with no `plans:` entry whenever the directory exists, so it owns a change id an external source also carries; a `brief.md` with a `Source:` line is an external change's brief, not a change), then each external source in `plans.sources` — `openspec` change dirs, or `superpowers` writing-plans-shaped docs (s30: `# <title>`/`**Goal:**`/`### Task N:` sections, a task done iff every checkbox in its section is checked). `plans.sources` cannot name `canon`. No `--watch` — plans are operator-pulled. `--dialect`/`--source` bypass `canon.yaml`'s `plans:` section and `.canon/changes/` for a one-shot import of that one source; both are required together. |
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon change new` | `<change-id>` | `--subject-id <SUBJECT_ID>`, `--title <TITLE>` | write: Write .canon/changes/<slug>/brief.md, import it, and adopt it into a subject | `canon change new add-search --subject-id demo --title "Add search"` |
+{/* canon:generated cli-change end */}
 
-## Trust
+### `canon context-pack`
 
-The trust-spine gate, plus the native `Review`/`Divergence` verdict
-producers it reads.
+{/* canon:generated cli-context-pack begin */}
+Create, inspect, and verify reproducible context packs.
 
-| Command | Description |
-|---|---|
-| `canon gate check [--repo <dir>] [--release]` | Run the coverage/ledger/staleness/spec-coverage/bound-artifact/trust-ladder check set, printing violations by failure class (ten: `uncovered-cell`, `unreviewed-promotion`, `trust-below-required`, `stale-evidence`, `malformed-evidence`, `flagged`, `unevidenced-flip`, `fabricated-evidence`, `open-blocker`, `false-success`). With the opt-in `spec_coverage.require_review`, in-scope scenarios without an independent `Review` are `unreviewed-promotion` and open `blocker` findings on adopted changes are `open-blocker`; gaps waived by `canon subject status --override-reason` print afterwards as `review waivers:` advisories without failing. When the indexed spec corpus has scenarios but `.canon/policy.yaml` has no `spec_coverage` section, one stdout line `advisory: spec_coverage is off — N scenario(s) are not checked for evidence; see .canon/policy.yaml` follows the result; the exit code is unchanged. Exit `0` clean, `1` gate-red, `2` usage/load failure. `--release` additionally engages the release-scoped trust check. A file bound to a latest evidence record must still be provable: from its stored blob, or (records from before 0.14) from a working-tree file with the recorded digest, which prints an `evidence artifacts:` advisory naming `canon evidence vault`; otherwise it is `stale-evidence`. With `spec_coverage.require_audit: {rate, seed, scope}`, a deterministically sampled in-scope scenario whose latest audit is missing or `indeterminate` is `uncovered-cell`; a scenario whose latest audit is `refuted` is always `false-success`, whatever the policy, overriding any declared faithful verdict until a newer audit clears it. A spec root still on the pre-0.17 layout (a `.feature` file under `<root>/features/`) is `uncovered-cell <root>` (exit `1`) whether or not the index already holds its scenarios — they are not graded until `canon migrate` moves the root — and `subject status … shipped` refuses with the same violation. When `.canon/policy.yaml` exists but was never approved, an `advisory: policy not approved: …` line follows the result, naming `canon policy approve --by <who>`, and the exit code is unchanged. A policy that changed since its approval, or whose approval record is unreadable, fails closed: it is a violation (subject `policy`), the exit is `1`, and `--override-reason` does not waive it (see `canon policy show`). A fixed blocker or an approved chore without evidence recorded afterwards, and a `divergent` scenario no reviewer accepted (`canon divergence accept`), also keep a subject from shipping. |
-| `canon gate task <TASK_ID> [--repo <dir>]` | Evidence-gated checkbox flip for one plan `task_id` (`<change_id>#<n>`), found in `.canon/changes/` and then the `plans.sources`. Fails closed — the row stays unflipped — on missing, malformed, or fabricated evidence. The row's note sums up every record bound to the task (`2 evidence records (2 faithful); latest: <summary>`), and the plan source is re-ingested so `canon query --kind task` agrees. The flip still happens, but a warning goes to stderr when no evidence record for the task binds a file (`--artifact`/`--report`) and one of them cites a canon command as its `--ref` (for example `canon gate check`): bind the artifact or report that proves the task. Canon only reads external plans with one exception: for a task from an external plan, this flips the checkbox in that plan's own `tasks.md`, the one place canon writes into an external plan (open for the maintainer: record external flips only in the ledger instead). With no `.canon/changes/` and no `plans.sources` entries it is refused: this repo configures no plan sources; write the change with `canon change new`, or list your external plans under `plans.sources`. |
-| `canon gate promote [--repo <dir>] [--dry-run]` | Promote `_staging/` evidence records to the committed ledger, assigning a monotonic per-(role, surface) `run_seq`. `--dry-run` prints the plan without writing. `evidence add` and `finding add`/`close` stage for it. Under `canon.yaml`'s `write: { promote: auto }` (what `canon init` writes) or with `--promote`, they promote the one record they just staged in the same run — the same validation and `run_seq` assignment as this command, printing one success line that names the committed record (`wrote kind=…/….json`), not the staged file — ending `— staged and promoted in this run; nothing to promote`, so a separate `gate promote` is unnecessary for it. A record another run staged stays staged; only `gate promote` commits everything staged. It stays idempotent (with nothing staged it prints `nothing staged`, exit `0`). Under `write: { promote: manual }` (also the default when `write:` is absent) or with `--no-promote` they say ``— run `canon gate promote` to commit it``. When the promotion refuses the command's own record, it stays staged, the line says ``— run `canon gate promote` to commit it``, and the command exits `1`. `--promote` with `--no-promote` is exit `2`; with neither flag, a malformed `write:` section refuses the write (exit `2`) before anything is staged. Every other write command says `— written directly; nothing to promote`. |
-| `canon gate install-hooks [--repo <dir>] [--event <name>] [--matcher <m>] [--command <cmd>] [--timeout <secs>]` | Idempotent, diff-only hook-seam install into `.claude/settings.json`/`.codex/hooks.json`, plus a generic pre-commit script. Defaults: `--event PreToolUse`, `--command "canon gate task"`, `--timeout 30`. |
-| `canon gate selftest` | Run the shipped fixture corpus: every `FAILURE_CLASSES` string (all ten, including `false-success`) proven to fire, exact-set-match against `expected_failures.txt`. Takes no `--repo`. |
-| `canon evidence add --task <id> --kind <k> --ref <r> --role <role> [--session-id <id>] [--surface-ref <path-or-effect>] [--verdict <v>] [--summary <s>] [--command-result <out>] [--scenario-id <id>] [--run-id <ulid>] [--artifact <path>] [--report <junit\|cucumber\|swift-testing>:<path>] [--report-case <name>]... [--max-artifact-mib <n>] [--promote\|--no-promote] [--repo <dir>]` | Stage one attributed `EvidenceRecord` for a plan task, commit it — in the same run under `write: { promote: auto }` (what `canon init` writes) or with `--promote`, otherwise with `canon gate promote` (see there) — and spend it with `canon gate task`. A stale scenario index is rebuilt first (see `canon inventory sync`). `--surface-ref` persists a validated path or `effect:<kebab-slug>` risk binding, but remains attestation input rather than proof of changed paths. `--summary` is allowed with or without `--task` and scanned for fabrication markers; a task's flipped row shows the latest one; a line break in it is refused, because one would forge a second checked row. Risk approvals count only with a detached SSH signature verified against policy-pinned `approval.allowed_signers` and `--approval-role human`; `CANON_ACTOR`, caller text, and agent roles are not counted. **Experimental:** `--artifact` binds any repository file by sha256 and `--report` parses a JUnit/Cucumber report, recording the scenario's matched case and outcome (a `faithful` verdict over a failed case is refused); canon never runs the test. `--scenario-id` alone (with `--project-id`) attests a scenario instead of a task; a record with both answers both. Every report case carrying the scenario id is bound, `--report-case` (repeatable) adds more, and any failed bound case refuses `faithful`. Bound files are copied into `.canon/artifacts/sha256/<hex>` (tracked; commit them); a file over 25 MiB is refused unless `--max-artifact-mib` raises the limit. `--kind audit` records an external evaluator's audit — canon never generates or runs one: it requires `--evaluator-id`, `--evaluator-version`, `--evaluator-digest` (sha256, 64 lowercase hex), `--audit-result confirmed\|refuted\|indeterminate`, `--scenario-id` and `--project-id`, refuses `--task`, `--verdict`, `--surface-ref` and `--approval-*`, binds optional `--report`/`--artifact` counterexamples, and derives the verdict (confirmed → faithful, refuted → divergent, indeterminate → not-applicable); audits fold apart and never become the scenario's latest declared verdict. A record binds exactly the files its own write names: nothing is carried forward from an earlier record, and there is no drop flag. A record is refused (exit `1`, nothing staged) while a subject it attests for has an enforced, unapproved brief (see `canon status`): a `--scenario-id` reaches its subject through the scenario's `@subject` owner, a `--task <change>#<n>` every subject whose adopted changes include that change. It prints `unreviewed-promotion <subject>` naming the `.canon/changes/<change>/brief.md` that has no `Approved:` line (for a change from an external plan with no canon brief yet, the `brief.md` to create with a `Source:` line pointing at its `proposal.md`), and tells the agent to stop, report the brief and wait for the human's answer: nothing is built or attested for a subject before its brief is approved. A subject with no brief to answer (no adopted change, or a newest one with neither a canon `brief.md` nor an external `proposal.md`) is not refused; `canon review add` and `canon finding add` are not refused either. `--override-reason <text>` (one line) attests anyway: it prints the waived refusals and who recorded the override, and records `brief_override: {reason, waived: [{class, subject}], actor}` on the record; `canon status` lists it as a warning and `canon gate check` lists it under `brief overrides:` without failing. A blank or multi-line reason exits `2`; an override when nothing was refused is not recorded. |
-| `canon evidence add --project-id <id> --all-scenarios --report <junit\|cucumber\|swift-testing>:<path> --kind <k> --ref <r> --role <role> [--verdict <v>] [--artifact <scenario-id>=<path>]... [--summary <s>] [--session-id <id>] [--promote\|--no-promote] [--repo <dir>]` | One test run, many scenarios (0.18). Writes one record per indexed scenario of `--project-id` that owns a case in the report (the case's own leading scenario id, as above), each binding only its own cases, with the verdict they show: `faithful` when all passed, `divergent` when one failed, `not-applicable` when one was skipped and none failed; `--verdict` claims one verdict for every record instead. A case whose id is not indexed is named and skipped; a report no indexed scenario owns is refused (exit `2`). All or nothing: a claimed `faithful` over a failed case (exit `1`), a fabrication marker, an unapproved brief for any scenario's subject (exit `1`), or a scenario whose latest record binds a file the batch does not (exit `2`) writes no record. The records share the stored report, and the output lists each scenario with its verdict on its own line. Each record binds the attachments its own cases name in the report (a JUnit test case's `[[ATTACHMENT\|path]]` lines, as Playwright's JUnit reporter writes them; a Cucumber JSON embedding), so a test's screenshot stays with its scenario. A file the report does not name goes with `--artifact <scenario-id>=<path>`; a bare `--artifact <path>` is refused (exit `2`, `EVIDENCE_INVALID_ARGUMENT`), and so is a report attachment that is missing, outside the repo or oversized. `--scenario-id`, `--task`, `--report-case`, `--kind audit` and the approval flags are refused with it. `swift-testing:<path>` (also without `--all-scenarios`) reads the JSON-lines event stream of `swift test --experimental-event-stream-output <path>`: a test's display name is its case name, else its function name; a failing issue fails it, `testSkipped` skips it. `--task` with `--report` and no `--scenario-id` binds every case in the report, so `faithful` needs all of them to pass. Any `evidence add` that supersedes the evidence a current pinned review saw prints one line per review now stale, naming the reviewer, the scenario and the `canon review add … --pin <sha>` that re-pins it. |
-| `canon evidence vault [--max-artifact-mib <n>] [--repo <dir>]` | Store the bound files of existing evidence records (written before 0.14) and of current reviews in `.canon/artifacts/sha256/`: each file whose working-tree bytes still match the recorded digest is copied in, everything else is listed as not stored with both digests. A superseded review's files are not vaulted. Exit `0` when it ran, `2` on a ledger read or write failure. |
-| `canon finding add --change-id <id> --round <n> --seq <n> --severity <s> --reviewer <name> --summary <s> [--disposition <d>] [--reviewed-sha <sha>] [--resolution-sha <sha>] [--introduced-by <sha>] [--file-ref <path:lines>] [--scenario-id <id> …] [--session-id <id>] [--promote\|--no-promote] [--repo <dir>]` | Stage one code-review finding as a durable record, so a release note's count is read rather than remembered. Under `write: { promote: auto }` or with `--promote` it is promoted in the same run; otherwise `canon gate promote` commits it (see there). A defect the author found in its own work is recorded the same way, with `--reviewer` set to the author; `--introduced-by` names the introducing commit, so `--introduced-by self` is refused. `--seq` is required and a collision is refused. `fixed` requires `--resolution-sha`, and only `fixed` may carry one. `--reviewed-sha`/`--resolution-sha`/`--introduced-by` take a full 40-char sha or a short one (4–40 lowercase hex); a short sha is resolved with `git rev-parse` and the record stores the full sha. Refused (exit `2`) when it names no commit, is ambiguous, resolves only through a tag, or the directory is not a git repo. `--scenario-id` (repeatable; each must be a scenario the index knows) names the scenarios the finding is about: once it is closed `fixed`, fresh evidence for those scenarios alone re-verifies the fix, and `finding close` keeps the list; a finding naming none asks every evidenced scenario of the subject. |
-| `canon finding close --change-id <id> --round <n> --seq <n> --disposition <d> [--resolution-sha <sha>] [--reason <why>] [--session-id <id>] [--promote\|--no-promote] [--repo <dir>]` | Move an already-committed finding's disposition. Append-only: this writes a superseding record rather than editing history, so the round it was raised in is preserved. Reopening is a real transition. `--resolution-sha` takes a full or short sha, resolved through git as in `finding add`. Staged and promoted like `finding add`. `--reason` (one line) is required for `rejected` and `deferred` (`FINDING_REASON_REQUIRED`) and optional for `fixed`; it is stored on the closing version, shown by `finding list` as `[reason: …]` and carried in the JSON. |
-| `canon finding list --change-id <id> [--open] [--json] [--repo <dir>] [--limit <n> \| --all] [--cursor <c>] [--fields a,b,c]` | A change's committed findings at their latest version (0.18): round, seq, severity, disposition, reviewer and summary, ordered by round then seq, at most `--limit` (default 100) per page. `--open` keeps only the ones still open; `--json` prints `{change_id, findings: [{round, seq, severity, disposition, reviewer, summary, resolution_sha, file_ref}], meta: {returned, total, hasMore, nextCursor}}`, `--fields` keeping only the named row fields. Staged findings are not records yet: the command counts them on stderr and points at `canon gate promote`. Exit `0`, also when nothing matches. |
-| `canon review add --project-id <id> --scenario-id <id> --reviewer <name> --pin <pin> --role <role> --upstream-ref <ref>` (or `--original-spec-ref <ref>`) `[--actor-id <id>] [--session-id <id>] [--outcome signed\|indeterminate\|unavailable] [--reviewer-provider <p>] [--reviewer-model <m>] [--reviewer-harness <h>] [--artifact <path>]... [--max-artifact-mib <MiB>] [--repo <dir>]` | Write one native, attributed `Review` record directly to the ledger; there is nothing to promote. Exactly one of `--upstream-ref`/`--original-spec-ref` is required — both or neither refuses the write. The review pins what it saw, computed from the corpus: the scenario's digest and what its latest evidence says per role (the verdict and the identity of the checks it bound, never the record's own id); a scenario with no record is refused with exit `2`. Under `require_review` a pinned review counts only while both are unchanged; otherwise it is a stale `unreviewed-promotion`. `--outcome` (default `signed`) records an `indeterminate` or `unavailable` reviewer run as a gap, never an approval; the latest review per reviewer wins. `--reviewer-provider`/`--reviewer-model`/`--reviewer-harness` record the reviewer runtime. `--session-id` fills `actor.session_id`: under `require_review.distinct_actor`, a review from a session that attested the scenario's evidence does not count. `--artifact` (repeatable) binds a screenshot or recording the reviewer looked at, exactly as `evidence add --artifact` does: inside the repo, within `--max-artifact-mib` (default 25), stored in `.canon/artifacts/sha256/` and recorded as `{path, sha256}`; a refusal exits `2` and writes nothing. `canon gate check` re-checks the files of every current review (the latest per reviewer, unless it went stale) by the evidence rule: a missing blob whose working-tree file still matches is a `canon evidence vault` advisory; a missing one with a changed file, or an altered one, is `stale-evidence` naming the review. Canon never compares images. |
-| `canon review add --project-id <id> --scenario-id <id> [--scenario-id <id>]... [--scenario-ids-from <file\|->] --reviewer <name> --pin <pin> --role <role> --upstream-ref <ref> [...]` | Several scenarios in one call (0.18): one review per scenario, with the same reviewer, pin, provenance ref and artifacts, each pinning its own scenario and evidence. `--scenario-ids-from` reads one id per line (`-` is stdin; `#` starts a comment). All or nothing: a scenario with no record, or a line that is not a scenario id, exits `2` and writes no review. The artifacts are stored once. |
-| `canon review add --project-id <id> --change-id <slug> --reviewer <name> --pin <pin> --role reviewer --upstream-ref <ref>` (or `--original-spec-ref <ref>`) `[...]` | One change-level review of a chore (0.23), in place of `--scenario-id`: the reviewer signs the chore's invariants and checks against the diff. It pins the chore's brief (its digest, less the `Approved:` line), so editing the brief stales it. A chore has no scenarios, so this one review, plus evidence recorded after the chore's approval, is what `--to shipped` asks for. Takes a chore's slug and refuses a feature change. |
-| `canon artifacts verify [--full] [--repo <dir>] [--json]` | Check that the artifact store holds every file the latest evidence and current reviews bind, the way `canon gate check` does. The store is the one `canon.yaml`'s `artifact_store:` selects (default local, `.canon/artifacts/sha256`); for an object store it is one HEAD per distinct digest plus the size and sha256 metadata written at upload, and `--full` downloads each blob and re-hashes it. Exit `0` when every file is stored, `1` when one is missing or altered (`data.problems` names each), `2` when the store cannot be used or reached: an unreachable store is a refusal, never a pass. |
-| `canon artifacts migrate --to <tier> [--dry-run] [--repo <dir>] [--json]` | Move the local artifact blobs to an `s3` tier of `tiers:` (for example `cold`). Every blob in `.canon/artifacts/sha256` is hashed, uploaded under `<prefix>sha256/<digest>` and read back; only when all verified does `canon.yaml` gain `artifact_store: { backend: <tier>, prefix: artifacts/ }`, after which the local copies are removed and `.canon/artifacts/` is added to `.gitignore`. Commit the local-blob removals, `.gitignore` and `canon.yaml`. Idempotent and resumable; a blob whose bytes do not match its name is never migrated and stops the run with nothing removed. `--dry-run` previews and writes nothing. A decision for the repo's owner. |
-| `canon divergence add --project-id <id> --scenario-id <id> --sha <sha> --reviewer <name> --role <role> [--status <status>] [--reason <r>] [--expiry <e>] [--round <n>] [--detail <d>] [--promote\|--no-promote] [--repo <dir>]` | Stage one divergence record (`run_seq` unassigned) like any staged write; `--status` accepts `open`, `still-divergent`, `resolved`, or `deferred` (`deferred` additionally requires `--reason`/`--expiry`). `canon gate promote` (or `canon divergence promote`, for the staged divergences only) assigns `run_seq` later — or this same run does for this one candidate, under `write: { promote: auto }` or with `--promote`, ending `— staged and promoted in this run; nothing to promote`; other staged candidates stay staged. A candidate the promotion refuses stays staged, the line says ``— run `canon divergence promote` to commit it``, and the command exits `1`; flags and `write:` work as for `canon gate promote`. |
-| `canon divergence promote [--repo <dir>] [--dry-run]` | Promote every currently-staged `Divergence`, assigning each a monotonic `run_seq` within its `(project_id, role, surface)` partition. |
-| `canon divergence resolve --project-id <id> --scenario-id <id> --sha <sha> --reviewer <name> --role <role> [--round <n>] [--detail <d>] [--repo <dir>]` | Stage and promote a `Resolved` record in the same run; another record's staged work is left alone. |
-| `canon divergence defer --project-id <id> --scenario-id <id> --sha <sha> --reviewer <name> --reason <r> --expiry <e> --role <role> [--round <n>] [--repo <dir>]` | Stage and promote a `Deferred { reason, expiry }` record in the same run; another record's staged work is left alone. |
-| `canon divergence accept --project-id <id> --scenario-id <id> --reason <text> --tracking <url-or-ref> --reviewer <name> [--expiry <YYYY-MM-DD>] [--actor-id <id>] [--session-id <id>] [--role reviewer] [--repo <dir>] [--json]` | A reviewer accepts a scenario whose latest evidence is `divergent` as a known gap, limited by something outside the change and tracked at `--tracking` (`--scenario-id` repeats; all or nothing). Refused (`DIVERGENCE_ACCEPT_REFUSED`) unless the latest verdict is divergent and the accepting session and actor did not attest that evidence. The acceptance pins that evidence: new evidence for the scenario, or `--expiry` passing, ends it. While it holds, the ship guard counts the scenario as covered, and `status` and `gate check` keep listing it as `accepted-divergence <id> — <tracking>`. Staged and promoted in the same run. Never a way to skip a fix. |
-| `canon divergence status [--repo <dir>] [--as-of <date>] [--json] [--limit <n> \| --all] [--cursor <c>]` | The current-state divergence burn-down view. `--as-of` governs `Deferred` expiry evaluation; defaults to now. `--json` prints `{data: {as_of, summary, scenarios}, meta: {command, returned, total, hasMore, nextCursor}}`; at most `--limit` scenarios (default 100) are listed, the summary counts all. |
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon context-pack add` | none | `--manifest <MANIFEST>` | write: Create an immutable context pack from a repository-local JSON manifest | `canon context-pack add --manifest .canon/context-manifest.json` |
+| `canon context-pack show` | `<pack-id>` | none | read: Show a context pack after verifying its manifest and content objects | `canon context-pack show sha256:0000000000000000000000000000000000000000000000000000000000000000` |
+| `canon context-pack verify` | `<pack-id>` | none | read: Verify a context pack's manifest and immutable content objects | `canon context-pack verify sha256:0000000000000000000000000000000000000000000000000000000000000000` |
+{/* canon:generated cli-context-pack end */}
 
-**Re-verification.** A blocker whose latest disposition is `fixed`, and a chore change once approved, keep a subject from shipping until every evidenced scenario has evidence recorded after the close or the approval. The refusal names the scenarios and the command, `canon evidence add --project-id <root-id> --all-scenarios --report <format>:<path> …`; reviews pin what the evidence says, so recording the suite again with the same verdicts from the same cases leaves them current, and a chore instead needs one change-level review (`canon review add --change-id <slug> …`). `canon change new` on a shipped subject prints the reopen command (`canon subject status <id> --to verifying --reason "<why>"`). Every refusal carries a `hint` naming the way on.
+### `canon demo`
 
-A review written before 0.23 pins something the gate no longer compares: a
-0.15–0.22 review pins evidence record files, and one written before 0.15 has
-no pins, only `--pin`, the commit it reviewed. It does not count until
-`canon migrate` rewrites it to what the evidence says. Migration pins a
-review that was current under the rule it was written under (a pre-0.15
-review is checked against the scenario's digest at its commit, read through
-`git`), leaves a stale one stale, and pins one whose commit or scenario is
-not in this clone as the scenario stands. `gate check`, `status` and
-`subject status` print one advisory naming how many scenarios still wait for
-it. In CI, check out full history (`fetch-depth: 0`) for the job that runs
-`canon migrate`.
+{/* canon:generated cli-demo begin */}
+Try the evidence loop end-to-end in a throwaway demo repo.
 
-## Memory
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon demo init` | none | none | write: Scaffold the demo repo (gate starts RED) | `canon demo init --repo canon-demo` |
+| `canon demo review` | none | none | write: Record the missing reviewer evidence (gate turns GREEN) | `canon demo review` |
+{/* canon:generated cli-demo end */}
 
-Distilled strategies, role+regime-scoped retrieval, and the dispatch-time
-write seam.
+### `canon dispatch`
 
-| Command | Description |
-|---|---|
-| `canon learn promote <STRATEGY_ID> [--repo <dir>] [--evaluation <path> --approval <path>] [--signature <path>] [--dry-run]` | Activate one **quarantined** `StrategyItem` into `.canon/strategies/<role>/<id>.md`. The configured `occurrence`/paired-`crn` gate is only eligibility; activation also requires a valid paired `PromotionEvaluation` and an approval declared `human`, signed with an SSH detached signature. The evaluation requires non-empty paired baseline/candidate result digests, finite `pairs`/positive `uplift`/zero `regressions`, matching integrity/provenance, and a passing decision. The verifier uses policy-pinned `approval.allowed_signers` with `ssh-keygen -Y verify`; `--evaluation` and `--approval` are required together, and there is no `--force`. `--dry-run` does not activate. |
-| `canon learn approve <STRATEGY_ID> --evaluation <path> --principal <id> [--repo <dir>] [--json]` | Validate the quarantined candidate/evaluation and print an unsigned, domain-separated `canon-learning-approval-v1` payload (`strategy:<id>`, evaluation digest, RFC3339 timestamp, `payload_hex`) for an external SSH signer. It never reads a private key or sets `verified`. |
-| `canon learn rollback <STRATEGY_ID> --reason <text> --actor-id <id> --signature-file <path> --approved-at <RFC3339> [--contradicting-trajectory-id <id>] [--repo <dir>]` | Authenticated operator rollback, distinct from ordinary contradiction demotion. Verifies an armored SSH signature over the rollback-bound payload against policy-pinned `approval.allowed_signers`, records provenance, and sets lifecycle `rolled_back`. |
-| `canon retrieve --role <role> (--regime <regime_key> \| --domain <d> [--subject-id <id>]) [--k <n>] [--repo <dir>] [--json]` | Role+regime-scoped strategy retrieval. Give `--regime` directly, or derive it from `--domain`/`--subject-id` — retrieval tries area candidates `<domain>-<subject_id>` then `<domain>` in that fallback order. `--role` must equal the regime's leading segment (exit `2` on mismatch). Fail-soft: always exits `0` once that holds; a store outage degrades to an empty list. Quarantined/rejected/rolled-back/demoted rows are excluded; legacy `lifecycle: null` rows remain readable but carry no current paired-evaluation or SSH-approval provenance and are not measured-uplift evidence. |
-| `canon dispatch begin --role <role> --regime <regime_key> [--context-manifest <repo-relative.json>] [--prompt-bundle <name@version>] [--agent-id <id>] [--repo <dir>] [--json]` | Mint a `Run` (status `Running`), retrieve guidance for `--role`/`--regime`, and record an immutable ContextPack lineage. An explicit context manifest selects the exact docs/tools/prompts captured; `--prompt-bundle` selects and verifies a registered immutable prompt bundle. Missing, unsafe, or tampered selections are rejected before any run id or manifest is written. |
-| `canon regime-key --role <r> --repo <r> --area <a> --hash <h>` | Serialize + validate one canonical `regime_key` (`<role>/<repo>/<area>/<hash>`) from raw segments — the shell-facing counterpart to the Rust serializer every write/read path shares. Prints the key and exits `0`; exits `2` on a malformed result. |
+{/* canon:generated cli-dispatch begin */}
+Begin an agent run with retrieved guidance recorded.
 
-## Surface
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon dispatch begin` | none | `--regime <REGIME>` | write: Mint a Run manifest with retrieved guidance and context/policy lineage | `canon dispatch begin --regime implementer/my-repo/api/abcdef012345 --role implementer` |
+| `canon dispatch diff` | none | none | read: Diff the declared plan DAG against the observed execution graph | `canon dispatch diff` |
+| `canon dispatch end` | `<run-id>` | `--run-outcome <RUN_OUTCOME>` | write: Close a dispatched run with a terminal status and an ended_at | `canon dispatch end 01ARZ3NDEKTSV4RRFFQ69G5FAV --run-outcome succeeded` |
+{/* canon:generated cli-dispatch end */}
 
-Read the current state: reports, the dashboard, ad hoc queries, tier
-maintenance, plugin overlays, and self-checks.
+### `canon divergence`
 
-| Command | Description |
-|---|---|
-| `canon report [--repo <dir>] [--check] [--snapshot <dir>]` | Generate the markdown status report (default), byte-diff it against the committed copy (`--check`, exit `1` on drift), or export panel marts to Parquet + `manifest.json` (`--snapshot`, wins if both given). |
-| `canon dashboard [--repo <dir>] [--snapshot <dir>] [--port <n>]` | Serve the built dashboard app locally against a snapshot. Default port `4173`; an omitted `--snapshot` regenerates fresh at `.canon/dashboard-snapshot` on every run. Runs in any repo (the released binary carries the app). Prints the panels URL and a briefs URL (`/briefs.html`), where a human approves briefs exactly as `canon brief approve` records them. A taken port fails with `DASHBOARD_PORT_IN_USE` (pass `--port <n>` or `0`). Without the `duckdb` CLI the server still runs, the panels page says why there is no snapshot, and the briefs page works. Localhost only (`DASHBOARD_ORIGIN_REFUSED`). |
-| `canon query --kind <kind> [--since <ts>] [--repo <dir>] [--canon-yaml <path>] [--json] [--plugin <id>] [--change-id <id>] [--domain <d>] [--status <s>] [--include-sensitive] [--limit <n> \| --all] [--cursor <c>] [--fields a,b,c]` | Fan out a record kind's read across every tier it may live in and merge by `at`; every invocation is recorded in `.canon/audit/access.jsonl` of the repository whose `canon.yaml` it read (`--repo` or `--canon-yaml`), never the current directory; with no `canon.yaml`, nothing is written. Returns at most `--limit` records (default 100; 0.20 changed this from "everything"): `--json` adds `meta: {returned, total, hasMore, nextCursor}`, human mode ends with the next cursor, and `--cursor <c>` continues (`INVALID_CURSOR` if the cursor is from another listing); `--all` returns the rest. `--fields` keeps only the named top-level fields in `--json` records (`UNKNOWN_FIELD` otherwise). `--include-sensitive` requires `.canon/policy.yaml` `query.allow_sensitive: true`. |
-| `canon query --kind <kind> --history [--since <ts>] [--json] …` | Every version of a kind, the ledger's and the archive's (`.canon/archive`), unfolded and oldest first, instead of the current record per key. The ledger holds one file per key (0.23), so a default query is the working set the gate reads; `--history` is how you read what a key said before (an evidence record a newer one replaced, a finding before it was closed, a subject's earlier transitions and reopen reasons). Not combinable with `--plugin`. |
-| `canon ledger compact [--dry-run] [--repo <dir>] [--json]` | Move every superseded version of a record from `.canon/ledger` to `.canon/archive` (same layout and file names, tracked in git), once. Appending a new version already moves the versions it supersedes, so this is for a ledger written before 0.23 or after an interrupted move; `canon migrate` runs it. Idempotent; `--dry-run` reports what would move per kind (files, bytes) and writes nothing. A record that carries a standing claim (a flagged overlay, a `reviewed` lifecycle tag, a brief override, an approval at the current evidence) stays in the ledger. `gate check` and `status` read the same before and after. Exit `2` (`LEDGER_ARCHIVE_UNAVAILABLE`) when `tiers.local.root` is not a directory named `ledger`: such a ledger keeps every version. |
-| `canon purge --kind <session\|run\|event\|trajectory> --before <RFC3339> (--plan \| --confirm <planDigest>) [--repo <dir>] [--json]` | Purge matching records from the routed rung and every aging destination, including historical versions. `--plan` prints what would be removed and a `planDigest` and deletes nothing; `--confirm <planDigest>` deletes only if the plan recomputed now has that digest, else `PLAN_CHANGED` (exit 2). A bare `purge` is refused (`PURGE_PLAN_REQUIRED`). It never deletes source transcripts or Git history. |
-| `canon export --kind <kind> [--before <RFC3339>] [--after <RFC3339>] [--out <file>] [--repo <dir>] [--json] [--include-sensitive] [--limit <n> \| --all] [--cursor <c>]` | Write a versioned, redacted manifest with counts and content digests, one page of at most `--limit` records (default 100) at a time; the manifest's `meta` carries `returned`, `total`, `hasMore` and `nextCursor`. Sensitive bodies require explicit policy and flag; newly-created files are mode `0600`. |
-| `canon plugin sync <PLUGIN_ID> [--repo <dir>] [--spec-root <dir>]` | Resolve `<plugin-id>`'s manifest-declared overlay(s), hand each to its registered source, write every candidate through the validate-then-write pipeline. |
-| `canon selftest [--json]` | Run every registered crate's fixture-corpus self-test and diff against its EXPECTED oracle. Additive alongside `canon gate selftest`. |
+{/* canon:generated cli-divergence begin */}
+Stage, promote, resolve, and inspect spec divergences.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon divergence accept` | `<scenario-id>` (repeatable) | `--reason <REASON>`, `--tracking <TRACKING>`, `--actor-id <ACTOR_ID>` | write: Accept a divergent scenario as a tracked known gap (a reviewer step) | `canon divergence accept auth.login.01 --actor-id alice --reason "the engine drops the event" --tracking https://example.com/engine/issues/118 --expiry 2030-01-01 --role reviewer` |
+| `canon divergence add` | `<scenario-id>` | `--sha <SHA>`, `--actor-id <ACTOR_ID>` | write: Add a divergence candidate, staged with no run_seq yet (commit it with `canon gate promote --kind divergence`, or in the same run with --promote / `write | `canon divergence add auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --actor-id alice --role reviewer` |
+| `canon divergence defer` | `<scenario-id>` | `--sha <SHA>`, `--actor-id <ACTOR_ID>`, `--reason <REASON>`, `--expiry <EXPIRY>` | write: Directly record a deferred divergence (requires --reason/--expiry) | `canon divergence defer auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --actor-id alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer` |
+| `canon divergence list` | none | none | read: List the current divergence burn-down state | `canon divergence list --as-of 2030-01-01` |
+| `canon divergence resolve` | `<scenario-id>` | `--sha <SHA>`, `--actor-id <ACTOR_ID>` | write: Directly record a resolved divergence | `canon divergence resolve auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --actor-id alice --role reviewer` |
+{/* canon:generated cli-divergence end */}
+
+### `canon evidence`
+
+{/* canon:generated cli-evidence begin */}
+Author a staged, attributed evidence attestation for a plan task.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon evidence add` | none | none | write: Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write | `canon evidence add --scenario-id auth.login.01 --class test-run --ref "npm test" --role implementer` |
+| `canon evidence approval-payload` | none | `--artifact-sha <ARTIFACT_SHA>`, `--approver <APPROVER>`, `--approval-at <TIMESTAMP>` | read: Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1` | `canon evidence approval-payload --scenario-id auth.login.01 --project-id root --artifact-sha 0123456789abcdef0123456789abcdef01234567 --approver alice --approval-at 2030-01-01T00:00:00Z` |
+| `canon evidence audit` | `<scenario-id>` | `--ref <REF>`, `--evaluator-id <EVALUATOR_ID>`, `--evaluator-version <EVALUATOR_VERSION>`, `--evaluator-digest <EVALUATOR_DIGEST>`, `--audit-result <AUDIT_RESULT>` | write: Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator) | `canon evidence audit auth.login.01 --ref audit-report.json --evaluator-id eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer` |
+{/* canon:generated cli-evidence end */}
+
+### `canon feature`
+
+{/* canon:generated cli-feature begin */}
+Scaffold a new .feature spec file.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon feature new` | `<surface>` | `--title <TITLE>` | write: Create a fresh .feature file for a new area.surface | `canon feature new billing.invoice --title Invoices` |
+{/* canon:generated cli-feature end */}
+
+### `canon finding`
+
+{/* canon:generated cli-finding begin */}
+Record one code-review finding as a durable record.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon finding add` | none | `--change-id <CHANGE_ID>`, `--round <ROUND>`, `--seq <SEQ>`, `--severity <SEVERITY>`, `--actor-id <ACTOR_ID>`, `--summary <SUMMARY>` | write: Record one code-review finding (promoted in the same run under `write | `canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --actor-id alice --summary "Token is logged"` |
+| `canon finding close` | `<change-id>` | `--round <ROUND>`, `--seq <SEQ>`, `--disposition <DISPOSITION>` | write: Move an already-committed finding's disposition (promoted in the same run under `write | `canon finding close add-login --round 1 --seq 1 --disposition rejected --reason "works as designed"` |
+| `canon finding list` | none | `--change-id <CHANGE_ID>` | read: List a change's committed findings at their latest version | `canon finding list --change-id add-login` |
+{/* canon:generated cli-finding end */}
+
+### `canon gate`
+
+{/* canon:generated cli-gate begin */}
+Run evidence gates, promote staged records, install hooks.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon gate check` | none | none | read: Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage) | `canon gate check` |
+| `canon gate install-hooks` | none | none | write: Install the gate hook into .claude/settings.json / .codex/hooks.json | `canon gate install-hooks` |
+| `canon gate promote` | none | none | write: Promote staged records (evidence, findings, divergences) to the committed ledger | `canon gate promote --kind evidence` |
+{/* canon:generated cli-gate end */}
+
+### `canon ingest`
+
+{/* canon:generated cli-ingest begin */}
+Import agent sessions, records, and plans into canon's store.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon ingest plans` | none | none | write: Import plans as Change/Task records | `canon ingest plans` |
+| `canon ingest records` | none | none | write: Import review/divergence/task/handoff records and derive verdicts | `canon ingest records` |
+| `canon ingest sessions` | none | none | write: Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes) | `canon ingest sessions` |
+{/* canon:generated cli-ingest end */}
+
+### `canon inventory`
+
+{/* canon:generated cli-inventory begin */}
+Index a validated .feature corpus into the scenario ledger.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon inventory sync` | none | none | write: Validate each spec root, then materialize scenario index records | `canon inventory sync` |
+{/* canon:generated cli-inventory end */}
+
+### `canon ledger`
+
+{/* canon:generated cli-ledger begin */}
+Keep the ledger to the current version of each record.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon ledger compact` | none | none | destructive (preview, then `--commit --plan-digest`): Move superseded versions of every record out of the ledger into the archive | `canon ledger compact` |
+{/* canon:generated cli-ledger end */}
+
+### `canon plugin`
+
+{/* canon:generated cli-plugin begin */}
+Sync plugin overlay records onto the ledger.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon plugin sync` | `<plugin-id>` | none | write: Validate and write a plugin's overlay records | `canon plugin sync my-plugin` |
+{/* canon:generated cli-plugin end */}
+
+### `canon policy`
+
+{/* canon:generated cli-policy begin */}
+Record who approved the gate's policy (.canon/policy.yaml) and which bytes.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon policy approve` | none | `--approver <APPROVER>` | write: Approve the current .canon/policy.yaml (written directly; nothing to promote) | `canon policy approve --approver alice --note "reviewed the starter policy"` |
+| `canon policy show` | none | none | read: Show the policy's digest and its approval (who, when, which bytes) | `canon policy show` |
+{/* canon:generated cli-policy end */}
+
+### `canon prompt`
+
+{/* canon:generated cli-prompt begin */}
+Register and select versioned prompt bundles.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon prompt add` | `<name@version>` | `--manifest <MANIFEST>` | write: Add a prompt bundle from a repository-local JSON manifest | `canon prompt add reviewer@v1 --manifest .canon/prompt-manifest.json` |
+| `canon prompt show` | `<name@version>` | none | read: Select a registered prompt bundle version | `canon prompt show reviewer@v1` |
+{/* canon:generated cli-prompt end */}
+
+### `canon regime`
+
+{/* canon:generated cli-regime begin */}
+Build a canonical regime key for hook scripts.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon regime show` | none | `--role-segment <NAME>`, `--repo-name <NAME>`, `--area <AREA>`, `--hash <HASH>` | read: Build a canonical regime key for hook scripts | `canon regime show --role-segment reviewer --repo-name my-repo --area api --hash abcdef012345` |
+{/* canon:generated cli-regime end */}
+
+### `canon report`
+
+{/* canon:generated cli-report begin */}
+Build, check, or snapshot the status report.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon report build` | none | none | write: Write the status report (.canon/REPORT.md) | `canon report build` |
+| `canon report check` | none | none | read: Byte-diff .canon/REPORT.md against a fresh build (0 fresh, 1 missing or drifted); writes nothing | `canon report check` |
+| `canon report snapshot` | `<dir>` | none | write: Export the panel marts to <DIR>/*.parquet plus manifest.json | `canon report snapshot snapshot-out` |
+{/* canon:generated cli-report end */}
+
+### `canon review`
+
+{/* canon:generated cli-review begin */}
+Record an attributed review verdict.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon review change` | `<change-id>` | `--actor-id <ACTOR_ID>`, `--pin <PIN>`, one of `--upstream-ref` or `--original-spec-ref` | write: Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required) | `canon review change add-login --actor-id alice --pin abc123 --role reviewer --original-spec-ref docs/prd.md` |
+| `canon review scenario` | `<scenario-id>` (repeatable) | `--actor-id <ACTOR_ID>`, `--pin <PIN>`, one of `--upstream-ref` or `--original-spec-ref` | write: Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required) | `canon review scenario auth.login.01 --actor-id alice --pin abc123 --role reviewer --original-spec-ref docs/prd.md` |
+{/* canon:generated cli-review end */}
+
+### `canon scenario`
+
+{/* canon:generated cli-scenario begin */}
+Add a tagged scenario to a .feature spec file.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon scenario new` | `<scenario-id>` (optional) | one of `--from` or `tag` | write: Append a tagged scenario stub to its .feature file (created if missing), or many with --from | `canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature` |
+{/* canon:generated cli-scenario end */}
+
+### `canon skills`
+
+{/* canon:generated cli-skills begin */}
+Install canon's agent guides into a repo.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon skills check` | none | none | read: Check canonical projections without writing; exit 1 on drift, a legacy remnant, or a lock another canon version wrote | `canon skills check` |
+| `canon skills doctor` | none | none | read: Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a provider that is not selected, and other skills whose description claims build work; reports only, never edits | `canon skills doctor` |
+| `canon skills install` | none | none | write: Install the canonical `canon` bundle or legacy developer skills | `canon skills install` |
+{/* canon:generated cli-skills end */}
+
+### `canon strategy`
+
+{/* canon:generated cli-strategy begin */}
+Promote a proven strategy into the git-tracked tier.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon strategy approval-payload` | `<strategy-id>` | `--evaluation <EVALUATION>`, `--approver <APPROVER>`, `--approval-at <TIMESTAMP>` | read: The unsigned approval payload bytes an external signer signs (a read | `canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --approver alice --approval-at 2030-01-01T00:00:00Z` |
+| `canon strategy promote` | `<strategy-id>` | none | write: Promote a strategy after paired evaluation and signed approval | `canon strategy promote 01ARZ3NDEKTSV4RRFFQ69G5FAV` |
+| `canon strategy rollback` | `<strategy-id>` | `--reason <REASON>`, `--actor-id <ACTOR_ID>`, `--signature-file <SIGNATURE_FILE>`, `--approval-at <TIMESTAMP>` | write: Disable an active strategy with durable rollback provenance | `canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regressed in production" --actor-id alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z` |
+{/* canon:generated cli-strategy end */}
+
+### `canon subject`
+
+{/* canon:generated cli-subject begin */}
+Create and manage subjects (durable product units).
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon subject adopt` | `<subject-id>` | `--change-id <CHANGE_ID>` | write: Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several) | `canon subject adopt demo --change-id add-login` |
+| `canon subject move` | `<subject-id>` | `--to <STATE>` | write: Move a subject to another lifecycle state (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason) | `canon subject move demo --to specced` |
+| `canon subject new` | `<subject-id>` | `--domain <DOMAIN>`, `--title <TITLE>` | write: Author a new subject at status `proposed` | `canon subject new payments --domain dev --title Payments` |
+| `canon subject show` | `<subject-id>` | none | read: Show a subject (read-only) | `canon subject show demo` |
+| `canon subject unadopt` | `<subject-id>` | `--change-id <CHANGE_ID>` | write: Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved) | `canon subject unadopt demo --change-id add-login` |
+{/* canon:generated cli-subject end */}
+
+### `canon task`
+
+{/* canon:generated cli-task begin */}
+Flip a plan task's checkbox once committed evidence supports it.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon task done` | `<task-id>` | none | write: Flip one task checkbox, gated on real evidence (fails closed) | `canon task done add-login#1` |
+{/* canon:generated cli-task end */}
+
+### `canon tier`
+
+{/* canon:generated cli-tier begin */}
+Age records between storage tiers.
+
+| Command | Operands | Required options | Effect | Example |
+|---|---|---|---|---|
+| `canon tier age` | none | none | destructive (preview, then `--commit --plan-digest`): Apply canon.yaml aging rules, moving old records to their destination tier | `canon tier age` |
+{/* canon:generated cli-tier end */}
 
 ## Driving canon from an agent
 
@@ -233,7 +379,7 @@ invocation or its inputs are wrong and fixable (nothing was written); exit
 `1` is an operational failure or a blocking finding the command reports.
 
 **Paging and fields.** `canon query`, `canon finding list`,
-`canon divergence status` and `canon export` return at most `--limit`
+`canon divergence list` and `canon export` return at most `--limit`
 records (default 100). `--all` returns everything; `--cursor <nextCursor>`
 continues. `--json` adds `meta: {returned, total, hasMore, nextCursor}`.
 `canon query` and `canon finding list` also take `--fields a,b,c` to
@@ -248,7 +394,7 @@ adds `meta.next` (`[{command, why, actor, role}]`, at most five, with
 to the subject the write touched; `actor: human` marks a step only a human
 takes. canon never runs a step.
 
-**Retry safety.** Repeating `evidence add` or `review add` with identical
+**Retry safety.** Repeating `evidence add` or `review scenario` with identical
 input returns the existing record with `meta.unchanged: true`.
 
 ### Roles
@@ -258,7 +404,7 @@ An agent can declare a role: `planner`, `implementer`, `reviewer` or
 an unknown value is `UNKNOWN_ROLE`. A role is guidance, not enforcement:
 `canon schema` lists the role's commands, `canon status` and `meta.next` keep
 only the role's steps and count the rest in `waitingOn` (the orchestrator also
-sees the human's steps), and `--role` on `evidence add` and `review add`
+sees the human's steps), and `--role` on `evidence add` and `review scenario`
 defaults to it. Unset, every command behaves as before.
 
 The canon skill is split the same way: a short shared core plus
@@ -266,12 +412,12 @@ The canon skill is split the same way: a short shared core plus
 reference; one agent doing everything follows `canon status` and loads each
 role reference as its phase starts. The orchestrator starts each role with
 `CANON_ROLE` set and runs the reviewer as a separate process with its own
-session id. `--fields` (on `status`, `export`, `divergence status`, `context`,
+session id. `--fields` (on `status`, `export`, `divergence list`, `context`,
 `query`, `finding list`) keeps an agent's context small.
 
-**Destructive commands plan first.** `canon purge --plan` prints the removal
-set and a `planDigest` and deletes nothing; `canon purge --confirm
-<planDigest>` deletes only if the plan recomputed now has the same digest
+**Destructive commands plan first.** `canon purge` alone prints the removal
+set and a `planDigest` and deletes nothing; `canon purge --commit
+--plan-digest <planDigest>` deletes only if the plan recomputed now has the same digest
 (`PLAN_CHANGED` otherwise). There is no `--dry-run` on `purge`.
 
 ## Next

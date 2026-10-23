@@ -37,7 +37,7 @@ bunx @journeykit/canon gate check     # GREEN — the gate passes
 
 The first `gate check` fails, naming the exact missing evidence:
 
-```
+```text
 canon gate check: 1 violation(s)
 
 uncovered-cell (1):
@@ -49,7 +49,7 @@ The `dev` voice recorded evidence for scenario `auth.login.01`, but
 cell is uncovered → the gate is red. `demo add` records that evidence, and
 the same check turns green:
 
-```
+```text
 canon gate check: clean (0 violations)
 ```
 
@@ -86,7 +86,7 @@ is attributed, and is fresh — never on a self-report. See
      names it, and `canon status` shows it. The gate grades the work
      against the policy, so a human approves it, in the same answer that
      approves a subject's brief, and the agent records that answer with one
-     call, `canon brief approve --by <the human> --note "<their words>"`,
+     call, `canon brief approve --approver <the human> --note "<their words>"`,
      which records both; until then `canon gate check` and `canon status` print an advisory.
    - **A canon block in `AGENTS.md`**, between `<!-- canon:begin -->` and
      `<!-- canon:end -->`. It tells any agent that features are managed
@@ -133,8 +133,8 @@ is attributed, and is fresh — never on a self-report. See
    in and runs `canon brief check` until it has no blockers and each prose
    advisory is fixed or waived with a reason, then stops and reports it to
    the human in that language. When the human approves it,
-   the agent records the answer with `canon brief approve --change-id add-login
-   --by <the human> --note "<their words>"`, which writes the `Approved:`
+   the agent records the answer with `canon brief approve add-login
+   --approver <the human> --note "<their words>"`, which writes the `Approved:`
    line, bound to the brief's text, and the policy approval together. A
    brief edited afterwards is no longer approved until the human answers
    again. Each scenario points at the step it proves
@@ -143,7 +143,7 @@ is attributed, and is fresh — never on a self-report. See
    `canon status` reads the approval in the subject's newest adopted change
    to show whether its brief is approved, and asks for a human only when it
    is missing. Work that changes nothing a user can observe (a dependency,
-   build or refactor change) is `canon change new --kind chore`, with a
+   build or refactor change) is `canon change new <slug> --change-kind chore`, with a
    short brief and no new scenarios. A change from an external plan (an
    openspec `proposal.md` listed under `plans.sources`) gets its brief in
    `.canon/changes/<change>/brief.md` too, with a `Source: <path>` line
@@ -166,7 +166,7 @@ is attributed, and is fresh — never on a self-report. See
    under a configured `specs.roots[]` entry:
 
    ```bash
-   bunx @journeykit/canon fmt --check      # validate the corpus first
+   bunx @journeykit/canon format          # validate the corpus first
    bunx @journeykit/canon inventory sync   # materialize the scenario ledger index
    ```
 

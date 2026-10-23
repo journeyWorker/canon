@@ -74,7 +74,7 @@ spec_coverage:
 
 Every feature surface (`<area>.<surface>`) with in-scope scenarios must
 then carry at least one scenario of each listed case, or `canon gate
-check` reports it as `uncovered-cell`, and `canon subject status <id>
+check` reports it as `uncovered-cell`, and `canon subject move <id>
 --to shipped` refuses for a subject that owns such a surface. An untagged
 scenario counts toward its surface but satisfies no case, so an
 untagged corpus reports every surface instead of passing silently. The
@@ -101,7 +101,7 @@ canon scenario new checkout.cart.04 --title "Adding an out-of-stock item is refu
 
 There is no format or sync step after these: the scaffold writes a
 format-clean scenario, and `canon status`, `canon gate check`,
-`canon evidence add`, `canon review add` and `canon subject status`
+`canon evidence add`, `canon review scenario` and `canon subject move`
 index added, edited and deleted `.feature` files before they read. When
 one of them prints `NOT refreshed`, the corpus has a format violation
 (for example a hand-written header with no `# canon:` line) or a

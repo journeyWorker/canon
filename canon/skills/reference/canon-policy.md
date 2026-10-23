@@ -69,7 +69,7 @@ statuses (see `canon-gate`).
 ## Approving the policy
 
 ```bash
-canon policy approve --by <who> [--note <text>] [--repo <dir>]
+canon policy approve --approver <who> [--note <text>] [--repo <dir>]
 ```
 
 A human approves the policy after reviewing `.canon/policy.yaml`, in the
@@ -77,7 +77,7 @@ same answer that approves a subject's brief (0.16; see the skill's working
 loop). `canon brief approve` records both in one call, so the agent does
 not run this command next to it. Run `canon policy approve` alone for a
 policy-only change, as the human, or as the agent right after that answer
-(`canon policy approve --by <the human> --note "<their words>"`). It
+(`canon policy approve --approver <the human> --note "<their words>"`). It
 writes `.canon/policy.approval.json` directly (nothing to promote):
 
 ```json
@@ -92,13 +92,13 @@ writes `.canon/policy.approval.json` directly (nothing to promote):
 Commit it with the policy: the file is tracked, and neither canon's
 `.gitignore` nor the one `canon init` writes ignores it. Running the
 command again replaces the record. With no `.canon/policy.yaml` it is
-refused (exit `2`), and so is an empty `--by`.
+refused (exit `2`), and so is an empty `--approver`.
 
 While a policy exists with no approval, `canon gate check` prints after
 its result:
 
 ```
-advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --by <who>`
+advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --approver <who>`
 ```
 
 Once the policy's bytes no longer match the approved digest, or the
@@ -108,7 +108,7 @@ approval file cannot be read, the gate fails closed instead:
 unreviewed-promotion policy — policy changed since approval: .canon/policy.yaml is sha256:<now>, but `<who>` approved sha256:<then> at <time>; … (--override-reason does not waive it); the human re-approves the policy in force with `canon policy approve --by <human> --note "<words>"`, or restore the approved .canon/policy.yaml (and .canon/policy.approval.json) from git
 ```
 
-`canon gate check` exits `1`; `canon subject status` (the ship guard and
+`canon gate check` exits `1`; `canon subject move` (the ship guard and
 the reopen) refuses with `POLICY_CHANGED_SINCE_APPROVAL`, or
 `POLICY_APPROVAL_UNREADABLE` for an unreadable approval, and
 `--override-reason` does not waive either. A policy never approved stays
@@ -251,7 +251,7 @@ read as a big-endian u64, are less than `rate · 2^64` — computed exactly,
 as a comparison against `ceil(rate · 2^64)`, so `rate: 0` samples nothing
 and `rate: 1` samples everything. A sampled in-scope scenario whose
 latest audit is missing or `indeterminate` is `uncovered-cell`; with
-`shipped` in `scope`, `canon subject status <id> --to shipped` also refuses
+`shipped` in `scope`, `canon subject move <id> --to shipped` also refuses
 it. `canon context` and the `canon status` policy line show
 `require_audit=(rate=… seed=`…` scope=…)`.
 

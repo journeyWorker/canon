@@ -4,30 +4,30 @@
 `canon-learn`) at task-dispatch time. It is a fail-soft, advisory-only
 read: it NEVER blocks a dispatch and NEVER gates reproducibility.
 
-## `canon retrieve --role <r> --regime <k> [--k <n>] [--repo <dir>] [--json]`
+## `canon retrieve --for-role <r> --regime <k> [--limit <n>] [--repo <dir>] [--json]`
 
 Prints the top-`k` retrievable strategies stored for `regime_key = <k>`
 (active strategies plus backward-compatible legacy rows without a lifecycle;
 guardrails are just strategies distilled from a failure-polarity verdict),
-newest-distilled first, capped at `--k` (default 5). Demoted,
+newest-distilled first, capped at `--limit` (default 5). Demoted,
 quarantined, rejected, and rolled-back rows are not retrievable.
 
 ```bash
-canon retrieve --role dev --regime dev/canon/join-spine/9c93d024b1a2
-canon retrieve --role dev --regime dev/canon/join-spine/9c93d024b1a2 --k 3 --json
+canon retrieve --for-role dev --regime dev/canon/join-spine/9c93d024b1a2
+canon retrieve --for-role dev --regime dev/canon/join-spine/9c93d024b1a2 --limit 3 --json
 ```
 
 - `--regime` is the FULL `regime_key` string
   (`<role>/<repo>/<area>/<hash>`) — the same serialization the write side
   produces.
-- Assembling `--regime` in a script or hook? Use `canon regime-key
-  --role <r> --repo <r> --area <a> --hash <h>`: it runs canon's ONE
+- Assembling `--regime` in a script or hook? Use `canon regime show
+  --role-segment <r> --repo-name <r> --area <a> --hash <h>`: it runs canon's ONE
   canonical `regime_key` serializer and prints the validated key, so a
   caller routes through the exact normalizer the write path uses instead
   of a drifting shell slug. Exits `2` with empty stdout on a malformed
   result (empty segment / bad `<hash>`) — a clean fail-soft branch for
   `|| exit 0` callers.
-- `--role` MUST equal `--regime`'s leading segment — a mismatch is a
+- `--for-role` MUST equal `--regime`'s leading segment — a mismatch is a
   clean usage error, exit `2` (mirroring `canon gate check`'s
   0-clean/1-red/2-usage convention), never a panic or a silently-ignored
   mismatch.
@@ -36,7 +36,7 @@ canon retrieve --role dev --regime dev/canon/join-spine/9c93d024b1a2 --k 3 --jso
   `canon.yaml` `learn:` section names the store root (`.canon/learn` by
   default); a repo with no `canon.yaml` still works, defaulting cleanly.
 
-**FAIL-SOFT, always exit `0`** once `--role`/`--regime` agree: a store
+**FAIL-SOFT, always exit `0`** once `--for-role`/`--regime` agree: a store
 outage, an empty/nonexistent store, or a malformed on-disk row all
 degrade to an empty guidance list — never a nonzero exit or an error a
 caller must handle.
@@ -46,8 +46,8 @@ caller must handle.
 A generic, fail-soft, advisory-only shell script that fires at a
 PreToolUse-equivalent point for a `task`-shaped dispatch (Claude Code's
 `Task` tool / Codex's equivalent). It reads the tool's `subagent_type`
-as `--role`, assembles `--regime` by routing its repo/area segments
-through `canon regime-key` (so it never re-derives the join key with a
+as `--for-role`, assembles `--regime` by routing its repo/area segments
+through `canon regime show` (so it never re-derives the join key with a
 drifting shell slug), calls `canon retrieve --json`, and emits the
 result as a `PreToolUse` `hookSpecificOutput.additionalContext` JSON
 envelope on stdout — Claude Code's convention for surfacing advisory

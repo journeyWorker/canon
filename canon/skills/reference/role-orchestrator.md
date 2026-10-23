@@ -6,26 +6,77 @@ code or review yourself. Declare the role with `CANON_ROLE=orchestrator` (or
 
 ## Commands
 
-Every line is complete; fill the `<placeholders>`.
+Every line below is generated from the CLI's own spec and runs as written against the
+example story (subject `demo`, change `add-login`, scenario `auth.login.01`): swap in
+your ids. `canon schema <command> --json` lists every option.
 
+<!-- canon:generated commands-orchestrator begin -->
 ```bash
-canon status --as orchestrator --json --fields next,waitingOn   # at the start and when resuming
-canon brief approve --change-id <slug> --by "<the human>" --note "<their words>" --as orchestrator --json
-canon subject status <subject-id> --to <proposed|specced|building|verifying|shipped> --actor-id <unit> --as orchestrator --json
-canon subject status <subject-id> --to verifying --reason "<why>" --actor-id <unit> --as orchestrator --json   # reopen a shipped subject (--reason is required here; any other transition accepts it as a note)
-canon policy show --as orchestrator --json            # policy digest and its approval: approved, changed, unreadable or unapproved
-canon gate check --as orchestrator --json
-canon migrate --dry-run --as orchestrator --json       # on a repo upgraded from an earlier canon: the plan, nothing written
-canon migrate --as orchestrator --json                 # applies it (see "Upgraded repo")
-canon artifacts verify --as orchestrator --json        # the artifact store holds every bound file; refuses when an object store is unreachable
+canon adapter authorize --response adapter-response.json --repo .                                                                                                                          # Authorize declared capabilities against repository policy (preflight only)
+canon adapter validate --response adapter-response.json                                                                                                                                    # Read and validate one provider-neutral response envelope
+canon artifacts move --tier cold                                                                                                                                                           # Move the local artifact blobs to an object-store tier, verify them, and remove the local copies
+canon artifacts store                                                                                                                                                                      # Store the bound files of existing evidence records and current reviews in the artifact store (.canon/artifacts/sha256/)
+canon artifacts verify                                                                                                                                                                     # Check that the artifact store holds every file the latest evidence and current reviews bind (--full re-hashes the stored bytes)
+canon completion zsh                                                                                                                                                                       # Write the shell completion script for canon (bash, zsh or fish)
+canon context                                                                                                                                                                              # Show what you can author here: record kinds, fields, enums, policies
+canon context-pack add --manifest .canon/context-manifest.json                                                                                                                             # Create an immutable context pack from a repository-local JSON manifest
+canon context-pack show sha256:0000000000000000000000000000000000000000000000000000000000000000                                                                                            # Show a context pack after verifying its manifest and content objects
+canon context-pack verify sha256:0000000000000000000000000000000000000000000000000000000000000000                                                                                          # Verify a context pack's manifest and immutable content objects
+canon dashboard                                                                                                                                                                            # Serve the local status dashboard
+canon demo init --repo canon-demo                                                                                                                                                          # Scaffold the demo repo (gate starts RED)
+canon demo review                                                                                                                                                                          # Record the missing reviewer evidence (gate turns GREEN)
+canon dispatch begin --regime implementer/my-repo/api/abcdef012345 --role implementer                                                                                                      # Mint a Run manifest with retrieved guidance and context/policy lineage
+canon dispatch diff                                                                                                                                                                        # Diff the declared plan DAG against the observed execution graph
+canon dispatch end 01ARZ3NDEKTSV4RRFFQ69G5FAV --run-outcome succeeded                                                                                                                      # Close a dispatched run with a terminal status and an ended_at
+canon divergence list --as-of 2030-01-01                                                                                                                                                   # List the current divergence burn-down state
+canon evidence approval-payload --scenario-id auth.login.01 --project-id root --artifact-sha 0123456789abcdef0123456789abcdef01234567 --approver alice --approval-at 2030-01-01T00:00:00Z  # Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1`
+canon export --kind evidence --output evidence.json                                                                                                                                        # Export a redacted retention manifest without deleting records
+canon finding list --change-id add-login                                                                                                                                                   # List a change's committed findings at their latest version
+canon format .canon/specs                                                                                                                                                                  # Validate a spec/artifact corpus against canon's format
+canon gate check                                                                                                                                                                           # Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)
+canon gate install-hooks                                                                                                                                                                   # Install the gate hook into .claude/settings.json / .codex/hooks.json
+canon ingest plans                                                                                                                                                                         # Import plans as Change/Task records
+canon ingest records                                                                                                                                                                       # Import review/divergence/task/handoff records and derive verdicts
+canon ingest sessions                                                                                                                                                                      # Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes)
+canon init                                                                                                                                                                                 # Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home)
+canon inventory sync                                                                                                                                                                       # Validate each spec root, then materialize scenario index records
+canon ledger compact                                                                                                                                                                       # Move superseded versions of every record out of the ledger into the archive
+canon migrate                                                                                                                                                                              # Bring a repo from an earlier canon up to date
+canon plugin sync my-plugin                                                                                                                                                                # Validate and write a plugin's overlay records
+canon policy show                                                                                                                                                                          # Show the policy's digest and its approval (who, when, which bytes)
+canon prompt add reviewer@v1 --manifest .canon/prompt-manifest.json                                                                                                                        # Add a prompt bundle from a repository-local JSON manifest
+canon prompt show reviewer@v1                                                                                                                                                              # Select a registered prompt bundle version
+canon purge --kind session --before 2020-01-01T00:00:00Z                                                                                                                                   # Remove allowlisted records older than a cutoff
+canon query --kind evidence                                                                                                                                                                # Read stored records across every storage tier
+canon regime show --role-segment reviewer --repo-name my-repo --area api --hash abcdef012345                                                                                               # Build a canonical regime key for hook scripts
+canon report build                                                                                                                                                                         # Write the status report (.canon/REPORT.md)
+canon report check                                                                                                                                                                         # Byte-diff .canon/REPORT.md against a fresh build (0 fresh, 1 missing or drifted); writes nothing
+canon report snapshot snapshot-out                                                                                                                                                         # Export the panel marts to <DIR>/*.parquet plus manifest.json
+canon retrieve --for-role reviewer --domain dev --limit 20                                                                                                                                 # Fetch role-scoped strategy guidance
+canon schema evidence add                                                                                                                                                                  # Describe canon's own commands
+canon selftest --suite trust-spine-gate                                                                                                                                                    # Run canon's built-in fixture self-tests
+canon skills check                                                                                                                                                                         # Check canonical projections without writing; exit 1 on drift, a legacy remnant, or a lock another canon version wrote
+canon skills doctor                                                                                                                                                                        # Print diagnostics for canonical projections, the install lock's canon version, legacy remnants, canon projections for a provider that is not selected, and other skills whose description claims build work; reports only, never edits
+canon skills install                                                                                                                                                                       # Install the canonical `canon` bundle or legacy developer skills
+canon status                                                                                                                                                                               # Show where this repo stands: subjects by status, their gaps, and the next commands
+canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --approver alice --approval-at 2030-01-01T00:00:00Z                                                # The unsigned approval payload bytes an external signer signs (a read
+canon strategy promote 01ARZ3NDEKTSV4RRFFQ69G5FAV                                                                                                                                          # Promote a strategy after paired evaluation and signed approval
+canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regressed in production" --actor-id alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z                    # Disable an active strategy with durable rollback provenance
+canon subject adopt demo --change-id add-login                                                                                                                                             # Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several)
+canon subject move demo --to specced                                                                                                                                                       # Move a subject to another lifecycle state (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason)
+canon subject new payments --domain dev --title Payments                                                                                                                                   # Author a new subject at status `proposed`
+canon subject show demo                                                                                                                                                                    # Show a subject (read-only)
+canon subject unadopt demo --change-id add-login                                                                                                                                           # Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved)
+canon tier age                                                                                                                                                                             # Apply canon.yaml aging rules, moving old records to their destination tier
 ```
+<!-- canon:generated commands-orchestrator end -->
 
 ## Read the state
 
 `canon status` lists the next steps, each with the `role` that takes it
 (`null` for the human), and `waitingOn` counts the steps held by each other
 owner, `human` included. Call it once at the start and when resuming, not
-after a write: after `subject status --to` or `brief approve`, the write's
+after a write: after `subject move --to` or `brief approve`, the write's
 `meta.next` and `meta.waitingOn` are the status for what it touched.
 
 ## Spawn each role
@@ -97,7 +148,7 @@ edit the policy to pass the gate. A policy that no longer matches the
 approval fails closed (`POLICY_CHANGED_SINCE_APPROVAL`, or
 `POLICY_APPROVAL_UNREADABLE`): the ship guard and the reopen refuse, and
 `--override-reason` does not waive it. Run `canon policy show`, then stop and
-ask the human to re-approve (`canon policy approve --by <human>`) or restore
+ask the human to re-approve (`canon policy approve --approver <human>`) or restore
 the approved policy from git; never edit the policy yourself. Inside an
 approved scope never stop for a human: fixes, follow-ups and re-reviews go
 straight to the implementer and reviewer in the same change.
@@ -126,16 +177,16 @@ holds the next command and the verified claims (`reference/canon-vocab.md`).
 ## Move the subject
 
 Move along `proposed → specced → building → verifying → shipped` with
-`subject status --to`. It refuses a move the policy does not allow (missing
+`subject move --to`. It refuses a move the policy does not allow (missing
 evidence or reviews, open blockers, an unapproved brief); fix the gap rather
 than overriding. Move to `shipped` yourself once its guard passes, unless the
 brief says the human ships. A follow-up on a shipped subject goes back to
 `verifying` with `--reason`, then the implementer and reviewer in the same
 change, then `--to shipped` again. A chore on a shipped subject (`change
-new … --kind chore` names the reopen command) is approved first, then
+new --change-kind chore` names the reopen command) is approved first, then
 reopened the same way; shipping again needs the whole suite evidenced after
 the chore's approval (the implementer's `evidence add --all-scenarios`) and
-one change-level review of the chore from the reviewer (`review add --change-id
+one change-level review of the chore from the reviewer (`review change
 <slug>`): the order is approval, evidence, review. A blocker closed
 `fixed` needs the suite again. The refusal names the scenarios and
 the command; never override them. `canon status` flags a shipped subject
@@ -144,17 +195,17 @@ whose gate went red. A bad `--to` fails with `error.field` `--to` and
 
 ## Upgraded repo
 
-After a repo moves to a newer canon, run `canon migrate --dry-run`, then
-`canon migrate`. Besides the layout, it compacts the ledger (moves every
+After a repo moves to a newer canon, run `canon migrate` (it previews), then
+`canon migrate --commit --plan-digest <digest>`. Besides the layout, it compacts the ledger (moves every
 superseded version to `.canon/archive`, as `canon ledger compact` does) and
 re-pins the reviews written before 0.23, which do not count until then (the
-gate, `status` and `subject status` print one advisory naming it). Commit
+gate, `status` and `subject move` print one advisory naming it). Commit
 what it changes. In CI run it with full history (`fetch-depth: 0`).
 
-`canon artifacts migrate --to <tier>` moves the local artifact store to an
+`canon artifacts move --tier <tier>` moves the local artifact store to an
 object store and removes the local blobs. It is the repo owner's decision,
 not a step of the loop: never run it yourself. If the repo is large, the
 store is slow or the human has not asked for it, ask the human first, and
-run it only on their answer (`--dry-run` previews it).
+run it only on their answer (the bare run previews it).
 
 Reference: `reference/canon-subject.md`.

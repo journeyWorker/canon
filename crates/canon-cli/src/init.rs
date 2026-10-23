@@ -258,7 +258,7 @@ pub(crate) const AGENTS_END: &str = "<!-- canon:end -->";
 /// The canon block, markers included, no trailing newline (0.14 D2):
 /// harness-neutral, short, and pointing at `canon status` and the skill
 /// for everything else.
-const AGENTS_BLOCK: &str = "\
+pub const AGENTS_BLOCK: &str = "\
 <!-- canon:begin -->
 ## Canon
 

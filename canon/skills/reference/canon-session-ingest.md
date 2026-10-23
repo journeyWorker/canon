@@ -15,7 +15,7 @@ no live database. Swap `hot` to postgres (the commented stanza `canon
 init` ships beside the sqlite one) once team-scale multi-agent
 concurrency outgrows sqlite's single-writer mode.
 
-## `canon ingest sessions [--watch] [--interval-secs N] [--home <dir>] [--canon-yaml <path>] [--full] [--all-workspaces]`
+## `canon ingest sessions [--watch] [--interval-secs N] [--home <dir>] [--full] [--all-workspaces]`
 
 ```bash
 canon ingest sessions                   # one pass over this project's sources
@@ -208,7 +208,7 @@ events written: 37
 
 ## What this skill does NOT cover
 
-- Artifact/verdict ingestion (`canon ingest artifacts`) — a different
+- Artifact/verdict ingestion (`canon ingest records`) — a different
   pipeline; see the `canon-artifact-ingest` skill.
 - Cost-parity computation — omp/pi's own cost is `0.0`/`Unknown` per the
   ported behavior.

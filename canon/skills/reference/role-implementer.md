@@ -8,24 +8,38 @@ planner and the human own that.
 
 ## Commands
 
-Every line is complete; fill the `<placeholders>`. `<root-id>` is the `id` of
-a `specs.roots[]` entry in `canon.yaml` (`root` by default).
+Every line below is generated from the CLI's own spec and runs as written against the
+example story (subject `demo`, change `add-login`, scenario `auth.login.01`): swap in
+your ids. `canon schema <command> --json` lists every option.
 
+<!-- canon:generated commands-implementer begin -->
 ```bash
-canon status --as implementer --json                  # once, at the start
-canon feature new <area>.<surface> --title "<title>" --as implementer --json
-canon scenario new <area>.<surface>.<nn> --subject-id <subject-id> --flow <F-id> --case <happy|edge|failure> --title "<title>" --as implementer --json
-canon scenario new --from - --as implementer --json     # many at once: NDJSON on stdin, one {"id","title","subject-id","flow","case",…} per line
-canon evidence add --project-id <root-id> --all-scenarios --report <junit|cucumber|swift-testing>:<path> --kind test-run --role implementer --ref "<test command>" --actor-id <unit> --session-id <session> --as implementer --json
-canon evidence add --project-id <root-id> --scenario-id <id> --artifact <path> --kind test-run --role implementer --ref "<what it shows>" --actor-id <unit> --session-id <session> --as implementer --json
-canon evidence add --project-id <root-id> --scenario-id <id> --verdict divergent --artifact <path> --kind test-run --role implementer --ref "<the external limit, and where it is tracked>" --actor-id <unit> --session-id <session> --as implementer --json   # honest divergent evidence
-canon artifacts verify --full --as implementer --json  # bound files are in the artifact store (omit --full to trust the store's size and digest metadata); refuses when an object store is unreachable
-canon finding add --change-id <slug> --round <n> --seq <n> --severity <blocker|should-fix|note> --reviewer <unit> --actor-id <unit> --session-id <session> --summary "<defect>" --as implementer --json
-canon inventory sync --as implementer --json          # only after a write printed NOT refreshed
-canon query --kind <kind> --history --as implementer --json   # earlier versions too; without --history only the current record of each key
-canon ledger compact --as implementer --json           # only for a pre-0.23 ledger or an interrupted move (add --dry-run to preview)
-canon gate promote --as implementer --json            # only with write.promote: manual
+canon completion zsh                                                                                                                                                                                                                      # Write the shell completion script for canon (bash, zsh or fish)
+canon context                                                                                                                                                                                                                             # Show what you can author here: record kinds, fields, enums, policies
+canon context-pack add --manifest .canon/context-manifest.json                                                                                                                                                                            # Create an immutable context pack from a repository-local JSON manifest
+canon context-pack show sha256:0000000000000000000000000000000000000000000000000000000000000000                                                                                                                                           # Show a context pack after verifying its manifest and content objects
+canon context-pack verify sha256:0000000000000000000000000000000000000000000000000000000000000000                                                                                                                                         # Verify a context pack's manifest and immutable content objects
+canon divergence add auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --actor-id alice --role reviewer                                                                                                                        # Add a divergence candidate, staged with no run_seq yet (commit it with `canon gate promote --kind divergence`, or in the same run with --promote / `write
+canon divergence defer auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --actor-id alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer                                                       # Directly record a deferred divergence (requires --reason/--expiry)
+canon divergence list --as-of 2030-01-01                                                                                                                                                                                                  # List the current divergence burn-down state
+canon divergence resolve auth.login.01 --sha 0123456789abcdef0123456789abcdef01234567 --actor-id alice --role reviewer                                                                                                                    # Directly record a resolved divergence
+canon evidence add --scenario-id auth.login.01 --class test-run --ref "npm test" --role implementer                                                                                                                                       # Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write
+canon evidence approval-payload --scenario-id auth.login.01 --project-id root --artifact-sha 0123456789abcdef0123456789abcdef01234567 --approver alice --approval-at 2030-01-01T00:00:00Z                                                 # Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1`
+canon evidence audit auth.login.01 --ref audit-report.json --evaluator-id eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer  # Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator)
+canon feature new billing.invoice --title Invoices                                                                                                                                                                                        # Create a fresh .feature file for a new area.surface
+canon finding list --change-id add-login                                                                                                                                                                                                  # List a change's committed findings at their latest version
+canon format .canon/specs                                                                                                                                                                                                                 # Validate a spec/artifact corpus against canon's format
+canon gate check                                                                                                                                                                                                                          # Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)
+canon gate promote --kind evidence                                                                                                                                                                                                        # Promote staged records (evidence, findings, divergences) to the committed ledger
+canon inventory sync                                                                                                                                                                                                                      # Validate each spec root, then materialize scenario index records
+canon query --kind evidence                                                                                                                                                                                                               # Read stored records across every storage tier
+canon retrieve --for-role reviewer --domain dev --limit 20                                                                                                                                                                                # Fetch role-scoped strategy guidance
+canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature                                                                                                                           # Append a tagged scenario stub to its .feature file (created if missing), or many with --from
+canon schema evidence add                                                                                                                                                                                                                 # Describe canon's own commands
+canon status                                                                                                                                                                                                                              # Show where this repo stands: subjects by status, their gaps, and the next commands
+canon task done add-login#1                                                                                                                                                                                                               # Flip one task checkbox, gated on real evidence (fails closed)
 ```
+<!-- canon:generated commands-implementer end -->
 
 After the first `status`, follow `meta.next` of each write; do not call
 `canon status` again to learn the next step.
@@ -79,7 +93,7 @@ After the first `status`, follow `meta.next` of each write; do not call
    re-checks them, so the working-tree report may be gitignored. Run
    `canon artifacts verify` to ask the store yourself; it refuses, never
    passes, when an object store cannot be reached. Moving an existing store
-   (`canon artifacts migrate`) is the repo owner's call: do not run it.
+   (`canon artifacts move --tier`) is the repo owner's call: do not run it.
    For a scenario about what users see, let the test report carry its
    screenshots: Playwright's JUnit reporter attaches, per test case, what a
    test attaches (`testInfo.attach(name, {path})`, or `screenshot: 'on'`), and
@@ -87,8 +101,8 @@ After the first `status`, follow `meta.next` of each write; do not call
    record only its own tests' files. A file the report does not name goes
    with `--artifact <scenario-id>=<path>`; a bare `--artifact` in a batch is
    refused. An external evaluator's audit is
-   `--kind audit`; canon never generates one. Evidence for a task of an
-   imported plan (`--task <id>`) must bind the artifact or report that proves
+   `canon evidence audit`; canon never generates one. Evidence for a task of an
+   imported plan (`--task-id <id>`) must bind the artifact or report that proves
    the task; a canon command is never that proof. When the behavior cannot
    match the scenario because of something outside this change, record the
    evidence `divergent` and say why in `--ref`; never record `faithful` to
@@ -103,12 +117,12 @@ After the first `status`, follow `meta.next` of each write; do not call
    digests) of the evidence it saw, not which record it was. Recording the
    same verdict from the same checks keeps every review current; a different
    verdict, different checks or an edited scenario stales it. The add prints
-   the reviewer and the `canon review add … --pin <sha>` that re-pins it; that
+   the reviewer and the `canon review scenario <id> --pin <sha>` that re-pins it; that
    is the reviewer's call. Do not run it yourself.
 7. **After a fix or a chore, record the whole suite again.** A blocker the
    reviewer closed `fixed`, and an approved chore, are not done until every
    evidenced scenario has evidence newer than the close or the approval:
-   run the suite and bind it with `canon evidence add --all-scenarios …`
+   run the suite and bind it with `canon evidence add --all-scenarios`
    (the shipping refusal names the scenarios and this command). Reviews stay
    current while the verdicts and checks are unchanged; a scenario whose gap
    was accepted is accepted again by the reviewer once new evidence says
@@ -136,6 +150,6 @@ When every scenario has evidence, the review is the reviewer's session, in a
 separate process: do not review your own change. A chore adds no scenarios:
 once it is approved, run the suite and bind it with `--all-scenarios`;
 shipping needs that evidence newer than the chore's approval, plus the
-reviewer's one change-level review of the chore (`review add --change-id`).
+reviewer's one change-level review of the chore (`review change`).
 Scenario reviews stay current when the verdicts and checks are unchanged.
 Reference: `reference/canon-gate.md`.

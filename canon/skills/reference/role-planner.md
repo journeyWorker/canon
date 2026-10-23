@@ -7,26 +7,40 @@ then show your steps and count the rest under `waitingOn`.
 
 ## Commands
 
-Every line is complete; fill the `<placeholders>`.
+Every line below is generated from the CLI's own spec and runs as written against the
+example story (subject `demo`, change `add-login`, scenario `auth.login.01`): swap in
+your ids. `canon schema <command> --json` lists every option.
 
+<!-- canon:generated commands-planner begin -->
 ```bash
-canon status --as planner --json                      # once, at the start
-canon subject new <subject-id> --domain <domain> --title "<title>" --actor-id <unit> --as planner --json
-canon change new <slug> --subject-id <subject-id> --title "<title>" --as planner --json
-canon change new <slug> --subject-id <subject-id> --kind chore --title "<title>" --as planner --json
-canon subject adopt <slug> --subject-id <other-subject-id> --as planner --json
-canon subject unadopt <slug> --subject-id <subject-id> --as planner --json   # a draft change off a live subject; refused once its brief is approved
-canon brief check --change-id <slug> --as planner --json
-canon brief approve --change-id <slug> --by "<the human>" --note "<their words>" --as planner --json
+canon brief check                                                                                                # Read the brief against the rules: blocker and advisory findings (exit 0 clean, 2 blockers, 1 error)
+canon brief show                                                                                                 # Show where the change stands and the next one to three steps; never edits
+canon change new add-search --subject-id demo --title "Add search"                                               # Write .canon/changes/<slug>/brief.md, import it, and adopt it into a subject
+canon completion zsh                                                                                             # Write the shell completion script for canon (bash, zsh or fish)
+canon context                                                                                                    # Show what you can author here: record kinds, fields, enums, policies
+canon divergence list --as-of 2030-01-01                                                                         # List the current divergence burn-down state
+canon feature new billing.invoice --title Invoices                                                               # Create a fresh .feature file for a new area.surface
+canon finding list --change-id add-login                                                                         # List a change's committed findings at their latest version
+canon format .canon/specs                                                                                        # Validate a spec/artifact corpus against canon's format
+canon gate check                                                                                                 # Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)
+canon query --kind evidence                                                                                      # Read stored records across every storage tier
+canon retrieve --for-role reviewer --domain dev --limit 20                                                       # Fetch role-scoped strategy guidance
+canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature  # Append a tagged scenario stub to its .feature file (created if missing), or many with --from
+canon schema evidence add                                                                                        # Describe canon's own commands
+canon status                                                                                                     # Show where this repo stands: subjects by status, their gaps, and the next commands
+canon subject adopt demo --change-id add-login                                                                   # Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several)
+canon subject new payments --domain dev --title Payments                                                         # Author a new subject at status `proposed`
+canon subject unadopt demo --change-id add-login                                                                 # Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved)
 ```
+<!-- canon:generated commands-planner end -->
 
 After the first `status`, follow `meta.next` of each write. `brief check`
-lists blockers and advisories; bare `canon brief --as planner` names the next
+lists blockers and advisories; bare `canon brief show --as planner` names the next
 steps. While the brief has blockers, `status` and `change new`'s `meta.next`
-send you to write it (`write the brief: canon brief check --change-id <slug>
+send you to write it (`write the brief: canon brief check <slug>
 lists N blockers`); then, while prose advisories remain, to the polish pass
 (`polish the brief in <path> (reference/brief-polish.md), then run canon
-brief check --change-id <slug>`, with the advisory count and the top rule
+brief check <slug>`, with the advisory count and the top rule
 ids); the human step comes after it. A policy that no longer matches its approval fails closed
 (`POLICY_CHANGED_SINCE_APPROVAL`): never edit it; the human re-approves.
 
@@ -111,14 +125,14 @@ approval.
 ## Non-behavior work is a chore
 
 A refactor, dependency, build, CI or infra change that alters nothing a user
-can observe: `change new … --kind chore`. Its brief is short (intent,
+can observe: `change new --change-kind chore`. Its brief is short (intent,
 category, invariants, checks, out of scope) and approved like any brief, one
 human stop. A chore adds no scenarios: the
 implementer runs the subject's suite again and binds it with
-`canon evidence add --all-scenarios …`, then the reviewer records one
-change-level review of the chore (`canon review add --change-id <slug>`). On a
+`canon evidence add --all-scenarios`, then the reviewer records one
+change-level review of the chore (`canon review change <slug>`). On a
 shipped subject `change new` prints the reopen command for the orchestrator
-(`subject status <id> --to verifying --reason "<why>"`); the subject cannot
+(`subject move <id> --to verifying --reason "<why>"`); the subject cannot
 ship again until the suite is evidenced after the chore's approval. Work that
 changes behavior is never a chore: it is a feature change.
 

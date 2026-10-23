@@ -13,8 +13,8 @@ one, and neither can `canon gate`.
 one `<slug>/` directory per change holding `brief.md` (and a `tasks.md`
 only when someone adds one: an optional work note), written by
 `canon change new` (see `canon-subject`). Every plan reader —
-`canon ingest plans`, `canon gate task`, `canon evidence add --task`,
-`canon dispatch --task`, `canon status` and the brief check — reads it
+`canon ingest plans`, `canon task done`, `canon evidence add --task-id`,
+`canon dispatch begin --task-id`, `canon status` and the brief check — reads it
 first whenever the directory exists, with no `plans:` entry. Being first,
 it owns a change id an external source also carries (the external copy
 is the later duplicate, skipped and counted under `duplicate_change_id`).
@@ -27,7 +27,7 @@ document and holds the human's `Approved:` line, written by
 skips that directory and the external source keeps the change id.
 
 `plans.sources` lists only EXTERNAL plans — documents you prepare outside
-canon, which canon only reads. The one exception: `canon gate task`
+canon, which canon only reads. The one exception: `canon task done`
 flips the task's checkbox in an external plan's `tasks.md` (see
 `canon-gate`). Their briefs and approvals live in
 `.canon/changes/<change>/brief.md`, never in the external document.
@@ -58,7 +58,7 @@ single ad hoc import, reading only the source it names; either flag alone
 fails loud):
 
 ```bash
-canon ingest plans --dialect openspec --source ../other-repo
+canon ingest plans --dialect openspec --plan-source ../other-repo
 ```
 
 ## 2. Run the import
@@ -81,8 +81,8 @@ successful run is `skipped_unchanged` — re-importing writes zero records.
 ## 3. Read the imported rows
 
 ```bash
-canon query --kind change [--json]
-canon query --kind task [--json]
+canon query --kind change --json
+canon query --kind task --json
 ```
 
 No dialect/plugin filter exists or is needed — an imported `change`/
@@ -181,7 +181,7 @@ downstream reader's job.
   `.canon/changes/<slug>/brief.md` (no `tasks.md`) and adopts the change
   into a subject (see `canon-subject`); it never scaffolds an openspec
   change dir. This skill covers IMPORTING plans.
-- **`canon gate check`/`canon gate task`** (the hand-authored one-task-at-
+- **`canon gate check`/`canon task done`** (the hand-authored one-task-at-
   a-time path this complements at bulk) — see `canon-gate`.
 - **Wiring an imported `Task`/`Change` into a `canon gate` decision** —
   out of scope; needs its own reviewed change.

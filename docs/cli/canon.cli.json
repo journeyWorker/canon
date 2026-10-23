@@ -12634,7 +12634,7 @@
     {
       "code": "BRIEF_NOT_FOUND",
       "exit": 2,
-      "fix": "Pass the id of a change that has a brief; `canon change list` shows them.",
+      "fix": "Pass the id of a change that has a brief; `canon status` lists the changes.",
       "meaning": "the named change has no brief",
       "retryable": false
     },
@@ -13600,7 +13600,7 @@
     {
       "code": "SUBJECT_NOT_FOUND",
       "exit": 2,
-      "fix": "Pass the id of an existing subject; `canon subject list` shows them.",
+      "fix": "Pass the id of an existing subject; `canon status` lists the subjects.",
       "meaning": "no subject with that id",
       "retryable": false
     },

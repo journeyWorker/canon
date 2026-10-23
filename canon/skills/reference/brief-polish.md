@@ -216,7 +216,7 @@ uses the section key `brief`.
 ## The loop
 
 1. Fix the mode problems above, then the findings, section by section.
-2. Run `canon brief check --change-id <slug> --json`.
+2. Run `canon brief check <slug> --json`.
 3. Repeat until no advisory remains, or each remaining one is waived with a reason.
 4. Stop and report to the human, in the brief's language. Do not loop further: a clean run says nothing about whether the brief is good, only that these counts are within budget.
 

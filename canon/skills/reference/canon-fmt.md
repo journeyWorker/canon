@@ -1,6 +1,6 @@
 # canon-fmt
 
-`canon format --check` is canon's read-only format validator over a
+`canon format` is canon's read-only format validator over a
 consumer-repo artifact corpus: ledger records (run/drill/review/clear/
 code-review/design-review), divergence events (manifest/review/
 remediation), `kind=feature/` spec files, `inventory/`, and `policy.yaml`. It never
@@ -9,7 +9,7 @@ rewrites or mutates the corpus — it only validates and reports.
 ## Running
 
 ```bash
-canon format --check <corpus-root>   # e.g. a consumer repo's spec/
+canon format spec   # e.g. a consumer repo's spec/
 ```
 
 Read-only, always. Exits nonzero if any violation is found, and prints

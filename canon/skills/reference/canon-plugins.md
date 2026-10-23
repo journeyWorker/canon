@@ -66,8 +66,8 @@ never overwriting.
 ## 3. Project a read
 
 ```bash
-canon query --kind scenario --plugin porting          # human table, projected fields appended
-canon query --kind scenario --plugin porting --json   # merged record bodies
+canon query --kind scenario --plugin-id porting          # human table, projected fields appended
+canon query --kind scenario --plugin-id porting --json   # merged record bodies
 canon query --kind scenario                           # no --plugin: byte-identical to the core view
 ```
 
@@ -91,7 +91,7 @@ canon query --kind scenario                           # no --plugin: byte-identi
 
 1. `.canon/plugins/porting/plugin.yaml` — the manifest above.
 2. Its overlay source reads a spec root's `inventory/**/*.yaml` (the same
-   inventory files `canon format --check` covers) and, for every
+   inventory files `canon format` covers) and, for every
    `(project_id, scenario_id)` `canon inventory sync` would index, emits
    one candidate: `covered = true` iff that `scenario_id` appears in ANY
    inventory entry's `covered_by` list; `surface_ref` = every inventory-
@@ -101,7 +101,7 @@ canon query --kind scenario                           # no --plugin: byte-identi
    (zero new files) and a genuine coverage edit supersedes the prior
    overlay via latest-`at`-wins.
 3. `canon plugin sync porting` writes/dedupes those candidates.
-4. `canon query --kind scenario --plugin porting [--json]` projects
+4. `canon query --kind scenario --plugin-id porting [--json]` projects
    `covered`/`surface_ref` back onto each scenario.
 
 `canon gate check`'s verdicts are byte-identical with and without a

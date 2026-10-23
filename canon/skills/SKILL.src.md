@@ -25,7 +25,7 @@ a feature, a one-line request included. A human is needed once per scope:
   approves the brief and the policy, `.canon/policy.yaml`, which is what
   the gate grades the work against. The human may also approve it on the `canon dashboard` briefs page; you never use that form.
   Record it only from the human's answer:
-  `canon brief approve --change-id <slug> --by <the human> --note "<their words>"`.
+  `canon brief approve <slug> --approver <the human> --note "<their words>"`.
   Never edit the policy to make the gate pass: a policy that differs from
   the approved one fails closed (`POLICY_CHANGED_SINCE_APPROVAL`, not
   waivable); stop and ask the human. A brief edited after its
@@ -48,24 +48,24 @@ a feature, a one-line request included. A human is needed once per scope:
   implement, evidence, independent review. A follow-up that adds or changes
   a step of the brief edits the brief: that is a scope change and needs a
   new answer. A follow-up on a shipped subject reopens it
-  (`canon subject status <id> --to verifying --reason "<why>"`); a fix
+  (`canon subject move <id> --to verifying --reason "<why>"`); a fix
   closed `fixed`, and an approved chore, then need the whole suite evidenced
   again (`evidence add --all-scenarios`, for a chore after its approval)
   before it ships, and a chore also needs one change-level review
-  (`review add --change-id <slug>`).
+  (`review change <slug>`).
 - When no human can answer one of the brief's questions, write your
   assumption into the brief's Questions and assumptions, build on it, and say
   so in your report. That covers the brief's questions and work inside an
   approved scope, never the approval itself.
 
 1. **Brief.** The planner writes the PRD brief (`.canon/changes/<slug>/brief.md`), checks it with `canon brief check`, and stops for the human. → `reference/role-planner.md`
-2. **Subject.** `canon subject new`, then `canon change new` (`--kind chore` for work that alters no behavior); the change writes the brief skeleton. → `reference/role-planner.md`
+2. **Subject.** `canon subject new`, then `canon change new` (`--change-kind chore` for work that alters no behavior); the change writes the brief skeleton. → `reference/role-planner.md`
 3. **Scenarios.** `canon scenario new --flow <F-id> --case <case>` per behavior of a flow step, failure paths (`--case failure`) included. → `reference/role-implementer.md`
 4. **Units.** Split the work; one unit is one flow step's slice with a named verify command, and each unit has its own actor id and session id, passed on everything it records. A unit never attests another unit's work.
 5. **Implement.** Code with tests named by scenario id (`game.run.01: …`). → `reference/role-implementer.md`
 6. **Evidence.** `canon evidence add` binds the test run to its scenarios. → `reference/role-implementer.md`
-7. **Independent review.** A different session, a separate process with its own session id, that can run the checks it signs off, records `canon finding add` and `canon review add`. Every change. → `reference/role-reviewer.md`
-8. **Transition.** `canon subject status <id> --to <state>` along `proposed → specced → building → verifying → shipped`, with `canon gate check` clean; fix a refused guard rather than overriding it. → `reference/role-orchestrator.md`
+7. **Independent review.** A different session, a separate process with its own session id, that can run the checks it signs off, records `canon finding add` and `canon review scenario`. Every change. → `reference/role-reviewer.md`
+8. **Transition.** `canon subject move <id> --to <state>` along `proposed → specced → building → verifying → shipped`, with `canon gate check` clean; fix a refused guard rather than overriding it. → `reference/role-orchestrator.md`
 
 Every write command says whether the record is final (`written directly`,
 or `staged and promoted in this run`) or staged; only a staged record
@@ -83,10 +83,10 @@ evidence it saw are unchanged.
 
 Where artifact bytes live is the repo's choice: `canon.yaml`'s `artifact_store:`
 block defaults to the local, git-tracked `.canon/artifacts/sha256/`, or names
-an object-store tier, in which case `evidence add`, `review add` and
-`evidence vault` upload by digest and keep nothing locally. The gate and
+an object-store tier, in which case `evidence add`, `review scenario`, `review change` and
+`artifacts store` upload by digest and keep nothing locally. The gate and
 `canon artifacts verify [--full]` ask the store and refuse, never pass, when
-it cannot be reached. Moving an existing store with `canon artifacts migrate`
+it cannot be reached. Moving an existing store with `canon artifacts move --tier <tier>`
 is the repo owner's decision, not a step of the loop.
 
 ## Know your role
@@ -106,7 +106,7 @@ variable, and an unknown value is refused (`UNKNOWN_ROLE`).
   for 8.
 
 A role is guidance, not enforcement: `--role` on `evidence add` and
-`review add` defaults to it.
+`review scenario` defaults to it.
 
 ## Driving the CLI
 
@@ -133,9 +133,9 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   unapproved.
 - Page long lists with `--limit <n>` and `--cursor <nextCursor>` (`--all`
   for everything), and project fields with `--fields a,b` (`status`, `export`,
-  `query`, `finding list`, `divergence status`, `context`).
-- `canon purge` deletes only in two steps: `--plan` prints the removal set
-  and a `planDigest`; then `--confirm <planDigest>`.
+  `query`, `finding list`, `divergence list`, `context`).
+- `canon purge` deletes only in two steps: the bare run previews the removal set
+  and prints a `planDigest`; then `--commit --plan-digest <planDigest>`.
 
 ## Command reference
 
@@ -168,11 +168,11 @@ never by assuming a default. The projection is a read-only copy: Claude
 
 - **Fix a bug:** the approved change if there is one, else the planner (`canon change new`); first a failing run of the scenario (`canon scenario new --case failure`, then `canon evidence add`), then the fix. `reference/role-implementer.md`.
 - **Add or change a feature:** `canon subject new`, `canon change new`, then the brief. `reference/role-planner.md`.
-- **Pure refactor, dependency, build, CI or infra:** `canon change new <slug> --subject-id <id> --kind chore`; data or interface changes are not chores. `reference/role-planner.md`.
-- **Review someone's change:** `CANON_ROLE=reviewer`, `canon brief check --change-id <slug>`. `reference/role-reviewer.md`.
+- **Pure refactor, dependency, build, CI or infra:** `canon change new <slug> --subject-id <id> --change-kind chore`; data or interface changes are not chores. `reference/role-planner.md`.
+- **Review someone's change:** `CANON_ROLE=reviewer`, `canon brief check <slug>`. `reference/role-reviewer.md`.
 - **Resume:** `canon status --json`, then follow `meta.next`. `reference/role-orchestrator.md`.
 - **Plan more work on a live subject:** `canon change new <slug> --subject-id <id>` (it warns until the brief is approved; `canon subject unadopt` parks a draft). `reference/canon-subject.md`, `reference/role-planner.md`.
-- **Upgrade canon in a repo:** `canon migrate --dry-run`. `reference/role-orchestrator.md`.
+- **Upgrade canon in a repo:** `canon migrate` (previews; `--commit --plan-digest <digest>` applies). `reference/role-orchestrator.md`.
 - **Your role's steps:** `reference/role-planner.md`, `role-implementer.md`, `role-reviewer.md`, `role-orchestrator.md`.
 - **Where the repo stands, subjects and changes:** `reference/canon-subject.md` (`canon status`, `canon subject new|adopt|status`, `canon change new`).
 - **Write or reorganize `.feature` specs:** `reference/canon-authoring.md` before editing; use the scaffold.

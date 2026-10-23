@@ -13,18 +13,18 @@ trajectories into retrievable, promotable insights. Two tiers:
 ## Rebuilding strategy memory
 
 Strategy memory is re-derived from the current trajectory set as part of
-`canon ingest artifacts` (see `canon-artifact-ingest`): after it
+`canon ingest records` (see `canon-artifact-ingest`): after it
 persists a repo's verdict trajectories, it re-derives the distilled
 strategies. This is NON-DESTRUCTIVE — a rebuild never drops a
 hand-promoted strategy the trajectory rows don't touch. There is no
-standalone `canon learn` rebuild command; the only subcommand is
-`promote`.
+standalone rebuild command under `canon strategy`; its subcommands are
+`promote`, `approval-payload` and `rollback`.
 
-# `canon learn promote <strategy_id> [--repo <dir>] [--evaluation <path> --approval <path>] [--signature <path>] [--dry-run]`
+# `canon strategy promote <strategy_id> [--repo <dir>] [--evaluation <path> --approval <path>] [--signature-file <path>] [--dry-run]`
 
 The production activation path is a signed, paired-evaluation workflow:
 
-1. Run `canon ingest artifacts`. Ingest resolves covering verdicts and rebuilds
+1. Run `canon ingest records`. Ingest resolves covering verdicts and rebuilds
    newly distilled strategies as `lifecycle: quarantined`.
 2. Check eligibility with the configured `occurrence` or `crn` gate. This is
    only a prerequisite; occurrence alone MUST NOT activate a strategy.
@@ -44,14 +44,14 @@ The production activation path is a signed, paired-evaluation workflow:
 5. Produce the unsigned approval payload:
 
    ```bash
-   canon learn approve <strategy_id> --evaluation evaluation.json \
-     --principal alice --repo .
+   canon strategy approval-payload 01J8ZQ4W7K2M5N6P8R0S3T9VXY --evaluation evaluation.json \
+     --approver alice --approval-at 2026-10-02T12:00:00Z --repo .
    ```
 
    With `--json` the payload is `.data` of the `{ "data", "meta" }` envelope, and
    `meta.next` names the human signing step. The `data` contains the evaluation digest, RFC3339 `approved_at`,
    subject `strategy:<strategy_id>`, namespace
-   `canon-learning-approval-v1`, and `payload_hex`. `approve` never
+   `canon-learning-approval-v1`, and `payload_hex`. `approval-payload` never
    reads a private key and never sets `verified`.
 6. Decode `payload_hex` to the exact canonical JSON bytes. The signed object
    is:
@@ -97,12 +97,12 @@ The production activation path is a signed, paired-evaluation workflow:
 8. Activate only with both evidence files:
 
    ```bash
-   canon learn promote <strategy_id> --repo . \
+   canon strategy promote 01J8ZQ4W7K2M5N6P8R0S3T9VXY --repo . \
      --evaluation evaluation.json --approval approval.json
    # Or attach an armored signature file and recompute the approval digest:
-   canon learn promote <strategy_id> --repo . \
+   canon strategy promote 01J8ZQ4W7K2M5N6P8R0S3T9VXY --repo . \
      --evaluation evaluation.json --approval approval.json \
-     --signature approval.sig
+     --signature-file approval.sig
    ```
 
    `--evaluation` and `--approval` MUST be supplied together. A quarantined
@@ -160,11 +160,11 @@ A role with no explicit `promotion.<role>` entry defaults to
 
 Both gates read resolved `verdict_record.outcome`, not raw verdict rows.
 `Pending` trajectories neither corroborate nor contradict. `canon ingest
-artifacts` is therefore always first:
+records` is therefore always first:
 
 ```bash
-canon ingest artifacts
-canon learn promote <id> --evaluation evaluation.json --approval approval.json
+canon ingest records
+canon strategy promote 01J8ZQ4W7K2M5N6P8R0S3T9VXY --evaluation evaluation.json --approval approval.json
 ```
 
 ### Demotion versus authenticated rollback
@@ -178,15 +178,15 @@ record.
 
 An operator-requested rollback is a distinct authenticated action:
 
-```bash
-canon learn rollback <strategy_id> --reason "<reason>" --actor-id alice \
-  --signature-file rollback.sig --approved-at 2026-10-02T12:00:00Z \
+```text
+canon strategy rollback <strategy_id> --reason "<reason>" --actor-id alice \
+  --signature-file rollback.sig --approval-at 2026-10-02T12:00:00Z \
   [--contradicting-trajectory-id <trajectory_id>] --repo .
 ```
 
 `--signature-file` is an armored SSH detached signature over the
 `canon-learning-approval-v1` payload bound to
-`strategy:<id>:rollback:<sha256(reason)>`, actor, and `--approved-at`.
+`strategy:<id>:rollback:<sha256(reason)>`, actor, and `--approval-at`.
 `actor` MUST be listed in policy-pinned `approval.allowed_signers`; verification
 uses that file and `ssh-keygen -Y verify`. Successful rollback writes durable
 provenance, sets lifecycle `rolled_back`, and records the optional contradicting
@@ -203,7 +203,7 @@ not upgrade legacy rows or establish measured uplift.
 
 ## How verdicts feed scoring
 
-Verdicts arrive from `canon ingest artifacts` (see
+Verdicts arrive from `canon ingest records` (see
 `canon-artifact-ingest`), persisted regime-keyed
 (`<role>/<repo>/<area>/<hash>`). Each verdict scores its covering
 trajectory into `Success` / `Failure` / `RolledBack` / `Pending`; the

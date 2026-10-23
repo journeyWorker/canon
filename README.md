@@ -82,6 +82,98 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.28.0 release
+
+### Upgrading
+
+Every 0.27 spelling that 0.28 removed fails as a usage error (exit 2) whose
+`error.hint` names its replacement. The table is generated from the command
+spec (`docs/cli/canon.cli.json`, section `removed`).
+
+<!-- canon:generated removed begin -->
+| 0.27 spelling | 0.28 spelling | What changed |
+|---|---|---|
+| `canon artifacts migrate` | `canon artifacts move --tier` | the bare run previews; `--commit --plan-digest` acts |
+| `canon brief` (bare) | `canon brief show` | a group is never runnable; the change is an optional operand |
+| `canon context-pack new` | `canon context-pack add --manifest` |  |
+| `canon demo add` | `canon demo review` |  |
+| `canon divergence promote` | `canon gate promote --kind divergence` |  |
+| `canon divergence status` | `canon divergence list` |  |
+| `canon evidence vault` | `canon artifacts store` |  |
+| `canon fmt` | `canon format` | the `fmt` alias is gone; the directory is an optional operand |
+| `canon gate selftest` | `canon selftest --suite trust-spine-gate` |  |
+| `canon gate task` | `canon task done` | the task id is the operand; installed hooks are rewritten by `canon migrate` |
+| `canon ingest artifacts` | `canon ingest records` | "artifact" now means the blob store only |
+| `canon learn promote` | `canon strategy promote` | the strategy id is the operand |
+| `canon learn approve` | `canon strategy approval-payload --evaluation --approver --approval-at` | the strategy id is the operand; `approve` is reserved for commands that record a human approval |
+| `canon learn rollback` | `canon strategy rollback` | the strategy id is the operand |
+| `canon regime-key` | `canon regime show --role-segment --repo-name --area --hash` |  |
+| `canon report` (bare) | `canon report build` | `report check` and `report snapshot` are the other two modes |
+| `canon review add` | `canon review scenario` | split by what it reviews: `review change` reviews a chore change |
+| `canon subject status` | `canon subject show` | `subject move --to` changes the state |
+| `--check` on `canon report` | `canon report check` |  |
+| `--snapshot` on `canon report` | `canon report snapshot` | the output directory is the operand |
+| `--check` on `canon format` | `canon format` | `format` always validates; drop the flag |
+| `--check-config` on `canon init` | `--check` |  |
+| `--change-id` on `canon brief show`, `canon brief check`, `canon brief approve` | `canon brief show` | the change is the operand |
+| `--change` on `canon brief show`, `canon brief check`, `canon brief approve` | `canon brief show` | the change is the operand |
+| `--change-id` on `canon finding close` | `canon finding close` | the change is the operand |
+| `--run-id` on `canon dispatch end` | `canon dispatch end` | the run is the operand |
+| `--subject-id` on `canon subject adopt`, `canon subject unadopt` | `canon subject adopt` | the subject is the operand and the change is `--change-id` |
+| `--name` on `canon prompt add`, `canon prompt show` | `canon prompt add` | name and version are one operand, name@version |
+| `--version` on `canon prompt add`, `canon prompt show` | `canon prompt add` | name and version are one operand, name@version |
+| `--scenario-id` on `canon divergence add`, `canon divergence defer`, `canon divergence resolve`, `canon divergence accept` | `canon divergence add` | the scenario is the operand |
+| `--scenario-id` on `canon review scenario` | `canon review scenario` | the scenarios are operands |
+| `--scenario-ids-from` on `canon review scenario` | `--input` | a batch is an `--input` array |
+| `--change-id` on `canon review scenario` | `canon review change` | a chore change is reviewed with `review change` |
+| `--scenario-id` on `canon review change` | `canon review scenario` | scenarios are reviewed with `review scenario` |
+| `--scenario-ids-from` on `canon review change` | `canon review scenario` | scenarios are reviewed with `review scenario` |
+| `--change-id` on `canon review change` | `canon review change` | the change is the operand |
+| `--from` on `canon scenario new` | `--input` | a batch is an `--input` array with `operands` per element |
+| `--all` on `canon schema` | `canon schema` | the listing is unfiltered; `--as` filters it by role |
+| `--agent-id` on `canon dispatch begin` | `--actor-id` |  |
+| `--reviewer` on `canon divergence add`, `canon divergence defer`, `canon divergence resolve`, `canon divergence accept`, `canon finding add`, `canon review scenario`, `canon review change` | `--actor-id` | it is the reviewer, and required where `--reviewer` was |
+| `--by` on `canon brief approve`, `canon policy approve` | `--approver` |  |
+| `--principal` on `canon strategy approval-payload` | `--approver` |  |
+| `--approval-by` on `canon evidence add`, `canon evidence approval-payload` | `--approver` |  |
+| `--approved-at` on `canon strategy rollback` | `--approval-at` |  |
+| `--signature` on `canon strategy promote` | `--signature-file` |  |
+| `--approval-signature-file` on `canon evidence add` | `--signature-file` |  |
+| `--context-manifest` on `canon dispatch begin` | `--manifest` |  |
+| `--sha` on `canon divergence add`, `canon divergence defer`, `canon divergence resolve` | `--rev` | the commit the record is about; default HEAD |
+| `--pin` on `canon review scenario`, `canon review change` | `--rev` | default HEAD |
+| `--artifact-sha` on `canon evidence add`, `canon evidence audit`, `canon evidence approval-payload` | `--rev` | default HEAD |
+| `--reviewed-sha` on `canon finding add` | `--rev` | default HEAD |
+| `--resolution-sha` on `canon finding add`, `canon finding close` | `--resolution-rev` | default HEAD when fixed |
+| `--introduced-by` on `canon finding add` | `--introduced-rev` | no default |
+| `--out` on `canon export` | `--output` | `-o` is the short form |
+| `-k` on `canon retrieve` | `--limit` |  |
+| `--k` on `canon retrieve` | `--limit` |  |
+| `--role` on `canon retrieve` | `--for-role` | `--role` means only attribution |
+| `--kind` on `canon evidence add` | `--class` | an external re-audit is `evidence audit`, not `--class audit` |
+| `--kind` on `canon change new` | `--change-kind` | `--kind` is reserved for record kinds |
+| `--status` on `canon dispatch end` | `--run-outcome` |  |
+| `--status` on `canon divergence add` | `--state` |  |
+| `--outcome` on `canon review scenario`, `canon review change` | `--review-outcome` |  |
+| `--task` on `canon dispatch begin`, `canon evidence add`, `canon evidence approval-payload` | `--task-id` |  |
+| `--plugin` on `canon query` | `--plugin-id` |  |
+| `--parent-run` on `canon dispatch begin` | `--parent-run-id` |  |
+| `--source` on `canon skills install`, `canon skills check`, `canon skills doctor` | `--skills-source` |  |
+| `--source` on `canon ingest plans` | `--plan-source` |  |
+| `--role` on `canon regime show` | `--role-segment` |  |
+| `--repo` on `canon regime show` | `--repo-name` | the repo segment of the key; `--repo` names a directory on other commands |
+| `--to` on `canon artifacts move` | `--tier` |  |
+| `--target` on `canon skills install`, `canon skills check`, `canon skills doctor` | `--repo` | the repo is `--repo` on every command; omit it to use the nearest directory holding canon.yaml |
+| `--canon-yaml` on `canon ingest sessions`, `canon query`, `canon tier age` | `--repo` | the repo's canon.yaml is found from `--repo`, or from the nearest directory holding one when it is omitted |
+| `--dry-run` on `canon artifacts move`, `canon ledger compact`, `canon migrate`, `canon purge`, `canon tier age` | `--commit --plan-digest` | the bare run previews; `--commit --plan-digest` acts |
+| `--plan` on `canon purge` | `canon purge` | the bare run previews; `--commit --plan-digest` acts |
+| `--confirm` on `canon purge` | `--commit --plan-digest` | the bare run previews; `--commit --plan-digest` acts |
+| `--evaluator-id` on `canon evidence add` | `canon evidence audit` | an external evaluator's re-audit is its own command |
+| `--evaluator-version` on `canon evidence add` | `canon evidence audit` | an external evaluator's re-audit is its own command |
+| `--evaluator-digest` on `canon evidence add` | `canon evidence audit` | an external evaluator's re-audit is its own command |
+| `--audit-result` on `canon evidence add` | `canon evidence audit` | an external evaluator's re-audit is its own command |
+<!-- canon:generated removed end -->
+
 ## 0.27.0 release
 
 Two safety fixes found by the 0.25 CLI audit; no command, option or JSON shape changes.
