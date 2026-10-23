@@ -82,6 +82,341 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.28.0 release
+
+One grammar, generated from one spec. 0.28 renames and reshapes much of the
+CLI so that an agent can guess a command, learn it from the binary, and get
+the same answer shape every time. It is a clean cutover: no deprecated
+aliases. An old spelling fails with exit `2` and an `error.hint` that names
+its replacement.
+
+- The command spec `docs/cli/canon.cli.json` is generated from the clap tree
+  and the tables beside it, and checked in (`CANON_BLESS_CLI_SPEC=1 cargo test
+  -p canon-cli --test cli_spec`). `canon schema`, `canon completion`, the
+  skill's command lists, the website's CLI reference and the Upgrading table
+  below are rendered from it, so they cannot drift from the binary.
+- The grammar's rules are in `docs/design/cli-commands-0.28.md` (the per-leaf
+  table) and `docs/superpowers/plans/2026-10-22-canon-cli-grammar.md`
+  (decisions D1–D12).
+
+### D1, D2: one grammar, one spec
+
+- 76 leaves; every group requires a subcommand, so a group alone is a usage
+  error (`canon brief` is `canon brief show`, `canon report` is
+  `canon report build`).
+- One name, one meaning: an option keeps one value name and meaning on every
+  leaf. `--kind` is only a record kind, `--role` is only the role a record is
+  attributed to (default `--as`), `--actor-id` is who acts, `--approver` is the
+  human who approves, `--rev` is the commit a record is about, `--limit` pages.
+- A command's primary object is its operand: `canon brief approve add-login`,
+  `canon subject adopt demo --change-id add-login`, `canon task done add-login#1`,
+  `canon prompt add reviewer@v1`.
+- `--project-id` is required only when `canon.yaml` configures more than one
+  spec root; with one root it is inferred.
+- A mode that changes a command's options is its own command: `report build|check|snapshot`,
+  `review scenario|change`, `evidence add|audit`, `strategy promote|rollback`.
+- Every leaf has `effect` (`read`, `write`, `destructive`), `idempotency`,
+  `roles`, `exits`, its error codes, an output schema and one runnable
+  example: `canon schema <command> --json`.
+
+### D3, D4: one envelope, one exit table
+
+- `--json` prints exactly one document on stdout and nothing on stderr:
+  `{"ok": true, "data": ..., "meta": ...}` or `{"ok": false, "error": ..., "meta": ...}`
+  (a failure carries `data` too when the command has a partial report, such as
+  `gate check`'s violations). Warnings go to `meta.warnings`.
+- `meta` has `command`, `schemaVersion` (`"1.0"` for each report), `canonVersion`,
+  `context` (role, actor, repo), `next` (each step with `command` and `argv`),
+  paging, `warnings` and `coverage`; `meta.unchanged` is `true` when a repeat
+  changed nothing.
+- `error` has `code`, `message`, `field`, `expected`, `received`, `suggestions[]`
+  and a `hint` that is a working command.
+- Keys are camelCase in reports, errors and `--input`.
+- Exit `0` ok, `1` the command's finding (a failed check, an unverifiable
+  result), `2` refused (usage, `CONFIG_MISSING`, a missing id or file, unreadable
+  input, an invalid argument). `canon schema --errors --json` lists every code
+  with its exit, retryability and fix. A check that examined nothing reports
+  `UNVERIFIABLE` (exit 1), never clean.
+- `--repo <DIR>` is declared once; absent, canon uses the nearest ancestor
+  holding `canon.yaml`.
+
+### D6: preview by default
+
+`purge`, `tier age`, `ledger compact`, `artifacts move` and `migrate` delete or
+rewrite existing data. A bare run prints the plan (`planDigest`, `effects[]`)
+and changes nothing; `--commit --plan-digest <DIGEST>` acts and refuses
+(`PLAN_CHANGED`) when the plan changed since the preview. Their `--dry-run`,
+`purge --plan` and `purge --confirm` are gone. `--dry-run` stays on the other
+writing leaves where a preview helps. `--override-reason` is the only "proceed
+although refused" flag; the waiver is recorded and echoed in `data.overrides[]`,
+and `status` lists it for the human.
+
+### D7: `--input`
+
+Every write leaf takes its arguments as one JSON document:
+`--input '{"operands": ["auth.login.01"], "title": "Sign in"}'`, `--input file.json`
+or `--input -` (stdin; a terminal is refused). Keys are the option names in
+camelCase plus `operands`. A JSON array (or NDJSON from a file or stdin) is a
+batch: every element is validated before the first write, then run in order,
+and the reply is a `Batch<Name>Report` with one `ok`, `unchanged`, `failed` or
+`skipped` item per element. Re-running a batch is safe. `canon schema <command>
+--json` shows the leaf's input schema. `scenario new --from` and
+`review add --scenario-ids-from` are replaced by it.
+
+### D7b: commits default to HEAD
+
+`--rev <REV>` replaces `--pin`, `--sha`, `--artifact-sha` and `--reviewed-sha`;
+`--resolution-rev` and `--introduced-rev` replace `--resolution-sha` and
+`--introduced-by`. Omitted, the revision is `HEAD`; given, it is any git
+revision. Uncommitted code is recorded, never refused: every such record
+carries the full sha, a `code_tree` (the git tree of the code, with `.canon/`,
+spec roots and `code.exclude` globs removed) and `worktree_dirty`. A review of a
+working tree still covers the commit made from it, because both have the same
+code tree. Outside a git work tree, or with no commit, a command that needs
+one refuses with `NO_COMMIT`. `canon.yaml`'s `code.exclude` (default `docs/**`,
+`*.md`) says what is not code.
+
+### D10: the guide comes from the binary
+
+`canon skills show <NAME> [--full]` prints the guide embedded in the binary
+(`canon` for the core guide, a role or topic name for the rest), so it always
+matches the version you run. `canon skills install` now writes a short
+`SKILL.md` stub (what canon is, the loop in five lines, `canon skills show canon`)
+plus the retrieve hook script; it no longer projects `reference/**`. `skills check`
+reports a stub from another canon version as outdated. A command that repeats
+a write with identical content, and a `finding close` of a closed finding, are
+no-ops reported with `meta.unchanged`. `brief approve`, `policy approve` and
+`divergence accept` are human-only: the agent roles are refused with `HUMAN_ONLY`.
+
+### D11: re-verification follows the code
+
+An approved chore asks for new evidence only for scenarios whose latest evidence
+was recorded on a different code tree, so a docs-only chore needs its
+change-level review alone. When code did change, `status`, `meta.next` and the
+refusal hint name one batch command with the real report paths:
+`canon evidence add --all-scenarios --report junit:a.xml --report junit:b.xml --role implementer`.
+With a `--report`, `--class` defaults to `test-run` and `--ref` to the report
+paths, so that command runs as written. A bound report decides the verdict of a
+single scenario too: any failed case is `divergent`, a skipped one and none failed
+`not-applicable`, else `faithful`.
+
+### D9: callers move with the release
+
+The skill, the AGENTS.md block, the website (en, ko), the dashboard, the
+retrieve hook, the dogfood trace checker (its read/write split comes from the
+spec's `effect`) and the conformance corpus are updated in the same release.
+`status`, `gate check` and `context` detect a 0.27 skill lock, hook or
+`canon gate task` hook entry, warn, and put `canon migrate --json` first in
+`meta.next`. Every command in the skill, the website and the hints is parsed
+against the clap tree by a test (`tests/docs_lint.rs`).
+
+### Upgrading
+
+Recover a 0.27 repo in two runnable steps, then refresh the skill:
+
+```bash
+canon migrate
+canon migrate --commit --plan-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+canon skills install
+```
+
+The first command previews the plan and prints its `planDigest` (and, with
+`--json`, `meta.next[0].argv` is the second command with the real digest filled
+in). `migrate` rewrites canon's own hook commands (`canon gate task` becomes
+`canon task done`), the retrieve hook script and the old full skill, keeping a
+copy of every file it rewrites under `.canon/migrate-backup/<timestamp>/`. A
+repeat finds nothing to do. Then run `canon skills install` to write the stub.
+
+Every removed 0.27 spelling fails as a usage error (exit 2) whose `error.hint`
+names its replacement. The table is generated from the command spec
+(`docs/cli/canon.cli.json`, section `removed`):
+
+<!-- canon:generated removed begin -->
+| 0.27 spelling | 0.28 spelling | What changed |
+|---|---|---|
+| `canon artifacts migrate` | `canon artifacts move --tier` | the bare run previews; `--commit --plan-digest` acts |
+| `canon brief` (bare) | `canon brief show` | a group is never runnable; the change is an optional operand |
+| `canon context-pack new` | `canon context-pack add --manifest` |  |
+| `canon demo add` | `canon demo review` |  |
+| `canon divergence promote` | `canon gate promote --kind divergence` |  |
+| `canon divergence status` | `canon divergence list` |  |
+| `canon evidence vault` | `canon artifacts store` |  |
+| `canon fmt` | `canon format` | the `fmt` alias is gone; the directory is an optional operand |
+| `canon gate selftest` | `canon selftest --suite trust-spine-gate` |  |
+| `canon gate task` | `canon task done` | the task id is the operand; installed hooks are rewritten by `canon migrate` |
+| `canon ingest artifacts` | `canon ingest records` | "artifact" now means the blob store only |
+| `canon learn promote` | `canon strategy promote` | the strategy id is the operand |
+| `canon learn approve` | `canon strategy approval-payload --evaluation --approver --approval-at` | the strategy id is the operand; `approve` is reserved for commands that record a human approval |
+| `canon learn rollback` | `canon strategy rollback` | the strategy id is the operand |
+| `canon regime-key` | `canon regime show --role-segment --repo-name --area --hash` |  |
+| `canon report` (bare) | `canon report build` | `report check` and `report snapshot` are the other two modes |
+| `canon review add` | `canon review scenario` | split by what it reviews: `review change` reviews a chore change |
+| `canon subject status` | `canon subject show` | `subject move --to` changes the state |
+| `--check` on `canon report` | `canon report check` |  |
+| `--snapshot` on `canon report` | `canon report snapshot` | the output directory is the operand |
+| `--check` on `canon format` | `canon format` | `format` always validates; drop the flag |
+| `--check-config` on `canon init` | `--check` |  |
+| `--change-id` on `canon brief show`, `canon brief check`, `canon brief approve` | `canon brief show` | the change is the operand |
+| `--change` on `canon brief show`, `canon brief check`, `canon brief approve` | `canon brief show` | the change is the operand |
+| `--change-id` on `canon finding close` | `canon finding close` | the change is the operand |
+| `--run-id` on `canon dispatch end` | `canon dispatch end` | the run is the operand |
+| `--subject-id` on `canon subject adopt`, `canon subject unadopt` | `canon subject adopt` | the subject is the operand and the change is `--change-id` |
+| `--name` on `canon prompt add`, `canon prompt show` | `canon prompt add` | name and version are one operand, name@version |
+| `--version` on `canon prompt add`, `canon prompt show` | `canon prompt add` | name and version are one operand, name@version |
+| `--scenario-id` on `canon divergence add`, `canon divergence defer`, `canon divergence resolve`, `canon divergence accept` | `canon divergence add` | the scenario is the operand |
+| `--scenario-id` on `canon review scenario` | `canon review scenario` | the scenarios are operands |
+| `--scenario-ids-from` on `canon review scenario` | `--input` | a batch is an `--input` array |
+| `--change-id` on `canon review scenario` | `canon review change` | a chore change is reviewed with `review change` |
+| `--scenario-id` on `canon review change` | `canon review scenario` | scenarios are reviewed with `review scenario` |
+| `--scenario-ids-from` on `canon review change` | `canon review scenario` | scenarios are reviewed with `review scenario` |
+| `--change-id` on `canon review change` | `canon review change` | the change is the operand |
+| `--from` on `canon scenario new` | `--input` | a batch is an `--input` array with `operands` per element |
+| `--all` on `canon schema` | `canon schema` | the listing is unfiltered; `--as` filters it by role |
+| `--agent-id` on `canon dispatch begin` | `--actor-id` |  |
+| `--reviewer` on `canon divergence add`, `canon divergence defer`, `canon divergence resolve`, `canon divergence accept`, `canon finding add`, `canon review scenario`, `canon review change` | `--actor-id` | it is the reviewer, and required where `--reviewer` was |
+| `--by` on `canon brief approve`, `canon policy approve` | `--approver` |  |
+| `--principal` on `canon strategy approval-payload` | `--approver` |  |
+| `--approval-by` on `canon evidence add`, `canon evidence approval-payload` | `--approver` |  |
+| `--approved-at` on `canon strategy rollback` | `--approval-at` |  |
+| `--signature` on `canon strategy promote` | `--signature-file` |  |
+| `--approval-signature-file` on `canon evidence add` | `--signature-file` |  |
+| `--context-manifest` on `canon dispatch begin` | `--manifest` |  |
+| `--sha` on `canon divergence add`, `canon divergence defer`, `canon divergence resolve` | `--rev` | the commit the record is about; default HEAD |
+| `--pin` on `canon review scenario`, `canon review change` | `--rev` | default HEAD |
+| `--artifact-sha` on `canon evidence add`, `canon evidence audit`, `canon evidence approval-payload` | `--rev` | default HEAD |
+| `--reviewed-sha` on `canon finding add` | `--rev` | default HEAD |
+| `--resolution-sha` on `canon finding add`, `canon finding close` | `--resolution-rev` | default HEAD when fixed |
+| `--introduced-by` on `canon finding add` | `--introduced-rev` | no default |
+| `--out` on `canon export` | `--output` | `-o` is the short form |
+| `-k` on `canon retrieve` | `--limit` |  |
+| `--k` on `canon retrieve` | `--limit` |  |
+| `--role` on `canon retrieve` | `--for-role` | `--role` means only attribution |
+| `--kind` on `canon evidence add` | `--class` | an external re-audit is `evidence audit`, not `--class audit` |
+| `--kind` on `canon change new` | `--change-kind` | `--kind` is reserved for record kinds |
+| `--status` on `canon dispatch end` | `--run-outcome` |  |
+| `--status` on `canon divergence add` | `--state` |  |
+| `--outcome` on `canon review scenario`, `canon review change` | `--review-outcome` |  |
+| `--task` on `canon dispatch begin`, `canon evidence add`, `canon evidence approval-payload` | `--task-id` |  |
+| `--plugin` on `canon query` | `--plugin-id` |  |
+| `--parent-run` on `canon dispatch begin` | `--parent-run-id` |  |
+| `--source` on `canon skills install`, `canon skills check`, `canon skills doctor` | `--skills-source` |  |
+| `--source` on `canon ingest plans` | `--plan-source` |  |
+| `--role` on `canon regime show` | `--role-segment` |  |
+| `--repo` on `canon regime show` | `--repo-name` | the repo segment of the key; `--repo` names a directory on other commands |
+| `--to` on `canon artifacts move` | `--tier` |  |
+| `--target` on `canon skills install`, `canon skills check`, `canon skills doctor` | `--repo` | the repo is `--repo` on every command; omit it to use the nearest directory holding canon.yaml |
+| `--canon-yaml` on `canon ingest sessions`, `canon query`, `canon tier age` | `--repo` | the repo's canon.yaml is found from `--repo`, or from the nearest directory holding one when it is omitted |
+| `--dry-run` on `canon artifacts move`, `canon ledger compact`, `canon migrate`, `canon purge`, `canon tier age` | `--commit --plan-digest` | the bare run previews; `--commit --plan-digest` acts |
+| `--plan` on `canon purge` | `canon purge` | the bare run previews; `--commit --plan-digest` acts |
+| `--confirm` on `canon purge` | `--commit --plan-digest` | the bare run previews; `--commit --plan-digest` acts |
+| `--evaluator-id` on `canon evidence add` | `canon evidence audit` | an external evaluator's re-audit is its own command |
+| `--evaluator-version` on `canon evidence add` | `canon evidence audit` | an external evaluator's re-audit is its own command |
+| `--evaluator-digest` on `canon evidence add` | `canon evidence audit` | an external evaluator's re-audit is its own command |
+| `--audit-result` on `canon evidence add` | `canon evidence audit` | an external evaluator's re-audit is its own command |
+<!-- canon:generated removed end -->
+
+**Report shape changes.** Every report is an envelope now; read `data`. Each
+report's `schemaVersion` starts at `"1.0"`.
+
+- Keys are camelCase. Renamed: `learn approve` (now `strategy approval-payload`)
+  `schema_version`, `candidate_strategy_id`, `evaluation_digest`, `approver_identity`,
+  `approver_role`, `approved_at`, `payload_hex` -> `schemaVersion`, `candidateStrategyId`,
+  `evaluationDigest`, `approverIdentity`, `approverRole`, `approvedAt`, `payloadHex`;
+  `strategy rollback`: `strategy_id`, `rolled_back_at`, `evaluation_digest`,
+  `approval_digest`, `contradicting_trajectory_id`, `outcome_provenance`;
+  `dispatch begin`: `run_id`, `injected_guidance`, `task_id`, `parent_run_id`,
+  `tier_degraded`; `dispatch end`: `run_id`, `ended_at`, `tier_degraded`;
+  `finding list`: `change_id`, `resolution_sha`, `file_ref` (and its `--fields`
+  names); `divergence list`: `as_of`, `project_id`, `scenario_id`, `still_divergent`,
+  `resolved_invalid`; `export` manifest: `source_scope`, `record_count`,
+  `content_digests`, `sensitive_records`, and the `--output` result key `out` ->
+  `output`; `ingest sessions` metadata: `client_id`, `files_scanned`, `rows_parsed`,
+  `malformed_records`, `skipped_unchanged`, `sessions_normalized`, `runs_written`,
+  `events_written`, `rows_skipped`, `session_id`, `workspace_key`, `workspace_label`,
+  `project_key`, `run_id`, `parent_run_id`. The `policy.*` keys of `canon context`
+  keep the snake_case spelling of `policy.yaml`.
+- `canon context`: a `commands` index (filtered by `--as`); record kinds are keyed
+  by the name `--kind` takes (`evidence`, not `evidence_record`); each kind links
+  its schema. `--fields` takes any top-level name; an unknown one is `UNKNOWN_FIELD`
+  (exit 2).
+- `canon schema` renders the spec's nodes; `schema --all` is gone (use `--as` to
+  filter); `schema --errors --json` lists every code.
+- `evidence audit` has its own report; `review scenario` and `review change` are
+  two reports; `report build|check|snapshot` are three; `scenario new` has a single
+  and a batch report.
+- Destructive leaves report `planDigest`, `effects[]` and `committed`; several
+  `--dry-run` reports gained a `dryRun` key; `export --dry-run` returns
+  `{dryRun, output, kind, recordCount}`.
+- `finding close` reports a repeat with `meta.unchanged: true` instead of
+  `FindingCloseReport.unchanged`. A batch returns `data.items[]`.
+- `overrides[]` (`{code, reason}`) is always present on `evidence add`,
+  `evidence audit` and the new `subject move` report.
+- `MigrateReport` gains `backupDir`; its effects are `rewrite`, `write` or `remove`
+  entries with a `path`. `skills show` returns `{name, version, markdown}`.
+- Records: reviews, divergences, evidence and findings gain optional `code_tree`
+  and `worktree_dirty` (findings also `resolution_code_tree` and
+  `resolution_worktree_dirty`); the revision field is now always a full sha.
+  Old records still read.
+
+**Error codes.**
+
+- Renamed: `ARTIFACTS_MIGRATE_REFUSED` -> `ARTIFACTS_MOVE_REFUSED`,
+  `EVIDENCE_VAULT_FAILED` -> `ARTIFACTS_STORE_FAILED`,
+  `FINDING_RESOLUTION_SHA_UNEXPECTED` -> `FINDING_RESOLUTION_REV_UNEXPECTED`.
+- Removed: `PURGE_PLAN_REQUIRED`, `FINDING_RESOLUTION_SHA_REQUIRED` and
+  `FINDING_UNRESOLVABLE_COMMIT` (an unknown revision is `NO_COMMIT`).
+- Added: `NO_COMMIT`, `UNVERIFIABLE`, `HUMAN_ONLY`, `UNKNOWN_ERROR_CODE`, and the
+  `INPUT_*` family (`INPUT_INVALID`, `INPUT_INVALID_TYPE`, `INPUT_UNKNOWN_FIELD`,
+  `INPUT_CONFLICT`, `INPUT_UNREADABLE`, `INPUT_TOO_LARGE`, `INPUT_STDIN_CONFLICT`,
+  `INPUT_STDIN_TTY`, `INPUT_BATCH_UNSUPPORTED`, `INPUT_ELEMENT_FAILED`).
+- Exit changes: `brief check` with blockers exits `1` (was `2`); every
+  `*_NOT_FOUND`, `*_UNREADABLE` and `*_INVALID_ARGUMENT` exits `2`;
+  `init --check` of a malformed config exits `2`; `task done` on an unknown task
+  exits `2`.
+
+### Conformance changes
+
+- Reviewed re-bless of every case under the new envelope: JSON mode writes
+  nothing to stderr, so the `.err` files that held human lines are empty;
+  keys are camelCase and ordered by the report struct.
+- Meaning changed, not only shape: `brief check` with blockers exits `1`;
+  `init --check` of a malformed `write:` section exits `2`; fixtures are
+  committed before the steps run (records bind a revision), a case that wants
+  `faithful` over a contradicting report passes `--verdict` explicitly, `--pin`
+  is gone from 10 cases, one case is now `finding-add-refused-unresolvable-rev`;
+  the skills and init cases carry no `canon/skills*` tree and `skills-check-orphan`
+  runs on a real 0.27 projection; `scenario new --from` is gone and `init` repeats
+  with exit 0 as unchanged; a `purge --commit` that matches nothing writes no
+  audit line.
+
+### Deviations
+
+Where the 0.28 implementation departs from the plan or the per-leaf table:
+
+- Record fields keep their 0.27 names for the revision (`pin`, `sha`,
+  `evidence_sha`, `reviewed_sha`); the new fields are `code_tree` and
+  `worktree_dirty`.
+- A repeated `init` is unchanged (exit 0), per replay-safe.
+- `divergence accept` defaults `--role` to `reviewer`.
+- Batch variants exist for 41 write leaves; the destructive leaves and the
+  `dashboard` stream refuse a batch (`INPUT_BATCH_UNSUPPORTED`).
+- `evidence approval-payload` and `strategy approval-payload` declare
+  replay-safe although they only read.
+- `canon context`'s `policy.*` keys mirror `policy.yaml` (snake_case).
+- Extra error codes beyond the plan: `INPUT_UNREADABLE`, `INPUT_ELEMENT_FAILED`,
+  `HUMAN_ONLY`, `UNKNOWN_ERROR_CODE`, `UNVERIFIABLE`.
+- `skills show --full` prints the core guide followed by every reference, each
+  after a rule and a comment naming its file.
+
+**Acceptance.**
+
+- Workspace: TODO (test counts, filled in at release).
+- Doc lint (`tests/docs_lint.rs`): every `canon` command in the skill, the
+  website, the AGENTS block, the error hints and `meta.next` parses against the
+  clap tree.
+- canon's own corpus: TODO.
+- Dogfood eval: TODO (wrong-shape calls, trace-check result, agent runs).
+
 ## 0.27.0 release
 
 Two safety fixes found by the 0.25 CLI audit; no command, option or JSON shape changes.

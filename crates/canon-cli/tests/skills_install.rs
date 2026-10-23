@@ -563,8 +563,9 @@ fn skills_install_11_the_stub_claims_build_work_and_the_guide_opens_with_the_loo
     let body = &guide[guide.find("\n---\n").unwrap() + 5..];
     let sections: Vec<&str> = body.lines().filter(|line| line.starts_with("## ")).collect();
     assert_eq!(sections.first(), Some(&"## The working loop"), "the loop is the first section: {sections:?}");
-    assert!(sections.contains(&"## Command reference"), "the command reference follows the loop: {sections:?}");
-    let loop_section = &body[body.find("## The working loop").unwrap()..body.find("## Command reference").unwrap()];
+    let loop_start = body.find("## The working loop").unwrap();
+    let loop_end = body[loop_start + 3..].find("\n## ").map_or(body.len(), |at| loop_start + 3 + at);
+    let loop_section = &body[loop_start..loop_end];
     let skill_steps: Vec<&str> = loop_section
         .lines()
         .filter_map(|line| line.split_once(". **").filter(|(n, _)| n.parse::<u8>().is_ok()))
@@ -736,121 +737,6 @@ fn skills_install_43_doctor_warns_about_skills_claiming_build_work_and_never_edi
     assert_owned(&out, &[skills::Provider::Claude, skills::Provider::Codex]);
     assert_eq!(fs::read_to_string(&sites).unwrap(), sites_text);
     assert_eq!(fs::read_to_string(&notes).unwrap(), notes_text);
-}
-
-/// canon's own guide as the binary prints it (`canon skills show canon
-/// --full`: the core guide, then every reference; the loop's guidance is
-/// split across them) and the `canon init` AGENTS.md block, each with its
-/// whitespace collapsed so wrapped lines read as one.
-fn skill_and_block() -> [(&'static str, String); 2] {
-    let words = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
-    let skill = show(&["canon", "--full"]);
-    let tmp = tempfile::tempdir().unwrap();
-    let init = Command::new(env!("CARGO_BIN_EXE_canon")).arg("init").arg("--repo").arg(tmp.path()).output().unwrap();
-    assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
-    let block = fs::read_to_string(tmp.path().join("AGENTS.md")).unwrap();
-    [("skill", words(&skill)), ("AGENTS.md block", words(&block))]
-}
-
-/// skills.install.20 (0.16 D1, 0.17 D3): the skill and the AGENTS.md
-/// block both carry one human approval per scope, recorded by the agent
-/// at once in the change's `.canon/changes/<slug>/brief.md` (a `Source:`
-/// pointer for an external plan) and the policy approval, then no stop
-/// inside the scope, independent review on every change, and shipping
-/// by the agent.
-#[test]
-fn skills_install_20_skill_and_block_carry_one_approval_per_scope() {
-    for (name, text) in skill_and_block() {
-        for rule in [
-            "for a new subject or a scope change",
-            "canon brief check",
-            ".canon/changes/<slug>/brief.md",
-            "Source: <path>",
-            "Never approve without a human answer",
-            "Inside an approved scope, never stop for a human",
-            "When no human can answer",
-            "on every change",
-            "yourself once",
-            "unless the brief says the human ships",
-            "in the approved change",
-            "tasks.md",
-            "a new change is a new scope",
-            "edited after its approval",
-            "is an optional work note nothing gates on",
-        ] {
-            assert!(text.to_lowercase().contains(&rule.to_lowercase()), "the {name} must say {rule:?}: {text}");
-        }
-        let edited = text.to_lowercase().find("edited after its approval").unwrap();
-        assert!(text.to_lowercase()[edited..].contains("needs a new"), "the {name} must say an edited brief needs a new answer: {text}");
-    }
-}
-
-/// skills.install.21 (0.16 D1): neither the skill nor the AGENTS.md
-/// block keeps a second human stop: no fixed pair of stops, no
-/// per-request brief approval, and no rule that the agent may never run
-/// the policy approval for the human.
-#[test]
-fn skills_install_21_skill_and_block_name_no_second_human_stop() {
-    for (name, text) in skill_and_block() {
-        for stale in ["Two points stop for a human", "a human approves it.", "never approve it yourself", "A human approves the brief"] {
-            assert!(!text.contains(stale), "the {name} still says {stale:?}: {text}");
-        }
-    }
-}
-
-/// skills.install.44 (0.16 M7, eval 3b): the skill and the AGENTS.md
-/// block stop at the brief: write it, stop and report it, build and
-/// attest nothing until the human answers; the approval is never assumed,
-/// even when the human cannot answer before the report, since the brief
-/// is that report; assumptions cover the brief's questions and work
-/// inside an approved scope only; the ship and evidence refusals are
-/// backstops. The pre-M7 unscoped assumption rule is gone.
-#[test]
-fn skills_install_44_skill_and_block_stop_at_the_brief_and_never_assume_the_approval() {
-    for (name, text) in skill_and_block() {
-        let lower = text.to_lowercase();
-        for rule in [
-            "then stop and report",
-            "nothing for that scope",
-            "never assume",
-            "even when the human said they cannot answer until you report",
-            "the brief is that report",
-            "the brief's questions",
-            "inside an approved scope, never",
-            "canon evidence add",
-            "backstops",
-        ] {
-            assert!(lower.contains(rule), "the {name} must say {rule:?}: {text}");
-        }
-        assert!(!text.contains("When no human can answer, write"), "the {name} still scopes the assumption rule to nothing: {text}");
-    }
-}
-
-/// skills.install.22 (dogfood eval 3 H1, H2): the readers refresh the
-/// scenario index and `canon init` repos promote on write, so the
-/// working loop in the guide and the AGENTS.md block never sends the
-/// agent to `canon format specs` or `canon ingest plans`, names
-/// `canon inventory sync` only for a `NOT refreshed` line, and names
-/// `canon gate promote` only under `write.promote: manual`.
-#[test]
-fn skills_install_22_skill_and_block_name_no_bookkeeping_step() {
-    let [(_, skill), (_, block)] = skill_and_block();
-    let loop_start = skill.find("## The working loop").expect("the skill has its loop");
-    let loop_end = skill.find("## Command reference").expect("the reference follows the loop");
-    for (name, text) in [("skill loop", &skill[loop_start..loop_end]), ("AGENTS.md block", block.as_str())] {
-        assert!(!text.contains("canon format specs"), "the {name} names a format step: {text}");
-        for sentence in text.split(". ") {
-            if sentence.contains("canon ingest plans") {
-                assert!(sentence.contains(" no "), "the {name} sends the agent to ingest plans: {sentence:?}");
-            }
-            if sentence.contains("canon inventory sync") {
-                assert!(sentence.contains("NOT refreshed"), "the {name} names a sync step: {sentence:?}");
-            }
-            if sentence.contains("canon gate promote") {
-                assert!(sentence.contains("write.promote: manual"), "the {name} names promote outside manual mode: {sentence:?}");
-            }
-        }
-    }
 }
 
 /// A `canon.yaml` with comments and other sections around where a

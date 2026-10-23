@@ -7,13 +7,14 @@ records every downstream stage joins against.
 ## You rarely run it yourself
 
 Since 0.16 the commands that read the index see added, edited and deleted
-`.feature` files without a sync step. `canon evidence add`, `canon review
-add` and `canon subject status` refresh the index on disk first, with the
+`.feature` files without a sync step. `canon evidence add`, `canon evidence
+audit`, `canon artifacts store`, `canon divergence accept`, `canon review
+scenario` and `canon subject move` refresh the index on disk first, with the
 same code this command runs, scoped to the changed files, and say so in one
 stderr line:
 
-```
-canon evidence add: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
+```stderr
+canon artifacts store: refreshed the scenario index from 1 changed feature file(s) (.canon/specs/kind=feature/area=cart/add.feature): 1 record(s) written
 ```
 
 `canon status` and `canon gate check` are read commands and write nothing:
@@ -44,8 +45,8 @@ not the index already holds its scenarios, `shipped` is refused, and
 fix it; run `canon migrate`, which moves `features/kind=feature/` to
 `<root>/kind=feature/`.
 
-`canon migrate --dry-run` prints the plan without writing anything, and
-`canon migrate` applies it. Commit first: it refuses while a path it
+`canon migrate` prints the plan without writing anything, and
+`canon migrate --commit --plan-digest <digest>` applies it. Commit first: it refuses while a path it
 moves has uncommitted changes, and when a destination already exists.
 A root at the repo-level `specs` moves to `.canon/specs`, and
 `canon.yaml` records `former_roots: [specs]`, so reviews pinned before
@@ -68,19 +69,19 @@ kept an old index gets it rewritten on the first read.
 
 ## Where the index sits in the loop
 
-```
+```text
 author .feature corpus (canon scenario new)
         │
         ▼
 scenario index                  # refreshed by the writers; `canon inventory sync` rebuilds it
         │
         ▼
-canon review add                # attests a review — see canon-inventory downstream / canon-gate
-canon divergence {add,promote,resolve,defer,accept,status}   # tracks/resolves a divergence
+canon review scenario           # attests a review — see canon-inventory downstream / canon-gate
+canon divergence add|resolve|defer|accept|list   # tracks/resolves a divergence
 canon gate check [--release]    # trust-ladder / staleness / coverage — see canon-gate
         │
         ▼
-canon ingest artifacts          # with artifacts.native_records: true in canon.yaml —
+canon ingest records            # with artifacts.native_records: true in canon.yaml —
                                 # feeds review/divergence verdicts into the flywheel
                                 # (see canon-artifact-ingest)
 ```
@@ -98,7 +99,7 @@ canon inventory sync --spec-root ./specs    # ad hoc: ignore canon.yaml entirely
 
 Per configured root, in order:
 
-1. **Validate** — runs `canon format --check` over the root. ANY violation
+1. **Validate** — runs `canon format` over the root. ANY violation
    (missing provenance, layout-grammar, …) ABORTS THE WHOLE ROOT: zero
    records written for it, the violation(s) reported. Never a partial sync.
 2. **Scan** — walks `<root>/kind=feature/area=<area>/<surface>.feature`, pairing each
@@ -123,6 +124,13 @@ Per configured root, in order:
 The scenario index shape is deliberately general: `title` +
 `source_digest`, nothing else. It carries no coverage field — coverage
 stays `canon gate check`'s own authority (see `canon-gate`).
+
+`--dry-run` runs the same validation and reports what would be written
+without writing. A rerun that finds every digest unchanged writes nothing.
+
+**Done when:** `canon inventory sync` exits `0` with no violation or sync
+error for the root, and `canon query --kind scenario` lists the scenarios;
+`canon status` then reads the index without a `NOT refreshed` line.
 
 ## `specs.roots[]` config (`canon.yaml`)
 
@@ -149,7 +157,7 @@ specs:
 
 ## Sync-abort causes
 
-- **A `canon format --check` validation violation** in the root's corpus →
+- **A `canon format` validation violation** in the root's corpus →
   whole root aborts, 0 writes, violations reported.
 - **A root on the pre-0.17 layout** (a `.feature` file under
   `<root>/features/`) → a `layout-grammar` violation at path `features`;
@@ -160,12 +168,12 @@ specs:
 
 ## How the index feeds the rest
 
-- **Review** — `canon review add` attests a verdict against a synced
+- **Review** — `canon review scenario` attests a verdict against a synced
   scenario. (See `canon-inventory` downstream commands and each command's `--help`.)
-- **Divergence** — `canon divergence {add,promote,resolve,defer,accept,status}`
+- **Divergence** — `canon divergence add|resolve|defer|accept|list`
   tracks/resolves divergences against synced scenarios.
 - **Gate** — `canon gate check` enforces trust-ladder / staleness /
   coverage over the corpus (see `canon-gate`).
-- **Ingest** — `canon ingest artifacts` with `artifacts.native_records:
+- **Ingest** — `canon ingest records` with `artifacts.native_records:
   true` in `canon.yaml` feeds review/divergence verdicts into the
   reward flywheel (see `canon-artifact-ingest`).

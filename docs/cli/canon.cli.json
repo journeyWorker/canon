@@ -736,7 +736,7 @@
       "supportsJson": true
     },
     {
-      "about": "Read the brief against the rules: blocker and advisory findings (exit 0 clean, 2 blockers, 1 error)",
+      "about": "Read the brief against the rules: blocker and advisory findings (exit 0 clean, 1 blockers, 2 refused)",
       "aliases": [],
       "command": "brief check",
       "effect": "read",
@@ -12293,7 +12293,7 @@
               "$ref": "#/$defs/StepActor"
             },
             "argv": {
-              "description": "`command` split into its words (`[\"canon\", \"gate\", \"check\"]`); empty when `command` is not a canon command line.",
+              "description": "`command` split into its words (`[\"canon\", \"gate\", \"check\"]`); empty when `command` is not a canon command line, or still holds a `<placeholder>` for what only the agent knows (T14: `argv` is always runnable).",
               "items": {
                 "type": "string"
               },
@@ -12484,7 +12484,7 @@
               "$ref": "#/$defs/StepActor"
             },
             "argv": {
-              "description": "`command` split into its words (`[\"canon\", \"gate\", \"check\"]`); empty when `command` is not a canon command line.",
+              "description": "`command` split into its words (`[\"canon\", \"gate\", \"check\"]`); empty when `command` is not a canon command line, or still holds a `<placeholder>` for what only the agent knows (T14: `argv` is always runnable).",
               "items": {
                 "type": "string"
               },
@@ -12634,7 +12634,7 @@
     {
       "code": "BRIEF_NOT_FOUND",
       "exit": 2,
-      "fix": "Pass the id of a change that has a brief; `canon change list` shows them.",
+      "fix": "Pass the id of a change that has a brief; `canon status` lists the changes.",
       "meaning": "the named change has no brief",
       "retryable": false
     },
@@ -13600,7 +13600,7 @@
     {
       "code": "SUBJECT_NOT_FOUND",
       "exit": 2,
-      "fix": "Pass the id of an existing subject; `canon subject list` shows them.",
+      "fix": "Pass the id of an existing subject; `canon status` lists the subjects.",
       "meaning": "no subject with that id",
       "retryable": false
     },

@@ -1,6 +1,6 @@
 # canon-fmt
 
-`canon format --check` is canon's read-only format validator over a
+`canon format` is canon's read-only format validator over a
 consumer-repo artifact corpus: ledger records (run/drill/review/clear/
 code-review/design-review), divergence events (manifest/review/
 remediation), `kind=feature/` spec files, `inventory/`, and `policy.yaml`. It never
@@ -9,8 +9,13 @@ rewrites or mutates the corpus — it only validates and reports.
 ## Running
 
 ```bash
-canon format --check <corpus-root>   # e.g. a consumer repo's spec/
+canon format spec   # e.g. a consumer repo's spec/
 ```
+
+With no operand, `canon format` validates every `specs.roots[]` entry of
+`canon.yaml`; a relative `<dir>` resolves under the repo root when `--repo`
+is given, else under the current directory. The old `fmt` spelling
+and the no-op `--check` are gone.
 
 Read-only, always. Exits nonzero if any violation is found, and prints
 a report grouped by failure class in this fixed order:
@@ -29,6 +34,9 @@ a report grouped by failure class in this fixed order:
 | `missing-join-identity` | Corpus-wide, one line: no ledger record carries `change_id`/`task_id`. | Standing note only — new records carry these going forward; historical backfill is out of scope. |
 
 Every class is a stable string, safe to grep/diff across runs.
+
+**Done when:** `canon format` exits `0` and prints no violation; a
+violation names its class and file in the report.
 
 ## What it does NOT do
 

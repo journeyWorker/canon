@@ -91,8 +91,8 @@ byte-identical trajectory content, so the duplicate skip the rebuild
 rests on still fires and repeated runs don't churn. The rebuild is
 non-destructive — it never deletes a strategy the raw trajectory rows
 don't touch, so a rebuild can't silently drop a hand-promoted strategy.
-There is no standalone `canon learn` rebuild command; the only `canon
-learn` subcommand is `promote`.
+There is no standalone rebuild command under `canon strategy`; its
+subcommands are `approval-payload`, `promote` and `rollback`.
 
 ## Rewarding a trajectory
 
@@ -144,17 +144,16 @@ outside that policy).
 
 A role without an explicit `promotion.<role>` entry resolves to
 `occurrence`, `n_min: 5`, `window_days: 30`. Both modes read resolved
-trajectory outcomes, not raw verdict rows; run `canon ingest artifacts` first.
+trajectory outcomes, not raw verdict rows; run `canon ingest records` first.
 Neither mode alone proves a quality uplift.
 
 ## Promoting, approving, and rolling back
 
 ```bash
-canon ingest artifacts
-canon learn approve 01J...ULID --evaluation evaluation.json \
-  --principal alice --repo .
-# `request` is an exact alias for `approve`
-canon learn promote 01J...ULID --repo . \
+canon ingest records
+canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json \
+  --approver alice --approval-at 2026-10-02T12:00:00Z --repo .
+canon strategy promote 01ARZ3NDEKTSV4RRFFQ69G5FAV --repo . \
   --evaluation evaluation.json --approval approval.json
 ```
 
@@ -168,7 +167,7 @@ metrics, duplicate/shared result digests, a mismatched integrity digest, or a
 non-passing decision is rejected. Canon does not run the evaluator, and this
 repository currently publishes **no measured uplift result**.
 
-`canon learn approve`/`request` prints an unsigned payload: namespace
+`canon strategy approval-payload` prints an unsigned payload: namespace
 `canon-learning-approval-v1`, subject `strategy:<id>`, evaluation digest,
 RFC3339 `approved_at`, and `payload_hex`. It never reads a private key or
 sets `verified`. Decode those exact bytes and sign them externally with
@@ -194,7 +193,7 @@ approval:
 
 Promotion verifies that signature with `ssh-keygen -Y verify` and that
 policy-pinned file. `--evaluation` and `--approval` are required together;
-`--signature <path>` can attach the armored signature to the approval JSON.
+`--signature-file <path>` can attach the armored signature to the approval JSON.
 Without valid paired evidence and this signature, the quarantined candidate
 stays quarantined. There is no `--force`.
 
@@ -205,9 +204,9 @@ rollback and does not produce a rollback record. An explicit rollback is
 separate:
 
 ```bash
-canon learn rollback 01J...ULID --reason "regression" --actor-id alice \
-  --signature-file rollback.sig --approved-at 2026-10-02T12:00:00Z \
-  --contradicting-trajectory-id 01J...TRAJECTORY --repo .
+canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regression" --actor-id alice \
+  --signature-file rollback.sig --approval-at 2026-10-02T12:00:00Z \
+  --contradicting-trajectory-id 01ARZ3NDEKTSV4RRFFQ69G5FAW --repo .
 ```
 
 The rollback signature covers the
@@ -219,8 +218,8 @@ rollback records provenance and sets lifecycle `rolled_back`.
 ## Retrieving before a task
 
 ```bash
-canon retrieve --role dev --regime dev/canon/join-spine/9c93d024b1a2
-canon retrieve --role dev --regime dev/canon/join-spine/9c93d024b1a2 --k 3 --json
+canon retrieve --for-role dev --regime dev/canon/join-spine/9c93d024b1a2
+canon retrieve --for-role dev --regime dev/canon/join-spine/9c93d024b1a2 --limit 3 --json
 ```
 
 `--regime` is the full `regime_key` string,
@@ -229,10 +228,10 @@ write side produces. Assemble it through the one serializer instead of
 a second, drifting derivation:
 
 ```bash
-canon regime-key --role dev --repo canon --area join-spine --hash abc123
+canon regime show --role-segment dev --repo-name canon --area join-spine --hash abc123
 ```
 
-`--role` must equal `--regime`'s own leading segment; a mismatch is a
+`--for-role` must equal `--regime`'s own leading segment; a mismatch is a
 clean usage error (exit `2`). Once role and regime agree, retrieval is
 **fail-soft and always exits `0`** — a store outage, an empty store, or
 a malformed row all degrade to an empty guidance list, never a nonzero
@@ -252,4 +251,4 @@ exit a caller must handle.
   promoted strategies actually live
 - [Trust spine](/concepts/trust-spine/) — the verdicts strategy memory
   distills from
-- [CLI reference](/cli/) — the full `canon learn` / `canon retrieve` surface
+- [CLI reference](/cli/) — the full `canon strategy` / `canon retrieve` surface

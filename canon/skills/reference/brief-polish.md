@@ -99,7 +99,7 @@ and the result.
 ### `prose.paragraph-length`
 
 Normative sections. Catches a paragraph of more than five sentences. Fix: the
-compression pass in `role-planner.md`: keep the sentences that state a
+compression pass in `canon skills show role-planner`: keep the sentences that state a
 condition, an action, a result or a number; make three or more parallel
 items a list; delete or move the rest.
 
@@ -199,7 +199,7 @@ states the measured value and the budget. Section budgets (ko / en
 characters): Intent 400 / 700, Outcome 500 / 900, Flow 800 / 1500, Detail
 2500 / 3500, Acceptance 1000 / 1800, Questions 800 / 1200, Invariants and
 Checks 800 / 1500 each (Out of scope has none); whole brief 4000 / 6000. Fix: the
-compression pass in `role-planner.md`: delete sentences that restate another
+compression pass in `canon skills show role-planner`: delete sentences that restate another
 section, turn parallel items into a list or table, move assumptions to
 Questions and assumptions and a not-doing list to Out of scope. A brief this
 long usually says several things twice. A waiver for the whole-brief budget
@@ -216,7 +216,7 @@ uses the section key `brief`.
 ## The loop
 
 1. Fix the mode problems above, then the findings, section by section.
-2. Run `canon brief check --change-id <slug> --json`.
+2. Run `canon brief check <slug> --json`: the findings are in `data.findings[]`.
 3. Repeat until no advisory remains, or each remaining one is waived with a reason.
 4. Stop and report to the human, in the brief's language. Do not loop further: a clean run says nothing about whether the brief is good, only that these counts are within budget.
 
@@ -232,9 +232,11 @@ uses the section key `brief`.
 
 `canon brief check` no longer lists the `prose.*` findings you rewrote, or lists them as waived with a reason; no blockers appeared.
 
+**Done when:** `canon brief check <slug> --json` lists no `prose.*` finding (read `data.findings[]`) except those waived with a reason (`data.waivers[]`), and `data.counts` shows no blocker.
+
 ## Next
 
-Report to the human and `canon brief approve` from their answer.
+Report to the human, who approves with `canon brief approve` (theirs; agent roles are refused).
 
 ## Invariants (every brief pass)
 
@@ -242,4 +244,4 @@ Report to the human and `canon brief approve` from their answer.
 - Explaining writes nothing. Asked what a finding means or what a pass would do, answer in chat and leave the brief untouched.
 - No pass requires another as a prerequisite. Run the one the findings or the human point at, in any order.
 - A pass closes only the findings it rechecked: rerun `canon brief check` after the edit and report a finding as closed only when it is gone from that run. Never claim a rule you did not rerun.
-- Write in the brief's language (detected from the text, or `language:` in `canon.yaml` when set). Edits touch `.canon/changes/<slug>/brief.md` only. A brief edited after approval is not approved: it needs a new human answer and `canon brief approve` again.
+- Write in the brief's language (detected from the text, or `language:` in `canon.yaml` when set). Edits touch `.canon/changes/<slug>/brief.md` only. A brief edited after approval is not approved: it needs a new human answer and the human's `canon brief approve` again (agent roles are refused).

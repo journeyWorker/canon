@@ -52,7 +52,7 @@
 //! subject's step is the planner's `canon brief check <slug>`,
 //! `N blocker(s): write the brief`. With no blocker but advisories left
 //! (0.26 D4), a planner step to polish the brief
-//! (`reference/brief-polish.md`) and re-run `canon brief check` comes
+//! (`canon skills show brief-polish`) and re-run `canon brief check` comes
 //! first, naming the count and the top rule ids; the human step stays after
 //! it (advisories never refuse an approval). Those steps are the
 //! subject's only ones, whatever its status: the agent stops and reports
@@ -1107,7 +1107,7 @@ fn polish_step(id: &str, brief: &BriefStatus, draft: bool) -> Option<NextStep> {
     Some(NextStep {
         actor: StepActor::Agent,
         role: Some(Role::Planner),
-        command: format!("polish the brief in {} (reference/brief-polish.md), then run `canon brief check {change}`", brief.report_in()),
+        command: format!("polish the brief in {} (`canon skills show brief-polish`), then run `canon brief check {change}`", brief.report_in()),
         why: format!("{id}: {} advisory finding(s) remain in `{change}` ({top}); the check is clean of blockers, so the human can answer now, but a polished brief is easier to read; advisories never refuse an approval{draft}", counts.advisories),
     })
 }

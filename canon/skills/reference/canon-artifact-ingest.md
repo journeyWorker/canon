@@ -1,23 +1,27 @@
 # canon-artifact-ingest
 
-`canon ingest artifacts` turns a repo's canon-native ARTIFACTS — the
+`canon ingest records` turns a repo's canon-native ARTIFACTS — the
 outputs of review/divergence/task/handoff work — into the regime-keyed
 verdict trajectories that strategy memory and the reward gate consume
 (see `canon-learn`). One pass runs the four adapters, normalizes, derives
 verdicts, and writes idempotently.
 
-## `canon ingest artifacts [--repo <dir>] [--watch]`
+## `canon ingest records [--repo <dir>] [--watch]`
 
 ```bash
-canon ingest artifacts                # one pass over the repo's artifacts
-canon ingest artifacts --repo ../svc  # a specific repo
-canon ingest artifacts --watch        # poll loop
+canon ingest records                # one pass over the repo's artifacts
+canon ingest records --repo ../svc  # a specific repo
+canon ingest records --watch        # poll loop
 ```
 
 Source roots resolve from `canon.yaml`'s `artifacts.sources` config
 (`openspec_root`, ledger/divergence/handoff roots) — generic, never a
 hardcoded path; ordinarily the consumer repo's own roots. Unconfigured =
 no scan for that family.
+
+**Done when:** the pass exits `0` and reports no malformed artifact;
+`canon query --kind trajectory` lists the new trajectories. A rerun over an
+unchanged corpus writes nothing (`trajectories_skipped_duplicate`).
 
 ## The four adapters
 
@@ -58,7 +62,7 @@ new trajectories (reported as `trajectories_skipped_duplicate`).
 
 Verdicts persist regime-keyed (`<role>/<repo>/<area>/<hash>`), so a
 role-scoped agent reads only its own lane — the same regime namespacing
-`canon retrieve --role <r> --regime <k>` and `canon learn` query. This
+`canon retrieve --for-role <r> --regime <k>` and `canon strategy` query. This
 verdict stream is the evidence the reward gate scores when deciding
 promotion/demotion.
 
@@ -69,4 +73,4 @@ promotion/demotion.
 - Strategy promotion/demotion mechanics — see the `canon-learn` skill;
   this skill only produces the verdict evidence promotion reads.
 - The `regime_key` grammar itself — see `canon-retrieve`, which derives
-  the same key via the `canon regime-key` serializer.
+  the same key via the `canon regime show` serializer.

@@ -9,7 +9,7 @@ pub enum BriefCommand {
     /// Show where the change stands and the next one to three steps; never edits
     #[command(after_help = "Examples:\n  canon brief show\n  canon brief show add-login --json\n\nThe operand names the change; without it the repo's only live change is read.")]
     Show(BriefShowArgs),
-    /// Read the brief against the rules: blocker and advisory findings (exit 0 clean, 2 blockers, 1 error)
+    /// Read the brief against the rules: blocker and advisory findings (exit 0 clean, 1 blockers, 2 refused)
     Check(BriefCheckArgs),
     /// Record the human's approval of the brief, bound to its text; refused while `brief check` has blockers
     #[command(after_help = "Examples:\n  canon brief approve add-login --approver Ana --note 'Go. Ship the failure flow too.'\n\nWrites `Approved: <who> <when> — \"<words>\" (brief sha256:<digest>)` into the\nbrief (the digest covers the brief without its `Approved:` lines) and records\n`canon policy approve` in the same call. Edit the brief afterwards and it reads as\nnot approved (BRIEF_CHANGED_SINCE_APPROVAL) until a human answers again and this\nruns again. Run it only from the human's answer, with their words as --note.")]

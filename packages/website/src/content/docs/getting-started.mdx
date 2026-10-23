@@ -31,13 +31,13 @@ mkdir canon-demo && cd canon-demo
 
 bunx @journeykit/canon demo init      # scaffold a throwaway evidence loop
 bunx @journeykit/canon gate check     # RED  — the gate refuses
-bunx @journeykit/canon demo add    # record the reviewer's evidence
+bunx @journeykit/canon demo review   # record the reviewer's evidence
 bunx @journeykit/canon gate check     # GREEN — the gate passes
 ```
 
 The first `gate check` fails, naming the exact missing evidence:
 
-```
+```output
 canon gate check: 1 violation(s)
 
 uncovered-cell (1):
@@ -46,16 +46,18 @@ uncovered-cell (1):
 
 The `dev` voice recorded evidence for scenario `auth.login.01`, but
 `policy.yaml` requires an independent `reviewer`. No reviewer evidence → the
-cell is uncovered → the gate is red. `demo add` records that evidence, and
+cell is uncovered → the gate is red. `demo review` records that evidence, and
 the same check turns green:
 
-```
+```output
 canon gate check: clean (0 violations)
 ```
 
 That red → green flip *is* canon: completion is gated on evidence that exists,
 is attributed, and is fresh — never on a self-report. See
 [Trust spine](/concepts/trust-spine/) for the full failure-class table.
+
+**Done when:** the second `canon gate check` exits `0` with `clean (0 violations)`. Add `--json` to any command for the same result as `{ok, data, meta}`, with the next step in `meta.next`.
 
 ## Set up a repo
 
@@ -86,7 +88,7 @@ is attributed, and is fresh — never on a self-report. See
      names it, and `canon status` shows it. The gate grades the work
      against the policy, so a human approves it, in the same answer that
      approves a subject's brief, and the agent records that answer with one
-     call, `canon brief approve --by <the human> --note "<their words>"`,
+     call, `canon brief approve --approver <the human> --note "<their words>"`,
      which records both; until then `canon gate check` and `canon status` print an advisory.
    - **A canon block in `AGENTS.md`**, between `<!-- canon:begin -->` and
      `<!-- canon:end -->`. It tells any agent that features are managed
@@ -114,7 +116,7 @@ is attributed, and is fresh — never on a self-report. See
    with:
 
    ```bash
-   bunx @journeykit/canon init --check-config
+   bunx @journeykit/canon init --check
    ```
 
    Start a change under a subject with no config edits:
@@ -133,8 +135,8 @@ is attributed, and is fresh — never on a self-report. See
    in and runs `canon brief check` until it has no blockers and each prose
    advisory is fixed or waived with a reason, then stops and reports it to
    the human in that language. When the human approves it,
-   the agent records the answer with `canon brief approve --change-id add-login
-   --by <the human> --note "<their words>"`, which writes the `Approved:`
+   the agent records the answer with `canon brief approve add-login
+   --approver <the human> --note "<their words>"`, which writes the `Approved:`
    line, bound to the brief's text, and the policy approval together. A
    brief edited afterwards is no longer approved until the human answers
    again. Each scenario points at the step it proves
@@ -143,7 +145,7 @@ is attributed, and is fresh — never on a self-report. See
    `canon status` reads the approval in the subject's newest adopted change
    to show whether its brief is approved, and asks for a human only when it
    is missing. Work that changes nothing a user can observe (a dependency,
-   build or refactor change) is `canon change new --kind chore`, with a
+   build or refactor change) is `canon change new <slug> --change-kind chore`, with a
    short brief and no new scenarios. A change from an external plan (an
    openspec `proposal.md` listed under `plans.sources`) gets its brief in
    `.canon/changes/<change>/brief.md` too, with a `Source: <path>` line
@@ -166,7 +168,7 @@ is attributed, and is fresh — never on a self-report. See
    under a configured `specs.roots[]` entry:
 
    ```bash
-   bunx @journeykit/canon fmt --check      # validate the corpus first
+   bunx @journeykit/canon format          # validate the corpus first
    bunx @journeykit/canon inventory sync   # materialize the scenario ledger index
    ```
 
@@ -196,23 +198,69 @@ is attributed, and is fresh — never on a self-report. See
 
 </Steps>
 
+**Done when:** `canon status` shows the subject's brief approved and every flow step with a scenario, and `canon gate check` exits `0`. `canon status` names what is missing, and `meta.next` the command to run.
+
+## Record work: `--input`, `--rev`, `--json`
+
+Every write command takes `--input`: its arguments as one JSON object (keys
+are the option names in camelCase, plus `operands`), given inline, as a file
+path, or as `-` for stdin. A JSON array or NDJSON is a batch: every element is
+validated before anything is written. `canon schema <command> --json` prints
+the input schema and an example.
+
+```bash
+canon scenario new auth.login.02 --title "Sign out"
+canon evidence add --scenario-id auth.login.02 --class test-run --ref "npm test" --role implementer
+```
+
+The same calls as one batch, validated before anything is written:
+
+```text
+canon scenario new --input <JSON|FILE|->
+canon evidence add --input <JSON|FILE|->
+```
+
+where the input is `[{"operands": ["auth.login.03"], "title": "Session expires"}, {"operands": ["auth.login.04"], "title": "Remember me"}]`.
+
+A record that names code (`evidence add`, `review scenario`, `finding add`)
+takes `--rev <git revision>`, default `HEAD`. Uncommitted code is allowed: the
+record carries a `codeTree` and `worktreeDirty`, and a review survives the
+commit as long as the code tree is the same. Outside git, or in a repo with no
+commits, such a command refuses with `NO_COMMIT`.
+
+**Done when:** `canon gate check` exits `0`, and `canon subject show <id>`
+lists no uncovered scenario; both print the next step in `meta.next` when
+something is left.
+
 ## For agent harnesses
 
-If your repo runs coding agents, install canon's one canonical `canon` skill
-projected into each selected provider's project-local location: Claude gets
-`.claude/skills/canon/SKILL.md`, Codex gets `.agents/skills/canon/SKILL.md`
-(Codex scans `.agents/skills`, never `.codex/skills`), OMP gets
-`.omp/skills/canon/SKILL.md`, and Pi gets `.pi/skills/canon/SKILL.md`. OMP/Pi
-are passive bundles; their retrieve pre-dispatch script is a sidecar only, not
-a native hook. `canon init` already installed it for the harnesses you
-picked. `skills install`, `check` and `doctor` follow `canon.yaml`'s
+The canon guide is not a set of files in your repo. It is built into the
+binary and matches its version: an agent reads it with
+
+```bash
+canon skills show canon          # the core guide
+canon skills show canon --full   # the core guide plus every reference
+canon skills show role-reviewer  # one reference, by name
+```
+
+`canon skills install` writes only a **stub** `SKILL.md` per selected
+provider: Claude gets `.claude/skills/canon/SKILL.md`, Codex gets
+`.agents/skills/canon/SKILL.md` (Codex scans `.agents/skills`, never
+`.codex/skills`), OMP gets `.omp/skills/canon/SKILL.md`, and Pi gets
+`.pi/skills/canon/SKILL.md`. The stub carries the skill's frontmatter, so the
+harness still discovers it, and one short body that sends the agent to
+`canon skills show canon`. Nothing else is projected, so an upgrade never
+leaves stale guide text in the repo. OMP/Pi are passive bundles; their
+retrieve pre-dispatch script is a sidecar only, not a native hook.
+`canon init` already installed the stub for the harnesses you picked.
+`skills install`, `check` and `doctor` follow `canon.yaml`'s
 `skills.providers`; a repo without that key (set up before 0.17) uses the
 providers its install lock records, then the detected `.claude`, `.codex`,
 `.omp` and `.pi` directories. Nothing undetected is ever added. Pass
 `--providers` to change the list; install records it in `canon.yaml`:
 
 ```bash
-# project the canon skill for all four providers and record the list
+# write the stub for all four providers and record the list
 bunx @journeykit/canon skills install --providers=claude,codex,omp,pi
 
 # inspect projections without writing
@@ -220,29 +268,46 @@ bunx @journeykit/canon skills check
 bunx @journeykit/canon skills doctor
 
 # surface role-scoped strategy memory before a task starts
-bunx @journeykit/canon retrieve --role dev --regime "$(bunx @journeykit/canon regime-key dev my-repo core abc123)"
+bunx @journeykit/canon retrieve --for-role dev --regime "$(bunx @journeykit/canon regime show --role-segment dev --repo-name my-repo --area core --hash abcdef012345)"
 ```
 
 `skills check` and `skills doctor` are read-only: `check` reports missing or
-stale projections, while `doctor` reports provider, drift, and legacy-remnant
+stale stubs, while `doctor` reports provider, drift, and legacy-remnant
 diagnostics across all four managed roots without deleting user files. The
 install lock records the canon version that wrote it, so after you upgrade
 canon both say "installed by canon X, this canon is Y — run
-`canon skills install`" (or "an unknown canon version" for a lock from
-before 0.16) until you reinstall. `doctor` also names a canon projection
-left for a harness that is no longer selected (`stray:`, with the `rm -r`
-that removes it), and other skills in the same provider roots whose
+`canon skills install`" until you reinstall. `doctor` also names a canon
+projection left for a harness that is no longer selected (`stray:`, with the
+`rm -r` that removes it), and other skills in the same provider roots whose
 description claims build work, meaning one sentence pairs a build verb
 (build, create, implement, …) with a build object (site, app, game, feature,
 tool, service, …): if an agent picks one of those for build work, canon's
 loop will not run. It only reports them.
 
-Upgrading from canon 0.13.0 or earlier? Those releases wrote Codex's skill to
-`.codex/skills/canon.md`, which Codex never reads. Re-run `skills install`: it
-removes the legacy files whose bytes still match canon's install lock, keeps
-anything you edited or authored under `.codex/skills`, and removes
-`.codex/skills` only if it ends up empty. `check` and `doctor` flag whatever
-legacy projection remains, with the command that migrates it.
+**Done when:** `canon skills check` reports no missing or stale stub, and
+`canon skills show canon` prints the guide.
+
+## Upgrading from 0.27
+
+0.28 changed the command grammar with no aliases: an old spelling is a usage
+error whose hint names the replacement. To bring a 0.27 repo along, run
+
+```bash
+canon migrate
+canon migrate --commit --plan-digest 0123456789abcdef
+canon skills install
+```
+
+The first command only previews: it prints the `planDigest` and the effects
+(moved spec roots, rewritten `canon.yaml`, hooks and scripts, ledger layout),
+and changes nothing. The second applies exactly that plan, with the digest
+from the preview in place of the sample value, and backs up each rewritten file
+under `.canon/migrate-backup/`. The third replaces the old projected guide with
+the stub. `canon status`, `canon gate check` and `canon context` warn on a 0.27
+repo and put `canon migrate --json` first in `meta.next`.
+
+**Done when:** `canon status` no longer warns about a 0.27 repo and `canon
+gate check` runs clean or names real violations.
 
 Strategies are distilled from your team's own verdicts, quarantined by
 default, and activated only after paired evaluation plus policy-pinned SSH

@@ -342,7 +342,7 @@ fn context_status_81_the_polish_step_comes_before_the_human_stop() {
     assert_eq!(steps.len(), 2, "{steps:?}");
     assert_eq!((steps[0]["actor"].as_str(), steps[0]["role"].as_str()), (Some("agent"), Some("planner")), "{}", steps[0]);
     let command = steps[0]["command"].as_str().unwrap();
-    assert!(command.contains("reference/brief-polish.md") && command.contains("`canon brief check add-login`"), "{command}");
+    assert!(command.contains("canon skills show brief-polish") && command.contains("`canon brief check add-login`"), "{command}");
     let why = steps[0]["why"].as_str().unwrap();
     assert!(why.contains("1 advisory finding(s)") && why.contains("prose.key-sentence"), "{why}");
     assert_eq!((steps[1]["actor"].as_str(), steps[1]["role"].is_null()), (Some("human"), true), "{}", steps[1]);

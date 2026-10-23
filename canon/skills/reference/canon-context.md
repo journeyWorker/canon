@@ -31,9 +31,16 @@ or has no `spec_coverage` section (the gate then requires no evidence,
 cases or review), or when that section is invalid (the gate refuses until
 it is fixed); it is omitted when coverage is in force. `context` describes what CAN be
 authored; `canon status` (see `canon-subject`) says where the repo stands
-and what to run next. `--json` is unchanged: the header adds no field,
-and `policy.spec_coverage`/`policy.diagnostics` already carry the same
-fact.
+and what to run next. `--json` prints the `{ok, data, meta}` envelope: the
+header adds no field, and `policy.spec_coverage`/`policy.diagnostics`
+already carry the same fact. `--fields <list>` keeps only the named
+top-level fields (`kinds`, `enums`, `policy`, `review`, …); an unknown name is
+`UNKNOWN_FIELD` (exit 2).
+
+On a repository that still holds 0.27 canon state, `canon context` warns
+and puts `canon migrate --json` first in `meta.next`: run `canon migrate`
+(a preview), then `canon migrate --commit --plan-digest <digest from the
+preview>`, then `canon skills install`.
 
 ## Reproducible context packs and prompt bundles
 
@@ -43,19 +50,22 @@ an immutable content-addressed registry and records only metadata and digests
 in the pack manifest.
 
 ```bash
-canon context-pack new --manifest .canon/context-manifest.json
-canon context-pack new --manifest .canon/context-manifest.json --repo ../my-repo --json
+canon context-pack add --manifest .canon/context-manifest.json
+canon context-pack add --manifest .canon/context-manifest.json --repo ../my-repo --json
 canon context-pack show sha256:<pack-digest> --repo . --json
 canon context-pack verify sha256:<pack-digest>
 ```
 
-`create` prints only the pack id by default, so captured content is never
+`add` prints only the pack id by default, so captured content is never
 written to concise terminal output. `--json` prints the pack manifest,
 including selected-path metadata and content digests. `show` verifies the
 manifest and immutable content objects before returning it; `verify` exits
 nonzero when the pack is missing, stale, or tampered. Manifest paths must be
 relative to the resolved repo, remain inside it, and contain no symlink;
 missing or unsafe paths are rejected by the context-pack module.
+
+**Done when:** `canon context-pack verify sha256:<pack-digest>` exits `0`;
+`canon context-pack show` returns the manifest you recorded.
 
 ## Provider-neutral adapter responses
 
@@ -87,9 +97,9 @@ Version prompt inputs separately when several runs should share the same
 prompt files:
 
 ```bash
-canon prompt add --name reviewer --version v1 \
+canon prompt add reviewer@v1 \
   --manifest .canon/reviewer-prompt.json
-canon prompt show --name reviewer --version v1 --json
+canon prompt show reviewer@v1 --json
 ```
 
 Prompt registration uses the same immutable content registry. `prompt show`
@@ -97,7 +107,7 @@ verifies the selected bundle and returns its metadata/digests; neither concise
 output form includes captured prompt bytes.
 
 - **A capability query, never validation:** `canon context` ALWAYS exits
-  `0` with the full surface — even when `canon format --check` or
+  `0` with the full surface — even when `canon format` or
   `canon gate` would report diagnostics against the same repo. It reads
   only the schema/policy/vocabulary registry, never the corpus or the
   evidence ledger.
@@ -154,7 +164,7 @@ AND `canon format`'s diagnostics from one edit site, never two.
 
 ## Reading an "expected one of: …" validator error
 
-When `canon format --check` rejects an out-of-domain enum value it emits:
+When `canon format` rejects an out-of-domain enum value it emits:
 
 ```
 `not-a-real-kind` is not a valid value for `kind` of `run` (expected one of: run, review, divergence, …)
@@ -167,7 +177,7 @@ same schema, no hand-maintained second copy.
 
 ## What this skill does NOT cover
 
-- `canon format --check`'s full violation taxonomy — see `canon-fmt`;
+- `canon format`'s full violation taxonomy — see `canon-fmt`;
   this skill only covers reading its enum diagnostic against the surface.
 - Authoring a typed task atom / handoff body — see
   `canon-vocab`; `canon context`'s `vocab`/`cel` sections
