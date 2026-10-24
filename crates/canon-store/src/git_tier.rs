@@ -4,6 +4,7 @@
 //! local-first) and is fully offline-tested.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use canon_model::envelope::RecordKind;
 use canon_model::evidence::{EvidenceViolation, RawRecord};
@@ -17,6 +18,28 @@ use crate::tier::{AgeReport, AgingRule, StoreError, StoredRecord, Tier, TierQuer
 /// return shape: kept `(path, record)` pairs plus every violation
 /// encountered along the scan.
 pub type ScanResult = (Vec<(PathBuf, RawRecord)>, Vec<EvidenceViolation>);
+
+/// [`ScanResult`] with each record shared with the per-process file cache:
+/// no body is copied until a caller asks for an owned one.
+pub type SharedScanResult = (Vec<(PathBuf, Arc<RawRecord>)>, Vec<EvidenceViolation>);
+
+/// [`GitTier::read_shared`]'s result: [`TierReadResult`] with each record
+/// shared with the per-process file cache. A reader that only inspects or
+/// deserializes the body borrows it (`T::deserialize(&record.0)`), and one
+/// that needs an owned [`RawRecord`] clones at its own edge.
+#[derive(Debug, Clone, Default)]
+pub struct SharedRead {
+    pub records: Vec<Arc<RawRecord>>,
+    pub violations: Vec<EvidenceViolation>,
+}
+
+impl SharedRead {
+    /// The owned [`TierReadResult`]: a body is moved out when nothing else
+    /// holds it, cloned otherwise.
+    pub fn into_owned(self) -> TierReadResult {
+        TierReadResult { records: self.records.into_iter().map(Arc::unwrap_or_clone).collect(), violations: self.violations }
+    }
+}
 
 /// A `kind=<x>/` directory [`GitTier::scan_corpus`] found whose `<x>`
 /// does not match any of `RecordKind`'s twelve closed core kinds
@@ -163,7 +186,7 @@ impl FileStamp {
     }
 }
 
-type Loaded = Result<RawRecord, EvidenceViolation>;
+type Loaded = Result<Arc<RawRecord>, EvidenceViolation>;
 
 /// Validated record files already read by this process, by absolute path
 /// and kind. One command scans the same kind several times (the index
@@ -184,7 +207,7 @@ fn load_candidate(kind: RecordKind, candidate: &Candidate) -> Result<Loaded, Sto
         }
     }
     let bytes = std::fs::read(&candidate.absolute)?;
-    let loaded = validate_file(kind, &candidate.relative, &bytes);
+    let loaded = validate_file(kind, &candidate.relative, &bytes).map(Arc::new);
     if let Some(stamp) = candidate.stamp {
         FILE_MEMO.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).insert(key, (stamp, loaded.clone()));
     }
@@ -238,6 +261,18 @@ impl GitTier {
         kind: RecordKind,
         keep: impl Fn(chrono::DateTime<chrono::Utc>) -> bool,
     ) -> Result<ScanResult, StoreError> {
+        let (found, violations) = self.scan_kind_shared(kind, keep)?;
+        Ok((found.into_iter().map(|(relative, raw)| (relative, Arc::unwrap_or_clone(raw))).collect(), violations))
+    }
+
+    /// [`Self::scan_kind_where`] without copying: each record is the
+    /// `Arc` the per-process file cache holds, so a repeat scan of an
+    /// unchanged kind allocates the row list and nothing else.
+    fn scan_kind_shared(
+        &self,
+        kind: RecordKind,
+        keep: impl Fn(chrono::DateTime<chrono::Utc>) -> bool,
+    ) -> Result<SharedScanResult, StoreError> {
         let kind_dir = self.absolute(Path::new(&format!("kind={}", kind.as_str())));
         let mut records = Vec::new();
         let mut violations = Vec::new();
@@ -285,6 +320,16 @@ impl GitTier {
             }
         }
         Ok((records, violations))
+    }
+
+    /// [`Tier::read`] with the records shared rather than copied: the same
+    /// scan, validation and `since` filter, but each record is the `Arc`
+    /// the per-process file cache holds. For a reader that only borrows
+    /// the body (`T::deserialize(&raw.0)`) of every row.
+    pub fn read_shared(&self, query: &TierQuery) -> Result<SharedRead, StoreError> {
+        let since = query.since;
+        let (found, violations) = self.scan_kind_shared(query.kind, move |at| since.is_none_or(|s| at >= s))?;
+        Ok(SharedRead { records: found.into_iter().map(|(_, raw)| raw).collect(), violations })
     }
 
     /// The ONE `kind` record at tier-relative `relative`, validated
@@ -664,9 +709,7 @@ impl Tier for GitTier {
     }
 
     fn read(&self, query: &TierQuery) -> Result<TierReadResult, StoreError> {
-        let since = query.since;
-        let (found, violations) = self.scan_kind_where(query.kind, move |at| since.is_none_or(|s| at >= s))?;
-        Ok(TierReadResult { records: found.into_iter().map(|(_, raw)| raw).collect(), violations })
+        self.read_shared(query).map(SharedRead::into_owned)
     }
 
     fn purge_keys(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>) -> Result<Vec<String>, StoreError> {
