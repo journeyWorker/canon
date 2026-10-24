@@ -306,6 +306,9 @@ def generate(out, subjects, per_subject, evidence_n, reviews_n, batches, uncover
         sys.exit(f"{out} exists and is not empty")
     out.mkdir(parents=True, exist_ok=True)
     git(out, "init", "-q", "-b", "main")
+    # No background `git gc --auto` repacking loose objects while run.py copies the repo.
+    git(out, "config", "gc.auto", "0")
+    git(out, "config", "maintenance.auto", "false")
 
     (out / "canon.yaml").write_text(CANON_YAML)
     (out / ".gitignore").write_text(GITIGNORE)

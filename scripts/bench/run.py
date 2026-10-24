@@ -151,6 +151,7 @@ def main():
     parser.add_argument("--canon", required=True, help="the canon binary to measure")
     parser.add_argument("--grid", choices=sorted(GRIDS), required=True)
     parser.add_argument("--out", required=True, help="results TSV")
+    parser.add_argument("--only", choices=["scenarios", "batch"], help="measure one axis only")
     parser.add_argument("--runs", type=int, default=3, help="runs per point; the lowest-CPU run is kept (default 3)")
     args = parser.parse_args()
     canon = str(Path(args.canon).resolve())
@@ -159,10 +160,12 @@ def main():
 
     work = Path(tempfile.mkdtemp(prefix="canon-bench-"))
     try:
-        for total in grid["scenarios"]:
-            measure_scenarios(canon, work, total, args.runs, rows)
-        for batch in grid["batch"]:
-            measure_batch(canon, work, batch, args.runs, rows)
+        if args.only in (None, "scenarios"):
+            for total in grid["scenarios"]:
+                measure_scenarios(canon, work, total, args.runs, rows)
+        if args.only in (None, "batch"):
+            for batch in grid["batch"]:
+                measure_batch(canon, work, batch, args.runs, rows)
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
