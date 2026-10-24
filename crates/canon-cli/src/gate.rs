@@ -178,10 +178,11 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     let unrefreshable = crate::inventory::unrefreshable_roots(&repo).into_iter().map(|root| root.violation(""));
     // A chore approved on a subject asks for the suite again (0.22 D2): a
     // subject past `building` with evidenced scenarios and none newer.
+    let code_tree = crate::reverify::CodeTreeMemo::known(gate_context.code_tree.clone());
     let reverify = canon_gate::spec_coverage::latest_subjects(&gate_context)
         .into_iter()
         .filter(|s| matches!(s.status, canon_model::SubjectStatus::Verifying | canon_model::SubjectStatus::Shipped))
-        .flat_map(|s| crate::reverify::chore_violations(&repo, &gate_context, s))
+        .flat_map(|s| crate::reverify::chore_violations(&repo, &gate_context, &code_tree, s))
         .collect::<Vec<_>>();
     // An approval that no longer holds fails closed (0.22 D3); a policy never approved is only an advisory below.
     let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).chain(unrefreshable).chain(reverify).chain(crate::policy_approval::violation(&repo)).collect());

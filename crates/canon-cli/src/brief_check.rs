@@ -280,35 +280,43 @@ pub fn flow_scenarios(repo: &Path, change: &ChangeId) -> Result<FlowIndex, Strin
     Ok(index)
 }
 
-/// The changes the `@flow:<change>.<F-id>` tags of scenario `scenario_id`
-/// in spec root `project` name (0.25 D1), in tag order, read through the
-/// same Gherkin scan as [`flow_scenarios`]. Empty for an untagged
-/// scenario or an unreadable spec configuration.
-pub fn flow_changes_of(
-    repo: &Path,
-    project: &canon_model::ProjectId,
-    scenario_id: &canon_model::ScenarioId,
-) -> Vec<ChangeId> {
-    let Ok(roots) = crate::inventory::load_spec_roots(&repo.join("canon.yaml")) else {
-        return Vec::new();
-    };
-    let mut changes: Vec<ChangeId> = Vec::new();
-    for root in roots.iter().filter(|root| &root.id == project) {
-        for path in canon_fmt::util::feature_files(&root.root) {
-            let Some(file) = crate::inventory::feature_file_scan(&path) else {
-                continue;
-            };
-            for scenario in file
-                .scan
-                .scenarios
-                .iter()
-                .filter(|s| s.scenario_id == scenario_id.as_str())
-            {
-                for tag in &scenario.flow_tags {
-                    if let Some(change) = tag
-                        .rsplit_once('.')
-                        .and_then(|(change, _)| ChangeId::parse(change).ok())
-                    {
+/// The changes the `@flow:<change>.<F-id>` tags of every scenario name
+/// (0.25 D1), keyed by spec root and scenario id, in tag order, read
+/// through the same Gherkin scan as [`flow_scenarios`]. Built on first
+/// lookup so a command that never asks pays no walk, and once so a
+/// command that asks per scenario walks the feature files once.
+pub struct FlowChangesIndex(std::cell::OnceCell<BTreeMap<(String, String), Vec<ChangeId>>>);
+
+impl FlowChangesIndex {
+    /// An index that walks the spec roots on first lookup.
+    pub fn lazy() -> Self {
+        Self(std::cell::OnceCell::new())
+    }
+
+    /// The changes the `@flow:` tags of scenario `scenario_id` in spec
+    /// root `project` name, in tag order. Empty for an untagged scenario or
+    /// an unreadable spec configuration.
+    pub fn changes_of(&self, repo: &Path, project: &canon_model::ProjectId, scenario_id: &canon_model::ScenarioId) -> &[ChangeId] {
+        let index = self.0.get_or_init(|| Self::build(repo));
+        index.get(&(project.as_str().to_string(), scenario_id.as_str().to_string())).map_or(&[], Vec::as_slice)
+    }
+
+    fn build(repo: &Path) -> BTreeMap<(String, String), Vec<ChangeId>> {
+        let mut index: BTreeMap<(String, String), Vec<ChangeId>> = BTreeMap::new();
+        let Ok(roots) = crate::inventory::load_spec_roots(&repo.join("canon.yaml")) else {
+            return index;
+        };
+        for root in &roots {
+            for path in canon_fmt::util::feature_files(&root.root) {
+                let Some(file) = crate::inventory::feature_file_scan(&path) else {
+                    continue;
+                };
+                for scenario in &file.scan.scenarios {
+                    for tag in &scenario.flow_tags {
+                        let Some(change) = tag.rsplit_once('.').and_then(|(change, _)| ChangeId::parse(change).ok()) else {
+                            continue;
+                        };
+                        let changes = index.entry((root.id.as_str().to_string(), scenario.scenario_id.clone())).or_default();
                         if !changes.contains(&change) {
                             changes.push(change);
                         }
@@ -316,8 +324,8 @@ pub fn flow_changes_of(
                 }
             }
         }
+        index
     }
-    changes
 }
 
 /// The flow step ids `change`'s brief defines, in order; empty for a
