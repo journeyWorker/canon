@@ -14,7 +14,9 @@ name: Test
 # are told to fail hard instead of skipping via `CANON_REQUIRE_LIVE=1` —
 # without it, a docker-compose regression that left the stack unreachable
 # would go GREEN, exercising nothing; `CANON_REQUIRE_LIVE=1` makes that a
-# hard CI failure instead.
+# hard CI failure instead. `bench-shape` (0.29) holds the cost of `canon
+# gate check`, `canon status` and batch `canon evidence add` to the size of
+# the corpus: 10x the corpus may not cost more than 20x the CPU or memory.
 
 # `push` to main is included because canon's releases land as direct
 # pushes: a PR-only trigger never ran on them.
@@ -31,6 +33,7 @@ on:
       - "packages/cli/**"
       - "bun.lock"
       - "examples/platformer/**"
+      - "scripts/bench/**"
       - ".github/workflows/test.yml"
   pull_request:
     paths:
@@ -43,6 +46,7 @@ on:
       - "packages/cli/**"
       - "bun.lock"
       - "examples/platformer/**"
+      - "scripts/bench/**"
       - ".github/workflows/test.yml"
   workflow_dispatch:
 
@@ -166,6 +170,56 @@ jobs:
 
       - name: seeded violations each fail their test
         run: scripts/check-mutations.sh
+
+  # 0.29 D1: the corpus-size shape gate. Every other job here proves what canon
+  # does; none noticed that `gate check` re-derived whole-corpus data once per
+  # subject or that batch evidence rescanned the ledger once per record, because
+  # both are right at 10 scenarios and slow at 3000. This builds the release
+  # binary (the one users run: lto and opt-level s change the memory shape),
+  # measures it over synthetic corpora of 100 to 1000 scenarios and 10 to 100
+  # batch records (scripts/bench/README.md), and fails when 10x the corpus
+  # costs more than 20x the CPU or peak RSS. CPU and RSS, not wall time, are
+  # judged: a shared runner's load moves wall time and leaves those alone.
+  bench-shape:
+    name: corpus-size cost shape (release binary)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+
+      - name: Cache cargo
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-test-bench-shape-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: cargo fetch --locked
+        run: cargo fetch --locked
+
+      - name: cargo build --release -p canon-cli --bin canon
+        run: cargo build --release --locked --offline -p canon-cli --bin canon
+
+      - name: measure the small grid
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: python3 scripts/bench/run.py --canon target/release/canon --grid small --out "$RUNNER_TEMP/bench.tsv"
+
+      - name: the shape holds (10x corpus costs at most 20x)
+        run: python3 scripts/bench/check_shape.py "$RUNNER_TEMP/bench.tsv" --max-factor 20
+
+      - name: Upload the measurements
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: bench-shape-tsv
+          path: ${{ runner.temp }}/bench.tsv
+          if-no-files-found: ignore
 
   launcher:
     name: "@journeykit/canon launcher (bun test)"
