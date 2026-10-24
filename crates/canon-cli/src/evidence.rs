@@ -1491,8 +1491,12 @@ fn land_batch(
         }
     }
     if promote {
+        // One committed-history read for the whole batch, and one archive
+        // pass after the last record, instead of one of each per record.
+        let committed = GitTier::new(ledger_root);
+        let mut promoter = canon_gate::promote::EvidencePromoter::new(&staging, &committed);
         for index in 0..locations.len() {
-            match crate::gate::try_promote(ledger_root, &locations[index].staged) {
+            match crate::gate::try_promote_in(&mut promoter, &locations[index].staged) {
                 Ok(target) => locations[index].promoted = Some(target),
                 Err(refusal) => {
                     let why = if refusal.lines.trim().is_empty() { refusal.error.message.clone() } else { refusal.lines.trim_end().to_string() };
@@ -1502,6 +1506,7 @@ fn land_batch(
                 }
             }
         }
+        promoter.archive();
     }
     let stored = held.stored();
     Ok(LandedBatch { stored, locations })

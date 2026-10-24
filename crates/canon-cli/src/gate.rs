@@ -1108,7 +1108,17 @@ pub(crate) struct PromoteRefusal {
 /// [`promote_after_stage`]'s promotion, without its reporting: the committed
 /// path (relative to the ledger root), or why not.
 pub(crate) fn try_promote(ledger_root: &Path, location: &str) -> Result<String, PromoteRefusal> {
-    match promote_staged(&GitTier::new(evidence_staging_dir(ledger_root)), &GitTier::new(ledger_root), Path::new(location)) {
+    promotion_outcome(promote_staged(&GitTier::new(evidence_staging_dir(ledger_root)), &GitTier::new(ledger_root), Path::new(location)))
+}
+
+/// [`try_promote`] for one record of a batch, promoted through the batch's
+/// own `EvidencePromoter` (one committed-history read for the batch).
+pub(crate) fn try_promote_in(promoter: &mut canon_gate::promote::EvidencePromoter<'_>, location: &str) -> Result<String, PromoteRefusal> {
+    promotion_outcome(promoter.promote(Path::new(location)))
+}
+
+fn promotion_outcome(promoted: Result<PromoteReport, canon_store::tier::StoreError>) -> Result<String, PromoteRefusal> {
+    match promoted {
         // The report carries exactly this one candidate: committed or
         // recovered, or refused.
         Ok(report) => match report.promoted.iter().chain(&report.recovered).next().filter(|_| report.is_clean()) {
