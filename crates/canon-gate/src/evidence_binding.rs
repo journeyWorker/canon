@@ -40,7 +40,7 @@ use canon_model::{EvidenceRecord, ProjectId, ReportOutcome, Scenario, ScenarioId
 use crate::context::{GateCheck, GateContext};
 use crate::failure_class::{FailureClass, Violation};
 use crate::policy::{BindingMode, BindingStrength, EvidenceBinding};
-use crate::spec_coverage::{latest_by_key, scope_decision, ScopeDecision};
+use crate::spec_coverage::{latest_scenarios, latest_subjects, scope_decision, ScopeDecision};
 
 /// The strength an evidence record reaches (module doc).
 pub fn strength_of(record: &EvidenceRecord) -> BindingStrength {
@@ -113,10 +113,7 @@ pub fn binding_summary(ctx: &GateContext) -> Option<BindingSummary> {
     }
 
     let subject_status: BTreeMap<&str, SubjectStatus> =
-        latest_by_key(&ctx.subjects, |s| s.subject_id.as_str().to_string())
-            .into_iter()
-            .map(|s| (s.subject_id.as_str(), s.status))
-            .collect();
+        latest_subjects(ctx).into_iter().map(|s| (s.subject_id.as_str(), s.status)).collect();
 
     let mut latest_evidence: BTreeMap<(ProjectId, ScenarioId), &EvidenceRecord> = BTreeMap::new();
     for record in &ctx.evidence {
@@ -144,9 +141,7 @@ pub fn binding_summary(ctx: &GateContext) -> Option<BindingSummary> {
 
     let mut counts = BTreeMap::new();
     let mut gaps = Vec::new();
-    for scenario in latest_by_key(&ctx.scenarios, |s| {
-        (s.project_id.clone(), s.scenario_id.clone())
-    }) {
+    for scenario in latest_scenarios(ctx) {
         if !held(scenario) {
             continue;
         }
