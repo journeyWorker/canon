@@ -75,7 +75,8 @@ use canon_model::{Change, ChangeId, EvidenceRecord, EvidenceVerdict, ProjectId, 
 use crate::context::{GateCheck, GateContext, SPEC_CORPUS_KINDS};
 use crate::review_gate;
 use crate::failure_class::{FailureClass, Violation};
-use crate::ledger::latest_verdicts;
+use crate::derived::{latest_of, stamps_of};
+use crate::ledger::{latest_verdicts, verdicts_of};
 use crate::policy::SpecCoverage;
 
 /// The spec-corpus coverage check. Silent unless `policy.yaml` declares
@@ -178,7 +179,7 @@ impl GateCheck for SpecCoverageCheck {
                 }
             }
 
-            if let Some(entry) = verdicts.iter().find(|((subject, _), _)| subject == scenario.scenario_id.as_str()).map(|(_, entry)| entry) {
+            if let Some(entry) = verdicts_of(verdicts, scenario.scenario_id.as_str()).next().map(|(_, entry)| entry) {
                 if entry.verdict == EvidenceVerdict::Divergent && !crate::acceptance::is_accepted(ctx, scenario) {
                     let cell = [(scenario.project_id.as_str().to_string(), scenario.scenario_id.as_str().to_string())];
                     violations.push(Violation::new(
@@ -282,23 +283,7 @@ pub fn case_gaps<'a>(scenarios: impl IntoIterator<Item = &'a Scenario>, required
 /// `(run_seq, round)`, not `(at, schema, digest)`, and
 /// [`fold_to_current_state`] owns that rule and needs every row.
 pub fn latest_by_key<'a, T: serde::Serialize, K: Ord>(records: &'a [T], key: impl Fn(&T) -> K) -> Vec<&'a T> {
-    struct Row<'a, T> {
-        record: &'a T,
-        at: chrono::DateTime<chrono::Utc>,
-        schema: u32,
-        digest: String,
-    }
-    let rows = records.iter().filter_map(|record| {
-        let body = serde_json::to_value(record).ok()?;
-        let at = body.get("at")?.as_str()?.parse::<chrono::DateTime<chrono::Utc>>().ok()?;
-        let schema = body.get("schema").and_then(serde_json::Value::as_u64).unwrap_or(1) as u32;
-        let digest = canon_store::partition::content_digest12(&body);
-        Some(Row { record, at, schema, digest })
-    });
-    canon_store::fold::fold_latest_by_key(rows, |r| key(r.record), |r| r.at, |r| r.schema, |r| r.digest.as_str())
-        .into_values()
-        .map(|r| r.record)
-        .collect()
+    latest_of(&stamps_of(records), 0..records.len(), |i| key(&records[i])).into_iter().map(|i| &records[i]).collect()
 }
 
 /// The latest evidence record per `(project_id, scenario_id)` among
@@ -325,7 +310,7 @@ pub fn coverage_off_scenarios(ctx: &GateContext) -> Option<usize> {
     if ctx.policy.spec_coverage.is_some() {
         return None;
     }
-    let count = latest_by_key(&ctx.scenarios, |s| (s.project_id.clone(), s.scenario_id.clone())).len();
+    let count = ctx.scenario_fold().latest.len();
     (count > 0).then_some(count)
 }
 
@@ -341,7 +326,7 @@ pub fn coverage_off_scenarios(ctx: &GateContext) -> Option<usize> {
 /// whose tag was removed or moved to another subject still has its old
 /// tagged generation on disk, and reading that row would keep it linked.
 pub fn subject_scenarios<'a>(ctx: &'a GateContext, subject: &SubjectId) -> Vec<&'a Scenario> {
-    latest_scenarios(ctx).into_iter().filter(|s| s.subject_id.as_ref() == Some(subject)).collect()
+    ctx.scenario_fold().by_subject.get(subject).into_iter().flatten().map(|&i| &ctx.scenarios[i]).collect()
 }
 
 /// The LATEST generation of every `(project_id, scenario_id)` in the
@@ -349,19 +334,19 @@ pub fn subject_scenarios<'a>(ctx: &'a GateContext, subject: &SubjectId) -> Vec<&
 /// [`subject_scenarios`] filters, exposed so a reader that needs the whole
 /// corpus (`canon status`'s unowned list) folds it the same way.
 pub fn latest_scenarios(ctx: &GateContext) -> Vec<&Scenario> {
-    latest_by_key(&ctx.scenarios, |s| (s.project_id.clone(), s.scenario_id.clone()))
+    ctx.scenario_fold().latest.iter().map(|&i| &ctx.scenarios[i]).collect()
 }
 
 /// The LATEST record of every Subject, ordered by `subject_id` — the
 /// fold this check's `scope` filter and [`crate::review_gate`] read
 /// subject status from.
 pub fn latest_subjects(ctx: &GateContext) -> Vec<&Subject> {
-    latest_by_key(&ctx.subjects, |s| s.subject_id.as_str().to_string())
+    ctx.subject_fold().iter().map(|&i| &ctx.subjects[i]).collect()
 }
 
 /// The LATEST record of every Change, ordered by `change_id`.
 pub fn latest_changes(ctx: &GateContext) -> Vec<&Change> {
-    latest_by_key(&ctx.changes, |c| c.change_id.as_str().to_string())
+    ctx.change_fold().latest.iter().map(|&i| &ctx.changes[i]).collect()
 }
 
 /// The changes `subject` adopted, joined from both sides (0.18 D4): its
@@ -373,8 +358,15 @@ pub fn latest_changes(ctx: &GateContext) -> Vec<&Change> {
 /// gates both whichever record carries the link.
 pub fn subject_change_ids(ctx: &GateContext, subject: &Subject) -> Vec<ChangeId> {
     let mut ids = subject.change_ids.clone();
-    let mut named: Vec<&Change> =
-        latest_changes(ctx).into_iter().filter(|c| c.subject_ids.contains(&subject.subject_id) && !ids.contains(&c.change_id)).collect();
+    let mut named: Vec<&Change> = ctx
+        .change_fold()
+        .naming
+        .get(&subject.subject_id)
+        .into_iter()
+        .flatten()
+        .map(|&i| &ctx.changes[i])
+        .filter(|c| !ids.contains(&c.change_id))
+        .collect();
     named.sort_by(|a, b| (a.envelope.at, a.change_id.as_str()).cmp(&(b.envelope.at, b.change_id.as_str())));
     ids.extend(named.into_iter().map(|c| c.change_id.clone()));
     ids
@@ -384,7 +376,7 @@ pub fn subject_change_ids(ctx: &GateContext, subject: &Subject) -> Vec<ChangeId>
 /// each one whose [`subject_change_ids`] holds it. The change → subject
 /// side of the same join.
 pub fn change_subjects<'a>(ctx: &'a GateContext, change: &ChangeId) -> Vec<&'a Subject> {
-    latest_subjects(ctx).into_iter().filter(|s| subject_change_ids(ctx, s).contains(change)).collect()
+    ctx.change_subject_fold().get(change).into_iter().flatten().map(|&i| &ctx.subjects[i]).collect()
 }
 
 /// Every `(project_id, scenario_id)` an `EvidenceRecord` attests to.
@@ -569,6 +561,7 @@ mod tests {
             corpus_violations: Vec::new(),
             unreadable_kinds: corpus.unreadable,
             code_tree: None,
+            derived: Default::default(),
             now: Utc::now(),
         }
     }
@@ -1132,11 +1125,13 @@ mod tests {
         // Both.
         let mut both = flipped;
         both.scenarios = spec_changed.scenarios.clone();
+        both.invalidate_derived();
         assert!(SpecCoverageCheck.run(&both)[0].detail.starts_with("stale review by `reviewer-2`: its spec and its evidence changed"));
 
         // Reviewing again pins the new state and clears it.
         let fresh = pinned_review(&both, "reviewer-2", Signed, 10);
         both.reviews.push(fresh);
+        both.invalidate_derived();
         assert!(SpecCoverageCheck.run(&both).is_empty());
     }
 
@@ -1156,6 +1151,7 @@ mod tests {
             s.source_digest = SpecDigest::of(file);
             s.scenario_digest = own.map(SpecDigest::of);
             ctx.scenarios.push(s);
+            ctx.invalidate_derived();
         };
 
         let mut ctx = pinned_corpus();
@@ -1196,6 +1192,7 @@ mod tests {
         ctx.reviews.push(review);
         assert!(SpecCoverageCheck.run(&ctx).is_empty());
         ctx.evidence.push(evidence("p.a.01", EvidenceVerdict::Faithful));
+        ctx.invalidate_derived();
         assert!(SpecCoverageCheck.run(&ctx)[0].detail.contains("its evidence changed"));
     }
 

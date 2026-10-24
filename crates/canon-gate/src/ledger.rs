@@ -98,7 +98,20 @@ impl LedgerEntry {
 /// cell identity and are excluded, mirroring
 /// [`crate::coverage::CoverageCheck`]'s identical interface-gap
 /// treatment (one shared `CellSubject`, module doc).
-pub fn latest_verdicts(ctx: &GateContext) -> BTreeMap<CellKey, LedgerEntry> {
+pub fn latest_verdicts(ctx: &GateContext) -> &BTreeMap<CellKey, LedgerEntry> {
+    ctx.derived.verdicts.get_or_init(|| fold_verdicts(ctx))
+}
+
+/// The cells of one `subject` in `verdicts`, in role order (`None` first): a
+/// key-range lookup, never a scan of the whole ledger. `verdicts` is
+/// [`latest_verdicts`]'s map.
+pub fn verdicts_of<'a>(verdicts: &'a BTreeMap<CellKey, LedgerEntry>, subject: &'a str) -> impl Iterator<Item = (&'a CellKey, &'a LedgerEntry)> + 'a {
+    // `None` sorts before every `Some`, so this key is the first possible cell of `subject`.
+    let first: CellKey = (subject.to_string(), None);
+    verdicts.range(first..).take_while(move |((cell_subject, _), _)| cell_subject == subject)
+}
+
+fn fold_verdicts(ctx: &GateContext) -> BTreeMap<CellKey, LedgerEntry> {
     struct Candidate {
         entry: LedgerEntry,
         /// The record's own `envelope.schema` — the fold's equal-`at`
@@ -108,9 +121,14 @@ pub fn latest_verdicts(ctx: &GateContext) -> BTreeMap<CellKey, LedgerEntry> {
         schema: u32,
         digest: String,
     }
-    let candidates = ctx.evidence.iter().flat_map(|record| {
+    let stamps = &ctx.evidence_index().stamps;
+    let candidates = ctx.evidence.iter().enumerate().flat_map(|(i, record)| {
         let role = record.envelope.actor.role.as_ref().map(|r| r.as_str().to_string());
-        let digest = canon_store::partition::content_digest12(&serde_json::to_value(record).unwrap_or_default());
+        // The record's digest is the one the shared stamp already holds.
+        let digest = match &stamps[i] {
+            Some(stamp) => stamp.digest.clone(),
+            None => canon_store::partition::content_digest12(&serde_json::to_value(record).unwrap_or_default()),
+        };
         CellSubject::all_of(record).map(move |subject| {
             let entry = LedgerEntry { subject: subject.as_str().to_string(), role: role.clone(), verdict: record.verdict, agent_id: record.envelope.actor.agent_id.clone(), at: record.envelope.at };
             Candidate { entry, schema: record.envelope.schema, digest: digest.clone() }
@@ -190,6 +208,7 @@ mod tests {
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
             code_tree: None,
+            derived: Default::default(),
             now: Utc::now(),
         }
     }

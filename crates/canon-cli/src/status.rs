@@ -852,7 +852,7 @@ fn coverage_settings(ctx: &GateContext) -> (&[String], &[String]) {
 
 /// The gate's corpus-wide folds, computed once per report.
 struct Joins<'a> {
-    verdicts: BTreeMap<CellKey, LedgerEntry>,
+    verdicts: &'a BTreeMap<CellKey, LedgerEntry>,
     blockers: Vec<&'a Finding>,
 }
 
@@ -861,7 +861,7 @@ impl Joins<'_> {
     /// latest one is divergent — the `verifying → shipped` gate's reading.
     fn verdict_state(&self, scenario: &Scenario) -> (bool, bool) {
         let id = scenario.scenario_id.as_str();
-        let mut entries = self.verdicts.iter().filter(|((subject, _), _)| subject == id).map(|(_, entry)| entry).peekable();
+        let mut entries = canon_gate::verdicts_of(self.verdicts, id).map(|(_, entry)| entry).peekable();
         let evidenced = entries.peek().is_some();
         (evidenced, entries.any(|e| e.verdict == EvidenceVerdict::Divergent))
     }

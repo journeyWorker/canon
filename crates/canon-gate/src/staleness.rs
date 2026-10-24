@@ -112,9 +112,14 @@ struct Candidate<'a> {
 fn fold_latest_green_cells(ctx: &GateContext) -> Vec<GreenCell> {
     // Every cell the record answers (`CellSubject::all_of`): a
     // task+scenario record's staleness degrades its scenario cell too.
-    let candidates = ctx.evidence.iter().flat_map(|record| {
+    let stamps = &ctx.evidence_index().stamps;
+    let candidates = ctx.evidence.iter().enumerate().flat_map(|(i, record)| {
         let role = record.envelope.actor.role.as_ref().map(|r| r.as_str().to_string());
-        let digest = canon_store::partition::content_digest12(&serde_json::to_value(record).unwrap_or_default());
+        // The record's digest is the one the shared stamp already holds.
+        let digest = match &stamps[i] {
+            Some(stamp) => stamp.digest.clone(),
+            None => canon_store::partition::content_digest12(&serde_json::to_value(record).unwrap_or_default()),
+        };
         CellSubject::all_of(record).map(move |subject| Candidate {
             subject: subject.as_str().to_string(),
             role: role.clone(),
@@ -150,8 +155,8 @@ struct GitMemo {
 }
 
 impl GitMemo {
-    fn changed_files_since(&mut self, repo: &Path, sha: &str) -> Option<HashSet<String>> {
-        self.changed.entry(sha.to_string()).or_insert_with(|| git_diff_names(repo, sha)).clone()
+    fn changed_files_since(&mut self, repo: &Path, sha: &str) -> Option<&HashSet<String>> {
+        self.changed.entry(sha.to_string()).or_insert_with(|| git_diff_names(repo, sha)).as_ref()
     }
 
     fn commits_behind(&mut self, repo: &Path, sha: &str) -> Option<u32> {
@@ -199,52 +204,59 @@ impl GateCheck for StalenessCheck {
     }
 
     fn run(&self, ctx: &GateContext) -> Vec<Violation> {
-        let mut memo = GitMemo::default();
-        let now = ctx.now;
-        let mut violations = Vec::new();
+        ctx.staleness_violations().to_vec()
+    }
+}
 
-        for cell in fold_latest_green_cells(ctx) {
-            // No `evidence_sha` at all: neither tier has a starting
-            // ref to query. Unresolvable, never assumed stale (module
-            // doc).
-            let Some(sha) = cell.evidence_sha.as_ref() else { continue };
-            // The code is what it was when the evidence was recorded (D7b):
-            // commits since then (docs, specs, briefs) did not move it, so no
-            // surface changed and the ceiling is not about code.
-            if cell.code_tree.is_some() && cell.code_tree == ctx.code_tree {
-                continue;
-            }
+/// What [`StalenessCheck`] reports for `ctx`. Callers go through
+/// [`GateContext::staleness_violations`], which holds the result for the
+/// command: the staleness check and the risk check read the same one.
+pub(crate) fn compute(ctx: &GateContext) -> Vec<Violation> {
+    let mut memo = GitMemo::default();
+    let now = ctx.now;
+    let mut violations = Vec::new();
 
-            let mut reasons: Vec<String> = Vec::new();
+    for cell in fold_latest_green_cells(ctx) {
+        // No `evidence_sha` at all: neither tier has a starting
+        // ref to query. Unresolvable, never assumed stale (module
+        // doc).
+        let Some(sha) = cell.evidence_sha.as_ref() else { continue };
+        // The code is what it was when the evidence was recorded (D7b):
+        // commits since then (docs, specs, briefs) did not move it, so no
+        // surface changed and the ceiling is not about code.
+        if cell.code_tree.is_some() && cell.code_tree == ctx.code_tree {
+            continue;
+        }
 
-            let surface_scoped = ctx.policy.surface_scoped(&cell.raw, now).unwrap_or(DEFAULT_SURFACE_SCOPED);
-            if surface_scoped && !cell.surface_ref.is_empty() {
-                if let Some(changed) = memo.changed_files_since(&ctx.ctx.repo, sha.as_str()) {
-                    if cell.surface_ref.iter().any(|declared| changed.contains(declared)) {
-                        reasons.push(format!("a declared surface file changed since {sha}"));
-                    }
-                }
-                // `None` (unresolvable diff query) contributes nothing
-                // to this tier — never assumed stale.
-            }
+        let mut reasons: Vec<String> = Vec::new();
 
-            // The ceiling is an UNCONDITIONAL backstop (module doc) —
-            // it always runs, even when the precise diff above came
-            // back clean.
-            if let Some(commits_behind) = memo.commits_behind(&ctx.ctx.repo, sha.as_str()) {
-                let ceiling = ctx.policy.max_commits_behind(&cell.raw, now).unwrap_or(DEFAULT_MAX_COMMITS_BEHIND);
-                if commits_behind > ceiling {
-                    reasons.push(format!("{commits_behind} commits behind HEAD (max_commits_behind={ceiling})"));
+        let surface_scoped = ctx.policy.surface_scoped(&cell.raw, now).unwrap_or(DEFAULT_SURFACE_SCOPED);
+        if surface_scoped && !cell.surface_ref.is_empty() {
+            if let Some(changed) = memo.changed_files_since(&ctx.ctx.repo, sha.as_str()) {
+                if cell.surface_ref.iter().any(|declared| changed.contains(declared)) {
+                    reasons.push(format!("a declared surface file changed since {sha}"));
                 }
             }
+            // `None` (unresolvable diff query) contributes nothing
+            // to this tier — never assumed stale.
+        }
 
-            if !reasons.is_empty() {
-                violations.push(Violation::new(FailureClass::StaleEvidence, cell.subject.clone(), reasons.join("; ")));
+        // The ceiling is an UNCONDITIONAL backstop (module doc) —
+        // it always runs, even when the precise diff above came
+        // back clean.
+        if let Some(commits_behind) = memo.commits_behind(&ctx.ctx.repo, sha.as_str()) {
+            let ceiling = ctx.policy.max_commits_behind(&cell.raw, now).unwrap_or(DEFAULT_MAX_COMMITS_BEHIND);
+            if commits_behind > ceiling {
+                reasons.push(format!("{commits_behind} commits behind HEAD (max_commits_behind={ceiling})"));
             }
         }
 
-        violations
+        if !reasons.is_empty() {
+            violations.push(Violation::new(FailureClass::StaleEvidence, cell.subject.clone(), reasons.join("; ")));
+        }
     }
+
+    violations
 }
 
 #[cfg(test)]
@@ -352,6 +364,7 @@ mod tests {
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
             code_tree: None,
+            derived: Default::default(),
             now,
         }
     }
