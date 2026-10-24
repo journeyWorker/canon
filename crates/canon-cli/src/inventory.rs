@@ -960,6 +960,9 @@ pub fn overlay_stale_index(ctx: &mut GateContext) {
     let replaced: BTreeSet<(&ProjectId, &ScenarioId)> = written.iter().map(|r| (&r.project_id, &r.scenario_id)).collect();
     ctx.scenarios.retain(|s| !replaced.contains(&(&s.project_id, &s.scenario_id)));
     ctx.scenarios.extend(written.into_iter().filter(|r| !r.removed));
+    // The overlay normally runs before any derived read; invalidating keeps
+    // that an optimisation, not a precondition (0.29 D2).
+    ctx.invalidate_derived();
 }
 
 /// `canon inventory sync`'s stdout — one block per configured root.
