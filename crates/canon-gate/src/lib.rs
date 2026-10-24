@@ -50,7 +50,7 @@ pub mod audit;
 pub mod checkbox;
 pub mod context;
 pub mod coverage;
-mod derived;
+pub mod derived;
 pub mod dispatch;
 pub mod evidence_binding;
 pub mod failure_class;

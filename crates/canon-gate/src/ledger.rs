@@ -98,6 +98,10 @@ impl LedgerEntry {
 /// cell identity and are excluded, mirroring
 /// [`crate::coverage::CoverageCheck`]'s identical interface-gap
 /// treatment (one shared `CellSubject`, module doc).
+///
+/// The fold runs once per context ([`crate::derived`]); every caller
+/// borrows the same map. Per-subject questions go through [`verdicts_of`],
+/// never a scan of the map.
 pub fn latest_verdicts(ctx: &GateContext) -> &BTreeMap<CellKey, LedgerEntry> {
     ctx.derived.verdicts.get_or_init(|| fold_verdicts(ctx))
 }
