@@ -98,7 +98,24 @@ impl LedgerEntry {
 /// cell identity and are excluded, mirroring
 /// [`crate::coverage::CoverageCheck`]'s identical interface-gap
 /// treatment (one shared `CellSubject`, module doc).
-pub fn latest_verdicts(ctx: &GateContext) -> BTreeMap<CellKey, LedgerEntry> {
+///
+/// The fold runs once per context ([`crate::derived`]); every caller
+/// borrows the same map. Per-subject questions go through [`verdicts_of`],
+/// never a scan of the map.
+pub fn latest_verdicts(ctx: &GateContext) -> &BTreeMap<CellKey, LedgerEntry> {
+    ctx.derived.verdicts.get_or_init(|| fold_verdicts(ctx))
+}
+
+/// The cells of one `subject` in `verdicts`, in role order (`None` first): a
+/// key-range lookup, never a scan of the whole ledger. `verdicts` is
+/// [`latest_verdicts`]'s map.
+pub fn verdicts_of<'a>(verdicts: &'a BTreeMap<CellKey, LedgerEntry>, subject: &'a str) -> impl Iterator<Item = (&'a CellKey, &'a LedgerEntry)> + 'a {
+    // `None` sorts before every `Some`, so this key is the first possible cell of `subject`.
+    let first: CellKey = (subject.to_string(), None);
+    verdicts.range(first..).take_while(move |((cell_subject, _), _)| cell_subject == subject)
+}
+
+fn fold_verdicts(ctx: &GateContext) -> BTreeMap<CellKey, LedgerEntry> {
     struct Candidate {
         entry: LedgerEntry,
         /// The record's own `envelope.schema` — the fold's equal-`at`
@@ -108,9 +125,14 @@ pub fn latest_verdicts(ctx: &GateContext) -> BTreeMap<CellKey, LedgerEntry> {
         schema: u32,
         digest: String,
     }
-    let candidates = ctx.evidence.iter().flat_map(|record| {
+    let stamps = &ctx.evidence_index().stamps;
+    let candidates = ctx.evidence.iter().enumerate().flat_map(|(i, record)| {
         let role = record.envelope.actor.role.as_ref().map(|r| r.as_str().to_string());
-        let digest = canon_store::partition::content_digest12(&serde_json::to_value(record).unwrap_or_default());
+        // The record's digest is the one the shared stamp already holds.
+        let digest = match &stamps[i] {
+            Some(stamp) => stamp.digest.clone(),
+            None => canon_store::partition::content_digest12(&serde_json::to_value(record).unwrap_or_default()),
+        };
         CellSubject::all_of(record).map(move |subject| {
             let entry = LedgerEntry { subject: subject.as_str().to_string(), role: role.clone(), verdict: record.verdict, agent_id: record.envelope.actor.agent_id.clone(), at: record.envelope.at };
             Candidate { entry, schema: record.envelope.schema, digest: digest.clone() }
@@ -190,6 +212,7 @@ mod tests {
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
             code_tree: None,
+            derived: Default::default(),
             now: Utc::now(),
         }
     }
@@ -290,5 +313,26 @@ mod tests {
         for subject in ["cats#1", "game.run.01"] {
             assert!(verdicts.get(&(subject.to_string(), Some("implementer".to_string()))).is_some_and(LedgerEntry::is_green), "{subject}");
         }
+    }
+
+    /// `verdicts_of` is a key range: every role of one subject in role
+    /// order, and not a neighbour whose id merely starts the same.
+    #[test]
+    fn verdicts_of_reads_one_subjects_cells_and_stops_at_its_neighbours() {
+        let now = Utc::now();
+        let ctx = ctx_with(
+            vec![
+                record_at("a#1", "reviewer", "agent-b", EvidenceVerdict::Divergent, now),
+                record_at("a#1", "implementer", "agent-a", EvidenceVerdict::Faithful, now),
+                record_at("a#10", "implementer", "agent-a", EvidenceVerdict::Faithful, now),
+                record_at("a#0", "implementer", "agent-a", EvidenceVerdict::Faithful, now),
+            ],
+            Vec::new(),
+        );
+        let verdicts = latest_verdicts(&ctx);
+        let roles: Vec<Option<&str>> = verdicts_of(verdicts, "a#1").map(|((_, role), _)| role.as_deref()).collect();
+        assert_eq!(roles, vec![Some("implementer"), Some("reviewer")]);
+        assert_eq!(verdicts_of(verdicts, "a#").count(), 0);
+        assert_eq!(verdicts_of(verdicts, "a#10").count(), 1);
     }
 }

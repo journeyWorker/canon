@@ -34,16 +34,21 @@ use canon_model::{CheckPin, EvidenceRecord, PinnedSpec, ReviewPins, Scenario, Sp
 use chrono::{DateTime, Utc};
 
 use crate::context::GateContext;
-use crate::spec_coverage::{latest_by_key, subject_scenarios};
+use crate::derived::latest_of;
+use crate::spec_coverage::subject_scenarios;
 
 /// Every evidence record for the scenario's id whose `project_id`
 /// matches or is absent. Counting a project-less record is the stricter
 /// reading: it can only make a review not count, never let one count.
 pub fn scenario_evidence<'a>(ctx: &'a GateContext, scenario: &Scenario) -> Vec<&'a EvidenceRecord> {
-    ctx.evidence
-        .iter()
-        .filter(|e| e.scenario_id.as_ref() == Some(&scenario.scenario_id) && e.project_id.as_ref().is_none_or(|p| *p == scenario.project_id))
-        .collect()
+    scenario_evidence_at(ctx, scenario).into_iter().map(|i| &ctx.evidence[i]).collect()
+}
+
+/// [`scenario_evidence`]'s positions in `ctx.evidence`, in ledger order: a
+/// lookup in the per-scenario index, not a scan of the ledger.
+fn scenario_evidence_at(ctx: &GateContext, scenario: &Scenario) -> Vec<usize> {
+    let rows = ctx.evidence_index().by_scenario.get(scenario.scenario_id.as_str()).into_iter().flatten().copied();
+    rows.filter(|&i| ctx.evidence[i].project_id.as_ref().is_none_or(|p| *p == scenario.project_id)).collect()
 }
 
 /// The identity of the checks `record` bound: `<format>:<case>` for each
@@ -70,10 +75,13 @@ pub fn check_identity(record: &EvidenceRecord) -> Vec<String> {
 /// What `scenario`'s evidence says now: per role, the latest record's
 /// verdict and check identity, in `(role, verdict, checks)` order.
 pub fn current_checks(ctx: &GateContext, scenario: &Scenario) -> Vec<CheckPin> {
-    let evidence = scenario_evidence(ctx, scenario);
-    let mut pins: Vec<CheckPin> = latest_by_key(&evidence, |e| e.envelope.actor.role.as_ref().map(|r| r.as_str().to_string()))
+    let latest = latest_of(&ctx.evidence_index().stamps, scenario_evidence_at(ctx, scenario), |i| ctx.evidence[i].envelope.actor.role.as_ref().map(|r| r.as_str().to_string()));
+    let mut pins: Vec<CheckPin> = latest
         .into_iter()
-        .map(|record| CheckPin { role: record.envelope.actor.role.as_ref().map(|r| r.as_str().to_string()), verdict: record.verdict, checks: check_identity(record) })
+        .map(|i| {
+            let record = &ctx.evidence[i];
+            CheckPin { role: record.envelope.actor.role.as_ref().map(|r| r.as_str().to_string()), verdict: record.verdict, checks: check_identity(record) }
+        })
         .collect();
     pins.sort();
     pins

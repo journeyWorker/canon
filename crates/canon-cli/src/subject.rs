@@ -1253,7 +1253,7 @@ fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> V
     let mut violations = Vec::new();
     for scenario in &owned {
         let sid = scenario.scenario_id.as_str().to_string();
-        let entries: Vec<&LedgerEntry> = verdicts.iter().filter(|((subject, _), _)| subject == &sid).map(|(_, entry)| entry).collect();
+        let entries: Vec<&LedgerEntry> = canon_gate::verdicts_of(verdicts, &sid).map(|(_, entry)| entry).collect();
         if entries.is_empty() {
             violations.push(Violation::new(FailureClass::UncoveredCell, sid.clone(), "verifying → shipped: no ledger verdict for this linked scenario"));
         } else if let Some(divergent) = entries.iter().find(|e| e.verdict == EvidenceVerdict::Divergent).filter(|_| !canon_gate::acceptance::is_accepted(gate_context, scenario)) {

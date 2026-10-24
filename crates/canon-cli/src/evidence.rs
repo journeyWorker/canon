@@ -1533,19 +1533,23 @@ fn stale_review_notices(ctx: &mut GateContext, written: &[EvidenceRecord]) -> Ve
     let mut current_before = Vec::new();
     for (scenario, review) in &candidates {
         ctx.reviews = vec![review.clone()];
+        ctx.invalidate_reviews();
         current_before.push(review_gap(ctx, scenario, false).is_none());
     }
     let evidence = ctx.evidence.len();
     ctx.evidence.extend(declared);
+    ctx.invalidate_evidence();
     let mut stale = Vec::new();
     for ((scenario, review), was_current) in candidates.into_iter().zip(current_before) {
         ctx.reviews = vec![review.clone()];
+        ctx.invalidate_reviews();
         if was_current && review_gap(ctx, &scenario, false).is_some_and(|gap| gap.kind == ReviewGapKind::Stale) {
             stale.push(review);
         }
     }
     ctx.evidence.truncate(evidence);
     ctx.reviews = reviews;
+    ctx.invalidate_derived();
     stale
 }
 

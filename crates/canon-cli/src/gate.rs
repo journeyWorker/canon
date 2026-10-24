@@ -576,7 +576,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
                     return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
                 }
             };
-            (canon_gate::history::evidence_history(&gate_context), notes)
+            (canon_gate::history::evidence_history(&gate_context).to_vec(), notes)
         }
         Err(e) => {
             return CliError::refused("TYPED_ATOMS_INVALID", e.to_string()).hint("fix the typed evidence atom in the plan task (the message names it), then run the command again").emit("canon task done", json);

@@ -146,7 +146,7 @@ impl GateCheck for CoverageCheck {
         // a role is covered when ANY record carries it: superseded
         // records count, so this reads the archive too (`crate::history`).
         let history = crate::history::evidence_history(ctx);
-        for record in &history {
+        for record in history.iter() {
             for subject in CellSubject::all_of(record) {
                 groups.entry(subject).or_default().push(record);
             }
@@ -154,8 +154,10 @@ impl GateCheck for CoverageCheck {
 
         let mut violations = Vec::new();
         for (subject, records) in &groups {
+            // Each record's JSON, converted once and read by every role.
+            let bodies: Vec<(&EvidenceRecord, serde_json::Value)> = records.iter().filter_map(|record| Some((*record, serde_json::to_value(record).ok()?))).collect();
             for role in ctx.policy.risk_routing.keys() {
-                if !rule_applies_to_any(role, records, ctx) {
+                if !rule_applies_to_any(role, &bodies, ctx) {
                     // Policy declares this cell irrelevant to this
                     // artifact (or the predicate itself failed to
                     // evaluate against every one of its records) — not
@@ -184,13 +186,8 @@ impl GateCheck for CoverageCheck {
 /// itself errors, is treated as "does not prove the rule applies" —
 /// never a check-crashing `Err` (design §7, the same fail-soft-per-record
 /// discipline [`crate::context::GateCheck::run`]'s own doc mandates).
-fn rule_applies_to_any(role: &str, records: &[&EvidenceRecord], ctx: &GateContext) -> bool {
-    records.iter().any(|record| {
-        let Ok(json) = serde_json::to_value(record) else {
-            return false;
-        };
-        matches!(ctx.policy.risk_routing_for(role, &json, record.envelope.at), Ok(Some(true)))
-    })
+fn rule_applies_to_any(role: &str, bodies: &[(&EvidenceRecord, serde_json::Value)], ctx: &GateContext) -> bool {
+    bodies.iter().any(|(record, json)| matches!(ctx.policy.risk_routing_for(role, json, record.envelope.at), Ok(Some(true))))
 }
 
 /// Whether any of this artifact's records was authored by an actor
@@ -248,6 +245,7 @@ mod tests {
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
             code_tree: None,
+            derived: Default::default(),
             now: Utc::now(),
         }
     }
