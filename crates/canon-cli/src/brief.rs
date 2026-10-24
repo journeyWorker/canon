@@ -382,10 +382,10 @@ fn has_approved_line(repo: &Path, change: &ChangeId) -> bool {
 /// newest approved change blocks. When every adopted change is such a draft,
 /// nothing is set aside and `changes` is returned unchanged. `canon status`
 /// keeps showing the set-aside drafts as awaiting the human.
-pub fn scope_changes(repo: &Path, ctx: &GateContext, subject: &Subject, changes: &[ChangeId]) -> (Vec<ChangeId>, Vec<ChangeId>) {
+pub fn scope_changes(repo: &Path, ctx: &GateContext, flow_changes: &crate::brief_check::FlowChangesIndex, subject: &Subject, changes: &[ChangeId]) -> (Vec<ChangeId>, Vec<ChangeId>) {
     let tagged: Vec<ChangeId> = canon_gate::spec_coverage::subject_scenarios(ctx, &subject.subject_id)
         .into_iter()
-        .flat_map(|s| crate::brief_check::flow_changes_of(repo, &s.project_id, &s.scenario_id))
+        .flat_map(|s| flow_changes.changes_of(repo, &s.project_id, &s.scenario_id).iter().cloned())
         .collect();
     match changes.iter().rposition(|c| has_approved_line(repo, c) || tagged.contains(c)) {
         Some(at) => (changes[..=at].to_vec(), changes[at + 1..].to_vec()),
@@ -477,7 +477,7 @@ pub fn attested_briefs<'a>(
     });
     let task_change = task.map(TaskId::change_id);
     let tagged = scenario
-        .map(|(project, id)| crate::brief_check::flow_changes_of(repo, project, id))
+        .map(|(project, id)| crate::brief_check::FlowChangesIndex::lazy().changes_of(repo, project, id).to_vec())
         .unwrap_or_default();
     let mut subjects: Vec<(&Subject, Vec<ChangeId>)> = latest_subjects(ctx)
         .into_iter()

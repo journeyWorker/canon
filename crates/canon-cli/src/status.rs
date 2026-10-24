@@ -570,7 +570,8 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
             Vec::new()
         }
     };
-    let mut summaries: Vec<(&Subject, SubjectSummary)> = subjects.iter().map(|s| (*s, summarize(&ctx, &joins, repo, &plan_roots, s))).collect();
+    let derived = Derived { code_tree: crate::reverify::CodeTreeMemo::lazy(), flow_changes: crate::brief_check::FlowChangesIndex::lazy() };
+    let mut summaries: Vec<(&Subject, SubjectSummary)> = subjects.iter().map(|s| (*s, summarize(&ctx, &joins, repo, &plan_roots, &derived, s))).collect();
     summaries.sort_by_key(|(s, _)| (rank(&DISPLAY_ORDER, s.status), s.subject_id.as_str().to_string()));
 
     let scenarios = latest_scenarios(&ctx);
@@ -888,7 +889,14 @@ fn counted<'a>(ctx: &'a GateContext, subject: &Subject) -> (Vec<&'a Scenario>, u
     (counted, excluded)
 }
 
-fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBuf], subject: &Subject) -> SubjectSummary {
+/// Whole-corpus values derived at most once per `canon status` run, each
+/// computed on first need so a run that never asks pays nothing.
+struct Derived {
+    code_tree: crate::reverify::CodeTreeMemo,
+    flow_changes: crate::brief_check::FlowChangesIndex,
+}
+
+fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBuf], derived: &Derived, subject: &Subject) -> SubjectSummary {
     let (counted, excluded) = counted(ctx, subject);
     let (_, require_cases) = coverage_settings(ctx);
     let rr = review_rule(ctx);
@@ -916,10 +924,10 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         .collect();
     let review_due = rr.is_some_and(|rr| rr.covers(subject.status) || next_status(subject.status).is_some_and(|n| rr.covers(n)));
     let stale_reviews = gap_count(ReviewGapKind::Stale);
-    let red = if subject.status == SubjectStatus::Shipped { shipped_red(repo, ctx, subject) } else { Vec::new() };
+    let red = if subject.status == SubjectStatus::Shipped { shipped_red(repo, ctx, &derived.code_tree, subject) } else { Vec::new() };
 
     // The flow the ship guard checks is the scope's, not a pending draft's.
-    let (scope, pending) = crate::brief::scope_changes(repo, ctx, subject, &changes);
+    let (scope, pending) = crate::brief::scope_changes(repo, ctx, &derived.flow_changes, subject, &changes);
     // The brief status reports is the newest adopted change's, unless a pending
     // draft sits above an unapproved tagged change: that one blocks, so it is
     // the one the human is asked about.
@@ -950,7 +958,7 @@ fn summarize(ctx: &GateContext, joins: &Joins, repo: &Path, plan_roots: &[PathBu
         pending_drafts: pending.iter().map(|c| c.as_str().to_string()).collect(),
         red,
         flow: scope.last().map(|change| flow_steps(ctx, joins, repo, change, distinct_actor)).unwrap_or_default(),
-        reverify: if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) { crate::reverify::gaps(repo, ctx, subject) } else { Vec::new() },
+        reverify: if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) { crate::reverify::gaps(repo, ctx, &derived.code_tree, subject) } else { Vec::new() },
         chore_reviews: if matches!(subject.status, SubjectStatus::Building | SubjectStatus::Verifying) { crate::reverify::chore_review_gaps(repo, ctx, subject) } else { Vec::new() },
     }
 }
@@ -965,7 +973,11 @@ fn flow_steps(ctx: &GateContext, joins: &Joins, repo: &Path, change: &ChangeId, 
         return Vec::new();
     }
     let index = crate::brief_check::flow_scenarios(repo, change).unwrap_or_default();
-    let known = latest_scenarios(ctx);
+    // The first record per id wins, as the linear search it replaces did.
+    let mut known: BTreeMap<&str, &Scenario> = BTreeMap::new();
+    for scenario in latest_scenarios(ctx) {
+        known.entry(scenario.scenario_id.as_str()).or_insert(scenario);
+    }
     ids.into_iter()
         .map(|id| {
             let scenarios: Vec<FlowScenarioState> = index
@@ -973,7 +985,7 @@ fn flow_steps(ctx: &GateContext, joins: &Joins, repo: &Path, change: &ChangeId, 
                 .into_iter()
                 .flatten()
                 .map(|found| {
-                    let record = known.iter().find(|s| s.scenario_id.as_str() == found.id);
+                    let record = known.get(found.id.as_str()).copied();
                     let (evidenced, review) = match record {
                         None => (false, "not-indexed"),
                         Some(record) => (
@@ -1019,9 +1031,9 @@ fn brief_with_findings(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, c
 /// What makes a `shipped` subject's gate red ([`SubjectSummary::red`]):
 /// the ship guard's own gaps ([`crate::subject::shipped_gate_gaps`]),
 /// grouped by failure class in the order the guard reports them.
-fn shipped_red(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<String> {
+fn shipped_red(repo: &Path, ctx: &GateContext, code_tree: &crate::reverify::CodeTreeMemo, subject: &Subject) -> Vec<String> {
     let mut classes: Vec<(&'static str, usize, String)> = Vec::new();
-    for violation in crate::subject::shipped_gate_gaps(repo, ctx, subject) {
+    for violation in crate::subject::shipped_gate_gaps(repo, ctx, code_tree, subject) {
         match classes.iter_mut().find(|(class, _, _)| *class == violation.class.as_str()) {
             Some((_, count, _)) => *count += 1,
             None => classes.push((violation.class.as_str(), 1, violation.subject)),

@@ -45,7 +45,7 @@ use chrono::Utc;
 
 use crate::context::resolve_repo_root;
 use crate::migrate_legacy_pins::SpecSources;
-use crate::subject::enum_membership_violation;
+use crate::subject::enum_membership_in;
 
 /// The stable literal id BOTH the absent-`specs:` default AND
 /// `--spec-root`'s ad hoc override resolve to (design D3) — NEVER the
@@ -444,7 +444,7 @@ fn sync_with_ctx(ctx: &SyncCtx, spec_root_override: Option<&Path>, dry_run: bool
     let mut outcomes = Vec::with_capacity(roots.len());
     for (spec_root, scanned) in roots.iter().zip(&scans) {
         let outcome = if dry_run {
-            plan_one_root(|| latest_index(&tier), &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None)?.outcome
+            plan_one_root(|| latest_index(&tier).map(std::borrow::Cow::Owned), &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None)?.outcome
         } else {
             sync_one_root(&tier, &ctx.repo, spec_root, scanned, &corpus[&spec_root.id], &actor, None)?
         };
@@ -689,13 +689,31 @@ fn resolve_subject_tag(scanned: &ScannedScenario, root_id: &ProjectId, diagnosti
     }
 }
 
+/// The vocabulary's enums, resolved on first need and once per plan: a
+/// root with no `@lane:`/`@case:` tag never loads the vocabulary, and a
+/// root with many loads it once, not per tag.
+struct VocabEnums<'a> {
+    repo: &'a Path,
+    enums: std::cell::OnceCell<BTreeMap<String, Vec<String>>>,
+}
+
+impl<'a> VocabEnums<'a> {
+    fn lazy(repo: &'a Path) -> Self {
+        Self { repo, enums: std::cell::OnceCell::new() }
+    }
+
+    fn get(&self) -> &BTreeMap<String, Vec<String>> {
+        self.enums.get_or_init(|| canon_vocab::resolve_snapshot(self.repo, None).0.enums)
+    }
+}
+
 /// Resolve one vocabulary-classified axis tag (`@lane:`, `@case:`) into
 /// the scenario's optional classification, fail-soft like
 /// [`resolve_subject_tag`]. `axis` names both the tag namespace and the
 /// vocabulary enum it is checked against. The first tag wins; a
 /// malformed shape or a value outside the repo's activated enum drops
 /// only that classification, with a counted diagnostic.
-fn resolve_axis_tag(axis: &str, tags: &[String], scenario_id: &ScenarioId, root_id: &ProjectId, repo: &Path, diagnostics: &mut Vec<String>) -> Option<String> {
+fn resolve_axis_tag(axis: &str, tags: &[String], scenario_id: &ScenarioId, root_id: &ProjectId, enums: &VocabEnums, diagnostics: &mut Vec<String>) -> Option<String> {
     let first = tags.first()?;
     if tags.len() > 1 {
         diagnostics.push(format!(
@@ -715,7 +733,7 @@ fn resolve_axis_tag(axis: &str, tags: &[String], scenario_id: &ScenarioId, root_
         ));
         return None;
     }
-    if let Some(detail) = enum_membership_violation(repo, axis, first) {
+    if let Some(detail) = enum_membership_in(enums.get(), axis, first) {
         diagnostics.push(format!(
             "scenario `{}` under root `{}` has an invalid `@{axis}:{}` tag ({detail}) — indexed without the {axis}",
             scenario_id.as_str(),
@@ -793,8 +811,8 @@ struct RootPlan {
 /// (`folded`, read only when the root is not refused), without writing.
 /// [`sync_one_root`] writes it; [`overlay_stale_index`] only reads it.
 #[allow(clippy::too_many_arguments)]
-fn plan_one_root(
-    folded: impl FnOnce() -> Result<BTreeMap<(ProjectId, ScenarioId), Scenario>, InventoryError>,
+fn plan_one_root<'f>(
+    folded: impl FnOnce() -> Result<std::borrow::Cow<'f, BTreeMap<(ProjectId, ScenarioId), Scenario>>, InventoryError>,
     repo: &Path,
     spec_root: &SpecRoot,
     scanned: &[ScannedScenario],
@@ -823,13 +841,14 @@ fn plan_one_root(
     // Fail-soft tag diagnostics accumulate across the whole root but
     // never abort it (see `RootSyncOutcome::tag_diagnostics`).
     let mut tag_diagnostics = Vec::new();
+    let enums = VocabEnums::lazy(repo);
     for candidate in scanned.iter().filter(|candidate| only.is_none_or(|only| only.contains(&candidate.path))) {
         // Resolve BEFORE the idempotence check so a persistently
         // malformed/duplicate tag is reported on EVERY sync run, not
         // just the write that first introduced it.
         let subject_id = resolve_subject_tag(candidate, &spec_root.id, &mut tag_diagnostics);
-        let lane = resolve_axis_tag("lane", &candidate.lane_tags, &candidate.scenario_id, &spec_root.id, repo, &mut tag_diagnostics);
-        let case = resolve_axis_tag("case", &candidate.case_tags, &candidate.scenario_id, &spec_root.id, repo, &mut tag_diagnostics);
+        let lane = resolve_axis_tag("lane", &candidate.lane_tags, &candidate.scenario_id, &spec_root.id, &enums, &mut tag_diagnostics);
+        let case = resolve_axis_tag("case", &candidate.case_tags, &candidate.scenario_id, &spec_root.id, &enums, &mut tag_diagnostics);
         let mut namespaces = std::collections::BTreeSet::new();
         for namespace in &candidate.unknown_namespace_tags {
             namespaces.insert(namespace);
@@ -905,7 +924,7 @@ fn sync_one_root(
     actor: &Actor,
     only: Option<&BTreeSet<PathBuf>>,
 ) -> Result<RootSyncOutcome, InventoryError> {
-    let plan = plan_one_root(|| latest_index(tier), repo, spec_root, scanned, project_corpus, actor, only)?;
+    let plan = plan_one_root(|| latest_index(tier).map(std::borrow::Cow::Owned), repo, spec_root, scanned, project_corpus, actor, only)?;
     for record in &plan.records {
         tier.write(record)?;
     }
@@ -927,18 +946,20 @@ pub fn overlay_stale_index(ctx: &mut GateContext) {
     let Ok(folded) = latest_index(&tier) else { return };
     let (stale, corpus) = stale_roots_against(&folded, &roots);
     let actor = Actor::new_unattributed("canon-inventory-sync");
+    let mut written: Vec<Scenario> = Vec::new();
     for StaleRoot { root, scanned, files, .. } in &stale {
-        let Ok(plan) = plan_one_root(|| Ok(folded.clone()), &repo, root, scanned, &corpus[&root.id], &actor, Some(files)) else { continue };
+        let Ok(plan) = plan_one_root(|| Ok(std::borrow::Cow::Borrowed(&folded)), &repo, root, scanned, &corpus[&root.id], &actor, Some(files)) else { continue };
         if !plan.outcome.is_clean() {
             continue;
         }
-        for record in plan.records {
-            ctx.scenarios.retain(|s| !(s.project_id == record.project_id && s.scenario_id == record.scenario_id));
-            if !record.removed {
-                ctx.scenarios.push(record);
-            }
-        }
+        written.extend(plan.records);
     }
+    // One pass: a plan holds one record per `(project_id, scenario_id)`
+    // (D5), so replacing every replaced key at once equals replacing them
+    // one record at a time, and the pushes keep the plans' order.
+    let replaced: BTreeSet<(&ProjectId, &ScenarioId)> = written.iter().map(|r| (&r.project_id, &r.scenario_id)).collect();
+    ctx.scenarios.retain(|s| !replaced.contains(&(&s.project_id, &s.scenario_id)));
+    ctx.scenarios.extend(written.into_iter().filter(|r| !r.removed));
 }
 
 /// `canon inventory sync`'s stdout — one block per configured root.
