@@ -1803,6 +1803,71 @@ mod tests {
         assert_eq!(report2.promoted[0].run_seq(), Some(3));
     }
 
+    /// The names under `<dir>/.canon/<tier>/kind=evidence_record/`, sorted.
+    fn evidence_names(dir: &TempDir, tier: &str) -> Vec<String> {
+        let kind_dir = dir.path().join(".canon").join(tier).join("kind=evidence_record");
+        let mut names: Vec<String> = std::fs::read_dir(kind_dir)
+            .map(|entries| entries.filter_map(Result::ok).filter(|entry| entry.path().is_file()).map(|entry| entry.file_name().to_string_lossy().into_owned()).collect())
+            .unwrap_or_default();
+        names.sort();
+        names
+    }
+
+    /// A batch promoted through one [`EvidencePromoter`] lands exactly as
+    /// the same records promoted by one [`promote_staged`] call each: the
+    /// same reports (so the same `run_seq` per partition, in the order
+    /// given), the same committed files, and, after the one archive pass,
+    /// the same superseded versions in the archive.
+    #[test]
+    fn a_promoter_lands_a_batch_as_sequential_promote_staged_calls_do() {
+        let first = evidence("implementer", Some("world.firstbuy-hotdeal.14"));
+        let mut second = evidence("implementer", Some("world.firstbuy-hotdeal.14"));
+        second.envelope.at = first.envelope.at + chrono::Duration::seconds(5);
+        let other = evidence("implementer", Some("world.firstbuy-hotdeal.26"));
+        let batch = [first, second, other];
+
+        let sequential = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&sequential);
+        let mut expected = Vec::new();
+        for record in &batch {
+            let location = staging.write(record).unwrap().location;
+            expected.push(promote_staged(&staging, &committed, Path::new(&location)).unwrap());
+        }
+
+        let batched = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&batched);
+        let locations: Vec<String> = batch.iter().map(|record| staging.write(record).unwrap().location).collect();
+        let mut promoter = EvidencePromoter::new(&staging, &committed);
+        let reports: Vec<PromoteReport> = locations.iter().map(|location| promoter.promote(Path::new(location)).unwrap()).collect();
+        assert!(evidence_names(&batched, "archive").is_empty(), "nothing is archived until the batch has landed");
+        promoter.archive();
+
+        assert_eq!(reports, expected);
+        assert_eq!(reports.iter().map(|r| r.promoted[0].run_seq()).collect::<Vec<_>>(), vec![Some(1), Some(2), Some(3)]);
+        assert_eq!(evidence_names(&batched, "ledger"), evidence_names(&sequential, "ledger"));
+        assert_eq!(evidence_names(&batched, "archive"), evidence_names(&sequential, "archive"));
+        assert!(!evidence_names(&batched, "archive").is_empty(), "the first version of .14 is superseded, so the pass moved it");
+    }
+
+    /// A record that is not staged is refused by the promoter as it is by
+    /// [`promote_staged`], and the batch's later records still promote
+    /// against the index.
+    #[test]
+    fn a_promoter_refuses_a_missing_candidate_and_continues() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+        let mut promoter = EvidencePromoter::new(&staging, &committed);
+        let gone = "kind=evidence_record/world.firstbuy-hotdeal.14__000000000000.json";
+        let expected = promote_staged(&staging, &committed, Path::new(gone)).unwrap();
+        let refused = promoter.promote(Path::new(gone)).unwrap();
+        assert_eq!(refused, expected);
+        assert_eq!(refused.refused.len(), 1);
+
+        let location = staging.write(&evidence("implementer", Some("world.firstbuy-hotdeal.14"))).unwrap().location;
+        let report = promoter.promote(Path::new(&location)).unwrap();
+        assert_eq!(report.promoted[0].run_seq(), Some(1));
+    }
+
     #[test]
     fn promote_refuses_a_malformed_candidate_without_consuming_a_run_seq() {
         let dir = TempDir::new().unwrap();

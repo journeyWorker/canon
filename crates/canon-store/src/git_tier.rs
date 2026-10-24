@@ -842,6 +842,28 @@ mod tests {
         assert_eq!(second.violations.len(), 1, "the edited file is read again and refused: {:?}", second.violations);
     }
 
+    /// `read_shared` returns what `read` does, and a repeat scan of
+    /// unchanged, settled files hands out the rows the cache holds instead
+    /// of copies of them.
+    #[test]
+    fn a_shared_read_matches_read_and_reuses_the_cached_rows() {
+        let dir = tempfile::tempdir().unwrap();
+        let tier = GitTier::new(dir.path());
+        let hour = std::time::Duration::from_secs(3600);
+        for id in ["first-change", "second-change"] {
+            let location = tier.write(&change_named(id)).unwrap().location;
+            set_age(&dir.path().join(location), hour);
+        }
+        let query = TierQuery::kind(RecordKind::Change);
+        let owned = tier.read(&query).unwrap();
+        let first = tier.read_shared(&query).unwrap();
+        let second = tier.read_shared(&query).unwrap();
+
+        assert_eq!(first.records.iter().map(|raw| raw.as_ref()).collect::<Vec<_>>(), owned.records.iter().collect::<Vec<_>>());
+        assert!(first.records.iter().zip(&second.records).all(|(a, b)| Arc::ptr_eq(a, b)), "a repeat scan shares the cached rows");
+        assert_eq!(second.into_owned().records, owned.records);
+    }
+
     /// A kind big enough to be read by several threads comes back in
     /// path order, as the sequential scan returns it.
     #[test]
