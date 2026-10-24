@@ -310,4 +310,25 @@ mod tests {
             assert!(verdicts.get(&(subject.to_string(), Some("implementer".to_string()))).is_some_and(LedgerEntry::is_green), "{subject}");
         }
     }
+
+    /// `verdicts_of` is a key range: every role of one subject in role
+    /// order, and not a neighbour whose id merely starts the same.
+    #[test]
+    fn verdicts_of_reads_one_subjects_cells_and_stops_at_its_neighbours() {
+        let now = Utc::now();
+        let ctx = ctx_with(
+            vec![
+                record_at("a#1", "reviewer", "agent-b", EvidenceVerdict::Divergent, now),
+                record_at("a#1", "implementer", "agent-a", EvidenceVerdict::Faithful, now),
+                record_at("a#10", "implementer", "agent-a", EvidenceVerdict::Faithful, now),
+                record_at("a#0", "implementer", "agent-a", EvidenceVerdict::Faithful, now),
+            ],
+            Vec::new(),
+        );
+        let verdicts = latest_verdicts(&ctx);
+        let roles: Vec<Option<&str>> = verdicts_of(verdicts, "a#1").map(|((_, role), _)| role.as_deref()).collect();
+        assert_eq!(roles, vec![Some("implementer"), Some("reviewer")]);
+        assert_eq!(verdicts_of(verdicts, "a#").count(), 0);
+        assert_eq!(verdicts_of(verdicts, "a#10").count(), 1);
+    }
 }

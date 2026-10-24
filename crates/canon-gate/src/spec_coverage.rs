@@ -1300,6 +1300,67 @@ mod tests {
         assert_eq!(holders, vec!["editing", "perception"]);
     }
 
+    /// The indexed joins answer what the whole-kind scans they replaced
+    /// did: the latest generation per key, then the filter, in the same
+    /// order, however many generations and repeated names the corpus holds.
+    #[test]
+    fn the_indexed_joins_match_a_scan_of_the_latest_generations() {
+        let base = Utc::now();
+        let secs = chrono::Duration::seconds;
+        let mut moved = scenario("p.a.01", Some("new"));
+        moved.envelope.at = base + secs(5);
+        let mut corpus = Corpus::new();
+        corpus.scenarios = vec![moved, scenario("p.a.01", Some("old")), scenario("p.a.02", Some("old")), scenario("p.b.01", None)];
+        let change = |id: &str, subjects: &[&str], offset: i64| {
+            let envelope = Envelope::new(2, RecordKind::Change, base + secs(offset), Actor::new("canon", RoleId::parse("implementer").unwrap()));
+            let mut c = canon_model::Change::new(envelope, ChangeId::parse(id).unwrap(), "t", "s", canon_model::ChangeStatus::InProgress);
+            c.subject_ids = subjects.iter().map(|s| SubjectId::parse(*s).unwrap()).collect();
+            c
+        };
+        // `c1`'s later generation names `old` and, twice, `new`; `c2` is named by `new`, which lists it too.
+        corpus.changes = vec![change("c1", &["old"], 0), change("c1", &["old", "new", "new"], 1), change("c2", &["new"], 2), change("c3", &[], 3)];
+        corpus.subjects = vec![verifying_subject("new", &["c2"]), verifying_subject("old", &[])];
+        let ctx = context(corpus, None);
+
+        let latest = latest_by_key(&ctx.scenarios, |s| (s.project_id.clone(), s.scenario_id.clone()));
+        for id in ["old", "new", "nobody"] {
+            let subject = SubjectId::parse(id).unwrap();
+            let scanned: Vec<_> = latest.iter().filter(|s| s.subject_id.as_ref() == Some(&subject)).map(|s| s.scenario_id.as_str()).collect();
+            let indexed: Vec<_> = subject_scenarios(&ctx, &subject).into_iter().map(|s| s.scenario_id.as_str()).collect();
+            assert_eq!(indexed, scanned, "{id}");
+        }
+        assert_eq!(latest_scenarios(&ctx).len(), latest.len());
+
+        let latest_changes_scanned = latest_by_key(&ctx.changes, |c| c.change_id.as_str().to_string());
+        for subject in latest_subjects(&ctx) {
+            let mut ids = subject.change_ids.clone();
+            let mut named: Vec<&canon_model::Change> =
+                latest_changes_scanned.iter().copied().filter(|c| c.subject_ids.contains(&subject.subject_id) && !ids.contains(&c.change_id)).collect();
+            named.sort_by(|a, b| (a.envelope.at, a.change_id.as_str()).cmp(&(b.envelope.at, b.change_id.as_str())));
+            ids.extend(named.into_iter().map(|c| c.change_id.clone()));
+            assert_eq!(subject_change_ids(&ctx, subject), ids, "{}", subject.subject_id.as_str());
+        }
+        for change in latest_changes(&ctx) {
+            let scanned: Vec<&str> =
+                latest_subjects(&ctx).into_iter().filter(|s| subject_change_ids(&ctx, s).contains(&change.change_id)).map(|s| s.subject_id.as_str()).collect();
+            let indexed: Vec<&str> = change_subjects(&ctx, &change.change_id).into_iter().map(|s| s.subject_id.as_str()).collect();
+            assert_eq!(indexed, scanned, "{}", change.change_id.as_str());
+        }
+    }
+
+    /// A derived value answers for the corpus it was read from; a caller
+    /// that changes a vector says so, and the next read sees the change.
+    #[test]
+    fn invalidating_a_context_makes_the_next_read_see_a_changed_corpus() {
+        let mut corpus = Corpus::new();
+        corpus.scenarios = vec![scenario("p.a.01", None)];
+        let mut ctx = context(corpus, None);
+        assert_eq!(latest_scenarios(&ctx).len(), 1);
+        ctx.scenarios.push(scenario("p.a.02", None));
+        ctx.invalidate_derived();
+        assert_eq!(latest_scenarios(&ctx).len(), 2);
+    }
+
     fn waiver(waived: &[(&str, &str)]) -> StatusOverride {
         StatusOverride {
             to: SubjectStatus::Verifying,
