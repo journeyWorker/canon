@@ -121,34 +121,59 @@ pub(crate) fn repeats_latest(
     subject: impl Fn(&Value) -> bool,
     followed_by: Option<(&str, &dyn Fn(&Value) -> bool)>,
 ) -> Option<Existing> {
-    let mut latest: Option<(Existing, Value)> = None;
-    let mut consider = |existing: Existing, stored: Value| {
-        if !subject(&stored) {
-            return;
+    let corpus = RepeatCorpus::read(ledger_root, staging, kind, followed_by.map(|(later_kind, _)| later_kind));
+    corpus.repeats(body, subject, followed_by.map(|(_, matches)| matches))
+}
+
+/// What [`repeats_latest`] reads, read once: every record of one kind in
+/// the ledger and in staging, and, the first time a stored record equals
+/// the body asked about, every record of the kind that can follow it. A
+/// caller that asks about several bodies before it writes any of them reads
+/// the corpus once and asks [`Self::repeats`] for each; the answers are the
+/// ones [`repeats_latest`] gives one by one, because nothing is written
+/// between the questions.
+pub(crate) struct RepeatCorpus {
+    /// Committed records, then staged ones: the order the newest is picked in.
+    stored: Vec<(Existing, Value)>,
+    /// Where the following kind is read from, and what was read.
+    later_source: Option<(std::path::PathBuf, String)>,
+    later: std::sync::OnceLock<Vec<(String, Value)>>,
+}
+
+impl RepeatCorpus {
+    pub(crate) fn read(ledger_root: &Path, staging: Option<&Path>, kind: &str, later_kind: Option<&str>) -> Self {
+        let mut stored: Vec<(Existing, Value)> =
+            records_under(ledger_root, kind).into_iter().map(|(path, body)| (Existing { staged: None, committed: Some(path) }, body)).collect();
+        if let Some(staging) = staging {
+            stored.extend(records_under(staging, kind).into_iter().map(|(path, body)| (Existing { staged: Some(path), committed: None }, body)));
         }
-        if latest.as_ref().is_none_or(|(_, held)| at_of(&stored) >= at_of(held)) {
-            latest = Some((existing, stored));
+        Self { stored, later_source: later_kind.map(|later| (ledger_root.to_path_buf(), later.to_string())), later: std::sync::OnceLock::new() }
+    }
+
+    /// [`repeats_latest`]'s answer for `body`, from the records read.
+    pub(crate) fn repeats(&self, body: &Value, subject: impl Fn(&Value) -> bool, followed_by: Option<&dyn Fn(&Value) -> bool>) -> Option<Existing> {
+        let mut latest: Option<&(Existing, Value)> = None;
+        for candidate in &self.stored {
+            if !subject(&candidate.1) {
+                continue;
+            }
+            if latest.is_none_or(|(_, held)| at_of(&candidate.1) >= at_of(held)) {
+                latest = Some(candidate);
+            }
         }
-    };
-    for (path, stored) in records_under(ledger_root, kind) {
-        consider(Existing { staged: None, committed: Some(path) }, stored);
-    }
-    if let Some(staging) = staging {
-        for (path, stored) in records_under(staging, kind) {
-            consider(Existing { staged: Some(path), committed: None }, stored);
-        }
-    }
-    let (existing, stored) = latest?;
-    if comparable(&stored) != comparable(body) {
-        return None;
-    }
-    if let Some((later_kind, matches)) = followed_by {
-        let stored_at = at_of(&stored);
-        if records_under(ledger_root, later_kind).iter().any(|(_, later)| matches(later) && at_of(later) > stored_at) {
+        let (existing, stored) = latest?;
+        if comparable(stored) != comparable(body) {
             return None;
         }
+        if let Some(matches) = followed_by {
+            let stored_at = at_of(stored);
+            let later = self.later.get_or_init(|| self.later_source.as_ref().map(|(root, kind)| records_under(root, kind)).unwrap_or_default());
+            if later.iter().any(|(_, later)| matches(later) && at_of(later) > stored_at) {
+                return None;
+            }
+        }
+        Some(existing.clone())
     }
-    Some(existing)
 }
 
 #[cfg(test)]
