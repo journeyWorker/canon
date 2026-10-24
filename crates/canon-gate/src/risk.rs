@@ -21,7 +21,6 @@ use crate::context::{GateCheck, GateContext};
 use crate::coverage::CellSubject;
 use crate::failure_class::{FailureClass, Violation};
 use crate::policy::{allowed_signers_path, PolicyDiagnostic, RiskTierRule};
-use crate::staleness::StalenessCheck;
 
 /// Verifies minimum distinct human approvals for the highest matching risk
 /// tier in each existing evidence subject group.
@@ -50,11 +49,11 @@ impl GateCheck for RiskApprovalCheck {
             }
         };
 
-        let stale_subjects: BTreeSet<String> = StalenessCheck
-            .run(ctx)
-            .into_iter()
+        let stale_subjects: BTreeSet<String> = ctx
+            .staleness_violations()
+            .iter()
             .filter(|violation| violation.class == FailureClass::StaleEvidence)
-            .map(|violation| violation.subject)
+            .map(|violation| violation.subject.clone())
             .collect();
         let mut groups: BTreeMap<(CellSubject, Option<String>), Vec<&EvidenceRecord>> = BTreeMap::new();
         for record in &ctx.evidence {
