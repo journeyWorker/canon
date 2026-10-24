@@ -1139,6 +1139,13 @@ fn promote_evidence_candidates(
 /// moves to the archive in one pass, [`Self::archive`], once the caller
 /// has landed every record. A caller whose batch fails drops the promoter
 /// instead, and nothing was archived.
+///
+/// The committed files match per-record promotion always; the archive
+/// matches it when no two records of the batch share a `(project,
+/// scenario)` or task. With two that do, a risk approval the first record
+/// made stale and the second made current again stays in the ledger,
+/// where per-record archiving would have moved it. `canon evidence add`'s
+/// batches hold one record per indexed scenario, so they never do.
 pub struct EvidencePromoter<'a> {
     staging: &'a GitTier,
     committed: &'a GitTier,

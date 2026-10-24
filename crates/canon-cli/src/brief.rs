@@ -68,7 +68,7 @@
 
 use std::path::{Path, PathBuf};
 
-use canon_gate::spec_coverage::{latest_scenarios, latest_subjects, subject_change_ids};
+use canon_gate::spec_coverage::{latest_scenario, latest_subjects, subject_change_ids};
 use canon_gate::GateContext;
 use canon_ingest::markdown::{field, without_field};
 use canon_model::{paths, ChangeId, ProjectId, ScenarioId, Subject, SubjectStatus, TaskId};
@@ -469,16 +469,13 @@ pub fn attested_briefs<'a>(
     repo: &Path,
     plan_roots: &[PathBuf],
     ctx: &'a GateContext,
+    flow_changes: &crate::brief_check::FlowChangesIndex,
     task: Option<&TaskId>,
     scenario: Option<(&ProjectId, &ScenarioId)>,
 ) -> Vec<(&'a Subject, BriefStatus)> {
-    let owner = scenario.and_then(|(project, id)| {
-        latest_scenarios(ctx).into_iter().find(|s| &s.project_id == project && &s.scenario_id == id).and_then(|s| s.subject_id.as_ref())
-    });
+    let owner = scenario.and_then(|(project, id)| latest_scenario(ctx, project, id).and_then(|s| s.subject_id.as_ref()));
     let task_change = task.map(TaskId::change_id);
-    let tagged = scenario
-        .map(|(project, id)| crate::brief_check::FlowChangesIndex::lazy().changes_of(repo, project, id).to_vec())
-        .unwrap_or_default();
+    let tagged = scenario.map(|(project, id)| flow_changes.changes_of(repo, project, id).to_vec()).unwrap_or_default();
     let mut subjects: Vec<(&Subject, Vec<ChangeId>)> = latest_subjects(ctx)
         .into_iter()
         .map(|s| (s, subject_change_ids(ctx, s)))

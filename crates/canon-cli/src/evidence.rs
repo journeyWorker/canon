@@ -272,7 +272,13 @@ fn load_gate_context(repo: &Path) -> Result<GateContext, String> {
 /// class and subject the ship guard's brief check prints. The subjects
 /// come from [`crate::brief::attested_briefs`]: the scenario's
 /// `@subject` owner and every subject adopting the task's change.
-fn brief_refusals(repo: &Path, ctx: &GateContext, task_id: Option<&TaskId>, scenario: Option<(&ProjectId, &ScenarioId)>) -> Vec<BriefRefusal> {
+fn brief_refusals(
+    repo: &Path,
+    ctx: &GateContext,
+    flow_changes: &crate::brief_check::FlowChangesIndex,
+    task_id: Option<&TaskId>,
+    scenario: Option<(&ProjectId, &ScenarioId)>,
+) -> Vec<BriefRefusal> {
     // An unreadable `plans:` section finds no external proposal.md;
     // `canon status` warns about it.
     let plan_roots = crate::brief::plan_roots(repo).unwrap_or_default();
@@ -281,7 +287,7 @@ fn brief_refusals(repo: &Path, ctx: &GateContext, task_id: Option<&TaskId>, scen
         .flatten()
         .collect::<Vec<_>>()
         .join(" and ");
-    crate::brief::attested_briefs(repo, &plan_roots, ctx, task_id, scenario)
+    crate::brief::attested_briefs(repo, &plan_roots, ctx, flow_changes, task_id, scenario)
         .into_iter()
         .filter(|(_, brief)| brief.enforced)
         .map(|(subject, brief)| BriefRefusal {
@@ -915,7 +921,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit(&args.full(), args.json);
         }
     };
-    let refusals = brief_refusals(&repo, &gate_context, args.task_id.as_ref(), args.project_id.as_ref().zip(args.scenario_id.as_ref()));
+    let refusals = brief_refusals(&repo, &gate_context, &crate::brief_check::FlowChangesIndex::lazy(), args.task_id.as_ref(), args.project_id.as_ref().zip(args.scenario_id.as_ref()));
     if let Err(error) = report_brief_refusals(args, &refusals) {
         return error.emit(&args.full(), args.json);
     }
@@ -1311,7 +1317,10 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         }
     }
 
-    let refusals: Vec<Vec<BriefRefusal>> = scenario_ids.iter().map(|id| brief_refusals(repo, &gate_context, None, Some((project_id, id)))).collect();
+    // One flow-change index for the whole batch: each lookup is then a map
+    // read, not a walk of every spec root per scenario (0.29 D3).
+    let flow_changes = crate::brief_check::FlowChangesIndex::lazy();
+    let refusals: Vec<Vec<BriefRefusal>> = scenario_ids.iter().map(|id| brief_refusals(repo, &gate_context, &flow_changes, None, Some((project_id, id)))).collect();
     if let Err(error) = report_brief_refusals(args, &refusals.concat()) {
         let hint = format!("no record of the batch is written; {}", error.hint.as_deref().unwrap_or_default());
         return error.hint(hint).emit("canon evidence add", args.json);

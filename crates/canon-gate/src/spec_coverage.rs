@@ -337,6 +337,12 @@ pub fn latest_scenarios(ctx: &GateContext) -> Vec<&Scenario> {
     ctx.scenario_fold().latest.iter().map(|&i| &ctx.scenarios[i]).collect()
 }
 
+/// The LATEST generation of one `(project_id, scenario_id)`: the row
+/// [`latest_scenarios`] holds for that key, by lookup.
+pub fn latest_scenario<'a>(ctx: &'a GateContext, project: &ProjectId, scenario: &ScenarioId) -> Option<&'a Scenario> {
+    ctx.scenario_fold().by_key.get(&(project.clone(), scenario.clone())).map(|&i| &ctx.scenarios[i])
+}
+
 /// The LATEST record of every Subject, ordered by `subject_id` — the
 /// fold this check's `scope` filter and [`crate::review_gate`] read
 /// subject status from.
