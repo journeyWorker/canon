@@ -47,6 +47,7 @@
 //!   mitigation; see that module's doc for the runtime half.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use canon_model::RecordKind;
 use cel::common::ast::{CallExpr, ComprehensionExpr, EntryExpr, Expr, IdedExpr};
@@ -69,8 +70,12 @@ use crate::registry::CelType;
 #[derive(Debug, Clone)]
 pub struct CompiledPolicy {
     pub(crate) source: String,
+    /// The program `compile` parsed to validate `source`, kept so that
+    /// evaluating a record does not parse it again.
+    pub(crate) program: Arc<Program>,
     pub(crate) kind: RecordKind,
-    pub(crate) record_fields: BTreeMap<String, CelType>,
+    /// Shared by every clone: evaluation maps a record through it on each call.
+    pub(crate) record_fields: Arc<BTreeMap<String, CelType>>,
     /// The expression's max comprehension NESTING depth (`0` if it has
     /// no comprehension at all) — [`crate::eval::evaluate`]'s runtime
     /// companion to [`check_complexity`]'s compile-time bound: this
@@ -119,8 +124,9 @@ pub fn compile(source: &str, bindings: &BindingSet) -> Result<CompiledPolicy, Ve
     if diagnostics.is_empty() {
         Ok(CompiledPolicy {
             source: source.to_string(),
+            program: Arc::new(program),
             kind: bindings.kind,
-            record_fields: bindings.record_fields.clone(),
+            record_fields: Arc::new(bindings.record_fields.clone()),
             comprehension_nesting: complexity.max_comprehension_nesting,
         })
     } else {

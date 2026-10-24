@@ -9,10 +9,11 @@
 //! profile, [`crate::validate`]'s module doc) plus exactly the `record`
 //! variable and the `age_days` function ([`crate::functions`]) — no I/O,
 //! no ambient state. `Program::execute`'s own `ExecutionError` is a
-//! value, and `Program::compile`/`execute` both run inside
-//! `catch_unwind` (task 4.2): a malformed call or a `cel` parser/
-//! interpreter panic surfaces as `Err(PolicyError)`, never unwinds past
-//! this crate's boundary.
+//! value, and `Program::execute` runs inside `catch_unwind` (task 4.2;
+//! `Program::compile` already ran inside one in [`crate::validate::compile`],
+//! whose program a [`CompiledPolicy`] keeps rather than parsing again): a
+//! malformed call or a `cel` interpreter panic surfaces as
+//! `Err(PolicyError)`, never unwinds past this crate's boundary.
 //!
 //! # Eval budget (design D5, review finding #3 fix — ReviewS13 d26bc9d7)
 //!
@@ -221,13 +222,13 @@ pub fn evaluate(compiled: &CompiledPolicy, record: &serde_json::Value, now: Date
         }
     }
 
-    let source = compiled.source.clone();
-    let record_fields = compiled.record_fields.clone();
+    let program = Arc::clone(&compiled.program);
+    let record_fields = Arc::clone(&compiled.record_fields);
     let record_json = record.clone();
 
     let (tx, rx) = mpsc::channel();
     let spawned = thread::Builder::new().name("canon-policy-eval".to_string()).spawn(move || {
-        let outcome = std::panic::catch_unwind(AssertUnwindSafe(|| run(&source, &record_fields, &record_json, now)));
+        let outcome = std::panic::catch_unwind(AssertUnwindSafe(|| run(&program, &record_fields, &record_json, now)));
         // The receiver may already be gone (budget exceeded, caller moved
         // on) — a dropped-receiver send error is expected, not a bug.
         let _ = tx.send(outcome);
@@ -257,13 +258,9 @@ pub fn evaluate(compiled: &CompiledPolicy, record: &serde_json::Value, now: Date
     }
 }
 
-fn run(source: &str, record_fields: &BTreeMap<String, CelType>, record_json: &serde_json::Value, now: DateTime<Utc>) -> cel::ResolveResult {
-    // Re-parsing a pre-validated source is deterministic and cheap; it
-    // avoids needing `cel::Program` to be `Send` across the eval thread
-    // boundary.
-    let program = cel::Program::compile(source).expect("source was validated by crate::validate::compile before a CompiledPolicy could exist");
+fn run(program: &cel::Program, record_fields: &BTreeMap<String, CelType>, record_json: &serde_json::Value, now: DateTime<Utc>) -> cel::ResolveResult {
     let mut ctx = cel::Context::empty();
-    let record_value = json_to_cel(record_json, &CelType::Map(record_fields.clone()));
+    let record_value = json_map_to_cel(record_json, record_fields);
     ctx.add_variable_from_value("record", record_value);
     crate::functions::register(&mut ctx, now);
     program.execute(&ctx)
@@ -307,18 +304,24 @@ pub(crate) fn json_to_cel(json: &serde_json::Value, ty: &CelType) -> cel::Value 
             Some(items) => cel::Value::List(Arc::new(items.iter().map(|item| json_to_cel(item, inner)).collect())),
             None => cel::Value::Null,
         },
-        CelType::Map(fields) => match json.as_object() {
-            Some(obj) => {
-                let mut map: HashMap<String, cel::Value> = HashMap::with_capacity(obj.len());
-                for (key, value) in obj {
-                    let field_ty = fields.get(key).unwrap_or(&CelType::Dyn);
-                    map.insert(key.clone(), json_to_cel(value, field_ty));
-                }
-                map.into()
-            }
-            None => cel::Value::Null,
-        },
+        CelType::Map(fields) => json_map_to_cel(json, fields),
         CelType::Dyn => json_dyn_to_cel(json),
+    }
+}
+
+/// [`json_to_cel`] for an object guided by the field types `fields` — a
+/// [`CelType::Map`] without needing one built around a copy of the tree.
+fn json_map_to_cel(json: &serde_json::Value, fields: &BTreeMap<String, CelType>) -> cel::Value {
+    match json.as_object() {
+        Some(obj) => {
+            let mut map: HashMap<String, cel::Value> = HashMap::with_capacity(obj.len());
+            for (key, value) in obj {
+                let field_ty = fields.get(key).unwrap_or(&CelType::Dyn);
+                map.insert(key.clone(), json_to_cel(value, field_ty));
+            }
+            map.into()
+        }
+        None => cel::Value::Null,
     }
 }
 

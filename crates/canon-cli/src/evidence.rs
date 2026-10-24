@@ -1103,15 +1103,21 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
 /// verifies again what the review saw, and the review stays current when
 /// the new record says the same).
 fn repeat_of_latest(ledger_root: &Path, body: &serde_json::Value) -> Option<crate::retry::Existing> {
-    let reviewed = |review: &serde_json::Value| ["project_id", "scenario_id"].iter().all(|key| review.get(key) == body.get(key));
-    crate::retry::repeats_latest(
-        ledger_root,
-        Some(&evidence_staging_dir(ledger_root)),
-        RecordKind::EvidenceRecord.as_str(),
-        body,
-        |stored| same_evidence_subject(stored, body),
-        Some((RecordKind::Review.as_str(), &reviewed)),
-    )
+    repeats_of_latest(ledger_root, std::slice::from_ref(body)).into_iter().next().flatten()
+}
+
+/// [`repeat_of_latest`] for each of `bodies`, which a batch checks before
+/// it writes any of them: the ledger, the staging area and the reviews are
+/// read once for all of them, not once per body.
+fn repeats_of_latest(ledger_root: &Path, bodies: &[serde_json::Value]) -> Vec<Option<crate::retry::Existing>> {
+    let corpus = crate::retry::RepeatCorpus::read(ledger_root, Some(&evidence_staging_dir(ledger_root)), RecordKind::EvidenceRecord.as_str(), Some(RecordKind::Review.as_str()));
+    bodies
+        .iter()
+        .map(|body| {
+            let reviewed = |review: &serde_json::Value| ["project_id", "scenario_id"].iter().all(|key| review.get(key) == body.get(key));
+            corpus.repeats(body, |stored| same_evidence_subject(stored, body), Some(&reviewed))
+        })
+        .collect()
 }
 
 /// Whether the stored record `stored` attests the same subject as `body`:
@@ -1342,10 +1348,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
     // A record that repeats its scenario's latest one is not written again
     // (`crate::retry`); the rest of the batch is.
     let all_bodies: Vec<serde_json::Value> = records.iter().map(|record| record_body(record, args)).collect();
-    let repeats: Vec<Option<crate::retry::Existing>> = all_bodies
-        .iter()
-        .map(|body| repeat_of_latest(&ledger_root, body))
-        .collect();
+    let repeats: Vec<Option<crate::retry::Existing>> = repeats_of_latest(&ledger_root, &all_bodies);
     let mut unchanged = Vec::new();
     for ((record, id), repeat) in records.iter().zip(&scenario_ids).zip(&repeats) {
         if let Some(existing) = repeat {
@@ -1491,8 +1494,12 @@ fn land_batch(
         }
     }
     if promote {
+        // One committed-history read for the whole batch, and one archive
+        // pass after the last record, instead of one of each per record.
+        let committed = GitTier::new(ledger_root);
+        let mut promoter = canon_gate::promote::EvidencePromoter::new(&staging, &committed);
         for index in 0..locations.len() {
-            match crate::gate::try_promote(ledger_root, &locations[index].staged) {
+            match crate::gate::try_promote_in(&mut promoter, &locations[index].staged) {
                 Ok(target) => locations[index].promoted = Some(target),
                 Err(refusal) => {
                     let why = if refusal.lines.trim().is_empty() { refusal.error.message.clone() } else { refusal.lines.trim_end().to_string() };
@@ -1502,6 +1509,7 @@ fn land_batch(
                 }
             }
         }
+        promoter.archive();
     }
     let stored = held.stored();
     Ok(LandedBatch { stored, locations })
