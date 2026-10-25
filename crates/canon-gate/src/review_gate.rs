@@ -351,14 +351,14 @@ pub struct ReviewGap {
 /// The latest scenario review per `reviewer` of `(project_id, scenario_id)`
 /// (module doc), in reviewer order.
 fn latest_reviews<'a>(ctx: &'a GateContext, scenario: &Scenario) -> Vec<&'a Review> {
-    let reviews: Vec<&Review> = ctx.reviews.iter().filter(|r| r.project_id == scenario.project_id && r.scenario_id.as_ref() == Some(&scenario.scenario_id)).collect();
-    latest_by_key(&reviews, |r| r.reviewer.clone()).into_iter().copied().collect()
+    let key = (scenario.project_id.clone(), scenario.scenario_id.clone());
+    ctx.review_fold().by_scenario.get(&key).into_iter().flatten().map(|&i| &ctx.reviews[i]).collect()
 }
 
 /// The in-effect reviews: the latest per `(project_id, scenario_id or
 /// change_id, reviewer)`, the fold every review rule reads (module doc).
 pub fn in_effect_reviews(ctx: &GateContext) -> Vec<&Review> {
-    latest_by_key(&ctx.reviews, |r| (r.project_id.clone(), r.scenario_id.clone(), r.change_id.clone(), r.reviewer.clone()))
+    ctx.review_fold().in_effect.iter().map(|&i| &ctx.reviews[i]).collect()
 }
 
 /// The in-effect reviews that are still current (0.18 D5): every
@@ -371,26 +371,30 @@ pub fn in_effect_reviews(ctx: &GateContext) -> Vec<&Review> {
 /// rule's): dropping either would only ever skip a check. Review artifacts
 /// are re-checked over exactly these ([`crate::artifact_store`]).
 pub fn current_reviews(ctx: &GateContext) -> Vec<&Review> {
-    let live: BTreeMap<(&canon_model::ProjectId, &canon_model::ScenarioId), &Scenario> =
-        latest_scenarios(ctx).into_iter().map(|s| ((&s.project_id, &s.scenario_id), s)).collect();
-    let mut checks: BTreeMap<(&canon_model::ProjectId, &canon_model::ScenarioId), Vec<CheckPin>> = BTreeMap::new();
-    let mut current = Vec::new();
-    for review in in_effect_reviews(ctx) {
-        let Some(scenario_id) = &review.scenario_id else {
-            current.push(review);
-            continue;
-        };
-        let key = (&review.project_id, scenario_id);
-        let Some(scenario) = live.get(&key).copied() else {
-            current.push(review);
-            continue;
-        };
-        let now = checks.entry(key).or_insert_with(|| current_checks(ctx, scenario));
-        if drift(review.pins.as_ref(), scenario, now).is_none() {
-            current.push(review);
+    let current = ctx.derived.current_reviews.get_or_init(|| {
+        let scenarios = ctx.scenario_fold();
+        let mut checks: BTreeMap<(&canon_model::ProjectId, &canon_model::ScenarioId), Vec<CheckPin>> = BTreeMap::new();
+        let mut current = Vec::new();
+        for &i in &ctx.review_fold().in_effect {
+            let review = &ctx.reviews[i];
+            let Some(scenario_id) = &review.scenario_id else {
+                current.push(i);
+                continue;
+            };
+            let key = (&review.project_id, scenario_id);
+            let Some(&at) = scenarios.by_key.get(&(review.project_id.clone(), scenario_id.clone())) else {
+                current.push(i);
+                continue;
+            };
+            let scenario = &ctx.scenarios[at];
+            let now = checks.entry(key).or_insert_with(|| current_checks(ctx, scenario));
+            if drift(review.pins.as_ref(), scenario, now).is_none() {
+                current.push(i);
+            }
         }
-    }
-    current
+        current
+    });
+    current.iter().map(|&i| &ctx.reviews[i]).collect()
 }
 
 /// The scenarios whose in-effect review predates 0.23 review pinning (it
@@ -532,8 +536,9 @@ pub fn review_gap(ctx: &GateContext, scenario: &Scenario, distinct_actor: bool) 
 /// whose disposition is still `open` and whose severity is `blocker`,
 /// in natural-key order.
 pub fn open_blockers(ctx: &GateContext) -> Vec<&Finding> {
-    latest_by_key(&ctx.findings, |f| (f.change_id.as_str().to_string(), f.round, f.seq))
-        .into_iter()
+    ctx.finding_fold()
+        .iter()
+        .map(|&i| &ctx.findings[i])
         .filter(|f| f.severity == FindingSeverity::Blocker && f.disposition() == FindingDisposition::Open)
         .collect()
 }
@@ -586,8 +591,9 @@ impl FixedBlocker<'_> {
 /// Every blocker finding whose latest disposition is `fixed`, each with
 /// the time it was closed (the `at` of that latest record).
 pub fn fixed_blockers(ctx: &GateContext) -> Vec<FixedBlocker<'_>> {
-    latest_by_key(&ctx.findings, |f| (f.change_id.as_str().to_string(), f.round, f.seq))
-        .into_iter()
+    ctx.finding_fold()
+        .iter()
+        .map(|&i| &ctx.findings[i])
         .filter(|f| f.severity == FindingSeverity::Blocker && f.disposition() == FindingDisposition::Fixed)
         .map(|finding| FixedBlocker { finding, closed: finding.envelope.at })
         .collect()
@@ -598,9 +604,13 @@ pub fn fixed_blockers(ctx: &GateContext) -> Vec<FixedBlocker<'_>> {
 /// once. Empty when that evidence bound no report.
 fn latest_report_words(ctx: &GateContext, project: &str, scenario: &str) -> BTreeSet<String> {
     let evidence: Vec<&canon_model::EvidenceRecord> = ctx
-        .evidence
-        .iter()
-        .filter(|e| e.scenario_id.as_ref().is_some_and(|id| id.as_str() == scenario) && e.project_id.as_ref().is_none_or(|p| p.as_str() == project))
+        .evidence_index()
+        .by_scenario
+        .get(scenario)
+        .into_iter()
+        .flatten()
+        .map(|&i| &ctx.evidence[i])
+        .filter(|e| e.project_id.as_ref().is_none_or(|p| p.as_str() == project))
         .collect();
     let Some(latest) = crate::freshness::latest_evidence(&evidence) else { return BTreeSet::new() };
     latest

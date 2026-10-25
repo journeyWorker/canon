@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "canon_version": "0.28.0",
-  "source_hash": "sha256:fff15092e4041e9c0f76aec71c50e26193b0609cff5089437d9799d1f9173f35",
+  "canon_version": "0.29.0",
+  "source_hash": "sha256:56c801a3a71edd8c3ccd1ee4446889075f736e80acad009f6050c99823d336d0",
   "providers": [
     "claude",
     "codex",
@@ -9,13 +9,13 @@
     "pi"
   ],
   "files": {
-    ".agents/skills/canon/SKILL.md": "sha256:2caf6f8706ec78270374288e9b9a10b4992b3eb4a2cd3fe4cc274943b1bb6fe6",
-    ".agents/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:e918eeff1ed4697c0b15c92b9f10bce86eb8c4c833f6084d8e6c93c833f434e4",
-    ".claude/skills/canon/SKILL.md": "sha256:2caf6f8706ec78270374288e9b9a10b4992b3eb4a2cd3fe4cc274943b1bb6fe6",
-    ".claude/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:e918eeff1ed4697c0b15c92b9f10bce86eb8c4c833f6084d8e6c93c833f434e4",
-    ".omp/skills/canon/SKILL.md": "sha256:2caf6f8706ec78270374288e9b9a10b4992b3eb4a2cd3fe4cc274943b1bb6fe6",
-    ".omp/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:e918eeff1ed4697c0b15c92b9f10bce86eb8c4c833f6084d8e6c93c833f434e4",
-    ".pi/skills/canon/SKILL.md": "sha256:2caf6f8706ec78270374288e9b9a10b4992b3eb4a2cd3fe4cc274943b1bb6fe6",
-    ".pi/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:e918eeff1ed4697c0b15c92b9f10bce86eb8c4c833f6084d8e6c93c833f434e4"
+    ".agents/skills/canon/SKILL.md": "sha256:61ef0e8a3831a5939067f01d15cdf6737f074b4fb2d0c316859dce8558848c38",
+    ".agents/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:3a8b61df074a344b8c222e2d053b98f7cb51009cdd904e4d3c323ac8645219b9",
+    ".claude/skills/canon/SKILL.md": "sha256:61ef0e8a3831a5939067f01d15cdf6737f074b4fb2d0c316859dce8558848c38",
+    ".claude/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:3a8b61df074a344b8c222e2d053b98f7cb51009cdd904e4d3c323ac8645219b9",
+    ".omp/skills/canon/SKILL.md": "sha256:61ef0e8a3831a5939067f01d15cdf6737f074b4fb2d0c316859dce8558848c38",
+    ".omp/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:3a8b61df074a344b8c222e2d053b98f7cb51009cdd904e4d3c323ac8645219b9",
+    ".pi/skills/canon/SKILL.md": "sha256:61ef0e8a3831a5939067f01d15cdf6737f074b4fb2d0c316859dce8558848c38",
+    ".pi/skills/canon/scripts/canon-retrieve-pre-dispatch.sh": "sha256:3a8b61df074a344b8c222e2d053b98f7cb51009cdd904e4d3c323ac8645219b9"
   }
 }

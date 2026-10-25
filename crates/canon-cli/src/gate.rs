@@ -178,10 +178,11 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     let unrefreshable = crate::inventory::unrefreshable_roots(&repo).into_iter().map(|root| root.violation(""));
     // A chore approved on a subject asks for the suite again (0.22 D2): a
     // subject past `building` with evidenced scenarios and none newer.
+    let code_tree = crate::reverify::CodeTreeMemo::known(gate_context.code_tree.clone());
     let reverify = canon_gate::spec_coverage::latest_subjects(&gate_context)
         .into_iter()
         .filter(|s| matches!(s.status, canon_model::SubjectStatus::Verifying | canon_model::SubjectStatus::Shipped))
-        .flat_map(|s| crate::reverify::chore_violations(&repo, &gate_context, s))
+        .flat_map(|s| crate::reverify::chore_violations(&repo, &gate_context, &code_tree, s))
         .collect::<Vec<_>>();
     // An approval that no longer holds fails closed (0.22 D3); a policy never approved is only an advisory below.
     let report = GateReport::from_violations(checks.iter().flat_map(|check| check.run(&gate_context)).chain(unrefreshable).chain(reverify).chain(crate::policy_approval::violation(&repo)).collect());
@@ -575,7 +576,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
                     return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
                 }
             };
-            (canon_gate::history::evidence_history(&gate_context), notes)
+            (canon_gate::history::evidence_history(&gate_context).to_vec(), notes)
         }
         Err(e) => {
             return CliError::refused("TYPED_ATOMS_INVALID", e.to_string()).hint("fix the typed evidence atom in the plan task (the message names it), then run the command again").emit("canon task done", json);
@@ -1108,7 +1109,17 @@ pub(crate) struct PromoteRefusal {
 /// [`promote_after_stage`]'s promotion, without its reporting: the committed
 /// path (relative to the ledger root), or why not.
 pub(crate) fn try_promote(ledger_root: &Path, location: &str) -> Result<String, PromoteRefusal> {
-    match promote_staged(&GitTier::new(evidence_staging_dir(ledger_root)), &GitTier::new(ledger_root), Path::new(location)) {
+    promotion_outcome(promote_staged(&GitTier::new(evidence_staging_dir(ledger_root)), &GitTier::new(ledger_root), Path::new(location)))
+}
+
+/// [`try_promote`] for one record of a batch, promoted through the batch's
+/// own `EvidencePromoter` (one committed-history read for the batch).
+pub(crate) fn try_promote_in(promoter: &mut canon_gate::promote::EvidencePromoter<'_>, location: &str) -> Result<String, PromoteRefusal> {
+    promotion_outcome(promoter.promote(Path::new(location)))
+}
+
+fn promotion_outcome(promoted: Result<PromoteReport, canon_store::tier::StoreError>) -> Result<String, PromoteRefusal> {
+    match promoted {
         // The report carries exactly this one candidate: committed or
         // recovered, or refused.
         Ok(report) => match report.promoted.iter().chain(&report.recovered).next().filter(|_| report.is_clean()) {

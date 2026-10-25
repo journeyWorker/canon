@@ -280,44 +280,70 @@ pub fn flow_scenarios(repo: &Path, change: &ChangeId) -> Result<FlowIndex, Strin
     Ok(index)
 }
 
-/// The changes the `@flow:<change>.<F-id>` tags of scenario `scenario_id`
-/// in spec root `project` name (0.25 D1), in tag order, read through the
-/// same Gherkin scan as [`flow_scenarios`]. Empty for an untagged
-/// scenario or an unreadable spec configuration.
-pub fn flow_changes_of(
-    repo: &Path,
-    project: &canon_model::ProjectId,
-    scenario_id: &canon_model::ScenarioId,
-) -> Vec<ChangeId> {
-    let Ok(roots) = crate::inventory::load_spec_roots(&repo.join("canon.yaml")) else {
-        return Vec::new();
-    };
-    let mut changes: Vec<ChangeId> = Vec::new();
-    for root in roots.iter().filter(|root| &root.id == project) {
-        for path in canon_fmt::util::feature_files(&root.root) {
+/// The changes the `@flow:<change>.<F-id>` tags of every scenario name
+/// (0.25 D1), keyed by spec root and scenario id, in tag order, read
+/// through the same Gherkin scan as [`flow_scenarios`]. Each spec root is
+/// walked on its first lookup, and once: a command that never asks pays no
+/// walk, one that asks about one scenario walks only that scenario's root,
+/// and one that asks per scenario walks each root once.
+pub struct FlowChangesIndex(std::cell::OnceCell<Vec<RootFlows>>);
+
+/// The spec roots of one project id of a [`FlowChangesIndex`] (in
+/// configuration order) and, once read, their scenarios' flow changes by
+/// scenario id.
+struct RootFlows {
+    id: String,
+    roots: Vec<std::path::PathBuf>,
+    flows: std::cell::OnceCell<BTreeMap<String, Vec<ChangeId>>>,
+}
+
+impl FlowChangesIndex {
+    /// An index that reads the spec configuration and walks a root on first
+    /// lookup.
+    pub fn lazy() -> Self {
+        Self(std::cell::OnceCell::new())
+    }
+
+    /// The changes the `@flow:` tags of scenario `scenario_id` in spec
+    /// root `project` name, in tag order. Empty for an untagged scenario,
+    /// an unknown root or an unreadable spec configuration.
+    pub fn changes_of(&self, repo: &Path, project: &canon_model::ProjectId, scenario_id: &canon_model::ScenarioId) -> &[ChangeId] {
+        let roots = self.0.get_or_init(|| {
+            let mut grouped: Vec<RootFlows> = Vec::new();
+            for root in crate::inventory::load_spec_roots(&repo.join("canon.yaml")).unwrap_or_default() {
+                match grouped.iter_mut().find(|group| group.id == root.id.as_str()) {
+                    Some(group) => group.roots.push(root.root),
+                    None => grouped.push(RootFlows { id: root.id.as_str().to_string(), roots: vec![root.root], flows: std::cell::OnceCell::new() }),
+                }
+            }
+            grouped
+        });
+        let Some(group) = roots.iter().find(|group| group.id == project.as_str()) else {
+            return &[];
+        };
+        group.flows.get_or_init(|| Self::walk(&group.roots)).get(scenario_id.as_str()).map_or(&[], Vec::as_slice)
+    }
+
+    fn walk(roots: &[std::path::PathBuf]) -> BTreeMap<String, Vec<ChangeId>> {
+        let mut flows: BTreeMap<String, Vec<ChangeId>> = BTreeMap::new();
+        for path in roots.iter().flat_map(|root| canon_fmt::util::feature_files(root)) {
             let Some(file) = crate::inventory::feature_file_scan(&path) else {
                 continue;
             };
-            for scenario in file
-                .scan
-                .scenarios
-                .iter()
-                .filter(|s| s.scenario_id == scenario_id.as_str())
-            {
+            for scenario in &file.scan.scenarios {
                 for tag in &scenario.flow_tags {
-                    if let Some(change) = tag
-                        .rsplit_once('.')
-                        .and_then(|(change, _)| ChangeId::parse(change).ok())
-                    {
-                        if !changes.contains(&change) {
-                            changes.push(change);
-                        }
+                    let Some(change) = tag.rsplit_once('.').and_then(|(change, _)| ChangeId::parse(change).ok()) else {
+                        continue;
+                    };
+                    let changes = flows.entry(scenario.scenario_id.clone()).or_default();
+                    if !changes.contains(&change) {
+                        changes.push(change);
                     }
                 }
             }
         }
+        flows
     }
-    changes
 }
 
 /// The flow step ids `change`'s brief defines, in order; empty for a

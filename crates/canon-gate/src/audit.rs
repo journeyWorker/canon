@@ -274,6 +274,7 @@ mod tests {
             corpus_violations: Vec::new(),
             unreadable_kinds: Vec::new(),
             code_tree: None,
+            derived: Default::default(),
             now: Utc::now(),
         }
     }

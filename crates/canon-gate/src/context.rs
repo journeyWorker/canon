@@ -31,6 +31,7 @@ use canon_store::git_tier::GitTier;
 use canon_store::tier::{StoreError, Tier, TierQuery};
 use chrono::{DateTime, Utc};
 
+use crate::derived::Derived;
 use crate::policy::PolicyResolution;
 use crate::Violation;
 
@@ -210,6 +211,10 @@ pub struct GateContext {
     /// with the record's own `code_tree`, never commit shas. `None` after
     /// [`Self::load`]: the loader does not run git.
     pub code_tree: Option<String>,
+    /// What this context derives from the corpus above, computed once per
+    /// command ([`crate::derived`]). After changing a corpus vector, call
+    /// [`GateContext::invalidate_derived`].
+    pub derived: Derived,
     pub now: DateTime<Utc>,
 }
 
@@ -272,6 +277,7 @@ impl GateContext {
             corpus_violations,
             unreadable_kinds,
             code_tree: None,
+            derived: Derived::default(),
             now,
         })
     }
@@ -293,8 +299,8 @@ fn read_corpus_kind<T: serde::de::DeserializeOwned>(
     let read = tier.read(&TierQuery::kind(kind))?;
     corpus_violations.extend(read.violations.into_iter().map(|violation| (kind, violation)));
     let mut out = Vec::with_capacity(read.records.len());
-    for raw in &read.records {
-        match serde_json::from_value::<T>(raw.0.clone()) {
+    for raw in read.records {
+        match serde_json::from_value::<T>(raw.0) {
             Ok(record) => out.push(record),
             // `RawRecord` is a bare body with no path, so the subject is
             // the kind itself. The tier's own `validate_body` already

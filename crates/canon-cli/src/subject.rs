@@ -414,7 +414,13 @@ const DOMAIN_ENUM: &str = "domain";
 /// invalidates history.
 pub fn enum_membership_violation(repo: &Path, enum_name: &str, value: &str) -> Option<String> {
     let (snapshot, _diags) = canon_vocab::resolve_snapshot(repo, None);
-    let members = snapshot.enums.get(enum_name)?;
+    enum_membership_in(&snapshot.enums, enum_name, value)
+}
+
+/// [`enum_membership_violation`] against enums already resolved, for a
+/// caller that checks many values and resolves the snapshot once.
+pub fn enum_membership_in(enums: &std::collections::BTreeMap<String, Vec<String>>, enum_name: &str, value: &str) -> Option<String> {
+    let members = enums.get(enum_name)?;
     if members.is_empty() || members.iter().any(|m| m == value) {
         return None;
     }
@@ -656,9 +662,10 @@ fn tagged_scenarios(resolved: &Path, subject_id: &SubjectId, change_id: &ChangeI
     let ctx = GateCtx::from_repo(resolved)
         .map_err(|e| e.to_string())
         .and_then(|ctx| GateContext::load(ctx, &schemas, Utc::now()).map_err(|e| e.to_string()))?;
+    let flow_changes = crate::brief_check::FlowChangesIndex::lazy();
     Ok(subject_scenarios(&ctx, subject_id)
         .into_iter()
-        .filter(|s| crate::brief_check::flow_changes_of(resolved, &s.project_id, &s.scenario_id).contains(change_id))
+        .filter(|s| flow_changes.changes_of(resolved, &s.project_id, &s.scenario_id).contains(change_id))
         .map(|s| s.scenario_id.as_str().to_string())
         .collect())
 }
@@ -949,11 +956,12 @@ pub fn run_move(
     // scenario tagged for it) does not freeze the maintenance loop.
     let adopted = changes.len();
     let (changes, pending_drafts) = match &gate_context {
-        Some(ctx) if ships || reopens => crate::brief::scope_changes(&repo, ctx, &subject, &changes),
+        Some(ctx) if ships || reopens => crate::brief::scope_changes(&repo, ctx, &crate::brief_check::FlowChangesIndex::lazy(), &subject, &changes),
         _ => (changes, Vec::new()),
     };
     let pending_note: Vec<String> = (!pending_drafts.is_empty()).then(|| crate::brief::pending_draft_line(&pending_drafts)).into_iter().collect();
 
+    let code_tree = crate::reverify::CodeTreeMemo::lazy();
     let mut blocking = match (ships, &gate_context) {
         (true, Some(ctx)) => ship_gate_violations(ctx, subject_id),
         _ => Vec::new(),
@@ -964,7 +972,7 @@ pub fn run_move(
         blocking.extend(crate::inventory::unrefreshable_roots(&repo).into_iter().map(|root| root.violation("verifying → shipped: ")));
         blocking.extend(brief_check_violation(&repo, subject_id, &changes));
         if let Some(ctx) = &gate_context {
-            blocking.extend(crate::reverify::chore_violations(&repo, ctx, &subject));
+            blocking.extend(crate::reverify::chore_violations(&repo, ctx, &code_tree, &subject));
         }
     }
     if reopens {
@@ -992,7 +1000,7 @@ pub fn run_move(
 
     if !blocking.is_empty() {
         let lines = blocking.iter().chain(&waivable).map(Violation::line).collect::<Vec<_>>().join("\n");
-        let mut hints: Vec<String> = crate::reverify::hint(&repo, gate_context.as_ref(), &subject, &blocking.iter().chain(&waivable).collect::<Vec<_>>()).into_iter().collect();
+        let mut hints: Vec<String> = crate::reverify::hint(&repo, gate_context.as_ref(), &code_tree, &subject, &blocking.iter().chain(&waivable).collect::<Vec<_>>()).into_iter().collect();
         if let Some(ctx) = &gate_context {
             let divergent = divergent_cells(ctx, subject_id, &blocking);
             if !divergent.is_empty() {
@@ -1027,7 +1035,7 @@ pub fn run_move(
             }
             let reverify: Vec<&Violation> = waivable.iter().filter(|v| canon_gate::review_gate::is_reverify(v)).collect();
             if reverify.iter().any(|v| !canon_gate::review_gate::is_scoped_reverify(v)) {
-                let commands = gate_context.as_ref().map(|ctx| crate::reverify::batch_commands_of(&repo, ctx, &subject)).unwrap_or_default();
+                let commands = gate_context.as_ref().map(|ctx| crate::reverify::batch_commands_of(&repo, ctx, &code_tree, &subject)).unwrap_or_default();
                 fixes.push(match commands.as_slice() {
                     [] => "record the suite again with `canon evidence add --all-scenarios` and a --report for each test report of the suite (a review stays current while the verdicts and checks are the same)".to_string(),
                     many => format!("record the suite again for the scenarios named with {} (a review stays current while the verdicts and checks are the same)", many.iter().map(|c| format!("`{c}`")).collect::<Vec<_>>().join("; ")),
@@ -1183,9 +1191,9 @@ fn review_checks(ctx: &GateContext, rr: &RequireReview, exclude_lanes: &[String]
 /// status`'s red flag on a shipped subject (0.18 D3) and the ship guard
 /// cannot disagree. The brief and the unrefreshable-index check are not
 /// here: status reports both on their own.
-pub(crate) fn shipped_gate_gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Violation> {
+pub(crate) fn shipped_gate_gaps(repo: &Path, ctx: &GateContext, code_tree: &crate::reverify::CodeTreeMemo, subject: &Subject) -> Vec<Violation> {
     let mut gaps = ship_gate_violations(ctx, &subject.subject_id);
-    gaps.extend(crate::reverify::chore_violations(repo, ctx, subject));
+    gaps.extend(crate::reverify::chore_violations(repo, ctx, code_tree, subject));
     if let Some((rr, exclude_lanes)) = active_require_review(ctx).filter(|(rr, _)| rr.covers(SubjectStatus::Shipped)) {
         let (unwaivable, waivable, _) = review_checks(ctx, rr, exclude_lanes, subject);
         let waiver = subject.status_override.as_ref().filter(|waiver| waiver.to == subject.status);
@@ -1245,7 +1253,7 @@ fn ship_gate_violations(gate_context: &GateContext, subject_id: &SubjectId) -> V
     let mut violations = Vec::new();
     for scenario in &owned {
         let sid = scenario.scenario_id.as_str().to_string();
-        let entries: Vec<&LedgerEntry> = verdicts.iter().filter(|((subject, _), _)| subject == &sid).map(|(_, entry)| entry).collect();
+        let entries: Vec<&LedgerEntry> = canon_gate::verdicts_of(verdicts, &sid).map(|(_, entry)| entry).collect();
         if entries.is_empty() {
             violations.push(Violation::new(FailureClass::UncoveredCell, sid.clone(), "verifying → shipped: no ledger verdict for this linked scenario"));
         } else if let Some(divergent) = entries.iter().find(|e| e.verdict == EvidenceVerdict::Divergent).filter(|_| !canon_gate::acceptance::is_accepted(gate_context, scenario)) {

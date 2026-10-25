@@ -702,7 +702,7 @@ Status fails closed rather than suggest progress the gate would refuse:
 ```json
 {
   "statusVersion": 3,
-  "canonVersion": "0.28.0",
+  "canonVersion": "0.29.0",
   "policy": { "present": true, "spec_coverage": { "require_evidence": true, "scope": [], "exclude_lanes": [], "require_cases": ["failure"], "require_review": { "scope": ["verifying", "shipped"], "distinct_actor": true, "block_on_findings": true } } },
   "warnings": [],
   "subjects": [

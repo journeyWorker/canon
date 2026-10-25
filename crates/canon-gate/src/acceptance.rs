@@ -27,7 +27,7 @@ use canon_model::{EvidenceVerdict, ProjectId, Scenario, ScenarioId, SessionId};
 use chrono::{DateTime, Utc};
 
 use crate::context::GateContext;
-use crate::ledger::latest_verdicts;
+use crate::ledger::{latest_verdicts, verdicts_of};
 use crate::freshness::{current_checks, evidence_current};
 use crate::spec_coverage::latest_scenarios;
 
@@ -85,11 +85,7 @@ fn acceptance_of(record: &Divergence) -> Option<Acceptance> {
 /// The latest acceptance of `scenario` and whether it holds now. `None`
 /// when the scenario was never accepted.
 pub fn held(ctx: &GateContext, scenario: &Scenario) -> Option<Held> {
-    let latest = ctx
-        .divergences
-        .iter()
-        .filter(|d| d.project_id == scenario.project_id && d.scenario_id == scenario.scenario_id && matches!(d.status, DivergenceStatus::Accepted { .. }))
-        .max_by_key(|d| (d.envelope.at, d.run_seq, d.round))?;
+    let latest = ctx.acceptance_fold().get(&(scenario.project_id.clone(), scenario.scenario_id.clone())).map(|&i| &ctx.divergences[i])?;
     let DivergenceStatus::Accepted { checks, .. } = &latest.status else { return None };
     let acceptance = acceptance_of(latest)?;
     if !evidence_current(checks.as_deref(), &current_checks(ctx, scenario)) {
@@ -135,7 +131,7 @@ pub fn accepted_divergences(ctx: &GateContext) -> Vec<Acceptance> {
     let verdicts = latest_verdicts(ctx);
     let mut out: Vec<Acceptance> = latest_scenarios(ctx)
         .into_iter()
-        .filter(|s| verdicts.iter().any(|((subject, _), entry)| subject == s.scenario_id.as_str() && entry.verdict == EvidenceVerdict::Divergent))
+        .filter(|s| verdicts_of(verdicts, s.scenario_id.as_str()).any(|(_, entry)| entry.verdict == EvidenceVerdict::Divergent))
         .filter_map(|s| match held(ctx, s)? {
             Held::Holds(acceptance) => Some(acceptance),
             Held::Stale(_) | Held::Expired(_) => None,
@@ -153,7 +149,7 @@ pub fn accepted_divergences(ctx: &GateContext) -> Vec<Acceptance> {
 pub fn refusal(ctx: &GateContext, scenario: &Scenario, reviewer: &str, actor_id: &str, session: Option<&SessionId>) -> Option<String> {
     let id = scenario.scenario_id.as_str();
     let verdicts = latest_verdicts(ctx);
-    let latest: Vec<_> = verdicts.iter().filter(|((subject, _), _)| subject == id).map(|(_, entry)| entry).collect();
+    let latest: Vec<_> = verdicts_of(verdicts, id).map(|(_, entry)| entry).collect();
     if latest.is_empty() {
         return Some(format!("{id} has no evidence: only a divergent verdict can be accepted as a known gap"));
     }
@@ -163,11 +159,7 @@ pub fn refusal(ctx: &GateContext, scenario: &Scenario, reviewer: &str, actor_id:
     }
     // Independence holds against EVERY attestation, superseded ones
     // included: the archive is read explicitly (`crate::history`).
-    let history = crate::history::evidence_history(ctx);
-    let evidence: Vec<_> = history
-        .iter()
-        .filter(|e| e.scenario_id.as_ref() == Some(&scenario.scenario_id) && e.project_id.as_ref().is_none_or(|p| *p == scenario.project_id))
-        .collect();
+    let evidence = crate::history::scenario_history(ctx, scenario);
     let actors: BTreeSet<&str> = evidence.iter().map(|e| e.envelope.actor.agent_id.as_str()).collect();
     if let Some(same) = [reviewer, actor_id].into_iter().find(|who| actors.contains(who)) {
         return Some(format!("`{same}` attested {id}'s evidence; acceptance is an independent reviewer's step, by an actor other than the evidence's"));
@@ -184,10 +176,8 @@ pub fn refusal(ctx: &GateContext, scenario: &Scenario, reviewer: &str, actor_id:
 /// one need not be the latest record, so this reads the archive too
 /// (`crate::history`).
 pub fn evidence_sha(ctx: &GateContext, scenario: &Scenario) -> Option<canon_model::Sha> {
-    let history = crate::history::evidence_history(ctx);
-    history
-        .iter()
-        .filter(|e| e.scenario_id.as_ref() == Some(&scenario.scenario_id) && e.project_id.as_ref().is_none_or(|p| *p == scenario.project_id))
+    crate::history::scenario_history(ctx, scenario)
+        .into_iter()
         .filter(|e| e.evidence_sha.is_some())
         .max_by_key(|e| e.envelope.at)
         .and_then(|e| e.evidence_sha.clone())

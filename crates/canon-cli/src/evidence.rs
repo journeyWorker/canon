@@ -272,7 +272,13 @@ fn load_gate_context(repo: &Path) -> Result<GateContext, String> {
 /// class and subject the ship guard's brief check prints. The subjects
 /// come from [`crate::brief::attested_briefs`]: the scenario's
 /// `@subject` owner and every subject adopting the task's change.
-fn brief_refusals(repo: &Path, ctx: &GateContext, task_id: Option<&TaskId>, scenario: Option<(&ProjectId, &ScenarioId)>) -> Vec<BriefRefusal> {
+fn brief_refusals(
+    repo: &Path,
+    ctx: &GateContext,
+    flow_changes: &crate::brief_check::FlowChangesIndex,
+    task_id: Option<&TaskId>,
+    scenario: Option<(&ProjectId, &ScenarioId)>,
+) -> Vec<BriefRefusal> {
     // An unreadable `plans:` section finds no external proposal.md;
     // `canon status` warns about it.
     let plan_roots = crate::brief::plan_roots(repo).unwrap_or_default();
@@ -281,7 +287,7 @@ fn brief_refusals(repo: &Path, ctx: &GateContext, task_id: Option<&TaskId>, scen
         .flatten()
         .collect::<Vec<_>>()
         .join(" and ");
-    crate::brief::attested_briefs(repo, &plan_roots, ctx, task_id, scenario)
+    crate::brief::attested_briefs(repo, &plan_roots, ctx, flow_changes, task_id, scenario)
         .into_iter()
         .filter(|(_, brief)| brief.enforced)
         .map(|(subject, brief)| BriefRefusal {
@@ -915,7 +921,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit(&args.full(), args.json);
         }
     };
-    let refusals = brief_refusals(&repo, &gate_context, args.task_id.as_ref(), args.project_id.as_ref().zip(args.scenario_id.as_ref()));
+    let refusals = brief_refusals(&repo, &gate_context, &crate::brief_check::FlowChangesIndex::lazy(), args.task_id.as_ref(), args.project_id.as_ref().zip(args.scenario_id.as_ref()));
     if let Err(error) = report_brief_refusals(args, &refusals) {
         return error.emit(&args.full(), args.json);
     }
@@ -1103,15 +1109,21 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
 /// verifies again what the review saw, and the review stays current when
 /// the new record says the same).
 fn repeat_of_latest(ledger_root: &Path, body: &serde_json::Value) -> Option<crate::retry::Existing> {
-    let reviewed = |review: &serde_json::Value| ["project_id", "scenario_id"].iter().all(|key| review.get(key) == body.get(key));
-    crate::retry::repeats_latest(
-        ledger_root,
-        Some(&evidence_staging_dir(ledger_root)),
-        RecordKind::EvidenceRecord.as_str(),
-        body,
-        |stored| same_evidence_subject(stored, body),
-        Some((RecordKind::Review.as_str(), &reviewed)),
-    )
+    repeats_of_latest(ledger_root, std::slice::from_ref(body)).into_iter().next().flatten()
+}
+
+/// [`repeat_of_latest`] for each of `bodies`, which a batch checks before
+/// it writes any of them: the ledger, the staging area and the reviews are
+/// read once for all of them, not once per body.
+fn repeats_of_latest(ledger_root: &Path, bodies: &[serde_json::Value]) -> Vec<Option<crate::retry::Existing>> {
+    let corpus = crate::retry::RepeatCorpus::read(ledger_root, Some(&evidence_staging_dir(ledger_root)), RecordKind::EvidenceRecord.as_str(), Some(RecordKind::Review.as_str()));
+    bodies
+        .iter()
+        .map(|body| {
+            let reviewed = |review: &serde_json::Value| ["project_id", "scenario_id"].iter().all(|key| review.get(key) == body.get(key));
+            corpus.repeats(body, |stored| same_evidence_subject(stored, body), Some(&reviewed))
+        })
+        .collect()
 }
 
 /// Whether the stored record `stored` attests the same subject as `body`:
@@ -1305,7 +1317,10 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         }
     }
 
-    let refusals: Vec<Vec<BriefRefusal>> = scenario_ids.iter().map(|id| brief_refusals(repo, &gate_context, None, Some((project_id, id)))).collect();
+    // One flow-change index for the whole batch: each lookup is then a map
+    // read, not a walk of every spec root per scenario (0.29 D3).
+    let flow_changes = crate::brief_check::FlowChangesIndex::lazy();
+    let refusals: Vec<Vec<BriefRefusal>> = scenario_ids.iter().map(|id| brief_refusals(repo, &gate_context, &flow_changes, None, Some((project_id, id)))).collect();
     if let Err(error) = report_brief_refusals(args, &refusals.concat()) {
         let hint = format!("no record of the batch is written; {}", error.hint.as_deref().unwrap_or_default());
         return error.hint(hint).emit("canon evidence add", args.json);
@@ -1342,10 +1357,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
     // A record that repeats its scenario's latest one is not written again
     // (`crate::retry`); the rest of the batch is.
     let all_bodies: Vec<serde_json::Value> = records.iter().map(|record| record_body(record, args)).collect();
-    let repeats: Vec<Option<crate::retry::Existing>> = all_bodies
-        .iter()
-        .map(|body| repeat_of_latest(&ledger_root, body))
-        .collect();
+    let repeats: Vec<Option<crate::retry::Existing>> = repeats_of_latest(&ledger_root, &all_bodies);
     let mut unchanged = Vec::new();
     for ((record, id), repeat) in records.iter().zip(&scenario_ids).zip(&repeats) {
         if let Some(existing) = repeat {
@@ -1491,8 +1503,12 @@ fn land_batch(
         }
     }
     if promote {
+        // One committed-history read for the whole batch, and one archive
+        // pass after the last record, instead of one of each per record.
+        let committed = GitTier::new(ledger_root);
+        let mut promoter = canon_gate::promote::EvidencePromoter::new(&staging, &committed);
         for index in 0..locations.len() {
-            match crate::gate::try_promote(ledger_root, &locations[index].staged) {
+            match crate::gate::try_promote_in(&mut promoter, &locations[index].staged) {
                 Ok(target) => locations[index].promoted = Some(target),
                 Err(refusal) => {
                     let why = if refusal.lines.trim().is_empty() { refusal.error.message.clone() } else { refusal.lines.trim_end().to_string() };
@@ -1502,6 +1518,7 @@ fn land_batch(
                 }
             }
         }
+        promoter.archive();
     }
     let stored = held.stored();
     Ok(LandedBatch { stored, locations })
@@ -1533,19 +1550,23 @@ fn stale_review_notices(ctx: &mut GateContext, written: &[EvidenceRecord]) -> Ve
     let mut current_before = Vec::new();
     for (scenario, review) in &candidates {
         ctx.reviews = vec![review.clone()];
+        ctx.invalidate_reviews();
         current_before.push(review_gap(ctx, scenario, false).is_none());
     }
     let evidence = ctx.evidence.len();
     ctx.evidence.extend(declared);
+    ctx.invalidate_evidence();
     let mut stale = Vec::new();
     for ((scenario, review), was_current) in candidates.into_iter().zip(current_before) {
         ctx.reviews = vec![review.clone()];
+        ctx.invalidate_reviews();
         if was_current && review_gap(ctx, &scenario, false).is_some_and(|gap| gap.kind == ReviewGapKind::Stale) {
             stale.push(review);
         }
     }
     ctx.evidence.truncate(evidence);
     ctx.reviews = reviews;
+    ctx.invalidate_derived();
     stale
 }
 

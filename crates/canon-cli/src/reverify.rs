@@ -135,19 +135,41 @@ fn chore_approvals(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<(Ch
         .collect()
 }
 
+/// The code tree as it is now, computed at most once per command and only
+/// when a subject with an approved chore needs it (`git add -A` over the
+/// work tree is the cost). Errors (no git work tree) read as `None`, the
+/// same as [`crate::git_rev::code_tree`] failing for the time-rule-only case.
+pub struct CodeTreeMemo(std::cell::OnceCell<Option<String>>);
+
+impl CodeTreeMemo {
+    /// A memo that computes the tree on first use.
+    pub fn lazy() -> Self {
+        Self(std::cell::OnceCell::new())
+    }
+
+    /// A memo for a tree the command already computed.
+    pub fn known(tree: Option<String>) -> Self {
+        Self(std::cell::OnceCell::from(tree))
+    }
+
+    fn get(&self, repo: &Path) -> Option<&str> {
+        self.0.get_or_init(|| crate::git_rev::code_tree(repo, None).ok().map(|c| c.tree)).as_deref()
+    }
+}
+
 /// Every unmet chore trigger of `subject`.
-pub fn chore_gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Gap> {
+pub fn chore_gaps(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, subject: &Subject) -> Vec<Gap> {
     let approvals = chore_approvals(repo, ctx, subject);
     if approvals.is_empty() {
         return Vec::new();
     }
     // The code as it is now (D11): a scenario last evidenced on it needs nothing.
     // No git work tree means nothing to compare, and the time rule stands.
-    let code_tree = crate::git_rev::code_tree(repo, None).ok().map(|c| c.tree);
+    let code_tree = code_tree.get(repo);
     approvals
         .into_iter()
         .filter_map(|(change, since, _)| {
-            let scenarios: Vec<(String, String)> = scenarios_without_evidence_after_on_code(ctx, &subject.subject_id, since, code_tree.as_deref())
+            let scenarios: Vec<(String, String)> = scenarios_without_evidence_after_on_code(ctx, &subject.subject_id, since, code_tree)
                 .into_iter()
                 .map(|s| (s.project_id.as_str().to_string(), s.scenario_id.as_str().to_string()))
                 .collect();
@@ -206,8 +228,8 @@ fn reviewed_scenario_by_scenario_since(ctx: &GateContext, subject: &Subject, sin
 /// Every unmet trigger of `subject`, for `canon status`: the chore
 /// triggers and, when `require_review.block_on_findings` is on, the
 /// fixed blockers on its changes.
-pub fn gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Gap> {
-    let mut gaps = chore_gaps(repo, ctx, subject);
+pub fn gaps(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, subject: &Subject) -> Vec<Gap> {
+    let mut gaps = chore_gaps(repo, ctx, code_tree, subject);
     if active_require_review(ctx).is_some_and(|(rr, _)| rr.block_on_findings) {
         let changes = subject_change_ids(ctx, subject);
         for fixed in fixed_blockers(ctx).into_iter().filter(|f| changes.contains(&f.finding.change_id)) {
@@ -224,7 +246,7 @@ pub fn gaps(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Gap> {
 
 /// The `verifying → shipped` violations of the chore trigger: one
 /// `uncovered-cell` per unapproved-by-evidence chore, naming `subject`.
-pub fn chore_violations(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<Violation> {
+pub fn chore_violations(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, subject: &Subject) -> Vec<Violation> {
     let reviews = chore_review_gaps(repo, ctx, subject).into_iter().map(|(change, why)| {
         Violation::new(
             FailureClass::UnreviewedPromotion,
@@ -232,7 +254,7 @@ pub fn chore_violations(repo: &Path, ctx: &GateContext, subject: &Subject) -> Ve
             format!("chore change `{}` approved: {why}; {}", change.as_str(), chore_review_remedy(&change))
         )
     });
-    chore_gaps(repo, ctx, subject)
+    chore_gaps(repo, ctx, code_tree, subject)
         .into_iter()
         .map(|gap| {
             Violation::new(
@@ -265,7 +287,7 @@ pub fn chore_review_remedy(change: &ChangeId) -> String {
 /// report paths, [`Gap::commands`]) and what follows it, or, when every such
 /// refusal is for a finding that names its scenarios, the per-scenario
 /// command.
-pub fn hint(repo: &Path, ctx: Option<&GateContext>, subject: &Subject, violations: &[&Violation]) -> Option<String> {
+pub fn hint(repo: &Path, ctx: Option<&GateContext>, code_tree: &CodeTreeMemo, subject: &Subject, violations: &[&Violation]) -> Option<String> {
     let reverify: Vec<&&Violation> = violations.iter().filter(|v| is_reverify(v)).collect();
     if reverify.is_empty() {
         return None;
@@ -273,7 +295,7 @@ pub fn hint(repo: &Path, ctx: Option<&GateContext>, subject: &Subject, violation
     if reverify.iter().all(|v| is_scoped_reverify(v)) {
         return Some("record evidence again for the scenarios named, one command each (`canon evidence add --project-id <root> --scenario-id <id> --report <junit|cucumber|swift-testing>:<path> --role implementer`); the rest of the suite needs nothing; reviews stay current while a scenario's verdict and checks are unchanged, then ship".to_string());
     }
-    let commands = ctx.map(|ctx| batch_commands_of(repo, ctx, subject)).unwrap_or_default();
+    let commands = ctx.map(|ctx| batch_commands_of(repo, ctx, code_tree, subject)).unwrap_or_default();
     let how = match commands.as_slice() {
         [] => "record the suite again for the scenarios named with `canon evidence add --all-scenarios` and a --report for each test report of the suite".to_string(),
         [one] => format!("record the suite again for the scenarios named: `{one}`"),
@@ -287,9 +309,9 @@ pub fn hint(repo: &Path, ctx: Option<&GateContext>, subject: &Subject, violation
 }
 
 /// The batch commands of every whole-suite gap of `subject`, each once.
-pub fn batch_commands_of(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<String> {
+pub fn batch_commands_of(repo: &Path, ctx: &GateContext, code_tree: &CodeTreeMemo, subject: &Subject) -> Vec<String> {
     let mut commands: Vec<String> = Vec::new();
-    for gap in gaps(repo, ctx, subject).into_iter().filter(|g| !g.scoped) {
+    for gap in gaps(repo, ctx, code_tree, subject).into_iter().filter(|g| !g.scoped) {
         for command in gap.commands {
             if !commands.contains(&command) {
                 commands.push(command);

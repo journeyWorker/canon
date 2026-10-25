@@ -55,9 +55,8 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use canon_model::{Actor, EvidenceRecord, FlaggedOverlay, ProjectId, RecordKind, Review, ScenarioId, TrustLifecycle};
+use canon_model::{Actor, EvidenceRecord, FlaggedOverlay, ProjectId, RecordKind, ScenarioId, TrustLifecycle};
 use canon_store::git_tier::GitTier;
-use canon_store::tier::{Tier, TierQuery};
 
 use crate::context::{GateCheck, GateContext};
 use crate::failure_class::{FailureClass, Violation};
@@ -116,14 +115,14 @@ impl ReviewIndex {
     }
 }
 
-fn review_index(ledger_root: &Path) -> ReviewIndex {
+/// The reviews [`GateContext::load`] already read, indexed: the Review kind
+/// is not read a second time.
+fn review_index(ctx: &GateContext) -> ReviewIndex {
     let mut index = ReviewIndex::default();
-    let reviews = GitTier::new(ledger_root).read(&TierQuery::kind(RecordKind::Review)).map(|read| read.records).unwrap_or_default();
-    for raw in reviews {
-        let Ok(review) = serde_json::from_value::<Review>(raw.0) else { continue };
-        let Some(scenario_id) = review.scenario_id else { continue };
+    for review in &ctx.reviews {
+        let Some(scenario_id) = &review.scenario_id else { continue };
         index.composite.insert((review.project_id.clone(), scenario_id.clone()));
-        index.bare.insert(scenario_id);
+        index.bare.insert(scenario_id.clone());
     }
     index
 }
@@ -153,7 +152,7 @@ impl GateCheck for TrustLadderCheck {
     }
 
     fn run(&self, ctx: &GateContext) -> Vec<Violation> {
-        let reviewed = review_index(&ctx.ctx.ledger_root);
+        let reviewed = review_index(ctx);
 
         let mut violations = Vec::new();
         for record in &ctx.evidence {
@@ -196,7 +195,7 @@ impl GateCheck for ReleaseTrustCheck {
 
     fn run(&self, ctx: &GateContext) -> Vec<Violation> {
         let raw_records = raw_evidence(&ctx.ctx.ledger_root);
-        let reviewed = review_index(&ctx.ctx.ledger_root);
+        let reviewed = review_index(ctx);
         let now = ctx.now;
 
         let mut violations = Vec::new();
@@ -291,6 +290,8 @@ pub fn attempt_clear(current: &FlaggedOverlay, clearing_actor: &Actor) -> Result
 #[cfg(test)]
 mod tests {
     use canon_model::{Envelope, EvidenceVerdict, ProjectId, ProvenanceRef, RoleId};
+    use canon_model::Review;
+    use canon_store::tier::Tier;
     use chrono::Utc;
     use canon_policy::SchemaRegistry;
     use tempfile::TempDir;

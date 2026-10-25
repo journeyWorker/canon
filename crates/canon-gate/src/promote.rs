@@ -977,44 +977,73 @@ fn promote_with_run_seq(staging: &GitTier, committed: &GitTier, scope: Scope<'_>
     let (staged, malformed) = staged_in_scope(staging, RecordKind::EvidenceRecord, scope)?;
     report.refused.extend(malformed);
 
-    // `1 + max(run_seq)` per (role, surface), scanning only the
-    // committed tier's own already-landed records (parity.py
-    // `_next_run_seq`) — `next_seq` holds the HIGHEST run_seq assigned
-    // so far per key; each successful promotion below bumps it by
-    // exactly one, so N candidates for the same key in one call get N
-    // distinct sequential values without re-scanning disk per
-    // candidate.
-    // The recovery index reads the archive too: a committed attestation that a
-    // newer version archived is still "already committed" (0.23 D2).
-    let committed_read = committed.read_history(RecordKind::EvidenceRecord)?;
-    let mut next_seq: HashMap<(RoleId, String), u64> = HashMap::new();
-    // The SAME scan also indexes every committed record by the
-    // `staging_id` it was promoted under (module doc's recovery section),
-    // so the per-candidate loop below can recognize an attestation an
-    // interrupted earlier call already committed instead of appending it a
-    // second time. One pass, not two: the recovery index and the
-    // partition maxima are both facts about the committed corpus.
-    let mut already_committed: HashMap<String, RecoveredCommit> = HashMap::new();
-    for raw in &committed_read.records {
-        let Ok(record) = serde_json::from_value::<EvidenceRecord>(raw.0.clone()) else { continue };
-        let Some(key) = partition_key(&record) else { continue };
-        let Some(seq) = raw.0.get("run_seq").and_then(serde_json::Value::as_u64) else { continue };
-        let slot = next_seq.entry(key).or_insert(0);
-        *slot = (*slot).max(seq);
+    let mut index = EvidenceIndex::read(committed)?;
+    promote_evidence_candidates(staging, &mut index, staged, dry_run, &mut |write| committed.write(write), report)
+}
 
-        let Some(staging_id) = raw.0.get(STAGING_ID_KEY).and_then(serde_json::Value::as_str) else { continue };
-        // LOWEST `run_seq` wins when one identity somehow appears twice
-        // (a corpus that already carries duplicates from before this
-        // recovery existed): the earliest commit is the original, and
-        // "earliest" is a total order over the data rather than an
-        // artifact of directory-walk order.
-        if already_committed.get(staging_id).is_some_and(|existing| existing.run_seq <= seq) {
-            continue;
+/// What promotion reads off the committed evidence history: the highest
+/// `run_seq` per partition, and every committed attestation by the
+/// `staging_id` it was promoted under.
+///
+/// `1 + max(run_seq)` per (role, surface), scanning only the committed
+/// tier's own already-landed records (parity.py `_next_run_seq`) —
+/// `next_seq` holds the HIGHEST run_seq assigned so far per key; each
+/// successful promotion bumps it by exactly one, so N candidates for the
+/// same key get N distinct sequential values without re-scanning disk per
+/// candidate. The recovery index reads the archive too: a committed
+/// attestation that a newer version archived is still "already committed"
+/// (0.23 D2).
+struct EvidenceIndex {
+    next_seq: HashMap<(RoleId, String), u64>,
+    already_committed: HashMap<String, RecoveredCommit>,
+}
+
+impl EvidenceIndex {
+    /// The SAME scan indexes every committed record by the `staging_id` it
+    /// was promoted under (module doc's recovery section), so the
+    /// per-candidate loop can recognize an attestation an interrupted
+    /// earlier call already committed instead of appending it a second
+    /// time. One pass, not two: the recovery index and the partition
+    /// maxima are both facts about the committed corpus.
+    fn read(committed: &GitTier) -> Result<Self, StoreError> {
+        let committed_read = committed.read_history_shared(RecordKind::EvidenceRecord)?;
+        let mut next_seq: HashMap<(RoleId, String), u64> = HashMap::new();
+        let mut already_committed: HashMap<String, RecoveredCommit> = HashMap::new();
+        for raw in &committed_read.records {
+            let Ok(record) = <EvidenceRecord as serde::Deserialize>::deserialize(&raw.0) else { continue };
+            let Some(key) = partition_key(&record) else { continue };
+            let Some(seq) = raw.0.get("run_seq").and_then(serde_json::Value::as_u64) else { continue };
+            let slot = next_seq.entry(key).or_insert(0);
+            *slot = (*slot).max(seq);
+
+            let Some(staging_id) = raw.0.get(STAGING_ID_KEY).and_then(serde_json::Value::as_str) else { continue };
+            // LOWEST `run_seq` wins when one identity somehow appears twice
+            // (a corpus that already carries duplicates from before this
+            // recovery existed): the earliest commit is the original, and
+            // "earliest" is a total order over the data rather than an
+            // artifact of directory-walk order.
+            if already_committed.get(staging_id).is_some_and(|existing| existing.run_seq <= seq) {
+                continue;
+            }
+            let target = expected_relative_path(RecordKind::EvidenceRecord, &raw.0).map_err(StoreError::Layout)?;
+            already_committed.insert(staging_id.to_string(), RecoveredCommit { run_seq: seq, target });
         }
-        let target = expected_relative_path(RecordKind::EvidenceRecord, &raw.0).map_err(StoreError::Layout)?;
-        already_committed.insert(staging_id.to_string(), RecoveredCommit { run_seq: seq, target });
+        Ok(Self { next_seq, already_committed })
     }
+}
 
+/// Promote staged evidence candidates against `index`, committing each
+/// through `commit` (`GitTier::write`, or `write_unarchived` for a batch
+/// that archives once at its end) and recording what it assigned in
+/// `report`.
+fn promote_evidence_candidates(
+    staging: &GitTier,
+    index: &mut EvidenceIndex,
+    staged: Vec<RawRecord>,
+    dry_run: bool,
+    commit: &mut dyn FnMut(&RawWrite) -> Result<canon_store::tier::WriteReceipt, StoreError>,
+    report: &mut PromoteReport,
+) -> Result<(), StoreError> {
     // Parse every well-formed staging candidate up front so processing
     // order is deterministic (same staging set -> same run_seq
     // assignment every run) rather than filesystem-walk order.
@@ -1049,7 +1078,7 @@ fn promote_with_run_seq(staging: &GitTier, committed: &GitTier, scope: Scope<'_>
         // after an interrupted call still has (module doc).
         let staging_id = staging_candidate_id(&raw.0);
 
-        if let Some(existing) = already_committed.get(&staging_id) {
+        if let Some(existing) = index.already_committed.get(&staging_id) {
             // This exact attestation is already in the append-only
             // committed ledger: an earlier call wrote it and did not get
             // to remove the staging source. Completing that call means
@@ -1069,7 +1098,7 @@ fn promote_with_run_seq(staging: &GitTier, committed: &GitTier, scope: Scope<'_>
         }
 
         let seq = {
-            let slot = next_seq.entry((role.clone(), surface.clone())).or_insert(0);
+            let slot = index.next_seq.entry((role.clone(), surface.clone())).or_insert(0);
             *slot += 1;
             *slot
         };
@@ -1078,13 +1107,14 @@ fn promote_with_run_seq(staging: &GitTier, committed: &GitTier, scope: Scope<'_>
         let target = expected_relative_path(RecordKind::EvidenceRecord, &body).map_err(StoreError::Layout)?;
 
         if !dry_run {
-            committed.write(&RawWrite(RawRecord(body)))?;
+            commit(&RawWrite(RawRecord(body)))?;
             // The window (module doc): if this removal does not land, the
             // record above is committed and the staging file survives. A
             // retry then finds `staging_id` in `already_committed` and
             // takes the recovery branch instead of promoting again.
             let staging_relative = expected_relative_path(RecordKind::EvidenceRecord, &raw.0).map_err(StoreError::Layout)?;
             std::fs::remove_file(staging.root().join(&staging_relative))?;
+            index.already_committed.insert(staging_id, RecoveredCommit { run_seq: seq, target: target.clone() });
         }
 
         report.promoted.push(Promoted {
@@ -1095,6 +1125,83 @@ fn promote_with_run_seq(staging: &GitTier, committed: &GitTier, scope: Scope<'_>
     }
 
     Ok(())
+}
+
+/// [`promote_staged`] for a sequence of staged evidence records that one
+/// command stages together (`canon evidence add` over a batch): the
+/// committed history is read once, on the first record, and every later
+/// record is promoted against the index that read built, which each
+/// commit updates. Records are promoted in the order they are passed, one
+/// [`PromoteReport`] each, exactly as the same number of [`promote_staged`]
+/// calls would assign and report them.
+///
+/// Commits are NOT archived one by one: a version a record supersedes
+/// moves to the archive in one pass, [`Self::archive`], once the caller
+/// has landed every record. A caller whose batch fails drops the promoter
+/// instead, and nothing was archived.
+///
+/// The committed files match per-record promotion always; the archive
+/// matches it when no two records of the batch share a `(project,
+/// scenario)` or task. With two that do, a risk approval the first record
+/// made stale and the second made current again stays in the ledger,
+/// where per-record archiving would have moved it. `canon evidence add`'s
+/// batches hold one record per indexed scenario, so they never do.
+pub struct EvidencePromoter<'a> {
+    staging: &'a GitTier,
+    committed: &'a GitTier,
+    index: Option<EvidenceIndex>,
+    /// The last record committed and where it landed, for the archive pass
+    /// and the warning it prints when it fails.
+    last: Option<(RawRecord, String)>,
+}
+
+impl<'a> EvidencePromoter<'a> {
+    pub fn new(staging: &'a GitTier, committed: &'a GitTier) -> Self {
+        Self { staging, committed, index: None, last: None }
+    }
+
+    /// Promote the one staged record at staging-relative `relative`.
+    /// A path outside `kind=evidence_record/` takes [`promote_staged`]'s
+    /// own route.
+    pub fn promote(&mut self, relative: &Path) -> Result<PromoteReport, StoreError> {
+        let kind_dir = format!("kind={}", RecordKind::EvidenceRecord.as_str());
+        if relative.components().next().and_then(|component| component.as_os_str().to_str()) != Some(kind_dir.as_str()) {
+            return promote_staged(self.staging, self.committed, relative);
+        }
+        let mut report = PromoteReport::default();
+        let (staged, malformed) = staged_in_scope(self.staging, RecordKind::EvidenceRecord, Scope::One(relative))?;
+        report.refused.extend(malformed);
+        let committed = self.committed;
+        let index = match &mut self.index {
+            Some(index) => index,
+            empty => empty.insert(EvidenceIndex::read(committed)?),
+        };
+        let last = &mut self.last;
+        promote_evidence_candidates(
+            self.staging,
+            index,
+            staged,
+            false,
+            &mut |write| {
+                let receipt = committed.write_unarchived(write)?;
+                *last = Some((write.0.clone(), receipt.location.clone()));
+                Ok(receipt)
+            },
+            &mut report,
+        )?;
+        Ok(report)
+    }
+
+    /// Move every evidence version the batch superseded to the archive,
+    /// once. A failure leaves the ledger readable and is reported on
+    /// stderr like [`Tier::write`]'s own, for the next append or `canon
+    /// ledger compact` to finish.
+    pub fn archive(self) {
+        let Some((written, location)) = self.last else { return };
+        if let Err(e) = self.committed.archive_after_write(RecordKind::EvidenceRecord, &written) {
+            eprintln!("canon: wrote {location} but could not archive the versions it supersedes ({e}); `canon ledger compact` moves them");
+        }
+    }
 }
 
 /// The `run_seq` a staged `Divergence` carries until promotion assigns
@@ -1701,6 +1808,71 @@ mod tests {
         let report2 = promote(&staging, &committed, false).unwrap();
         assert_eq!(report2.promoted.len(), 1);
         assert_eq!(report2.promoted[0].run_seq(), Some(3));
+    }
+
+    /// The names under `<dir>/.canon/<tier>/kind=evidence_record/`, sorted.
+    fn evidence_names(dir: &TempDir, tier: &str) -> Vec<String> {
+        let kind_dir = dir.path().join(".canon").join(tier).join("kind=evidence_record");
+        let mut names: Vec<String> = std::fs::read_dir(kind_dir)
+            .map(|entries| entries.filter_map(Result::ok).filter(|entry| entry.path().is_file()).map(|entry| entry.file_name().to_string_lossy().into_owned()).collect())
+            .unwrap_or_default();
+        names.sort();
+        names
+    }
+
+    /// A batch promoted through one [`EvidencePromoter`] lands exactly as
+    /// the same records promoted by one [`promote_staged`] call each: the
+    /// same reports (so the same `run_seq` per partition, in the order
+    /// given), the same committed files, and, after the one archive pass,
+    /// the same superseded versions in the archive.
+    #[test]
+    fn a_promoter_lands_a_batch_as_sequential_promote_staged_calls_do() {
+        let first = evidence("implementer", Some("world.firstbuy-hotdeal.14"));
+        let mut second = evidence("implementer", Some("world.firstbuy-hotdeal.14"));
+        second.envelope.at = first.envelope.at + chrono::Duration::seconds(5);
+        let other = evidence("implementer", Some("world.firstbuy-hotdeal.26"));
+        let batch = [first, second, other];
+
+        let sequential = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&sequential);
+        let mut expected = Vec::new();
+        for record in &batch {
+            let location = staging.write(record).unwrap().location;
+            expected.push(promote_staged(&staging, &committed, Path::new(&location)).unwrap());
+        }
+
+        let batched = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&batched);
+        let locations: Vec<String> = batch.iter().map(|record| staging.write(record).unwrap().location).collect();
+        let mut promoter = EvidencePromoter::new(&staging, &committed);
+        let reports: Vec<PromoteReport> = locations.iter().map(|location| promoter.promote(Path::new(location)).unwrap()).collect();
+        assert!(evidence_names(&batched, "archive").is_empty(), "nothing is archived until the batch has landed");
+        promoter.archive();
+
+        assert_eq!(reports, expected);
+        assert_eq!(reports.iter().map(|r| r.promoted[0].run_seq()).collect::<Vec<_>>(), vec![Some(1), Some(2), Some(3)]);
+        assert_eq!(evidence_names(&batched, "ledger"), evidence_names(&sequential, "ledger"));
+        assert_eq!(evidence_names(&batched, "archive"), evidence_names(&sequential, "archive"));
+        assert!(!evidence_names(&batched, "archive").is_empty(), "the first version of .14 is superseded, so the pass moved it");
+    }
+
+    /// A record that is not staged is refused by the promoter as it is by
+    /// [`promote_staged`], and the batch's later records still promote
+    /// against the index.
+    #[test]
+    fn a_promoter_refuses_a_missing_candidate_and_continues() {
+        let dir = TempDir::new().unwrap();
+        let (staging, committed) = tiers(&dir);
+        let mut promoter = EvidencePromoter::new(&staging, &committed);
+        let gone = "kind=evidence_record/world.firstbuy-hotdeal.14__000000000000.json";
+        let expected = promote_staged(&staging, &committed, Path::new(gone)).unwrap();
+        let refused = promoter.promote(Path::new(gone)).unwrap();
+        assert_eq!(refused, expected);
+        assert_eq!(refused.refused.len(), 1);
+
+        let location = staging.write(&evidence("implementer", Some("world.firstbuy-hotdeal.14"))).unwrap().location;
+        let report = promoter.promote(Path::new(&location)).unwrap();
+        assert_eq!(report.promoted[0].run_seq(), Some(1));
     }
 
     #[test]

@@ -318,10 +318,18 @@ impl GitTier {
     /// The one history read (`canon query --history`, the rules that
     /// name history). Violations from both sides are returned.
     pub fn read_history(&self, kind: RecordKind) -> Result<crate::tier::TierReadResult, StoreError> {
-        use crate::tier::{Tier, TierQuery};
-        let mut read = self.read(&TierQuery::kind(kind))?;
+        self.read_history_shared(kind).map(crate::git_tier::SharedRead::into_owned)
+    }
+
+    /// [`Self::read_history`] with the records shared with the per-process
+    /// file cache rather than copied: for a reader that only borrows each
+    /// body (`T::deserialize(&raw.0)`), as promotion's committed-history
+    /// index does.
+    pub fn read_history_shared(&self, kind: RecordKind) -> Result<crate::git_tier::SharedRead, StoreError> {
+        use crate::tier::TierQuery;
+        let mut read = self.read_shared(&TierQuery::kind(kind))?;
         if let Some(archive) = self.archive_tier() {
-            let archived = archive.read(&TierQuery::kind(kind))?;
+            let archived = archive.read_shared(&TierQuery::kind(kind))?;
             read.records.extend(archived.records);
             read.violations.extend(archived.violations);
         }
@@ -406,6 +414,14 @@ fn scope_of(kind: RecordKind, raw: &RawRecord) -> Option<(PathBuf, Box<dyn Fn(&s
             let prefix = format!("{}__{}__", text(&raw.0, "project_id")?, target);
             Some((dir, Box::new(move |name| name.starts_with(&prefix))))
         }
+        // `EvidenceRecord` has no narrower scope, on purpose: the ledger
+        // is one flat directory keyed by scenario or task, but its fold
+        // groups span keys (the `run_seq` partition covers every scenario
+        // of one surface, the project and subject groups several), so a
+        // fresh record can supersede a file under any other key, and a
+        // pass has always moved every superseded version it finds.
+        // `canon evidence add` therefore writes a batch unarchived and
+        // calls `archive_after_write` once, after the last record.
         _ => None,
     }
 }

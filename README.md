@@ -82,6 +82,89 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+## 0.29.0 release
+
+Shared derived data. `canon gate check`, `canon status` and a batch
+`canon evidence add` derive whole-corpus data once per command instead of once
+per subject, scenario or record. Output does not change: this release changes
+cost, not behaviour. Plan: `docs/superpowers/plans/2026-10-24-canon-0.29.0-shared-derived-data.md`;
+release order and findings: `docs/superpowers/notes/2026-10-24-canon-0.29-0.30-release-order.md`.
+
+### Measured
+
+Release builds, best run by CPU (user+sys), synthetic corpus from
+`scripts/bench/` (25 scenarios per subject, 3 evidence and 2 reviews per
+scenario; the batch lands B records into a ledger of 10×B scenarios).
+
+| Command | Size | 0.28 CPU s | 0.29 CPU s | 0.28 RSS MB | 0.29 RSS MB |
+|---|---:|---:|---:|---:|---:|
+| `gate check` | 300 scenarios | 1.01 | 0.25 | 27 | 21 |
+| `gate check` | 1000 scenarios | 16.17 | 0.66 | 56 | 50 |
+| `gate check` | 3000 scenarios | 45.14 | 1.85 | 133 | 118 |
+| `status` | 300 scenarios | 1.01 | 0.25 | 26 | 25 |
+| `status` | 1000 scenarios | 15.32 | 0.63 | 53 | 50 |
+| `status` | 3000 scenarios | 57.63 | 1.84 | 128 | 118 |
+| `evidence add` batch | B=10 | 0.46 | 0.25 | 22 | 20 |
+| `evidence add` batch | B=100 | 28.46 | 1.42 | 68 | 64 |
+| `evidence add` batch | B=300 | 194.98 | 4.49 | 176 | 162 |
+
+At 10× the corpus, CPU grew 44.7× (`gate check`), 57.1× (`status`) and 61.9×
+(batch) on 0.28, and 7.4×, 7.4× and 5.7× on 0.29. On canon's own corpus
+(about 600 scenarios, 853 evidence records, 931 reviews) `gate check` went from
+1.32 s to 0.67 s CPU and `status` from 1.43 s to 0.14 s.
+
+### D1: corpus-size bench and shape gate
+
+- `scripts/bench/gen_corpus.py` writes a deterministic repo canon accepts
+  (ledger records under the git tier's own names, the scenario index, an
+  archive, approved chore briefs, a JUnit report for batch landing).
+- `scripts/bench/run.py` measures a given binary over a grid;
+  `scripts/bench/check_shape.py` fails when 10× the corpus costs more than 20×
+  the CPU or peak RSS.
+- The `bench-shape` CI job runs the small grid on the release build.
+
+### D2: gate derivation once per command
+
+- `canon-gate`'s new `derived` module holds, per `GateContext`, the latest
+  fold of each kind (scenarios, subjects, changes, reviews, findings), indexes
+  by subject, scenario and change, the verdict ledger, the archive and the
+  staleness result. Each record is converted and hashed once per command.
+- Per-scenario evidence, review and divergence questions are lookups;
+  `verdicts_of` is a key range. The risk check shares the staleness result.
+- Code that edits a context's corpus after a derived read calls
+  `invalidate_derived` (or the finer `invalidate_reviews`/`invalidate_evidence`).
+
+### D3: CLI derivation once per command
+
+- The code tree (`git add -A` into a temporary index) is computed once per
+  command, not once per subject with an approved chore brief: 178 → 13 git
+  processes for `gate check` on a 300-scenario corpus.
+- One flow-change index per command, each spec root walked once; the
+  vocabulary snapshot is resolved once per inventory sync; the stale-index
+  overlay replaces records in one pass.
+
+### D4: batch landing, store and policy
+
+- A batch is promoted through one read of the committed evidence history and
+  archived in one pass at the end; repeats are checked against one read of
+  the ledger, staging and reviews.
+- The store's file cache hands out shared rows instead of deep copies.
+- A policy program is compiled once and its field schema shared; the
+  per-evaluation thread (time budget, panic containment) is unchanged.
+- The risk check caches changed paths by evidence sha.
+
+### Acceptance
+
+- `canon gate check --json` and `canon status --json` are byte-identical to
+  0.28.0 (apart from the version string) on canon's own corpus and on a
+  1000-scenario synthetic corpus; a 100-record batch leaves the same ledger
+  and archive and prints the same report, timestamps and the digests derived
+  from them aside.
+- Conformance re-blessed for the version string only.
+- Canon's own gate is clean.
+- Rust coding rules: `docs/design/rust-coding-rules.md` is Accepted and binds
+  new code; the sweep of existing code is 0.30.
+
 ## 0.28.0 release
 
 One grammar, generated from one spec. 0.28 renames and reshapes much of the

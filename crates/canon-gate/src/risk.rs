@@ -21,7 +21,6 @@ use crate::context::{GateCheck, GateContext};
 use crate::coverage::CellSubject;
 use crate::failure_class::{FailureClass, Violation};
 use crate::policy::{allowed_signers_path, PolicyDiagnostic, RiskTierRule};
-use crate::staleness::StalenessCheck;
 
 /// Verifies minimum distinct human approvals for the highest matching risk
 /// tier in each existing evidence subject group.
@@ -50,11 +49,11 @@ impl GateCheck for RiskApprovalCheck {
             }
         };
 
-        let stale_subjects: BTreeSet<String> = StalenessCheck
-            .run(ctx)
-            .into_iter()
+        let stale_subjects: BTreeSet<String> = ctx
+            .staleness_violations()
+            .iter()
             .filter(|violation| violation.class == FailureClass::StaleEvidence)
-            .map(|violation| violation.subject)
+            .map(|violation| violation.subject.clone())
             .collect();
         let mut groups: BTreeMap<(CellSubject, Option<String>), Vec<&EvidenceRecord>> = BTreeMap::new();
         for record in &ctx.evidence {
@@ -62,6 +61,7 @@ impl GateCheck for RiskApprovalCheck {
                 groups.entry((subject, record.project_id.as_ref().map(ToString::to_string))).or_default().push(record);
             }
         }
+        let mut changed_paths: BTreeMap<String, Result<Vec<String>, String>> = BTreeMap::new();
 
         groups
             .into_iter()
@@ -79,9 +79,12 @@ impl GateCheck for RiskApprovalCheck {
                         .collect(),
                     None => Vec::new(),
                 };
-                let analysis = current.evidence_sha.as_ref()
-                    .ok_or_else(|| "missing artifact Git SHA".to_string())
-                    .and_then(|sha| artifact_changed_paths(&ctx.ctx.repo, sha));
+                let analysis = match current.evidence_sha.as_ref() {
+                    None => Err("missing artifact Git SHA".to_string()),
+                    // Groups of one generation share a commit: two git
+                    // processes per commit, not per group.
+                    Some(sha) => changed_paths.entry(sha.to_string()).or_insert_with(|| artifact_changed_paths(&ctx.ctx.repo, sha)).clone(),
+                };
                 let analysis_known = analysis.is_ok();
                 let mut derived_surfaces = analysis.unwrap_or_default();
                 // Effects are supplemental; self-declared paths cannot hide
@@ -313,7 +316,7 @@ mod tests {
                 risk_routing: BTreeMap::new(), risk_tiers, spec_coverage: None, evidence_binding: None, diagnostics: Vec::new(),
             },
             evidence, audits: Vec::new(), scenarios: Vec::new(), divergences: Vec::new(), subjects: Vec::new(), changes: Vec::new(), reviews: Vec::new(), findings: Vec::new(),
-            violations: Vec::new(), corpus_violations: Vec::new(), unreadable_kinds: Vec::new(), code_tree: None, now: now(),
+            violations: Vec::new(), corpus_violations: Vec::new(), unreadable_kinds: Vec::new(), code_tree: None, derived: Default::default(), now: now(),
         }
     }
 
