@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-030-ln",
+    "role": "reviewer",
+    "session_id": "rev-030-ln-r5-2026-10-26"
+  },
+  "at": "2026-10-26T21:52:08.015383645Z",
+  "change_id": "canon-0-30-ledger-naming",
+  "code_tree": "d32fd4db96dbc643d3ede05947b670234f833a64",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-gate/src/spec_coverage.rs:150-160",
+  "kind": "finding",
+  "reason": "round 5: spec_coverage.rs:154-158 leaves findings to malformed_findings when block_on_findings is on; repro names the misnamed finding once with block_on_findings on (unreadable finding record) and once with it off (layout); ledger_naming_23b passes",
+  "resolution_code_tree": "098994ad826a229303bffa0b0dd2d0619fc4ffd5",
+  "resolution_sha": "7f7bbaac55ade16b602e60b16599b9447567bf4a",
+  "resolution_worktree_dirty": false,
+  "review_id": "01M5X2W4S13D9G5Z4Z3S5D1QJ8",
+  "reviewed_sha": "b71529db7476fe4c9b2d1f65bd459d09877e552a",
+  "reviewer": "rev-030-ln",
+  "round": 4,
+  "scenario_ids": [
+    "ledger.naming.23"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "A misnamed finding file is named twice by gate check: SpecCoverageCheck now emits malformed-evidence for every corpus layout violation, and review_gate::malformed_findings (review_gate.rs:295-313) already emits one for each Finding corpus violation when require_review.block_on_findings is on, which is the default and what canon init scaffolds. Repro on b71529db: canon init, finding add, rename add-login_1_1_x.json to _1_2_: gate check --json lists two malformed-evidence violations with the same subject kind=finding/add-login_1_2_x.json. The exit code is unchanged and the count is doubled. Fix: skip RecordKind::Finding in SpecCoverageCheck when block_on_findings is on, or skip layout violations in malformed_findings",
+  "worktree_dirty": false
+}

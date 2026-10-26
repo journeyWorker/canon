@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-030-ln",
+    "role": "reviewer",
+    "session_id": "rev-030-ln-r5-2026-10-26"
+  },
+  "at": "2026-10-26T21:52:08.202225299Z",
+  "change_id": "canon-0-30-ledger-naming",
+  "code_tree": "d32fd4db96dbc643d3ede05947b670234f833a64",
+  "disposition": "fixed",
+  "file_ref": "canon/skills/reference/canon-gate.md:208-210",
+  "kind": "finding",
+  "reason": "round 5: canon-gate.md:208-216 says unparseable corpus rows stay off and layout violations are named once spec_coverage judges the corpus",
+  "resolution_code_tree": "098994ad826a229303bffa0b0dd2d0619fc4ffd5",
+  "resolution_sha": "7f7bbaac55ade16b602e60b16599b9447567bf4a",
+  "resolution_worktree_dirty": false,
+  "review_id": "01M5X2W4S13D9G5Z4Z3S5D1QJ8",
+  "reviewed_sha": "b71529db7476fe4c9b2d1f65bd459d09877e552a",
+  "reviewer": "rev-030-ln",
+  "round": 4,
+  "scenario_ids": [
+    "ledger.naming.23"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "canon-gate.md:208-210 still says malformed rows of the spec_coverage corpus kinds do NOT surface as malformed-evidence, kept off on purpose. Since b71529db, a misnamed corpus file (layout violation) does surface as malformed-evidence once spec_coverage judges the corpus. The guide should say so; unparseable rows still stay off",
+  "worktree_dirty": false
+}
