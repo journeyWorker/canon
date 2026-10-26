@@ -481,3 +481,64 @@ Feature: gate check
     Then the refusal names every evidenced scenario and leads its hint with one batch command built from the real report paths, such as `canon evidence add --all-scenarios --report junit:a.xml --report junit:b.xml --role implementer`, never a loop over scenarios
     And status leads its next steps with that same command, once
     And the command runs as written and clears the evidence gap, leaving the chore's change review
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:34Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:gate-trust-spine
+  @case:happy
+  @flow:canon-0-30-spec-backfill.F3
+  @gate.check.105
+  Scenario: Gate install-hooks writes the hook commands and the pre-commit script, and a second run writes nothing
+    Given a git work tree with a canon.yaml and no hook files
+    When canon gate install-hooks is run, then run again
+    Then the first run exits 0 with installed true and preCommitScriptWritten true
+    And .claude/settings.json and .codex/hooks.json each hold a PreToolUse command hook running canon task done with a 30 second timeout
+    And the pre-commit script is written under .canon/scripts
+    And the second run exits 0 with installed false, marks the result unchanged and changes no file
+    And --event, --matcher, --command and --timeout set the hook entry written
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:34Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:gate-trust-spine
+  @case:happy
+  @flow:canon-0-30-spec-backfill.F3
+  @gate.check.106
+  Scenario: Gate install-hooks with --dry-run reports what it would install and writes nothing
+    Given a git work tree with a canon.yaml and no hook files
+    When canon gate install-hooks --dry-run is run
+    Then it exits 0 with dryRun true, installed true and preCommitScriptWritten true
+    And no file or directory was created
+    And the same command without --dry-run then writes the files the preview named
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:34Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F3
+  @gate.check.107
+  Scenario: Gate install-hooks refuses a repo that is no directory and an unreadable timeout and writes nothing
+    Given a git work tree with a canon.yaml and a plain file afile
+    When canon gate install-hooks is run with --repo afile, with --timeout abc, or with an option it does not have
+    Then --repo afile exits 2 with HOOKS_INSTALL_FAILED saying afile is not a directory
+    And --timeout abc exits 2 with USAGE naming the --timeout field, and the unknown option exits 2
+    And the tree is unchanged after each
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:34Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:gate-trust-spine
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F3
+  @gate.check.108
+  Scenario: Selftest refuses an unknown suite and runs nothing
+    Given any directory
+    When canon selftest --suite no-such-suite is run
+    Then it exits 2 as a usage error that lists the valid suites, with nothing on stdout
+    And no suite ran and nothing was written
+    And a valid suite name such as policy-expressions runs and exits 0
+
+  # canon: {"schema":1,"at":"2026-10-26T11:50:36Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:gate-trust-spine
+  @case:happy
+  @flow:canon-0-30-spec-backfill.F3
+  @gate.check.109
+  Scenario: Selftest runs one named suite clean and exits 0
+    Given any directory
+    When canon selftest --suite trust-spine-gate is run with --json
+    Then it exits 0 with clean true
+    And data.suites holds that one suite, clean, with a positive passed count and no failures

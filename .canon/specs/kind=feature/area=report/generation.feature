@@ -135,3 +135,14 @@ Feature: report generation
     When canon report check runs
     Then it compares and reports no drift, and creates no seed file, directory or parquet under .canon
     And the empty sources are seeded in a scratch directory that is gone when the run ends
+
+  # canon: {"schema":1,"at":"2026-10-26T11:42:45Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}
+  @subject:report-generation
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F4
+  @report.generation.14
+  Scenario: Report snapshot without an output directory is refused with exit 2 and writes nothing
+    Given a canon repo
+    When canon report snapshot runs without the directory operand
+    Then it exits 2 with USAGE naming the missing <DIR>
+    And no file in the repo changed

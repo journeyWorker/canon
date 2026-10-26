@@ -110,3 +110,33 @@ test('platformer.levels.02: Best acorns and time persist per level across reload
   s.click('Level Select');
   expect(best(reload())).toContain('best 12 acorns / 45.0s');
 });
+
+test('platformer.levels.03: Corrupted saved progress falls back to a fresh start without breaking the menu', () => {
+  const store = (value: unknown) => localStorage.setItem('rpr.v2.progress', typeof value === 'string' ? value : JSON.stringify(value));
+  const best = { '1': { acorns: 5, timeMs: 50000 } };
+
+  // Given saved progress that is not JSON, that unlocks a level beyond the
+  // last, or that carries an unknown version.
+  for (const saved of [
+    'not json {',
+    { version: 1, unlockedLevel: 99, best },
+    { version: 1, unlockedLevel: 0, best },
+    { version: 2, unlockedLevel: 2, best },
+    { version: 1, unlockedLevel: 2, best: 'nope' },
+  ]) {
+    store(saved);
+    // When the game starts and the level-select menu is shown.
+    const s = reload();
+    // Then only level one is unlocked and no best is shown.
+    expect(unlocked(s)).toEqual([true, false, false]);
+    expect(s.button('Level 1')?.textContent).not.toContain('best');
+  }
+
+  // And saved progress holding one valid and one malformed best keeps the
+  // valid best and unlocks the saved level.
+  store({ version: 1, unlockedLevel: 2, best: { ...best, '2': 'bad' } });
+  const s = reload();
+  expect(unlocked(s)).toEqual([true, true, false]);
+  expect(s.button('Level 1')?.textContent).toContain('best 5 acorns / 50.0s');
+  expect(s.button('Level 2')?.textContent).not.toContain('best');
+});

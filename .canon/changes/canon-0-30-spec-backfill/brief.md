@@ -3,7 +3,7 @@
 <!-- canon:section intent role=context -->
 ## Intent
 
-canon은 자기 기능을 시나리오 659개로 정의하지만 빈 곳이 있다. CLI 명령 76개 중 17개는 시나리오가 하나도 없고, 7개는 실패 경로가 없다. subject 둘은 시나리오가 0개로 `specced`에 멈춰 있고, 예제 게임 시나리오 10개는 subject가 없다. 0.30의 코드 정리는 동작을 지켜야 하는데, 스펙이 없는 동작은 지켰는지 확인할 수 없다. 정리보다 먼저 지금 동작을 스펙으로 고정한다.
+canon은 자기 기능을 시나리오 659개로 정의하지만 빈 곳이 있다. CLI 명령 76개 중 17개는 시나리오가 하나도 없고, 8개는 실패 경로가 없다. subject 둘은 시나리오가 0개로 `specced`에 멈춰 있고, 예제 게임 시나리오 10개는 subject가 없다. 0.30의 코드 정리는 동작을 지켜야 하는데, 스펙이 없는 동작은 지켰는지 확인할 수 없다. 정리보다 먼저 지금 동작을 스펙으로 고정한다.
 
 0.30 순서: 계획 이전 → 이 변경 → 코드 정리 → clippy CI → 레저 이름 변경 → 레코드 연결. 여섯 brief는 함께 승인받는다.
 
@@ -47,10 +47,11 @@ F1 대상은 dispatch-manifest subject의 다음 명령이다.
 
 - evidence-attestation: 시나리오가 없는 artifacts move, artifacts verify. 성공 경로가 없는 evidence approval-payload.
 - tier-storage: 시나리오가 없는 ledger compact. 종류 이름 철자 외 동작이 없는 export, purge.
+- plugin-overlay: 실패 경로가 없는 plugin sync.
 
 ### F3 게이트·정책 명령
 
-- gate-trust-spine: 시나리오가 없는 gate install-hooks. 실패 경로가 없는 selftest.
+- gate-trust-spine: 시나리오가 없는 gate install-hooks. 실패 경로와 성공 경로가 없는 selftest(기존 시나리오는 실패 표기만 있다).
 - policy-expressions: 시나리오가 없는 policy show.
 
 ### F4 조회 명령

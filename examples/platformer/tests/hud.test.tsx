@@ -5,7 +5,7 @@ import { HUD } from '../src/hud/HUD';
 import { LEVELS } from '../src/engine/level';
 import { FIXED_DT } from '../src/engine/constants';
 import { GameSimulation } from '../src/engine/simulation';
-import { frozen, level, Screen, settle, simOf } from './harness';
+import { frozen, level, placeOn, Screen, settle, simOf } from './harness';
 
 vi.mock('../src/render/PixiStage', () => ({ PixiStage: () => null }));
 
@@ -113,4 +113,37 @@ test('platformer.hud.02: HUD reflects hearts acorns and level in real time', () 
   // And the top-center label shows the current level and a running timer.
   expect([...labels].every((l) => l?.startsWith('Level 1 · '))).toBe(true);
   expect(labels.size).toBeGreaterThan(1);
+});
+
+test('platformer.hud.03: The pause key opens no pause menu outside play', () => {
+  const pauseMenu = () => screen!.container.querySelector('.pause-menu');
+
+  // Given the level-select menu is showing.
+  screen = new Screen(<App />);
+  expect(screen.button('Level 1')).toBeDefined();
+
+  // When the pause key is pressed (Escape, and P).
+  screen.press('Escape');
+  screen.release('Escape');
+  screen.press('KeyP');
+  screen.release('KeyP');
+
+  // Then no pause menu opens, the simulation is not paused, and the menu stays.
+  expect(pauseMenu()).toBeNull();
+  expect(screen.sim.getHudSnapshot().paused).toBe(false);
+  expect(screen.button('Level 1')).toBeDefined();
+
+  // And on a completed level's complete screen the same holds.
+  screen.click('Level 1');
+  const sim = screen.sim;
+  placeOn(sim, sim.getRenderSnapshot().squirrel);
+  screen.frame();
+  expect(screen.container.querySelector('.level-complete')).not.toBeNull();
+  screen.press('Escape');
+  screen.release('Escape');
+  screen.press('KeyP');
+  screen.release('KeyP');
+  expect(pauseMenu()).toBeNull();
+  expect(sim.getHudSnapshot().paused).toBe(false);
+  expect(screen.container.querySelector('.level-complete')).not.toBeNull();
 });

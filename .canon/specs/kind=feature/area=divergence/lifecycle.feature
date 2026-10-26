@@ -120,3 +120,14 @@ Feature: divergence lifecycle
     Given the same acceptance and no agent role declared
     When canon divergence accept runs
     Then it is not refused as HUMAN_ONLY and reaches its own checks instead
+
+  # canon: {"schema":1,"at":"2026-10-26T11:42:45Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}
+  @subject:divergence-lifecycle
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F4
+  @divergence.lifecycle.13
+  Scenario: Divergence list refuses an invalid timestamp, a zero limit or a cursor canon did not issue with exit 2
+    Given a repo with no divergences
+    When canon divergence list runs with --as-of bogus, with --limit 0, with --cursor zzz, and with both --limit and --all
+    Then --as-of bogus, --limit 0 and the combined flags each exit 2 with USAGE naming the option, and --cursor zzz exits 2 with INVALID_CURSOR
+    And no file in the repo changed

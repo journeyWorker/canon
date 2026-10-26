@@ -136,3 +136,28 @@ Feature: policy expressions
     When canon gate check runs before any approval, after an approval, and after the policy changes
     Then it prints a policy-not-approved advisory, then nothing, then a changed-since-approval advisory naming both digests
     And the gate's exit code is the same in all three runs
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:35Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:policy-expressions
+  @case:happy
+  @flow:canon-0-30-spec-backfill.F3
+  @policy.expressions.33
+  Scenario: Policy show reports the policy digest and whether its approval holds, no longer holds, or is absent
+    Given a repo whose .canon/policy.yaml no human has approved
+    When canon policy show is run, with and without --json
+    Then it exits 0 with state unapproved, the policy path, a sha256 policyDigest and no approver
+    And once the human has approved it, state is approved and the approver, time, note and approved digest are shown, the approved digest equal to the policy digest
+    And once the policy is edited after the approval, state is changed, the policy digest follows the new bytes, the approved digest keeps the old ones and the human form says the gate fails closed
+    And a repo with no policy file shows state none and no digest
+    And policy show writes nothing
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:35Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:policy-expressions
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F3
+  @policy.expressions.34
+  Scenario: Policy show outside a configured repo is refused with CONFIG_MISSING
+    Given a directory with no canon.yaml in it or in any parent
+    When canon policy show is run, with and without --json
+    Then it exits 2 with CONFIG_MISSING naming the --repo field
+    And nothing was written

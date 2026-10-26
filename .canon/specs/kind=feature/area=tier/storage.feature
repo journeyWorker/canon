@@ -116,3 +116,77 @@ Feature: tier storage
     When canon tier age is run with --dry-run, with --canon-yaml, or with --commit and no plan digest
     Then each exits 2 as a usage error
     And the bare run is the preview, so nothing was written
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:32Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:tier-storage
+  @case:happy
+  @flow:canon-0-30-spec-backfill.F2
+  @tier.storage.12
+  Scenario: Ledger compact previews the superseded versions, then moves them to the archive on the previewed digest
+    Given a ledger holding three versions of one evidence key, none yet moved to the archive
+    When canon ledger compact is run bare, then with --commit and the planDigest it printed
+    Then the bare run exits 0 with committed false, two superseded versions and none moved, and changes no file
+    And the committed run exits 0 with committed true and two moved, leaving the newest version in the ledger and the two older ones in the archive
+    And a bare run afterwards reports nothing superseded and nothing moved
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:33Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:tier-storage
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F2
+  @tier.storage.13
+  Scenario: Ledger compact refuses a plan that changed since its preview, a commit without a digest, and a ledger with no archive
+    Given a preview of canon ledger compact that printed a plan digest
+    And another superseded version landed after that preview
+    When canon ledger compact is run with --commit and the old digest
+    Then it exits 2 with PLAN_CHANGED and nothing moved
+    And --commit without --plan-digest exits 2 naming --plan-digest and nothing moved
+    And a repo whose ledger root is a custom directory exits 2 with LEDGER_ARCHIVE_UNAVAILABLE
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:33Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:tier-storage
+  @case:happy
+  @flow:canon-0-30-spec-backfill.F2
+  @tier.storage.14
+  Scenario: Export prints a redacted retention manifest and writes it to a private file on request
+    Given a repo with one indexed scenario
+    When canon export --kind scenario is run with --json, then with --output manifest.json, then with --dry-run
+    Then the manifest names schema canon.retention.export, the kind, a record count of one and sensitive false
+    And each record carries only kind, at, id and digest, so the scenario title is not exported
+    And --output writes the manifest to that file with mode 0600 and says it wrote one record
+    And --dry-run exits 0 with dryRun true and writes no file
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:33Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:tier-storage
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F2
+  @tier.storage.15
+  Scenario: Export refuses sensitive records without policy permission, an unknown kind and an unreadable bound
+    Given a repo whose policy does not allow sensitive export
+    When canon export is run with --include-sensitive, with an unknown --kind, or with a --before that is no timestamp
+    Then the first exits 2 with RETENTION_EXPORT_FAILED naming query.allow_sensitive and writes no output file
+    And the others exit 2 as usage errors, the kind one listing the valid kinds and the bound one saying invalid timestamp
+    And the tree is unchanged
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:33Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:tier-storage
+  @case:happy
+  @flow:canon-0-30-spec-backfill.F2
+  @tier.storage.16
+  Scenario: Purge previews the removal set, then deletes exactly that set on the previewed digest
+    Given a repo routing sessions to the local rung and holding one session before the cutoff and one after it
+    When canon purge --kind session --before the cutoff is run bare, then with --commit and the planDigest it printed
+    Then the bare run exits 0, prints the planDigest and says nothing was written, and no record is removed
+    And the committed run exits 0 reporting one matched and one deleted
+    And only the record before the cutoff is gone
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:34Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:tier-storage
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F2
+  @tier.storage.17
+  Scenario: Purge refuses a stale digest, a kind outside its four, and a missing cutoff, and deletes nothing
+    Given the same repo with a preview of canon purge that printed a plan digest
+    When canon purge is run with --commit and that digest but a later --before, with --kind change, with no --before, or with --commit and no --plan-digest
+    Then the stale digest exits 2 with PLAN_CHANGED
+    And the other three exit 2 as usage errors, the kind one listing session, run, event and trajectory as the only kinds
+    And no record was deleted and the tree is unchanged

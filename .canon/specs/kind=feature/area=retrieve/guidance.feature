@@ -61,3 +61,14 @@ Feature: retrieve guidance
     Then a fresh live retrieval returns nothing, because the demotion took effect
     And replaying the manifest still returns the recorded snapshot, unchanged and still one item
     And the demotion never perturbs a manifest already written
+
+  # canon: {"schema":1,"at":"2026-10-26T11:42:44Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}
+  @subject:retrieve-guidance
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F4
+  @retrieve.guidance.07
+  Scenario: Regime show refuses a missing segment or a hash that is not hex with exit 2
+    Given any canon repo
+    When canon regime show runs with a well-formed hash, with the hash zz, and with no --hash
+    Then the well-formed call exits 0 and prints the regime key reviewer/my-repo/api/abcdef012345
+    And the hash zz exits 2 with REGIME_KEY_INVALID, and the missing --hash exits 2 with USAGE naming --hash

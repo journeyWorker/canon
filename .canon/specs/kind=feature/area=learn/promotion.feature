@@ -95,3 +95,50 @@ Feature: learn promotion
     Then its front matter carries a demoted status
     And the front matter it already carried survives unchanged
     And the body survives too, because a demotion records a judgement rather than erasing the strategy
+
+  # canon: {"schema":1,"at":"2026-10-26T11:42:43Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}
+  @subject:learn-promotion
+  @case:happy
+  @flow:canon-0-30-spec-backfill.F4
+  @learn.promotion.10
+  Scenario: The approval payload of a seeded strategy is the same bytes on every call, carrying the approver, time and subject
+    Given a quarantined strategy candidate and a passing paired evaluation file
+    When canon strategy approval-payload runs twice with the same approver and approval time, and once more with --json
+    Then every run exits 0 and the two plain runs print identical bytes
+    And the --json data carries the payload as hex equal to those bytes, the approver, the approval time and the subject strategy:<id>
+    And no file in the repo changed
+
+  # canon: {"schema":1,"at":"2026-10-26T11:42:44Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}
+  @subject:learn-promotion
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F4
+  @learn.promotion.11
+  Scenario: The approval payload of an unknown strategy or a malformed id is refused and writes nothing
+    Given a repo with no strategies and an evaluation file
+    When canon strategy approval-payload runs for a well-formed id no strategy has, for the malformed id nope, and for a well-formed id without --evaluation
+    Then the unknown strategy exits 2 with LEARN_STRATEGY_NOT_FOUND, and the malformed id and the missing --evaluation each exit 2 with USAGE
+    And no file in the repo changed
+
+  # canon: {"schema":1,"at":"2026-10-26T11:42:44Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}
+  @subject:learn-promotion
+  @case:happy
+  @flow:canon-0-30-spec-backfill.F4
+  @learn.promotion.12
+  Scenario: A rollback of a promoted strategy signed by the pinned approver disables it and prints the rollback record
+    Given a strategy promoted with a paired evaluation and an approval signed by the pinned approver alice, and a rollback signature over the strategy, the reason and the time
+    When canon strategy rollback runs with that reason, --actor-id alice, the signature file and the approval time
+    Then it exits 0 and prints the record: the strategy id, the actor alice, the reason, an approval digest and the rollback time
+    And the promoted file's status changes from active to rolled_back and gains the rollback reason and actor
+    And the rest of its front matter and its body survive unchanged
+
+  # canon: {"schema":1,"at":"2026-10-26T11:42:44Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}
+  @subject:learn-promotion
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F4
+  @learn.promotion.13
+  Scenario: A rollback with an unreadable signature, an unknown strategy or a malformed timestamp is refused and writes nothing
+    Given a repo with a strategy candidate, an approver pinned in the policy, and a signature file that is not a valid signature
+    When canon strategy rollback runs with a signature file that does not exist, with an unknown strategy id, with --approval-at yesterday, and with no --reason
+    Then the missing signature file exits 2 with LEARN_SIGNATURE_UNREADABLE and the unknown strategy exits 1 with LEARN_ROLLBACK_FAILED
+    And the malformed timestamp and the missing reason each exit 2 with USAGE
+    And no file in the repo changed
