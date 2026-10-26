@@ -219,7 +219,7 @@ fn ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_re
     let output = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(output.status.success(), "canon ingest records must exit 0; stderr: {}", stderr(&output));
 
-    let payload: Value = data_of(&stdout(&output));
+    let payload = data_of(&stdout(&output));
 
     // ── (a) the handoff RECORDS-source adapter was actually DRIVEN. ──
     let adapters = payload["adapters"].as_array().expect("adapters array");
@@ -332,12 +332,12 @@ fn ingest_artifacts_stamps_the_dispatched_run_it_was_given_and_rejects_one_it_wa
     let regime = canon_model::regime_key("dev", "acme-repo", "world", "abc123");
     let begun = run_canon(&["dispatch", "begin", "--role", "dev", "--regime", &regime, "--repo", ".", "--json"], &repo);
     assert!(begun.status.success(), "canon dispatch begin must exit 0; stderr: {}", stderr(&begun));
-    let begun_payload: Value = data_of(&stdout(&begun));
+    let begun_payload = data_of(&stdout(&begun));
     let run_id = begun_payload["runId"].as_str().expect("run_id string").to_string();
 
     let ingested = run_canon(&["ingest", "records", "--repo", ".", "--run-id", &run_id, "--json"], &repo);
     assert!(ingested.status.success(), "canon ingest records --run-id must exit 0; stderr: {}", stderr(&ingested));
-    let payload: Value = data_of(&stdout(&ingested));
+    let payload = data_of(&stdout(&ingested));
     let persisted = payload["trajectoriesPersisted"].as_array().expect("trajectories_persisted array");
     assert_eq!(persisted.len(), 1, "one regime-keyed trajectory persisted: {payload}");
     let regime_key = RegimeKey::parse(persisted[0]["regimeKey"].as_str().expect("regime_key string")).unwrap();
@@ -372,7 +372,7 @@ fn a_second_ingest_over_an_unchanged_corpus_persists_zero_new_trajectories() {
     // ── First pass: the baseline write. ──
     let first = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(first.status.success(), "first canon ingest records must exit 0; stderr: {}", stderr(&first));
-    let first_payload: Value = data_of(&stdout(&first));
+    let first_payload = data_of(&stdout(&first));
     assert_eq!(first_payload["trajectoriesPersisted"].as_array().unwrap().len(), 1, "{first_payload}");
     assert_eq!(first_payload["trajectoriesSkippedDuplicate"], 0, "{first_payload}");
     let regime_key_str = first_payload["trajectoriesPersisted"][0]["regimeKey"].as_str().unwrap().to_string();
@@ -387,7 +387,7 @@ fn a_second_ingest_over_an_unchanged_corpus_persists_zero_new_trajectories() {
     // ── Second pass over the SAME, unchanged corpus. ──
     let second = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(second.status.success(), "second canon ingest records must exit 0; stderr: {}", stderr(&second));
-    let second_payload: Value = data_of(&stdout(&second));
+    let second_payload = data_of(&stdout(&second));
 
     // No NEW trajectory persisted, no verdict double-counted.
     assert_eq!(
@@ -434,7 +434,7 @@ fn an_unrouted_handoff_source_degrades_to_unavailable_without_aborting_the_rest_
     let output = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(output.status.success(), "stderr: {}", stderr(&output));
 
-    let payload: Value = data_of(&stdout(&output));
+    let payload = data_of(&stdout(&output));
     let adapters = payload["adapters"].as_array().unwrap();
     let handoff_summary = adapters.iter().find(|a| a["adapterId"] == "handoff").expect("handoff adapter entry present");
     assert_eq!(handoff_summary["status"], "unavailable", "{payload}");
@@ -526,7 +526,7 @@ fn native_flywheel_review_and_divergence_resolved_in_same_run_both_produce_traje
 
     let output = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(output.status.success(), "stderr: {}", stderr(&output));
-    let payload: Value = data_of(&stdout(&output));
+    let payload = data_of(&stdout(&output));
 
     let adapters = payload["adapters"].as_array().expect("adapters array");
     let review_summary = adapters.iter().find(|a| a["adapterId"] == "review").unwrap_or_else(|| panic!("no `review` adapter entry: {payload}"));
@@ -646,11 +646,11 @@ fn handoff_adapter_is_unaffected_by_the_native_records_switch() {
 
     let off = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo_off);
     assert!(off.status.success(), "stderr: {}", stderr(&off));
-    let off_payload: Value = data_of(&stdout(&off));
+    let off_payload = data_of(&stdout(&off));
 
     let on = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo_on);
     assert!(on.status.success(), "stderr: {}", stderr(&on));
-    let on_payload: Value = data_of(&stdout(&on));
+    let on_payload = data_of(&stdout(&on));
 
     let off_handoff = off_payload["adapters"].as_array().unwrap().iter().find(|a| a["adapterId"] == "handoff").expect("handoff entry (off)");
     let on_handoff = on_payload["adapters"].as_array().unwrap().iter().find(|a| a["adapterId"] == "handoff").expect("handoff entry (on)");

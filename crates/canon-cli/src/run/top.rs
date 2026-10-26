@@ -1,9 +1,8 @@
 //! Handlers of the top-level leaf commands.
 
-use canon_model::envelope::RecordKind;
-use canon_model::{ChangeId, RegimeKey, RoleId, SubjectId, regime_key};
-use chrono::{DateTime, Utc};
+use canon_model::{RegimeKey, RoleId, SubjectId, regime_key};
 use crate::cli_error::CliError;
+use crate::cli::top::QueryArgs;
 use std::process::ExitCode;
 
 /// `plugin: None` calls the EXACT SAME [`crate::query::run`] path this
@@ -14,21 +13,10 @@ use std::process::ExitCode;
 /// returns is printed to stderr regardless of whether a projection actually
 /// resolved, and stdout uses the matching core/overlay formatter with the
 /// same sensitive-output authorization.
-#[expect(clippy::too_many_arguments)]
-pub(super) fn run_query(
-    repo: &std::path::Path,
-    kind: RecordKind,
-    since: Option<DateTime<Utc>>,
-    json: bool,
-    plugin: Option<String>,
-    history: bool,
-    change_id: Option<ChangeId>,
-    status: Option<String>,
-    domain: Option<String>,
-    include_sensitive: bool,
-    page: crate::paging::Page,
-    fields: Option<Vec<String>>,
-) -> ExitCode {
+pub(crate) fn run_query(args: QueryArgs) -> ExitCode {
+    let QueryArgs { kind, since, repo, json, plugin_id: plugin, history, change_id, status, domain, include_sensitive, page, fields } = args;
+    let repo = repo.as_path();
+    let page = page.page();
     // s19 `query-scope-filters` design D5: kind-gating + status-domain
     // validation runs BEFORE any tier read (task 3.2/3.3) -- a usage
     // fault here is a clean, nothing-read `2`, never a store error.
@@ -94,7 +82,7 @@ pub(super) fn run_query(
 
 /// `base`, plus how to repair a `missing-provenance` violation when one is
 /// among them (#64: editing a generated `.feature` drops the line).
-pub(super) fn with_provenance_fix(base: &str, missing_provenance: bool) -> String {
+pub(crate) fn with_provenance_fix(base: &str, missing_provenance: bool) -> String {
     if missing_provenance {
         format!("{base}; for missing-provenance, {}", canon_fmt::PROVENANCE_FIX)
     } else {
@@ -107,7 +95,7 @@ pub(super) fn with_provenance_fix(base: &str, missing_provenance: bool) -> Strin
 /// resolves under `--repo` when that is given, else the current directory.
 /// Exit 1 = violations, or a corpus with no file to check (`unverifiable`);
 /// exit 2 = `DIR` is not a directory, or the configured roots cannot be read.
-pub(super) fn run_fmt(dir: Option<&std::path::Path>, repo: &crate::cli::RepoArgs, json: bool) -> ExitCode {
+pub(crate) fn run_fmt(dir: Option<&std::path::Path>, repo: &crate::cli::RepoArgs, json: bool) -> ExitCode {
     let mut coverage = crate::coverage::Coverage::new();
     let mut report = canon_fmt::FmtReport::default();
     let mut check = |id: &str, shown: String, root: &std::path::Path, coverage: &mut crate::coverage::Coverage| {
@@ -178,7 +166,7 @@ pub(super) fn run_fmt(dir: Option<&std::path::Path>, repo: &crate::cli::RepoArgs
 /// READ-ONLY validates an existing config instead (`2` on a missing
 /// file, `0` when every present section parses clean, `1` when a
 /// present section fails).
-pub(super) fn run_init(repo: &std::path::Path, check_config: bool, options: crate::init::InitOptions, json: bool) -> ExitCode {
+pub(crate) fn run_init(repo: &std::path::Path, check_config: bool, options: crate::init::InitOptions, json: bool) -> ExitCode {
     let code = if check_config { crate::init::run_check_config(repo, json) } else { crate::init::run_init(repo, options, json) };
     ExitCode::from(code)
 }
@@ -189,7 +177,7 @@ pub(super) fn run_init(repo: &std::path::Path, check_config: bool, options: crat
 /// via [`crate::context::resolve_repo_root`] (design D7, task 1.4) —
 /// the `--repo`-omitted/`--repo .` nearest-`canon.yaml` ancestor walk —
 /// before [`crate::context::resolve_surface`] ever reads it.
-pub(super) fn run_context(repo: &std::path::Path, json: bool, fields: Option<Vec<String>>, role: Option<crate::role::Role>) -> ExitCode {
+pub(crate) fn run_context(repo: &std::path::Path, json: bool, fields: Option<Vec<String>>, role: Option<crate::role::Role>) -> ExitCode {
     if let Some(requested) = &fields {
         if let Err(e) = crate::paging::check_known("canon context", requested, &crate::context::SURFACE_FIELDS) {
             return ExitCode::from(e.emit("canon context", json));
@@ -225,7 +213,7 @@ pub(super) fn run_context(repo: &std::path::Path, json: bool, fields: Option<Vec
 /// exiting `2` (mirrors `canon gate check`'s own 0-clean/1-red/2-usage
 /// convention) — never reachable via `retrieve_guidance`, which has no
 /// error channel at all (`crate::retrieve`'s own module doc).
-pub(super) fn run_retrieve(repo: &std::path::Path, role: &RoleId, regime: Option<&RegimeKey>, domain: Option<&str>, subject: Option<&SubjectId>, k: Option<usize>, json: bool) -> ExitCode {
+pub(crate) fn run_retrieve(repo: &std::path::Path, role: &RoleId, regime: Option<&RegimeKey>, domain: Option<&str>, subject: Option<&SubjectId>, k: Option<usize>, json: bool) -> ExitCode {
     match crate::retrieve::run_scoped(repo, role, regime, domain, subject, k) {
         Ok(o) => {
             if json {
@@ -251,7 +239,7 @@ pub(super) fn run_retrieve(repo: &std::path::Path, role: &RoleId, regime: Option
 /// can still produce — see its doc) reports to stderr and exits `2`
 /// with nothing on stdout, so the hook's own `|| exit 0` degrades it to
 /// a silent no-op rather than passing a malformed `--regime` on.
-pub(super) fn run_regime_show(role: &str, repo: &str, area: &str, hash: &str, json: bool) -> ExitCode {
+pub(crate) fn run_regime_show(role: &str, repo: &str, area: &str, hash: &str, json: bool) -> ExitCode {
     match RegimeKey::parse(regime_key(role, repo, area, hash)) {
         Ok(valid) => {
             if json {
@@ -285,7 +273,7 @@ pub(super) fn run_regime_show(role: &str, repo: &str, area: &str, hash: &str, js
 /// derivation the written report's own `## Kinds not read directly`
 /// section reads, so the two can never disagree; silent for a repo
 /// with nothing routed to a backend that is not read directly.
-pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Option<&std::path::Path>, json: bool) -> ExitCode {
+pub(crate) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Option<&std::path::Path>, json: bool) -> ExitCode {
     let command = if check {
         "canon report check"
     } else if snapshot_dir.is_some() {
@@ -374,7 +362,7 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
 /// forever — this subcommand never returns on success; the process exits
 /// only via the standard SIGINT/SIGTERM default handler (no signal
 /// handling installed, matching every other local dev-server tool).
-pub(super) fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path::Path>, port: u16, json: bool) -> ExitCode {
+pub(crate) fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path::Path>, port: u16, json: bool) -> ExitCode {
     match crate::dashboard::prepare(repo, snapshot, port) {
         Ok(bound) => {
             crate::say!(json, "canon dashboard: app       = {}", bound.app.describe());
@@ -422,7 +410,7 @@ fn print_query(report: &crate::query::QueryReport, page: Option<&crate::paging::
 /// `canon completion <SHELL>`: text mode prints the script itself, so
 /// `canon completion zsh > _canon` is the whole installation; `--json`
 /// envelopes it as `{shell, script}`.
-pub(super) fn run_completion(shell: crate::cli::CompletionShell, json: bool) -> ExitCode {
+pub(crate) fn run_completion(shell: crate::cli::CompletionShell, json: bool) -> ExitCode {
     let report = crate::completion::script(shell);
     if json {
         crate::json_out::data("completion", &report);

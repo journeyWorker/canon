@@ -60,6 +60,7 @@ pub struct OperandMeta {
 }
 
 /// The spec facts of one leaf.
+#[derive(Debug)]
 pub struct LeafFacts {
     pub path: &'static str,
     /// Required for a writing leaf; a read has one only where the per-leaf table declares it.

@@ -47,6 +47,7 @@ pub enum QueryError {
     Store(#[from] StoreError),
 }
 
+#[derive(Debug)]
 pub struct QueryOutcome {
     pub kind: RecordKind,
     pub since: Option<DateTime<Utc>>,
@@ -395,7 +396,6 @@ fn rollup_for(kind: RecordKind, records: &[RawRecord]) -> Option<(usize, usize)>
 /// ([`canon_store::git_tier::GitTier::read_history`]), unfolded, oldest
 /// first. Without it, the current records only: the ledger holds one
 /// version per key, so this is the working set the gate reads.
-#[expect(clippy::too_many_arguments)]
 pub fn run(
     repo: &Path,
     kind: RecordKind,
@@ -670,6 +670,7 @@ fn finish_human(mut out: String, outcome: &QueryOutcome) -> String {
 /// One resolved overlay's projected view (task 3.3): the `<namespace>.
 /// <kind>` identity it came from, plus [`project_overlay`]'s own
 /// folded output.
+#[derive(Debug)]
 pub struct OverlayProjection {
     pub identity: String,
     pub projected: BTreeMap<(ProjectId, ScenarioId), serde_json::Map<String, Value>>,
@@ -689,7 +690,7 @@ pub struct OverlayProjection {
 /// non-empty whenever `projections` is empty, and possibly non-empty
 /// even when `projections` isn't (a malformed sibling overlay record
 /// is still worth reporting).
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct PluginQueryOutcome {
     pub projections: Vec<OverlayProjection>,
     pub diagnostics: Vec<String>,

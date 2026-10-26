@@ -433,6 +433,7 @@ fn too_large(what: &str) -> CliError {
 }
 
 /// Reads at most [`MAX_BYTES`] from `reader`; one byte more is `INPUT_TOO_LARGE`.
+#[expect(clippy::map_err_ignore, reason = "`refused` takes a message and a hint, no source; the message already says the input is not UTF-8")]
 fn read_capped(reader: impl Read, what: &str) -> Result<String, CliError> {
     let mut bytes = Vec::new();
     reader.take(MAX_BYTES + 1).read_to_end(&mut bytes).map_err(|e| refused("INPUT_UNREADABLE", format!("{what} could not be read: {e}"), "check that the file is readable, or pass the document inline"))?;
@@ -687,6 +688,7 @@ fn assemble(base: &Base<'_>, settings: &[Setting], prefix: &str) -> Result<Vec<S
 // ---------------------------------------------------------------- expand
 
 /// What `main` does with the command line after [`expand`].
+#[derive(Debug)]
 pub enum Expanded {
     /// Parse and run this command line.
     Argv(Vec<OsString>),
@@ -1064,7 +1066,7 @@ pub fn example_document(cmd: &Command, leaf: &Leaf) -> Option<Value> {
 }
 
 /// One input of a leaf in the spec (`inputs[]`).
-#[derive(Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InputDoc {
     /// The option that carries it.

@@ -285,7 +285,7 @@ impl From<&canon_learn::RollbackRecord> for StrategyRollbackReport {
 
 
 /// `canon strategy approval-payload --json`: the payload an external signer signs.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StrategyApprovalPayloadReport {
     /// The exact bytes to sign, hex-encoded.
@@ -362,6 +362,7 @@ pub fn run_approval_payload(repo: &Path, strategy_id: &StrategyId, evaluation_pa
     ExitCode::SUCCESS
 }
 
+#[expect(clippy::too_many_arguments, reason = "the signature is the `strategy rollback` flag set, passed one-to-one from `run/strategy.rs`")]
 pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: &str, contradicting: Option<&str>, signature_path: &Path, approved_at: &str, json: bool) -> ExitCode {
     let repo = resolve_repo_root(repo);
     let config = match LearnConfig::from_manifest(&std::fs::read_to_string(repo.join("canon.yaml")).unwrap_or_default()) {

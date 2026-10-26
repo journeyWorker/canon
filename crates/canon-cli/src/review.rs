@@ -107,6 +107,7 @@ pub fn parse_runtime_label(s: &str) -> Result<String, String> {
 /// path, two leaves: a change review sets `change`). `upstream_ref` /
 /// `original_spec_ref` are the raw `--upstream-ref` / `--original-spec-ref`
 /// values — exactly one MUST be `Some`.
+#[derive(Debug)]
 pub struct ReviewAddArgs {
     pub project_id: ProjectId,
     /// The scenarios of `review scenario <SCENARIO_ID>...`: one review per scenario.
@@ -628,12 +629,12 @@ mod tests {
         assert_eq!((reviews(&dir).len(), blobs()), (0, 0));
 
         let review_dir = ledger_root.join("kind=review");
-        let mut readonly = std::fs::metadata(&review_dir).unwrap().permissions();
+        let original = std::fs::metadata(&review_dir).unwrap().permissions();
+        let mut readonly = original.clone();
         readonly.set_readonly(true);
-        std::fs::set_permissions(&review_dir, readonly.clone()).unwrap();
-        let refused = write_reviews(dir.path(), &ledger_root, &files, &batch, &mut |tier, review| tier.write(review));
-        readonly.set_readonly(false);
         std::fs::set_permissions(&review_dir, readonly).unwrap();
+        let refused = write_reviews(dir.path(), &ledger_root, &files, &batch, &mut |tier, review| tier.write(review));
+        std::fs::set_permissions(&review_dir, original).unwrap();
         assert!(refused.unwrap_err().contains("is read-only"));
         assert_eq!(blobs(), 0);
 

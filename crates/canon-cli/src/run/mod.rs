@@ -37,7 +37,7 @@ use crate::cli_error::CliError;
 use std::process::ExitCode;
 use crate::cli::{Cli, Command};
 use top::{run_regime_show, run_report, run_query, run_fmt, run_context, run_init, run_retrieve, run_dashboard, run_completion};
-use crate::cli::top::{QueryArgs, ExportArgs, PurgeArgs, FormatArgs, ContextArgs, StatusArgs, InitArgs, MigrateArgs, RetrieveArgs, DashboardArgs, SelftestArgs, SchemaArgs, CompletionArgs};
+use crate::cli::top::{PurgeArgs, FormatArgs, ContextArgs, StatusArgs, InitArgs, MigrateArgs, RetrieveArgs, DashboardArgs, SelftestArgs, SchemaArgs, CompletionArgs};
 
 pub fn run(cli: Cli) -> ExitCode {
     let declared = cli.declared_role;
@@ -73,10 +73,8 @@ pub fn run(cli: Cli) -> ExitCode {
         Command::Skills { action } => skills::run(action),
         Command::Tier { action } => tier::run(action),
         Command::Ledger { action } => ledger::run(action),
-        Command::Query(QueryArgs { kind, since, repo, json, plugin_id, history, change_id, status, domain, include_sensitive, page, fields }) => {
-            run_query(&repo, kind, since, json, plugin_id, history, change_id, status, domain, include_sensitive, page.page(), fields)
-        }
-        Command::Export(ExportArgs { kind, before, after, output, repo, json, include_sensitive, page, fields, dry_run, .. }) => ExitCode::from(crate::retention::run_export(&repo, kind, before, after, output.as_deref(), json, include_sensitive, &page.page(), fields.as_deref(), dry_run.dry_run)),
+        Command::Query(args) => run_query(args),
+        Command::Export(args) => ExitCode::from(crate::retention::run_export(args)),
         Command::Purge(PurgeArgs { kind, before, safety, repo, json, .. }) => {
             let base = crate::safety::command("purge", &[("--kind", crate::query::kind_cli_name(kind).to_string()), ("--before", before.to_rfc3339())], &repo);
             ExitCode::from(crate::retention::run_purge(&repo, kind, before, &safety.mode(), &base, json))

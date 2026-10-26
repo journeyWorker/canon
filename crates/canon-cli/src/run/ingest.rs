@@ -8,13 +8,25 @@ use std::process::ExitCode;
 
 pub fn run(cmd: IngestCommand) -> ExitCode {
     match cmd {
-        IngestCommand::Sessions(IngestSessionsArgs { watch, interval_secs, home, repo, full, all_workspaces, dry_run, json, .. }) => run_ingest_sessions(&repo.join("canon.yaml"), home.as_deref(), watch, interval_secs, full, all_workspaces, dry_run.dry_run, json),
+        IngestCommand::Sessions(IngestSessionsArgs { watch, interval_secs, home, repo, full, all_workspaces, dry_run, json, .. }) => run_ingest_sessions(&repo.join("canon.yaml"), home.as_deref(), SessionsOptions { watch, interval_secs, full, all_workspaces, dry_run: dry_run.dry_run, json }),
         IngestCommand::Records(IngestRecordsArgs { watch, interval_secs, repo, dry_run, json, run_id, .. }) => run_ingest_records(&repo, watch, interval_secs, dry_run.dry_run, json, run_id.as_ref()),
         IngestCommand::Plans(IngestPlansArgs { dialect, plan_source, repo, dry_run, json, .. }) => run_ingest_plans(&repo, dialect.as_deref(), plan_source.as_deref(), dry_run.dry_run, json),
     }
 }
 
-fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Path>, watch: bool, interval_secs: u64, full: bool, all_workspaces: bool, dry_run: bool, json: bool) -> ExitCode {
+/// The flags of `canon ingest sessions` that shape one run.
+#[derive(Debug, Clone, Copy)]
+struct SessionsOptions {
+    watch: bool,
+    interval_secs: u64,
+    full: bool,
+    all_workspaces: bool,
+    dry_run: bool,
+    json: bool,
+}
+
+fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Path>, options: SessionsOptions) -> ExitCode {
+    let SessionsOptions { watch, interval_secs, full, all_workspaces, dry_run, json } = options;
     let home = match home {
         Some(h) => h.to_path_buf(),
         None => match std::env::var_os("HOME") {

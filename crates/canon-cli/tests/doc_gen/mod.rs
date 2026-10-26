@@ -16,7 +16,6 @@
 //!
 //! `tests/docs_generated.rs` rewrites (`CANON_BLESS_DOCS=1`) or drift-checks
 //! every file; `tests/docs_lint.rs` lints the result.
-#![allow(dead_code)]
 
 use std::fmt::Write as _;
 use std::fs;

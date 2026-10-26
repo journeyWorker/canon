@@ -70,6 +70,7 @@ pub enum TierCliError {
 /// zero network); `pg`/`r2`/`sqlite` only when their own rung's block
 /// exists (design §9 local-first: an unconfigured rung is never
 /// attempted).
+#[derive(Debug)]
 pub struct LoadedTiers {
     pub policy: TierPolicy,
     pub git: Option<GitTier>,
@@ -153,6 +154,7 @@ fn build_tiers_with(canon_yaml_path: &Path, read_only: bool) -> Result<LoadedTie
                 // is never masked by an unset-DSN error naming the
                 // wrong problem first.
                 validate_schema_ident(&cfg.schema)?;
+                #[expect(clippy::map_err_ignore, reason = "`VarError` only says unset or non-UTF-8; the refusal names the variable and reads the same for both")]
                 let dsn = std::env::var(&cfg.dsn_env).map_err(|_| {
                     StoreError::tier_unavailable(rung, Some(canon_store::policy::Backend::Postgres), format!("`{}` is unset", cfg.dsn_env))
                 })?;

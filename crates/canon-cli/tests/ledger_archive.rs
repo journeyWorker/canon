@@ -119,7 +119,7 @@ fn query_count(repo: &Path, kind: &str, history: bool) -> usize {
     }
     let o = canon(repo, &args);
     assert!(o.status.success(), "{}", out(&o));
-    json(&o)["data"]["count"].as_u64().unwrap_or_else(|| panic!("no count: {}", out(&o))) as usize
+    json(&o)["data"]["count"].as_u64().map_or_else(|| panic!("no count: {}", out(&o)), |count| usize::try_from(count).expect("count fits usize"))
 }
 
 /// `status --json` without the fields that change from one run to the next.
@@ -130,9 +130,15 @@ fn status_json(repo: &Path) -> Value {
         match value {
             Value::Object(map) => {
                 map.retain(|key, _| !matches!(key.as_str(), "generatedAt" | "now" | "at"));
-                map.values_mut().for_each(scrub);
+                for child in map.values_mut() {
+                    scrub(child);
+                }
             }
-            Value::Array(items) => items.iter_mut().for_each(scrub),
+            Value::Array(items) => {
+                for item in items {
+                    scrub(item);
+                }
+            }
             _ => {}
         }
     }

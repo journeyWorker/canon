@@ -62,7 +62,7 @@ fn seed_trajectories(repo: &Path, count: usize, outcome: VerdictOutcome) {
     for i in 0..count {
         // Chronological, most recent last — the occurrence gate folds
         // samples in time order, so ordering is load-bearing.
-        let at = now - Duration::days((count - i) as i64);
+        let at = now - Duration::days(i64::try_from(count - i).expect("small count"));
         append_trajectory(&store, at, outcome);
     }
 }

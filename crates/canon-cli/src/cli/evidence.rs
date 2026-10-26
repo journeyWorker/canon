@@ -5,7 +5,7 @@ use clap::{Args, Subcommand};
 use std::path::PathBuf;
 use super::PromoteArgs;
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum EvidenceCommand {
     /// Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1`
     ApprovalPayload(EvidenceApprovalPayloadArgs),
@@ -17,7 +17,7 @@ pub enum EvidenceCommand {
     Audit(EvidenceAuditArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct EvidenceApprovalPayloadArgs {
     /// The plan task the approval is for (<change_id>#<n>); give this or --scenario-id
     #[arg(long, value_parser = crate::dispatch::parse_task_id, value_name = "TASK_ID")]
@@ -49,7 +49,7 @@ pub struct EvidenceApprovalPayloadArgs {
     pub json: bool,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct EvidenceAddArgs {
     /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given
     #[arg(long, value_parser = crate::dispatch::parse_task_id, value_name = "TASK_ID")]
@@ -135,7 +135,7 @@ pub struct EvidenceAddArgs {
 
 
 /// The flags of `evidence audit`: an external evaluator's re-audit of one scenario.
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct EvidenceAuditArgs {
     /// The re-audited scenario (`<area>.<surface>.<nn>`)
     #[arg(value_name = "SCENARIO_ID", value_parser = crate::review::parse_scenario_id)]

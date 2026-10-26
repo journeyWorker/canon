@@ -137,7 +137,7 @@ pub fn run_verify(repo: &Path, full: bool, json: bool) -> u8 {
 }
 
 /// `canon artifacts verify`: what the check looked at and the files that failed it.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactsVerifyReport<'a> {
     /// `local`, or the name of the artifact store tier.
@@ -156,7 +156,7 @@ pub struct ArtifactsVerifyReport<'a> {
 impl crate::json_out::Report for ArtifactsVerifyReport<'_> {}
 
 /// One bound file `artifacts verify` found missing or altered.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct VerifyProblem<'a> {
     pub subject: &'a str,

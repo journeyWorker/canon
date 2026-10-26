@@ -369,7 +369,8 @@ fn report_dashboard_09_refuses_requests_that_are_not_the_pages_own() {
         }
         headers
     };
-    let cases: Vec<(&str, Vec<(&'static str, String)>, u16, &str)> = vec![
+    type Case<'a> = (&'a str, Vec<(&'static str, String)>, u16, &'a str);
+    let cases: Vec<Case<'_>> = vec![
         ("foreign Origin", with("Origin", Some("http://evil.example".into())), 403, "DASHBOARD_ORIGIN_REFUSED"),
         ("another port's Origin", with("Origin", Some(format!("http://127.0.0.1:{}", port.wrapping_add(1)))), 403, "DASHBOARD_ORIGIN_REFUSED"),
         ("no Origin", with("Origin", None), 403, "DASHBOARD_ORIGIN_REFUSED"),

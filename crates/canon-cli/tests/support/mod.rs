@@ -10,7 +10,7 @@
 //! a subset of these helpers, so per-binary dead-code warnings are
 //! expected and suppressed here rather than by padding every test file
 //! with calls it doesn't otherwise need.
-#![allow(dead_code)]
+#![expect(dead_code, reason = "each test binary that includes this module uses a subset")]
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};

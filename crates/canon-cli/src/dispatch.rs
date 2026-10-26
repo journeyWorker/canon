@@ -2341,15 +2341,15 @@ mod begin_tests {
     use super::*;
     use tempfile::TempDir;
 
-    /// `pub(super)`, like [`regime`] and [`write_openspec_change`]
+    /// `pub(crate)`, like [`regime`] and [`write_openspec_change`]
     /// below, so s42's `tier_tests` composes the SAME dispatch inputs
     /// this module already uses instead of a second, silently
     /// drifting copy of them.
-    pub(super) fn role() -> RoleId {
+    pub(crate) fn role() -> RoleId {
         RoleId::parse("implementer").expect("a literal role slug")
     }
 
-    pub(super) fn regime() -> RegimeKey {
+    pub(crate) fn regime() -> RegimeKey {
         RegimeKey::parse("implementer/canon/dispatch/abc123").expect("a literal regime key")
     }
 
@@ -2357,7 +2357,7 @@ mod begin_tests {
     /// openspec dialect's own admission bar — a change dir without one
     /// is not a change the importer recognizes at all) plus the given
     /// `tasks.md` rows.
-    pub(super) fn write_openspec_change(root: &Path, change_id: &str, rows: &str) {
+    pub(crate) fn write_openspec_change(root: &Path, change_id: &str, rows: &str) {
         let change_dir = root.join(change_id);
         std::fs::create_dir_all(&change_dir).expect("creating the change dir");
         std::fs::write(change_dir.join("proposal.md"), format!("# {change_id}\n\n## Why\n\nTo exercise --task-id resolution.\n"))

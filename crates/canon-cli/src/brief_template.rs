@@ -46,6 +46,7 @@ impl Role {
 }
 
 /// One PRD section: its marker key and role, in brief order.
+#[derive(Debug)]
 pub struct PrdSection {
     pub key: &'static str,
     pub role: Role,

@@ -4,7 +4,7 @@ use canon_model::{RunId};
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum IngestCommand {
     /// Import agent CLI session transcripts (omp/pi, Claude Code, Codex, Hermes)
     Sessions(IngestSessionsArgs),
@@ -14,7 +14,7 @@ pub enum IngestCommand {
     Plans(IngestPlansArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct IngestSessionsArgs {
     /// Keep polling instead of exiting after one pass
     #[arg(long)]
@@ -42,7 +42,7 @@ pub struct IngestSessionsArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct IngestRecordsArgs {
     /// Keep polling instead of exiting after one pass
     #[arg(long)]
@@ -64,7 +64,7 @@ pub struct IngestRecordsArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct IngestPlansArgs {
     /// One-shot override: import this dialect's --plan-source root (requires --plan-source)
     #[arg(long, requires = "plan_source", value_name = "NAME")]

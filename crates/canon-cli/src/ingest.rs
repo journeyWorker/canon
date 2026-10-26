@@ -826,7 +826,7 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
 fn file_stat(path: &Path) -> (i64, u64) {
     match std::fs::metadata(path) {
         Ok(meta) => {
-            let mtime_ms = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_millis() as i64);
+            let mtime_ms = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX));
             (mtime_ms, meta.len())
         }
         Err(_) => (0, 0),
@@ -1032,7 +1032,7 @@ pub fn format_json(outcome: &IngestOutcome) -> Option<String> {
 }
 
 /// One adapter's scan counts in `ingest sessions`' report.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AdapterCounts<'a> {
     pub client: &'a str,
@@ -1046,7 +1046,7 @@ pub struct AdapterCounts<'a> {
 /// `canon ingest sessions`' report (`IngestSessionsReport`): the counts the
 /// human summary prints, plus `unwritten` (the metadata of what could not be
 /// persisted) when the store's tiers were unreachable.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct IngestSessionsReport<'a> {
     /// True when `--dry-run` previewed the pass without writing.
@@ -1065,7 +1065,7 @@ pub struct IngestSessionsReport<'a> {
 impl crate::json_out::Report for IngestSessionsReport<'_> {}
 
 /// One adapter's scan counts in the unwritten metadata.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UnwrittenAdapter<'a> {
     pub client_id: &'a str,
@@ -1077,7 +1077,7 @@ pub struct UnwrittenAdapter<'a> {
 }
 
 /// The counts of the unwritten metadata.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UnwrittenCounts {
     pub sessions: usize,
@@ -1091,7 +1091,7 @@ pub struct UnwrittenCounts {
 }
 
 /// One session that was not persisted: identity and digest, no content.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UnwrittenSession<'a> {
     pub session_id: &'a canon_model::SessionId,
@@ -1103,7 +1103,7 @@ pub struct UnwrittenSession<'a> {
 }
 
 /// One run that was not persisted.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UnwrittenRun<'a> {
     pub run_id: &'a canon_model::RunId,
@@ -1113,7 +1113,7 @@ pub struct UnwrittenRun<'a> {
 }
 
 /// One event that was not persisted: its place and digest, never its detail.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UnwrittenEvent<'a> {
     pub run_id: &'a canon_model::RunId,
@@ -1124,7 +1124,7 @@ pub struct UnwrittenEvent<'a> {
 }
 
 /// Why the pass did not reach a durable tier.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UnwrittenFailure<'a> {
     pub class: &'a str,
@@ -1132,7 +1132,7 @@ pub struct UnwrittenFailure<'a> {
 }
 
 /// The metadata-only account of what an ingest pass could not persist.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Unwritten<'a> {
     /// True when `--dry-run` previewed the pass without writing.

@@ -84,9 +84,8 @@ fn bless_mode() -> bool {
 /// half-added case must not vanish from the run.
 fn discover_cases() -> Result<Vec<Case>, String> {
     let root = cases_dir();
-    let entries = match std::fs::read_dir(&root) {
-        Ok(entries) => entries,
-        Err(_) => return Ok(Vec::new()),
+    let Ok(entries) = std::fs::read_dir(&root) else {
+        return Ok(Vec::new());
     };
     let mut dirs: Vec<PathBuf> = entries
         .filter_map(std::result::Result::ok)
@@ -511,8 +510,10 @@ fn run_case(case: &Case, bless: bool) -> Result<(), String> {
             .envs(&env)
             .output()
             .map_err(|e| format!("step {n}: spawn canon: {e}"))?;
+        #[expect(clippy::map_err_ignore, reason = "the case failure names the step and the stream; the UTF-8 error only adds a byte offset")]
         let stdout = String::from_utf8(output.stdout)
             .map_err(|_| format!("step {n}: stdout is not UTF-8"))?;
+        #[expect(clippy::map_err_ignore, reason = "the case failure names the step and the stream; the UTF-8 error only adds a byte offset")]
         let stderr = String::from_utf8(output.stderr)
             .map_err(|_| format!("step {n}: stderr is not UTF-8"))?;
         let stdout = normalize(&stdout, &repo_paths);
@@ -559,9 +560,8 @@ fn run_case(case: &Case, bless: bool) -> Result<(), String> {
 }
 
 fn expectation_files(expected_dir: &Path) -> Result<Vec<PathBuf>, String> {
-    let entries = match std::fs::read_dir(expected_dir) {
-        Ok(entries) => entries,
-        Err(_) => return Ok(Vec::new()),
+    let Ok(entries) = std::fs::read_dir(expected_dir) else {
+        return Ok(Vec::new());
     };
     Ok(entries
         .filter_map(std::result::Result::ok)

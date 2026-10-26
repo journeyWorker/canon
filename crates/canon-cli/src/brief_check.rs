@@ -286,11 +286,13 @@ pub fn flow_scenarios(repo: &Path, change: &ChangeId) -> Result<FlowIndex, Strin
 /// walked on its first lookup, and once: a command that never asks pays no
 /// walk, one that asks about one scenario walks only that scenario's root,
 /// and one that asks per scenario walks each root once.
+#[derive(Debug)]
 pub struct FlowChangesIndex(std::cell::OnceCell<Vec<RootFlows>>);
 
 /// The spec roots of one project id of a [`FlowChangesIndex`] (in
 /// configuration order) and, once read, their scenarios' flow changes by
 /// scenario id.
+#[derive(Debug)]
 struct RootFlows {
     id: String,
     roots: Vec<std::path::PathBuf>,
@@ -1768,6 +1770,7 @@ pub fn phase_of(repo: &Path, change: &ChangeId, text: &str) -> Phase {
 }
 
 /// A brief read from disk and judged.
+#[derive(Debug)]
 pub struct Checked {
     pub change: ChangeId,
     /// The brief, relative to the repo root.
@@ -1955,7 +1958,7 @@ fn fail(command: &str, json: bool, error: &CliError) -> u8 {
     error.emit(command, json)
 }
 
-#[derive(Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// The `brief check` report: the verdict over one change brief.
 pub struct BriefCheckReport<'a> {
@@ -2078,7 +2081,7 @@ fn next_steps(ev: &Evaluation) -> Vec<Step> {
     steps
 }
 
-#[derive(Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 /// The `brief show` report: the brief's state and the next steps.
 pub struct BriefShowReport<'a> {

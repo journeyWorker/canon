@@ -76,6 +76,7 @@ pub const STANDARD_EXITS: &[ExitMeta] = &[
 ];
 
 /// Metadata clap cannot supply, for one leaf command.
+#[derive(Debug)]
 pub struct CommandMeta {
     /// Canonical space-separated path, e.g. `evidence add`.
     pub path: &'static str,
@@ -246,7 +247,7 @@ pub fn check_metadata(root: &Command, meta: &[CommandMeta]) -> Vec<String> {
 }
 
 /// One command in `canon schema`'s listing.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ListEntry {
     command: String,
     effect: Effect,
@@ -255,7 +256,7 @@ pub struct ListEntry {
 }
 
 /// `canon schema` with no command: the commands, filtered to a role.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ListSchema {
     /// The role the listing was filtered to; absent when it lists every command.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -264,14 +265,14 @@ pub struct ListSchema {
 }
 
 /// `canon schema --errors`: every error code.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ErrorList {
     errors: Vec<spec::ErrorRow>,
 }
 
 /// `canon schema`'s report (`SchemaReport`): the command listing, one command's
 /// node of the generated spec, or the error registry.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
 pub enum SchemaReport<'a> {
     Commands(ListSchema),
@@ -281,7 +282,7 @@ pub enum SchemaReport<'a> {
 }
 
 /// `canon schema --error <CODE>`: the one registry row.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ErrorEntry {
     pub error: spec::ErrorRow,
 }
@@ -349,9 +350,7 @@ fn resolve(root: &Command, tokens: &[String]) -> Result<Resolved, Refusal> {
             }
         }
     }
-    if cmd.get_subcommands().any(|c| c.get_name() != "help") {
-        Ok(Resolved::Group(canonical))
-    } else if canonical.is_empty() {
+    if cmd.get_subcommands().any(|c| c.get_name() != "help") || canonical.is_empty() {
         Ok(Resolved::Group(canonical))
     } else {
         Ok(Resolved::Leaf(canonical))
@@ -577,7 +576,7 @@ fn print_human(node: &Node) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clap::{Arg, ArgAction, Command};
+    use clap::{Arg, ArgAction};
 
     fn tree() -> Command {
         Command::new("canon")

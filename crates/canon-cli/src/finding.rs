@@ -354,6 +354,7 @@ pub fn parse_introduced_rev(s: &str) -> Result<String, String> {
 /// completely different things and would all compile if transposed,
 /// and transposing them would silently produce a WRONG fix-of-fix
 /// derivation rather than an error.
+#[derive(Debug)]
 pub struct FindingArgs {
     /// The change under review — the finding's scope and the first
     /// component of its natural key.
@@ -1329,7 +1330,7 @@ mod tests {
     /// The three revision flags with the mutation that sets each one.
     /// `--resolution-rev` drags `--disposition fixed` along, or the
     /// coherence refusal fires first and the revision check never runs.
-    fn rev_flags() -> [(&'static str, fn(&mut FindingArgs, &str)); 3] {
+    fn rev_flags() -> [(&'static str, FlagMutation); 3] {
         [
             ("--rev", |a: &mut FindingArgs, r: &str| a.rev = r.to_string()),
             ("--introduced-rev", |a: &mut FindingArgs, r: &str| a.introduced_rev = Some(r.to_string())),
@@ -1339,6 +1340,8 @@ mod tests {
             }),
         ]
     }
+
+    type FlagMutation = fn(&mut FindingArgs, &str);
 
     /// A revision that names no commit is refused on every flag, and a
     /// refused add stages nothing.

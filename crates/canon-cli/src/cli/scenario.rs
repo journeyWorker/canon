@@ -4,13 +4,13 @@ use canon_model::{ChangeId, ProjectId, ScenarioId, SubjectId};
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum ScenarioCommand {
     /// Append a tagged scenario stub to its .feature file (created if missing); many at once with `--input`
     New(ScenarioNewArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct ScenarioNewArgs {
     /// <area>.<surface>.<nn> scenario tag
     #[arg(value_name = "SCENARIO_ID", value_parser = crate::scaffold::parse_scenario_tag)]

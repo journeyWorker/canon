@@ -144,7 +144,7 @@ pub fn snapshot(inputs: &ReportInputs, dir: &Path) -> Result<canon_report::Manif
 }
 
 /// `canon report build`: where the report was written (`ReportBuildReport`).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ReportBuildReport {
     /// The report file written.
@@ -154,7 +154,7 @@ pub struct ReportBuildReport {
 impl crate::json_out::Report for ReportBuildReport {}
 
 /// `canon report check`: whether the report file is current (`ReportCheckReport`).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ReportCheckReport {
     /// `fresh`, `missing` or `drift`.
@@ -166,7 +166,7 @@ pub struct ReportCheckReport {
 impl crate::json_out::Report for ReportCheckReport {}
 
 /// One parquet table a snapshot wrote.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SnapshotTable<'a> {
     pub table: &'a str,
@@ -174,7 +174,7 @@ pub struct SnapshotTable<'a> {
 }
 
 /// `canon report snapshot <dir>`: the tables written (`ReportSnapshotReport`).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ReportSnapshotReport<'a> {
     pub directory: String,

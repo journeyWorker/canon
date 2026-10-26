@@ -281,7 +281,6 @@ fn report_subject(repo: &Path, subject: &Subject, verb: &str, dry_run: bool, jso
 
 /// [`report_subject`] with `warnings`: said on stderr, and in `--json`
 /// carried in `meta.warnings` ([`crate::json_out::warnings_meta`]).
-#[expect(clippy::too_many_arguments)]
 fn report_subject_warning(
     repo: &Path,
     subject: &Subject,
@@ -310,7 +309,7 @@ fn report_subject_warning(
 }
 
 /// `data` of the subject leaves: the Subject record, embedded verbatim (it keeps the ledger record's own schema and snake_case keys).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(transparent)]
 pub struct SubjectReport<'a>(pub &'a Subject);
 
@@ -344,7 +343,7 @@ pub fn override_lines(ctx: &GateContext) -> Vec<String> {
 }
 
 /// `data` of `subject move`: the Subject record, plus the refusals `--override-reason` waived (D12).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SubjectMoveReport<'a> {
     #[serde(flatten)]
@@ -356,7 +355,7 @@ pub struct SubjectMoveReport<'a> {
 impl crate::json_out::Report for SubjectMoveReport<'_> {}
 
 /// `data` of a subject leaf under `--dry-run`: the Subject as it would stand, plus `dryRun`.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SubjectPreviewReport<'a> {
     #[serde(flatten)]
@@ -434,6 +433,23 @@ fn domain_membership_violation(repo: &Path, domain: &str) -> Option<String> {
     enum_membership_violation(repo, DOMAIN_ENUM, domain)
 }
 
+/// Who wrote a subject, and in which session.
+#[derive(Debug, Clone, Copy)]
+pub struct Actor<'a> {
+    pub id: &'a str,
+    pub session: Option<&'a canon_model::SessionId>,
+}
+
+/// The fields of a new subject ([`run_new`]).
+#[derive(Debug, Clone, Copy)]
+pub struct NewSubject<'a> {
+    pub subject_id: &'a SubjectId,
+    pub domain: &'a str,
+    pub title: &'a str,
+    pub summary: &'a str,
+    pub owner_role: &'a RoleId,
+}
+
 /// `canon subject new <id> --domain <d> --title <t> [--summary <s>]
 /// [--owner-role <r>]` (module doc): author a fresh [`Subject`] at
 /// status `proposed`. The envelope is attributed to `actor_id` (default
@@ -446,8 +462,9 @@ fn domain_membership_violation(repo: &Path, domain: &str) -> Option<String> {
 /// enum ([`domain_membership_violation`]). A `subject_id` already
 /// present in the store is a loud refusal (exit `2`), never a silent
 /// second append.
-#[expect(clippy::too_many_arguments)]
-pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, summary: &str, owner_role: &RoleId, actor_id: &str, session: Option<&canon_model::SessionId>, json: bool) -> u8 {
+pub fn run_new(repo: &Path, new: &NewSubject, actor: Actor, json: bool) -> u8 {
+    let NewSubject { subject_id, domain, title, summary, owner_role } = *new;
+    let Actor { id: actor_id, session } = actor;
     // `domain` shares `SubjectId`'s kebab-slug grammar (design D2: the
     // model validates the SAME shape via `is_kebab_slug`); validate it
     // BEFORE `Subject::new` so a malformed value is a clean refusal
@@ -860,17 +877,16 @@ fn preview_adoption(repo: &Path, mut change: Change, mut subject: Subject) -> Re
 /// runs no review guard, and records [`Reopen`]. A successful transition
 /// re-stamps the subject (fresh `at`) and persists it through the routed
 /// tier.
-#[expect(clippy::too_many_arguments)]
 pub fn run_move(
     repo: &Path,
     subject_id: &SubjectId,
     target: SubjectStatus,
     override_reason: Option<&str>,
     reason: Option<&str>,
-    actor_id: &str,
-    session: Option<&canon_model::SessionId>,
+    actor: Actor,
     json: bool,
 ) -> u8 {
+    let Actor { id: actor_id, session } = actor;
     for (flag, text, recorded) in [
         ("--override-reason", override_reason, "the accountable reason"),
         ("--reason", reason, "the transition note, with the actor"),

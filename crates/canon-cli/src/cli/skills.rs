@@ -3,7 +3,7 @@
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum SkillsCommand {
     /// Install the canonical `canon` bundle or legacy developer skills.
     Install(SkillsInstallArgs),
@@ -15,7 +15,7 @@ pub enum SkillsCommand {
     Show(SkillsShowArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct SkillsInstallArgs {
     /// Developer override: read SKILL.src.md's frontmatter and scripts/ from this directory instead of the text built into the binary; defaults to CANON_SKILLS_SOURCE, else the built-in text.
     #[arg(long, value_name = "DIR")]
@@ -38,7 +38,7 @@ pub struct SkillsInstallArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct SkillsCheckArgs {
     /// Source directory; defaults to CANON_SKILLS_SOURCE or canon/skills.
     #[arg(long, value_name = "DIR")]
@@ -53,7 +53,7 @@ pub struct SkillsCheckArgs {
     pub json: bool,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct SkillsDoctorArgs {
     /// Source directory; defaults to CANON_SKILLS_SOURCE or canon/skills.
     #[arg(long, value_name = "DIR")]
@@ -68,7 +68,7 @@ pub struct SkillsDoctorArgs {
     pub json: bool,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct SkillsShowArgs {
     /// The guide to print: `canon` (the core guide) or a reference such as `role-implementer`.
     #[arg(value_name = "NAME", value_parser = clap::builder::PossibleValuesParser::new(crate::guide::names()))]

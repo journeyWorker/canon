@@ -31,6 +31,7 @@ pub enum TierAgeError {
 
 /// One `aging:` entry's outcome: what a preview found past the threshold
 /// (`candidates`) and, once committed, what the run did with it.
+#[derive(Debug)]
 pub struct AgeRuleReport {
     pub kind: RecordKind,
     pub source: Rung,

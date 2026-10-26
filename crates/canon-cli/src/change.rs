@@ -231,7 +231,6 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         false,
         json,
         &ChangeNewReport { change_id: slug.as_str(), subject_id: subject_id.as_str(), brief: &brief },
-        crate::json_out::warnings_meta(&warnings),
-        extra);
+        crate::next::Extras { meta: crate::json_out::warnings_meta(&warnings), steps: extra });
     0
 }

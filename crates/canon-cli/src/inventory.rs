@@ -596,6 +596,7 @@ pub fn scan_feature_corpus_detailed(root: &Path) -> Vec<ScannedScenario> {
 }
 
 /// One `.feature` file as the Gherkin scan reads it.
+#[derive(Debug)]
 pub struct FeatureFileScan {
     pub scan: canon_fmt::gherkin::FeatureScan,
     pub source_digest: SpecDigest,
@@ -607,8 +608,10 @@ pub struct FeatureFileScan {
 /// One command scans the corpus for the staleness check, the refresh,
 /// the status, the gate and the brief's flow coverage; an unchanged file
 /// is read and lexed once, and an edited or new one is read again.
-static FEATURE_MEMO: std::sync::LazyLock<std::sync::Mutex<BTreeMap<PathBuf, (canon_store::git_tier::FileStamp, std::sync::Arc<FeatureFileScan>)>>> =
+static FEATURE_MEMO: std::sync::LazyLock<std::sync::Mutex<BTreeMap<PathBuf, MemoEntry>>> =
     std::sync::LazyLock::new(Default::default);
+
+type MemoEntry = (canon_store::git_tier::FileStamp, std::sync::Arc<FeatureFileScan>);
 
 /// The scan of the `.feature` file at `path`; `None` when it cannot be
 /// read or is not UTF-8 (the file holds no scenario).
@@ -617,7 +620,7 @@ pub fn feature_file_scan(path: &Path) -> Option<std::sync::Arc<FeatureFileScan>>
     if let Some(stamp) = stamp {
         let memo = FEATURE_MEMO.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some((_, file)) = memo.get(path).filter(|(seen, _)| *seen == stamp) {
-            return Some(file.clone());
+            return Some(std::sync::Arc::clone(file));
         }
     }
     let bytes = std::fs::read(path).ok()?;
@@ -628,7 +631,7 @@ pub fn feature_file_scan(path: &Path) -> Option<std::sync::Arc<FeatureFileScan>>
         scenario_digests: canon_fmt::gherkin::scenario_digests(text),
     });
     if let Some(stamp) = stamp {
-        FEATURE_MEMO.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(path.to_path_buf(), (stamp, file.clone()));
+        FEATURE_MEMO.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(path.to_path_buf(), (stamp, std::sync::Arc::clone(&file)));
     }
     Some(file)
 }
@@ -810,7 +813,6 @@ struct RootPlan {
 /// Decide what syncing `spec_root` writes against the index as it stands
 /// (`folded`, read only when the root is not refused), without writing.
 /// [`sync_one_root`] writes it; [`overlay_stale_index`] only reads it.
-#[expect(clippy::too_many_arguments)]
 fn plan_one_root<'f>(
     folded: impl FnOnce() -> Result<std::borrow::Cow<'f, BTreeMap<(ProjectId, ScenarioId), Scenario>>, InventoryError>,
     repo: &Path,
@@ -914,7 +916,6 @@ fn plan_one_root<'f>(
     Ok(RootPlan { outcome, records })
 }
 
-#[expect(clippy::too_many_arguments)]
 fn sync_one_root(
     tier: &GitTier,
     repo: &Path,
@@ -1004,7 +1005,7 @@ pub fn format_human(outcome: &SyncOutcome) -> String {
 }
 
 /// One spec root of `canon inventory sync`'s report.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InventoryRootReport<'a> {
     pub id: &'a str,
@@ -1020,7 +1021,7 @@ pub struct InventoryRootReport<'a> {
 }
 
 /// `canon inventory sync`'s report (`InventorySyncReport`).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InventorySyncReport<'a> {
     /// True when `--dry-run` previewed the run without writing.
@@ -1078,9 +1079,11 @@ struct StaleRoot {
 /// lacks or holds at another `source_digest` or `scenario_digest`, and
 /// an indexed scenario the corpus no longer declares — the indexed id
 /// set and the corpus id set of a project must be equal.
-fn stale_roots(tier: &GitTier, roots: &[SpecRoot]) -> Result<(Vec<StaleRoot>, BTreeMap<ProjectId, BTreeSet<ScenarioId>>), InventoryError> {
+fn stale_roots(tier: &GitTier, roots: &[SpecRoot]) -> Result<StaleScan, InventoryError> {
     Ok(stale_roots_against(&latest_index(tier)?, roots))
 }
+
+type StaleScan = (Vec<StaleRoot>, BTreeMap<ProjectId, BTreeSet<ScenarioId>>);
 
 /// [`stale_roots`] against an index already folded ([`latest_index`]).
 fn stale_roots_against(latest: &BTreeMap<(ProjectId, ScenarioId), Scenario>, roots: &[SpecRoot]) -> (Vec<StaleRoot>, BTreeMap<ProjectId, BTreeSet<ScenarioId>>) {

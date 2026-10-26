@@ -1233,7 +1233,6 @@ impl crate::reports::Report for GateInstallHooksReport {}
 /// `canon-gate-pre-commit.sh` (`PRE_COMMIT_SCRIPT`, task 4.2) into
 /// `<repo>/.canon/scripts/`, matching spec.md's "a non-donor repo gets a generic
 /// pre-commit script" scenario.
-#[expect(clippy::too_many_arguments)]
 pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, command: &str, timeout: u32, dry_run: bool, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let entry = HookEntry::new(event, matcher.map(str::to_string), command, timeout);

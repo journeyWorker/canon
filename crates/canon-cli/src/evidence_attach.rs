@@ -199,6 +199,7 @@ pub fn parse_report_spec(value: &str) -> Result<(ReportFormat, PathBuf), String>
 }
 
 /// Inputs for [`bind`].
+#[derive(Debug)]
 pub struct BindRequest<'a> {
     pub repo: &'a Path,
     pub artifacts: &'a [PathBuf],
@@ -239,7 +240,7 @@ impl BoundFile {
     /// The bytes behind the digest.
     fn reader(&self) -> std::io::Result<Box<dyn Read>> {
         match &self.embedded {
-            Some(bytes) => Ok(Box::new(std::io::Cursor::new(bytes.clone()))),
+            Some(bytes) => Ok(Box::new(std::io::Cursor::new(Arc::clone(bytes)))),
             None => Ok(Box::new(std::fs::File::open(&self.resolved)?)),
         }
     }
@@ -377,6 +378,7 @@ pub fn store_files_held<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<HeldS
 /// The blobs one [`store_files_held`] call stored, with the local store
 /// lock still held (none for an object store). Dropping it keeps them
 /// and releases the lock.
+#[derive(Debug)]
 pub struct HeldStore {
     lock: Option<canon_gate::artifact_store::StoreLock>,
     published: Vec<PathBuf>,
@@ -464,7 +466,7 @@ impl ParsedReport {
                         return Err(refusal(&name, format!("it is {} bytes, over the artifact store's limit of {max_bytes} bytes", bytes.len())));
                     }
                     let sha256 = format!("{:x}", Sha256::digest(bytes));
-                    (name.clone(), BoundFile { resolved: PathBuf::from(&name), sha256, embedded: Some(bytes.clone()) })
+                    (name.clone(), BoundFile { resolved: PathBuf::from(&name), sha256, embedded: Some(Arc::clone(bytes)) })
                 }
             };
             out.push((EvidenceAttachment { path, sha256: bound.sha256.clone(), format: None, case: None, outcome: None }, bound));
@@ -540,6 +542,7 @@ fn read_report_file(repo: &Path, format: ReportFormat, path: &Path, max_bytes: u
             "bind the file as an opaque --artifact, or split the report per suite",
         ));
     }
+    #[expect(clippy::map_err_ignore, reason = "`BindError::usage` takes a message and a hint, no source; the message already says the bytes are not UTF-8")]
     let text = std::str::from_utf8(&bytes)
         .map_err(|_| BindError::usage(format!("{} is not UTF-8", path.display()), "write the report as UTF-8 (a test runner's XML/JSON output is), or bind the file as an opaque --artifact"))?;
     let cases = match format {
@@ -607,6 +610,7 @@ pub fn bind(request: &BindRequest<'_>) -> Result<Bound, BindError> {
 }
 
 /// Inputs for [`bind_all_scenarios`].
+#[derive(Debug)]
 pub struct BatchRequest<'a> {
     pub repo: &'a Path,
     /// `--artifact <scenario-id>=<path>`: each bound to that scenario's
@@ -812,6 +816,7 @@ fn open_in_repo(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, Pat
             "name a file, not a directory; archive a directory first (zip or tar) and bind the archive",
         ));
     }
+    #[expect(clippy::map_err_ignore, reason = "`BindError::usage` takes a message and a hint, no source; `StripPrefixError` says nothing the message does not")]
     let relative = resolved.strip_prefix(repo).map_err(|_| {
         BindError::usage(
             format!("{} is outside the repository; bound files are recorded by repository-relative path", path.display()),

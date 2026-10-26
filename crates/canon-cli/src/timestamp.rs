@@ -4,6 +4,7 @@
 use chrono::{DateTime, NaiveDate, Utc};
 
 /// `DateTime<Utc>` value parser of a `<TIMESTAMP>` option.
+#[expect(clippy::map_err_ignore, reason = "clap prints this fixed message; the chrono parse error would only restate the input")]
 pub fn parse(s: &str) -> Result<DateTime<Utc>, String> {
     if let Ok(date) = NaiveDate::parse_from_str(s, "%Y-%m-%d") {
         return Ok(date.and_hms_opt(0, 0, 0).expect("midnight exists").and_utc());

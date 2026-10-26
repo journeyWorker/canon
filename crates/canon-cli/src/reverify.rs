@@ -139,6 +139,7 @@ fn chore_approvals(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<(Ch
 /// when a subject with an approved chore needs it (`git add -A` over the
 /// work tree is the cost). Errors (no git work tree) read as `None`, the
 /// same as [`crate::git_rev::code_tree`] failing for the time-rule-only case.
+#[derive(Debug)]
 pub struct CodeTreeMemo(std::cell::OnceCell<Option<String>>);
 
 impl CodeTreeMemo {

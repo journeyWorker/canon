@@ -84,7 +84,7 @@ pub fn env_var_names() -> impl Iterator<Item = &'static str> {
     ENV_VARS.iter().map(|v| v.name)
 }
 
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum NodeKind {
     Leaf,
@@ -92,7 +92,7 @@ pub enum NodeKind {
 }
 
 /// One operand of a leaf.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Operand {
     /// The clap id.
@@ -110,7 +110,7 @@ pub struct Operand {
 }
 
 /// How many values an operand takes; `max` is absent when unbounded.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct Arity {
     pub min: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -118,7 +118,7 @@ pub struct Arity {
 }
 
 /// One option of a leaf (or a global one).
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OptionSpec {
     /// The long name, without `--`.
@@ -146,7 +146,7 @@ pub struct OptionSpec {
 }
 
 /// One output of a leaf: what it prints and the schema of that.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Output {
     pub kind: OutputKind,
@@ -164,7 +164,7 @@ pub struct Output {
 
 /// One exit code of a leaf with its meaning: the leaf's own rows ([`crate::schema::META`]),
 /// then one row per exit a listed error code carries that the leaf did not declare.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ExitRow {
     pub code: u8,
     pub meaning: String,
@@ -189,7 +189,7 @@ fn exits_of(declared: &[ExitMeta], codes: &[&'static str]) -> Vec<ExitRow> {
 }
 
 /// The part of a node only a leaf has.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Leaf {
     pub effect: Effect,
@@ -215,7 +215,7 @@ pub struct Leaf {
 }
 
 /// One node of the command tree: a leaf, or a group that only holds children.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Node {
     /// The canonical space-separated path, e.g. `evidence add`.
@@ -487,7 +487,7 @@ fn global_options(root: &Command) -> Vec<OptionSpec> {
 }
 
 /// One error code of the registry.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ErrorRow {
     pub code: &'static str,
     pub meaning: &'static str,

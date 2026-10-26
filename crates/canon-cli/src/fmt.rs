@@ -18,7 +18,7 @@ pub fn format_human(report: &FmtReport) -> String {
 }
 
 /// One format violation as `--json` shows it.
-#[derive(Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ViolationEntry<'a> {
     /// The failure class (`missing-provenance`, …).
@@ -34,7 +34,7 @@ impl<'a> ViolationEntry<'a> {
 }
 
 /// `canon format`'s report (`FormatReport`).
-#[derive(Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FormatReport<'a> {
     pub clean: bool,

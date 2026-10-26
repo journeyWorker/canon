@@ -49,6 +49,7 @@ use std::process::ExitCode;
 /// One registered suite's outcome: `passed` counts the independent
 /// fixture checks that cleared; `failures` carries one human-readable
 /// line per failing check (empty ⇒ the suite is clean).
+#[derive(Debug)]
 pub struct SuiteResult {
     pub name: &'static str,
     pub passed: usize,
@@ -62,6 +63,7 @@ impl SuiteResult {
 }
 
 /// Every registered suite's outcome from one `canon selftest` run.
+#[derive(Debug)]
 pub struct SelftestReport {
     pub suites: Vec<SuiteResult>,
 }
@@ -187,7 +189,7 @@ pub fn run_suite(only: Option<&str>) -> SelftestReport {
 }
 
 /// `canon selftest --json`: one entry per suite.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SelftestSummary {
     /// Every suite is clean.
@@ -196,7 +198,7 @@ pub struct SelftestSummary {
 }
 
 /// One suite's outcome in [`SelftestSummary`].
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SuiteSummary {
     pub name: String,

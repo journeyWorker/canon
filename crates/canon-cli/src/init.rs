@@ -292,7 +292,7 @@ Inside an approved scope, never stop for a human: fixes, follow-ups and review r
 /// blocks, with `end` before the line's newline. `Err` when the text
 /// ends inside an unclosed fence: a block appended there would land in
 /// the fence and never be found again.
-pub(crate) fn marker_lines(text: &str) -> Result<(Vec<(usize, usize)>, Vec<(usize, usize)>), String> {
+pub(crate) fn marker_lines(text: &str) -> Result<(MarkerSpans, MarkerSpans), String> {
     let (mut begins, mut ends) = (Vec::new(), Vec::new());
     let mut open_fence: Option<(char, usize)> = None;
     let mut offset = 0;
@@ -314,6 +314,8 @@ pub(crate) fn marker_lines(text: &str) -> Result<(Vec<(usize, usize)>, Vec<(usiz
     }
     Ok((begins, ends))
 }
+
+type MarkerSpans = Vec<(usize, usize)>;
 
 /// `AGENTS.md`'s content with the canon block merged in. `existing` is
 /// the current file (`None` when absent). Only standalone marker lines
@@ -401,7 +403,7 @@ impl InitLog {
 }
 
 /// One step `canon init` took.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InitStep {
     pub step: String,
@@ -409,7 +411,7 @@ pub struct InitStep {
 }
 
 /// `canon init`'s report (`InitReport`): what it did, step by step.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InitReport {
     /// True when `--dry-run` previewed the run without writing.
@@ -420,7 +422,7 @@ pub struct InitReport {
 impl crate::json_out::Report for InitReport {}
 
 /// One `canon.yaml` section `init --check-config` examined.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InitCheckSection {
     pub section: String,
@@ -430,7 +432,7 @@ pub struct InitCheckSection {
 }
 
 /// `canon init --check-config`'s report (`InitCheckReport`).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InitCheckReport {
     pub ok: bool,

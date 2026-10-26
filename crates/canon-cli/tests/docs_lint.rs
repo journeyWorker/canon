@@ -29,6 +29,7 @@
 //! entry that stops failing must be removed (this test says so), and phase B
 //! of S8 empties the list.
 
+#[expect(dead_code, reason = "this test uses only the lint half of the generator")]
 mod doc_gen;
 
 use std::collections::BTreeSet;

@@ -102,6 +102,9 @@ fn records_under(root: &Path, kind: &str) -> Vec<(String, Value)> {
     out
 }
 
+/// A later record kind and the test for a record of it that makes a write deliberate.
+type FollowedBy<'a> = (&'a str, &'a dyn Fn(&Value) -> bool);
+
 /// The existing record that `body` would repeat, if any.
 ///
 /// `subject` says whether a stored record belongs to the same subject as
@@ -119,7 +122,7 @@ pub(crate) fn repeats_latest(
     kind: &str,
     body: &Value,
     subject: impl Fn(&Value) -> bool,
-    followed_by: Option<(&str, &dyn Fn(&Value) -> bool)>,
+    followed_by: Option<FollowedBy<'_>>,
 ) -> Option<Existing> {
     let corpus = RepeatCorpus::read(ledger_root, staging, kind, followed_by.map(|(later_kind, _)| later_kind));
     corpus.repeats(body, subject, followed_by.map(|(_, matches)| matches))

@@ -73,7 +73,6 @@ fn audit_path(repo: &Path) -> Option<PathBuf> {
 /// record bodies. New audit files are created mode 0600. Silently writes
 /// nothing when there is no `canon.yaml` to scope the event to
 /// ([`audit_path`]).
-#[expect(clippy::too_many_arguments)]
 pub fn append_access_audit(
     repo: &Path,
     operation: &str,
@@ -248,7 +247,7 @@ fn purge_effects(outcome: &PurgeOutcome, keys: &[String], learn_keys: Option<&[S
 /// `canon purge --kind K --before T [--commit --plan-digest D]`. A bare run
 /// previews and writes nothing, not even the access-audit line; `--commit`
 /// deletes only when the plan recomputed now has the digest given. `base` is
-/// the command line without the safety flags ([`crate::safety::command`]).
+/// the command line without the `--commit`/`--plan-digest` flags.
 pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mode, base: &str, json_output: bool) -> u8 {
     let result = (|| -> Result<(), RetentionError> {
         let (yaml, registry) = loaded_registry(repo, kind, true)?;
@@ -329,7 +328,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
 }
 
 /// One exported record: identity and digest, never the content.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportRecord {
     pub kind: &'static str,
@@ -354,7 +353,7 @@ impl ExportRecord {
 }
 
 /// An exported record cut to the `--fields` asked for.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectedExportRecord {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -367,7 +366,7 @@ pub struct ProjectedExportRecord {
     pub digest: Option<String>,
 }
 
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
 pub enum ExportRecordView {
     Full(ExportRecord),
@@ -377,7 +376,7 @@ pub enum ExportRecordView {
 /// The `canon.retention.export` manifest: what `export` writes to stdout or
 /// `--output`, and what `--json` envelopes (without `meta`, which then travels
 /// in the envelope's `meta`).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportManifest {
     pub schema: &'static str,
@@ -399,7 +398,7 @@ pub struct ExportManifest {
 }
 
 /// What `--json --output` returns: the file holds the manifest, this names it.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportWritten {
     pub output: String,
@@ -408,7 +407,7 @@ pub struct ExportWritten {
 }
 
 /// What `--json --dry-run` returns: what the run would write, nothing written.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportPreview {
     /// Always true.
@@ -421,7 +420,7 @@ pub struct ExportPreview {
 
 /// `canon export --json` (`ExportReport`): the manifest, or with `--output` the
 /// file it was written to; with `--dry-run` the preview.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
 pub enum ExportReport {
     Manifest(ExportManifest),
@@ -434,18 +433,13 @@ impl crate::json_out::Report for ExportReport {}
 /// The fields of one exported record, which `--fields` may name.
 const RECORD_FIELDS: [&str; 4] = ["kind", "at", "id", "digest"];
 
-pub fn run_export(
-    repo: &Path,
-    kind: RecordKind,
-    before: Option<DateTime<Utc>>,
-    after: Option<DateTime<Utc>>,
-    out: Option<&Path>,
-    json_output: bool,
-    include_sensitive: bool,
-    page: &crate::paging::Page,
-    fields: Option<&[String]>,
-    dry_run: bool,
-) -> u8 {
+pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
+    let crate::cli::top::ExportArgs { kind, before, after, output, repo, json: json_output, include_sensitive, page, fields, dry_run, .. } = args;
+    let repo = repo.as_path();
+    let out = output.as_deref();
+    let page = &page.page();
+    let fields = fields.as_deref();
+    let dry_run = dry_run.dry_run;
     let mut next_cursor_line = None;
     let result = (|| -> Result<(), ExportFailure> {
         if let Some(requested) = fields {

@@ -295,6 +295,7 @@ fn validate_telemetry(telemetry: &AdapterTelemetry) -> Result<(), AdapterError> 
     Ok(())
 }
 
+#[expect(clippy::map_err_ignore, reason = "`AdapterError::Validation` carries a message only; the timestamp parser's detail is not part of the pinned wording")]
 fn parse_timestamp(label: &str, value: &str) -> Result<DateTime<FixedOffset>, AdapterError> {
     DateTime::parse_from_rfc3339(value)
         .map_err(|_| AdapterError::Validation(format!("{label} must be an RFC3339 timestamp")))

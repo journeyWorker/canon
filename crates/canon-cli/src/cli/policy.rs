@@ -2,7 +2,7 @@
 
 use clap::{Args, Subcommand};
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum PolicyCommand {
     /// Approve the current .canon/policy.yaml (written directly; nothing to promote)
     Approve(PolicyApproveArgs),
@@ -10,7 +10,7 @@ pub enum PolicyCommand {
     Show(PolicyShowArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct PolicyApproveArgs {
     /// Who approved it (a human's name or id)
     #[arg(long, value_name = "NAME")]
@@ -27,7 +27,7 @@ pub struct PolicyApproveArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct PolicyShowArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

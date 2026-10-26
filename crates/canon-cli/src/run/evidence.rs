@@ -11,7 +11,7 @@ use super::record_role;
 /// the only root `canon.yaml` configures.
 fn project_for(repo: &Path, given: Option<ProjectId>, command: &str, json: bool) -> Result<ProjectId, ExitCode> {
     let repo = crate::context::resolve_repo_root(repo);
-    crate::inventory::resolve_project_id(&repo, given.as_ref(), "EVIDENCE_INVALID_ARGUMENT", command, json).map_err(|code| ExitCode::from(code))
+    crate::inventory::resolve_project_id(&repo, given.as_ref(), "EVIDENCE_INVALID_ARGUMENT", command, json).map_err(ExitCode::from)
 }
 
 pub fn run(cmd: EvidenceCommand) -> ExitCode {

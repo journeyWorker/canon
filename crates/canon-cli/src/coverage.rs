@@ -8,6 +8,7 @@
 use serde_json::{json, Map, Value};
 
 /// One spec root a check looked at.
+#[derive(Debug)]
 struct RootSeen {
     id: String,
     path: String,
@@ -15,12 +16,13 @@ struct RootSeen {
 }
 
 /// One spec root a check could not look at, and why.
+#[derive(Debug)]
 struct RootSkipped {
     path: String,
     reason: String,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Coverage {
     roots: Vec<RootSeen>,
     skipped: Vec<RootSkipped>,

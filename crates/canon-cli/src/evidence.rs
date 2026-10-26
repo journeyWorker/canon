@@ -367,6 +367,7 @@ fn normalized_strings(values: &[String]) -> Vec<String> {
 /// `actor_id`/`surface_ref`/`approval_by` are plain strings — every adjacent
 /// pair of them would silently compile if transposed, and approval fields
 /// end up in the permanent ledger body.
+#[derive(Debug)]
 pub struct EvidenceArgs {
     /// The plan task this evidence attests to, validated against the
     /// live plan corpus by [`crate::dispatch::validate_task_binding`]
@@ -590,6 +591,7 @@ fn audit_of(args: &EvidenceArgs) -> Result<Option<EvidenceAudit>, String> {
 
 
 /// Inputs shared by payload export and authenticated evidence staging.
+#[derive(Debug)]
 pub struct ApprovalPayloadArgs {
     pub task_id: Option<TaskId>,
     pub scenario_id: Option<ScenarioId>,
@@ -602,7 +604,9 @@ pub struct ApprovalPayloadArgs {
     pub json: bool,
 }
 
-fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<(Vec<u8>, Vec<String>, Vec<String>), String> {
+type ApprovalBinding = (Vec<u8>, Vec<String>, Vec<String>);
+
+fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<ApprovalBinding, String> {
     let subject = args.task_id.as_ref().map(ToString::to_string)
         .or_else(|| args.scenario_id.as_ref().map(ToString::to_string))
         .ok_or("give --task-id or --scenario-id")?;
@@ -613,6 +617,7 @@ fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<(Vec<u8>,
         || first_row_line_break(&args.approval_by).is_some() {
         return Err("--approver must be a non-empty trimmed single-line identity".into());
     }
+    #[expect(clippy::map_err_ignore, reason = "the error is a fixed message string with no source slot; the chrono parse detail is not part of the pinned wording")]
     let at = args.approval_at.parse::<DateTime<Utc>>()
         .map_err(|_| "--approval-at must be an RFC3339 timestamp")?;
     if let Some(task) = &args.task_id {
@@ -821,7 +826,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
         if args.approval_at.as_deref().and_then(|value| value.parse::<DateTime<Utc>>().ok()).is_none() {
             return CliError::refused("EVIDENCE_APPROVAL_INVALID", "--approval-at must be an RFC3339 timestamp").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
-        let signature_path = args.approval_signature_file.as_ref().unwrap();
+        let signature_path = args.approval_signature_file.as_ref().expect("approval_requested implies --signature-file");
         if !signature_path.is_file() {
             return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("detached signature file does not exist: {}", signature_path.display())).hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
@@ -981,11 +986,11 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
         record = record.with_project_id(project_id.clone());
     }
     if approval_requested {
-        let approver = args.approval_by.as_ref().unwrap();
-        let role = args.approval_role.as_ref().unwrap();
-        let approval_at = args.approval_at.as_ref().unwrap().parse::<DateTime<Utc>>().unwrap();
+        let approver = args.approval_by.as_ref().expect("approval_requested implies --approver");
+        let role = args.approval_role.as_ref().expect("approval_requested implies --approval-role");
+        let approval_at = args.approval_at.as_ref().expect("approval_requested implies --approval-at").parse::<DateTime<Utc>>().expect("--approval-at was validated as RFC3339 above");
         let artifact_sha = &args.commit.sha;
-        let subject = args.task_id.as_ref().map(ToString::to_string).or_else(|| args.scenario_id.as_ref().map(ToString::to_string)).unwrap();
+        let subject = args.task_id.as_ref().map(ToString::to_string).or_else(|| args.scenario_id.as_ref().map(ToString::to_string)).expect("a task or scenario id was required above");
         let (payload, surface, effects) = match approval_binding(&repo, &ApprovalPayloadArgs {
             task_id: args.task_id.clone(),
             scenario_id: args.scenario_id.clone(),
@@ -994,7 +999,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
             artifact_sha: artifact_sha.clone(),
             surface_ref: args.surface_ref.clone(),
             approval_by: approver.clone(),
-            approval_at: args.approval_at.clone().unwrap(),
+            approval_at: args.approval_at.clone().expect("approval_requested implies --approval-at"),
             json: args.json,
         }) {
             Ok(binding) => binding,
@@ -1003,7 +1008,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
             }
         };
         record = record.with_surface_ref(surface.clone());
-        let signature_path = args.approval_signature_file.as_ref().unwrap();
+        let signature_path = args.approval_signature_file.as_ref().expect("approval_requested implies --signature-file");
         let signature = match std::fs::read(signature_path) {
             Ok(signature) => signature,
             Err(error) => {
@@ -1022,11 +1027,8 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
         if let Err(error) = verify_risk_approval(&payload, &signature, approver, &allowed_signers) {
             return CliError::failed("EVIDENCE_APPROVAL_INVALID", error.clone()).hint("sign the exact bytes `canon evidence approval-payload` prints with a key listed in the policy's allowed_signers, then record the approval again").emit(&args.full(), args.json);
         }
-        let signature = match String::from_utf8(signature) {
-            Ok(signature) => signature,
-            Err(_) => {
-                return CliError::refused("EVIDENCE_APPROVAL_INVALID", "detached signature must be UTF-8 armored SSH signature text").hint("sign the bytes `canon evidence approval-payload` prints with `ssh-keygen -Y sign` and pass the armored output as --signature-file").emit(&args.full(), args.json);
-            }
+        let Ok(signature) = String::from_utf8(signature) else {
+            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "detached signature must be UTF-8 armored SSH signature text").hint("sign the bytes `canon evidence approval-payload` prints with `ssh-keygen -Y sign` and pass the armored output as --signature-file").emit(&args.full(), args.json);
         };
         record = record.with_approval(EvidenceApproval {
             approver: approver.clone(),
@@ -1700,12 +1702,9 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
             missing.push(format!("{path} (recorded sha256 {sha256}): the recorded path leaves the repository"));
             continue;
         };
-        let file = match std::fs::File::open(&source) {
-            Ok(file) => file,
-            Err(_) => {
-                missing.push(format!("{path} (recorded sha256 {sha256}): working tree: missing"));
-                continue;
-            }
+        let Ok(file) = std::fs::File::open(&source) else {
+            missing.push(format!("{path} (recorded sha256 {sha256}): working tree: missing"));
+            continue;
         };
         let size = file.metadata().map_or(0, |m| m.len());
         if size > max_bytes {
@@ -1763,7 +1762,7 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
 }
 
 /// `canon artifacts store`: what the pass stored, or with `--dry-run` would store.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactsStoreReport<'a> {
     /// True when `--dry-run` previewed the pass without writing.
@@ -1795,8 +1794,6 @@ fn verdict_slug(verdict: EvidenceVerdict) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use canon_store::tier::TierQuery;
     use tempfile::TempDir;
 
@@ -1872,7 +1869,7 @@ mod tests {
     #[test]
     fn the_full_add_promote_task_path_flips_a_real_checkbox() {
         let tmp = repo_with_plan_corpus();
-        let repo: PathBuf = tmp.path().to_path_buf();
+        let repo = tmp.path().to_path_buf();
 
         assert_eq!(run_add(&repo, &args(Some("the add -> promote -> task loop exercised this row"))), 0, "staging must succeed");
         assert_eq!(staged_count(&repo), 1, "the record must be in _staging, not committed");
@@ -2163,12 +2160,12 @@ mod tests {
 
         // A read-only destination is refused before anything is written.
         let staging_kind = evidence_staging_dir(&ledger_root).join("kind=evidence_record");
-        let mut readonly = std::fs::metadata(&staging_kind).unwrap().permissions();
+        let original = std::fs::metadata(&staging_kind).unwrap().permissions();
+        let mut readonly = original.clone();
         readonly.set_readonly(true);
-        std::fs::set_permissions(&staging_kind, readonly.clone()).unwrap();
-        let outcome = land_batch(repo, &ledger_root, &files, bodies(), true, &mut |tier, write| tier.write(write));
-        readonly.set_readonly(false);
         std::fs::set_permissions(&staging_kind, readonly).unwrap();
+        let outcome = land_batch(repo, &ledger_root, &files, bodies(), true, &mut |tier, write| tier.write(write));
+        std::fs::set_permissions(&staging_kind, original).unwrap();
         assert!(matches!(&outcome, Err((e, 2)) if e.contains("is read-only")), "{:?}", outcome.as_ref().err());
         assert_eq!(blobs(), 0);
 

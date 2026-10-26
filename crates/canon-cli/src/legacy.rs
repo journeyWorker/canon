@@ -97,7 +97,11 @@ fn commands(value: &Value, out: &mut Vec<String>) {
                 }
             }
         }
-        Value::Array(items) => items.iter().for_each(|item| commands(item, out)),
+        Value::Array(items) => {
+            for item in items {
+                commands(item, out);
+            }
+        }
         _ => {}
     }
 }
@@ -400,6 +404,7 @@ pub fn backup(repo: &Path, paths: &[String]) -> Result<Option<PathBuf>, String> 
 }
 
 /// What a cheap scan found, for the warning.
+#[derive(Debug)]
 pub struct Detected {
     pub hooks: bool,
     pub scripts: bool,

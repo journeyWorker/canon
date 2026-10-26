@@ -316,6 +316,7 @@ fn parse_expected(text: &str) -> Result<BTreeSet<(String, String)>, String> {
 /// One fixture's diff outcome — both halves of the two-sided exact-set
 /// oracle (spec Req 1): `missing` (under-detection, expected but not
 /// produced) and `extra` (over-triggering, produced but not expected).
+#[derive(Debug)]
 pub struct FixtureOutcome {
     pub name: &'static str,
     pub missing: BTreeSet<(String, String)>,
@@ -348,6 +349,7 @@ impl FixtureOutcome {
 }
 
 /// Every fixture's outcome from one run.
+#[derive(Debug)]
 pub struct SelftestReport {
     pub outcomes: Vec<FixtureOutcome>,
 }

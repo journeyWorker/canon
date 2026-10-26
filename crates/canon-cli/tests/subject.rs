@@ -186,7 +186,7 @@ fn adopt_links_the_change_and_the_subject_on_both_sides() {
     // Change side: some version carries the stamped `subject_ids`.
     let cq = run(dir.path(), &["query", "--kind", "change", "--json"]);
     assert!(cq.status.success(), "stderr: {}", stderr(&cq));
-    let change_payload: Value = data_of(&cq);
+    let change_payload = data_of(&cq);
     let changes = change_payload["records"].as_array().unwrap();
     assert!(
         changes.iter().any(|c| c["subject_ids"] == serde_json::json!(["demo-subject"]) && c["schema"] == 2),
@@ -260,7 +260,7 @@ fn adopt_failing_between_its_two_writes_prints_a_repair_that_completes_the_link(
 
     let repair = run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "s36-demo"]);
     assert_eq!(repair.status.code(), Some(0), "{}", stderr(&repair));
-    let changes: Value = data_of(&run(dir.path(), &["query", "--kind", "change", "--json"]));
+    let changes = data_of(&run(dir.path(), &["query", "--kind", "change", "--json"]));
     assert!(changes["records"].as_array().unwrap().iter().any(|c| c["subject_ids"] == serde_json::json!(["demo-subject"])), "{changes}");
     let again = run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "s36-demo"]);
     assert!(stdout(&again).contains("nothing written"), "{}", stdout(&again));
@@ -1072,7 +1072,7 @@ fn review_add_61_the_guard_and_status_judge_a_review_that_predates_pinning_as_th
     assert!(err.contains(&format!("canon subject move: advisory: {UNMIGRATED_ADVISORY}\n")), "{err}");
     assert_eq!(current_subject(dir.path())["status"], "building");
 
-    let report: Value = data_of(&run(dir.path(), &["status", "--json"]));
+    let report = data_of(&run(dir.path(), &["status", "--json"]));
     let subject = report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "demo-subject").unwrap().clone();
     assert_eq!((subject["reviewed"].as_u64(), subject["staleReviews"].as_u64()), (Some(0), Some(1)), "counted as a stale review: {subject}");
     let text = stdout(&run(dir.path(), &["status"]));
@@ -1104,7 +1104,7 @@ fn seed_technically_ship_ready(repo: &Path, brief: &str) {
 fn status_brief(repo: &Path) -> Value {
     let out = run(repo, &["status", "--json"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
-    let report: Value = data_of(&out);
+    let report = data_of(&out);
     report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "demo-subject").unwrap()["brief"].clone()
 }
 
@@ -1676,7 +1676,7 @@ fn subject_lifecycle_32_shipping_a_reopened_subject_runs_every_guard_again() {
 
 /// The latest stored version of change `id`, as `canon query` shows it.
 fn latest_change(repo: &Path, id: &str) -> Value {
-    let changes: Value = data_of(&run(repo, &["query", "--kind", "change", "--json"]));
+    let changes = data_of(&run(repo, &["query", "--kind", "change", "--json"]));
     changes["records"]
         .as_array()
         .unwrap()
@@ -1720,7 +1720,7 @@ fn subject_lifecycle_34_a_pre_0_18_change_reads_as_a_one_element_list_and_a_seco
     let change = latest_change(dir.path(), "refactor-core");
     assert_eq!(change["subject_ids"], serde_json::json!(["perception", "editing"]), "appended, not re-pointed: {change}");
     assert_eq!(change["schema"], 2, "written at the current generation: {change}");
-    let changes: Value = data_of(&run(dir.path(), &["query", "--kind", "change", "--json"]));
+    let changes = data_of(&run(dir.path(), &["query", "--kind", "change", "--json"]));
     assert_eq!(changes["count"], 1, "the old and the new version fold to one row: {changes}");
     assert_eq!(changes["records"][0]["subject_ids"], serde_json::json!(["perception", "editing"]), "{changes}");
 }

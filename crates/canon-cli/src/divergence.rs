@@ -168,7 +168,7 @@ impl crate::reports::Report for DivergenceListFieldsReport {}
 /// promotes that one candidate (`canon_gate::promote_staged_divergence`)
 /// and leaves every other staged candidate for `canon divergence
 /// promote` ([`crate::write_mode`]).
-#[expect(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "the signature is the `divergence add` flag set, passed one-to-one from `run/divergence.rs`")]
 pub fn run_stage(
     repo: &Path,
     project_id: &canon_model::ProjectId,
@@ -200,7 +200,7 @@ pub fn run_stage(
             return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence add", json);
         }
     };
-    let candidate = candidate(project_id, scenario_id, &commit.sha, Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, actor_in(actor_id, role, session), Utc::now());
+    let candidate = candidate(CandidateSpec { project_id, scenario_id, sha: &commit.sha, code: Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, actor: actor_in(actor_id, role, session), at: Utc::now() });
 
     // The scenario's newest divergence already says exactly this: a repeat
     // writes nothing and reports the record that is there.
@@ -228,10 +228,25 @@ pub fn run_stage(
     outcome.exit_code()
 }
 
+/// What [`candidate`] builds a staged divergence from.
+struct CandidateSpec<'a> {
+    project_id: &'a ProjectId,
+    scenario_id: &'a ScenarioId,
+    sha: &'a Sha,
+    /// `(code tree, worktree dirty)` of the commit, when the verb binds one.
+    code: Option<(&'a str, bool)>,
+    status: DivergenceStatus,
+    round: u32,
+    reviewer: &'a str,
+    detail: &'a str,
+    actor: Actor,
+    at: DateTime<Utc>,
+}
+
 /// The staged shape of one divergence: the full record, `run_seq` not yet
 /// assigned.
-#[expect(clippy::too_many_arguments)]
-fn candidate(project_id: &ProjectId, scenario_id: &ScenarioId, sha: &Sha, code: Option<(&str, bool)>, status: DivergenceStatus, round: u32, reviewer: &str, detail: &str, actor: Actor, at: DateTime<Utc>) -> Divergence {
+fn candidate(spec: CandidateSpec<'_>) -> Divergence {
+    let CandidateSpec { project_id, scenario_id, sha, code, status, round, reviewer, detail, actor, at } = spec;
     let record = Divergence::new(
         Envelope::new(1, RecordKind::Divergence, at, actor),
         project_id.clone(),
@@ -269,24 +284,26 @@ fn stage_and_promote(ledger_root: &Path, candidate: &Divergence) -> Result<std::
     }
 }
 
-/// Shared `resolve`/`defer` path (module doc): build one
-/// divergence with `status`, stage it and promote that one record.
-#[expect(clippy::too_many_arguments)]
-fn run_commit(
-    verb: &str,
-    repo: &Path,
-    project_id: &canon_model::ProjectId,
-    scenario_id: &canon_model::ScenarioId,
-    commit: &crate::git_rev::Bound,
+/// The inputs of [`run_commit`].
+struct CommitArgs<'a> {
+    repo: &'a Path,
+    project_id: &'a canon_model::ProjectId,
+    scenario_id: &'a canon_model::ScenarioId,
+    commit: &'a crate::git_rev::Bound,
     status: DivergenceStatus,
     round: u32,
-    reviewer: &str,
-    detail: &str,
-    actor_id: &str,
-    role: &RoleId,
-    session: Option<&SessionId>,
+    reviewer: &'a str,
+    detail: &'a str,
+    actor_id: &'a str,
+    role: &'a RoleId,
+    session: Option<&'a SessionId>,
     json: bool,
-) -> u8 {
+}
+
+/// Shared `resolve`/`defer` path (module doc): build one
+/// divergence with `status`, stage it and promote that one record.
+fn run_commit(verb: &str, args: CommitArgs<'_>) -> u8 {
+    let CommitArgs { repo, project_id, scenario_id, commit, status, round, reviewer, detail, actor_id, role, session, json } = args;
     let repo = resolve_repo_root(repo);
     if let Err(error) = crate::inventory::require_spec_root(&repo, project_id) {
         return error.emit(&format!("canon divergence {verb}"), json);
@@ -297,7 +314,7 @@ fn run_commit(
             return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&format!("canon divergence {verb}"), json);
         }
     };
-    let candidate = candidate(project_id, scenario_id, &commit.sha, Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, actor_in(actor_id, role, session), Utc::now());
+    let candidate = candidate(CandidateSpec { project_id, scenario_id, sha: &commit.sha, code: Some((&commit.code_tree, commit.worktree_dirty)), status, round, reviewer, detail, actor: actor_in(actor_id, role, session), at: Utc::now() });
 
     match stage_and_promote(&gate_ctx.ledger_root, &candidate) {
         Ok(target) => {
@@ -324,7 +341,7 @@ fn actor_in(actor_id: &str, role: &RoleId, session: Option<&SessionId>) -> Actor
 
 /// `canon divergence resolve` (module doc): stages and promotes a
 /// `Resolved` record.
-#[expect(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "the signature is the `divergence resolve` flag set, passed one-to-one from `run/divergence.rs`")]
 pub fn run_resolve(
     repo: &Path,
     project_id: &canon_model::ProjectId,
@@ -338,12 +355,12 @@ pub fn run_resolve(
     session: Option<&SessionId>,
     json: bool,
 ) -> u8 {
-    run_commit("resolve", repo, project_id, scenario_id, commit, DivergenceStatus::Resolved, round, reviewer, detail, actor_id, role, session, json)
+    run_commit("resolve", CommitArgs { repo, project_id, scenario_id, commit, status: DivergenceStatus::Resolved, round, reviewer, detail, actor_id, role, session, json })
 }
 
 /// `canon divergence defer --reason <..> --expiry <..>` (module doc):
 /// stages and promotes a `Deferred { reason, expiry }` record.
-#[expect(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "the signature is the `divergence defer` flag set, passed one-to-one from `run/divergence.rs`")]
 pub fn run_defer(
     repo: &Path,
     project_id: &canon_model::ProjectId,
@@ -358,24 +375,11 @@ pub fn run_defer(
     session: Option<&SessionId>,
     json: bool,
 ) -> u8 {
-    run_commit(
-        "defer",
-        repo,
-        project_id,
-        scenario_id,
-        commit,
-        DivergenceStatus::Deferred { reason: reason.to_string(), expiry },
-        round,
-        reviewer,
-        "",
-        actor_id,
-        role,
-        session,
-        json,
-    )
+    run_commit("defer", CommitArgs { repo, project_id, scenario_id, commit, status: DivergenceStatus::Deferred { reason: reason.to_string(), expiry }, round, reviewer, detail: "", actor_id, role, session, json })
 }
 
 /// `canon divergence accept`'s arguments.
+#[derive(Debug)]
 pub struct AcceptArgs {
     pub project_id: ProjectId,
     /// `--scenario-id`, repeatable: one acceptance per scenario, all or nothing.
@@ -470,27 +474,27 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
     let at = Utc::now();
     let mut wrote: Vec<(String, std::path::PathBuf)> = Vec::new();
     for scenario in &scenarios {
-        let record = candidate(
-            &scenario.project_id,
-            &scenario.scenario_id,
+        let record = candidate(CandidateSpec {
+            project_id: &scenario.project_id,
+            scenario_id: &scenario.scenario_id,
             // The commit the divergent evidence was attested against; an
             // acceptance binds to evidence, not to an app state, so a
             // scenario whose evidence carries no commit gets the null one.
-            &canon_gate::acceptance::evidence_sha(&context, scenario).unwrap_or_else(|| Sha::parse("0".repeat(40)).expect("forty hex digits")),
-            None,
-            DivergenceStatus::Accepted {
+            sha: &canon_gate::acceptance::evidence_sha(&context, scenario).unwrap_or_else(|| Sha::parse("0".repeat(40)).expect("forty hex digits")),
+            code: None,
+            status: DivergenceStatus::Accepted {
                 reason: args.reason.clone(),
                 tracking: args.tracking.clone(),
                 expiry: args.expiry,
                 checks: Some(canon_gate::freshness::current_checks(&context, scenario)),
                 evidence: Vec::new(),
             },
-            1,
-            &args.reviewer,
-            &args.reason,
-            actor.clone(),
+            round: 1,
+            reviewer: &args.reviewer,
+            detail: &args.reason,
+            actor: actor.clone(),
             at,
-        );
+        });
         let failure = match stage_and_promote(&context.ctx.ledger_root, &record) {
             Ok(target) => {
                 wrote.push((scenario.scenario_id.as_str().to_string(), target));
@@ -638,8 +642,7 @@ fn state_slug(state: &canon_model::FoldedState) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use canon_model::{ProjectId, ScenarioId};
-    use canon_store::tier::{Tier, TierQuery};
+    use canon_store::tier::TierQuery;
     use tempfile::TempDir;
 
     use super::*;
@@ -696,18 +699,18 @@ mod tests {
         let (project_id, scenario_id, role, sha) = ids();
 
         // Refused: no `actor.role` at all.
-        let malformed = candidate(
-            &project_id,
-            &ScenarioId::parse("world.firstbuy-hotdeal.90").unwrap(),
-            &sha.sha,
-            None,
-            DivergenceStatus::Open,
-            1,
-            "reviewer-1",
-            "",
-            Actor::new_unattributed("legacy-writer"),
-            Utc::now(),
-        );
+        let malformed = candidate(CandidateSpec {
+            project_id: &project_id,
+            scenario_id: &ScenarioId::parse("world.firstbuy-hotdeal.90").unwrap(),
+            sha: &sha.sha,
+            code: None,
+            status: DivergenceStatus::Open,
+            round: 1,
+            reviewer: "reviewer-1",
+            detail: "",
+            actor: Actor::new_unattributed("legacy-writer"),
+            at: Utc::now(),
+        });
         stage(&gate_ctx_root(&dir), &malformed).unwrap();
 
         assert_eq!(run_stage(dir.path(), &project_id, &scenario_id, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, None, Default::default(), false), 0);

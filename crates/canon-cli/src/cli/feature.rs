@@ -4,13 +4,13 @@ use canon_model::ProjectId;
 use clap::{Args, Subcommand};
 use crate::scaffold::AreaSurface;
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum FeatureCommand {
     /// Create a fresh .feature file for a new area.surface
     New(FeatureNewArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct FeatureNewArgs {
     /// <area>.<surface> the fresh .feature file scaffolds
     #[arg(value_name = "SURFACE", value_parser = crate::scaffold::parse_area_surface)]

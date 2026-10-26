@@ -3,7 +3,7 @@
 use canon_model::{ChangeId, RoleId, SubjectId};
 use clap::{Args, Subcommand};
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum SubjectCommand {
     /// Author a new subject at status `proposed`
     New(SubjectNewArgs),
@@ -20,7 +20,7 @@ pub enum SubjectCommand {
     Move(SubjectMoveArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct SubjectNewArgs {
     /// The subject's kebab-slug id
     #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]
@@ -51,7 +51,7 @@ pub struct SubjectNewArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct SubjectAdoptArgs {
     /// The subject to adopt the change under
     #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]
@@ -70,7 +70,7 @@ pub struct SubjectAdoptArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct SubjectUnadoptArgs {
     /// The subject to take the change out of
     #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]
@@ -89,7 +89,7 @@ pub struct SubjectUnadoptArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct SubjectShowArgs {
     /// The subject to show
     #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]
@@ -101,7 +101,7 @@ pub struct SubjectShowArgs {
     pub json: bool,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct SubjectMoveArgs {
     /// The subject to move
     #[arg(value_name = "SUBJECT_ID", value_parser = crate::subject::parse_subject_id)]

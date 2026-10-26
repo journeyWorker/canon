@@ -4,7 +4,7 @@
 //! repository the leaves run in.
 //!
 //! Each test binary uses a subset, so dead-code warnings are expected here.
-#![allow(dead_code)]
+#![expect(dead_code, reason = "each test binary that includes this module uses a subset")]
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -366,7 +366,7 @@ pub fn validate_document(document: &Value) -> Vec<String> {
 
     static VALIDATORS: LazyLock<Mutex<HashMap<String, std::sync::Arc<jsonschema::Validator>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
     let validator = |key: &str, schema: &Value| -> std::sync::Arc<jsonschema::Validator> {
-        VALIDATORS.lock().unwrap().entry(key.to_string()).or_insert_with(|| std::sync::Arc::new(compile(schema))).clone()
+        std::sync::Arc::clone(VALIDATORS.lock().unwrap().entry(key.to_string()).or_insert_with(|| std::sync::Arc::new(compile(schema))))
     };
 
     let mut problems = Vec::new();

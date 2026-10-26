@@ -4,7 +4,7 @@ use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
 /// The flags of `context-pack add`.
-#[derive(clap::Args)]
+#[derive(Debug, clap::Args)]
 pub struct ContextPackAddArgs {
     /// Repository-relative input manifest
     #[arg(long, value_name = "FILE")]
@@ -18,7 +18,7 @@ pub struct ContextPackAddArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum ContextPackCommand {
     /// Create an immutable context pack from a repository-local JSON manifest
     Add(ContextPackAddArgs),
@@ -28,7 +28,7 @@ pub enum ContextPackCommand {
     Verify(ContextPackVerifyArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct ContextPackShowArgs {
     /// Context pack id (sha256:<64 hex digits>)
     #[arg(value_name = "PACK_ID")]
@@ -40,7 +40,7 @@ pub struct ContextPackShowArgs {
     pub json: bool,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct ContextPackVerifyArgs {
     /// Context pack id (sha256:<64 hex digits>)
     #[arg(value_name = "PACK_ID")]

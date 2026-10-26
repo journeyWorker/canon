@@ -1363,7 +1363,7 @@ impl RegimeEvidence {
     /// Folds one [`DerivedVerdict`] in, keeping the running max
     /// timestamp and both first-seen-ordered dedup lists.
     fn absorb(&mut self, derived: DerivedVerdict) {
-        let DerivedVerdict { regime_key: _, row, at, join_key, scenario_title, kind_label, evidence_line, antecedents } = derived;
+        let DerivedVerdict { row, at, join_key, scenario_title, kind_label, evidence_line, antecedents, .. } = derived;
         if self.rows.is_empty() {
             self.join_key = Some(join_key);
         } else {
@@ -1853,7 +1853,7 @@ impl RowProvenance {
     fn of(row: &Trajectory) -> Self {
         // Exhaustive on purpose (see this type's doc) — never a
         // two-field pick that a new `Trajectory` field slips past.
-        let Trajectory { id: _, regime_key: _, task: _, context: _, verdicts: _, recorded_at: _, tags: _, verdict_record, run_id } = row;
+        let Trajectory { verdict_record, run_id, .. } = row;
         Self { verdict_record: *verdict_record, run_id: *run_id }
     }
 

@@ -886,7 +886,7 @@ fn plan_source_cursor_id(dialect: &str, parse_version: u32, root: &Path) -> Stri
 fn file_stat(path: &Path) -> (i64, u64) {
     match std::fs::metadata(path) {
         Ok(meta) => {
-            let mtime_ms = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_millis() as i64);
+            let mtime_ms = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX));
             (mtime_ms, meta.len())
         }
         Err(_) => (0, 0),

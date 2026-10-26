@@ -707,9 +707,10 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
         }
         let mut by_priority: Vec<&(&Subject, SubjectSummary)> = summaries.iter().filter(|(s, _)| NEXT_ORDER.contains(&s.status)).collect();
         by_priority.sort_by_key(|(s, _)| (rank(&NEXT_ORDER, s.status), s.subject_id.as_str().to_string()));
+        let inputs = StepInputs { ctx: &ctx, joins: &joins, all: &scenarios, roots: &roots };
         for (subject, summary) in by_priority {
             let start = next.len();
-            subject_steps(&ctx, &joins, &scenarios, &roots, !policy_blocks, promote_manual, subject, summary, &mut next);
+            subject_steps(&inputs, !policy_blocks, promote_manual, subject, summary, &mut next);
             owners.push((start..next.len(), subject.subject_id.as_str().to_string()));
         }
     }
@@ -750,7 +751,6 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     report
 }
 
-#[expect(clippy::too_many_arguments)]
 fn finish(
     repo: &Path,
     policy: &PolicyResolution,
@@ -1128,23 +1128,29 @@ fn awaits_brief(summary: &SubjectSummary) -> bool {
     !on_pending_draft(summary) && summary.brief.as_ref().is_some_and(|brief| brief.enforced)
 }
 
+/// What every subject's `next:` rules ([`subject_steps`]) read alike.
+#[derive(Clone, Copy)]
+struct StepInputs<'a> {
+    ctx: &'a GateContext,
+    joins: &'a Joins<'a>,
+    all: &'a [&'a Scenario],
+    roots: &'a [ProjectId],
+}
+
 /// The per-subject `next:` rules (module doc), each producing at most one
 /// step. An enforced unapproved brief is the subject's only step; else
 /// the gap rules; the status advance only when none fired and
 /// `may_advance` (no blocking policy gap). `promote_manual` is whether
 /// `canon.yaml` keeps writes staged for `canon gate promote`.
-#[expect(clippy::too_many_arguments)]
 fn subject_steps(
-    ctx: &GateContext,
-    joins: &Joins,
-    all: &[&Scenario],
-    roots: &[ProjectId],
+    inputs: &StepInputs<'_>,
     may_advance: bool,
     promote_manual: bool,
     subject: &Subject,
     summary: &SubjectSummary,
     next: &mut Vec<NextStep>,
 ) {
+    let StepInputs { ctx, joins, all, roots } = *inputs;
     let id = subject.subject_id.as_str();
     let status = subject.status;
 

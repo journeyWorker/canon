@@ -293,6 +293,7 @@ fn a_new_audit_replaces_a_refutation_and_binds_only_what_it_names() {
 /// computed here independently of canon: sha256(seed 0x00 project 0x00
 /// scenario), first 8 bytes big-endian, below rate * 2^64.
 fn expected_sample(seed: &str, rate: f64, ids: &[&str]) -> Vec<String> {
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "range: rate is a fraction in [0, 1], so rate * 2^64 is non-negative and fits u128")]
     let threshold = (rate * 18_446_744_073_709_551_616.0).ceil() as u128;
     ids.iter()
         .filter(|id| {

@@ -3,7 +3,7 @@
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum AdapterCommand {
     /// Read and validate one provider-neutral response envelope
     Validate(AdapterValidateArgs),
@@ -11,7 +11,7 @@ pub enum AdapterCommand {
     Authorize(AdapterAuthorizeArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct AdapterValidateArgs {
     /// JSON response file to validate
     #[arg(long, value_name = "FILE")]
@@ -23,7 +23,7 @@ pub struct AdapterValidateArgs {
     pub json: bool,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct AdapterAuthorizeArgs {
     /// JSON response file to validate and authorize
     #[arg(long, value_name = "FILE")]

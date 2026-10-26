@@ -75,11 +75,6 @@ impl Row {
         self.setup = setup;
         self
     }
-
-    const fn exit(mut self, exit: i32) -> Self {
-        self.exit = exit;
-        self
-    }
 }
 
 /// A `canon.yaml` that does not parse: every leaf that reads the config refuses it.

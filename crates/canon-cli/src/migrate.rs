@@ -326,9 +326,15 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
     };
     if !commit {
         crate::legacy::warn_stale_guide(&repo);
-        ledger_lines.into_iter().for_each(|line| log.line(line));
+        for line in ledger_lines {
+            log.line(line);
+        }
         match &pins {
-            Ok(report) => report.lines(true).into_iter().for_each(|line| log.line(line)),
+            Ok(report) => {
+                for line in report.lines(true) {
+                    log.line(line);
+                }
+            }
             Err(e) => log.line(format!("canon migrate: could not check the reviews against their evidence ({e}); a run that applies the plan checks them again")),
         }
         log.line(safe_plan.commit_hint(&base));
@@ -362,7 +368,9 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
     for effect in plan.legacy.effects() {
         log.line(format!("canon migrate:{}", safety::effect_line(&effect)));
     }
-    plan.legacy.notes().into_iter().for_each(|note| log.line(format!("canon migrate: {note}")));
+    for note in plan.legacy.notes() {
+        log.line(format!("canon migrate: {note}"));
+    }
 
     let applied = apply(&repo, &plan, git, &mut log);
     // The openspec source goes only once every change moved and every
@@ -417,7 +425,11 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
         }
     }
     match crate::ledger::migrate_lines(&repo, false) {
-        Ok(lines) => lines.into_iter().for_each(|line| log.line(line)),
+        Ok(lines) => {
+            for line in lines {
+                log.line(line);
+            }
+        }
         Err(e) => {
             return CliError::refused("MIGRATE_STOPPED", format!("{}; what moved is in the archive, so running `canon migrate` again finishes the rest", e.message))
                 .hint("run `canon ledger compact` (or `canon migrate`) again; it finishes the rest")
@@ -737,7 +749,8 @@ fn change_versions(repo: &Path) -> BTreeMap<String, ChangeVersions> {
         }
     }
     type At = chrono::DateTime<chrono::Utc>;
-    let mut seen: BTreeMap<String, ((At, bool), (At, String))> = BTreeMap::new();
+    type Newest = ((At, bool), (At, String));
+    let mut seen: BTreeMap<String, Newest> = BTreeMap::new();
     for raw in result.records {
         let Some(id) = raw.0.get("change_id").and_then(serde_json::Value::as_str) else { continue };
         let Some(at) = raw.0.get("at").and_then(serde_json::Value::as_str).and_then(|at| at.parse::<At>().ok()) else { continue };

@@ -72,7 +72,7 @@ pub fn command() -> clap::Command {
     Cli::command()
 }
 
-#[derive(Parser)]
+#[derive(Debug, Parser)]
 #[command(
     name = "canon",
     version,
@@ -104,7 +104,7 @@ pub struct Cli {
     pub command: Command,
 }
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum Command {
     // ── Getting started ──
     /// Set up canon in a repo (canon.yaml, a starter policy, the AGENTS.md block, a plans home)

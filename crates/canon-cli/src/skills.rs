@@ -394,6 +394,7 @@ fn reject_symlink_path(path: &Path) -> Result<(), SkillsError> {
 }
 
 fn reject_symlink_path_under(target_dir: &Path, path: &Path) -> Result<(), SkillsError> {
+    #[expect(clippy::map_err_ignore, reason = "`StripPrefixError` only says `path` is not under `target_dir`; the refusal names `path` and its message has no slot for a cause")]
     let relative = path
         .strip_prefix(target_dir)
         .map_err(|_| SkillsError::RefuseSymlink(path.to_path_buf()))?;
@@ -1338,14 +1339,14 @@ mod legacy_fs {
         Some(bytes)
     }
 
-    pub(super) fn read(target_dir: &Path, key: &str) -> Option<Vec<u8>> {
+    pub(crate) fn read(target_dir: &Path, key: &str) -> Option<Vec<u8>> {
         let (dir, name) = open_parent(target_dir, key)?;
         read_in(&dir, name)
     }
 
     /// Whether it unlinked the file: `false` when the file is gone, is not a
     /// regular file, or no longer holds the bytes `hash` names.
-    pub(super) fn remove_file_if_hash(target_dir: &Path, key: &str, hash: &str) -> Result<bool, SkillsError> {
+    pub(crate) fn remove_file_if_hash(target_dir: &Path, key: &str, hash: &str) -> Result<bool, SkillsError> {
         let Some((dir, name)) = open_parent(target_dir, key) else {
             return Ok(false);
         };
@@ -1361,7 +1362,7 @@ mod legacy_fs {
 
     /// `rmdir` relative to the parent's handle: it never follows a symlink
     /// and refuses a non-empty directory atomically.
-    pub(super) fn remove_dir_if_empty(target_dir: &Path, key: &str) -> Result<(), SkillsError> {
+    pub(crate) fn remove_dir_if_empty(target_dir: &Path, key: &str) -> Result<(), SkillsError> {
         let Some((dir, name)) = open_parent(target_dir, key) else {
             return Ok(());
         };
@@ -1389,14 +1390,14 @@ mod legacy_fs {
 
     use super::{content_hash, reject_symlink_path_under, SkillsError};
 
-    pub(super) fn read(target_dir: &Path, key: &str) -> Option<Vec<u8>> {
+    pub(crate) fn read(target_dir: &Path, key: &str) -> Option<Vec<u8>> {
         let path = target_dir.join(key);
         reject_symlink_path_under(target_dir, &path).ok()?;
         fs::symlink_metadata(&path).ok()?.is_file().then_some(())?;
         fs::read(&path).ok()
     }
 
-    pub(super) fn remove_file_if_hash(target_dir: &Path, key: &str, hash: &str) -> Result<bool, SkillsError> {
+    pub(crate) fn remove_file_if_hash(target_dir: &Path, key: &str, hash: &str) -> Result<bool, SkillsError> {
         if read(target_dir, key).is_none_or(|bytes| content_hash(&bytes) != hash) {
             return Ok(false);
         }
@@ -1404,7 +1405,7 @@ mod legacy_fs {
         fs::remove_file(&path).map(|()| true).map_err(|source| SkillsError::Io { path, source })
     }
 
-    pub(super) fn remove_dir_if_empty(target_dir: &Path, key: &str) -> Result<(), SkillsError> {
+    pub(crate) fn remove_dir_if_empty(target_dir: &Path, key: &str) -> Result<(), SkillsError> {
         let path = target_dir.join(key);
         if reject_symlink_path_under(target_dir, &path).is_err()
             || !fs::symlink_metadata(&path).is_ok_and(|metadata| metadata.is_dir())
@@ -1909,7 +1910,7 @@ pub fn resolve_source(explicit: Option<&Path>) -> Option<PathBuf> {
 }
 
 /// One skill the legacy (pre-bundle) install wrote.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InstalledSkillEntry<'a> {
     pub name: &'a str,
@@ -1918,7 +1919,7 @@ pub struct InstalledSkillEntry<'a> {
 }
 
 /// What the legacy install (a source without `SKILL.src.md`) reports.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LegacyInstall<'a> {
     /// True when `--dry-run` previewed the run without writing.
@@ -1927,7 +1928,7 @@ pub struct LegacyInstall<'a> {
 }
 
 /// An orphan the install pruned.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PrunedEntry {
     pub path: String,
@@ -1936,7 +1937,7 @@ pub struct PrunedEntry {
 }
 
 /// An orphan the install kept, with what to do by hand.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct KeptEntry {
     pub path: String,
@@ -1946,7 +1947,7 @@ pub struct KeptEntry {
 }
 
 /// What the bundle install reports.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BundleInstall {
     /// True when `--dry-run` previewed the run without writing.
@@ -1962,7 +1963,7 @@ pub struct BundleInstall {
 
 /// `canon skills install`'s report (`SkillsInstallReport`): the bundle install,
 /// or the legacy one for a source without `SKILL.src.md`.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
 pub enum SkillsInstallReport<'a> {
     Bundle(BundleInstall),
@@ -1972,7 +1973,7 @@ pub enum SkillsInstallReport<'a> {
 impl crate::json_out::Report for SkillsInstallReport<'_> {}
 
 /// The state of one installed skill file.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillFileStatus {
     pub path: String,
@@ -1981,7 +1982,7 @@ pub struct SkillFileStatus {
 }
 
 /// An orphan `skills check` found.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OrphanEntry {
     pub path: String,
@@ -1992,7 +1993,7 @@ pub struct OrphanEntry {
 }
 
 /// An install lock written by another canon version.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OutdatedEntry {
     pub path: String,
@@ -2001,7 +2002,7 @@ pub struct OutdatedEntry {
 }
 
 /// `canon skills check`'s report (`SkillsCheckReport`).
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillsCheckReport {
     pub clean: bool,
@@ -2017,7 +2018,7 @@ pub struct SkillsCheckReport {
 impl crate::json_out::Report for SkillsCheckReport {}
 
 /// `canon skills doctor`'s report (`SkillsDoctorReport`).
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillsDoctorReport<'a> {
     pub lines: &'a [String],
@@ -2026,7 +2027,7 @@ pub struct SkillsDoctorReport<'a> {
 impl crate::json_out::Report for SkillsDoctorReport<'_> {}
 
 /// `--json` of `canon skills show`: the guide `name` names, as this canon embeds it.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillsShowReport {
     pub name: String,

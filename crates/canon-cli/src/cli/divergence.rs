@@ -6,7 +6,7 @@ use clap::{Args, Subcommand};
 use super::PromoteArgs;
 
 /// The flags of `divergence add`.
-#[derive(clap::Args)]
+#[derive(Debug, clap::Args)]
 pub struct DivergenceAddArgs {
     /// The scenario (`<area>.<surface>.<nn>`)
     #[arg(value_name = "SCENARIO_ID", value_parser = crate::review::parse_scenario_id)]
@@ -50,7 +50,7 @@ pub struct DivergenceAddArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum DivergenceCliCommand {
     /// Add a divergence candidate, staged with no run_seq yet (commit it with `canon gate promote --kind divergence`, or in the same run with --promote / `write: { promote: auto }`)
     Add(DivergenceAddArgs),
@@ -64,7 +64,7 @@ pub enum DivergenceCliCommand {
     List(DivergenceListArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct DivergenceResolveArgs {
     /// The scenario (`<area>.<surface>.<nn>`)
     #[arg(value_name = "SCENARIO_ID", value_parser = crate::review::parse_scenario_id)]
@@ -97,7 +97,7 @@ pub struct DivergenceResolveArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct DivergenceDeferArgs {
     /// The scenario (`<area>.<surface>.<nn>`)
     #[arg(value_name = "SCENARIO_ID", value_parser = crate::review::parse_scenario_id)]
@@ -133,7 +133,7 @@ pub struct DivergenceDeferArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct DivergenceAcceptArgs {
     /// The accepted scenarios (`<area>.<surface>.<nn>`), one acceptance each, all or nothing
     #[arg(value_name = "SCENARIO_ID", required = true, value_parser = crate::review::parse_scenario_id)]
@@ -168,7 +168,7 @@ pub struct DivergenceAcceptArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct DivergenceListArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

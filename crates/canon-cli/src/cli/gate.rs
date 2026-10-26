@@ -2,7 +2,7 @@
 
 use clap::{Args, Subcommand};
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum GateCommand {
     /// Run the coverage/ledger/staleness/trust checks (0 clean, 1 red, 2 usage)
     Check(GateCheckArgs),
@@ -12,7 +12,7 @@ pub enum GateCommand {
     InstallHooks(GateInstallHooksArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct GateCheckArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -24,7 +24,7 @@ pub struct GateCheckArgs {
     pub json: bool,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct GatePromoteArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -40,7 +40,7 @@ pub struct GatePromoteArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct GateInstallHooksArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

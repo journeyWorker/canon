@@ -42,6 +42,7 @@ pub fn changed_since_page_load(brief: &str) -> CliError {
 }
 
 /// An HTTP status and the JSON document that answers with it.
+#[derive(Debug)]
 pub struct Reply {
     pub status: u16,
     pub body: Value,
@@ -161,7 +162,7 @@ pub fn list(repo: &Path) -> Reply {
 }
 
 /// A brief the page could not read.
-#[derive(Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UnreadableBrief {
     pub change_id: String,
@@ -169,7 +170,7 @@ pub struct UnreadableBrief {
 }
 
 /// One finding of a pending brief, as the page shows it.
-#[derive(Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BriefFinding {
     pub severity: crate::brief_check::Severity,
@@ -184,7 +185,7 @@ pub struct BriefFinding {
 }
 
 /// One brief still waiting for the human's answer.
-#[derive(Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PendingBrief {
     pub change_id: String,
@@ -206,7 +207,7 @@ pub struct PendingBrief {
 }
 
 /// `GET /api/briefs` (`DashboardBriefsReport`).
-#[derive(Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardBriefsReport {
     pub briefs: Vec<PendingBrief>,
