@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-sb-f2",
+    "role": "implementer",
+    "session_id": "sb-f2-2026-10-26"
+  },
+  "at": "2026-10-26T13:01:16.143370456Z",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_storage_gate evidence_add_122_an_approval_payload_is_refused_without_a_task_or_scenario_or_with_an_unreadable_time_and_prints_no_bytes"
+  },
+  "evidence_sha": "b5bb0837c492eabacbbdfeb303af3aa97bbbcc58",
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 158,
+  "scenario_id": "evidence.add.122",
+  "schema": 1,
+  "staging_id": "a7fcce4903ea",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

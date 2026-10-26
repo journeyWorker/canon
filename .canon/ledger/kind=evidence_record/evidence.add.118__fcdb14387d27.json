@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-sb-f2",
+    "role": "implementer",
+    "session_id": "sb-f2-2026-10-26"
+  },
+  "at": "2026-10-26T13:01:22.599368159Z",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_storage_gate evidence_add_118_artifacts_move_previews_its_plan_then_moves_the_blobs_when_the_plan_digest_is_given"
+  },
+  "evidence_sha": "b5bb0837c492eabacbbdfeb303af3aa97bbbcc58",
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 160,
+  "scenario_id": "evidence.add.118",
+  "schema": 1,
+  "staging_id": "092d70a1770d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

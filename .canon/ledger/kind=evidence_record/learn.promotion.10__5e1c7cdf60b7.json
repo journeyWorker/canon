@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-sb-f4",
+    "role": "implementer",
+    "session_id": "sb-f4-2026-10-26"
+  },
+  "at": "2026-10-26T13:01:02.439680596Z",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_reads learn_promotion_10_the_approval_payload_of_a_seeded_strategy_is_the_same_bytes_on_every_call_carrying_the_approver_time_and_subject"
+  },
+  "evidence_sha": "b5bb0837c492eabacbbdfeb303af3aa97bbbcc58",
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 21,
+  "scenario_id": "learn.promotion.10",
+  "schema": 1,
+  "staging_id": "63fe599bc23f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

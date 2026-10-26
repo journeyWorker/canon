@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-sb-f1",
+    "role": "implementer",
+    "session_id": "sb-f1-2026-10-26"
+  },
+  "at": "2026-10-26T13:01:20.235056879Z",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_dispatch_demo dispatch_manifest_27_dispatch_end_on_a_run_that_was_never_begun_is_refused_and_writes_nothing"
+  },
+  "evidence_sha": "b5bb0837c492eabacbbdfeb303af3aa97bbbcc58",
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 29,
+  "scenario_id": "dispatch.manifest.27",
+  "schema": 1,
+  "staging_id": "28f1d79cc70e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

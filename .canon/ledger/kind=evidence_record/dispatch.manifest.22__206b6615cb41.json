@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-sb-f1",
+    "role": "implementer",
+    "session_id": "sb-f1-2026-10-26"
+  },
+  "at": "2026-10-26T13:01:14.246401731Z",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_dispatch_demo dispatch_manifest_22_prompt_add_refuses_different_content_under_an_already_registered_name_and_version"
+  },
+  "evidence_sha": "b5bb0837c492eabacbbdfeb303af3aa97bbbcc58",
+  "kind": "evidence_record",
+  "project_id": "canon",
+  "run_seq": 24,
+  "scenario_id": "dispatch.manifest.22",
+  "schema": 1,
+  "staging_id": "a735f819a0dd",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
