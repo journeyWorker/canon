@@ -149,11 +149,13 @@ impl GateCheck for SpecCoverageCheck {
 
         // A corpus file whose name is not the one its body computes is skipped by every read, so the corpus being
         // judged here is missing it: name it (R9/F1). Without the section the gate stays as it was (`canon query`
-        // and `canon status` report it).
+        // and `canon status` report it). A finding is left to `review_gate::malformed_findings` when
+        // `block_on_findings` is on, which names every unreadable finding already.
+        let findings_named_elsewhere = require_review.as_ref().is_some_and(|review| review.block_on_findings);
         let mut violations: Vec<Violation> = ctx
             .corpus_violations
             .iter()
-            .filter(|(_, violation)| canon_store::partition::is_layout_violation(violation))
+            .filter(|(kind, violation)| canon_store::partition::is_layout_violation(violation) && !(findings_named_elsewhere && *kind == canon_model::RecordKind::Finding))
             .map(|(_, violation)| {
                 Violation::new(FailureClass::MalformedEvidence, violation.subject.clone(), format!("{} ({})", violation.detail, violation.class.as_str()))
             })

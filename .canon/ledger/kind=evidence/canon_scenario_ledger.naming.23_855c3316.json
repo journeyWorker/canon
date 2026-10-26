@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-ln-fix",
+    "role": "implementer",
+    "session_id": "ln-fix-2026-10-26e"
+  },
+  "at": "2026-10-26T21:51:13.729655703Z",
+  "code_tree": "098994ad826a229303bffa0b0dd2d0619fc4ffd5",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test ledger_naming ledger_naming_23"
+  },
+  "evidence_sha": "b71529db7476fe4c9b2d1f65bd459d09877e552a",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 71,
+  "scenario_id": "ledger.naming.23",
+  "schema": 1,
+  "staging_id": "9da75466",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

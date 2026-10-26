@@ -1187,3 +1187,23 @@ fn ledger_naming_23_a_misnamed_divergence_is_a_layout_violation_that_gate_check_
     assert!(status.contains("`canon query --kind divergence`") && status.contains("does not judge them without a `spec_coverage` section"), "{status}");
     assert!(!status.contains("`canon gate check` names them"), "{status}");
 }
+
+/// ledger.naming.23, findings: under the scaffolded policy (`block_on_findings`
+/// on) a misnamed finding file is named once, by the review gate's unreadable
+/// finding check, not a second time by the spec-coverage layout check.
+#[test]
+fn ledger_naming_23b_a_misnamed_finding_is_named_once() {
+    let dir = repo30(1);
+    let repo = dir.path();
+    ok(repo, &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "bob", "--summary", "s"]);
+    let ledger = repo.join(".canon/ledger/kind=finding");
+    let name = ledger_names(&ledger).remove(0);
+    assert!(name.starts_with("add-login_1_1_"), "{name}");
+    let wrong = name.replacen("_1_1_", "_1_2_", 1);
+    std::fs::rename(ledger.join(&name), ledger.join(&wrong)).unwrap();
+
+    let gate = canon_in(repo, &["gate", "check", "--json"], &[]);
+    let doc = json_of(&gate);
+    let naming: Vec<&Value> = doc["data"]["violations"].as_array().unwrap().iter().filter(|v| v.to_string().contains(&wrong)).collect();
+    assert_eq!(naming.len(), 1, "the misnamed finding is named exactly once: {doc}");
+}
