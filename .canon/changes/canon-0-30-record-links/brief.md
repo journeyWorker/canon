@@ -94,3 +94,5 @@ canon 레코드를 그래프로 조회하려는 조사에서 끊긴 연결 다�
 - 기존 finding의 빈 칸을 거슬러 채우는 일.
 - 원본 없는 옛 참조를 고치거나 지우는 일.
 - worktree 사이 hot 저장소 공유.
+
+Approved: Journey Hwang 2026-10-26T12:59:31Z — "레츠고" (brief sha256:a60f094c31b38ed50a9c3d63d66ce173fd6f37d9852c56c397ecd03b1384fd85)

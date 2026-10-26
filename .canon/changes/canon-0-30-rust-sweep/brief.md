@@ -73,3 +73,5 @@ refactor
 - 다른 crate에서 쓰지 않는 공개 항목 약 1,000개를 좁히는 일, rustfmt 폭, edition 2024, 코드 전반의 newtype 도입.
 - ingest 재해시와 행 보관, `report check`의 duckdb 메모리.
 - id 플래그의 `-id` 접미사 제거.
+
+Approved: Journey Hwang 2026-10-26T12:59:28Z — "레츠고" (brief sha256:03b5528c36d1a7749a1c9be3d3191be12db6c1b21c9786bb569d32faa3d11d72)

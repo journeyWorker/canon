@@ -104,3 +104,5 @@ Source: docs/design/ledger-layout.md
 - 다른 도구의 레저를 읽는 ingest 어댑터의 입력 배치.
 - 레코드 안 경로 문자열 수정.
 - id 플래그 이름 변경.
+
+Approved: Journey Hwang 2026-10-26T12:59:30Z — "레츠고" (brief sha256:813ab83f6b1998bdf76f6c518eedb68a2ff554fdc301cae0a5cefe185b69b587)

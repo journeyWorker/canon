@@ -95,3 +95,5 @@ F1 대상은 dispatch-manifest subject의 다음 명령이다.
 - 0.30 다른 변경이 새로 만드는 동작의 시나리오(각 변경이 쓴다).
 - CLI로 관찰할 수 없는 내부 단위(원자적 쓰기 등).
 - 스펙 형식에 명령 태그를 새로 넣는 일.
+
+Approved: Journey Hwang 2026-10-26T12:59:27Z — "레츠고" (brief sha256:83fed3243ef19d05b22e549f38635d75b0f953ee70388663faf6a1954c5f1651)

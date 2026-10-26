@@ -43,3 +43,5 @@ infra
 - 계획 어댑터 기능 제거.
 - 옛 레코드 안의 계획 참조 문자열 수정.
 - 승인된 정책 파일 첫 줄의 openspec 언급(바꾸면 정책 재승인이 필요하다).
+
+Approved: Journey Hwang 2026-10-26T12:59:26Z — "레츠고" (brief sha256:7b71d3ce72b0640787dfa5115ca940a5cd899ffd360f31a95692b9b6a8b0ed06)
