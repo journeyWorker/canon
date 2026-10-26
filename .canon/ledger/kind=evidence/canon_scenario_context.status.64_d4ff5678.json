@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:25:13.616549748Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test status context_status_64_an_external_change_is_answered_in_a_canon_brief_that_points_at_it"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 127,
+  "scenario_id": "context.status.64",
+  "schema": 1,
+  "staging_id": "76256591",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

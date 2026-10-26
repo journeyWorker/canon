@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:34:18.966728864Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_storage_gate policy_expressions_34_policy_show_outside_a_configured_repo_is_refused_with_config_missing"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 41,
+  "scenario_id": "policy.expressions.34",
+  "schema": 1,
+  "staging_id": "df73bddf",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:31:46.522970680Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-ingest --test claude_ingest_integration a_sidechain_transcript_normalizes_to_a_root_run_plus_one_child_run_per_subagent"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 29,
+  "scenario_id": "ingest.sessions.04",
+  "schema": 1,
+  "staging_id": "62b2d32a",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

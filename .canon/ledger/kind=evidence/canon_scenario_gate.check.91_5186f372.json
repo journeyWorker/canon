@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:30:34.254626361Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test migrate_pins migrate_pins_02_a_legacy_review_of_a_changed_scenario_stays_stale"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 154,
+  "scenario_id": "gate.check.91",
+  "schema": 1,
+  "staging_id": "9d311e81",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

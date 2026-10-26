@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:37:35.396415654Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test change subject_lifecycle_33_a_change_adopted_by_a_second_subject_belongs_to_both_and_its_blocker_gates_both"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 108,
+  "scenario_id": "subject.lifecycle.33",
+  "schema": 1,
+  "staging_id": "c1104e58",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

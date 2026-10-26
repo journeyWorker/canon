@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:32:51.618704521Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-learn --lib promotion::demote::tests::default_policy_soft_flags_an_existing_git_tier_file_leaving_other_front_matter_intact"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 39,
+  "scenario_id": "learn.promotion.09",
+  "schema": 1,
+  "staging_id": "ae33f0f9",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

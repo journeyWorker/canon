@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:31:55.890429197Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-ingest --lib opted_in_privacy_redacts_split_multiline_unicode_and_after_bound_secrets_before_truncation"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 36,
+  "scenario_id": "ingest.sessions.11",
+  "schema": 1,
+  "staging_id": "7ae560b3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

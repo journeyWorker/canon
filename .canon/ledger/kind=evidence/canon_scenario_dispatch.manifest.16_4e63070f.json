@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:25:51.725187419Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_dispatch_demo dispatch_manifest_16_context_pack_show_prints_the_manifest_of_a_stored_pack"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 67,
+  "scenario_id": "dispatch.manifest.16",
+  "schema": 1,
+  "staging_id": "b8cf593c",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

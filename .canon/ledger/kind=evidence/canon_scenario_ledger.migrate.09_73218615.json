@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:33:09.756608109Z",
+  "attachments": [
+    {
+      "case": "ledger_migrate_09_revert_restores_the_tree_the_sqlite_file_and_the_index",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/030-junit-canon.xml",
+      "sha256": "325366efa06b97a55594e69cb9ae92e432994ce07687e3a2ed997da4ad010bdc"
+    },
+    {
+      "case": "ledger_migrate_09_postgres_rows_are_rekeyed_and_the_revert_restores_their_old_keys",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/030-junit-canon.xml",
+      "sha256": "325366efa06b97a55594e69cb9ae92e432994ce07687e3a2ed997da4ad010bdc"
+    }
+  ],
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/030-junit-canon.xml"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 47,
+  "scenario_id": "ledger.migrate.09",
+  "schema": 1,
+  "staging_id": "97f4499b",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

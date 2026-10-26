@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:24:39.105571516Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test cli_spec completion_refuses_a_shell_it_does_not_know_and_needs_no_repo"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 192,
+  "scenario_id": "context.capability.42",
+  "schema": 1,
+  "staging_id": "86121eb4",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

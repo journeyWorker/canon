@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:24:44.697281783Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_reads context_capability_46_schema_of_an_unknown_command_or_a_leaf_with_a_sub_path_is_refused_with_unknown_command_and_exit_2"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 196,
+  "scenario_id": "context.capability.46",
+  "schema": 1,
+  "staging_id": "2c60a3ef",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

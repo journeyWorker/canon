@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:32:13.269864316Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib two_subject_tags_on_one_scenario_first_wins_with_a_counted_diagnostic"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 75,
+  "scenario_id": "inventory.sync.08",
+  "schema": 1,
+  "staging_id": "2be2f332",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

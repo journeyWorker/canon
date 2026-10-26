@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:35:40.354834484Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test review_pins && cargo test -p canon-gate a_spec_pin_is_compared_like_for_like && cargo test -p canon-fmt scenario_digest"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 108,
+  "scenario_id": "review.add.28",
+  "schema": 1,
+  "staging_id": "1c85ce1c",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

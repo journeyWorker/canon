@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:39:00.937960688Z",
+  "attachments": [
+    {
+      "case": "platformer.hud.03: The pause key opens no pause menu outside play",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "be6822ce40fa6d095fa6ef9b0690d7ab8a2cd34fe175c1621d2fd25560a2e140"
+    }
+  ],
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "examples/platformer/reports/junit.xml"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "platformer",
+  "run_seq": 10,
+  "scenario_id": "platformer.hud.03",
+  "schema": 1,
+  "staging_id": "c67e30eb",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

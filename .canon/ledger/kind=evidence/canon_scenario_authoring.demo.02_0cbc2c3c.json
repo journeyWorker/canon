@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:22:01.121739230Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_dispatch_demo authoring_demo_02_demo_init_in_a_directory_that_already_has_a_canon_yaml_is_refused_and_changes_nothing"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 14,
+  "scenario_id": "authoring.demo.02",
+  "schema": 1,
+  "staging_id": "82e7eb29",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:38:26.374474409Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-fmt --test fixtures_check fmt_check_flags_the_flat_feature_partition_as_layout_violation"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 28,
+  "scenario_id": "format.corpus.04",
+  "schema": 1,
+  "staging_id": "98d23611",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

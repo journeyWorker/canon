@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:34:29.808693938Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test query_tier_degradation pg_routed_kind_query_fails_naming_pg_and_the_no_live_dsn_reason"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 32,
+  "scenario_id": "query.read.08",
+  "schema": 1,
+  "staging_id": "16f77a95",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
