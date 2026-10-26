@@ -100,3 +100,7 @@ vendors/
 examples/platformer/reports/
 # the snapshot `canon dashboard` and `canon report snapshot` regenerate -- derived, never committed.
 .canon/dashboard-snapshot/
+
+# Change records are derived from .canon/changes (see the ledger rule
+# above); their superseded versions are derived the same way.
+.canon/archive/kind=change/

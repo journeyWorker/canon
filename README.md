@@ -82,6 +82,11 @@ and storage formats may change. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
 the current architecture contract and [`canon/knowledge-index.json`](canon/knowledge-index.json)
 for the machine-readable source/projection/memory map.
 
+Since 0.30 canon plans its own work as canon changes in
+[`.canon/changes/`](.canon/changes/). The plan files the release notes below
+cite under `docs/superpowers/` and `openspec/` were removed in 0.30; read
+them in git history, e.g. `git show 0977bce1:<path>`.
+
 ## 0.29.0 release
 
 Shared derived data. `canon gate check`, `canon status` and a batch

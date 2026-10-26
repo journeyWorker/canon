@@ -15,8 +15,10 @@ status: Accepted
 - **Scope:** the Rust code under `crates/` (11 crates, 315 source files,
   125k lines). canon's own `canon fmt` / doc lint check spec corpora and are
   not covered here.
-- **Schedule:** see
-  `docs/superpowers/notes/2026-10-24-canon-0.29-0.30-release-order.md`.
+- **Schedule:** see the 0.29/0.30 release-order note
+  (`docs/superpowers/notes/2026-10-24-canon-0.29-0.30-release-order.md`,
+  removed in 0.30; `git show 0977bce1:<path>`) and the 0.30 changes in
+  `.canon/changes/canon-0-30-*`.
   0.29 restructures how `canon gate check`, `canon status` and evidence
   batches derive data from the corpus (§7). Once this note is `Accepted`, new
   0.29 code follows it, but existing code is not swept. 0.30 applies the

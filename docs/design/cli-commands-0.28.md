@@ -1,6 +1,6 @@
 # Canon 0.28: the per-leaf command table
 
-Status: normative draft, reviewed together with the 0.28 grammar plan (`docs/superpowers/plans/2026-10-22-canon-cli-grammar.md`). This is the final table of every leaf that plan D1 promises. The spec generator (D2), the skill, the website reference and the "Removed in 0.28" hints are generated from it; an agent must be able to build any command from this table alone.
+Status: normative draft, reviewed together with the 0.28 grammar plan (`docs/superpowers/plans/2026-10-22-canon-cli-grammar.md`, removed in 0.30; `git show 0977bce1:<path>`). This is the final table of every leaf that plan D1 promises. The spec generator (D2), the skill, the website reference and the "Removed in 0.28" hints are generated from it; an agent must be able to build any command from this table alone.
 
 76 leaves: 29 read, 42 write, 5 destructive. A leaf is a command you can run. Every group requires a subcommand and none is runnable (D2). `help`, `-h/--help` and `-V/--version` are clap built-ins, not leaves.
 

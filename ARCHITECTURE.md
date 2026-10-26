@@ -10,7 +10,8 @@ review_criteria:
 # Canon architecture
 
 This is the current-contract map for Canon. It is intentionally separate from
-historical change plans in `openspec/changes/` and `docs/superpowers/`. The
+change plans: canon's own changes and briefs live in `.canon/changes/` (the
+pre-0.30 plans under `openspec/` and `docs/superpowers/` are in git history). The
 machine-readable companion is [`canon/knowledge-index.json`](canon/knowledge-index.json);
 run `python3 scripts/check-knowledge.py --as-of 2026-10-01` to check its paths,
 primary Markdown links, projection ownership, and review dates.
