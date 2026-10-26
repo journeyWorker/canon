@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-26T09:53:00.762995334Z",
+  "change_ids": [
+    "s44-spec-derived-worklist",
+    "canon-0-30-spec-backfill"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "specced",
+  "subject_id": "spec-derived-worklist",
+  "summary": "Unimplemented or mismatched spec IS the work item: invert coverage to start from the Scenario corpus, and demote Task from report inventory driver to optional annotation",
+  "title": "Spec-derived worklist"
+}

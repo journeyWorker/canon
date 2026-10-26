@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-26T09:52:55.836081246Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "verifying",
+  "subject_id": "finding-lifecycle",
+  "summary": "canon finding add/close and the promote-time transition exemption",
+  "title": "Finding lifecycle: a finding is raised open and closed later"
+}

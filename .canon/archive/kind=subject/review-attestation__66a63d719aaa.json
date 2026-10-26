@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-26T09:52:57.214793623Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "verifying",
+  "subject_id": "review-attestation",
+  "summary": "",
+  "title": "Review: attributed per-scenario review verdict"
+}
