@@ -1117,3 +1117,34 @@ fn ledger_naming_21_promotion_breaks_ties_by_components_then_digest() {
     assert_eq!(committed_ev.iter().map(|c| c.1.clone()).collect::<Vec<_>>(), evidence.iter().map(|d| d.1.clone()).collect::<Vec<_>>(), "evidence commits in the same order");
     assert!(committed_ev.iter().all(|(seq, _, name)| name.starts_with("root_scenario_auth.login.01_") && *seq >= 1));
 }
+
+/// ledger.naming.22: a `canon.yaml` key still spelled `evidence_record` is
+/// read only to send the user to `canon migrate`.
+#[test]
+fn ledger_naming_22_a_canon_yaml_key_spelled_evidence_record_sends_the_user_to_migrate() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    let canon = |args: &[&str]| Command::new(env!("CARGO_BIN_EXE_canon")).args(args).current_dir(repo).env_remove("CANON_ROLE").output().unwrap();
+    let git = |args: &[&str]| assert!(Command::new("git").args(args).current_dir(repo).output().unwrap().status.success());
+    git(&["init", "-q"]);
+    assert!(canon(&["init", "--repo", ".", "--no-policy"]).status.success());
+    let yaml = std::fs::read_to_string(repo.join("canon.yaml")).unwrap();
+    std::fs::write(repo.join("canon.yaml"), format!("{yaml}routing:\n  evidence_record: local\n")).unwrap();
+    git(&["add", "-A"]);
+    git(&["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "0.30 repo with a 0.29 key"]);
+
+    let o = canon(&["context", "--json"]);
+    assert!(o.status.success(), "{}", text(&o));
+    let doc = json_of(&o);
+    let warnings = doc["meta"]["warnings"].as_array().expect("a warning");
+    assert!(warnings.iter().any(|w| w.as_str().is_some_and(|w| w.contains("`evidence_record` spelled the 0.29 way"))), "{doc}");
+    assert_eq!(doc["meta"]["next"][0]["command"], "canon migrate --json", "{doc}");
+
+    let before = files(&repo.join(".canon"));
+    let o = canon(&["evidence", "add", "--scenario-id", "cart.add.01", "--class", "test-run", "--ref", "x", "--verdict", "faithful", "--role", "implementer", "--actor-id", "a", "--session-id", "s", "--json"]);
+    assert_eq!(o.status.code(), Some(2), "{}", text(&o));
+    let doc = json_of(&o);
+    assert_eq!(doc["error"]["code"], "OLD_LAYOUT", "{doc}");
+    assert!(doc["error"]["hint"].as_str().is_some_and(|h| h.contains("canon migrate")), "{doc}");
+    assert_eq!(files(&repo.join(".canon")), before, "nothing is written");
+}

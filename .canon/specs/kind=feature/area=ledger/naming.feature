@@ -227,3 +227,14 @@ Feature: ledger naming
     When they are promoted
     Then each is named `<project>_<scenario>_<run seq>_<round>_<digest8>` with no padding
     And the order they commit in is the typed components in table order and then the body digest, not the order staging was scanned in
+
+  # canon: {"schema":1,"at":"2026-10-26T19:33:28Z","actor":{"agent_id":"impl-030-ln-fix","role":"implementer","session_id":"ln-fix-2026-10-26b"}}
+  @subject:context-capability
+  @case:failure
+  @flow:canon-0-30-ledger-naming.F2
+  @ledger.naming.22
+  Scenario: A canon.yaml key still spelled evidence_record is read only to send the user to canon migrate
+    Given a repo on the 0.30 layout whose `canon.yaml` routes the kind as `evidence_record: local`
+    When `canon context --json` runs
+    Then it exits 0, warns that `canon.yaml` spells `evidence_record` the 0.29 way, and its first next step is `canon migrate --json`
+    And `canon evidence add` exits 2 with `OLD_LAYOUT`, a hint naming `canon migrate`, and writes nothing
