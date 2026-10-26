@@ -1,4 +1,4 @@
 canon review scenario: pinned cart.add.01 at scenario digest 6bb1bf143405 and the verdict and checks of its 1 role(s) of evidence; the review counts only while they are unchanged
 canon review scenario: outcome `indeterminate` is recorded as a review gap, never as an approval
-canon review scenario: wrote kind=review/area=cart/root__cart.add.01__7341cf78e512575a872d858ecf923518b0334602__<digest12>.json (new) — written directly; nothing to promote
+canon review scenario: wrote kind=review/root_scenario_cart.add.01_<digest8>.json (new) — written directly; nothing to promote
 next: canon review scenario cart.add.01 --project-id root --actor-id <reviewer> --session-id <review-session> --role reviewer --original-spec-ref "<feature file>" — cart: 1 of 1 scenario(s) lack a qualifying review (1 with only indeterminate or unavailable reviews); review from another session (--session-id must differ from every evidence session), as an actor other than the evidence actor

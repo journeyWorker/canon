@@ -114,7 +114,7 @@ where
 /// `canon divergence list` and the gate must never do. `canon-store`
 /// is the lowest crate both callers already depend on, and the only one
 /// holding both `fold_latest_by_key` and
-/// [`crate::partition::content_digest12`].
+/// [`crate::partition::content_digest`].
 pub fn live_bindings_of(evidence: &[EvidenceRecord]) -> BTreeMap<(ProjectId, ScenarioId), BindingSnapshot> {
     struct Candidate {
         key: (ProjectId, ScenarioId),
@@ -134,7 +134,7 @@ pub fn live_bindings_of(evidence: &[EvidenceRecord]) -> BTreeMap<(ProjectId, Sce
         let app_sha = record.evidence_sha.clone()?;
         let at = record.envelope.at;
         let schema = record.envelope.schema;
-        let digest = crate::partition::content_digest12(&serde_json::to_value(record).unwrap_or_default());
+        let digest = crate::partition::content_digest(&serde_json::to_value(record).unwrap_or_default());
         Some(Candidate { key: (project_id, scenario_id), at, schema, digest, snapshot: BindingSnapshot { app_sha, reserved_digest: None } })
     });
 

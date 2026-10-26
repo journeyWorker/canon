@@ -58,7 +58,7 @@ use arrow::record_batch::RecordBatch;
 use parquet::arrow::ArrowWriter;
 
 use canon_model::envelope::RecordKind;
-use canon_store::partition::content_digest12;
+use canon_store::partition::content_digest;
 use canon_store::policy::{BackendConfig, TierPolicy};
 use canon_store::sqlite_tier::SqliteTier;
 use canon_store::tier::{Tier as _, TierQuery};
@@ -200,10 +200,12 @@ impl Roots {
     }
 
     /// Writes every row of the sqlite hot tier ([`Self::hot_db`]) under
-    /// `dir` as `kind=<kind>/<n>__<digest12>.json`, the layout
-    /// `stg_hot_records` reads. The digest is
-    /// [`content_digest12`] of the body, the same value a git filename
-    /// carries, so the two tiers fold against each other. Nothing is
+    /// `dir` as `kind=<kind>/<n>_<digest8>.json`, the layout
+    /// `stg_hot_records` reads. The file text is the body as canon writes a
+    /// ledger record (sorted-key pretty JSON), so the views' own
+    /// `canon_body_digest` of it is [`content_digest`] of the body, the
+    /// value a git record has, and the two tiers fold against each other.
+    /// The name is for humans; the views never read the digest from it. Nothing is
     /// written when there is no hot db or its file does not exist yet:
     /// opening a missing db would create it.
     pub fn materialize_hot(&self, dir: &Path) -> Result<(), ReportError> {
@@ -220,8 +222,8 @@ impl Roots {
             let kind_dir = dir.join(format!("kind={}", kind.as_str()));
             fs::create_dir_all(&kind_dir)?;
             for (n, raw) in rows.iter().enumerate() {
-                let body = serde_json::to_vec(&raw.0)?;
-                fs::write(kind_dir.join(format!("{n:06}__{}.json", content_digest12(&raw.0))), body)?;
+                let body = serde_json::to_vec_pretty(&raw.0)?;
+                fs::write(kind_dir.join(format!("{n}_{}.json", content_digest(&raw.0))), body)?;
             }
         }
         Ok(())

@@ -242,7 +242,7 @@ mod tests {
     fn evidence(id: &str, attachment: Option<EvidenceAttachment>, offset: i64) -> EvidenceRecord {
         let envelope = Envelope::new(
             1,
-            RecordKind::EvidenceRecord,
+            RecordKind::Evidence,
             Utc::now() + Duration::seconds(offset),
             Actor::new("agent", RoleId::parse("implementer").unwrap()),
         );

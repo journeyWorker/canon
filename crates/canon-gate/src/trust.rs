@@ -87,7 +87,7 @@ fn subject_of(record: &EvidenceRecord) -> String {
 /// proves the root loaded successfully once for this same
 /// `GateContext`, so this should not realistically fail independently.
 fn raw_evidence(ledger_root: &Path) -> Vec<canon_model::RawRecord> {
-    GitTier::new(ledger_root).read_history(RecordKind::EvidenceRecord).map(|read| read.records).unwrap_or_default()
+    GitTier::new(ledger_root).read_history(RecordKind::Evidence).map(|read| read.records).unwrap_or_default()
 }
 
 /// Every well-formed ledger [`Review`], indexed for [`TrustRung::classify`]'s
@@ -315,7 +315,7 @@ mod tests {
     fn write_tagged_evidence(tier: &GitTier, project_id: Option<&str>, scenario_id: &str, actor_role: &str, lifecycle: TrustLifecycle, flagged: bool, class: Option<&str>) {
         let actor = Actor::new("test-agent", RoleId::parse(actor_role).unwrap());
         let mut record = EvidenceRecord::new(
-            Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), actor.clone()),
+            Envelope::new(1, RecordKind::Evidence, Utc::now(), actor.clone()),
             None,
             Some(ScenarioId::parse(scenario_id).unwrap()),
             None,
@@ -396,7 +396,7 @@ mod tests {
         let gate_ctx = GateCtx::from_fixture(dir.path());
         let tier = GitTier::new(&gate_ctx.ledger_root);
         let record = EvidenceRecord::new(
-            Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("test-agent", RoleId::parse("implementer").unwrap())),
+            Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("test-agent", RoleId::parse("implementer").unwrap())),
             None,
             None,
             None,
@@ -503,7 +503,7 @@ mod tests {
 
         let body = serde_json::json!({
             "schema": 1,
-            "kind": "evidence_record",
+            "kind": "evidence",
             "at": Utc::now().to_rfc3339(),
             "actor": {"agent_id": "test-agent", "role": "implementer"},
             "scenario_id": "world.firstbuy-hotdeal.91",

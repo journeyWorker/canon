@@ -163,7 +163,7 @@ pub fn project_overlay(
         // call both unconditionally at this point.
         let at = canon_store::tier::raw_record_at(raw);
         let schema = canon_store::tier::raw_record_schema(raw);
-        let digest = canon_store::partition::content_digest12(&raw.0);
+        let digest = canon_store::partition::content_digest(&raw.0);
 
         let fields: serde_json::Map<String, Value> =
             decl.fields.iter().filter_map(|field| obj.get(&field.name).map(|v| (field.name.clone(), v.clone()))).collect();

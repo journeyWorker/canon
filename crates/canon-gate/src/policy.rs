@@ -93,7 +93,7 @@ pub const KNOWN_TOP_LEVEL_KEYS: &[&str] = &[
 /// The [`RecordKind`] every `policy.yaml` CEL predicate binds against
 /// (module doc) — the one `bindings_for` call [`PolicyResolution::resolve`]
 /// makes.
-pub const POLICY_BINDING_KIND: RecordKind = RecordKind::EvidenceRecord;
+pub const POLICY_BINDING_KIND: RecordKind = RecordKind::Evidence;
 
 /// `staleness.max_commits_behind`'s default when `policy.yaml`
 /// declares no value — parity.py's own audited default
@@ -1196,7 +1196,7 @@ mod tests {
     fn fixture_record(verdict: &str, at: DateTime<Utc>) -> serde_json::Value {
         json!({
             "schema": 1,
-            "kind": "evidence_record",
+            "kind": "evidence",
             "at": at.to_rfc3339(),
             "actor": {"agent_id": "test-agent"},
             "verdict": verdict,
@@ -1483,7 +1483,7 @@ trust_required:
         let resolution = PolicyResolution::resolve(dir.path(), &registry);
 
         assert!(!resolution.is_clean());
-        assert!(resolution.diagnostics.iter().any(|d| matches!(d, PolicyDiagnostic::SchemaUnavailable { kind } if *kind == RecordKind::EvidenceRecord)));
+        assert!(resolution.diagnostics.iter().any(|d| matches!(d, PolicyDiagnostic::SchemaUnavailable { kind } if *kind == RecordKind::Evidence)));
         // p2's `{cel: ...}` predicate can never compile without
         // bindings — dropped with its OWN diagnostic naming it, same
         // as any other invalid predicate.

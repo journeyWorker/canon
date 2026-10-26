@@ -152,8 +152,8 @@ Feature: context capability
   Scenario: A --kind value never carries the _record suffix
     Given the --kind options of query, export and purge
     When their accepted values are listed by `canon schema <command> --json`
-    Then every value is a record kind without the _record suffix, so evidence_record is evidence
-    And the record's own kind field, the ledger directories and the canon.yaml routing keys keep their stored names
+    Then every value is a record kind without the _record suffix, so the evidence kind is evidence
+    And the record's own kind field, the ledger directories and the canon.yaml routing keys spell it the same way, evidence
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
@@ -400,7 +400,7 @@ Feature: context capability
   Scenario: Context names the kinds users see, evidence included, and every artifact family
     Given the record kinds and artifact families the model registers
     When canon context is run
-    Then its kinds are every record kind under the name users type, evidence rather than evidence_record, and its cel section names the same kinds
+    Then its kinds are every record kind under the one name every surface uses, evidence included, and its cel section names the same kinds
     And its families are every artifact family in order, and the capability version is 6
     And every closed --kind value of query, export and purge is one of those kinds
 

@@ -39,5 +39,8 @@ fn main() -> ExitCode {
     if let Some(code) = refuse_without_config(&parsed) {
         return code;
     }
+    if let Some(code) = canon_cli::old_layout::refuse_write(&parsed) {
+        return code;
+    }
     canon_cli::run::run(cli)
 }

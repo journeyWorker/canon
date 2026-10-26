@@ -1,4 +1,3 @@
-canon subject move: refreshed the scenario index from 1 changed feature file(s) (specs/kind=feature/area=cart/add.feature): 1 record(s) written
 canon subject move: review guard for building → verifying (spec_coverage.require_review, scope: verifying, shipped)
 canon subject move:   ran unreviewed-promotion — every owned scenario needs a signed review, current with the spec and evidence it pinned, by an actor, and from a session, other than its evidence's
 canon subject move:   ran open-blocker — 1 adopted change(s) checked for open blocker findings

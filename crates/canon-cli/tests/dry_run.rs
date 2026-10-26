@@ -390,7 +390,7 @@ fn export_dry_run_refuses_like_the_real_run() {
 // ── subject adopt / unadopt ──
 
 fn subject_repo(listing: &[&str]) -> tempfile::TempDir {
-    let dir = repo_with(&format!("{LOCAL_TIER}routing:\n  subject: local\n  change: local\n  scenario: local\n  evidence_record: local\n"));
+    let dir = repo_with(&format!("{LOCAL_TIER}routing:\n  subject: local\n  change: local\n  scenario: local\n  evidence: local\n"));
     let ledger = GitTier::new(dir.path().join(".canon/ledger"));
     let change = Change::new(
         Envelope::new(1, RecordKind::Change, chrono::Utc::now(), Actor::new("importer", RoleId::parse("planner").unwrap())),

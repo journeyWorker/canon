@@ -121,7 +121,7 @@ fn write_read_upsert_and_age_round_trip_against_a_live_instance() {
         raw: canon_model::RawRecord,
         digest: String,
     }
-    let digested: Vec<DigestedRow> = session_rows.into_iter().map(|raw| DigestedRow { digest: canon_store::partition::content_digest12(&raw.0), raw }).collect();
+    let digested: Vec<DigestedRow> = session_rows.into_iter().map(|raw| DigestedRow { digest: canon_store::partition::content_digest(&raw.0), raw }).collect();
     let folded = canon_store::fold_latest_by_key(
         digested,
         |r| r.raw.0["session_id"].as_str().unwrap().to_string(),

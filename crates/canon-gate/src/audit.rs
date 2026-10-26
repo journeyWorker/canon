@@ -231,7 +231,7 @@ mod tests {
     }
 
     fn record(scenario: &str, verdict: EvidenceVerdict, audit: Option<AuditResult>, offset: i64) -> EvidenceRecord {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now() + chrono::Duration::seconds(offset), Actor::new("agent", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now() + chrono::Duration::seconds(offset), Actor::new("agent", RoleId::parse("implementer").unwrap()));
         let record = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(scenario).unwrap()), None, verdict).with_project_id(ProjectId::parse("root").unwrap());
         match audit {
             Some(result) => record.with_audit(EvidenceAudit { evaluator_id: "ev".into(), evaluator_version: "1".into(), evaluator_digest: "b".repeat(64), result }),

@@ -16,7 +16,7 @@
 //! of parity.py's `fixture_ctx(fx)` — audit §3.1). Unlike parity.py's
 //! literal, hand-authored JSON fixture files, `canon_store::GitTier`
 //! derives each record's own on-disk filename from a content digest
-//! (`canon_store::partition::content_digest12`) — hand-authoring a
+//! (`canon_store::partition::content_digest`) — hand-authoring a
 //! literal fixture JSON file at exactly that path would either drift the
 //! moment the digest algorithm changes, or need re-deriving by hand for
 //! every edit. Each fixture's CORPUS is therefore built by ordinary Rust
@@ -109,7 +109,7 @@ fn ledger_root(dir: &Path) -> PathBuf {
 }
 
 fn envelope(role: &str) -> Envelope {
-    Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("selftest-agent", RoleId::parse(role).expect("selftest role is a valid RoleId")))
+    Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("selftest-agent", RoleId::parse(role).expect("selftest role is a valid RoleId")))
 }
 
 fn write_policy_yaml(dir: &Path, contents: &str) {
@@ -205,9 +205,15 @@ fn build_stale_evidence(dir: &Path) {
 }
 
 fn build_malformed_evidence(dir: &Path) {
-    let path = ledger_root(dir).join("kind=evidence_record").join("broken.json");
+    let path = ledger_root(dir).join("kind=evidence").join("broken.json");
     std::fs::create_dir_all(path.parent().expect("has a parent dir")).expect("create fixture ledger dir");
     std::fs::write(&path, b"{ this is not valid json").expect("write malformed fixture file");
+}
+
+fn build_old_layout(dir: &Path) {
+    let path = ledger_root(dir).join("kind=evidence_record").join("world.firstbuy-hotdeal.14__0123456789ab.json");
+    std::fs::create_dir_all(path.parent().expect("has a parent dir")).expect("create fixture ledger dir");
+    std::fs::write(&path, b"{}").expect("write 0.29-named fixture file");
 }
 
 fn build_flagged(dir: &Path) {
@@ -328,6 +334,9 @@ fn run_stale_evidence(now: DateTime<Utc>) -> BTreeSet<(FailureClass, String)> {
 fn run_malformed_evidence(now: DateTime<Utc>) -> BTreeSet<(FailureClass, String)> {
     run_check_fixture(build_malformed_evidence, now)
 }
+fn run_old_layout(now: DateTime<Utc>) -> BTreeSet<(FailureClass, String)> {
+    run_check_fixture(build_old_layout, now)
+}
 fn run_flagged(now: DateTime<Utc>) -> BTreeSet<(FailureClass, String)> {
     run_check_fixture(build_flagged, now)
 }
@@ -356,6 +365,7 @@ fn fixtures() -> Vec<Fixture> {
         Fixture { class: FailureClass::FabricatedEvidence, run: run_fabricated_evidence, expected: include_str!("../fixtures/fabricated-evidence/expected_failures.txt") },
         Fixture { class: FailureClass::OpenBlocker, run: run_open_blocker, expected: include_str!("../fixtures/open-blocker/expected_failures.txt") },
         Fixture { class: FailureClass::FalseSuccess, run: run_false_success, expected: include_str!("../fixtures/false-success/expected_failures.txt") },
+        Fixture { class: FailureClass::OldLayout, run: run_old_layout, expected: include_str!("../fixtures/old-layout/expected_failures.txt") },
     ]
 }
 
@@ -474,7 +484,7 @@ mod tests {
     use super::*;
 
     /// Tests lock this (assignment acceptance criterion): every one of
-    /// the ten `FAILURE_CLASSES` strings fires on its own fixture,
+    /// the eleven `FAILURE_CLASSES` strings fires on its own fixture,
     /// exactly (missing AND extra both empty, every fixture).
     #[test]
     fn every_failure_class_fires_exactly_on_its_own_fixture() {

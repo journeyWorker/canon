@@ -230,7 +230,7 @@ fn an_unreachable_or_unattachable_store_refuses_with_a_hint_and_never_passes() {
 
     // A write refuses and records nothing.
     std::fs::write(repo.path().join("reports/other.json"), br#"{"other":1}"#).unwrap();
-    let before = std::fs::read_dir(repo.path().join(".canon/ledger/kind=evidence_record")).unwrap().count();
+    let before = std::fs::read_dir(repo.path().join(".canon/ledger/kind=evidence")).unwrap().count();
     let mut args = vec!["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "x", "--role", "implementer", "--artifact", "reports/other.json"];
     args.push("--json");
     let add = repo.canon_s3(&args, &env);
@@ -238,7 +238,7 @@ fn an_unreachable_or_unattachable_store_refuses_with_a_hint_and_never_passes() {
     let body = stdout_json(&add);
     assert_eq!(body["error"]["code"], "EVIDENCE_STORE_FAILED");
     assert!(body["error"]["hint"].as_str().unwrap().contains("reachable"), "{body}");
-    assert_eq!(std::fs::read_dir(repo.path().join(".canon/ledger/kind=evidence_record")).unwrap().count(), before, "no record was written");
+    assert_eq!(std::fs::read_dir(repo.path().join(".canon/ledger/kind=evidence")).unwrap().count(), before, "no record was written");
 }
 
 #[test]

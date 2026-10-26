@@ -63,12 +63,12 @@ fn tasks_md(repo: &Path, change_id: &str) -> String {
 /// library read — this file deliberately owns no in-process knowledge of
 /// canon's layout beyond the one path the CLI documents.
 fn staging_is_empty(repo: &Path) -> bool {
-    let staged = repo.join(".canon/ledger/_staging/kind=evidence_record");
+    let staged = repo.join(".canon/ledger/_staging/kind=evidence");
     std::fs::read_dir(&staged).map_or(true, |mut entries| entries.next().is_none())
 }
 
 fn committed_evidence_files(repo: &Path) -> Vec<std::path::PathBuf> {
-    let committed = repo.join(".canon/ledger/kind=evidence_record");
+    let committed = repo.join(".canon/ledger/kind=evidence");
     let Ok(entries) = std::fs::read_dir(&committed) else { return Vec::new() };
     let mut paths: Vec<std::path::PathBuf> = entries.filter_map(Result::ok).map(|e| e.path()).collect();
     // Total, data-derived order so an assertion never depends on

@@ -79,7 +79,7 @@ impl PromoteKind {
     pub fn record_kind(self) -> canon_model::envelope::RecordKind {
         use canon_model::envelope::RecordKind;
         match self {
-            PromoteKind::Evidence => RecordKind::EvidenceRecord,
+            PromoteKind::Evidence => RecordKind::Evidence,
             PromoteKind::Finding => RecordKind::Finding,
             PromoteKind::Divergence => RecordKind::Divergence,
         }

@@ -83,7 +83,7 @@ fn attest(repo: &Path, extra: &[&str]) -> Output {
 }
 
 fn committed_records(repo: &Path) -> Vec<serde_json::Value> {
-    let dir = repo.join(".canon/ledger/kind=evidence_record");
+    let dir = repo.join(".canon/ledger/kind=evidence");
     let mut paths: Vec<_> = std::fs::read_dir(dir).map(|d| d.filter_map(Result::ok).map(|e| e.path()).collect()).unwrap_or_default();
     paths.sort();
     paths.iter().map(|p| serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap()).collect()
@@ -232,7 +232,7 @@ fn a_fabrication_marker_refusal_reads_refused_and_exits_1() {
     assert!(lines[0].starts_with("canon evidence add: EVIDENCE_FABRICATED — fabricated-evidence game.run.01 — ") && lines[1].starts_with("fabricated-evidence game.run.01 — ") && lines[2].starts_with("hint: "), "{stderr}");
     assert!(lines[0].contains("summary field contains fabrication marker \"tbd\"") && lines[1].contains("command_result field contains fabrication marker \"n/a\""), "{stderr}");
     assert!(committed_records(repo).is_empty(), "a refused add writes nothing");
-    let staged = repo.join(".canon/ledger/_staging/kind=evidence_record");
+    let staged = repo.join(".canon/ledger/_staging/kind=evidence");
     assert!(std::fs::read_dir(&staged).map_or(true, |mut entries| entries.next().is_none()), "a refused add stages nothing");
 }
 

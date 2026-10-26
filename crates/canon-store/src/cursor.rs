@@ -72,7 +72,7 @@ use crate::tier::StoreError;
 
 /// The full 64-hex sha256 of a file's raw bytes — the cursor's
 /// per-file content fingerprint. Distinct from
-/// [`crate::partition::content_digest12`]'s 12-hex git-path suffix: a
+/// [`crate::partition::content_digest`]'s 12-hex git-path suffix: a
 /// cursor is machine-local operator state, never a git path, so it uses
 /// the full digest for a vanishing collision probability. Standard
 /// FIPS 180-4 sha256, byte-for-byte reproducible.

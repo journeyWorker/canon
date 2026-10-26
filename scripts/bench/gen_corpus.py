@@ -76,7 +76,7 @@ routing:
   divergence: local
   trajectory: local
   strategy_item: local
-  evidence_record: local
+  evidence: local
   subject: local
   finding: local
 specs:
@@ -219,7 +219,7 @@ def evidence_body(clock, sid, run_seq, sha, tree, verdict, session):
         "code_tree": tree,
         "evidence": {"kind": "test-run", "ref": "bench"},
         "evidence_sha": sha,
-        "kind": "evidence_record",
+        "kind": "evidence",
         "project_id": PROJECT,
         "run_seq": run_seq,
         "scenario_id": sid,
@@ -421,7 +421,7 @@ def generate(out, subjects, per_subject, evidence_n, reviews_n, batches, uncover
             # An older run alternates failing and passing; the latest always passes.
             verdict = "faithful" if latest or round_n % 2 == 0 else "divergent"
             record = evidence_body(clock, sid, run_seq[s], sha, tree, verdict, f"impl-{index % 7}")
-            write_record(out, "evidence_record", None, sid, record, archive=not latest)
+            write_record(out, "evidence", None, sid, record, archive=not latest)
     for _, s, sid, digest, _ in covered:
         for r in range(reviews_n):
             clock += 1

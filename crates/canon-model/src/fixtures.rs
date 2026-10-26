@@ -41,7 +41,7 @@ fn round_trip_well_formed(kind: RecordKind, json: &serde_json::Value) {
         RecordKind::Divergence => check!(Divergence),
         RecordKind::Trajectory => check!(Trajectory),
         RecordKind::StrategyItem => check!(StrategyItem),
-        RecordKind::EvidenceRecord => check!(EvidenceRecord),
+        RecordKind::Evidence => check!(EvidenceRecord),
         RecordKind::Subject => check!(Subject),
         RecordKind::Finding => check!(Finding),
     }

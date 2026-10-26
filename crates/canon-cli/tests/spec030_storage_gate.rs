@@ -309,7 +309,7 @@ routing:
   subject: local
   change: local
   scenario: local
-  evidence_record: local
+  evidence: local
   divergence: local
   finding: local
 ";
@@ -335,11 +335,11 @@ fn json_files(dir: &Path) -> Vec<PathBuf> {
 }
 
 fn ledger_files(repo: &Path) -> usize {
-    json_files(&repo.join(".canon/ledger/kind=evidence_record")).len()
+    json_files(&repo.join(".canon/ledger/kind=evidence")).len()
 }
 
 fn archive_files(repo: &Path) -> usize {
-    json_files(&repo.join(".canon/archive/kind=evidence_record")).len()
+    json_files(&repo.join(".canon/archive/kind=evidence")).len()
 }
 
 fn canon_in(repo: &Path, args: &[&str]) -> Output {
@@ -369,7 +369,7 @@ fn compact_repo() -> TempDir {
 fn attest(repo: &Path, offset: i64) {
     let actor = Actor::new("impl-agent", role("implementer")).with_session(SessionId::parse("impl-agent-session").unwrap());
     let record = EvidenceRecord::new(
-        Envelope::new(1, RecordKind::EvidenceRecord, Utc::now() + Duration::seconds(offset), actor),
+        Envelope::new(1, RecordKind::Evidence, Utc::now() + Duration::seconds(offset), actor),
         None,
         Some(ScenarioId::parse(SCENARIO).unwrap()),
         None,

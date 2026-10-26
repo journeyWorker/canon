@@ -43,7 +43,7 @@ fn every_well_formed_fixture_round_trips_through_git_tier() {
 }
 
 #[test]
-fn area_scoped_kinds_land_under_area_and_flat_kinds_do_not() {
+fn every_kind_lands_one_directory_level_below_the_root_with_no_area() {
     let dir = tempfile::tempdir().unwrap();
     let tier = GitTier::new(dir.path());
 
@@ -51,14 +51,9 @@ fn area_scoped_kinds_land_under_area_and_flat_kinds_do_not() {
         let path = fixtures_dir().join(format!("{}.json", kind.as_str()));
         let json: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
         let receipt = tier.write(&RawWrite(RawRecord(json))).unwrap();
-        let has_area_segment = receipt.location.contains("/area=");
-        assert_eq!(
-            has_area_segment,
-            kind.is_area_scoped(),
-            "{}: location {:?} area-segment presence must match RecordKind::is_area_scoped()",
-            kind.as_str(),
-            receipt.location
-        );
+        assert!(!receipt.location.contains("area="), "{}: location {:?} must have no area level (R1)", kind.as_str(), receipt.location);
+        assert_eq!(std::path::Path::new(&receipt.location).components().count(), 2, "{}: `kind=<kind>/<name>.json`, {:?}", kind.as_str(), receipt.location);
+        assert!(receipt.location.starts_with(&format!("kind={}/", kind.as_str())));
     }
 }
 

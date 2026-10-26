@@ -193,6 +193,26 @@ impl fmt::Debug for AgingRule {
     }
 }
 
+/// One `records_history` row as a hot tier stores it (sqlite, Postgres): the
+/// key `(kind, id, digest)`, the body's `at` and the body itself.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StoredRow {
+    pub kind: String,
+    pub id: String,
+    pub at: String,
+    pub digest: String,
+    pub body: serde_json::Value,
+}
+
+/// One row's move to another key (0.30 `canon migrate`): the key it has, the
+/// key and body it gets. `at` never changes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RowRekey {
+    pub from: (String, String, String),
+    pub to: (String, String, String),
+    pub body: serde_json::Value,
+}
+
 /// The outcome of one retention purge operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct PurgeCount {
@@ -236,6 +256,8 @@ pub enum StoreError {
     Layout(#[from] EvidenceViolation),
     #[error("{kind:?}: write to an already-occupied path {location:?} was rejected (append-only; corrections are new records, `canon migrate` is the sole exception)")]
     DuplicatePath { kind: RecordKind, location: String },
+    #[error("`{location}` already holds different content under the same key (an 8-hex digest collision, or an edited file); a key is never overwritten and nothing of this write was kept")]
+    KeyConflict { location: String },
     #[error("{kind:?}: no `TierPolicy.routing` entry (canon.yaml) — every write/read must resolve through the declarative policy, never a hardcoded default")]
     UnroutedKind { kind: RecordKind },
     #[error("purge kind `{kind}` is not allowed; allowed kinds: session, run, event, trajectory")]

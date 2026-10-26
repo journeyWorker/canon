@@ -493,7 +493,7 @@ fn cross_source_change_id_collision_is_visible_in_the_default_human_summary() {
 // ── design R1: plan import is never an authority ──
 
 fn write_evidence(ledger_root: &Path, task_id: &str) {
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, chrono::Utc::now(), Actor::new("it-agent", RoleId::parse("implementer").unwrap()));
+    let envelope = Envelope::new(1, RecordKind::Evidence, chrono::Utc::now(), Actor::new("it-agent", RoleId::parse("implementer").unwrap()));
     let record = EvidenceRecord::new(envelope, Some(TaskId::parse(task_id).unwrap()), None, None, EvidenceVerdict::Faithful);
     GitTier::new(ledger_root).write(&record).expect("write evidence record");
 }

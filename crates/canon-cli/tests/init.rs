@@ -62,7 +62,7 @@ fn init_scaffolds_a_working_config_in_a_fresh_repo() {
     for kind in ["task", "handoff", "session", "run", "event"] {
         assert!(text.contains(&format!("{kind}: hot")), "missing hot-routing line for `{kind}`: {text}");
     }
-    for kind in ["change", "scenario", "review", "divergence", "trajectory", "strategy_item", "evidence_record"] {
+    for kind in ["change", "scenario", "review", "divergence", "trajectory", "strategy_item", "evidence"] {
         assert!(text.contains(&format!("{kind}: local")), "missing local-routing line for `{kind}`: {text}");
     }
     assert!(text.contains("specs:"), "{text}");

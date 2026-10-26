@@ -10,7 +10,7 @@ use canon_model::envelope::RecordKind;
 use canon_model::evidence::{EvidenceViolation, RawRecord};
 use canon_model::FailureClass;
 
-use crate::partition::{expected_relative_path, validate_body, validate_kind_matches_content};
+use crate::partition::{content_digest, expected_relative_path, validate_body, validate_kind_matches_content, validate_layout};
 use crate::policy::Backend;
 use crate::tier::{AgeReport, AgingRule, StoreError, StoredRecord, Tier, TierQuery, TierReadResult, WriteReceipt};
 
@@ -122,6 +122,21 @@ fn validate_namespaced_kind_matches_content(namespaced_kind: &str, json: &serde_
     }
 }
 
+/// One write checked and ready: where it lands and the bytes that go there.
+struct PlannedWrite {
+    kind: RecordKind,
+    raw: RawRecord,
+    relative: PathBuf,
+    absolute: PathBuf,
+    bytes: Vec<u8>,
+}
+
+impl PlannedWrite {
+    fn receipt(&self) -> WriteReceipt {
+        WriteReceipt { kind: self.kind, location: self.relative.display().to_string(), digest: content_digest(&self.raw.0), deduped: false }
+    }
+}
+
 #[derive(Debug)]
 pub struct GitTier {
     root: PathBuf,
@@ -147,14 +162,7 @@ fn validate_file(kind: RecordKind, relative: &Path, bytes: &[u8]) -> Result<RawR
     let json: serde_json::Value =
         serde_json::from_slice(bytes).map_err(|e| EvidenceViolation::new(FailureClass::Malformed, relative.display().to_string(), e.to_string()))?;
     validate_kind_matches_content(kind, &json).map_err(|violation| at_file(violation, relative))?;
-    let expected = expected_relative_path(kind, &json).map_err(|violation| at_file(violation, relative))?;
-    if expected != relative {
-        return Err(EvidenceViolation::new(
-            FailureClass::Malformed,
-            "layout",
-            format!("expected `{}` (template `{}`), found `{}`", expected.display(), kind.partition_template(), relative.display()),
-        ));
-    }
+    validate_layout(kind, relative, &json).map_err(|violation| if violation.class == FailureClass::OldLayout { violation } else { at_file(violation, relative) })?;
     let raw = RawRecord(json);
     validate_body(kind, &raw).map_err(|violation| at_file(violation, relative))?;
     Ok(raw)
@@ -353,6 +361,26 @@ impl GitTier {
         Ok(validate_file(kind, relative, &bytes))
     }
 
+    /// Every file under the 0.29 `kind=evidence_record/` directory, each an
+    /// [`FailureClass::OldLayout`] violation: that directory is no kind
+    /// canon 0.30 reads (evidence is `kind=evidence/`), so a normal scan
+    /// never sees what is in it. `canon migrate` moves them.
+    pub fn legacy_kind_dir_violations(&self) -> Result<Vec<EvidenceViolation>, StoreError> {
+        let dir = self.absolute(Path::new(crate::partition::LEGACY_KIND_DIR));
+        if !dir.is_dir() {
+            return Ok(Vec::new());
+        }
+        let mut found = Vec::new();
+        for entry in walkdir::WalkDir::new(&dir).sort_by_file_name() {
+            let entry = entry.map_err(|err| StoreError::Policy(format!("failed to scan `{}`: {err}", dir.display())))?;
+            if entry.file_type().is_file() {
+                let relative = entry.path().strip_prefix(&self.root).expect("walked entries are under root");
+                found.push(crate::partition::old_layout(relative));
+            }
+        }
+        Ok(found)
+    }
+
     /// Corpus-wide scan across every `kind=<x>/` directory directly
     /// under `root` — unlike [`Tier::read`]/`scan_kind_where`, which
     /// are always told a specific, already-known `kind` up front,
@@ -440,8 +468,8 @@ impl GitTier {
     /// ever reports success over them -- a 12-hex-digest collision or a
     /// hand-tampered file at the SAME path holding DIFFERENT content is
     /// a loud `StoreError::Layout`, never a silent `deduped: true`.
-    pub fn write_namespaced(&self, namespaced_kind: &str, natural_key: &str, body: RawRecord) -> Result<NamespacedWriteReceipt, StoreError> {
-        let (receipt, absolute, canonical) = self.plan_namespaced(namespaced_kind, natural_key, &body)?;
+    pub fn write_namespaced(&self, namespaced_kind: &str, key: &[String], body: RawRecord) -> Result<NamespacedWriteReceipt, StoreError> {
+        let (receipt, absolute, canonical) = self.plan_namespaced(namespaced_kind, key, &body)?;
         if !receipt.deduped {
             crate::atomic::write_atomic(&absolute, &canonical)?;
         }
@@ -451,46 +479,35 @@ impl GitTier {
     /// What [`GitTier::write_namespaced`] would do, without writing: the
     /// same validation and the same refusal, and the receipt it would
     /// return (`deduped` when the identical record is already stored).
-    pub fn check_namespaced(&self, namespaced_kind: &str, natural_key: &str, body: &RawRecord) -> Result<NamespacedWriteReceipt, StoreError> {
-        self.plan_namespaced(namespaced_kind, natural_key, body).map(|(receipt, _, _)| receipt)
+    pub fn check_namespaced(&self, namespaced_kind: &str, key: &[String], body: &RawRecord) -> Result<NamespacedWriteReceipt, StoreError> {
+        self.plan_namespaced(namespaced_kind, key, body).map(|(receipt, _, _)| receipt)
     }
 
-    fn plan_namespaced(&self, namespaced_kind: &str, natural_key: &str, body: &RawRecord) -> Result<(NamespacedWriteReceipt, PathBuf, Vec<u8>), StoreError> {
+    fn plan_namespaced(&self, namespaced_kind: &str, key: &[String], body: &RawRecord) -> Result<(NamespacedWriteReceipt, PathBuf, Vec<u8>), StoreError> {
         crate::partition::validate_namespaced_kind(namespaced_kind)?;
-        crate::partition::validate_natural_key(natural_key)?;
-        crate::partition::natural_key_matches_body(natural_key, &body.0)?;
+        let components = crate::partition::overlay_components(key)?;
+        crate::partition::overlay_key_matches_body(key, &body.0)?;
         validate_namespaced_kind_matches_content(namespaced_kind, &body.0)?;
 
-        let digest = crate::partition::content_digest12(&body.0);
-        let relative = PathBuf::from(format!("kind={namespaced_kind}/{natural_key}__{digest}.json"));
+        let digest = content_digest(&body.0);
+        let relative = canon_model::layout::name(&components, &digest).relative_path(namespaced_kind, "json");
         let absolute = self.absolute(&relative);
 
         // The canonical bytes this write would produce. `serde_json::Value`
         // is a `BTreeMap` workspace-wide (no `preserve_order` feature), so
         // `to_vec_pretty` is DETERMINISTIC for a given Value -- the same
-        // sorted-key form `content_digest12` hashes over. Dedup compares and
+        // sorted-key form `content_digest` hashes over. Dedup compares and
         // the write emits exactly these bytes, so a genuine idempotent
         // resubmission is always byte-identical while any file at the path
-        // that is NOT the canonical serialization (a 12-hex digest collision,
+        // that is NOT the canonical serialization (an 8-hex digest collision,
         // or a tampered / hand-edited / non-canonical file) is caught.
         let canonical = serde_json::to_vec_pretty(&body.0)?;
 
-        if absolute.exists() {
-            let existing_bytes = std::fs::read(&absolute)?;
-            if existing_bytes != canonical {
-                return Err(StoreError::Layout(EvidenceViolation::new(
-                    FailureClass::Malformed,
-                    relative.display().to_string(),
-                    format!(
-                        "`{digest}`-suffixed path already holds bytes that are NOT this body's canonical serialization -- a 12-hex digest collision, or a tampered / non-canonical file, never silently deduped"
-                    ),
-                )));
-            }
-            let receipt = NamespacedWriteReceipt { namespaced_kind: namespaced_kind.to_string(), location: relative.display().to_string(), digest, deduped: true };
-            return Ok((receipt, absolute, canonical));
+        let deduped = absolute.exists();
+        if deduped && std::fs::read(&absolute)? != canonical {
+            return Err(StoreError::KeyConflict { location: relative.display().to_string() });
         }
-
-        let receipt = NamespacedWriteReceipt { namespaced_kind: namespaced_kind.to_string(), location: relative.display().to_string(), digest, deduped: false };
+        let receipt = NamespacedWriteReceipt { namespaced_kind: namespaced_kind.to_string(), location: relative.display().to_string(), digest, deduped };
         Ok((receipt, absolute, canonical))
     }
 
@@ -513,7 +530,7 @@ impl GitTier {
     /// an `attic/` subdirectory) is never a record `write_namespaced`
     /// could have produced; (2) the file extension is `.json`; (3) the
     /// filename's own `__{digest12}` suffix is present, exactly 12
-    /// lowercase-hex characters, AND agrees with `content_digest12` of
+    /// lowercase-hex characters, AND agrees with `content_digest` of
     /// the file's OWN parsed content -- the same self-consistency
     /// `write_namespaced` itself just wrote. F1's store-layer defense
     /// in depth ([`validate_namespaced_kind_matches_content`]) also
@@ -576,30 +593,33 @@ impl GitTier {
                 continue;
             }
 
-            let digest = crate::partition::content_digest12(&json);
+            let digest = content_digest(&json);
             let stem = absolute.file_stem().and_then(|s| s.to_str()).unwrap_or_default();
-            let Some((_, suffix)) = stem.rsplit_once("__") else {
+            if crate::partition::is_old_stem(stem) {
+                violations.push(crate::partition::old_layout(&relative));
+                continue;
+            }
+            let Some((key, suffix)) = canon_model::layout::split_stem(stem) else {
                 violations.push(EvidenceViolation::new(
                     FailureClass::Malformed,
                     relative.display().to_string(),
-                    "filename carries no `__<digest12>` suffix".to_string(),
+                    "filename is not `<key>_<digest8>` (the digest is 8 lowercase-hex characters)".to_string(),
                 ));
                 continue;
             };
-            let is_lower_hex12 = suffix.len() == 12 && suffix.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
-            if !is_lower_hex12 {
-                violations.push(EvidenceViolation::new(
-                    FailureClass::Malformed,
-                    relative.display().to_string(),
-                    format!("filename digest suffix `{suffix}` is not 12 lowercase-hex characters"),
-                ));
-                continue;
-            }
             if suffix != digest {
                 violations.push(EvidenceViolation::new(
                     FailureClass::Malformed,
                     relative.display().to_string(),
                     format!("filename digest suffix disagrees with content digest `{digest}`"),
+                ));
+                continue;
+            }
+            if !crate::partition::overlay_name_matches_body(key, &json) {
+                violations.push(EvidenceViolation::new(
+                    FailureClass::Malformed,
+                    relative.display().to_string(),
+                    "filename key does not match the join-key field values in the record body".to_string(),
                 ));
                 continue;
             }
@@ -609,44 +629,48 @@ impl GitTier {
         Ok((records, violations))
     }
 
+    /// The refusal of a write whose path is taken: the same bytes is a
+    /// duplicate write, other bytes is a key conflict (an 8-hex digest
+    /// collision or a tampered file), never a silent no-op.
+    fn occupied(&self, kind: RecordKind, relative: &Path, absolute: &Path, raw: &RawRecord) -> Result<StoreError, StoreError> {
+        let same = std::fs::read(absolute)? == serde_json::to_vec_pretty(&raw.0)?;
+        Ok(if same { StoreError::DuplicatePath { kind, location: relative.display().to_string() } } else { StoreError::KeyConflict { location: relative.display().to_string() } })
+    }
+
     /// [`Tier::write`] without the archive step: the record lands and
     /// nothing else moves. For a writer that removes what it wrote when a
     /// later write of its batch fails: it must not have archived the
     /// versions a record it is about to remove superseded.
     pub fn write_unarchived(&self, record: &dyn StoredRecord) -> Result<WriteReceipt, StoreError> {
+        let planned = self.plan_write(record)?;
+        crate::atomic::write_atomic(&planned.absolute, &planned.bytes)?;
+        Ok(planned.receipt())
+    }
+
+    /// Everything [`Self::write_unarchived`] checks before it writes: the
+    /// name the record's own content resolves to, that the path is free (a
+    /// taken path is a duplicate write for the same bytes and a
+    /// [`StoreError::KeyConflict`] for other bytes), and that the archive does
+    /// not hold that path with other bytes (R7).
+    fn plan_write(&self, record: &dyn StoredRecord) -> Result<PlannedWrite, StoreError> {
         let kind = record.kind();
         let raw = record.to_raw();
         let relative = expected_relative_path(kind, &raw.0)?;
         let absolute = self.absolute(&relative);
+        let bytes = serde_json::to_vec_pretty(&raw.0)?;
 
         if absolute.exists() {
-            return Err(StoreError::DuplicatePath { kind, location: relative.display().to_string() });
+            return Err(self.occupied(kind, &relative, &absolute, &raw)?);
         }
-
-        // NOT a live defense-in-depth check, despite appearances:
-        // `relative` above was JUST derived by calling
-        // `expected_relative_path(kind, &raw.0)` on this exact
-        // `(kind, json)` pair, and `validate_layout` internally does
-        // nothing but call that SAME pure function again and compare
-        // the result to `relative` — same function, same inputs,
-        // deterministic output, so this can never actually disagree
-        // or fail here. A bug in `expected_relative_path` itself
-        // would reproduce identically on both calls, not get caught
-        // by this. What it actually is: a self-documenting invariant
-        // marker (this IS the path `read`'s own layout check will
-        // expect) and a cheap regression net against a future edit
-        // that changes `relative`'s derivation above without updating
-        // this call site to match.
-        crate::partition::validate_layout(kind, &relative, &raw.0)?;
-
-        crate::atomic::write_atomic(&absolute, &serde_json::to_vec_pretty(&raw.0)?)?;
-
-        Ok(WriteReceipt {
-            kind,
-            location: relative.display().to_string(),
-            digest: crate::partition::content_digest12(&raw.0),
-            deduped: false,
-        })
+        // A path the archive already holds with other bytes would make the
+        // later move refuse; refuse before anything is written.
+        if let Some(archive) = self.archive_tier() {
+            let archived = archive.absolute(&relative);
+            if archived.exists() && std::fs::read(&archived)? != bytes {
+                return Err(StoreError::KeyConflict { location: relative.display().to_string() });
+            }
+        }
+        Ok(PlannedWrite { kind, raw, relative, absolute, bytes })
     }
 
     /// Every record file of `kind` in this tier, validated as
@@ -710,13 +734,45 @@ impl Tier for GitTier {
         Ok(receipt)
     }
 
+    /// All of `records` or none (R7): every record is checked first (a path
+    /// taken by other bytes, a repeated path inside the batch, the archive
+    /// holding the path with other bytes), then written; a write that fails
+    /// removes the files this batch already wrote, so a conflict leaves no
+    /// record of the batch behind. The versions the records supersede move to
+    /// the archive once the whole batch has landed.
+    fn write_batch(&self, records: &[&dyn StoredRecord]) -> Result<Vec<WriteReceipt>, StoreError> {
+        let mut planned: Vec<PlannedWrite> = Vec::with_capacity(records.len());
+        for record in records {
+            let next = self.plan_write(*record)?;
+            if let Some(earlier) = planned.iter().find(|p| p.relative == next.relative) {
+                let location = next.relative.display().to_string();
+                return Err(if earlier.bytes == next.bytes { StoreError::DuplicatePath { kind: next.kind, location } } else { StoreError::KeyConflict { location } });
+            }
+            planned.push(next);
+        }
+        for (done, write) in planned.iter().enumerate() {
+            if let Err(e) = crate::atomic::write_atomic(&write.absolute, &write.bytes) {
+                for written in &planned[..done] {
+                    let _ = std::fs::remove_file(&written.absolute);
+                }
+                return Err(e.into());
+            }
+        }
+        for write in &planned {
+            if let Err(e) = self.archive_after_write(write.kind, &write.raw) {
+                eprintln!("canon: wrote {} but could not archive the versions it supersedes ({e}); `canon ledger compact` moves them", write.relative.display());
+            }
+        }
+        Ok(planned.iter().map(PlannedWrite::receipt).collect())
+    }
+
     fn read(&self, query: &TierQuery) -> Result<TierReadResult, StoreError> {
         self.read_shared(query).map(SharedRead::into_owned)
     }
 
     fn purge_keys(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>) -> Result<Vec<String>, StoreError> {
         let (candidates, _) = self.scan_kind_where(kind, |at| at < before)?;
-        let mut keys: Vec<String> = candidates.iter().map(|(relative, raw)| format!("{}#{}", relative.display(), crate::partition::content_digest12(&raw.0))).collect();
+        let mut keys: Vec<String> = candidates.iter().map(|(relative, raw)| format!("{}#{}", relative.display(), content_digest(&raw.0))).collect();
         keys.sort();
         Ok(keys)
     }
@@ -1053,7 +1109,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let tier = GitTier::new(dir.path());
         let record = canon_model::EvidenceRecord::new(
-            Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), actor()),
+            Envelope::new(1, RecordKind::Evidence, Utc::now(), actor()),
             Some(canon_model::TaskId::parse("s5#1.7").unwrap()),
             None,
             None,
@@ -1068,13 +1124,13 @@ mod tests {
 
         let mut planted = Vec::new();
         for body in [bad_verdict, no_agent] {
-            let relative = expected_relative_path(RecordKind::EvidenceRecord, &body).unwrap();
+            let relative = expected_relative_path(RecordKind::Evidence, &body).unwrap();
             std::fs::create_dir_all(dir.path().join(&relative).parent().unwrap()).unwrap();
             std::fs::write(dir.path().join(&relative), serde_json::to_vec_pretty(&body).unwrap()).unwrap();
             planted.push(relative.display().to_string());
         }
 
-        let result = tier.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap();
+        let result = tier.read(&TierQuery::kind(RecordKind::Evidence)).unwrap();
         assert!(result.records.is_empty(), "{:?}", result.records);
         let mut subjects: Vec<_> = result.violations.iter().map(|v| v.subject.clone()).collect();
         subjects.sort();
@@ -1183,7 +1239,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let tier = GitTier::new(dir.path());
         let body = overlay_body("root", "world.hotdeal.01", true);
-        let receipt = tier.write_namespaced("porting.coverage", "root__world.hotdeal.01", body).unwrap();
+        let receipt = tier.write_namespaced("porting.coverage", &["root".to_string(), "world.hotdeal.01".to_string()], body).unwrap();
         assert!(!receipt.deduped);
         assert_eq!(receipt.namespaced_kind, "porting.coverage");
         assert!(receipt.location.starts_with("kind=porting.coverage/root__world.hotdeal.01__"), "got {}", receipt.location);
@@ -1206,9 +1262,9 @@ mod tests {
                 "project_id": "root", "scenario_id": "world.hotdeal.01", "covered": true,
             }))
         };
-        let first = tier.write_namespaced("porting.coverage", "root__world.hotdeal.01", body()).unwrap();
+        let first = tier.write_namespaced("porting.coverage", &["root".to_string(), "world.hotdeal.01".to_string()], body()).unwrap();
         assert!(!first.deduped);
-        let second = tier.write_namespaced("porting.coverage", "root__world.hotdeal.01", body()).unwrap();
+        let second = tier.write_namespaced("porting.coverage", &["root".to_string(), "world.hotdeal.01".to_string()], body()).unwrap();
         assert!(second.deduped, "byte-identical resubmission must dedupe, never a rejected-duplicate error");
         assert_eq!(first.location, second.location);
         assert_eq!(first.digest, second.digest);
@@ -1233,7 +1289,7 @@ mod tests {
                 "project_id": "root", "scenario_id": "world.hotdeal.01", "covered": true,
             }))
         };
-        let receipt = tier.write_namespaced("porting.coverage", "root__world.hotdeal.01", body()).unwrap();
+        let receipt = tier.write_namespaced("porting.coverage", &["root".to_string(), "world.hotdeal.01".to_string()], body()).unwrap();
         assert!(!receipt.deduped);
 
         // Hand-tamper the file at the exact resolved path: same
@@ -1244,7 +1300,7 @@ mod tests {
         // digest-suffixed path (`body()` is deterministic) -- an
         // identical resubmission would normally dedupe, but the file
         // now sitting there is NOT what it claims to be.
-        let err = tier.write_namespaced("porting.coverage", "root__world.hotdeal.01", body()).unwrap_err();
+        let err = tier.write_namespaced("porting.coverage", &["root".to_string(), "world.hotdeal.01".to_string()], body()).unwrap_err();
         assert!(matches!(err, StoreError::Layout(_)), "expected a loud Layout rejection, got {err:?}");
     }
 
@@ -1267,7 +1323,7 @@ mod tests {
                 "project_id": "root", "scenario_id": "world.hotdeal.01", "covered": true,
             }))
         };
-        let receipt = tier.write_namespaced("porting.coverage", "root__world.hotdeal.01", body()).unwrap();
+        let receipt = tier.write_namespaced("porting.coverage", &["root".to_string(), "world.hotdeal.01".to_string()], body()).unwrap();
         assert!(!receipt.deduped);
 
         // Overwrite with the SAME Value serialized COMPACT (to_string) --
@@ -1278,7 +1334,7 @@ mod tests {
         assert_ne!(compact.as_bytes(), pretty.as_slice(), "the two serializations must actually differ");
         std::fs::write(dir.path().join(&receipt.location), &compact).unwrap();
 
-        let err = tier.write_namespaced("porting.coverage", "root__world.hotdeal.01", body()).unwrap_err();
+        let err = tier.write_namespaced("porting.coverage", &["root".to_string(), "world.hotdeal.01".to_string()], body()).unwrap_err();
         assert!(matches!(err, StoreError::Layout(_)), "a same-Value but non-canonical-bytes file must be a loud Layout rejection, got {err:?}");
     }
 
@@ -1288,8 +1344,8 @@ mod tests {
         let tier = GitTier::new(dir.path());
         let first_body = overlay_body("root", "world.hotdeal.01", false);
         let second_body = overlay_body("root", "world.hotdeal.01", true); // covered flips false -> true
-        let first = tier.write_namespaced("porting.coverage", "root__world.hotdeal.01", first_body).unwrap();
-        let second = tier.write_namespaced("porting.coverage", "root__world.hotdeal.01", second_body).unwrap();
+        let first = tier.write_namespaced("porting.coverage", &["root".to_string(), "world.hotdeal.01".to_string()], first_body).unwrap();
+        let second = tier.write_namespaced("porting.coverage", &["root".to_string(), "world.hotdeal.01".to_string()], second_body).unwrap();
         assert!(!second.deduped, "a logically different body must be a genuine append, not a dedup");
         assert_ne!(first.location, second.location, "different content must resolve to a different digest-suffixed path");
 
@@ -1303,7 +1359,7 @@ mod tests {
     fn write_namespaced_rejects_namespaced_kind_colliding_with_a_core_recordkind() {
         let dir = tempfile::tempdir().unwrap();
         let tier = GitTier::new(dir.path());
-        let err = tier.write_namespaced("scenario", "x", RawRecord(serde_json::json!({}))).unwrap_err();
+        let err = tier.write_namespaced("scenario", &["x".to_string()], RawRecord(serde_json::json!({}))).unwrap_err();
         assert!(matches!(err, StoreError::Layout(_)), "expected a Layout rejection, got {err:?}");
         assert!(!dir.path().join("kind=scenario").exists(), "a core kind directory must never be touched by a namespaced write");
     }
@@ -1313,7 +1369,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let tier = GitTier::new(dir.path());
         for bad in ["porting/coverage", "porting", "porting.coverage.extra", "Porting.Coverage", "porting.cov erage", "porting..coverage"] {
-            let err = tier.write_namespaced(bad, "x", RawRecord(serde_json::json!({"x": "x"}))).unwrap_err();
+            let err = tier.write_namespaced(bad, &["x".to_string()], RawRecord(serde_json::json!({"x": "x"}))).unwrap_err();
             assert!(matches!(err, StoreError::Layout(_)), "expected `{bad}` rejected as Layout, got {err:?}");
         }
         assert!(std::fs::read_dir(dir.path()).unwrap().next().is_none(), "no directory must be created for any rejected namespaced_kind");
@@ -1324,7 +1380,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let tier = GitTier::new(dir.path());
         for bad_key in ["../../etc/passwd", "a/b", "a\\b", "..", ".hidden", "/abs"] {
-            let err = tier.write_namespaced("porting.coverage", bad_key, overlay_body("root", "world.hotdeal.01", true)).unwrap_err();
+            let err = tier.write_namespaced("porting.coverage", &[bad_key.to_string()], overlay_body("root", "world.hotdeal.01", true)).unwrap_err();
             assert!(matches!(err, StoreError::Layout(_)), "expected `{bad_key}` rejected as Layout, got {err:?}");
         }
         assert!(!dir.path().join("kind=porting.coverage").exists(), "no path may be constructed for a rejected natural_key");
@@ -1336,7 +1392,7 @@ mod tests {
         let tier = GitTier::new(dir.path());
         // body carries scenario_id "world.hotdeal.99"; natural_key names ".01" instead.
         let body = overlay_body("root", "world.hotdeal.99", true);
-        let err = tier.write_namespaced("porting.coverage", "root__world.hotdeal.01", body).unwrap_err();
+        let err = tier.write_namespaced("porting.coverage", &["root".to_string(), "world.hotdeal.01".to_string()], body).unwrap_err();
         assert!(matches!(err, StoreError::Layout(_)), "expected a Layout rejection, got {err:?}");
         assert!(!dir.path().join("kind=porting.coverage").exists());
     }
@@ -1350,7 +1406,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let tier = GitTier::new(dir.path());
         let body = overlay_body("root", "world.hotdeal.01", true); // body kind is "porting.coverage"
-        let err = tier.write_namespaced("other.coverage", "root__world.hotdeal.01", body).unwrap_err();
+        let err = tier.write_namespaced("other.coverage", &["root".to_string(), "world.hotdeal.01".to_string()], body).unwrap_err();
         assert!(matches!(err, StoreError::Layout(_)), "expected a Layout rejection, got {err:?}");
         assert!(!dir.path().join("kind=other.coverage").exists(), "no path may be constructed for a body/namespaced_kind mismatch");
     }
@@ -1413,7 +1469,7 @@ mod tests {
             "actor": {"agent_id": "a", "role": "implementer"},
             "project_id": "root", "scenario_id": "world.hotdeal.03", "covered": true,
         });
-        let digest = crate::partition::content_digest12(&planted);
+        let digest = content_digest(&planted);
         std::fs::write(kind_dir.join(format!("root__world.hotdeal.03__{digest}.json")), planted.to_string()).unwrap();
 
         let (records, violations) = tier.scan_namespaced_kind("porting.coverage").unwrap();
@@ -1436,11 +1492,11 @@ mod tests {
         std::fs::create_dir_all(&nested_dir).unwrap();
 
         let body_a = overlay_body("root", "world.hotdeal.04", true).0;
-        let digest_a = crate::partition::content_digest12(&body_a);
+        let digest_a = content_digest(&body_a);
         std::fs::write(nested_dir.join(format!("root__world.hotdeal.04__{digest_a}.json")), body_a.to_string()).unwrap();
 
         let body_b = overlay_body("root", "world.hotdeal.05", true).0;
-        let digest_b = crate::partition::content_digest12(&body_b);
+        let digest_b = content_digest(&body_b);
         std::fs::write(kind_dir.join(format!("root__world.hotdeal.05__{digest_b}.txt")), body_b.to_string()).unwrap();
 
         let (records, violations) = tier.scan_namespaced_kind("porting.coverage").unwrap();
@@ -1454,7 +1510,7 @@ mod tests {
         // must still round-trip, unaffected by the new layout checks.
         let dir = tempfile::tempdir().unwrap();
         let tier = GitTier::new(dir.path());
-        tier.write_namespaced("porting.coverage", "root__world.hotdeal.06", overlay_body("root", "world.hotdeal.06", true)).unwrap();
+        tier.write_namespaced("porting.coverage", &["root".to_string(), "world.hotdeal.06".to_string()], overlay_body("root", "world.hotdeal.06", true)).unwrap();
 
         let (records, violations) = tier.scan_namespaced_kind("porting.coverage").unwrap();
         assert!(violations.is_empty(), "{violations:?}");

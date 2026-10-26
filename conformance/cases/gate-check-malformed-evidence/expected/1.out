@@ -1,7 +1,10 @@
-canon gate check: 2 violation(s)
+canon gate check: 5 violation(s)
 
-malformed-evidence (2):
-  malformed-evidence kind=evidence_record/cart.add.01__<digest12>.json — unknown variant `maybe`, expected one of `faithful`, `not_applicable`, `divergent` (malformed)
-  malformed-evidence kind=evidence_record/cart.add.02__<digest12>.json — EOF while parsing an object at line 8 column 4 (malformed)
+old-layout (5):
+  old-layout kind=evidence_record/cart.add.01__567170f5e757.json — named by the 0.29 rule (an `area=` level, a 12-hex digest or `kind=evidence_record/`); canon 0.30 does not read it. Hint: run `canon migrate` (a bare run only previews)
+  old-layout kind=evidence_record/cart.add.01__c17ba25cb2c0.json — named by the 0.29 rule (an `area=` level, a 12-hex digest or `kind=evidence_record/`); canon 0.30 does not read it. Hint: run `canon migrate` (a bare run only previews)
+  old-layout kind=evidence_record/cart.add.02__bc24e7fea2f9.json — named by the 0.29 rule (an `area=` level, a 12-hex digest or `kind=evidence_record/`); canon 0.30 does not read it. Hint: run `canon migrate` (a bare run only previews)
+  old-layout kind=scenario/area=cart/root__cart.add.01__efd668b7fbcf.json — named by the 0.29 rule (an `area=` level, a 12-hex digest or `kind=evidence_record/`); canon 0.30 does not read it. Hint: run `canon migrate` (a bare run only previews)
+  old-layout kind=scenario/area=cart/root__cart.add.02__a8550ce2b340.json — named by the 0.29 rule (an `area=` level, a 12-hex digest or `kind=evidence_record/`); canon 0.30 does not read it. Hint: run `canon migrate` (a bare run only previews)
 
 advisory: spec_coverage is off — 2 scenario(s) are not checked for evidence; see .canon/policy.yaml

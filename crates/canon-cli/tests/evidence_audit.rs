@@ -101,11 +101,11 @@ fn record(repo: &Path, args: &[&str]) {
 }
 
 fn staged(repo: &Path) -> usize {
-    std::fs::read_dir(repo.join(".canon/ledger/_staging/kind=evidence_record")).map_or(0, std::iter::Iterator::count)
+    std::fs::read_dir(repo.join(".canon/ledger/_staging/kind=evidence")).map_or(0, std::iter::Iterator::count)
 }
 
 fn committed(repo: &Path) -> Vec<serde_json::Value> {
-    let dir = repo.join(".canon/ledger/kind=evidence_record");
+    let dir = repo.join(".canon/ledger/kind=evidence");
     let mut records: Vec<serde_json::Value> =
         std::fs::read_dir(dir).unwrap().filter_map(Result::ok).map(|e| serde_json::from_str(&std::fs::read_to_string(e.path()).unwrap()).unwrap()).collect();
     records.sort_by(|a, b| a["at"].as_str().cmp(&b["at"].as_str()));

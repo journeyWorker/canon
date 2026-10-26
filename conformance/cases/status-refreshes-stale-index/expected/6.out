@@ -1,2 +1,2 @@
-canon evidence add: wrote kind=evidence_record/cart.add.01__<digest12>.json for cart.add.01 (verdict faithful) — staged and promoted in this run; nothing to promote, then `canon gate check`
+canon evidence add: wrote kind=evidence/root_scenario_cart.add.01_<digest8>.json for cart.add.01 (verdict faithful) — staged and promoted in this run; nothing to promote, then `canon gate check`
 next: canon subject move cart --to specced --actor-id <unit> --session-id <session> — cart has its scenarios and every required case; move it on

@@ -64,7 +64,7 @@ use canon_store::fold::live_bindings_of;
 /// own contract) — pass `Utc::now()` for "right now".
 pub fn current_states(ledger_root: &Path, as_of: DateTime<Utc>) -> BTreeMap<(ProjectId, ScenarioId), FoldedState> {
     let divergences: Vec<Divergence> = read_kind_fail_soft(ledger_root, RecordKind::Divergence);
-    let evidence: Vec<EvidenceRecord> = read_kind_fail_soft(ledger_root, RecordKind::EvidenceRecord);
+    let evidence: Vec<EvidenceRecord> = read_kind_fail_soft(ledger_root, RecordKind::Evidence);
     let live_bindings = live_bindings_of(&evidence);
     fold_to_current_state(&divergences, &live_bindings, as_of)
 }
@@ -128,7 +128,7 @@ mod tests {
     }
 
     fn write_evidence(tier: &GitTier, project_id: &str, scenario_id: &str, sha: &str, at: DateTime<Utc>) {
-        let record = EvidenceRecord::new(Envelope::new(1, RecordKind::EvidenceRecord, at, actor("implementer")), None, Some(ScenarioId::parse(scenario_id).unwrap()), None, EvidenceVerdict::Faithful)
+        let record = EvidenceRecord::new(Envelope::new(1, RecordKind::Evidence, at, actor("implementer")), None, Some(ScenarioId::parse(scenario_id).unwrap()), None, EvidenceVerdict::Faithful)
             .with_project_id(ProjectId::parse(project_id).unwrap())
             .with_evidence_sha(Sha::parse(sha).unwrap());
         tier.write(&record).expect("write fixture evidence");

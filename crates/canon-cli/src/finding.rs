@@ -272,7 +272,7 @@ use canon_ingest::task_rows::first_row_line_break;
 use canon_model::{Actor, ChangeId, Envelope, Finding, FindingDisposition, FindingSeverity, RawRecord, RecordKind, RoleId, ScenarioId, SessionId, Sha};
 use canon_store::fold::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
-use canon_store::partition::{content_digest12, resolve_partition};
+use canon_store::partition::{content_digest, resolve_partition};
 use canon_store::tier::{RawWrite, Tier, TierQuery};
 use chrono::Utc;
 use schemars::JsonSchema;
@@ -1006,7 +1006,7 @@ fn current_findings(tier: &GitTier, change_id: &ChangeId) -> Result<Vec<Finding>
         .into_iter()
         .filter_map(|raw| {
             let finding = Finding::from_body(&raw.0).ok()?;
-            (&finding.change_id == change_id).then(|| (finding, content_digest12(&raw.0)))
+            (&finding.change_id == change_id).then(|| (finding, content_digest(&raw.0)))
         })
         .collect();
     let mut current: Vec<Finding> =
@@ -1180,7 +1180,7 @@ fn find_finding(args: &FindingCloseArgs, tier: &GitTier) -> Result<Option<Findin
         .filter_map(|raw| {
             let finding = Finding::from_body(&raw.0).ok()?;
             (finding.change_id == args.change_id && finding.round == args.round && finding.seq == args.seq)
-                .then(|| (finding, content_digest12(&raw.0)))
+                .then(|| (finding, content_digest(&raw.0)))
         })
         .collect();
     Ok(fold_latest_by_key(versions, |_| (), |(f, _)| f.envelope.at, |(f, _)| f.envelope.schema, |(_, digest)| digest.as_str())

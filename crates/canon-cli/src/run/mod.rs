@@ -76,7 +76,7 @@ pub fn run(cli: Cli) -> ExitCode {
         Command::Query(args) => run_query(args),
         Command::Export(args) => ExitCode::from(crate::retention::run_export(args)),
         Command::Purge(PurgeArgs { kind, before, safety, repo, json, .. }) => {
-            let base = crate::safety::command("purge", &[("--kind", crate::query::kind_cli_name(kind).to_string()), ("--before", before.to_rfc3339())], &repo);
+            let base = crate::safety::command("purge", &[("--kind", kind.as_str().to_string()), ("--before", before.to_rfc3339())], &repo);
             ExitCode::from(crate::retention::run_purge(&repo, kind, before, &safety.mode(), &base, json))
         }
         Command::Format(FormatArgs { dir, repo, json }) => run_fmt(dir.as_deref(), &repo, json),

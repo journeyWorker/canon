@@ -701,7 +701,7 @@ fn two_overlay_projects_over_one_authored_scenario_yield_one_row() {
     // that authored no `Scenario`.
     git.write_namespaced(
         "porting.coverage",
-        &format!("otherproj__{scenario}"),
+        &["otherproj".to_string(), scenario.to_string()],
         canon_model::RawRecord(serde_json::json!({
             "schema": 1, "kind": "porting.coverage",
             "at": "2026-01-06T00:00:00Z",

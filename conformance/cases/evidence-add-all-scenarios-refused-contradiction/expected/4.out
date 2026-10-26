@@ -1,6 +1,6 @@
 canon evidence add: artifact store holds 1 bound file(s) under .canon/artifacts/sha256/ (1 newly stored) — commit them with the ledger
-canon evidence add: staged kind=evidence_record/cart.add.01__<digest12>.json for cart.add.01 (verdict faithful) — run `canon gate promote` to commit it, then `canon gate check`
-canon evidence add: staged kind=evidence_record/cart.add.02__<digest12>.json for cart.add.02 (verdict divergent) — run `canon gate promote` to commit it, then `canon gate check`
+canon evidence add: staged kind=evidence/root_scenario_cart.add.01_<digest8>.json for cart.add.01 (verdict faithful) — run `canon gate promote` to commit it, then `canon gate check`
+canon evidence add: staged kind=evidence/root_scenario_cart.add.02_<digest8>.json for cart.add.02 (verdict divergent) — run `canon gate promote` to commit it, then `canon gate check`
 canon evidence add: skipped cart.add.09 — not an indexed scenario of spec root `root` (case `cart.add.09 is not indexed`); index it (`canon inventory sync`) or fix the test name
 canon evidence add: skipped 1 case(s) that carry no scenario id
 next: canon gate promote — the record is staged, not in the ledger yet; promote it so status and the gate count it

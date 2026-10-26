@@ -25,7 +25,7 @@ routing:
   scenario: local
   review: local
   divergence: local
-  evidence_record: local
+  evidence: local
   finding: local
   strategy_item: local
   task: hot

@@ -54,7 +54,7 @@ fn ledger_root(repo: &Path) -> PathBuf {
 fn write_evidence(repo: &Path, agent: &str, role: &str) -> Result<(), String> {
     let scenario = ScenarioId::parse(DEMO_SCENARIO).map_err(|e| e.to_string())?;
     let role_id = RoleId::parse(role).map_err(|e| e.to_string())?;
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, chrono::Utc::now(), Actor::new(agent, role_id));
+    let envelope = Envelope::new(1, RecordKind::Evidence, chrono::Utc::now(), Actor::new(agent, role_id));
     let record = EvidenceRecord::new(envelope, None, Some(scenario), None, EvidenceVerdict::Faithful);
     GitTier::new(ledger_root(repo)).write(&record).map_err(|e| e.to_string())?;
     Ok(())

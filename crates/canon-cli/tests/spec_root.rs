@@ -50,7 +50,7 @@ fn repo(roots: &[&str]) -> TempDir {
         std::fs::create_dir_all(feature.parent().unwrap()).unwrap();
         std::fs::write(feature, FEATURE).unwrap();
     }
-    yaml.push_str("routing:\n  scenario: local\n  evidence_record: local\n  review: local\n  divergence: local\n");
+    yaml.push_str("routing:\n  scenario: local\n  evidence: local\n  review: local\n  divergence: local\n");
     std::fs::write(repo.join("canon.yaml"), yaml).unwrap();
     std::fs::create_dir_all(repo.join("reports")).unwrap();
     std::fs::write(repo.join("reports/junit.xml"), JUNIT).unwrap();

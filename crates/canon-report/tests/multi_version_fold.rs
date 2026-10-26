@@ -94,7 +94,7 @@ use canon_report::query;
 use canon_report::roots::Roots;
 use canon_store::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
-use canon_store::partition::{content_digest12, resolve_partition};
+use canon_store::partition::{content_digest, resolve_partition};
 use canon_store::r2_tier::R2Tier;
 use canon_store::tier::{raw_record_at, raw_record_schema, Tier, TierQuery};
 use chrono::{DateTime, TimeDelta, TimeZone, Utc};
@@ -299,7 +299,7 @@ fn subjects_counts_scenarios_once_across_a_status_lifecycle() {
     }
 
     tier.write(&EvidenceRecord::new(
-        Envelope::new(1, RecordKind::EvidenceRecord, at(2026, 5, 2, 14), actor("dev")),
+        Envelope::new(1, RecordKind::Evidence, at(2026, 5, 2, 14), actor("dev")),
         None,
         Some(covered.clone()),
         None,
@@ -402,7 +402,7 @@ fn trust_matrix_and_scope_status_yield_one_row_per_task_after_a_checkbox_flip() 
     }
 
     tier.write(&EvidenceRecord::new(
-        Envelope::new(1, RecordKind::EvidenceRecord, at(2026, 5, 3, 11), actor("dev")),
+        Envelope::new(1, RecordKind::Evidence, at(2026, 5, 3, 11), actor("dev")),
         Some(task_id.clone()),
         None,
         None,
@@ -534,7 +534,7 @@ fn scope_status_reports_each_projects_own_coverage_for_a_shared_scenario_id() {
     // rows — the driving side now carries the project.
     for (project_id, covered) in [("alpha", true), ("beta", false)] {
         write_scenario(&git_root, project_id, SHARED_SCENARIO);
-        let natural_key = format!("{project_id}__{SHARED_SCENARIO}");
+        let natural_key = [project_id.to_string(), SHARED_SCENARIO.to_string()];
         tier.write_namespaced("porting.coverage", &natural_key, coverage_overlay(project_id, SHARED_SCENARIO, covered)).unwrap();
     }
 
@@ -633,7 +633,7 @@ fn trust_matrix_breaks_an_equal_at_task_tie_the_same_way_canon_query_does() {
             key: resolve_partition(RecordKind::Task, &record.0).unwrap().natural_key,
             at: raw_record_at(record),
             schema: raw_record_schema(record),
-            digest: content_digest12(&record.0),
+            digest: content_digest(&record.0),
             status: record.0["status"].as_str().expect("a stored Task always carries a string status").to_string(),
         })
         .collect();
@@ -723,7 +723,7 @@ fn scope_status_picks_the_schema_version_canon_query_picks_when_a_rung_overflows
     // Two versions of ONE overlay key (`write_namespaced` appends on a
     // changed body), tied on `at`, disagreeing about `covered` so the
     // winner is observable, and differing on the ONE rung under test.
-    let natural_key = format!("{PROJECT}__{SCENARIO}");
+    let natural_key = [PROJECT.to_string(), SCENARIO.to_string()];
     tier.write_namespaced("porting.coverage", &natural_key, coverage_overlay_at_schema(PROJECT, SCENARIO, true, 1)).unwrap();
     tier.write_namespaced("porting.coverage", &natural_key, coverage_overlay_at_schema(PROJECT, SCENARIO, false, OVERFLOWED_SCHEMA)).unwrap();
 
@@ -748,7 +748,7 @@ fn scope_status_picks_the_schema_version_canon_query_picks_when_a_rung_overflows
             key: format!("{}__{}", record.0["project_id"].as_str().unwrap(), record.0["scenario_id"].as_str().unwrap()),
             at: raw_record_at(record),
             schema: raw_record_schema(record),
-            digest: content_digest12(&record.0),
+            digest: content_digest(&record.0),
             raw_schema: record.0["schema"].as_u64().expect("both fixture bodies store `schema` as a JSON integer"),
             covered: record.0["covered"].as_bool().expect("a coverage overlay always carries a boolean `covered`"),
         })
@@ -837,7 +837,7 @@ impl AtRungCorpus {
 
         write_scenario(&git_root, AT_RUNG_PROJECT, scenario);
 
-        let natural_key = format!("{AT_RUNG_PROJECT}__{scenario}");
+        let natural_key = [AT_RUNG_PROJECT.to_string(), scenario.to_string()];
         for (stamp, schema, covered) in versions {
             tier.write_namespaced("porting.coverage", &natural_key, coverage_overlay_at_stamp(AT_RUNG_PROJECT, scenario, covered, schema, stamp))
                 .unwrap();
@@ -854,7 +854,7 @@ impl AtRungCorpus {
                 at: raw_record_at(record),
                 at_text: record.0["at"].as_str().expect("the fixture always stores `at` as a string").to_string(),
                 schema: raw_record_schema(record),
-                digest: content_digest12(&record.0),
+                digest: content_digest(&record.0),
                 covered: record.0["covered"].as_bool().expect("a coverage overlay always carries a boolean `covered`"),
             })
             .collect();
@@ -1026,7 +1026,7 @@ fn scope_status_ranks_a_lowercase_rfc3339_stamp_at_its_real_instant() {
 }
 
 /// A 12-hex digest that sorts strictly above every real
-/// `content_digest12` output, so a row planted with it wins the third
+/// `content_digest` output, so a row planted with it wins the third
 /// rung outright.
 const TAMPERED_DIGEST: &str = "ffffffffffff";
 
@@ -1081,7 +1081,7 @@ fn digest_residual_task(task_id: &TaskId, at: DateTime<Utc>, status: TaskStatus)
 /// roots, for the same structural reason and through two different
 /// enforcement points.
 ///
-/// `content_digest12` hashes a canonical serialization DuckDB cannot
+/// `content_digest` hashes a canonical serialization DuckDB cannot
 /// reproduce, so each staging view reads a STORED copy of that number
 /// instead: the git FILENAME's `__{digest12}` suffix, and the r2
 /// parquet `digest` COLUMN. Each copy is enforced against the content

@@ -515,7 +515,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: b
 fn open_store(repo: &Path, canon_yaml_path: &Path) -> Result<(TierRegistry, Option<PathBuf>), PlansError> {
     let canon_yaml_text = std::fs::read_to_string(canon_yaml_path).unwrap_or_default();
     let policy = if canon_yaml_text.trim().is_empty() {
-        TierPolicy { tiers: HashMap::new(), routing: HashMap::new(), aging: HashMap::new() }
+        TierPolicy { tiers: HashMap::new(), routing: HashMap::new(), aging: HashMap::new(), legacy_kind_keys: Vec::new() }
     } else {
         TierPolicy::from_yaml_at(&canon_yaml_text, repo)?
     };

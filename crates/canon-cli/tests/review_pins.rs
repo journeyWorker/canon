@@ -142,7 +142,7 @@ fn record_suite(repo: &Path, report: &str) {
 /// Every evidence record ever written: the ledger holds the latest per key
 /// and the archive the ones it superseded (0.23 D2).
 fn evidence_records(repo: &Path) -> usize {
-    [".canon/ledger/kind=evidence_record", ".canon/archive/kind=evidence_record"]
+    [".canon/ledger/kind=evidence", ".canon/archive/kind=evidence"]
         .iter()
         .map(|dir| std::fs::read_dir(repo.join(dir)).map_or(0, std::iter::Iterator::count))
         .sum()

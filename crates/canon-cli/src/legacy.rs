@@ -502,7 +502,10 @@ fn migrate_step(found: &Detected) -> NextStep {
 /// For `status`, `gate check` and `context`: when `repo` holds 0.27-era state, says so as a warning and
 /// puts `canon migrate --json` first in `meta.next` ([`crate::json_out::prepend_next`]).
 pub fn announce(repo: &Path) {
-    if let Some(found) = detect(repo) {
+    let legacy = detect(repo);
+    // A 0.29 ledger layout (0.30 `ledger-naming`): the same `canon migrate` step; one step when both hold.
+    crate::old_layout::announce(repo, legacy.is_none());
+    if let Some(found) = legacy {
         let stale = if found.skill { format!("; {STALE_GUIDE}") } else { "; run `canon migrate --json` to preview the upgrade".to_string() };
         crate::json_out::warn(format!("this repo holds 0.27-era canon state ({}){stale}", found.what()));
         crate::json_out::prepend_next(migrate_step(&found));

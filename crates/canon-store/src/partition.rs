@@ -1,46 +1,40 @@
-//! Git-tier Hive layout: partition-key extraction from a record's own
-//! JSON content, canonical content digests, and the write/read-shared
-//! layout check (git-tier-layout-enforcement spec; S2 design D2,
-//! generalizing `tools/parity.py::_ledger_layout_problem`/`_area_of`).
+//! The git-tier name of a record: its components from its own content,
+//! the canonical content digest, and the write/read-shared layout check
+//! (git-tier-layout-enforcement spec; S2 design D2; 0.30
+//! `ledger-naming`, `docs/design/ledger-layout.md`).
 //!
-//! `canon-model`'s [`canon_model::envelope::RecordKind::partition_template`]
-//! is the pure, storage-agnostic path-TEMPLATE string; everything here is
-//! the INTERPRETATION half design D2's Risk section reserves for
-//! `canon-store` alone — `canon-model` never sees this module.
+//! `canon-model`'s [`canon_model::layout`] is the component TABLE and the
+//! path builder; everything here is the INTERPRETATION half: which digest a
+//! body gets, which relative path or row key results, and whether a found
+//! file sits where its own content says it must.
 //!
-//! Every kind's `{id}` placeholder resolves to `<natural-key>__<digest12>`:
-//! a human-legible natural key (the kind's own join-key field(s), so a
-//! git-tier directory listing stays legible — mirrors the donor's
-//! `_write_ledger_records` "digest-suffixed filename construction") PLUS
-//! a 12-hex content-digest suffix so a byte-identical resubmission always
-//! resolves to the SAME path (append-only "duplicate write rejected" —
-//! git-tier-layout-enforcement spec) while a logically different record
-//! sharing the same natural key (e.g. a second `Review` of the same
-//! `scenario_id`, or a re-emitted `Change` at a new lifecycle state)
-//! always resolves to a DIFFERENT path (a genuine new append, never
-//! forced through `canon migrate`). This is a deliberate generalization
-//! beyond the donor's exact `{scenario_id}.json` review filename: canon's
-//! `GitTier` is unconditionally append-only (spec: "writing a record
-//! never overwrites an existing file"), which parity.py's in-place-edited
-//! review file does not fully honor.
+//! Every store names a record the same way:
+//! `kind=<kind>/<component>_<component>…_<digest8>.json` (git ledger,
+//! archive, `_staging`, plugin overlay), `(kind, <key>, <digest8>)` (sqlite
+//! and Postgres rows), `<prefix>kind=<kind>/<…>_<digest8>.parquet` (R2). The
+//! 8-hex digest makes a byte-identical resubmission resolve to the SAME
+//! name, while a logically different record with the same key resolves to a
+//! different one (a genuine append). A same key with different content is
+//! never silent in any store (R7).
 
 use canon_model::envelope::RecordKind;
 use canon_model::evidence::EvidenceViolation;
-use canon_model::ids::ScenarioId;
+use canon_model::layout::{self, Component, Name};
 use canon_model::{FailureClass, RawRecord};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-/// A record's resolved git-tier partition coordinates, extracted from
-/// its own content (never a source directory — the load-bearing
-/// invariant this whole module exists to enforce).
+/// A record's resolved name coordinates, extracted from its own content
+/// (never a source directory — the load-bearing invariant this whole
+/// module exists to enforce).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PartitionKey {
-    /// `Some(area)` for an area-scoped kind ([`RecordKind::is_area_scoped`]),
-    /// always `None` otherwise.
-    pub area: Option<String>,
-    /// The human-legible portion of the filename stem, before the
-    /// digest suffix — the kind's own natural join-key field(s).
+    /// The typed components in table order (`canon_model::layout`).
+    pub components: Vec<Component>,
+    /// The components as the user reads them, joined by `_` and never
+    /// escaped: the key folds group by, and the one query, cursors and error
+    /// messages print. The escaped form a store names the record by is
+    /// [`resolve_name`].
     pub natural_key: String,
 }
 
@@ -55,117 +49,22 @@ fn get_str<'a>(json: &'a Value, field: &str) -> Result<&'a str, EvidenceViolatio
         .ok_or_else(|| malformed(field, format!("missing or non-string `{field}` field")))
 }
 
-fn get_int(json: &Value, field: &str) -> Result<i64, EvidenceViolation> {
-    json.get(field).and_then(Value::as_i64).ok_or_else(|| malformed(field, format!("missing or non-integer `{field}` field")))
-}
-
-/// Filesystem-unsafe characters a join-key grammar otherwise permits
-/// (only [`canon_model::ids::RegimeKey`]'s `/`-separated grammar today)
-/// collapsed to `_` — never silently dropped, so the sanitized key is
-/// still visibly derived from the original.
-fn sanitize_component(s: &str) -> String {
-    s.chars().map(|c| if c == '/' { '_' } else { c }).collect()
-}
-
-/// `ScenarioId::area()`, re-validated from a raw JSON string field
-/// rather than trusted as already-parsed — `GitTier::read` calls this
-/// against arbitrary on-disk content, which may not have passed
-/// `ScenarioId::parse` yet.
-fn scenario_area(scenario_id: &str) -> Result<String, EvidenceViolation> {
-    ScenarioId::parse(scenario_id)
-        .map(|sid| sid.area().to_string())
-        .map_err(|e| EvidenceViolation::new(FailureClass::InvalidJoinKey, "scenario_id", e.to_string()))
-}
-
-/// Extract this record's git-tier [`PartitionKey`] from its own body —
-/// the ONLY input; never the directory it happened to be found in
-/// (parity-harness audit: six real feature-dir-vs-scenario-area mismatch
-/// cases). `kind` is the caller's already-confirmed kind (the
-/// containing `kind=<kind>/` directory for a read, or `T::KIND` for a
-/// write) — [`validate_kind_matches_content`] is the separate check that
-/// the JSON body's own `kind` field agrees with it.
+/// Extract this record's [`PartitionKey`] from its own body — the ONLY
+/// input; never the directory it happened to be found in. `kind` is the
+/// caller's already-confirmed kind (the containing `kind=<kind>/` directory
+/// for a read, or `T::KIND` for a write) —
+/// [`validate_kind_matches_content`] is the separate check that the JSON
+/// body's own `kind` field agrees with it.
 pub fn resolve_partition(kind: RecordKind, json: &Value) -> Result<PartitionKey, EvidenceViolation> {
-    match kind {
-        RecordKind::Change => Ok(PartitionKey { area: None, natural_key: get_str(json, "change_id")?.to_string() }),
-        RecordKind::Task => Ok(PartitionKey { area: None, natural_key: get_str(json, "task_id")?.to_string() }),
-        RecordKind::Scenario => {
-            let project_id = get_str(json, "project_id")?;
-            let scenario_id = get_str(json, "scenario_id")?;
-            Ok(PartitionKey { area: Some(scenario_area(scenario_id)?), natural_key: format!("{project_id}__{scenario_id}") })
-        }
-        RecordKind::Session => Ok(PartitionKey { area: None, natural_key: sanitize_component(get_str(json, "session_id")?) }),
-        RecordKind::Run => Ok(PartitionKey { area: None, natural_key: get_str(json, "run_id")?.to_string() }),
-        RecordKind::Event => {
-            let run_id = get_str(json, "run_id")?;
-            let seq = get_int(json, "seq")?;
-            Ok(PartitionKey { area: None, natural_key: format!("{run_id}-{seq:010}") })
-        }
-        RecordKind::Handoff => Ok(PartitionKey { area: None, natural_key: get_str(json, "id")?.to_string() }),
-        RecordKind::Review => {
-            let project_id = get_str(json, "project_id")?;
-            let pin = get_str(json, "pin")?;
-            // A change-level review (0.23) names its change instead of a
-            // scenario and files under the fixed `change` area: a scenario
-            // id always has dots, so neither key can be mistaken for the
-            // other.
-            if json.get("scenario_id").is_none() {
-                let change_id = get_str(json, "change_id")?;
-                return Ok(PartitionKey { area: Some("change".to_string()), natural_key: format!("{project_id}__change-{change_id}__{pin}") });
-            }
-            let scenario_id = get_str(json, "scenario_id")?;
-            Ok(PartitionKey { area: Some(scenario_area(scenario_id)?), natural_key: format!("{project_id}__{scenario_id}__{pin}") })
-        }
-        RecordKind::Divergence => {
-            let project_id = get_str(json, "project_id")?;
-            let scenario_id = get_str(json, "scenario_id")?;
-            let run_seq = get_int(json, "run_seq")?;
-            let round = get_int(json, "round")?;
-            Ok(PartitionKey {
-                area: Some(scenario_area(scenario_id)?),
-                natural_key: format!("{project_id}__{scenario_id}__{run_seq:010}__{round:06}"),
-            })
-        }
-        RecordKind::Trajectory => Ok(PartitionKey { area: None, natural_key: get_str(json, "run_id")?.to_string() }),
-        RecordKind::StrategyItem => {
-            Ok(PartitionKey { area: None, natural_key: sanitize_component(get_str(json, "regime_key")?) })
-        }
-        RecordKind::EvidenceRecord => {
-            // Whichever join key this attestation actually carries
-            // (all three are `Option` on `EvidenceRecord` — S1 design);
-            // `"unscoped"` only when none is present, so an
-            // `EvidenceRecord` about a bare run/task never fails to
-            // resolve a partition just for lacking a `scenario_id`.
-            let key = ["task_id", "scenario_id", "run_id"].into_iter().find_map(|f| json.get(f).and_then(Value::as_str));
-            Ok(PartitionKey { area: None, natural_key: key.unwrap_or("unscoped").to_string() })
-        }
-        // s36: `Subject` is a by-id, flat-partition kind (like
-        // `Change`) — no mandatory `scenario_id`, so no `area=` segment
-        // (`RecordKind::is_area_scoped` is false for it). Natural key is
-        // the `subject_id` slug.
-        RecordKind::Subject => Ok(PartitionKey { area: None, natural_key: get_str(json, "subject_id")?.to_string() }),
-        // s43: `Finding` is scoped to the CHANGE under review, not to a
-        // scenario, so it is flat (`RecordKind::is_area_scoped` false).
-        // Its natural key is the composite
-        // `{change_id}__{round:04}__{seq:04}` — deliberately NOT keyed
-        // on `reviewed_sha`, which is `Option` because most review
-        // rounds examine an UNCOMMITTED working tree and have no sha at
-        // all (canon-model's `Finding` doc). `ChangeId`'s kebab grammar
-        // forbids `_`, so `__` stays an unambiguous split point, and the
-        // zero-padded widths keep a `kind=finding/` directory listing in
-        // round-then-seq order within a change.
-        RecordKind::Finding => {
-            let change_id = get_str(json, "change_id")?;
-            let round = get_int(json, "round")?;
-            let seq = get_int(json, "seq")?;
-            Ok(PartitionKey { area: None, natural_key: format!("{change_id}__{round:04}__{seq:04}") })
-        }
-    }
+    let components = layout::components(kind, json)?;
+    let natural_key = layout::display_key(&components);
+    Ok(PartitionKey { components, natural_key })
 }
 
 /// The JSON body's own `kind` field must agree with the caller's
 /// already-known kind (a containing `kind=<kind>/` directory on read, or
 /// `T::KIND` on write) — a directory/content kind mismatch is itself a
-/// layout violation, distinct from (and checked before) path-shape/area
+/// layout violation, distinct from (and checked before) path-shape
 /// agreement.
 pub fn validate_kind_matches_content(expected: RecordKind, json: &Value) -> Result<(), EvidenceViolation> {
     let found = get_str(json, "kind")?;
@@ -175,49 +74,70 @@ pub fn validate_kind_matches_content(expected: RecordKind, json: &Value) -> Resu
     Ok(())
 }
 
-/// First 12 lowercase-hex characters of SHA-256 over the canonical
+/// First 8 lowercase-hex characters of SHA-256 over the canonical
 /// (alphabetical-key, since `serde_json::Value::Object` is a `BTreeMap`
 /// by default — no `preserve_order` feature anywhere in this workspace)
-/// JSON serialization of `json` — the same digest-based-idempotence
-/// mechanism design D3 specifies for `canon tier age`, reused here at
-/// git-tier filename-uniqueness granularity (module doc).
-pub fn content_digest12(json: &Value) -> String {
+/// JSON serialization of `json`: the digest every name ends in (R7), and
+/// the identity digest-based idempotence (`canon tier age`) compares.
+pub fn content_digest(json: &Value) -> String {
     let bytes = serde_json::to_vec(json).expect("serde_json::Value always serializes");
     let hash = Sha256::digest(&bytes);
-    let mut hex = String::with_capacity(12);
-    for byte in hash.iter().take(6) {
+    let mut hex = String::with_capacity(layout::DIGEST_LEN);
+    for byte in hash.iter().take(layout::DIGEST_LEN / 2) {
         hex.push_str(&format!("{byte:02x}"));
     }
     hex
 }
 
-/// The full Hive-partitioned relative object key a record's OWN
-/// content resolves to — `kind={kind}/[area={area}/]{natural_key}__{digest12}.{extension}`
-/// — the shared coordinate scheme `GitTier` (extension `"json"`, a
-/// filesystem path) and `R2Tier` (extension `"parquet"`, an object
-/// store key) both compute identically at write time (where each tier
-/// writes exactly here) and read time (where a found file/object's
-/// actual key is compared against this). Divergence between the two is
-/// precisely a layout violation (git-tier-layout-enforcement spec).
-pub fn hive_object_key(kind: RecordKind, json: &Value, extension: &str) -> Result<std::path::PathBuf, EvidenceViolation> {
+/// The total order every place that orders records uses (R5): the body's
+/// `at`, then its typed name components in table order, then the body
+/// digest. Never the file name or the order a store happened to scan in.
+pub fn record_order(kind: RecordKind, raw: &RawRecord) -> (chrono::DateTime<chrono::Utc>, Vec<Component>, String) {
+    (crate::tier::raw_record_at(raw), layout::components(kind, &raw.0).unwrap_or_default(), content_digest(&raw.0))
+}
+
+/// The escaped key and digest every store names this record by.
+pub fn resolve_name(kind: RecordKind, json: &Value) -> Result<Name, EvidenceViolation> {
     validate_kind_matches_content(kind, json)?;
-    let key = resolve_partition(kind, json)?;
-    let digest = content_digest12(json);
-    let filename = format!("{}__{digest}.{extension}", key.natural_key);
-    let mut path = std::path::PathBuf::from(format!("kind={}", kind.as_str()));
-    if let Some(area) = &key.area {
-        path.push(format!("area={area}"));
-    }
-    path.push(filename);
-    Ok(path)
+    let components = layout::components(kind, json)?;
+    Ok(layout::name(&components, &content_digest(json)))
+}
+
+/// The full relative object key a record's OWN content resolves to —
+/// `kind={kind}/{key}_{digest8}.{extension}` — the shared coordinate scheme
+/// `GitTier` (extension `"json"`, a filesystem path) and `R2Tier`
+/// (extension `"parquet"`, an object store key) both compute identically at
+/// write time (where each tier writes exactly here) and read time (where a
+/// found file/object's actual key is compared against this). Divergence
+/// between the two is precisely a layout violation.
+pub fn hive_object_key(kind: RecordKind, json: &Value, extension: &str) -> Result<std::path::PathBuf, EvidenceViolation> {
+    Ok(resolve_name(kind, json)?.relative_path(kind.as_str(), extension))
 }
 
 /// `GitTier`'s `.json`-specific alias of [`hive_object_key`] — kept as
 /// a separate name at git-tier call sites since "the path a git-tier
 /// record resolves to" is the concept those call sites reason about,
-/// not "some Hive object key at some extension".
+/// not "some object key at some extension".
 pub fn expected_relative_path(kind: RecordKind, json: &Value) -> Result<std::path::PathBuf, EvidenceViolation> {
     hive_object_key(kind, json, "json")
+}
+
+/// The 0.29 directory of evidence records (0.30 names the kind `evidence`).
+pub const LEGACY_KIND_DIR: &str = "kind=evidence_record";
+
+/// Whether `relative` (a path under a tier root) is shaped like a 0.29
+/// name: an `area=` level, a `__<digest12>` stem, or the `evidence_record`
+/// directory. Such a file is what `canon migrate` moves; a reader reports it
+/// as [`FailureClass::OldLayout`] and never uses it for a verdict.
+pub fn is_old_layout_path(relative: &std::path::Path) -> bool {
+    let mut components = relative.components().filter_map(|c| c.as_os_str().to_str());
+    components.any(|c| c == LEGACY_KIND_DIR || c.starts_with("area="))
+        || relative.file_name().and_then(|n| n.to_str()).and_then(|n| n.strip_suffix(".json")).is_some_and(is_old_stem)
+}
+
+/// `<key>__<12 lowercase hex>`: the 0.29 stem.
+pub fn is_old_stem(stem: &str) -> bool {
+    stem.rsplit_once("__").is_some_and(|(_, digest)| digest.len() == 12 && digest.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)))
 }
 
 /// Validate that `actual_path` (relative to the git tier's `root`) is
@@ -225,22 +145,30 @@ pub fn expected_relative_path(kind: RecordKind, json: &Value) -> Result<std::pat
 /// git-tier-layout-enforcement spec's core check, shared by
 /// `GitTier::write` (self-consistency: the path it is about to write to)
 /// and `GitTier::read` (a found file's actual path). A mismatch names
-/// both the expected template-resolved path and the rejected path, as
-/// the spec's own scenario wording requires.
+/// both the expected path and the rejected path; a 0.29-shaped file is
+/// the dedicated [`FailureClass::OldLayout`] with the `canon migrate` hint.
 pub fn validate_layout(kind: RecordKind, actual_path: &std::path::Path, json: &Value) -> Result<(), EvidenceViolation> {
     let expected = expected_relative_path(kind, json)?;
     if expected != actual_path {
+        if is_old_layout_path(actual_path) {
+            return Err(old_layout(actual_path));
+        }
         return Err(malformed(
             "layout",
-            format!(
-                "expected `{}` (template `{}`), found `{}`",
-                expected.display(),
-                kind.partition_template(),
-                actual_path.display()
-            ),
+            format!("expected `{}` (template `{}`), found `{}`", expected.display(), kind.partition_template(), actual_path.display()),
         ));
     }
     Ok(())
+}
+
+/// The violation of a file named by the 0.29 rule (F2): its hint is
+/// `canon migrate`, and the file is not used for any judgement.
+pub fn old_layout(actual_path: &std::path::Path) -> EvidenceViolation {
+    EvidenceViolation::new(
+        FailureClass::OldLayout,
+        actual_path.display().to_string(),
+        "named by the 0.29 rule (an `area=` level, a 12-hex digest or `kind=evidence_record/`); canon 0.30 does not read it. Hint: run `canon migrate` (a bare run only previews)",
+    )
 }
 
 /// `canon_model::validate_evidence`/`validate_evidence_batch` are the
@@ -277,7 +205,7 @@ pub fn validate_body(kind: RecordKind, raw: &RawRecord) -> Result<(), EvidenceVi
         // (S2 assignment's S1-interface note: "the ledger-read loop
         // calls it directly") rather than re-deriving the same
         // scenario_id-grammar + verdict-enum checks a second time.
-        RecordKind::EvidenceRecord => canon_model::validate_evidence(raw).map(|_| ()),
+        RecordKind::Evidence => canon_model::validate_evidence(raw).map(|_| ()),
         RecordKind::Subject => try_deserialize!(Subject),
         // s43: the `disposition` ⇔ `resolution_sha` biconditional is
         // enforced by `Finding`'s OWN `Deserialize` (canon-model keeps
@@ -342,177 +270,91 @@ pub(crate) fn validate_namespaced_kind(namespaced_kind: &str) -> Result<(), Evid
     Ok(())
 }
 
-/// [`crate::git_tier::GitTier::write_namespaced`]'s `natural_key`
-/// path-safety guard (s16 tasks.md 2.3). REJECTS, before any filesystem
-/// path is built, a `natural_key` containing `/`, `\`, `..`, a leading
-/// `.`, or that is itself an absolute path -- exactly the traversal
-/// surface an otherwise-unconstrained caller-supplied path component
-/// would open (`plugin-overlay-records` spec).
-pub(crate) fn validate_natural_key(natural_key: &str) -> Result<(), EvidenceViolation> {
-    let unsafe_key = natural_key.contains('/')
-        || natural_key.contains('\\')
-        || natural_key.contains("..")
-        || natural_key.starts_with('.')
-        || std::path::Path::new(natural_key).is_absolute();
-    if unsafe_key {
-        return Err(malformed(
-            "natural_key",
-            format!("`{natural_key}` fails the path-safety grammar (no `/`, `\\`, `..`, leading `.`, or absolute path)"),
-        ));
+/// The components of an overlay record's name: its declared join-key values,
+/// in declaration order, each a free-text component (an overlay's values
+/// have no grammar canon knows). REJECTS an empty value or list.
+pub fn overlay_components(key: &[String]) -> Result<Vec<Component>, EvidenceViolation> {
+    if key.is_empty() || key.iter().any(String::is_empty) {
+        return Err(malformed("natural_key", "an overlay key needs at least one join-key value, none of them empty"));
     }
-    Ok(())
+    Ok(key.iter().cloned().map(Component::Text).collect())
 }
 
-/// [`crate::git_tier::GitTier::write_namespaced`]'s natural-key/body
-/// consistency guard (s16 tasks.md 2.3, design.md D4: "a filename and
-/// its body's join-key fields can never disagree"). `write_namespaced`
-/// has no schema for an arbitrary namespaced kind (unlike
-/// [`resolve_partition`]'s per-`RecordKind` field extraction), so this
-/// check is deliberately schema-agnostic: every `__`-delimited segment
-/// of `natural_key` MUST equal the string value of SOME top-level field
-/// already present in `body` -- a `natural_key` can never be
-/// manufactured from content absent from the record it accompanies. The
-/// caller (canon-plugin's plugin-aware writer) derives `natural_key`
-/// from `OverlayDecl.join_key`'s SPECIFIC named fields, in order -- a
-/// stronger, decl-aware guarantee this generic check does not (and,
-/// lacking the join-key field names, structurally cannot) verify
-/// itself, but every value that writer produces always satisfies this
-/// weaker one too.
-pub(crate) fn natural_key_matches_body(natural_key: &str, body: &Value) -> Result<(), EvidenceViolation> {
+/// [`crate::git_tier::GitTier::write_namespaced`]'s key/body consistency
+/// guard (design.md D4: "a filename and its body's join-key fields can never
+/// disagree"). `write_namespaced` has no schema for an arbitrary namespaced
+/// kind, so this check is deliberately schema-agnostic: every key value MUST
+/// equal the string value of SOME top-level field already present in `body`
+/// -- a key can never be manufactured from content absent from the record it
+/// accompanies. The caller (canon-plugin's plugin-aware writer) derives the
+/// key from `OverlayDecl.join_key`'s SPECIFIC named fields, in order -- a
+/// stronger, decl-aware guarantee this generic check does not verify itself.
+pub fn overlay_key_matches_body(key: &[String], body: &Value) -> Result<(), EvidenceViolation> {
     let Some(obj) = body.as_object() else {
         return Err(EvidenceViolation::new(FailureClass::InvalidJoinKey, "natural_key", "overlay body is not a JSON object"));
     };
-    let disagrees = natural_key.split("__").any(|segment| !obj.values().any(|v| v.as_str() == Some(segment)));
-    if disagrees {
+    if key.iter().any(|value| !obj.values().any(|v| v.as_str() == Some(value.as_str()))) {
         return Err(EvidenceViolation::new(
             FailureClass::InvalidJoinKey,
             "natural_key",
-            format!("`{natural_key}` does not match the join-key field values present in the overlay body"),
+            format!("`{}` does not match the join-key field values present in the overlay body", key.join("_")),
         ));
     }
     Ok(())
 }
 
+/// Whether an overlay file's `<key>` (the escaped components of its name)
+/// traces back to `body`: each `_`-separated component, unescaped, equals a
+/// top-level string field of the body, or is the `h<16 hex>` of one.
+pub(crate) fn overlay_name_matches_body(escaped_key: &str, body: &Value) -> bool {
+    let Some(obj) = body.as_object() else { return false };
+    let strings = || obj.values().filter_map(Value::as_str);
+    escaped_key.split('_').all(|part| {
+        if let Some(value) = layout::unescape(part) {
+            if strings().any(|s| s == value) {
+                return true;
+            }
+        }
+        part.len() == 17 && part.starts_with('h') && strings().any(|s| layout::shortened(s) == part)
+    })
+}
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
 
-    #[test]
-    fn area_scoped_kind_resolves_area_from_scenario_id_not_a_directory() {
-        let json = json!({"kind": "scenario", "project_id": "root", "scenario_id": "world.firstbuy-hotdeal.26"});
-        let key = resolve_partition(RecordKind::Scenario, &json).unwrap();
-        assert_eq!(key.area.as_deref(), Some("world"));
-        assert_eq!(key.natural_key, "root__world.firstbuy-hotdeal.26");
+    fn stem(kind: RecordKind, body: &Value) -> String {
+        resolve_name(kind, body).unwrap().stem()
     }
 
     #[test]
-    fn flat_kind_has_no_area() {
-        let json = json!({"kind": "change", "change_id": "s2-tiered-storage"});
-        let key = resolve_partition(RecordKind::Change, &json).unwrap();
-        assert_eq!(key.area, None);
-    }
-
-    #[test]
-    fn six_mismatch_style_case_area_disagrees_with_a_plausible_directory_guess() {
-        // parity-harness audit's own example: a `promise-date`-prefixed
-        // scenario_id living under a `spec/features/world/` feature
-        // directory. `resolve_partition` must side with the id, never
-        // a caller-supplied directory guess.
-        let json = json!({"kind": "review", "project_id": "root", "scenario_id": "promise-date.play.03", "pin": "abc123", "reviewer": "r"});
-        let key = resolve_partition(RecordKind::Review, &json).unwrap();
-        assert_eq!(key.area.as_deref(), Some("promise-date"), "area must come from scenario_id, never a directory named `world`");
-        assert_eq!(key.natural_key, "root__promise-date.play.03__abc123");
-    }
-
-    #[test]
-    fn scenario_review_divergence_natural_keys_are_project_prefixed() {
-        // s15 design D2/D6, scenario-project-identity spec: every
-        // spine kind's natural_key gains a `<project_id>__` prefix —
-        // `ProjectId`'s grammar forbids `_`, so `__` stays an
-        // unambiguous split point alongside each kind's own suffix.
+    fn scenario_review_divergence_keys_start_with_the_project_and_have_no_area() {
         let scenario = json!({"kind": "scenario", "project_id": "app-a", "scenario_id": "world.firstbuy-hotdeal.26"});
-        assert_eq!(resolve_partition(RecordKind::Scenario, &scenario).unwrap().natural_key, "app-a__world.firstbuy-hotdeal.26");
-
+        assert_eq!(resolve_partition(RecordKind::Scenario, &scenario).unwrap().natural_key, "app-a_world.firstbuy-hotdeal.26");
         let review = json!({"kind": "review", "project_id": "app-a", "scenario_id": "world.firstbuy-hotdeal.26", "pin": "abc123", "reviewer": "r"});
-        assert_eq!(resolve_partition(RecordKind::Review, &review).unwrap().natural_key, "app-a__world.firstbuy-hotdeal.26__abc123");
-
+        assert_eq!(resolve_partition(RecordKind::Review, &review).unwrap().natural_key, "app-a_scenario_world.firstbuy-hotdeal.26");
         let divergence = json!({"kind": "divergence", "project_id": "app-a", "scenario_id": "world.firstbuy-hotdeal.26", "run_seq": 3, "round": 1});
-        assert_eq!(
-            resolve_partition(RecordKind::Divergence, &divergence).unwrap().natural_key,
-            "app-a__world.firstbuy-hotdeal.26__0000000003__000001"
-        );
+        assert_eq!(resolve_partition(RecordKind::Divergence, &divergence).unwrap().natural_key, "app-a_world.firstbuy-hotdeal.26_3_1");
+        let path = expected_relative_path(RecordKind::Review, &review).unwrap();
+        assert_eq!(path.components().count(), 2, "one directory level, no area=: {}", path.display());
+        assert!(path.to_str().unwrap().starts_with("kind=review/app-a_scenario_world.firstbuy-hotdeal.26_"));
     }
 
-    /// s43: a `Finding` has no single identifying field, so its natural
-    /// key is the composite `{change_id}__{round:04}__{seq:04}`. The
-    /// zero-padding is load-bearing for a directory listing: without
-    /// it, round 10 would sort before round 2.
     #[test]
-    fn finding_natural_key_is_change_id_then_zero_padded_round_and_seq() {
+    fn finding_name_is_change_round_seq_unpadded() {
         let json = json!({"kind": "finding", "change_id": "s42-close-the-open-loops", "round": 11, "seq": 4});
-        let key = resolve_partition(RecordKind::Finding, &json).unwrap();
-        assert_eq!(key.area, None, "a finding is scoped to a change, never to a scenario area");
-        assert_eq!(key.natural_key, "s42-close-the-open-loops__0011__0004");
+        assert_eq!(resolve_partition(RecordKind::Finding, &json).unwrap().natural_key, "s42-close-the-open-loops_11_4");
     }
 
-    /// The reason the key is `change_id`-based and not `reviewed_sha`-
-    /// based: a review round usually reads an UNCOMMITTED working tree
-    /// and has no sha at all, so a sha-keyed finding could not be
-    /// stored for the common case.
     #[test]
     fn finding_with_no_reviewed_sha_still_resolves_a_key() {
         let worktree_round = json!({"kind": "finding", "change_id": "s42-close-the-open-loops", "round": 8, "seq": 10});
-        let committed_round = json!({
-            "kind": "finding",
-            "change_id": "s42-close-the-open-loops",
-            "reviewed_sha": "8c81f9e13e9bda0a6a5ee29ba1b6b5137e7bf552",
-            "round": 8,
-            "seq": 10
-        });
-        assert_eq!(
-            resolve_partition(RecordKind::Finding, &worktree_round).unwrap().natural_key,
-            "s42-close-the-open-loops__0008__0010",
-            "a round that reviewed a worktree must still resolve a partition"
-        );
+        let committed_round = json!({"kind": "finding", "change_id": "s42-close-the-open-loops", "reviewed_sha": "8c81f9e13e9bda0a6a5ee29ba1b6b5137e7bf552", "round": 8, "seq": 10});
         assert_eq!(
             resolve_partition(RecordKind::Finding, &committed_round).unwrap().natural_key,
             resolve_partition(RecordKind::Finding, &worktree_round).unwrap().natural_key,
             "`reviewed_sha` is provenance, never part of the identity"
         );
-    }
-
-    #[test]
-    fn finding_keys_sort_by_round_then_seq_within_one_change() {
-        let key = |round: u32, seq: u32| {
-            resolve_partition(
-                RecordKind::Finding,
-                &json!({"kind": "finding", "change_id": "s42-close-the-open-loops", "round": round, "seq": seq}),
-            )
-            .unwrap()
-            .natural_key
-        };
-        let mut keys = vec![key(10, 1), key(2, 12), key(2, 3), key(1, 1)];
-        keys.sort();
-        assert_eq!(keys, vec![key(1, 1), key(2, 3), key(2, 12), key(10, 1)]);
-    }
-
-    #[test]
-    fn two_findings_in_one_round_resolve_to_distinct_keys() {
-        let change = "s42-close-the-open-loops";
-        let first = resolve_partition(RecordKind::Finding, &json!({"kind": "finding", "change_id": change, "round": 3, "seq": 1})).unwrap();
-        let second = resolve_partition(RecordKind::Finding, &json!({"kind": "finding", "change_id": change, "round": 3, "seq": 2})).unwrap();
-        assert_ne!(first.natural_key, second.natural_key, "`seq` is what distinguishes findings within one round");
-    }
-
-    #[test]
-    fn findings_of_two_changes_never_collapse_to_one_key() {
-        let key = |change: &str| {
-            resolve_partition(RecordKind::Finding, &json!({"kind": "finding", "change_id": change, "round": 1, "seq": 1}))
-                .unwrap()
-                .natural_key
-        };
-        assert_ne!(key("s42-close-the-open-loops"), key("s43-findings-are-records"));
     }
 
     #[test]
@@ -524,29 +366,17 @@ mod tests {
             json!({"kind": "finding", "change_id": change, "round": 1}),
         ] {
             let err = resolve_partition(RecordKind::Finding, &json).unwrap_err();
-            assert_eq!(err.class, FailureClass::Malformed, "an incomplete finding key must be malformed, never partially resolved");
+            assert_eq!(err.class, FailureClass::Malformed);
         }
     }
 
-    /// s43: the `disposition` ⇔ `resolution_sha` biconditional is
-    /// re-checked on the READ path (canon-model's constructors already
-    /// make it unconstructible in Rust, but an on-disk record was
-    /// hand-authorable). Both incoherent directions land as malformed.
     #[test]
     fn finding_body_rejects_an_incoherent_disposition_resolution_pair() {
         let body = |disposition: &str, resolution: Option<&str>| {
             let mut json = json!({
-                "schema": 1,
-                "kind": "finding",
-                "at": "2026-07-30T09:15:00Z",
-                "actor": {"agent_id": "codex-cli"},
-                "change_id": "s42-close-the-open-loops",
-                "round": 1,
-                "seq": 1,
-                "severity": "blocker",
-                "disposition": disposition,
-                "reviewer": "review-voice",
-                "summary": "s"
+                "schema": 1, "kind": "finding", "at": "2026-07-30T09:15:00Z", "actor": {"agent_id": "codex-cli"},
+                "change_id": "s42-close-the-open-loops", "round": 1, "seq": 1, "severity": "blocker",
+                "disposition": disposition, "reviewer": "review-voice", "summary": "s"
             });
             if let Some(sha) = resolution {
                 json["resolution_sha"] = Value::String(sha.to_string());
@@ -554,79 +384,74 @@ mod tests {
             RawRecord(json)
         };
         let closing = "b41d7e0925ca38f6ee1cb70d4a982f65173d0ce8";
-
-        validate_body(RecordKind::Finding, &body("fixed", Some(closing))).expect("a fixed finding naming its closing commit is coherent");
-        validate_body(RecordKind::Finding, &body("open", None)).expect("an open finding with no resolution is coherent");
-
+        validate_body(RecordKind::Finding, &body("fixed", Some(closing))).unwrap();
+        validate_body(RecordKind::Finding, &body("open", None)).unwrap();
         for incoherent in [body("fixed", None), body("open", Some(closing)), body("rejected", Some(closing))] {
             let err = validate_body(RecordKind::Finding, &incoherent).unwrap_err();
-            assert_eq!(err.class, FailureClass::Malformed);
             assert_eq!(err.subject, "resolution_sha");
         }
     }
 
     #[test]
-    fn same_scenario_id_under_different_project_ids_resolves_to_distinct_paths() {
-        // Cross-project isolation (scenario-project-identity spec):
-        // two roots sharing a `scenario_id` must never collapse to
-        // one natural key or one storage path.
+    fn same_scenario_id_under_different_projects_resolves_to_distinct_paths() {
         let a = json!({"kind": "scenario", "project_id": "app-a", "scenario_id": "world.firstbuy-hotdeal.26", "schema": 1});
         let b = json!({"kind": "scenario", "project_id": "app-b", "scenario_id": "world.firstbuy-hotdeal.26", "schema": 1});
-        let key_a = resolve_partition(RecordKind::Scenario, &a).unwrap();
-        let key_b = resolve_partition(RecordKind::Scenario, &b).unwrap();
-        assert_ne!(key_a.natural_key, key_b.natural_key, "distinct project_id must never collapse to the same natural key");
-        assert_ne!(
-            expected_relative_path(RecordKind::Scenario, &a).unwrap(),
-            expected_relative_path(RecordKind::Scenario, &b).unwrap(),
-            "two projects sharing a scenario_id must resolve to distinct storage paths"
-        );
+        assert_ne!(expected_relative_path(RecordKind::Scenario, &a).unwrap(), expected_relative_path(RecordKind::Scenario, &b).unwrap());
     }
 
     #[test]
     fn spine_record_missing_project_id_is_malformed() {
-        // Clean-cutover migration (scenario-project-identity spec):
-        // `project_id` is REQUIRED on the three spine kinds, so a
-        // stray record lacking it is malformed=no-evidence — never a
-        // legitimately-identified record with an inferred project.
         for (kind, json) in [
             (RecordKind::Scenario, json!({"kind": "scenario", "scenario_id": "world.firstbuy-hotdeal.26"})),
             (RecordKind::Review, json!({"kind": "review", "scenario_id": "world.firstbuy-hotdeal.26", "pin": "abc123"})),
             (RecordKind::Divergence, json!({"kind": "divergence", "scenario_id": "world.firstbuy-hotdeal.26", "run_seq": 1, "round": 1})),
         ] {
-            let err = resolve_partition(kind, &json).unwrap_err();
-            assert_eq!(err.class, FailureClass::Malformed, "{kind:?} missing project_id must resolve as malformed, not silently default");
+            assert_eq!(resolve_partition(kind, &json).unwrap_err().class, FailureClass::Malformed, "{kind:?}");
         }
     }
 
     #[test]
-    fn regime_key_slashes_are_sanitized_not_left_as_path_separators() {
+    fn regime_key_and_session_text_are_escaped_only_in_the_name() {
         let json = json!({"kind": "strategy_item", "regime_key": "implementer/canon/join-spine/9c93d024b1a2"});
         let key = resolve_partition(RecordKind::StrategyItem, &json).unwrap();
-        assert_eq!(key.natural_key, "implementer_canon_join-spine_9c93d024b1a2");
+        assert_eq!(key.natural_key, "implementer/canon/join-spine/9c93d024b1a2", "typed value, never escaped");
+        assert!(stem(RecordKind::StrategyItem, &json).starts_with("implementer+2fcanon+2fjoin-spine+2f9c93d024b1a2_"));
+        let session = json!({"kind": "session", "session_id": "Sess_1/x"});
+        assert!(stem(RecordKind::Session, &session).starts_with("+53ess+5f1+2fx_"));
     }
 
     #[test]
     fn identical_content_yields_identical_digest_and_path() {
         let a = json!({"kind": "change", "change_id": "x", "schema": 1});
         let b = json!({"schema": 1, "kind": "change", "change_id": "x"});
-        assert_eq!(content_digest12(&a), content_digest12(&b), "key order must not affect the canonical digest");
+        assert_eq!(content_digest(&a), content_digest(&b));
+        assert_eq!(content_digest(&a).len(), 8);
         assert_eq!(expected_relative_path(RecordKind::Change, &a).unwrap(), expected_relative_path(RecordKind::Change, &b).unwrap());
     }
 
     #[test]
     fn kind_directory_content_mismatch_is_a_layout_violation() {
         let json = json!({"kind": "task", "change_id": "x"});
-        let err = validate_kind_matches_content(RecordKind::Change, &json).unwrap_err();
-        assert_eq!(err.class, FailureClass::Malformed);
+        assert_eq!(validate_kind_matches_content(RecordKind::Change, &json).unwrap_err().class, FailureClass::Malformed);
     }
 
     #[test]
     fn validate_layout_reports_expected_and_actual_paths() {
         let json = json!({"kind": "change", "change_id": "s2-tiered-storage", "schema": 1});
-        let wrong_path = std::path::Path::new("kind=change/wrong-name.json");
-        let err = validate_layout(RecordKind::Change, wrong_path, &json).unwrap_err();
-        assert!(err.detail.contains("expected"), "detail should name the expected path: {}", err.detail);
-        assert!(err.detail.contains("wrong-name.json"), "detail should name the rejected path: {}", err.detail);
+        let err = validate_layout(RecordKind::Change, std::path::Path::new("kind=change/wrong-name.json"), &json).unwrap_err();
+        assert!(err.detail.contains("expected") && err.detail.contains("wrong-name.json"), "{}", err.detail);
+        assert_eq!(err.class, FailureClass::Malformed);
+    }
+
+    #[test]
+    fn a_file_named_by_the_0_29_rule_is_the_old_layout_violation_with_the_migrate_hint() {
+        let json = json!({"kind": "change", "change_id": "s2-tiered-storage", "schema": 1});
+        for old in ["kind=change/s2-tiered-storage__0123456789ab.json", "kind=review/area=gate/x__0123456789ab.json"] {
+            let err = validate_layout(RecordKind::Change, std::path::Path::new(old), &json).unwrap_err();
+            assert_eq!(err.class, FailureClass::OldLayout, "{old}");
+            assert!(err.detail.contains("canon migrate"));
+        }
+        assert!(!is_old_layout_path(std::path::Path::new("kind=change/wrong-name.json")));
     }
 
     #[test]
@@ -650,26 +475,12 @@ mod tests {
     }
 
     #[test]
-    fn validate_natural_key_accepts_a_safe_component() {
-        validate_natural_key("root__world.hotdeal.01").unwrap();
-    }
-
-    #[test]
-    fn validate_natural_key_rejects_path_traversal_and_absolute_paths() {
-        for bad in ["../../etc/passwd", "a/b", "a\\b", "..", ".hidden", "/abs"] {
-            assert!(validate_natural_key(bad).is_err(), "`{bad}` must be rejected");
-        }
-    }
-
-    #[test]
-    fn natural_key_matches_body_accepts_segments_traceable_to_body_fields() {
+    fn overlay_key_must_trace_back_to_the_body() {
         let body = json!({"project_id": "root", "scenario_id": "world.hotdeal.01", "covered": true});
-        natural_key_matches_body("root__world.hotdeal.01", &body).unwrap();
-    }
-
-    #[test]
-    fn natural_key_matches_body_rejects_a_segment_absent_from_body() {
-        let body = json!({"project_id": "root", "scenario_id": "world.hotdeal.99"});
-        assert!(natural_key_matches_body("root__world.hotdeal.01", &body).is_err());
+        overlay_key_matches_body(&["root".into(), "world.hotdeal.01".into()], &body).unwrap();
+        assert!(overlay_key_matches_body(&["root".into(), "world.hotdeal.99".into()], &body).is_err());
+        assert!(overlay_name_matches_body("root_world.hotdeal.01", &body));
+        assert!(!overlay_name_matches_body("root_world.hotdeal.99", &body));
+        assert!(overlay_components(&[]).is_err());
     }
 }

@@ -159,7 +159,7 @@ fn fresh_snapshot_matches_the_committed_dashboard_fixture_contract() {
 }
 
 fn write_evidence(ledger_root: &Path, task_id: &str) {
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("selftest-agent", RoleId::parse("implementer").unwrap()));
+    let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("selftest-agent", RoleId::parse("implementer").unwrap()));
     let record = EvidenceRecord::new(envelope, Some(TaskId::parse(task_id).unwrap()), None, None, EvidenceVerdict::Faithful);
     GitTier::new(ledger_root).write(&record).expect("write evidence record");
 }

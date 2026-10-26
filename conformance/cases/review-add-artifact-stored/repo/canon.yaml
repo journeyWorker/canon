@@ -8,6 +8,6 @@ specs:
       root: specs
 routing:
   scenario: local
-  evidence_record: local
+  evidence: local
   review: local
   subject: local

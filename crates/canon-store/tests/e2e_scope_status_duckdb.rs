@@ -85,13 +85,13 @@ fn a_declared_covered_evidenced_scenario_resolves_fully_green_in_one_query() {
 
     // Evidence-VERIFIED half: a Faithful EvidenceRecord for the task_id
     // — the exact `mart_trust_matrix` half this view reuses verbatim.
-    let evidence = EvidenceRecord::new(Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), actor()), Some(task_id.clone()), None, None, EvidenceVerdict::Faithful);
+    let evidence = EvidenceRecord::new(Envelope::new(1, RecordKind::Evidence, Utc::now(), actor()), Some(task_id.clone()), None, None, EvidenceVerdict::Faithful);
     git.write(&evidence).expect("persist evidence");
 
     // Spec-COVERED half: a `porting.coverage` overlay row for ONLY the
     // covered scenario — the uncovered scenario deliberately has none.
     let overlay = overlay_body("e2e-join-project", covered_scenario.as_str(), true);
-    git.write_namespaced("porting.coverage", &format!("e2e-join-project__{}", covered_scenario.as_str()), overlay).expect("persist porting.coverage overlay");
+    git.write_namespaced("porting.coverage", &["e2e-join-project".to_string(), covered_scenario.as_str().to_string()], overlay).expect("persist porting.coverage overlay");
 
     let views_sql = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sql/views.sql");
     let r2_dir = tempfile::tempdir().unwrap();

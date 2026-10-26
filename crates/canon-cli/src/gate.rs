@@ -545,7 +545,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
     // The row counts every record bound to the task and scans every note
     // it carries, so this is a history read: the ledger's records and the
     // archive's (`canon_gate::history`).
-    let raw_records = match GitTier::new(gate_context.ctx.ledger_root.clone()).read_history(RecordKind::EvidenceRecord) {
+    let raw_records = match GitTier::new(gate_context.ctx.ledger_root.clone()).read_history(RecordKind::Evidence) {
         Ok(read) => read.records,
         Err(e) => {
             return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon task done", json);
@@ -910,7 +910,7 @@ fn raw_evidence_kind_ref(raw: &serde_json::Value) -> Option<(String, String)> {
 /// The staging [`GitTier`] root `canon evidence add` writes to and
 /// [`run_promote`] drains: `<ledger_root>/_staging`, a SIBLING of the
 /// committed `kind=<k>/` tree — a committed read walks
-/// `<ledger_root>/kind=evidence_record/`, so a staged record is
+/// `<ledger_root>/kind=evidence/`, so a staged record is
 /// invisible to `canon task done`/`canon gate check` until promotion
 /// (the same sibling-directory arrangement `canon_gate::
 /// divergence_staging_dir`'s `_staging_divergence` already uses).
@@ -1142,7 +1142,7 @@ fn promotion_outcome(promoted: Result<PromoteReport, canon_store::tier::StoreErr
 /// kinds in one call, and a batch that silently drained none of the
 /// kind you cared about is the failure mode this command has: a bare
 /// "promoted 7" cannot be checked against a ledger, where "promoted
-/// evidence_record=1, finding=6" can. Every registered kind appears
+/// evidence=1, finding=6" can. Every registered kind appears
 /// with its count INCLUDING zero, so the output also answers "which
 /// kinds can be promoted at all" — the question an author whose
 /// records went nowhere is actually asking.
@@ -1201,13 +1201,13 @@ fn format_candidate_lines(report: &PromoteReport, dry_run: bool) -> String {
 fn kind_tally(landed: &[Promoted]) -> String {
     STAGED_KINDS
         .iter()
-        .map(|staged| format!("{}={}", crate::query::kind_cli_name(staged.kind), landed.iter().filter(|p| p.kind == staged.kind).count()))
+        .map(|staged| format!("{}={}", staged.kind.as_str(), landed.iter().filter(|p| p.kind == staged.kind).count()))
         .collect::<Vec<_>>()
         .join(", ")
 }
 
 fn promotable_kinds() -> String {
-    STAGED_KINDS.iter().map(|staged| crate::query::kind_cli_name(staged.kind)).collect::<Vec<_>>().join(", ")
+    STAGED_KINDS.iter().map(|staged| staged.kind.as_str()).collect::<Vec<_>>().join(", ")
 }
 
 /// `canon gate install-hooks`: whether the hooks changed.
@@ -1349,7 +1349,7 @@ mod tests {
     /// staging-relative location.
     fn stage(ledger_root: &Path, actor: Actor) -> String {
         let record = EvidenceRecord::new(
-            Envelope::current(RecordKind::EvidenceRecord, Utc::now(), actor),
+            Envelope::current(RecordKind::Evidence, Utc::now(), actor),
             Some(TaskId::parse("demo-change#1.1").unwrap()),
             None,
             None,
@@ -1391,7 +1391,7 @@ mod tests {
         assert_eq!(outcome, StagedOutcome::Refused);
         assert!(evidence_staging_dir(&ledger_root).join(&refused).exists(), "a refused record stays staged");
         assert!(evidence_staging_dir(&ledger_root).join(&bystander).exists(), "a refusal promotes nothing else either");
-        let committed = GitTier::new(&ledger_root).read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap();
+        let committed = GitTier::new(&ledger_root).read(&TierQuery::kind(RecordKind::Evidence)).unwrap();
         assert_eq!(committed.records.len(), 1, "only the command's own promoted record is committed");
     }
 }

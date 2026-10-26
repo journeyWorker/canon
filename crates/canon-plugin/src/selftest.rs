@@ -268,7 +268,7 @@ fn run_fixture() -> Result<FixtureRun, String> {
     // own validation) -- design.md R7's scenario: a record already on
     // disk that no longer matches the CURRENT manifest.
     let malformed_on_disk = body_missing_covered_only("world.selftest.03");
-    tier.write_namespaced(OVERLAY_IDENTITY, "root__world.selftest.03", malformed_on_disk).map_err(|e| format!("inject schema-drifted on-disk record: {e}"))?;
+    tier.write_namespaced(OVERLAY_IDENTITY, &["root".to_string(), "world.selftest.03".to_string()], malformed_on_disk).map_err(|e| format!("inject schema-drifted on-disk record: {e}"))?;
 
     let (post_records, post_violations) = tier.scan_namespaced_kind(OVERLAY_IDENTITY).map_err(|e| format!("scan after injecting schema-drifted record: {e}"))?;
 

@@ -543,7 +543,7 @@ mod tests {
         assert!(pins.evidence.is_empty(), "a new review never pins evidence record ids");
 
         let a = args();
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("impl", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("impl", RoleId::parse("implementer").unwrap()));
         let record = EvidenceRecord::new(envelope, None, Some(a.scenario_ids[0].clone()), None, EvidenceVerdict::Faithful).with_project_id(a.project_id.clone());
         ledger(&dir).write(&record).unwrap();
         assert_eq!(run_add(dir.path(), &ReviewAddArgs { reviewer: "reviewer-2".into(), ..args() }), 0);

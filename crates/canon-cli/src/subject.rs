@@ -215,7 +215,7 @@ pub(crate) fn registry_for(canon_yaml_path: &Path, kinds: &[RecordKind]) -> Resu
 }
 
 /// Fold every retained version of `kind` to one latest row per natural
-/// key — winner = greatest `(at, envelope.schema, content_digest12)`,
+/// key — winner = greatest `(at, envelope.schema, content_digest)`,
 /// via the shared [`canon_store::fold_latest_by_key`] every
 /// multi-version reader uses, keyed by the SAME `resolve_partition`
 /// natural key `canon query` derives. This is how an `adopt`/`status`
@@ -235,7 +235,7 @@ fn fold_latest(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
         let key = canon_store::partition::resolve_partition(kind, &record.0).map(|p| p.natural_key).unwrap_or_default();
         let at = canon_store::tier::raw_record_at(&record);
         let schema = canon_store::tier::raw_record_schema(&record);
-        let digest = canon_store::partition::content_digest12(&record.0);
+        let digest = canon_store::partition::content_digest(&record.0);
         Candidate { key, at, schema, digest, record }
     });
     canon_store::fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str())

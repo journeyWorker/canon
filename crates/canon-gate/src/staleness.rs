@@ -118,7 +118,7 @@ fn fold_latest_green_cells(ctx: &GateContext) -> Vec<GreenCell> {
         // The record's digest is the one the shared stamp already holds.
         let digest = match &stamps[i] {
             Some(stamp) => stamp.digest.clone(),
-            None => canon_store::partition::content_digest12(&serde_json::to_value(record).unwrap_or_default()),
+            None => canon_store::partition::content_digest(&serde_json::to_value(record).unwrap_or_default()),
         };
         CellSubject::all_of(record).map(move |subject| Candidate {
             subject: subject.as_str().to_string(),
@@ -299,7 +299,7 @@ mod tests {
     /// raw-JSON companion, module doc) into `ledger_root`, through the
     /// ordinary typed write path.
     fn write_green_record(ledger_root: &Path, task: &str, role: &str, evidence_sha: &str, surface_ref: &[&str]) {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent", RoleId::parse(role).unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("agent", RoleId::parse(role).unwrap()));
         let record = EvidenceRecord::new(envelope, Some(TaskId::parse(task).unwrap()), None, None, EvidenceVerdict::Faithful)
             .with_evidence_sha(Sha::parse(evidence_sha).unwrap())
             .with_surface_ref(surface_ref.iter().map(std::string::ToString::to_string).collect());
@@ -312,7 +312,7 @@ mod tests {
     /// is "latest" by `at`, rather than relying on `Utc::now()`'s
     /// natural ordering across two calls a few nanoseconds apart.
     fn write_record_at(ledger_root: &Path, task: &str, role: &str, verdict: EvidenceVerdict, at: DateTime<Utc>, evidence_sha: &str, surface_ref: &[&str]) {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, at, Actor::new("agent", RoleId::parse(role).unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, at, Actor::new("agent", RoleId::parse(role).unwrap()));
         let record = EvidenceRecord::new(envelope, Some(TaskId::parse(task).unwrap()), None, None, verdict)
             .with_evidence_sha(Sha::parse(evidence_sha).unwrap())
             .with_surface_ref(surface_ref.iter().map(std::string::ToString::to_string).collect());
@@ -348,7 +348,7 @@ mod tests {
     /// reads `ctx.evidence` directly, so this fixture must actually
     /// populate it, never leave it empty).
     fn ctx_for(repo: &Path, ledger_root: &Path, policy: PolicyResolution, now: DateTime<Utc>) -> GateContext {
-        let read = GitTier::new(ledger_root).read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap_or_default();
+        let read = GitTier::new(ledger_root).read(&TierQuery::kind(RecordKind::Evidence)).unwrap_or_default();
         let (evidence, _validation_violations) = canon_model::validate_evidence_batch(&read.records);
         GateContext {
             ctx: GateCtx { repo: repo.to_path_buf(), ledger_root: ledger_root.to_path_buf() },
@@ -475,7 +475,7 @@ mod tests {
         write_and_commit(repo, "README.md", "hello", "initial");
 
         let ledger_root = repo.join(".canon/ledger");
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("agent", RoleId::parse("implementer").unwrap()));
         let record = EvidenceRecord::new(envelope, Some(TaskId::parse("s5#1.7").unwrap()), None, None, EvidenceVerdict::Faithful);
         let value = serde_json::to_value(&record).unwrap();
         GitTier::new(&ledger_root).write(&RawWrite(RawRecord(value))).unwrap();
@@ -492,7 +492,7 @@ mod tests {
         let sha = write_and_commit(repo, "crates/foo/src/bar.rs", "fn bar() {}", "initial");
 
         let ledger_root = repo.join(".canon/ledger");
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("agent", RoleId::parse("implementer").unwrap()));
         let record = EvidenceRecord::new(envelope, Some(TaskId::parse("s5#1.7").unwrap()), None, None, EvidenceVerdict::Divergent);
         let mut value = serde_json::to_value(&record).unwrap();
         value.as_object_mut().unwrap().insert("evidence_sha".to_string(), serde_json::json!(sha));

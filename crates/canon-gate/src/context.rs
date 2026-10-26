@@ -247,7 +247,7 @@ impl GateContext {
         let policy = PolicyResolution::resolve(&ctx.repo, registry);
 
         let tier = GitTier::new(&ctx.ledger_root);
-        let read = tier.read(&TierQuery::kind(RecordKind::EvidenceRecord))?;
+        let read = tier.read(&TierQuery::kind(RecordKind::Evidence))?;
         let (records, validation_violations) = validate_evidence_batch(&read.records);
         let (audits, evidence): (Vec<EvidenceRecord>, Vec<EvidenceRecord>) = records.into_iter().partition(EvidenceRecord::is_audit);
 
@@ -262,6 +262,13 @@ impl GateContext {
         let reviews = read_corpus_kind(&tier, RecordKind::Review, &mut corpus_violations)?;
         let findings = read_corpus_kind(&tier, RecordKind::Finding, &mut corpus_violations)?;
         let unreadable_kinds = unreadable_corpus_kinds(&ctx.repo)?;
+
+        // A file named by the 0.29 rule is reported whatever kind it is (F2): it is never used for a
+        // verdict, so the one gate code `old-layout` says what to do, instead of a silent empty corpus.
+        violations.extend(tier.legacy_kind_dir_violations()?);
+        let (old_layout, corpus_violations): (Vec<_>, Vec<_>) =
+            corpus_violations.into_iter().partition(|(_, violation)| violation.class == canon_model::FailureClass::OldLayout);
+        violations.extend(old_layout.into_iter().map(|(_, violation)| violation));
 
         Ok(Self {
             ctx,
@@ -506,7 +513,7 @@ mod tests {
         let tier = GitTier::new(&ctx.ledger_root);
 
         let record = EvidenceRecord::new(
-            Envelope::new(1, RecordKind::EvidenceRecord, chrono::Utc::now(), Actor::new("test-agent", RoleId::parse("implementer").unwrap())),
+            Envelope::new(1, RecordKind::Evidence, chrono::Utc::now(), Actor::new("test-agent", RoleId::parse("implementer").unwrap())),
             None,
             None,
             None,

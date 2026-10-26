@@ -66,7 +66,7 @@ use canon_ingest::{enumerate, registry, scanner};
 use canon_model::envelope::RecordKind;
 use canon_model::paths;
 use canon_store::cursor::{CursorStore, SourceCursor, file_digest};
-use canon_store::partition::content_digest12;
+use canon_store::partition::content_digest;
 use canon_store::policy::BackendConfig;
 use canon_store::registry::TierRegistry;
 use canon_store::tier::StoreError;
@@ -1178,7 +1178,7 @@ fn degraded_metadata<'a>(outcome: &'a IngestOutcome, sessions: &'a [NormalizedSe
                 workspace_key: session.workspace_key.as_deref(),
                 workspace_label: session.workspace_label.as_deref(),
                 project_key: session.project_key.as_deref(),
-                digest: content_digest12(&body),
+                digest: content_digest(&body),
             }
         })
         .collect();
@@ -1187,7 +1187,7 @@ fn degraded_metadata<'a>(outcome: &'a IngestOutcome, sessions: &'a [NormalizedSe
         .flat_map(|normalized| {
             normalized.runs().map(|run| {
                 let body = serde_json::to_value(run).expect("Run always serializes");
-                UnwrittenRun { run_id: &run.run_id, session_id: run.session_id.as_ref(), parent_run_id: run.parent_run_id.as_ref(), digest: content_digest12(&body) }
+                UnwrittenRun { run_id: &run.run_id, session_id: run.session_id.as_ref(), parent_run_id: run.parent_run_id.as_ref(), digest: content_digest(&body) }
             })
         })
         .collect();
@@ -1196,7 +1196,7 @@ fn degraded_metadata<'a>(outcome: &'a IngestOutcome, sessions: &'a [NormalizedSe
         .flat_map(|normalized| {
             normalized.events.iter().map(|event| {
                 let body = serde_json::to_value(event).expect("Event always serializes");
-                UnwrittenEvent { run_id: &event.run_id, seq: event.seq, at: event.envelope.at, label: &event.label, digest: content_digest12(&body) }
+                UnwrittenEvent { run_id: &event.run_id, seq: event.seq, at: event.envelope.at, label: &event.label, digest: content_digest(&body) }
             })
         })
         .collect();

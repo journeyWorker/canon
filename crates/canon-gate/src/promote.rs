@@ -32,7 +32,7 @@
 //! (`walkdir::WalkDir`) — unlike parity.py's own fixed-depth
 //! `Path.glob`, which naturally excludes a `_staging/` directory one
 //! path segment deeper than its glob pattern by construction. Nesting
-//! staging inside the SAME `kind=evidence_record/` subtree a committed
+//! staging inside the SAME `kind=evidence/` subtree a committed
 //! [`GitTier`] scans would make staging candidates visible to
 //! `committed.read()` by accident. The caller instead roots `staging`
 //! at a SEPARATE directory — by convention
@@ -170,7 +170,7 @@ use std::path::{Path, PathBuf};
 use canon_model::{Divergence, EvidenceRecord, ProjectId, RawRecord, RecordKind, RoleId};
 use canon_store::fold::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
-use canon_store::partition::{content_digest12, expected_relative_path, resolve_partition};
+use canon_store::partition::{content_digest, expected_relative_path, resolve_partition};
 use canon_store::tier::{RawWrite, StoreError, Tier, TierQuery};
 use chrono::{DateTime, Utc};
 
@@ -186,7 +186,7 @@ use crate::failure_class::{FailureClass, Violation};
 pub struct Promoted {
     /// Which staged kind this candidate is. Reported so a batch that
     /// drained several kinds at once is readable PER KIND: "promoted
-    /// evidence_record=1, finding=6" is a claim an operator can check
+    /// evidence=1, finding=6" is a claim an operator can check
     /// against the ledger, where a bare "promoted 7" is not.
     pub kind: RecordKind,
     /// What promotion assigned this candidate — `None` for a kind it
@@ -310,13 +310,13 @@ const STAGING_ID_KEY: &str = "staging_id";
 /// STAGED body, before `run_seq`/`staging_id` are stamped on (module
 /// doc's recovery section).
 ///
-/// Deliberately the same `content_digest12` the candidate's own staging
+/// Deliberately the same `content_digest` the candidate's own staging
 /// FILENAME already ends in (`canon_store::partition`'s Hive object key)
 /// — the identity is not a new invented token, it is the one the staging
 /// layout already assigned, made explicit so a committed record can carry
 /// it forward.
 fn staging_candidate_id(staged_body: &serde_json::Value) -> String {
-    content_digest12(staged_body)
+    content_digest(staged_body)
 }
 
 /// The EXACT committed body a staged candidate promotes to: its staged
@@ -415,7 +415,7 @@ pub enum StagedAssignment {
 ///
 /// It cannot be inferred from the storage layout, which is why it has
 /// to be declared: `canon_store::partition`'s object key is
-/// `{natural_key}__{content_digest12}.json` for EVERY kind, so two
+/// `{natural_key}__{content_digest}.json` for EVERY kind, so two
 /// different bodies at one natural key always resolve to two different
 /// paths and always both write. That is deliberate — it is how a
 /// re-emitted record appends instead of overwriting — and it means the
@@ -490,7 +490,7 @@ pub struct StagedKind {
 /// per-kind tally `canon gate promote` prints.
 pub const STAGED_KINDS: [StagedKind; 3] = [
     StagedKind {
-        kind: RecordKind::EvidenceRecord,
+        kind: RecordKind::Evidence,
         assignment: StagedAssignment::RunSeqPerRoleSurface,
         natural_key: NaturalKeyRule::Versioned,
     },
@@ -758,7 +758,9 @@ fn promote_verbatim(
         let natural_key = resolve_partition(kind, &raw.0).map_err(StoreError::Layout)?.natural_key;
         candidates.push((relative, natural_key, raw));
     }
-    candidates.sort_by(|(a, ..), (b, ..)| a.cmp(b));
+    // The typed name components in table order, then the body digest (R5):
+    // never the order the staging directory happened to scan in.
+    candidates.sort_by_cached_key(|(_, _, raw)| (canon_model::layout::components(kind, &raw.0).unwrap_or_default(), content_digest(&raw.0)));
 
     // Natural keys this call has itself claimed. Tracked even under
     // `dry_run`, so the PLAN reports the same refusals a real run would
@@ -974,7 +976,7 @@ fn obstruction_at(absolute: &Path) -> Option<String> {
 fn promote_with_run_seq(staging: &GitTier, committed: &GitTier, scope: Scope<'_>, dry_run: bool, report: &mut PromoteReport) -> Result<(), StoreError> {
     // Malformed/misfiled staging candidates never reach run_seq
     // assignment at all (module doc's re-validation guarantee).
-    let (staged, malformed) = staged_in_scope(staging, RecordKind::EvidenceRecord, scope)?;
+    let (staged, malformed) = staged_in_scope(staging, RecordKind::Evidence, scope)?;
     report.refused.extend(malformed);
 
     let mut index = EvidenceIndex::read(committed)?;
@@ -1007,7 +1009,7 @@ impl EvidenceIndex {
     /// time. One pass, not two: the recovery index and the partition
     /// maxima are both facts about the committed corpus.
     fn read(committed: &GitTier) -> Result<Self, StoreError> {
-        let committed_read = committed.read_history_shared(RecordKind::EvidenceRecord)?;
+        let committed_read = committed.read_history_shared(RecordKind::Evidence)?;
         let mut next_seq: HashMap<(RoleId, String), u64> = HashMap::new();
         let mut already_committed: HashMap<String, RecoveredCommit> = HashMap::new();
         for raw in &committed_read.records {
@@ -1026,7 +1028,7 @@ impl EvidenceIndex {
             if already_committed.get(staging_id).is_some_and(|existing| existing.run_seq <= seq) {
                 continue;
             }
-            let target = expected_relative_path(RecordKind::EvidenceRecord, &raw.0).map_err(StoreError::Layout)?;
+            let target = expected_relative_path(RecordKind::Evidence, &raw.0).map_err(StoreError::Layout)?;
             already_committed.insert(staging_id.to_string(), RecoveredCommit { run_seq: seq, target });
         }
         Ok(Self { next_seq, already_committed })
@@ -1061,7 +1063,7 @@ fn promote_evidence_candidates(
             }
         }
     }
-    candidates.sort_by_key(|(a, _)| subject_of(a));
+    candidates.sort_by_cached_key(|(record, raw)| (subject_of(record), canon_model::layout::components(RecordKind::Evidence, &raw.0).unwrap_or_default(), content_digest(&raw.0)));
 
     for (record, raw) in candidates {
         let subject = subject_of(&record);
@@ -1087,11 +1089,11 @@ fn promote_evidence_candidates(
             // consuming a `run_seq`, which would also shift every later
             // candidate in this batch.
             if !dry_run {
-                let staging_relative = expected_relative_path(RecordKind::EvidenceRecord, &raw.0).map_err(StoreError::Layout)?;
+                let staging_relative = expected_relative_path(RecordKind::Evidence, &raw.0).map_err(StoreError::Layout)?;
                 std::fs::remove_file(staging.root().join(&staging_relative))?;
             }
             report.recovered.push(Promoted {
-                kind: RecordKind::EvidenceRecord,
+                kind: RecordKind::Evidence,
                 assigned: Some(RunSeqAssignment { role, surface, run_seq: existing.run_seq }),
                 target: existing.target.clone(),
             });
@@ -1105,7 +1107,7 @@ fn promote_evidence_candidates(
         };
 
         let body = committed_body(&raw.0, seq, &staging_id);
-        let target = expected_relative_path(RecordKind::EvidenceRecord, &body).map_err(StoreError::Layout)?;
+        let target = expected_relative_path(RecordKind::Evidence, &body).map_err(StoreError::Layout)?;
 
         if !dry_run {
             commit(&RawWrite(RawRecord(body)))?;
@@ -1113,13 +1115,13 @@ fn promote_evidence_candidates(
             // record above is committed and the staging file survives. A
             // retry then finds `staging_id` in `already_committed` and
             // takes the recovery branch instead of promoting again.
-            let staging_relative = expected_relative_path(RecordKind::EvidenceRecord, &raw.0).map_err(StoreError::Layout)?;
+            let staging_relative = expected_relative_path(RecordKind::Evidence, &raw.0).map_err(StoreError::Layout)?;
             std::fs::remove_file(staging.root().join(&staging_relative))?;
             index.already_committed.insert(staging_id, RecoveredCommit { run_seq: seq, target: target.clone() });
         }
 
         report.promoted.push(Promoted {
-            kind: RecordKind::EvidenceRecord,
+            kind: RecordKind::Evidence,
             assigned: Some(RunSeqAssignment { role, surface, run_seq: seq }),
             target,
         });
@@ -1163,15 +1165,15 @@ impl<'a> EvidencePromoter<'a> {
     }
 
     /// Promote the one staged record at staging-relative `relative`.
-    /// A path outside `kind=evidence_record/` takes [`promote_staged`]'s
+    /// A path outside `kind=evidence/` takes [`promote_staged`]'s
     /// own route.
     pub fn promote(&mut self, relative: &Path) -> Result<PromoteReport, StoreError> {
-        let kind_dir = format!("kind={}", RecordKind::EvidenceRecord.as_str());
+        let kind_dir = format!("kind={}", RecordKind::Evidence.as_str());
         if relative.components().next().and_then(|component| component.as_os_str().to_str()) != Some(kind_dir.as_str()) {
             return promote_staged(self.staging, self.committed, relative);
         }
         let mut report = PromoteReport::default();
-        let (staged, malformed) = staged_in_scope(self.staging, RecordKind::EvidenceRecord, Scope::One(relative))?;
+        let (staged, malformed) = staged_in_scope(self.staging, RecordKind::Evidence, Scope::One(relative))?;
         report.refused.extend(malformed);
         let committed = self.committed;
         let index = match &mut self.index {
@@ -1200,7 +1202,7 @@ impl<'a> EvidencePromoter<'a> {
     /// ledger compact` to finish.
     pub fn archive(self) {
         let Some((written, location)) = self.last else { return };
-        if let Err(e) = self.committed.archive_after_write(RecordKind::EvidenceRecord, &written) {
+        if let Err(e) = self.committed.archive_after_write(RecordKind::Evidence, &written) {
             eprintln!("canon: wrote {location} but could not archive the versions it supersedes ({e}); `canon ledger compact` moves them");
         }
     }
@@ -1254,7 +1256,7 @@ fn promote_divergences(staging: &GitTier, committed: &GitTier, scope: Scope<'_>,
             Err(e) => report.refused.push(refuse("<staging>", format!("candidate re-parse failed after passing the staging read's own validation: {e}"))),
         }
     }
-    candidates.sort_by_key(|(record, _)| (record.project_id.clone(), record.scenario_id.clone(), record.round));
+    candidates.sort_by_cached_key(|(record, raw)| (record.project_id.clone(), record.scenario_id.clone(), record.round, content_digest(&raw.0)));
 
     for (record, raw) in candidates {
         let subject = record.scenario_id.to_string();
@@ -1318,7 +1320,7 @@ mod tests {
 
     fn evidence(role: &str, scenario_id: Option<&str>) -> EvidenceRecord {
         EvidenceRecord::new(
-            Envelope::new(1, RecordKind::EvidenceRecord, chrono::Utc::now(), Actor::new("test-agent", RoleId::parse(role).unwrap())),
+            Envelope::new(1, RecordKind::Evidence, chrono::Utc::now(), Actor::new("test-agent", RoleId::parse(role).unwrap())),
             None,
             scenario_id.map(|s| ScenarioId::parse(s).unwrap()),
             None,
@@ -1362,7 +1364,7 @@ mod tests {
         // promote`'s tally line is printed from.
         let findings: Vec<&Promoted> = report.promoted.iter().filter(|p| p.kind == RecordKind::Finding).collect();
         assert_eq!(findings.len(), 2, "both findings promoted: {:?}", report.promoted);
-        assert_eq!(report.promoted.iter().filter(|p| p.kind == RecordKind::EvidenceRecord).count(), 1);
+        assert_eq!(report.promoted.iter().filter(|p| p.kind == RecordKind::Evidence).count(), 1);
 
         // Nothing was assigned, and nothing is CLAIMED to have been —
         // a fabricated `run_seq=0` here would be indistinguishable from
@@ -1775,7 +1777,7 @@ mod tests {
     #[test]
     fn the_staged_kind_registry_is_exactly_the_kinds_promote_drains() {
         let kinds: Vec<RecordKind> = STAGED_KINDS.iter().map(|staged| staged.kind).collect();
-        assert_eq!(kinds, vec![RecordKind::EvidenceRecord, RecordKind::Finding, RecordKind::Divergence]);
+        assert_eq!(kinds, vec![RecordKind::Evidence, RecordKind::Finding, RecordKind::Divergence]);
     }
 
     #[test]
@@ -1799,9 +1801,9 @@ mod tests {
         assert_eq!(seqs, vec![Some(1), Some(2)], "no gaps, strictly increasing");
 
         // Staging is now empty (both candidates landed + were deleted).
-        assert!(staging.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.is_empty());
+        assert!(staging.read(&TierQuery::kind(RecordKind::Evidence)).unwrap().records.is_empty());
         // Both committed files exist, each carrying its own run_seq.
-        let landed = committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap();
+        let landed = committed.read(&TierQuery::kind(RecordKind::Evidence)).unwrap();
         assert_eq!(landed.records.len(), 2);
 
         // A THIRD candidate for the SAME (role, surface), promoted in a
@@ -1813,9 +1815,9 @@ mod tests {
         assert_eq!(report2.promoted[0].run_seq(), Some(3));
     }
 
-    /// The names under `<dir>/.canon/<tier>/kind=evidence_record/`, sorted.
+    /// The names under `<dir>/.canon/<tier>/kind=evidence/`, sorted.
     fn evidence_names(dir: &TempDir, tier: &str) -> Vec<String> {
-        let kind_dir = dir.path().join(".canon").join(tier).join("kind=evidence_record");
+        let kind_dir = dir.path().join(".canon").join(tier).join("kind=evidence");
         let mut names: Vec<String> = std::fs::read_dir(kind_dir)
             .map(|entries| entries.filter_map(Result::ok).filter(|entry| entry.path().is_file()).map(|entry| entry.file_name().to_string_lossy().into_owned()).collect())
             .unwrap_or_default();
@@ -1867,7 +1869,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let (staging, committed) = tiers(&dir);
         let mut promoter = EvidencePromoter::new(&staging, &committed);
-        let gone = "kind=evidence_record/world.firstbuy-hotdeal.14__000000000000.json";
+        let gone = "kind=evidence/world.firstbuy-hotdeal.14__000000000000.json";
         let expected = promote_staged(&staging, &committed, Path::new(gone)).unwrap();
         let refused = promoter.promote(Path::new(gone)).unwrap();
         assert_eq!(refused, expected);
@@ -1886,7 +1888,7 @@ mod tests {
         // Malformed: missing the required `verdict` field.
         let malformed = serde_json::json!({
             "schema": 1,
-            "kind": "evidence_record",
+            "kind": "evidence",
             "at": chrono::Utc::now().to_rfc3339(),
             "actor": {"agent_id": "agent-x", "role": "implementer"},
             "scenario_id": "world.firstbuy-hotdeal.40",
@@ -1904,10 +1906,10 @@ mod tests {
 
         // The malformed staging file is left in place, never committed;
         // the well-formed one is gone (promoted + deleted from staging).
-        let staged_after = staging.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap();
+        let staged_after = staging.read(&TierQuery::kind(RecordKind::Evidence)).unwrap();
         assert!(staged_after.records.is_empty());
         assert_eq!(staged_after.violations.len(), 1);
-        assert_eq!(committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 1);
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::Evidence)).unwrap().records.len(), 1);
     }
 
     #[test]
@@ -1922,7 +1924,7 @@ mod tests {
         // (module doc: no more per-candidate re-check needed).
         let malformed = serde_json::json!({
             "schema": 1,
-            "kind": "evidence_record",
+            "kind": "evidence",
             "at": chrono::Utc::now().to_rfc3339(),
             "actor": {"agent_id": "agent-x", "role": "implementer"},
             "scenario_id": "world.firstbuy-hotdeal.80",
@@ -1944,10 +1946,10 @@ mod tests {
         // it lands in `staged.violations`, so it never even reaches
         // `staged.records`, and stays on disk (never deleted, never
         // committed).
-        let staged_after = staging.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap();
+        let staged_after = staging.read(&TierQuery::kind(RecordKind::Evidence)).unwrap();
         assert!(staged_after.records.is_empty());
         assert_eq!(staged_after.violations.len(), 1);
-        assert_eq!(committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 1);
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::Evidence)).unwrap().records.len(), 1);
     }
 
     #[test]
@@ -1957,7 +1959,7 @@ mod tests {
 
         // Well-formed EvidenceRecord, but no `actor.role` at all.
         let record = EvidenceRecord::new(
-            Envelope::new(1, RecordKind::EvidenceRecord, chrono::Utc::now(), Actor::new_unattributed("legacy-writer")),
+            Envelope::new(1, RecordKind::Evidence, chrono::Utc::now(), Actor::new_unattributed("legacy-writer")),
             None,
             Some(ScenarioId::parse("world.firstbuy-hotdeal.50").unwrap()),
             None,
@@ -1969,7 +1971,7 @@ mod tests {
         assert!(report.promoted.is_empty());
         assert_eq!(report.refused.len(), 1);
         assert_eq!(report.refused[0].violation.class, FailureClass::MalformedEvidence);
-        assert!(committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.is_empty());
+        assert!(committed.read(&TierQuery::kind(RecordKind::Evidence)).unwrap().records.is_empty());
     }
 
     #[test]
@@ -1982,8 +1984,8 @@ mod tests {
         assert_eq!(report.promoted.len(), 1);
         assert_eq!(report.promoted[0].run_seq(), Some(1));
 
-        assert!(committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.is_empty(), "dry-run must not write");
-        assert_eq!(staging.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 1, "dry-run must not delete");
+        assert!(committed.read(&TierQuery::kind(RecordKind::Evidence)).unwrap().records.is_empty(), "dry-run must not write");
+        assert_eq!(staging.read(&TierQuery::kind(RecordKind::Evidence)).unwrap().records.len(), 1, "dry-run must not delete");
     }
 
     #[test]
@@ -2102,8 +2104,8 @@ mod tests {
         newer.envelope.at = original.envelope.at + chrono::Duration::seconds(30);
         staging.write(&newer).unwrap();
         assert_eq!(promote(&staging, &committed, false).unwrap().promoted.len(), 1);
-        assert_eq!(committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 1, "the first commit is archived now");
-        assert_eq!(committed.read_history(RecordKind::EvidenceRecord).unwrap().records.len(), 2);
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::Evidence)).unwrap().records.len(), 1, "the first commit is archived now");
+        assert_eq!(committed.read_history(RecordKind::Evidence).unwrap().records.len(), 2);
 
         // The interruption, replayed: the original's staging file survives.
         staging.write(&original).unwrap();
@@ -2111,9 +2113,9 @@ mod tests {
         assert!(retry.promoted.is_empty(), "nothing new is appended: {:?}", retry.promoted);
         assert_eq!(retry.recovered.len(), 1);
         assert_eq!(retry.recovered[0].target, first.promoted[0].target);
-        assert_eq!(committed.read_history(RecordKind::EvidenceRecord).unwrap().records.len(), 2, "history is unchanged by the retry");
-        assert_eq!(committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 1);
-        assert!(staging.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.is_empty(), "the retry drains staging");
+        assert_eq!(committed.read_history(RecordKind::Evidence).unwrap().records.len(), 2, "history is unchanged by the retry");
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::Evidence)).unwrap().records.len(), 1);
+        assert!(staging.read(&TierQuery::kind(RecordKind::Evidence)).unwrap().records.is_empty(), "the retry drains staging");
     }
 
     /// The same for the generic (finding) path: a body already committed at
@@ -2163,7 +2165,7 @@ mod tests {
 
         // The interruption.
         staging.write(&record).unwrap();
-        assert_eq!(staging.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 1);
+        assert_eq!(staging.read(&TierQuery::kind(RecordKind::Evidence)).unwrap().records.len(), 1);
 
         let retry = promote(&staging, &committed, false).unwrap();
         assert!(retry.is_clean(), "a recovery must exit clean or the retry is unusable: {:?}", retry.refused);
@@ -2173,11 +2175,11 @@ mod tests {
         assert_eq!(retry.recovered[0].target, first.promoted[0].target, "and the committed path that call actually wrote");
 
         assert_eq!(
-            committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(),
+            committed.read(&TierQuery::kind(RecordKind::Evidence)).unwrap().records.len(),
             1,
             "exactly one committed record survives the retry"
         );
-        assert!(staging.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.is_empty(), "the retry drains staging");
+        assert!(staging.read(&TierQuery::kind(RecordKind::Evidence)).unwrap().records.is_empty(), "the retry drains staging");
 
         // The identity is per-CANDIDATE, not per-(role, surface): a
         // different attestation in the SAME run_seq partition
@@ -2191,7 +2193,7 @@ mod tests {
         let third = promote(&staging, &committed, false).unwrap();
         assert_eq!(third.promoted.len(), 1, "a distinct attestation is not a recovery: {third:?}");
         assert_eq!(third.promoted[0].run_seq(), Some(2));
-        assert_eq!(committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 2);
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::Evidence)).unwrap().records.len(), 2);
     }
 
     /// `--dry-run` stays side-effect free on the recovery path too: it
@@ -2210,8 +2212,8 @@ mod tests {
         let dry = promote(&staging, &committed, true).unwrap();
         assert_eq!(dry.recovered.len(), 1);
         assert!(dry.promoted.is_empty());
-        assert_eq!(staging.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 1, "--dry-run removes nothing");
-        assert_eq!(committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records.len(), 1, "--dry-run writes nothing");
+        assert_eq!(staging.read(&TierQuery::kind(RecordKind::Evidence)).unwrap().records.len(), 1, "--dry-run removes nothing");
+        assert_eq!(committed.read(&TierQuery::kind(RecordKind::Evidence)).unwrap().records.len(), 1, "--dry-run writes nothing");
     }
 
     /// The identity is carried by the committed record itself, so it
@@ -2228,7 +2230,7 @@ mod tests {
         staging.write(&record).unwrap();
         promote(&staging, &committed, false).unwrap();
 
-        let landed = committed.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap();
+        let landed = committed.read(&TierQuery::kind(RecordKind::Evidence)).unwrap();
         assert_eq!(landed.records.len(), 1);
         assert_eq!(
             landed.records[0].0.get(STAGING_ID_KEY).and_then(serde_json::Value::as_str),

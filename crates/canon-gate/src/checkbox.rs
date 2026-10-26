@@ -143,7 +143,7 @@ mod tests {
 
     fn evidence_record(task_id: &TaskId, verdict: EvidenceVerdict) -> EvidenceRecord {
         EvidenceRecord::new(
-            Envelope::new(1, RecordKind::EvidenceRecord, chrono::Utc::now(), Actor::new("implementer", RoleId::parse("implementer").unwrap())),
+            Envelope::new(1, RecordKind::Evidence, chrono::Utc::now(), Actor::new("implementer", RoleId::parse("implementer").unwrap())),
             Some(task_id.clone()),
             None,
             None,

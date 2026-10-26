@@ -24,7 +24,7 @@ routing:
   subject: local
   change: local
   scenario: local
-  evidence_record: local
+  evidence: local
   divergence: local
 ";
 
@@ -75,7 +75,7 @@ fn attest(repo: &Path, verdict: EvidenceVerdict) {
 /// Attest the scenario, optionally binding one file (a different check).
 fn attest_binding(repo: &Path, verdict: EvidenceVerdict, binding: Option<&str>) {
     let actor = Actor::new("impl-agent", role("implementer")).with_session(SessionId::parse("impl-session").unwrap());
-    let mut record = EvidenceRecord::new(Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), actor), None, Some(ScenarioId::parse(SCENARIO).unwrap()), None, verdict)
+    let mut record = EvidenceRecord::new(Envelope::new(1, RecordKind::Evidence, Utc::now(), actor), None, Some(ScenarioId::parse(SCENARIO).unwrap()), None, verdict)
         .with_project_id(ProjectId::parse("demo").unwrap());
     if let Some(path) = binding {
         record.attachments.push(canon_model::EvidenceAttachment { path: path.to_string(), sha256: "a".repeat(64), format: None, case: None, outcome: None });

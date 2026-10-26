@@ -193,7 +193,7 @@ pub fn validate_overlay_body(decl: &OverlayDecl, body: &RawRecord) -> Result<(),
 }
 
 /// Derive an overlay's `natural_key` from its OWN validated body -- the
-/// `__`-joined values of `decl.join_key`'s named fields, IN DECLARED
+/// values of `decl.join_key`'s named fields, IN DECLARED
 /// ORDER (design.md D4: "mirroring canon-store core's `resolve_partition`,
 /// which derives a record's on-disk path FROM the record's own fields,
 /// never from an out-of-band argument"), generalized to `OverlayDecl`'s
@@ -201,7 +201,7 @@ pub fn validate_overlay_body(decl: &OverlayDecl, body: &RawRecord) -> Result<(),
 /// Callable only AFTER [`validate_overlay_body`] has confirmed every
 /// join-key field is present and string-typed -- `.expect`s that
 /// guarantee rather than re-threading a second `Result`.
-fn derive_natural_key(decl: &OverlayDecl, body: &RawRecord) -> String {
+fn derive_natural_key(decl: &OverlayDecl, body: &RawRecord) -> Vec<String> {
     decl.join_key
         .iter()
         .map(|field| {
@@ -209,9 +209,9 @@ fn derive_natural_key(decl: &OverlayDecl, body: &RawRecord) -> String {
                 .get(field)
                 .and_then(Value::as_str)
                 .expect("validate_overlay_body already confirmed every join-key field is present and string-typed")
+                .to_string()
         })
-        .collect::<Vec<_>>()
-        .join("__")
+        .collect()
 }
 
 /// Everything that can keep an overlay from being written -- `body`

@@ -36,7 +36,7 @@ use object_store::{ObjectStore, ObjectStoreExt, PutPayload};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 
-use crate::partition::{content_digest12, hive_object_key, resolve_partition, validate_body, validate_kind_matches_content};
+use crate::partition::{content_digest, resolve_name, validate_body, validate_kind_matches_content};
 use crate::policy::Backend;
 use crate::tier::{raw_record_at, AgeReport, AgingRule, PurgeCount, StoreError, StoredRecord, Tier, TierQuery, TierReadResult, WriteReceipt};
 
@@ -57,10 +57,10 @@ fn arrow_schema() -> Arc<Schema> {
     ]))
 }
 
-fn encode_row(kind: RecordKind, natural_key: &str, at: &str, digest: &str, body_json: &str) -> Result<Vec<u8>, StoreError> {
+fn encode_row(kind: &str, natural_key: &str, at: &str, digest: &str, body_json: &str) -> Result<Vec<u8>, StoreError> {
     let schema = arrow_schema();
     let columns: Vec<ArrayRef> = vec![
-        Arc::new(StringArray::from(vec![kind.as_str()])),
+        Arc::new(StringArray::from(vec![kind])),
         Arc::new(StringArray::from(vec![natural_key])),
         Arc::new(StringArray::from(vec![at])),
         Arc::new(StringArray::from(vec![digest])),
@@ -119,7 +119,7 @@ fn decode_rows(bytes: bytes::Bytes, path: &ObjectPath, kind: RecordKind) -> Resu
 /// [`decode_rows`]'s per-row validator: parse `body_json`, confirm its
 /// envelope/content is well-formed for `kind`, and confirm `digest`
 /// (the row's own parquet column, computed by
-/// [`crate::partition::content_digest12`] at write time) still agrees
+/// [`crate::partition::content_digest`] at write time) still agrees
 /// with the content — a stale/tampered `digest` column is exactly as
 /// much a violation as a stale/tampered `body`. Design D4's "kind/id/
 /// digest presence" wording maps onto three checks: `kind` via
@@ -134,7 +134,7 @@ fn validate_row(kind: RecordKind, body_json: &str, digest: &str) -> Result<RawRe
     validate_kind_matches_content(kind, &raw.0)?;
     validate_body(kind, &raw)?;
 
-    let expected_digest = content_digest12(&raw.0);
+    let expected_digest = content_digest(&raw.0);
     if digest.is_empty() || digest != expected_digest {
         return Err(EvidenceViolation::new(
             FailureClass::Malformed,
@@ -453,6 +453,20 @@ impl R2Tier {
         })
     }
 
+    /// The object at `path` holds exactly `raw`, else a key conflict: an
+    /// 8-hex digest collision or an edited object is never reported `deduped`.
+    fn confirm_same(&self, path: &ObjectPath, kind: RecordKind, raw: &RawRecord) -> Result<(), StoreError> {
+        let bytes = self.rt.block_on(async {
+            let result = self.store.get(path).await.map_err(|e| StoreError::ObjectStore(e.to_string()))?;
+            result.bytes().await.map_err(|e| StoreError::ObjectStore(e.to_string()))
+        })?;
+        let (stored, violations) = decode_rows(bytes, path, kind)?;
+        if !violations.is_empty() || stored.len() != 1 || stored[0] != *raw {
+            return Err(StoreError::KeyConflict { location: path.to_string() });
+        }
+        Ok(())
+    }
+
     fn list_kind(&self, kind: RecordKind) -> Result<Vec<ObjectPath>, StoreError> {
         let list_prefix = ObjectPath::from(format!("{}kind={}", self.prefix, kind.as_str()));
         self.rt.block_on(async {
@@ -475,29 +489,74 @@ impl Tier for R2Tier {
     fn write(&self, record: &dyn StoredRecord) -> Result<WriteReceipt, StoreError> {
         let kind = record.kind();
         let raw = record.to_raw();
-        let relative = hive_object_key(kind, &raw.0, "parquet")?;
-        let object_path = self.object_path(&relative);
-        let digest = content_digest12(&raw.0);
+        let name = resolve_name(kind, &raw.0)?;
+        let object_path = self.object_path(&name.relative_path(kind.as_str(), "parquet"));
+        let digest = name.digest.clone();
 
         if self.exists(&object_path)? {
-            // Digest is part of the key (module doc) — an object
-            // already present at this exact path is, by construction,
-            // byte-identical content. This is `R2Tier`'s aging-idempotence
-            // no-op (tier-policy spec: "the second run performs no
-            // duplicate write... reports zero newly-aged records").
+            // The digest is part of the key (module doc), so an object at
+            // this exact path is the same content unless the 8-hex digest
+            // collided or the object was edited: compare what is stored
+            // instead of trusting the key (R7). The same content is
+            // `R2Tier`'s aging-idempotence no-op (tier-policy spec: "the
+            // second run performs no duplicate write... reports zero
+            // newly-aged records").
+            self.confirm_same(&object_path, kind, &raw)?;
             return Ok(WriteReceipt { kind, location: object_path.to_string(), digest, deduped: true });
         }
 
-        let key = resolve_partition(kind, &raw.0)?;
         let at = record.at().to_rfc3339();
         let body_json = serde_json::to_string(&raw.0)?;
-        let bytes = encode_row(kind, &key.natural_key, &at, &digest, &body_json)?;
+        let bytes = encode_row(kind.as_str(), &name.key, &at, &digest, &body_json)?;
 
         self.rt.block_on(async {
             self.store.put(&object_path, PutPayload::from(bytes)).await.map_err(|e| StoreError::ObjectStore(e.to_string()))
         })?;
 
         Ok(WriteReceipt { kind, location: object_path.to_string(), digest, deduped: false })
+    }
+
+    /// All of `records` or none (R7): every record's key is checked against
+    /// what the store holds (and against the rest of the batch) before the
+    /// first object is put, and a put that fails deletes the objects this
+    /// batch already put.
+    fn write_batch(&self, records: &[&dyn StoredRecord]) -> Result<Vec<WriteReceipt>, StoreError> {
+        let mut seen: std::collections::HashMap<String, RawRecord> = std::collections::HashMap::new();
+        for record in records {
+            let raw = record.to_raw();
+            let name = resolve_name(record.kind(), &raw.0)?;
+            let object_path = self.object_path(&name.relative_path(record.kind().as_str(), "parquet"));
+            if let Some(earlier) = seen.get(&object_path.to_string()) {
+                if *earlier != raw {
+                    return Err(StoreError::KeyConflict { location: object_path.to_string() });
+                }
+                continue;
+            }
+            if self.exists(&object_path)? {
+                self.confirm_same(&object_path, record.kind(), &raw)?;
+            }
+            seen.insert(object_path.to_string(), raw);
+        }
+        let mut put: Vec<ObjectPath> = Vec::new();
+        let mut receipts = Vec::with_capacity(records.len());
+        for record in records {
+            let before = self.exists(&self.object_path(&resolve_name(record.kind(), &record.to_raw().0)?.relative_path(record.kind().as_str(), "parquet")))?;
+            match self.write(*record) {
+                Ok(receipt) => {
+                    if !before {
+                        put.push(ObjectPath::from(receipt.location.clone()));
+                    }
+                    receipts.push(receipt);
+                }
+                Err(e) => {
+                    for path in put {
+                        let _ = self.rt.block_on(async { self.store.delete(&path).await });
+                    }
+                    return Err(e);
+                }
+            }
+        }
+        Ok(receipts)
     }
 
     fn read(&self, query: &TierQuery) -> Result<TierReadResult, StoreError> {
@@ -571,6 +630,125 @@ impl Tier for R2Tier {
     }
 }
 
+
+/// One object of an r2 tier as `canon migrate` reads it, whatever its name
+/// and kind spelling: no validation, because the 0.29 spelling is not a
+/// [`RecordKind`] any more.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StoredObject {
+    /// The object key below this tier's prefix: `kind=<kind>/<name>.parquet`.
+    pub key: String,
+    pub kind: String,
+    pub natural_key: String,
+    pub at: String,
+    pub digest: String,
+    pub body: serde_json::Value,
+}
+
+/// One object's move to another key and body (the digest and natural-key
+/// columns follow from the new name).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ObjectRekey {
+    pub from: String,
+    pub to: String,
+    pub kind: String,
+    pub natural_key: String,
+    pub digest: String,
+    pub at: String,
+    pub body: serde_json::Value,
+}
+
+type RawRow = (String, String, String, String, serde_json::Value);
+
+fn raw_rows(bytes: bytes::Bytes) -> Result<Vec<RawRow>, StoreError> {
+    let reader = ParquetRecordBatchReaderBuilder::try_new(bytes).map_err(|e| StoreError::Parquet(e.to_string()))?.build().map_err(|e| StoreError::Parquet(e.to_string()))?;
+    let mut out = Vec::new();
+    for batch in reader {
+        let batch = batch.map_err(|e| StoreError::Parquet(e.to_string()))?;
+        let column = |name: &str| {
+            batch
+                .column_by_name(name)
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>())
+                .ok_or_else(|| StoreError::Parquet(format!("parquet batch missing `{name}` utf8 column")))
+        };
+        let (kind, natural_key, at, digest, body) = (column("kind")?, column("natural_key")?, column("at")?, column("digest")?, column("body")?);
+        for i in 0..batch.num_rows() {
+            out.push((kind.value(i).to_string(), natural_key.value(i).to_string(), at.value(i).to_string(), digest.value(i).to_string(), serde_json::from_str(body.value(i))?));
+        }
+    }
+    Ok(out)
+}
+
+impl R2Tier {
+    /// Every object under the tier's prefix (`kind=…/….parquet`), with its
+    /// row.
+    pub fn all_objects(&self) -> Result<Vec<StoredObject>, StoreError> {
+        let prefix = ObjectPath::from(self.prefix.trim_end_matches('/'));
+        let metas: Vec<ObjectPath> = self.rt.block_on(async {
+            let mut stream = if self.prefix.is_empty() { self.store.list(None) } else { self.store.list(Some(&prefix)) };
+            let mut paths = Vec::new();
+            while let Some(meta) = stream.next().await {
+                paths.push(meta.map_err(|e| StoreError::ObjectStore(e.to_string()))?.location);
+            }
+            Ok::<_, StoreError>(paths)
+        })?;
+        let mut out = Vec::new();
+        for path in metas {
+            let key = path.to_string();
+            let Some(relative) = key.strip_prefix(&self.prefix) else { continue };
+            if !relative.starts_with("kind=") || !relative.ends_with(".parquet") {
+                continue;
+            }
+            self.ensure_local_path_safe(&path)?;
+            let bytes = self.rt.block_on(async {
+                let result = self.store.get(&path).await.map_err(|e| StoreError::ObjectStore(e.to_string()))?;
+                result.bytes().await.map_err(|e| StoreError::ObjectStore(e.to_string()))
+            })?;
+            for (kind, natural_key, at, digest, body) in raw_rows(bytes)? {
+                out.push(StoredObject { key: relative.to_string(), kind, natural_key, at, digest, body });
+            }
+        }
+        out.sort_by(|a, b| a.key.cmp(&b.key));
+        Ok(out)
+    }
+
+    /// Move objects to new keys (`canon migrate`): the new object is put,
+    /// then the old one deleted. A new key that already holds other JSON is a
+    /// [`StoreError::KeyConflict`], found before the first put; a failed put
+    /// deletes what this call put.
+    pub fn rekey_objects(&self, moves: &[ObjectRekey]) -> Result<(), StoreError> {
+        for change in moves {
+            let to = ObjectPath::from(format!("{}{}", self.prefix, change.to));
+            if change.from != change.to && self.exists(&to)? {
+                let bytes = self.rt.block_on(async {
+                    let result = self.store.get(&to).await.map_err(|e| StoreError::ObjectStore(e.to_string()))?;
+                    result.bytes().await.map_err(|e| StoreError::ObjectStore(e.to_string()))
+                })?;
+                if raw_rows(bytes)?.iter().any(|row| row.4 != change.body) {
+                    return Err(StoreError::KeyConflict { location: to.to_string() });
+                }
+            }
+        }
+        let mut put: Vec<ObjectPath> = Vec::new();
+        for change in moves {
+            let to = ObjectPath::from(format!("{}{}", self.prefix, change.to));
+            let bytes = encode_row(&change.kind, &change.natural_key, &change.at, &change.digest, &serde_json::to_string(&change.body)?)?;
+            let landed = self.rt.block_on(async { self.store.put(&to, PutPayload::from(bytes)).await.map_err(|e| StoreError::ObjectStore(e.to_string())) });
+            if let Err(e) = landed {
+                for path in put {
+                    let _ = self.rt.block_on(async { self.store.delete(&path).await });
+                }
+                return Err(e);
+            }
+            put.push(to);
+        }
+        for change in moves.iter().filter(|c| c.from != c.to) {
+            let from = ObjectPath::from(format!("{}{}", self.prefix, change.from));
+            self.rt.block_on(async { self.store.delete(&from).await.map_err(|e| StoreError::ObjectStore(e.to_string())) })?;
+        }
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -751,8 +929,8 @@ mod tests {
         let change = Change::new(envelope, ChangeId::parse("s2-tiered-storage").unwrap(), "S2", "x", ChangeStatus::Proposed);
         tier.write(&change).unwrap();
 
-        let bogus_bytes = encode_row(RecordKind::Change, "bogus", &Utc::now().to_rfc3339(), "000000000000", "{}").unwrap();
-        let bogus_path = ObjectPath::from("canon/kind=change/bogus__000000000000.parquet");
+        let bogus_bytes = encode_row("change", "bogus", &Utc::now().to_rfc3339(), "000000000000", "{}").unwrap();
+        let bogus_path = ObjectPath::from("canon/kind=change/bogus_00000000.parquet");
         tier.rt.block_on(async { tier.store.put(&bogus_path, PutPayload::from(bogus_bytes)).await.unwrap() });
 
         let result = tier.read(&TierQuery::kind(RecordKind::Change)).unwrap();

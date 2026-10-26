@@ -89,7 +89,7 @@ fn plant_malformed_overlay(fixture: &support::Fixture, project_id: &str, scenari
     fields.insert("covered".to_string(), json!("not-a-bool")); // wrong type
     fields.insert("surface_ref".to_string(), json!([]));
     let body = compose_overlay_body(&envelope, fields);
-    let natural_key = format!("{project_id}__{scenario_id}");
+    let natural_key = [project_id.to_string(), scenario_id.to_string()];
     git.write_namespaced("porting.coverage", &natural_key, body).expect("plant a malformed overlay record straight onto disk");
 }
 

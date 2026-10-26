@@ -14,7 +14,7 @@ use std::path::Path;
 use std::process::Command;
 
 use canon_model::{approval_payload_bytes, ApprovalPayload, EvidenceApproval, EvidenceRecord, EvidenceVerdict};
-use canon_store::partition::content_digest12;
+use canon_store::partition::content_digest;
 
 use crate::approval::verify_risk_approval;
 use crate::context::{GateCheck, GateContext};
@@ -237,8 +237,8 @@ fn effects_for(surface: &[String]) -> Vec<String> {
 /// cannot bind an artifact, the required-risk path fails closed.
 fn latest_record<'a>(records: &[&'a EvidenceRecord]) -> Option<&'a EvidenceRecord> {
     records.iter().copied().max_by(|left, right| {
-        let left_digest = content_digest12(&serde_json::to_value(left).unwrap_or_default());
-        let right_digest = content_digest12(&serde_json::to_value(right).unwrap_or_default());
+        let left_digest = content_digest(&serde_json::to_value(left).unwrap_or_default());
+        let right_digest = content_digest(&serde_json::to_value(right).unwrap_or_default());
         (left.envelope.at, left.envelope.schema, left_digest).cmp(&(right.envelope.at, right.envelope.schema, right_digest))
     })
 }
@@ -309,7 +309,7 @@ mod tests {
 
     fn record(surface: &str, approver: Option<(&str, &str)>) -> EvidenceRecord {
         let mut record = EvidenceRecord::new(
-            Envelope::new(1, RecordKind::EvidenceRecord, now(), Actor::new("agent", RoleId::parse("implementer").unwrap())),
+            Envelope::new(1, RecordKind::Evidence, now(), Actor::new("agent", RoleId::parse("implementer").unwrap())),
             Some(TaskId::parse("change#1.1").unwrap()), None, None, EvidenceVerdict::Faithful,
         ).with_surface_ref(vec![surface.to_string()])
          .with_evidence_sha(Sha::parse("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").unwrap());

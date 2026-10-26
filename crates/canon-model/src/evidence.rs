@@ -43,6 +43,10 @@ pub enum FailureClass {
     /// A registered domain's template rejected `Handoff.body.fields`
     /// (missing/invalid field).
     InvalidHandoffBody,
+    /// A record file named by the 0.29 rule (an `area=` level, a 12-hex
+    /// digest, `kind=evidence_record/`): canon 0.30 never uses it for a
+    /// judgement, and its hint is `canon migrate` (0.30 `ledger-naming`).
+    OldLayout,
 }
 
 impl FailureClass {
@@ -57,6 +61,7 @@ impl FailureClass {
             FailureClass::InvalidStateTransition => "invalid-state-transition",
             FailureClass::UnregisteredHandoffDomain => "unregistered-handoff-domain",
             FailureClass::InvalidHandoffBody => "invalid-handoff-body",
+            FailureClass::OldLayout => "old-layout",
         }
     }
 
@@ -70,6 +75,7 @@ impl FailureClass {
             FailureClass::InvalidStateTransition,
             FailureClass::UnregisteredHandoffDomain,
             FailureClass::InvalidHandoffBody,
+            FailureClass::OldLayout,
         ]
         .into_iter()
         .find(|c| c.as_str() == s)
@@ -192,7 +198,13 @@ fn parse_evidence(candidate: &RawRecord) -> Result<EvidenceRecord, EvidenceViola
     validate_envelope_shape(candidate)?;
     check_optional_scenario_id(candidate, "scenario_id")?;
 
-    EvidenceRecord::deserialize(&candidate.0).map_err(|e| EvidenceViolation::new(FailureClass::Malformed, "<candidate>", e.to_string()))
+    let record = EvidenceRecord::deserialize(&candidate.0).map_err(|e| EvidenceViolation::new(FailureClass::Malformed, "<candidate>", e.to_string()))?;
+    // F5: a record that names no task, scenario or run has no name in any
+    // store, so the model refuses it for every writer.
+    if record.task_id.is_none() && record.scenario_id.is_none() && record.run_id.is_none() {
+        return Err(crate::layout::keyless_evidence());
+    }
+    Ok(record)
 }
 
 /// Batch form mirroring `tools/parity.py::_load_ledger`'s skip-not-crash
@@ -223,16 +235,31 @@ mod tests {
         let record = EvidenceRecord::new(
             Envelope::new(
                 1,
-                RecordKind::EvidenceRecord,
+                RecordKind::Evidence,
                 Utc::now(),
                 Actor::new("codex-cli", RoleId::parse("implementer").unwrap()),
             ),
             None,
-            None,
+            Some(crate::ids::ScenarioId::parse("vocab.typed.01").unwrap()),
             None,
             crate::records::EvidenceVerdict::Faithful,
         );
         serde_json::to_value(&record).unwrap()
+    }
+
+    /// F5: ledger-naming.keyless-evidence.01 -- evidence that names no
+    /// task, scenario or run is refused by the model, both as a typed
+    /// record and as a raw body.
+    #[test]
+    fn ledger_naming_keyless_evidence_01_the_model_refuses_a_record_with_no_key() {
+        let mut json = well_formed_evidence_json();
+        json.as_object_mut().unwrap().remove("scenario_id");
+        let violation = validate_evidence(&RawRecord(json.clone())).unwrap_err();
+        assert_eq!(violation.subject, "evidence");
+        assert!(!crate::layout::evidence_has_a_key(&json));
+        let (accepted, violations) = validate_evidence_batch(&[RawRecord(json)]);
+        assert!(accepted.is_empty());
+        assert_eq!(violations.len(), 1);
     }
 
     #[test]
@@ -284,6 +311,7 @@ mod tests {
             FailureClass::InvalidStateTransition,
             FailureClass::UnregisteredHandoffDomain,
             FailureClass::InvalidHandoffBody,
+            FailureClass::OldLayout,
         ] {
             let json = serde_json::to_string(&class).unwrap();
             assert_eq!(json, format!("\"{}\"", class.as_str()));

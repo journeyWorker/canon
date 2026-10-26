@@ -475,14 +475,14 @@ fn corpus_ids(roots: &[SpecRoot], scans: &[Vec<ScannedScenario>]) -> BTreeMap<Pr
 /// Each record's OWN content digest and format generation ride along
 /// into the fold (s21 D3: the tie-break needs a real digest, never just
 /// `at`; `s38-evidence-bearing-memory`: an equal-`at` tie is decided by
-/// `envelope.schema` FIRST) — `content_digest12` over the record's raw
+/// `envelope.schema` FIRST) — `content_digest` over the record's raw
 /// JSON, the same digest `GitTier`/`PgTier` writes already compute.
 fn latest_index(tier: &GitTier) -> Result<BTreeMap<(ProjectId, ScenarioId), Scenario>, InventoryError> {
     let existing = tier.read(&TierQuery::kind(RecordKind::Scenario))?;
     let indexed: Vec<(Scenario, String)> = existing
         .records
         .iter()
-        .filter_map(|raw| serde_json::from_value::<Scenario>(raw.0.clone()).ok().map(|scenario| (scenario, canon_store::partition::content_digest12(&raw.0))))
+        .filter_map(|raw| serde_json::from_value::<Scenario>(raw.0.clone()).ok().map(|scenario| (scenario, canon_store::partition::content_digest(&raw.0))))
         .collect();
     Ok(fold_latest_by_key(
         indexed,

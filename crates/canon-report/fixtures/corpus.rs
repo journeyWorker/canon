@@ -396,7 +396,7 @@ fn build_git_tier(git_root: &Path) {
     .unwrap();
 
     tier.write(&EvidenceRecord::new(
-        Envelope::new(1, RecordKind::EvidenceRecord, at(2026, 1, 2, 10), actor("agentA", "dev")),
+        Envelope::new(1, RecordKind::Evidence, at(2026, 1, 2, 10), actor("agentA", "dev")),
         Some(TaskId::parse("s9-fixture#1").unwrap()),
         None,
         None,
@@ -404,7 +404,7 @@ fn build_git_tier(git_root: &Path) {
     ))
     .unwrap();
     tier.write(&EvidenceRecord::new(
-        Envelope::new(1, RecordKind::EvidenceRecord, at(2026, 1, 2, 11), actor("agentB", "dev")),
+        Envelope::new(1, RecordKind::Evidence, at(2026, 1, 2, 11), actor("agentB", "dev")),
         Some(TaskId::parse("s9-fixture#2").unwrap()),
         None,
         None,
@@ -419,7 +419,7 @@ fn build_git_tier(git_root: &Path) {
     // and so is absent from `mart_scope_status` entirely.
     tier.write_namespaced(
         "porting.coverage",
-        &format!("root__{}", scope_status::FULLY_GREEN_SCENARIO_ID),
+        &["root".to_string(), scope_status::FULLY_GREEN_SCENARIO_ID.to_string()],
         RawRecord(json!({
             "schema": 1,
             "kind": "porting.coverage",
@@ -657,7 +657,7 @@ fn build_git_tier(git_root: &Path) {
     // excludes it too. Dated 2026-01-02 (an already-present
     // review-burndown day) so the burn-down's last row stays 2026-01-03.
     tier.write(&EvidenceRecord::new(
-        Envelope::new(1, RecordKind::EvidenceRecord, at(2026, 1, 2, 13), actor("agentA", "dev")),
+        Envelope::new(1, RecordKind::Evidence, at(2026, 1, 2, 13), actor("agentA", "dev")),
         None,
         Some(ScenarioId::parse(subjects::COVERED_SCENARIO_ID).unwrap()),
         None,

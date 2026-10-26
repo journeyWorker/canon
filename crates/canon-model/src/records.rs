@@ -1546,7 +1546,7 @@ impl EvidenceRecord {
     /// no early caller needs to set. Use the `with_*` builders below to
     /// set them.
     pub fn new(envelope: Envelope, task_id: Option<TaskId>, scenario_id: Option<ScenarioId>, run_id: Option<RunId>, verdict: EvidenceVerdict) -> Self {
-        debug_assert_eq!(envelope.kind, RecordKind::EvidenceRecord);
+        debug_assert_eq!(envelope.kind, RecordKind::Evidence);
         Self {
             envelope,
             project_id: None,
@@ -1631,7 +1631,7 @@ impl EvidenceRecord {
 }
 
 impl CanonRecord for EvidenceRecord {
-    const KIND: RecordKind = RecordKind::EvidenceRecord;
+    const KIND: RecordKind = RecordKind::Evidence;
     fn envelope(&self) -> &Envelope {
         &self.envelope
     }
@@ -2471,7 +2471,7 @@ mod tests {
     /// than reading as an unbound attestation.
     #[test]
     fn evidence_attachments_round_trip_and_reject_a_malformed_digest() {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("agent", RoleId::parse("implementer").unwrap()));
         let unbound = EvidenceRecord::new(envelope.clone(), None, Some(ScenarioId::parse("a.b.01").unwrap()), None, EvidenceVerdict::Faithful);
         assert!(serde_json::to_value(&unbound).unwrap().get("attachments").is_none());
 
@@ -2989,11 +2989,11 @@ mod tests {
 
     round_trip_test!(
         evidence_record_round_trips,
-        EvidenceRecord::new(envelope(RecordKind::EvidenceRecord), None, None, None, EvidenceVerdict::Faithful)
+        EvidenceRecord::new(envelope(RecordKind::Evidence), None, None, None, EvidenceVerdict::Faithful)
     );
     #[test]
     fn evidence_approval_is_additive_and_malformed_attestations_are_rejected() {
-        let record = EvidenceRecord::new(envelope(RecordKind::EvidenceRecord), None, None, None, EvidenceVerdict::Faithful);
+        let record = EvidenceRecord::new(envelope(RecordKind::Evidence), None, None, None, EvidenceVerdict::Faithful);
         let legacy = serde_json::to_value(&record).unwrap();
         assert!(legacy.get("approval").is_none());
         assert!(serde_json::from_value::<EvidenceRecord>(legacy.clone()).unwrap().approval.is_none());
@@ -3031,7 +3031,7 @@ mod tests {
         let at = serde_json::to_value(Utc::now()).unwrap();
         let json = serde_json::json!({
             "schema": 1,
-            "kind": "evidence_record",
+            "kind": "evidence",
             "at": at,
             "actor": {"agent_id": "codex-cli", "role": "implementer"},
             "verdict": "faithful",
@@ -3051,7 +3051,7 @@ mod tests {
         let at = serde_json::to_value(Utc::now()).unwrap();
         let json = serde_json::json!({
             "schema": 1,
-            "kind": "evidence_record",
+            "kind": "evidence",
             "at": at,
             "actor": {"agent_id": "codex-cli", "role": "implementer"},
             "verdict": "faithful",
@@ -3073,7 +3073,7 @@ mod tests {
         for field in ["lifecycle", "flagged", "evidence_sha", "run_seq"] {
             let mut obj = serde_json::json!({
                 "schema": 1,
-                "kind": "evidence_record",
+                "kind": "evidence",
                 "at": at,
                 "actor": {"agent_id": "codex-cli", "role": "implementer"},
                 "verdict": "faithful",
@@ -3129,7 +3129,7 @@ mod tests {
 
     /// The additive-field discipline every canon optional follows: an
     /// unset optional is ABSENT from the wire form, never a literal
-    /// `null` (which would change the record's `content_digest12` and
+    /// `null` (which would change the record's `content_digest` and
     /// break write-time idempotence).
     #[test]
     fn finding_omits_its_unset_optionals_entirely() {
@@ -3172,7 +3172,7 @@ mod tests {
 
     /// A resubmission carrying no new fact is not a transition. Without
     /// this, an identical body could append forever at one key — each
-    /// copy a new `content_digest12` from its fresh envelope alone.
+    /// copy a new `content_digest` from its fresh envelope alone.
     #[test]
     fn an_unchanged_disposition_is_not_a_transition() {
         let earlier = finding(3, 2);

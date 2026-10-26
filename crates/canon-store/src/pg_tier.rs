@@ -56,9 +56,9 @@ use canon_model::evidence::RawRecord;
 use chrono::{DateTime, Utc};
 use sqlx::Row;
 
-use crate::partition::{content_digest12, resolve_partition};
+use crate::partition::resolve_name;
 use crate::policy::{Backend, Rung};
-use crate::tier::{AgeReport, AgingRule, PurgeCount, RawWrite, StoreError, StoredRecord, Tier, TierQuery, TierReadResult, WriteReceipt};
+use crate::tier::{AgeReport, AgingRule, PurgeCount, RawWrite, RowRekey, StoreError, StoredRecord, StoredRow, Tier, TierQuery, TierReadResult, WriteReceipt};
 
 /// `schema` comes from `canon.yaml` (an operator-controlled config
 /// file, not runtime user input) but is still interpolated into DDL/
@@ -120,23 +120,6 @@ fn create_index_sql(schema: &str) -> String {
     format!("CREATE INDEX IF NOT EXISTS records_history_kind_id_idx ON {schema}.records_history (kind, id)")
 }
 
-/// INSERT-only (s21 D1/D2): `ON CONFLICT (kind, id, digest) DO
-/// NOTHING` — a byte-identical resubmission at the same key never
-/// lands a second row and never updates the existing one; ANY new
-/// digest is a genuine new row, an append, never an overwrite. Uses
-/// `RETURNING kind` (rather than a computed boolean column, the
-/// pre-s21 `existed_with_same_digest` shape) purely as the "did this
-/// row actually land" signal: a `DO NOTHING`-suppressed insert returns
-/// zero rows, a landed insert returns exactly one — [`PgTier::write_row`]
-/// reads `deduped` off row PRESENCE, not a computed column.
-fn insert_sql(schema: &str) -> String {
-    format!(
-        "INSERT INTO {schema}.records_history (kind, id, at, digest, body) VALUES ($1, $2, $3, $4, $5) \
-         ON CONFLICT (kind, id, digest) DO NOTHING \
-         RETURNING kind"
-    )
-}
-
 /// [`PgTier::write_batch`]'s chunk size (s31 design D2): 500 rows per
 /// multi-row `INSERT` statement — large enough that a typical ingest
 /// pass's batch (a session's worth of events) lands in a single
@@ -146,7 +129,7 @@ fn insert_sql(schema: &str) -> String {
 /// transaction short-lived.
 const WRITE_BATCH_CHUNK_SIZE: usize = 500;
 
-/// Multi-row form of [`insert_sql`] (s31 design D2: `PgTier::write_batch`'s
+/// The multi-row `INSERT` (s31 design D2: `PgTier::write_batch`'s
 /// 500-row chunk statement) — `n` `($1..$5), ($6..$10), …` VALUES
 /// tuples in ONE `INSERT … ON CONFLICT (kind, id, digest) DO NOTHING`,
 /// the SAME per-row dedup semantics as the single-row form. `RETURNING
@@ -168,6 +151,23 @@ fn insert_batch_sql(schema: &str, n: usize) -> String {
          RETURNING kind, id, digest",
         values.join(", ")
     )
+}
+
+/// The stored body of one `(kind, id, digest)` row: what a write that
+/// found its key taken compares itself against (R7). `body` is JSONB, so the
+/// comparison is of the parsed JSON values, not of bytes.
+fn select_body_sql(schema: &str) -> String {
+    format!("SELECT body FROM {schema}.records_history WHERE kind = $1 AND id = $2 AND digest = $3")
+}
+
+/// `canon migrate`'s re-key of one row (R7 conflict handling is in
+/// [`PgTier::rekey`]): the key, body and nothing else change.
+fn rekey_sql(schema: &str) -> String {
+    format!("UPDATE {schema}.records_history SET kind = $1, id = $2, digest = $3, body = $4 WHERE kind = $5 AND id = $6 AND digest = $7")
+}
+
+fn all_rows_sql(schema: &str) -> String {
+    format!("SELECT kind, id, to_char(at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS at, digest, body FROM {schema}.records_history ORDER BY kind, id, digest")
 }
 
 fn select_sql(schema: &str, since: bool) -> String {
@@ -306,60 +306,28 @@ impl PgTier {
         Self::connect(&dsn, schema)
     }
 
-    /// Append-only (s21 D1/D2): every write is a plain `INSERT …
-    /// ON CONFLICT (kind, id, digest) DO NOTHING` — a byte-identical
-    /// resubmission at the same key is a no-op (`deduped: true`, row
-    /// count unchanged); ANY new digest at the same `(kind, id)`
-    /// lands as a brand-new row, never an overwrite of a prior
-    /// version. `location` carries the digest too (mirrors
-    /// `GitTier`'s digest-suffixed path), since a pg-tier location is
-    /// now per-VERSION identity, not per-key.
+    /// Append-only (s21 D1/D2): a single-record batch, so one write and a
+    /// batch of one share the one code path.
     fn write_row(&self, record: &dyn StoredRecord) -> Result<WriteReceipt, StoreError> {
-        let kind = record.kind();
-        let raw = record.to_raw();
-        let key = resolve_partition(kind, &raw.0)?;
-        let digest = content_digest12(&raw.0);
-        let at = record.at();
-
-        let inserted = self.rt.block_on(async {
-            let row = sqlx::query(sqlx::AssertSqlSafe(insert_sql(&self.schema)))
-                .bind(kind.as_str())
-                .bind(&key.natural_key)
-                .bind(at)
-                .bind(&digest)
-                .bind(sqlx::types::Json(&raw.0))
-                .fetch_optional(&self.pool)
-                .await
-                .map_err(|e| StoreError::Sql(e.to_string()))?;
-            Ok::<bool, StoreError>(row.is_some())
-        })?;
-
-        Ok(WriteReceipt {
-            kind,
-            location: format!("{}.records_history[{}={}]__{}", self.schema, kind.as_str(), key.natural_key, digest),
-            digest,
-            deduped: !inserted,
-        })
+        Ok(self.write_rows(std::slice::from_ref(&record))?.remove(0))
     }
 
-    /// One ≤[`WRITE_BATCH_CHUNK_SIZE`]-row chunk of `Tier::write_batch`
-    /// (s31 design D2): a SINGLE multi-row `INSERT … ON CONFLICT DO
-    /// NOTHING` inside its OWN transaction — one transaction per
-    /// chunk, never one per row and never one spanning multiple
-    /// chunks. Per-row semantics mirror [`Self::write_row`] exactly
-    /// (s21 append-only contract): a byte-identical resubmission lands
-    /// zero new rows for that row's `(kind, id, digest)`, and its
-    /// receipt reports `deduped: true`, byte-for-byte the same
-    /// `WriteReceipt` shape `write_row` would have produced for it.
-    fn write_chunk(&self, records: &[&dyn StoredRecord]) -> Result<Vec<WriteReceipt>, StoreError> {
+    /// The whole of one [`Tier::write_batch`] in ONE transaction (R7): every
+    /// row is a plain `INSERT … ON CONFLICT (kind, id, digest) DO NOTHING`.
+    /// A key that already holds the SAME JSON value is a no-op (`deduped:
+    /// true`); a key that holds a DIFFERENT value is a
+    /// [`StoreError::KeyConflict`] and the transaction rolls back, so none of
+    /// the batch's rows (in any chunk) is kept. A new digest at the same
+    /// `(kind, id)` is a genuine append. `location` carries the digest too
+    /// (mirrors `GitTier`'s digest-suffixed path).
+    fn write_rows(&self, records: &[&dyn StoredRecord]) -> Result<Vec<WriteReceipt>, StoreError> {
         if records.is_empty() {
             return Ok(Vec::new());
         }
 
         // Resolve every row's persisted shape BEFORE opening the
-        // transaction: a malformed record (`resolve_partition` error)
-        // is an ordinary per-record `Err`, never something that should
-        // abort a half-open transaction.
+        // transaction: a malformed record is an ordinary per-record `Err`,
+        // never something that should abort a half-open transaction.
         let mut kinds = Vec::with_capacity(records.len());
         let mut keys = Vec::with_capacity(records.len());
         let mut ats = Vec::with_capacity(records.len());
@@ -368,25 +336,52 @@ impl PgTier {
         for record in records {
             let kind = record.kind();
             let raw = record.to_raw();
-            let key = resolve_partition(kind, &raw.0)?;
-            digests.push(content_digest12(&raw.0));
+            let name = resolve_name(kind, &raw.0)?;
+            digests.push(name.digest);
             kinds.push(kind);
             ats.push(record.at());
-            keys.push(key.natural_key);
+            keys.push(name.key);
             bodies.push(raw.0);
         }
 
         let landed: HashSet<(String, String, String)> = self.rt.block_on(async {
             let mut tx = self.pool.begin().await.map_err(|e| StoreError::Sql(e.to_string()))?;
-            let mut q = sqlx::query(sqlx::AssertSqlSafe(insert_batch_sql(&self.schema, records.len())));
-            for i in 0..records.len() {
-                q = q.bind(kinds[i].as_str()).bind(&keys[i]).bind(ats[i]).bind(&digests[i]).bind(sqlx::types::Json(&bodies[i]));
+            let mut landed = HashSet::new();
+            let mut seen: std::collections::HashMap<(String, String, String), usize> = std::collections::HashMap::new();
+            for start in (0..records.len()).step_by(WRITE_BATCH_CHUNK_SIZE) {
+                let end = (start + WRITE_BATCH_CHUNK_SIZE).min(records.len());
+                let mut q = sqlx::query(sqlx::AssertSqlSafe(insert_batch_sql(&self.schema, end - start)));
+                for i in start..end {
+                    q = q.bind(kinds[i].as_str()).bind(&keys[i]).bind(ats[i]).bind(&digests[i]).bind(sqlx::types::Json(&bodies[i]));
+                }
+                for r in q.fetch_all(&mut *tx).await.map_err(|e| StoreError::Sql(e.to_string()))? {
+                    landed.insert((r.get::<String, _>("kind"), r.get::<String, _>("id"), r.get::<String, _>("digest")));
+                }
             }
-            let rows = q.fetch_all(&mut *tx).await.map_err(|e| StoreError::Sql(e.to_string()))?;
-            let landed = rows
-                .into_iter()
-                .map(|r| (r.get::<String, _>("kind"), r.get::<String, _>("id"), r.get::<String, _>("digest")))
-                .collect();
+            for i in 0..records.len() {
+                let key = (kinds[i].as_str().to_string(), keys[i].clone(), digests[i].clone());
+                if let Some(&first) = seen.get(&key) {
+                    if bodies[first] != bodies[i] {
+                        return Err(StoreError::KeyConflict { location: self.location(kinds[i], &keys[i], &digests[i]) });
+                    }
+                    continue;
+                }
+                seen.insert(key.clone(), i);
+                if !landed.contains(&key) {
+                    let stored = sqlx::query(sqlx::AssertSqlSafe(select_body_sql(&self.schema)))
+                        .bind(kinds[i].as_str())
+                        .bind(&keys[i])
+                        .bind(&digests[i])
+                        .fetch_one(&mut *tx)
+                        .await
+                        .map_err(|e| StoreError::Sql(e.to_string()))?
+                        .get::<sqlx::types::Json<serde_json::Value>, _>("body")
+                        .0;
+                    if stored != bodies[i] {
+                        return Err(StoreError::KeyConflict { location: self.location(kinds[i], &keys[i], &digests[i]) });
+                    }
+                }
+            }
             tx.commit().await.map_err(|e| StoreError::Sql(e.to_string()))?;
             Ok::<_, StoreError>(landed)
         })?;
@@ -394,14 +389,77 @@ impl PgTier {
         Ok((0..records.len())
             .map(|i| {
                 let inserted = landed.contains(&(kinds[i].as_str().to_string(), keys[i].clone(), digests[i].clone()));
-                WriteReceipt {
-                    kind: kinds[i],
-                    location: format!("{}.records_history[{}={}]__{}", self.schema, kinds[i].as_str(), keys[i], digests[i]),
-                    digest: digests[i].clone(),
-                    deduped: !inserted,
-                }
+                WriteReceipt { kind: kinds[i], location: self.location(kinds[i], &keys[i], &digests[i]), digest: digests[i].clone(), deduped: !inserted }
             })
             .collect())
+    }
+
+    fn location(&self, kind: canon_model::envelope::RecordKind, key: &str, digest: &str) -> String {
+        format!("{}.records_history[{}={key}]_{digest}", self.schema, kind.as_str())
+    }
+
+    /// Every row of `records_history`, in key order (`canon migrate` reads it
+    /// to compute the rows' new keys).
+    pub fn all_rows(&self) -> Result<Vec<StoredRow>, StoreError> {
+        self.rt.block_on(async {
+            let rows = sqlx::query(sqlx::AssertSqlSafe(all_rows_sql(&self.schema))).fetch_all(&self.pool).await.map_err(|e| StoreError::Sql(e.to_string()))?;
+            Ok(rows
+                .into_iter()
+                .map(|r| StoredRow {
+                    kind: r.get("kind"),
+                    id: r.get("id"),
+                    at: r.get("at"),
+                    digest: r.get("digest"),
+                    body: r.get::<sqlx::types::Json<serde_json::Value>, _>("body").0,
+                })
+                .collect())
+        })
+    }
+
+    /// Re-key rows in ONE transaction (`canon migrate`): each row gets its new
+    /// `(kind, id, digest)` and body; a new key held by the same JSON drops the
+    /// old row, held by other JSON is a [`StoreError::KeyConflict`] and nothing
+    /// of the call is kept.
+    pub fn rekey(&self, changes: &[RowRekey]) -> Result<(), StoreError> {
+        self.rt.block_on(async {
+            let mut tx = self.pool.begin().await.map_err(|e| StoreError::Sql(e.to_string()))?;
+            for change in changes {
+                let held = sqlx::query(sqlx::AssertSqlSafe(select_body_sql(&self.schema)))
+                    .bind(&change.to.0)
+                    .bind(&change.to.1)
+                    .bind(&change.to.2)
+                    .fetch_optional(&mut *tx)
+                    .await
+                    .map_err(|e| StoreError::Sql(e.to_string()))?
+                    .map(|r| r.get::<sqlx::types::Json<serde_json::Value>, _>("body").0);
+                if let (Some(held), true) = (&held, change.from != change.to) {
+                    if *held != change.body {
+                        return Err(StoreError::KeyConflict { location: self.location(canon_model::envelope::RecordKind::ALL.into_iter().find(|k| k.as_str() == change.to.0).unwrap_or(canon_model::envelope::RecordKind::Change), &change.to.1, &change.to.2) });
+                    }
+                    sqlx::query(sqlx::AssertSqlSafe(delete_sql(&self.schema)))
+                        .bind(&change.from.0)
+                        .bind(&change.from.1)
+                        .bind(&change.from.2)
+                        .execute(&mut *tx)
+                        .await
+                        .map_err(|e| StoreError::Sql(e.to_string()))?;
+                    continue;
+                }
+                sqlx::query(sqlx::AssertSqlSafe(rekey_sql(&self.schema)))
+                    .bind(&change.to.0)
+                    .bind(&change.to.1)
+                    .bind(&change.to.2)
+                    .bind(sqlx::types::Json(&change.body))
+                    .bind(&change.from.0)
+                    .bind(&change.from.1)
+                    .bind(&change.from.2)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|e| StoreError::Sql(e.to_string()))?;
+            }
+            tx.commit().await.map_err(|e| StoreError::Sql(e.to_string()))?;
+            Ok(())
+        })
     }
 
     fn read_rows(&self, query: &TierQuery, older_than: Option<DateTime<Utc>>) -> Result<Vec<RawRecord>, StoreError> {
@@ -437,11 +495,7 @@ impl Tier for PgTier {
     /// — the s31 "batch == loop" equivalence tests hold this override
     /// to that bar.
     fn write_batch(&self, records: &[&dyn StoredRecord]) -> Result<Vec<WriteReceipt>, StoreError> {
-        let mut receipts = Vec::with_capacity(records.len());
-        for chunk in records.chunks(WRITE_BATCH_CHUNK_SIZE) {
-            receipts.extend(self.write_chunk(chunk)?);
-        }
-        Ok(receipts)
+        self.write_rows(records)
     }
 
     /// Never pre-folds (s21 D5) — returns every retained historical
@@ -498,13 +552,12 @@ impl Tier for PgTier {
         let mut moved = 0;
         let mut already_aged = 0;
         for raw in candidates {
-            let key = resolve_partition(rule.kind, &raw.0)?;
             // Computed BEFORE `raw` moves into `RawWrite` below — the
             // per-ROW identity `delete_sql` deletes by (s21 D1/task
             // 3.5: several rows can now share this `(kind, id)`, so
             // aging must delete exactly the ONE version it just moved,
             // never every version under this key).
-            let digest = content_digest12(&raw.0);
+            let name = resolve_name(rule.kind, &raw.0)?;
             let receipt = rule.destination.write(&RawWrite(raw))?;
             if receipt.deduped {
                 already_aged += 1;
@@ -514,8 +567,8 @@ impl Tier for PgTier {
             self.rt.block_on(async {
                 sqlx::query(sqlx::AssertSqlSafe(delete_sql(&self.schema)))
                     .bind(rule.kind.as_str())
-                    .bind(&key.natural_key)
-                    .bind(&digest)
+                    .bind(&name.key)
+                    .bind(&name.digest)
                     .execute(&self.pool)
                     .await
                     .map_err(|e| StoreError::Sql(e.to_string()))
@@ -534,14 +587,6 @@ mod tests {
         let sql = create_table_sql("canon_v1");
         assert!(sql.contains("CREATE TABLE IF NOT EXISTS canon_v1.records_history"));
         assert!(sql.contains("PRIMARY KEY (kind, id, digest)"), "s21 D2: the idempotence key includes digest, never a bare (kind, id)");
-    }
-
-    #[test]
-    fn insert_sql_conflicts_on_kind_id_digest_and_does_nothing_never_updates() {
-        let sql = insert_sql("canon_v1");
-        assert!(sql.contains("ON CONFLICT (kind, id, digest) DO NOTHING"), "s21 D1: append-only, never an UPDATE on conflict");
-        assert!(sql.contains("INSERT INTO canon_v1.records_history"));
-        assert!(!sql.to_uppercase().contains("DO UPDATE"), "must never fall back to an upsert-in-place");
     }
 
     #[test]

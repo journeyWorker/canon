@@ -88,7 +88,7 @@
 //! # Staged, never committed
 //! [`run_add`] writes to [`crate::gate::evidence_staging_dir`] —
 //! `<ledger_root>/_staging`, a `GitTier` sibling of the committed
-//! `kind=evidence_record/` tree — exactly the mechanism `canon gate
+//! `kind=evidence/` tree — exactly the mechanism `canon gate
 //! promote` already drains (`canon_gate::promote`), never a parallel
 //! one. So the three-command loop is:
 //!
@@ -984,7 +984,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
         actor = actor.with_session(session_id.clone());
     }
     let mut record = EvidenceRecord::new(
-        Envelope::current(RecordKind::EvidenceRecord, at, actor),
+        Envelope::current(RecordKind::Evidence, at, actor),
         args.task_id.clone(),
         args.scenario_id.clone(),
         args.run_id,
@@ -1139,7 +1139,7 @@ fn repeat_of_latest(ledger_root: &Path, body: &serde_json::Value) -> Option<crat
 /// it writes any of them: the ledger, the staging area and the reviews are
 /// read once for all of them, not once per body.
 fn repeats_of_latest(ledger_root: &Path, bodies: &[serde_json::Value]) -> Vec<Option<crate::retry::Existing>> {
-    let corpus = crate::retry::RepeatCorpus::read(ledger_root, Some(&evidence_staging_dir(ledger_root)), RecordKind::EvidenceRecord.as_str(), Some(RecordKind::Review.as_str()));
+    let corpus = crate::retry::RepeatCorpus::read(ledger_root, Some(&evidence_staging_dir(ledger_root)), RecordKind::Evidence.as_str(), Some(RecordKind::Review.as_str()));
     bodies
         .iter()
         .map(|body| {
@@ -1362,7 +1362,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
         .zip(&scenario_ids)
         .zip(&refusals)
         .map(|((binding, id), refusals)| {
-            let mut record = EvidenceRecord::new(Envelope::current(RecordKind::EvidenceRecord, at, actor.clone()), None, Some(id.clone()), args.run_id, binding.verdict)
+            let mut record = EvidenceRecord::new(Envelope::current(RecordKind::Evidence, at, actor.clone()), None, Some(id.clone()), args.run_id, binding.verdict)
                 .with_attachments(binding.attachments.clone())
                 .with_project_id(project_id.clone())
                 .with_evidence_sha(args.commit.sha.clone())
@@ -1485,7 +1485,7 @@ fn land_batch(
     write: &mut dyn FnMut(&GitTier, &RawWrite) -> Result<canon_store::tier::WriteReceipt, canon_store::tier::StoreError>,
 ) -> Result<LandedBatch, (String, u8)> {
     let staging_root = evidence_staging_dir(ledger_root);
-    let kind_dir = format!("kind={}", RecordKind::EvidenceRecord.as_str());
+    let kind_dir = format!("kind={}", RecordKind::Evidence.as_str());
     let mut destinations = vec![staging_root.join(&kind_dir)];
     if promote {
         destinations.push(ledger_root.join(&kind_dir));
@@ -1511,7 +1511,7 @@ fn land_batch(
             }
         }
         if locations.iter().any(|location| location.promoted.is_some()) {
-            crate::ledger::restore_after_rollback(ledger_root, RecordKind::EvidenceRecord);
+            crate::ledger::restore_after_rollback(ledger_root, RecordKind::Evidence);
         }
         held.rollback();
     };
@@ -1885,11 +1885,11 @@ mod tests {
 
     fn staged_count(repo: &Path) -> usize {
         let root = evidence_staging_dir(&GateCtx::from_repo(repo).unwrap().ledger_root);
-        GitTier::new(root).read(&TierQuery::kind(RecordKind::EvidenceRecord)).map_or(0, |read| read.records.len())
+        GitTier::new(root).read(&TierQuery::kind(RecordKind::Evidence)).map_or(0, |read| read.records.len())
     }
 
     fn committed(repo: &Path) -> Vec<RawRecord> {
-        GitTier::new(GateCtx::from_repo(repo).unwrap().ledger_root).read(&TierQuery::kind(RecordKind::EvidenceRecord)).expect("reading the committed ledger").records
+        GitTier::new(GateCtx::from_repo(repo).unwrap().ledger_root).read(&TierQuery::kind(RecordKind::Evidence)).expect("reading the committed ledger").records
     }
 
     /// s42 task 4.3, the whole point of the change: a checkbox flips on
@@ -2106,7 +2106,7 @@ mod tests {
     /// refusal existed would.
     fn stage_note_verbatim(repo: &Path, summary: &str) {
         let record = EvidenceRecord::new(
-            Envelope::current(RecordKind::EvidenceRecord, Utc::now(), Actor::new("canon", RoleId::parse("implementer").expect("a literal role"))),
+            Envelope::current(RecordKind::Evidence, Utc::now(), Actor::new("canon", RoleId::parse("implementer").expect("a literal role"))),
             Some(TaskId::parse("demo-change#1.1").expect("a literal task id")),
             None,
             None,
@@ -2144,7 +2144,7 @@ mod tests {
 
     /// A scenario-keyed evidence body by `actor`, as a batch stages it.
     fn batch_body(scenario: &str, actor: Actor) -> serde_json::Value {
-        let record = EvidenceRecord::new(Envelope::current(RecordKind::EvidenceRecord, Utc::now(), actor), None, Some(ScenarioId::parse(scenario).unwrap()), None, EvidenceVerdict::Faithful)
+        let record = EvidenceRecord::new(Envelope::current(RecordKind::Evidence, Utc::now(), actor), None, Some(ScenarioId::parse(scenario).unwrap()), None, EvidenceVerdict::Faithful)
             .with_project_id(ProjectId::parse("root").unwrap());
         serde_json::to_value(&record).unwrap()
     }
@@ -2188,7 +2188,7 @@ mod tests {
         assert_eq!((staged_count(repo), committed(repo).len(), blobs()), (0, 0, 0), "the first committed record is removed too");
 
         // A read-only destination is refused before anything is written.
-        let staging_kind = evidence_staging_dir(&ledger_root).join("kind=evidence_record");
+        let staging_kind = evidence_staging_dir(&ledger_root).join("kind=evidence");
         let original = std::fs::metadata(&staging_kind).unwrap().permissions();
         let mut readonly = original.clone();
         readonly.set_readonly(true);

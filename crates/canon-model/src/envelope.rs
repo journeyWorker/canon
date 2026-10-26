@@ -33,7 +33,7 @@ pub enum RecordKind {
     Divergence,
     Trajectory,
     StrategyItem,
-    EvidenceRecord,
+    Evidence,
     // The product/management unit (s36): the durable subject a team
     // plans, designs, builds, and measures across many changes — the
     // reviewed 13th kind (design D1's process). Plain line comment, NOT
@@ -68,7 +68,7 @@ impl RecordKind {
         RecordKind::Divergence,
         RecordKind::Trajectory,
         RecordKind::StrategyItem,
-        RecordKind::EvidenceRecord,
+        RecordKind::Evidence,
         RecordKind::Subject,
         RecordKind::Finding,
     ];
@@ -90,7 +90,7 @@ impl RecordKind {
             RecordKind::Divergence => "divergence",
             RecordKind::Trajectory => "trajectory",
             RecordKind::StrategyItem => "strategy_item",
-            RecordKind::EvidenceRecord => "evidence_record",
+            RecordKind::Evidence => "evidence",
             RecordKind::Subject => "subject",
             RecordKind::Finding => "finding",
         }
@@ -153,48 +153,18 @@ impl RecordKind {
             | RecordKind::Divergence
             | RecordKind::Trajectory
             | RecordKind::StrategyItem
-            | RecordKind::EvidenceRecord
+            | RecordKind::Evidence
             | RecordKind::Subject
             | RecordKind::Finding => 1,
         }
     }
 
-    /// The Hive-style path TEMPLATE this kind's git-tier files follow
-    /// (S2 design D2, task 1.2) — a pure, storage-agnostic path
-    /// template string; `canon-model` never resolves `{area}`/`{id}`
-    /// itself and never imports `canon-store` — only `canon-store`'s
-    /// `GitTier` interprets this template against a filesystem
-    /// (design D2's Risk-section mitigation). Exactly two shapes,
-    /// mirroring `tools/parity.py::_ledger_layout_problem`'s `run`/
-    /// `drill` (flat) vs. `review`/`design-review`/`code-review`/
-    /// `clear` (nested) split:
-    /// - flat: `"kind={kind}/{id}.json"` — every kind without a
-    ///   mandatory `scenario_id`.
-    /// - area-scoped: `"kind={kind}/area={area}/{id}.json"` — the
-    ///   three kinds whose `scenario_id` field is non-`Option`
-    ///   ([`crate::records::Scenario`], [`crate::records::Review`],
-    ///   [`crate::records::Divergence`]; see [`Self::is_area_scoped`]).
-    ///   `{area}` MUST be resolved via `ScenarioId::area()`, never
-    ///   trusted from a source directory (`tools/parity.py::_area_of`,
-    ///   six documented mismatch cases).
-    pub fn partition_template(self) -> &'static str {
-        if self.is_area_scoped() {
-            "kind={kind}/area={area}/{id}.json"
-        } else {
-            "kind={kind}/{id}.json"
-        }
-    }
-
-    /// Whether this kind's [`Self::partition_template`] requires the
-    /// Hive `area={area}/` segment — true for exactly the kinds whose
-    /// `scenario_id` field is mandatory (non-`Option`), false for the
-    /// other eleven (including [`RecordKind::EvidenceRecord`], whose
-    /// `scenario_id` is present-but-optional per S1 design — an
-    /// evidence record without a scenario tie is still a flat, valid
-    /// record, and [`RecordKind::Finding`], which is scoped to a
-    /// reviewed COMMIT rather than to a scenario at all).
-    pub fn is_area_scoped(self) -> bool {
-        matches!(self, RecordKind::Scenario | RecordKind::Review | RecordKind::Divergence)
+    /// The name template this kind's files follow in every store (0.30,
+    /// `crate::layout`): `kind=<kind>/<components>_<digest8>.json`. Pure
+    /// text for `canon context`; the components are
+    /// [`crate::layout::components`].
+    pub fn partition_template(self) -> String {
+        crate::layout::template(self)
     }
 }
 

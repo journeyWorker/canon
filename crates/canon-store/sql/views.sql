@@ -14,7 +14,7 @@
 --   int_*  gate-equivalent derivations mirroring `canon-gate` (S5).
 --          S5 has not shipped yet (S2 lands first, per the wave order)
 --          — `int_evidence_verdicts` below is an explicit STUB tally
---          over `evidence_record`'s own `verdict` field, not a
+--          over `evidence`'s own `verdict` field, not a
 --          `canon-gate` mirror; replace it wholesale once S5 ships the
 --          real Rust derivation to mirror (never let this stub silently
 --          become load-bearing).
@@ -37,7 +37,7 @@
 --
 -- 0.18 (#29) addition: a FOURTH rebindable root, `CANON_HOT_ROOT`,
 -- holds the sqlite hot tier's rows materialized as git-shaped JSON
--- files (`kind=<kind>/<n>__<digest12>.json`) by `canon-report` right
+-- files (`kind=<kind>/<n>_<digest8>.json`) by `canon-report` right
 -- before it opens this file — the sqlite db is local and needs no
 -- credential, so `canon init`'s default routing (`task`/`handoff`/
 -- `session`/`run`/`event` to a sqlite `hot` rung) reaches the marts.
@@ -57,7 +57,7 @@
 -- s42), `canon gate task` (a `task`, checkbox flip), `canon subject
 -- status` (a `subject`, proposed -> … -> shipped), a handoff
 -- transition (a `handoff`), a divergence being resolved (a
--- `divergence`), and a re-attestation (an `evidence_record`).
+-- `divergence`), and a re-attestation (an `evidence`).
 --
 -- `crate::query`'s Rust readers fold those versions to one winner per
 -- natural key (`canon_store::fold_latest_by_key`, greatest
@@ -137,9 +137,9 @@
 -- there is nothing left over.
 --
 -- `digest` — a RESIDUAL on each root, and they are DIFFERENT residuals.
--- `crate::query`'s readers RECOMPUTE `partition::content_digest12`
+-- `crate::query`'s readers RECOMPUTE `partition::content_digest`
 -- from the body; no staging view can, because canonical-form hashing
--- is not expressible here — `content_digest12` hashes serde_json's
+-- is not expressible here — `content_digest` hashes serde_json's
 -- alphabetical-key, compact serialization of the value, and DuckDB has
 -- no recursive JSON key-sorting canonicalizer that could reproduce
 -- those exact bytes to hash. Each root instead reads a STORED copy of
@@ -147,18 +147,19 @@
 -- OWN Rust reader will hand you — a different enforcement point per
 -- root, so the claim has to be made twice, never once:
 --
---   git — `stg_git_records.digest` is the FILENAME's `__{digest12}`
---     suffix, which `GitTier::write` writes from `content_digest12`
---     and `GitTier::scan_kind_where` REJECTS as a `layout` violation
---     for any file whose path is not the one its own content resolves
---     to (its `expected != relative` check), as `scan_namespaced_kind`
---     does for overlay records. RESIDUAL: a hand-planted or renamed
---     `.json` whose NAME disagrees with its body. `canon query` never
---     returns it (soft-skipped as a violation); these views run no
---     layout gate and fold it at whatever its filename claims.
+--   git — `stg_git_records.digest` is computed from the record's own TEXT
+--     by `canon_body_digest` (0.30 R10: never read from the file name, which
+--     since 0.30 carries only the first 8 hex digits of the same value and
+--     is checked against it by `GitTier::scan_kind_where`). The text canon
+--     writes is sorted-key pretty JSON, so removing its structural
+--     whitespace gives the canonical compact text `content_digest` hashes.
+--     RESIDUAL: a hand-edited file whose text is not canon's own pretty
+--     form hashes to something else; `canon query` never returns such a
+--     file (its name disagrees with its body, a `layout` violation) while
+--     these views run no layout gate and fold it at the digest its text has.
 --
 --   r2 — `stg_r2_records.digest` is the parquet `digest` COLUMN,
---     materialized by `R2Tier::write` from the same `content_digest12`
+--     materialized by `R2Tier::write` from the same `content_digest`
 --     call that names the object, and re-checked against the body on
 --     every read by `R2Tier::read`'s `validate_row` ("a stale/tampered
 --     `digest` column is exactly as much a violation as a stale/
@@ -179,7 +180,7 @@
 -- both_roots_fold_a_digest_the_rust_reader_refuses_to_return`.
 --
 -- Considered and REJECTED for r2: cross-checking the `digest` column
--- against the `__{digest12}` suffix the OBJECT KEY also carries
+-- against the `_<digest8>` suffix the OBJECT KEY also carries
 -- (`partition::hive_object_key` names r2 objects exactly as it names
 -- git files, from the same digest). It looks like the git-side gate,
 -- and it is not one. A check here only shrinks divergence when the
@@ -287,7 +288,7 @@
 -- `canon_store::tier::raw_record_schema` documents for its own `0`
 -- ("a record whose `schema` is missing or non-integer can never
 -- out-rank a well-formed record of the same key"). An unreadable git
--- filename suffix reads `''`, which sorts below every real 12-hex
+-- filename suffix reads `''` (before 0.30; the digest now comes from the body), which sorts below every real 8-hex
 -- digest, for the identical reason. Reading that suffix is the ONE
 -- thing this file derives from `record_path`, and it is narrow on
 -- purpose — the digest suffix is kind-INDEPENDENT (one end-anchored
@@ -312,7 +313,7 @@
 --     `scenario_id` alone: that is the `porting.coverage` overlay's
 --     own declared `join_key` (`.canon/plugins/porting/plugin.yaml`),
 --     and the pair is what `GitTier::write_namespaced` builds its
---     `{project_id}__{scenario_id}` natural key from. Keying
+--     `{project_id}_{scenario_id}` natural key from. Keying
 --     `scenario_id` alone MERGES two spec roots that share a scenario
 --     id and then returns an arbitrary winner — reporting one
 --     project's coverage under another's, which is worse than the
@@ -345,7 +346,7 @@
 --
 --   `mart_review_rounds`'s `finding_latest` — `(change_id, round,
 --     seq)`, the three fields `partition.rs`'s `Finding` arm builds
---     its `{change_id}__{round:04}__{seq:04}` key from. Grouped in the
+--     its `{change_id}_{round}_{seq}` key from. Grouped in the
 --     raw text form `body ->> …` returns, exactly like
 --     `mart_session_costs`' `token_usage` fold: JSON forbids a leading
 --     zero on a number, so a well-formed `round` of 1 is the text `1`
@@ -413,8 +414,8 @@
 -- second-derivation risk design D1 exists to prevent and the same
 -- reason `mart_trust_matrix` refuses to replicate `TrustRung::
 -- green()`. Parsing it back out of the git filename instead (where it
--- does sit, ahead of the `__{digest12}` suffix this file DOES read)
--- trades that drift for a different one: `{natural_key}__{digest12}`
+-- does sit, ahead of the `_<digest8>` suffix this file DOES read)
+-- trades that drift for a different one: `{natural_key}_{digest8}`
 -- is only unambiguously splittable from the RIGHT, so the recovered
 -- key is an opaque string that no longer knows which fields it was
 -- built from — enough to group by, useless for the per-field
@@ -432,6 +433,31 @@ LOAD json;
 
 -- ── stg_* ────────────────────────────────────────────────────────────
 
+-- The content digest of a record file's TEXT, from the body and never from
+-- the file name (0.30 R10): the first 8 hex digits of SHA-256 over the
+-- record's canonical JSON (sorted keys, compact), exactly
+-- `partition::content_digest`. canon writes a record file as sorted-key
+-- pretty JSON (`serde_json::to_vec_pretty` of a `BTreeMap`-keyed value), so
+-- its canonical text is that text with the structural whitespace removed:
+-- a raw newline never occurs inside a JSON string (it is escaped), so
+-- every newline and its indentation goes; the one space after a key's
+-- colon goes unless the quote before it is escaped (an odd run of
+-- backslashes), which the second pattern keeps. Everything inside strings
+-- is otherwise left as written.
+CREATE OR REPLACE MACRO canon_body_digest(record_text) AS
+    substr(
+        sha256(
+            regexp_replace(
+                regexp_replace(record_text, '\n *', '', 'g'),
+                '(^|[^\\])((?:\\\\)*)": ',
+                '\1\2":',
+                'g'
+            )
+        ),
+        1,
+        8
+    );
+
 -- Thin, content-trusted extraction over the git tier's Hive-laid-out
 -- JSON files — `read_text` + JSON-payload column pulls, NEVER
 -- `hive_partitioning=true` (design doc's Risk section: the donor's
@@ -441,8 +467,8 @@ LOAD json;
 -- `stg_records`' `version_rank` is where that narrowing happens.
 --
 -- `record_path` is kept for provenance, and `digest` is the ONE column
--- derived from it: the filename's own `__{digest12}` suffix, which
--- `GitTier::write` writes from `partition::content_digest12` and
+-- derived from it: the filename's own `_<digest8>` suffix, which
+-- `GitTier::write` writes from `partition::content_digest` and
 -- `GitTier::scan_kind_where`/`scan_namespaced_kind` reject the record
 -- outright for disagreeing with. It is the third rung of
 -- `fold_latest_by_key`'s `(at, schema, digest)` order and cannot be
@@ -465,11 +491,13 @@ CREATE OR REPLACE VIEW stg_git_records AS
 WITH raw AS (
     SELECT
         filename                AS record_path,
+        content                 AS record_text,
         CAST(content AS JSON)   AS j
     FROM read_text(getenv('CANON_GIT_ROOT') || '/kind=*/**/*.json')
     UNION ALL
     SELECT
         filename                AS record_path,
+        content                 AS record_text,
         CAST(content AS JSON)   AS j
     FROM read_text(coalesce(nullif(getenv('CANON_ARCHIVE_ROOT'), ''), getenv('CANON_GIT_ROOT') || '/_no_archive') || '/kind=*/**/*.json')
 )
@@ -479,7 +507,7 @@ SELECT
     j ->> '$.kind'                                            AS kind,
     try_cast(j ->> '$.at' AS TIMESTAMP)                       AS "at",
     j ->> '$.scenario_id'                                     AS scenario_id,
-    regexp_extract(record_path, '__([0-9a-f]{12})\.json$', 1) AS digest,
+    canon_body_digest(record_text)                            AS digest,
     j                                                         AS body
 FROM raw;
 
@@ -487,7 +515,7 @@ FROM raw;
 -- tier, `kind`/`natural_key`/`at`/`digest` are already real typed
 -- parquet columns (materialized at write time by `canon-store`'s
 -- `R2Tier`, not re-derived here) — and its `digest` is the SAME
--- `partition::content_digest12` value the git filename carries,
+-- `partition::content_digest` value the git filename carries,
 -- re-validated against the body on every read
 -- (`r2_tier.rs::validate_row`: "a stale/tampered `digest` column is
 -- exactly as much a violation as a stale/tampered `body`"), so the two
@@ -511,13 +539,14 @@ FROM read_parquet(getenv('CANON_R2_ROOT') || '/kind=*/**/*.parquet');
 -- Thin extraction over the sqlite hot tier, read the git way: the
 -- caller materializes every `records_history` row as one JSON file
 -- under `CANON_HOT_ROOT` (`canon_report::roots`, 0.18 #29), named
--- `__{digest12}.json` with the SAME `partition::content_digest12` the
+-- `_<digest8>.json` with the SAME `partition::content_digest` the
 -- git filename carries, so this view's columns line up with
 -- `stg_git_records` one for one and the fold compares them directly.
 CREATE OR REPLACE VIEW stg_hot_records AS
 WITH raw AS (
     SELECT
         filename                AS record_path,
+        content                 AS record_text,
         CAST(content AS JSON)   AS j
     FROM read_text(getenv('CANON_HOT_ROOT') || '/kind=*/**/*.json')
 )
@@ -527,7 +556,7 @@ SELECT
     j ->> '$.kind'                                            AS kind,
     try_cast(j ->> '$.at' AS TIMESTAMP)                       AS "at",
     j ->> '$.scenario_id'                                     AS scenario_id,
-    regexp_extract(record_path, '__([0-9a-f]{12})\.json$', 1) AS digest,
+    canon_body_digest(record_text)                            AS digest,
     j                                                         AS body
 FROM raw;
 
@@ -726,7 +755,7 @@ FROM read_parquet(getenv('CANON_LEARN_ROOT') || '/trajectories/*/*/*/*/*.parquet
 
 -- ── int_* ────────────────────────────────────────────────────────────
 
--- STUB — see the file header. Tallies `evidence_record` verdicts
+-- STUB — see the file header. Tallies `evidence` verdicts
 -- straight from the record body; this is NOT yet a mirror of any real
 -- `canon-gate` (S5) derivation (S5 doesn't exist at S2's own commit
 -- time) — S5 must replace this view's body, not merely extend it, once
@@ -736,10 +765,10 @@ SELECT
     body ->> '$.verdict' AS verdict,
     count(*)             AS n
 FROM stg_records
-WHERE kind = 'evidence_record'
+WHERE kind = 'evidence'
 GROUP BY 1;
 
--- S9 addition: one row per (task_id, evidence_record) — the join-spine
+-- S9 addition: one row per (task_id, evidence) — the join-spine
 -- fold `mart_trust_matrix` groups from below, kept as its own `int_*`
 -- layer so a future S5 real trust-ladder derivation (see
 -- `int_evidence_verdicts`'s own STUB note above) has one obvious place
@@ -763,7 +792,7 @@ SELECT
     body -> '$.actor' ->> '$.agent_id' AS who,
     version_rank
 FROM stg_records
-WHERE kind = 'evidence_record' AND (body ->> '$.task_id') IS NOT NULL;
+WHERE kind = 'evidence' AND (body ->> '$.task_id') IS NOT NULL;
 
 -- s20 addition (task-scenario-join spec, design D1/D3): one row per
 -- declared `(task_id, scenario_id)` pair, `UNNEST`ing `Task.
@@ -820,11 +849,11 @@ ORDER BY 1, 2;
 -- not patch around it, once the upstream field lands.
 
 -- Panel 1: change/task trust matrix (covered × green × who). `covered`
--- = at least one `evidence_record` exists for this `task_id`; `green`
+-- = at least one `evidence` exists for this `task_id`; `green`
 -- = the LATEST such record's `verdict` is `faithful` (last-wins-by-
 -- `at`, mirroring `canon-gate::ledger`'s own fold rule). `lifecycle`
 -- data lives in an interim `trust_ladder` companion JSON key
--- `canon-gate` writes onto a raw `evidence_record` body
+-- `canon-gate` writes onto a raw `evidence` body
 -- (`crates/canon-gate/src/trust_ladder.rs`'s own "INTERFACE REQUEST to
 -- canon-model": `EvidenceRecord` carries no native `lifecycle`/
 -- `flagged` field yet) — `green` here is deliberately NOT redefined
@@ -1009,7 +1038,7 @@ scenario_evidence AS (
         body ->> '$.scenario_id' AS scenario_id,
         body ->> '$.verdict'     AS verdict
     FROM stg_records
-    WHERE kind = 'evidence_record'
+    WHERE kind = 'evidence'
       AND (body ->> '$.scenario_id') IS NOT NULL
       AND (body ->> '$.project_id') IS NOT NULL
     QUALIFY row_number() OVER (
@@ -1569,7 +1598,7 @@ LEFT JOIN applied_counts   ac USING (role)
 ORDER BY r.role;
 
 -- Panel 5: review-feedback burn-down over time (S4's verdict stream:
--- `evidence_record`/`divergence` records). `divergence_open_running_
+-- `evidence`/`divergence` records). `divergence_open_running_
 -- total` is the actual burn-down curve — a running (opened - resolved)
 -- total by day, over `Divergence.status`
 -- (`canon_model::records::DivergenceStatus`); the `evidence_*` columns
@@ -1579,13 +1608,13 @@ CREATE OR REPLACE VIEW mart_review_burndown AS
 WITH by_day AS (
     SELECT
         date_trunc('day', "at") AS day,
-        count(*) FILTER (WHERE kind = 'evidence_record' AND (body ->> '$.verdict') = 'faithful')       AS evidence_faithful,
-        count(*) FILTER (WHERE kind = 'evidence_record' AND (body ->> '$.verdict') = 'divergent')      AS evidence_divergent,
-        count(*) FILTER (WHERE kind = 'evidence_record' AND (body ->> '$.verdict') = 'not_applicable') AS evidence_not_applicable,
+        count(*) FILTER (WHERE kind = 'evidence' AND (body ->> '$.verdict') = 'faithful')       AS evidence_faithful,
+        count(*) FILTER (WHERE kind = 'evidence' AND (body ->> '$.verdict') = 'divergent')      AS evidence_divergent,
+        count(*) FILTER (WHERE kind = 'evidence' AND (body ->> '$.verdict') = 'not_applicable') AS evidence_not_applicable,
         count(*) FILTER (WHERE kind = 'divergence' AND (body ->> '$.status') = 'open')                 AS divergence_opened,
         count(*) FILTER (WHERE kind = 'divergence' AND (body ->> '$.status') = 'resolved')              AS divergence_resolved
     FROM stg_records
-    WHERE kind IN ('evidence_record', 'divergence')
+    WHERE kind IN ('evidence', 'divergence')
     GROUP BY 1
 )
 SELECT
@@ -1731,7 +1760,7 @@ ORDER BY s.session_id, r.run_id, h.handoff_id;
 -- tagged in the corpus. Folding the scenario first matters: a scenario
 -- re-tagged to another subject still has its old generation on disk.
 -- `covered_scenarios` is how many of those carry a latest NON-Divergent
--- `evidence_record` verdict (faithful | not_applicable), the same
+-- `evidence` verdict (faithful | not_applicable), the same
 -- last-wins-by-`at` fold rule `mart_trust_matrix`'s `green` and
 -- `canon-gate::ledger::latest_verdicts` (the `verifying -> shipped`
 -- gate) use — read-only reporting only, never a `canon-gate` input. A
@@ -1796,7 +1825,7 @@ scenario_latest_verdict AS (
         body ->> '$.scenario_id' AS scenario_id,
         body ->> '$.verdict'     AS latest_verdict
     FROM stg_records
-    WHERE kind = 'evidence_record' AND (body ->> '$.scenario_id') IS NOT NULL
+    WHERE kind = 'evidence' AND (body ->> '$.scenario_id') IS NOT NULL
     QUALIFY row_number() OVER (PARTITION BY body ->> '$.scenario_id' ORDER BY version_rank DESC) = 1
 ),
 coverage AS (
@@ -2091,7 +2120,7 @@ ORDER BY r.change_id, r."round";
 --   introduced_by_sourced + introduced_by_unsourced       = findings
 -- The dispositions are the LATEST recorded state of each finding, not
 -- a history of it — the fold underneath keeps one version per
--- `{change_id}__{round}__{seq}`, so `disposition_open` is what is open
+-- `{change_id}_{round}_{seq}`, so `disposition_open` is what is open
 -- NOW and never what was ever opened.
 --
 -- ── `fix_of_fix` ─────────────────────────────────────────────────────

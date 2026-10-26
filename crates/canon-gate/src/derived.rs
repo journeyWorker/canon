@@ -56,7 +56,7 @@ impl Stamp {
         let at = body.get("at")?.as_str()?.parse::<DateTime<Utc>>().ok()?;
         #[expect(clippy::cast_possible_truncation, reason = "schema is a u32 on every well-formed record; wrapping keeps the prior behaviour for malformed ones")]
         let schema = body.get("schema").and_then(serde_json::Value::as_u64).unwrap_or(1) as u32;
-        let digest = canon_store::partition::content_digest12(&body);
+        let digest = canon_store::partition::content_digest(&body);
         Some(Self { at, schema, digest })
     }
 }

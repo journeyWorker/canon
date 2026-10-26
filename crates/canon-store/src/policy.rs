@@ -21,7 +21,7 @@
 //! full rationale (D1-D6).
 //!
 //! Routing/aging map keys are [`canon_model::envelope::RecordKind::as_str`]'s
-//! stable snake_case wire strings (`"evidence_record"`, `"strategy_item"`,
+//! stable snake_case wire strings (`"evidence"`, `"strategy_item"`,
 //! …) — the same string `#[serde(rename_all = "snake_case")]` already
 //! produces on the wire, not a second kebab-case config vocabulary. (The
 //! design doc's own `canon.yaml` illustration writes `evidence-record`/
@@ -499,7 +499,14 @@ pub struct TierPolicy {
     pub tiers: HashMap<Rung, BackendConfig>,
     pub routing: HashMap<RecordKind, Rung>,
     pub aging: HashMap<RecordKind, AgingRuleConfig>,
+    /// The `routing`/`aging` keys spelled the 0.29 way (`evidence_record`).
+    /// They are read only far enough to route the kind and to send the user
+    /// to `canon migrate`; canon 0.30 itself writes `evidence`.
+    pub legacy_kind_keys: Vec<String>,
 }
+
+/// The one 0.29 kind spelling a `canon.yaml` key may still carry.
+pub const LEGACY_EVIDENCE_KEY: &str = "evidence_record";
 
 /// `"30d"` / `"7d"` (D3's own example values) → a `chrono::Duration` —
 /// `d`(days)/`h`(hours)/`m`(minutes)/`s`(seconds) suffix, one integer
@@ -531,6 +538,9 @@ fn parse_duration_shorthand(s: &str) -> Result<chrono::Duration, TierPolicyError
 }
 
 fn parse_kind(s: &str) -> Result<RecordKind, TierPolicyError> {
+    if s == LEGACY_EVIDENCE_KEY {
+        return Ok(RecordKind::Evidence);
+    }
     RecordKind::ALL.into_iter().find(|k| k.as_str() == s).ok_or_else(|| TierPolicyError::UnknownRecordKind { key: s.to_string() })
 }
 
@@ -630,12 +640,26 @@ impl TierPolicy {
         }
 
         let mut routing = HashMap::new();
+        let mut legacy_kind_keys: Vec<String> = Vec::new();
         for (kind_str, rung_str) in &raw.routing {
+            if kind_str == LEGACY_EVIDENCE_KEY {
+                legacy_kind_keys.push(format!("routing.{kind_str}"));
+                // `evidence` itself wins when both are written.
+                if raw.routing.contains_key("evidence") {
+                    continue;
+                }
+            }
             routing.insert(parse_kind(kind_str)?, Rung::parse(rung_str)?);
         }
 
         let mut aging = HashMap::new();
         for (kind_str, rule) in &raw.aging {
+            if kind_str == LEGACY_EVIDENCE_KEY {
+                legacy_kind_keys.push(format!("aging.{kind_str}"));
+                if raw.aging.contains_key("evidence") {
+                    continue;
+                }
+            }
             let kind = parse_kind(kind_str)?;
             let to = Rung::parse(&rule.to)?;
             let routed = routing.get(&kind).copied().ok_or_else(|| TierPolicyError::AgingWithoutRouting { kind: kind_str.clone() })?;
@@ -645,7 +669,8 @@ impl TierPolicy {
             aging.insert(kind, AgingRuleConfig { after: parse_duration_shorthand(&rule.after)?, to });
         }
 
-        Ok(Self { tiers, routing, aging })
+        legacy_kind_keys.sort();
+        Ok(Self { tiers, routing, aging, legacy_kind_keys })
     }
 
     /// The rung `kind` resolves to for a FRESH write — `Err` (never a
@@ -686,7 +711,7 @@ tiers:
   hot:       { backend: postgres, dsn_env: CANON_PG_DSN, schema: canon_v1 }
   cold:      { backend: s3, bucket_env: CANON_R2_BUCKET, prefix: "canon/" }
 routing:
-  evidence_record: local
+  evidence: local
   strategy_item: local
   handoff: hot
   session: hot
@@ -729,7 +754,7 @@ aging:
 
     #[test]
     fn unknown_kind_name_in_routing_fails_loud() {
-        let bad = SAMPLE.replace("evidence_record: local", "not-a-kind: local");
+        let bad = SAMPLE.replace("evidence: local", "not-a-kind: local");
         let err = TierPolicy::from_yaml(&bad).unwrap_err();
         assert!(err.to_string().contains("not-a-kind"));
     }

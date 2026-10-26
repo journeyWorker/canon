@@ -138,7 +138,7 @@ fn committed(repo: &Path, kind: &str) -> Vec<Value> {
 /// The reference of each committed evidence record, ordered by scenario id. The ledger keeps the
 /// newest record of a scenario, so this is one entry per attested scenario.
 fn refs(repo: &Path) -> Vec<String> {
-    let mut rows: Vec<(String, String)> = committed(repo, "evidence_record")
+    let mut rows: Vec<(String, String)> = committed(repo, "evidence")
         .iter()
         .map(|r| (r["scenario_id"].as_str().unwrap().to_string(), r["evidence"]["ref"].as_str().unwrap().to_string()))
         .collect();
@@ -173,7 +173,7 @@ fn evidence_add_106_an_object_is_one_report_and_an_array_or_ndjson_is_a_batch() 
     let body = json_of(&one);
     assert_eq!(body["meta"]["command"], "evidence add");
     assert!(body["data"]["records"].is_array() && body["data"].get("items").is_none(), "an object returns the ordinary report: {body}");
-    assert_eq!(committed(r, "evidence_record").len(), 1);
+    assert_eq!(committed(r, "evidence").len(), 1);
 
     let array = json!([evidence_doc("auth.login.02", "npm test"), evidence_doc("auth.login.01", "npm test again")]);
     let batch = f.ok(&["evidence", "add", "--input", &array.to_string(), "--json"]);
@@ -229,7 +229,7 @@ fn evidence_add_108_a_repeat_writes_nothing_and_is_reported_unchanged() {
     let again = f.ok(&args);
     assert_eq!(json_of(&again)["meta"]["unchanged"], true);
     assert_eq!(tree(r), before, "a repeat writes nothing");
-    assert_eq!(committed(r, "evidence_record").len(), 1);
+    assert_eq!(committed(r, "evidence").len(), 1);
 
     // The same holds for a batch: every element that already landed is unchanged and the exit is 0.
     let batch = json!([evidence_doc("auth.login.01", "npm test"), evidence_doc("auth.login.02", "npm test")]).to_string();
@@ -254,7 +254,7 @@ fn evidence_add_113_an_explicit_faithful_verdict_over_a_skipped_or_failed_case_i
         }
         f.run(&args)
     };
-    let verdict = || committed(r, "evidence_record")[0]["verdict"].as_str().unwrap().to_string();
+    let verdict = || committed(r, "evidence")[0]["verdict"].as_str().unwrap().to_string();
 
     for report in ["junit:skipped.xml", "junit:failed.xml"] {
         let before = tree(r);

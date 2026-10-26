@@ -764,7 +764,7 @@ pub fn workspace_label_from_key(key: &str) -> Option<String> {
 /// the storage layer). `serde_json::to_value` on any of this crate's
 /// output types serializes `serde_json::Map` as a `BTreeMap` (no
 /// `preserve_order` feature anywhere in this workspace — same
-/// invariant `canon-store::partition::content_digest12` relies on), so
+/// invariant `canon-store::partition::content_digest` relies on), so
 /// key order never perturbs the digest.
 pub fn content_digest(value: &serde_json::Value) -> String {
     let canonical = serde_json::to_vec(value).expect("serde_json::Value always serializes");

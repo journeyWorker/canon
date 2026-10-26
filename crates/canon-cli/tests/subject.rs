@@ -33,7 +33,7 @@ routing:
   subject: local
   change: local
   scenario: local
-  evidence_record: local
+  evidence: local
 ";
 
 /// Makes `repo` a git work tree with one commit, which every revision-bound
@@ -105,7 +105,7 @@ fn seed_subject_with_changes(repo: &Path, id: &str, status: SubjectStatus, scena
 }
 
 fn seed_scenario_verdict(repo: &Path, scenario: &str, verdict: EvidenceVerdict) {
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("reviewer-1", RoleId::parse("reviewer").unwrap()));
+    let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("reviewer-1", RoleId::parse("reviewer").unwrap()));
     let record = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(scenario).unwrap()), None, verdict);
     ledger(repo).write(&record).unwrap();
 }
@@ -528,7 +528,7 @@ fn seed_attested_subject_with(repo: &Path, session: Option<&str>, status: Subjec
     if let Some(session) = session {
         actor = actor.with_session(SessionId::parse(session).unwrap());
     }
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), actor);
+    let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), actor);
     let record = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse("world.demo.01").unwrap()), None, EvidenceVerdict::Faithful)
         .with_project_id(ProjectId::parse("demo").unwrap());
     ledger(repo).write(&record).unwrap();
@@ -598,7 +598,7 @@ fn seed_blocker(repo: &Path, fixed_after: Option<i64>) {
 /// review of it, both after the blocker was raised and closed.
 fn seed_reverification(repo: &Path, scenario: &str) {
     let later = |seconds: i64| Utc::now() + chrono::Duration::seconds(seconds);
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, later(10), Actor::new("impl-agent", RoleId::parse("implementer").unwrap()));
+    let envelope = Envelope::new(1, RecordKind::Evidence, later(10), Actor::new("impl-agent", RoleId::parse("implementer").unwrap()));
     let evidence = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(scenario).unwrap()), None, EvidenceVerdict::Faithful).with_project_id(ProjectId::parse("demo").unwrap());
     ledger(repo).write(&evidence).unwrap();
     let envelope = Envelope::new(1, RecordKind::Review, later(11), Actor::new("reviewer-2", RoleId::parse("reviewer").unwrap()));
@@ -1228,7 +1228,7 @@ fn evidence_files(repo: &Path) -> Vec<std::path::PathBuf> {
             let path = entry.path();
             if path.is_dir() {
                 walk(&path, out);
-            } else if path.to_string_lossy().contains("evidence_record") {
+            } else if path.to_string_lossy().contains("evidence") {
                 out.push(path);
             }
         }
@@ -1653,7 +1653,7 @@ fn subject_lifecycle_32_shipping_a_reopened_subject_runs_every_guard_again() {
 
     seed_blocker(dir.path(), Some(5));
     seed_reverification(dir.path(), "world.demo.01");
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now() + chrono::Duration::seconds(10), Actor::new("impl-agent", RoleId::parse("implementer").unwrap()));
+    let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now() + chrono::Duration::seconds(10), Actor::new("impl-agent", RoleId::parse("implementer").unwrap()));
     let evidence = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse("world.demo.02").unwrap()), None, EvidenceVerdict::Faithful)
         .with_project_id(ProjectId::parse("demo").unwrap());
     ledger(dir.path()).write(&evidence).unwrap();

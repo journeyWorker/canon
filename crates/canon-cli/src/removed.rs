@@ -18,7 +18,7 @@ pub const KIND_COMMANDS: &[&str] = &["export", "purge", "query"];
 /// The canonical `--kind` value a removed `<kind>_record` one stood for.
 fn kind_replacement(old: &str) -> Option<&'static str> {
     let stem = old.strip_suffix("_record")?;
-    crate::query::parse_kind(stem).ok().map(crate::query::kind_cli_name)
+    crate::query::parse_kind(stem).ok().map(canon_model::envelope::RecordKind::as_str)
 }
 
 /// A removed spelling an invocation used.
@@ -225,13 +225,12 @@ pub fn find(root: &Command, args: &[String]) -> Option<Removed> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::query::kind_cli_name;
     use canon_model::envelope::RecordKind;
 
     #[test]
     fn every_record_kind_has_exactly_one_removed_spelling() {
         for kind in RecordKind::ALL {
-            let new = kind_cli_name(kind);
+            let new = kind.as_str();
             assert_eq!(kind_replacement(&format!("{new}_record")), Some(new), "{new}");
         }
         assert_eq!(kind_replacement("nonsense_record"), None);

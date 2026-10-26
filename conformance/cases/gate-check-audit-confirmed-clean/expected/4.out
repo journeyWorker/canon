@@ -1,2 +1,2 @@
-canon evidence add: staged kind=evidence_record/cart.add.01__<digest12>.json for cart.add.01 (audit confirmed) — run `canon gate promote` to commit it, then `canon gate check`
+canon evidence add: staged kind=evidence/root_scenario_cart.add.01_<digest8>.json for cart.add.01 (audit confirmed) — run `canon gate promote` to commit it, then `canon gate check`
 next: canon gate promote — the record is staged, not in the ledger yet; promote it so status and the gate count it

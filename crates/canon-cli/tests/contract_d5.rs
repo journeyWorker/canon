@@ -224,14 +224,14 @@ fn repeating_evidence_add_returns_the_existing_record_and_writes_nothing() {
     let first = evidence(dir.path(), &[]);
     assert!(first.status.success());
     assert!(body(&first)["meta"].get("unchanged").is_none(), "the first call writes");
-    assert_eq!(files_under(dir.path(), "evidence_record"), 1);
+    assert_eq!(files_under(dir.path(), "evidence"), 1);
 
     let again = evidence(dir.path(), &[]);
     assert!(again.status.success(), "{}", String::from_utf8_lossy(&again.stderr));
     let again = body(&again);
     assert_eq!(again["meta"]["unchanged"], true, "{again}");
     assert_eq!(again["data"]["records"][0]["committed"], body(&first)["data"]["records"][0]["committed"], "the existing record is the one returned");
-    assert_eq!(files_under(dir.path(), "evidence_record"), 1, "a repeat writes no second record");
+    assert_eq!(files_under(dir.path(), "evidence"), 1, "a repeat writes no second record");
 }
 
 #[test]
@@ -240,17 +240,17 @@ fn evidence_that_differs_is_a_new_record_and_only_the_latest_one_counts_as_the_r
     assert!(evidence(dir.path(), &[]).status.success());
     // A different verdict is a new fact.
     assert!(evidence(dir.path(), &["--verdict", "divergent"]).status.success());
-    assert_eq!(files_under(dir.path(), "evidence_record"), 2);
+    assert_eq!(files_under(dir.path(), "evidence"), 2);
     // Faithful again is a change from the latest (divergent), so it is written too...
     let third = evidence(dir.path(), &[]);
     assert!(body(&third)["meta"].get("unchanged").is_none());
-    assert_eq!(files_under(dir.path(), "evidence_record"), 3);
+    assert_eq!(files_under(dir.path(), "evidence"), 3);
     // ...and only now is a repeat of the latest.
     assert_eq!(body(&evidence(dir.path(), &[]))["meta"]["unchanged"], true);
-    assert_eq!(files_under(dir.path(), "evidence_record"), 3);
+    assert_eq!(files_under(dir.path(), "evidence"), 3);
     // A different summary is a different record.
     assert!(body(&evidence(dir.path(), &["--summary", "ran the suite"]))["meta"].get("unchanged").is_none());
-    assert_eq!(files_under(dir.path(), "evidence_record"), 4);
+    assert_eq!(files_under(dir.path(), "evidence"), 4);
 }
 
 #[test]
@@ -263,10 +263,10 @@ fn evidence_added_again_after_a_review_is_deliberate_and_is_written() {
     let again = evidence(dir.path(), &[]);
     assert!(again.status.success());
     assert!(body(&again)["meta"].get("unchanged").is_none(), "{}", String::from_utf8_lossy(&again.stdout));
-    assert_eq!(files_under(dir.path(), "evidence_record"), 2);
+    assert_eq!(files_under(dir.path(), "evidence"), 2);
     // Nothing followed that one: repeating it is a retry.
     assert_eq!(body(&evidence(dir.path(), &[]))["meta"]["unchanged"], true);
-    assert_eq!(files_under(dir.path(), "evidence_record"), 2);
+    assert_eq!(files_under(dir.path(), "evidence"), 2);
 }
 
 fn review(dir: &Path, rev: &str) -> Output {

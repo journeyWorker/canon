@@ -82,7 +82,7 @@ fn valid_task() -> Task {
 /// Every OTHER gate is deliberately satisfied: the body's own `kind`
 /// agrees with its directory, and the file is written at exactly the
 /// path `expected_relative_path` resolves from its own content
-/// (`kind=task/{task_id}__{content_digest12}.json`). The body-schema
+/// (`kind=task/{task_id}__{content_digest}.json`). The body-schema
 /// gate is the only reason this file is refused, which is what makes
 /// this test a pin of THAT gate rather than a second copy of the
 /// layout-gate pin in `multi_version_fold.rs`.
@@ -96,7 +96,7 @@ fn plant_refused_task(git_root: &std::path::Path) -> std::path::PathBuf {
         "status": "open",
         "scenario_refs": [REFUSED_SCENARIO_ID],
     });
-    let digest = canon_store::partition::content_digest12(&body);
+    let digest = canon_store::partition::content_digest(&body);
     let dir = git_root.join("kind=task");
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join(format!("{REFUSED_TASK_ID}__{digest}.json"));

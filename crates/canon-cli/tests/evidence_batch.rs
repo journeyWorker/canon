@@ -84,12 +84,12 @@ fn files_under(root: &Path, needle: &str) -> Vec<PathBuf> {
 }
 
 fn evidence_files(repo: &Path) -> Vec<PathBuf> {
-    files_under(&repo.join(".canon"), "evidence_record")
+    files_under(&repo.join(".canon"), "evidence")
 }
 
 /// The committed evidence records, by scenario id.
 fn committed_evidence(repo: &Path) -> Vec<Value> {
-    files_under(&repo.join(".canon/ledger/kind=evidence_record"), ".json")
+    files_under(&repo.join(".canon/ledger/kind=evidence"), ".json")
         .into_iter()
         .map(|p| serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap())
         .collect()

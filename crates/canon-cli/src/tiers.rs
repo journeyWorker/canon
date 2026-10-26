@@ -209,7 +209,7 @@ fn build_tiers_with(canon_yaml_path: &Path, read_only: bool) -> Result<LoadedTie
 /// degrade-or-propagate decision for the postgres backend in this
 /// module (s22 design.md D4, renamed from `attach_pg` per s27 design D4
 /// to name the BACKEND it attaches).
-fn attach_postgres(cfg: &PgTierConfig) -> Result<(Option<PgTier>, Option<String>), TierCliError> {
+pub(crate) fn attach_postgres(cfg: &PgTierConfig) -> Result<(Option<PgTier>, Option<String>), TierCliError> {
     validate_schema_ident(&cfg.schema)?;
     match std::env::var(&cfg.dsn_env) {
         Err(_) => Ok((None, Some(format!("`{}` is unset", cfg.dsn_env)))),
@@ -229,7 +229,7 @@ fn attach_postgres(cfg: &PgTierConfig) -> Result<(Option<PgTier>, Option<String>
 /// Shared by [`build_lenient_tiers`]/[`build_lenient_tiers_for_kinds`]
 /// -- the ONE degrade-or-propagate decision for the s3 backend
 /// (renamed from `attach_r2` per s27 design D4).
-fn attach_s3(cfg: &R2TierConfig) -> Result<(Option<R2Tier>, Option<String>), TierCliError> {
+pub(crate) fn attach_s3(cfg: &R2TierConfig) -> Result<(Option<R2Tier>, Option<String>), TierCliError> {
     match R2Tier::attach(cfg) {
         Ok(tier) => Ok((Some(tier), None)),
         Err(StoreError::BackendUnattached { reason, .. }) => Ok((None, Some(reason))),
@@ -593,7 +593,7 @@ mod lenient_tier_tests {
         for (kind, to) in aging {
             aging_map.insert(*kind, AgingRuleConfig { after: chrono::Duration::days(30), to: *to });
         }
-        TierPolicy { tiers: std::collections::HashMap::new(), routing: routing_map, aging: aging_map }
+        TierPolicy { tiers: std::collections::HashMap::new(), routing: routing_map, aging: aging_map, legacy_kind_keys: Vec::new() }
     }
 
     /// design.md D2/task 2.3: a local-routed, never-aged kind

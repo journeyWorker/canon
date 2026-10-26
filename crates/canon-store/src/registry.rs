@@ -220,7 +220,8 @@ impl TierRegistry {
             merged.records.append(&mut result.records);
             merged.violations.append(&mut result.violations);
         }
-        merged.records.sort_by_key(crate::tier::raw_record_at);
+        let kind = query.kind;
+        merged.records.sort_by_cached_key(|raw| crate::partition::record_order(kind, raw));
         Ok(merged)
     }
     /// This registry owns only canon-store's routed/aging rungs. The

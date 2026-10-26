@@ -220,7 +220,7 @@ impl Report for PartialPurgeReport {}
 
 fn purge_report(outcome: &PurgeOutcome, learn_counts: Option<(usize, usize)>, plan: Plan) -> PurgeReport {
     PurgeReport {
-        kind: crate::query::kind_cli_name(outcome.kind).to_string(),
+        kind: outcome.kind.as_str().to_string(),
         before: outcome.before.to_rfc3339(),
         source_scope: "routed_and_aging_destinations",
         rungs: outcome.rungs.iter().map(|r| PurgeRung { rung: r.rung.as_str().to_string(), backend: r.backend.as_str().to_string(), matched: r.matched, deleted: r.deleted }).collect(),
@@ -231,7 +231,7 @@ fn purge_report(outcome: &PurgeOutcome, learn_counts: Option<(usize, usize)>, pl
 }
 
 fn partial_purge_report(kind: RecordKind, before: DateTime<Utc>, matched: usize, deleted: usize, error: &str) -> PartialPurgeReport {
-    PartialPurgeReport { kind: crate::query::kind_cli_name(kind).to_string(), before: before.to_rfc3339(), status: "partial", matched, deleted, error: error.to_string(), atomic: false }
+    PartialPurgeReport { kind: kind.as_str().to_string(), before: before.to_rfc3339(), status: "partial", matched, deleted, error: error.to_string(), atomic: false }
 }
 
 /// The plan of a purge: one `delete` per record the removal set holds, in
@@ -287,7 +287,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
         let report = purge_report(&outcome, learn_counts, if commit { plan.committed() } else { plan });
         if commit {
             if !json_output {
-                println!("canon purge --kind {}: {matched} matched, {deleted} deleted", crate::query::kind_cli_name(kind));
+                println!("canon purge --kind {}: {matched} matched, {deleted} deleted", kind.as_str());
             }
             crate::next::finish(repo, "purge", &crate::next::Scope::Repo, false, json_output, &report);
         } else {
@@ -339,7 +339,7 @@ pub struct ExportRecord {
 
 impl ExportRecord {
     fn of(kind: RecordKind, raw: &canon_model::evidence::RawRecord) -> Self {
-        let digest = canon_store::partition::content_digest12(&raw.0);
+        let digest = canon_store::partition::content_digest(&raw.0);
         let at = raw_record_at(raw).to_rfc3339();
         let id = canon_store::partition::resolve_partition(kind, &raw.0).ok().map(|p| p.natural_key);
         Self { kind: kind.as_str(), at, id, digest }

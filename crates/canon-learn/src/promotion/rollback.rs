@@ -119,7 +119,7 @@ pub fn rollback_strategy_authenticated(rollback: AuthenticatedRollback<'_>) -> R
     };
     if let Some(contradicting_trajectory_id) = contradicting_trajectory_id {
         let evidence = DemotionEvidence {
-            envelope: canon_model::envelope::Envelope::new(1, canon_model::envelope::RecordKind::EvidenceRecord, now, canon_model::envelope::Actor::new_unattributed(actor)),
+            envelope: canon_model::envelope::Envelope::new(1, canon_model::envelope::RecordKind::Evidence, now, canon_model::envelope::Actor::new_unattributed(actor)),
             contradicting_trajectory_id,
             reason: reason.to_string(),
             evaluation_digest: record.evaluation_digest.clone(),

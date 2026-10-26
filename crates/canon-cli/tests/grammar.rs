@@ -277,9 +277,9 @@ fn record_role_defaults_to_the_declared_implementer_or_reviewer() {
 
     let implementer = evidence_without_role(repo, &[("CANON_ROLE", "implementer")]);
     assert!(implementer.status.success(), "{}{}", stdout(&implementer), stderr(&implementer));
-    let records = std::fs::read_dir(repo.join(".canon/ledger/kind=evidence_record")).unwrap().count();
+    let records = std::fs::read_dir(repo.join(".canon/ledger/kind=evidence")).unwrap().count();
     assert_eq!(records, 1, "the record was committed");
-    let record = std::fs::read_dir(repo.join(".canon/ledger/kind=evidence_record")).unwrap().next().unwrap().unwrap().path();
+    let record = std::fs::read_dir(repo.join(".canon/ledger/kind=evidence")).unwrap().next().unwrap().unwrap().path();
     let text = std::fs::read_to_string(record).unwrap();
     assert!(text.contains("\"implementer\""), "the record carries the declared role: {text}");
 

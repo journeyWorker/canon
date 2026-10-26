@@ -19,7 +19,7 @@
 //!    which is a worse trade than one more entry in
 //!    [`crate::dispatch::check_set`].
 //! 3. **Requiredness is unanswerable here.** `risk_routing` is a CEL
-//!    predicate bound to `RecordKind::EvidenceRecord`
+//!    predicate bound to `RecordKind::Evidence`
 //!    (`crate::coverage`'s own note on `PolicyResolution`'s binding
 //!    contract) and, by that module's stated rule, is "evaluate[d] ...
 //!    against the artifact's OWN already-submitted evidence (never a
@@ -488,7 +488,7 @@ mod tests {
     /// A SCENARIO-keyed record carrying the composite key — the shape
     /// `canon evidence add --scenario-id --project-id` now produces.
     fn evidence(scenario_id: &str, verdict: EvidenceVerdict) -> EvidenceRecord {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent-a", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("agent-a", RoleId::parse("implementer").unwrap()));
         EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(scenario_id).unwrap()), None, verdict).with_project_id(project())
     }
 
@@ -741,7 +741,7 @@ mod tests {
     /// in another.
     #[test]
     fn evidence_without_a_project_id_does_not_cover_a_scenario() {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("a", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("a", RoleId::parse("implementer").unwrap()));
         let half_keyed = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse("p.a.01").unwrap()), None, EvidenceVerdict::Faithful);
 
         let mut corpus = Corpus::new();

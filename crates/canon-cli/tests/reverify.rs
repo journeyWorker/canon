@@ -26,7 +26,7 @@ routing:
   subject: local
   change: local
   scenario: local
-  evidence_record: local
+  evidence: local
   finding: local
 ";
 
@@ -97,7 +97,7 @@ fn seed_change(repo: &Path, id: &str) {
 }
 
 fn seed_evidence(repo: &Path, scenario: &str, at: DateTime<Utc>) {
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, at, actor("impl-agent", "implementer"));
+    let envelope = Envelope::new(1, RecordKind::Evidence, at, actor("impl-agent", "implementer"));
     let record = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(scenario).unwrap()), None, EvidenceVerdict::Faithful).with_project_id(ProjectId::parse("demo").unwrap());
     ledger(repo).write(&record).unwrap();
 }
@@ -604,7 +604,7 @@ fn gate_check_99_a_scoped_refusal_names_a_command_for_each_spec_root() {
     seed_scenario_in(r, "other", "world.other.01");
     seed_scenario_in(r, "other", "world.other.02");
     let seed_other = |scenario: &str, at: DateTime<Utc>| {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, at, actor("impl-agent", "implementer"));
+        let envelope = Envelope::new(1, RecordKind::Evidence, at, actor("impl-agent", "implementer"));
         let record = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(scenario).unwrap()), None, EvidenceVerdict::Faithful).with_project_id(ProjectId::parse("other").unwrap());
         ledger(r).write(&record).unwrap();
     };

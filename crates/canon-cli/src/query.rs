@@ -66,43 +66,31 @@ pub struct QueryOutcome {
 }
 
 /// `--kind`'s `clap` value parser — `<k>` is a [`RecordKind`] spelled by
-/// [`kind_cli_name`] (e.g. `handoff`, `strategy_item`, `evidence`): the
-/// snake_case wire string of `canon.yaml`'s own `routing`/`aging` keys
-/// (`canon-store`'s `policy` module doc) without the `_record` suffix.
+/// [`RecordKind::as_str`] (e.g. `handoff`, `strategy_item`, `evidence`): the
+/// one name every surface uses, the record's own `kind` field, the ledger
+/// directory and `canon.yaml`'s `routing`/`aging` keys (0.30).
 pub fn parse_kind(s: &str) -> Result<RecordKind, RecordKindError> {
-    RecordKind::ALL.into_iter().find(|k| kind_cli_name(*k) == s).ok_or_else(|| RecordKindError::Unknown(s.to_string()))
+    RecordKind::ALL.into_iter().find(|k| k.as_str() == s).ok_or_else(|| RecordKindError::Unknown(s.to_string()))
 }
 
 /// `--kind` named no record kind.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum RecordKindError {
-    #[error("unknown record kind `{0}` (expected one of: {known})", known = RecordKind::ALL.iter().map(|k| kind_cli_name(*k)).collect::<Vec<_>>().join(", "))]
+    #[error("unknown record kind `{0}` (expected one of: {known})", known = RecordKind::ALL.iter().map(|k| k.as_str()).collect::<Vec<_>>().join(", "))]
     Unknown(String),
-}
-
-/// A record kind as `--kind` spells it: the wire string without the
-/// `_record` suffix (`evidence_record` is `evidence`). The wire string
-/// itself (the record's `kind` field, ledger paths, `canon.yaml` routing
-/// keys) is storage and stays [`RecordKind::as_str`]; anything canon prints
-/// for an agent to type back after `--kind` uses this.
-pub fn kind_cli_name(kind: RecordKind) -> &'static str {
-    match kind {
-        RecordKind::EvidenceRecord => "evidence",
-        other => other.as_str(),
-    }
 }
 
 /// `--kind`'s clap parser: one of the record kinds, known to clap. The
 /// removed `<kind>_record` spellings do not parse ([`crate::removed`]).
 pub fn kind_parser() -> impl clap::builder::TypedValueParser<Value = RecordKind> {
-    let visible = RecordKind::ALL.iter().map(|k| clap::builder::PossibleValue::new(kind_cli_name(*k)));
+    let visible = RecordKind::ALL.iter().map(|k| clap::builder::PossibleValue::new(k.as_str()));
     crate::cli_error::closed_set(visible.collect::<Vec<_>>(), parse_kind)
 }
 
 /// `purge --kind`'s clap parser: the record kinds purge accepts
 /// ([`canon_store::tier::PURGEABLE_KINDS`]), a closed subset of [`kind_parser`]'s.
 pub fn purgeable_kind_parser() -> impl clap::builder::TypedValueParser<Value = RecordKind> {
-    let visible = canon_store::tier::PURGEABLE_KINDS.iter().map(|k| clap::builder::PossibleValue::new(kind_cli_name(*k)));
+    let visible = canon_store::tier::PURGEABLE_KINDS.iter().map(|k| clap::builder::PossibleValue::new(k.as_str()));
     crate::cli_error::closed_set(visible.collect::<Vec<_>>(), parse_kind)
 }
 
@@ -137,9 +125,9 @@ fn status_domain(kind: RecordKind) -> &'static [&'static str] {
 /// `--status` value outside the QUERIED kind's own status domain.
 #[derive(Debug, thiserror::Error)]
 pub enum ScopeError {
-    #[error("`{flag}` applies only to {supported} (got `--kind {}`)", kind_cli_name(*.kind))]
+    #[error("`{flag}` applies only to {supported} (got `--kind {}`)", .kind.as_str())]
     UnsupportedKind { flag: &'static str, supported: &'static str, kind: RecordKind },
-    #[error("`--status {value}` is not valid for `--kind {}` (expected one of: {})", kind_cli_name(*.kind), .valid.join(", "))]
+    #[error("`--status {value}` is not valid for `--kind {}` (expected one of: {})", .kind.as_str(), .valid.join(", "))]
     InvalidStatus { kind: RecordKind, value: String, valid: Vec<String> },
 }
 
@@ -253,7 +241,7 @@ fn scope_sort_key(kind: RecordKind, raw: &RawRecord) -> (String, Vec<u64>) {
 /// `canon-report::divergence`), keyed by the SAME natural key
 /// [`scope_sort_key`]/[`format_human`] already derive
 /// (`canon_store::partition::resolve_partition`), winner = greatest
-/// `(at, envelope.schema, content_digest12)`. A no-op for every kind routed to a
+/// `(at, envelope.schema, content_digest)`. A no-op for every kind routed to a
 /// local/cold (GitTier/R2Tier-backed) rung (returned untouched)
 /// and for a corpus with no supersession (row-count parity, design.md
 /// R3's own mitigation).
@@ -333,7 +321,7 @@ fn fold_rewritten_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
 /// The shared fold-to-latest-per-natural-key body (design D11/s21 D3,
 /// `s38-evidence-bearing-memory`): winner per natural key
 /// ([`canon_store::partition::resolve_partition`]) is the greatest
-/// `(at, envelope.schema, content_digest12)` triple, via the SAME
+/// `(at, envelope.schema, content_digest)` triple, via the SAME
 /// [`fold_latest_by_key`] `canon-gate::ledger` and `canon-report`
 /// already use. Called by both [`fold_pg_routed_kind`] (hot-routed
 /// multi-version kinds) and [`fold_rewritten_kind`] (git-routed but
@@ -359,7 +347,7 @@ fn fold_latest_by_natural_key(kind: RecordKind, records: Vec<RawRecord>) -> Vec<
         let key = canon_store::partition::resolve_partition(kind, &record.0).map(|p| p.natural_key).unwrap_or_default();
         let at = canon_store::tier::raw_record_at(&record);
         let schema = canon_store::tier::raw_record_schema(&record);
-        let digest = canon_store::partition::content_digest12(&record.0);
+        let digest = canon_store::partition::content_digest(&record.0);
         Candidate { key, at, schema, digest, record }
     });
     fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str()).into_values().map(|c| c.record).collect()
@@ -456,7 +444,7 @@ pub fn known_fields(kind: RecordKind, plugin: bool) -> BTreeSet<String> {
 /// same three the human table shows.
 fn record_key(kind: RecordKind, raw: &RawRecord) -> String {
     let id = canon_store::partition::resolve_partition(kind, &raw.0).map(|p| p.natural_key).unwrap_or_default();
-    format!("{}|{id}|{}", canon_store::tier::raw_record_at(raw).to_rfc3339(), canon_store::partition::content_digest12(&raw.0))
+    format!("{}|{id}|{}", canon_store::tier::raw_record_at(raw).to_rfc3339(), canon_store::partition::content_digest(&raw.0))
 }
 
 /// Applies `--limit`/`--cursor`/`--all` and `--fields` to a finished query:
@@ -488,7 +476,7 @@ pub fn format_human(outcome: &QueryOutcome) -> String {
 /// formatter.
 pub fn format_human_with_sensitive(outcome: &QueryOutcome, _include_sensitive: bool) -> String {
     let since_desc = outcome.since.map_or_else(|| "none".to_string(), |s| s.to_rfc3339());
-    let mut out = format!("canon query --kind {} --since {}: {} record(s)", kind_cli_name(outcome.kind), since_desc, outcome.records.len());
+    let mut out = format!("canon query --kind {} --since {}: {} record(s)", outcome.kind.as_str(), since_desc, outcome.records.len());
     if outcome.violation_count > 0 {
         out.push_str(&format!("  ({} violation(s) reported, excluded)", outcome.violation_count));
     }
@@ -504,11 +492,8 @@ pub fn format_human_with_sensitive(outcome: &QueryOutcome, _include_sensitive: b
     out.push_str("\nAT                             ID                              DIGEST\n");
     for raw in &outcome.records {
         let at = canon_store::tier::raw_record_at(raw);
-        let id = canon_store::partition::resolve_partition(outcome.kind, &raw.0).map_or_else(|_| "-".to_string(), |p| match p.area {
-                Some(area) => format!("area={area}/{}", p.natural_key),
-                None => p.natural_key,
-            });
-        let digest = canon_store::partition::content_digest12(&raw.0);
+        let id = canon_store::partition::resolve_partition(outcome.kind, &raw.0).map_or_else(|_| "-".to_string(), |p| p.natural_key);
+        let digest = canon_store::partition::content_digest(&raw.0);
         out.push_str(&format!("{:<30} {:<30} {}\n", at.to_rfc3339(), id, digest));
     }
     finish_human(out, outcome)
@@ -898,7 +883,7 @@ pub fn format_human_with_overlay(outcome: &QueryOutcome, plugin_id: &str, projec
 pub fn format_human_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id: &str, projections: &[OverlayProjection], _include_sensitive: bool) -> String {
     let since_desc = outcome.since.map_or_else(|| "none".to_string(), |s| s.to_rfc3339());
     let mut out =
-        format!("canon query --kind {} --since {} --plugin {}: {} record(s)", kind_cli_name(outcome.kind), since_desc, plugin_id, outcome.records.len());
+        format!("canon query --kind {} --since {} --plugin {}: {} record(s)", outcome.kind.as_str(), since_desc, plugin_id, outcome.records.len());
     if outcome.violation_count > 0 {
         out.push_str(&format!("  ({} violation(s) reported, excluded)", outcome.violation_count));
     }
@@ -914,11 +899,8 @@ pub fn format_human_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id
     out.push_str("\nAT                             ID                              DIGEST           OVERLAY\n");
     for raw in &outcome.records {
         let at = canon_store::tier::raw_record_at(raw);
-        let id = canon_store::partition::resolve_partition(outcome.kind, &raw.0).map_or_else(|_| "-".to_string(), |p| match p.area {
-                Some(area) => format!("area={area}/{}", p.natural_key),
-                None => p.natural_key,
-            });
-        let digest = canon_store::partition::content_digest12(&raw.0);
+        let id = canon_store::partition::resolve_partition(outcome.kind, &raw.0).map_or_else(|_| "-".to_string(), |p| p.natural_key);
+        let digest = canon_store::partition::content_digest(&raw.0);
         let overlay_desc = scenario_key(raw).map_or_else(|| "-".to_string(), |key| {
                 let mut obj = serde_json::Map::new();
                 for projection in projections {
@@ -939,7 +921,7 @@ mod tests {
 
     #[test]
     fn the_value_parsers_refuse_in_their_old_words() {
-        let known = RecordKind::ALL.iter().map(|k| kind_cli_name(*k)).collect::<Vec<_>>().join(", ");
+        let known = RecordKind::ALL.iter().map(|k| k.as_str()).collect::<Vec<_>>().join(", ");
         assert_eq!(parse_kind("bogus").unwrap_err().to_string(), format!("unknown record kind `bogus` (expected one of: {known})"));
         assert_eq!(parse_change_id("Bad Id").unwrap_err().to_string(), format!("invalid ChangeId: \"Bad Id\" does not match grammar `{}`", ChangeId::GRAMMAR));
     }

@@ -588,12 +588,12 @@ fn context_capability_23_gate_promote_tallies_the_staged_kinds_by_the_names_kind
 
     let empty = stdout(&run_canon(&["gate", "promote", "--repo", "."], repo));
     assert!(empty.contains("nothing staged") && empty.contains("(evidence, finding"), "{empty}");
-    assert!(!empty.contains("evidence_record"), "{empty}");
+    assert!(!empty.contains("evidence"), "{empty}");
 
     assert!(add(repo, &["--round", "5", "--seq", "1", "--actor-id", "r", "--summary", "first"]).status.success());
     let promoted = stdout(&run_canon(&["gate", "promote", "--repo", "."], repo));
     assert!(promoted.contains("evidence=0, finding=1"), "{promoted}");
-    assert!(!promoted.contains("evidence_record"), "{promoted}");
+    assert!(!promoted.contains("evidence"), "{promoted}");
 
     // A staged evidence record and a staged finding together: both are named as `--kind` takes them.
     let evidence = run_canon(&["evidence", "add", "--project-id", "root", "--scenario-id", "a.b.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--repo", "."], repo);
@@ -602,7 +602,7 @@ fn context_capability_23_gate_promote_tallies_the_staged_kinds_by_the_names_kind
     let tally = stdout(&run_canon(&["gate", "promote", "--repo", "."], repo));
     let tally_line = tally.lines().find(|l| l.starts_with("canon gate promote:")).expect("a tally line");
     assert!(tally_line.contains("evidence=1, finding=1"), "{tally}");
-    assert!(!tally_line.contains("evidence_record"), "{tally}");
+    assert!(!tally_line.contains("evidence"), "{tally}");
 }
 
 /// The nouns whose COUNT is the banned claim, in the plural. A value

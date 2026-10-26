@@ -25,7 +25,7 @@ use crate::ids::{StrategyId, StrategyIdentity, TrajectoryId};
 /// canon-model's join-key/envelope SHAPES, the same precedent
 /// `Trajectory`/`StrategyItem` themselves already set, per `lib.rs`'s
 /// "Deviates from the literal plan" note on S6 task 1.1). `kind` is
-/// [`RecordKind::EvidenceRecord`] — canon-model's twelve closed record
+/// [`RecordKind::Evidence`] — canon-model's twelve closed record
 /// kinds have no dedicated `Demotion` variant, and adding one is
 /// canon-model's own call, out of this crate's insulated surface; the
 /// closest existing kind is reused rather than smuggling an untyped
@@ -48,7 +48,7 @@ pub struct DemotionEvidence {
 
 impl DemotionEvidence {
     pub fn new(contradicting_trajectory_id: TrajectoryId, reason: impl Into<String>, at: DateTime<Utc>) -> Self {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, at, Actor::new_unattributed("canon-learn::demote_strategy"));
+        let envelope = Envelope::new(1, RecordKind::Evidence, at, Actor::new_unattributed("canon-learn::demote_strategy"));
         Self { envelope, contradicting_trajectory_id, reason: reason.into(), evaluation_digest: None, approval_digest: None, outcome_provenance: None }
     }
 

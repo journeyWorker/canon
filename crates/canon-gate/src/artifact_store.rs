@@ -921,7 +921,7 @@ mod tests {
     }
 
     fn evidence(id: &str, path: &str, digest: &str, offset: i64) -> EvidenceRecord {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now() + Duration::seconds(offset), Actor::new("agent", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now() + Duration::seconds(offset), Actor::new("agent", RoleId::parse("implementer").unwrap()));
         EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(id).unwrap()), None, EvidenceVerdict::Faithful)
             .with_project_id(ProjectId::parse("p").unwrap())
             .with_attachments(vec![EvidenceAttachment { path: path.into(), sha256: digest.into(), format: None, case: None, outcome: None }])

@@ -29,7 +29,7 @@ const EMIT_WINDOW: usize = 6;
 /// is emitted by `run::entry` for every command that needs canon state (see
 /// [`needs_config_leaves`]); `input.rs`, whose INPUT_* codes `derive` attributes to every
 /// leaf that takes `--input`.
-const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs", "context.rs", "input.rs"];
+const IGNORED: &[&str] = &["cli_error.rs", "schema_codes.rs", "context.rs", "input.rs", "old_layout.rs"];
 
 /// Codes registered ahead of the commands that emit them (none: every code is emitted).
 const AWAITING_WIRING: &[&str] = &[];
@@ -250,6 +250,10 @@ fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
             }
             table.get_mut(leaf.path).expect("leaf has a row").insert(info.code);
         }
+    }
+    // `OLD_LAYOUT` (`old_layout::refuse_write`, run by `main` before the command): every leaf that writes records.
+    for leaf in META.iter().filter(|m| canon_cli::old_layout::refuses_in_old_layout(m.path)) {
+        table.get_mut(leaf.path).expect("leaf has a row").insert("OLD_LAYOUT");
     }
     // The human-only refusal (`run::human_only`) is emitted for its caller's leaf.
     for leaf in HUMAN_ONLY_LEAVES {

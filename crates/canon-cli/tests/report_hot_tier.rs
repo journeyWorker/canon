@@ -129,7 +129,7 @@ fn report_generation_12_a_record_in_both_tiers_counts_once() {
         "evidence add",
     );
     ok(run_canon(&["task", "done", "add-login#1"], repo), "task done");
-    let evidence_dir = repo.join(".canon/ledger/kind=evidence_record");
+    let evidence_dir = repo.join(".canon/ledger/kind=evidence");
     let files: Vec<_> = fs::read_dir(&evidence_dir).unwrap().map(|e| e.unwrap().path()).collect();
     assert_eq!(files.len(), 1, "{files:?}");
     let body: serde_json::Value = serde_json::from_str(&fs::read_to_string(&files[0]).unwrap()).unwrap();
