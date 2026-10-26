@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-030-ln",
+    "role": "reviewer",
+    "session_id": "rev-030-ln-2026-10-26"
+  },
+  "at": "2026-10-26T18:26:01.210773641Z",
+  "change_id": "canon-0-30-ledger-naming",
+  "code_tree": "a63296920ba393b2da8dc7715fead8017ec5435e",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/migrate.rs:392-409; crates/canon-cli/src/migrate_names.rs; canon/skills/reference/role-orchestrator.md:637-645",
+  "introduced_by": "927f80d34cea422d9f9572d7e9dc034819180d33",
+  "kind": "finding",
+  "reviewed_sha": "63a5e3c4e25e58d42ca9db7cc692b02490f43ee5",
+  "reviewer": "rev-030-ln",
+  "round": 1,
+  "scenario_ids": [
+    "ledger.migrate.09"
+  ],
+  "schema": 1,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "[standards] `canon migrate --commit` now writes a whole-tree snapshot (.canon/ including hot.db, the full 0.29 ledger and archive, canon.yaml, .gitignore, spec roots) under .canon/migrate-backup/<stamp>/ and nothing ignores it: re-running the migrate on canon's own pre-migrate tree (927f80d3) left `?? .canon/migrate-backup/` of 24 MB and `git check-ignore` says it is not ignored; ledger_migrate_09 pins exactly that status line. The orchestrator guide then says 'Commit what it changes' and still describes the backup as 'every file it rewrites', so `git add -A` commits the snapshot (the implementers kept theirs outside the tree for that reason). Fix: have migrate add `.canon/migrate-backup/` to the .gitignore it already rewrites (and init's ignore block), or write the snapshot under .git/; update the guide text to say it is a full snapshot and not to commit it.",
+  "worktree_dirty": false
+}

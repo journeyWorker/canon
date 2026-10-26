@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "agent_id": "rev-030-ln",
+    "role": "reviewer",
+    "session_id": "rev-030-ln-2026-10-26"
+  },
+  "at": "2026-10-26T18:25:59.910427146Z",
+  "change_id": "canon-0-30-ledger-naming",
+  "code_tree": "a63296920ba393b2da8dc7715fead8017ec5435e",
+  "disposition": "open",
+  "file_ref": "crates/canon-store/tests/pg_tier_live.rs; crates/canon-cli/tests/ledger_naming.rs:449",
+  "introduced_by": "927f80d34cea422d9f9572d7e9dc034819180d33",
+  "kind": "finding",
+  "reviewed_sha": "63a5e3c4e25e58d42ca9db7cc692b02490f43ee5",
+  "reviewer": "rev-030-ln",
+  "round": 1,
+  "scenario_ids": [
+    "ledger.naming.08",
+    "ledger.migrate.09",
+    "ledger.naming.18"
+  ],
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[standards] No test reaches the Postgres tier's new behaviour: PgTier::write_rows KeyConflict + one-transaction rollback across chunks, PgTier::rekey (migrate) and the journal revert are never executed, not even behind the CANON_PG_DSN live gate (pg_tier_live.rs gained no test; its only diff is one line). The ledger_naming_08 doc comment says Postgres 'is covered by its own live test' - no such test exists. The brief's F1 acceptance names Postgres explicitly and its Q2 assumption says tier key changes are confirmed 'by code and tests'. Code read: write_rows/rekey mirror the sqlite ones, but nothing proves it. Fix: add live-gated tests in pg_tier_live.rs (batch >500 rows with a conflict in chunk 2 leaves no row; rekey onto a key held by other JSON refuses and keeps nothing; migrate --commit then --revert restores the rows), and correct the comment. Blast radius: canon's own canon.yaml routes task/session/run/event/handoff/trajectory to Postgres, so F4's query comparison could not cover those kinds either (both binaries: QUERY_FAILED, no DSN).",
+  "worktree_dirty": false
+}

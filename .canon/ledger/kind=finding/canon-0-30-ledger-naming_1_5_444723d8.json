@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-030-ln",
+    "role": "reviewer",
+    "session_id": "rev-030-ln-2026-10-26"
+  },
+  "at": "2026-10-26T18:26:02.316370852Z",
+  "change_id": "canon-0-30-ledger-naming",
+  "code_tree": "a63296920ba393b2da8dc7715fead8017ec5435e",
+  "disposition": "open",
+  "file_ref": "docs/design/ledger-layout.md (R6, component table); crates/canon-model/src/layout.rs:17-24",
+  "introduced_by": "927f80d34cea422d9f9572d7e9dc034819180d33",
+  "kind": "finding",
+  "reviewed_sha": "63a5e3c4e25e58d42ca9db7cc692b02490f43ee5",
+  "reviewer": "rev-030-ln",
+  "round": 1,
+  "scenario_ids": [
+    "ledger.naming.04"
+  ],
+  "schema": 1,
+  "seq": 5,
+  "severity": "note",
+  "summary": "[spec fidelity] Task ids are escaped too: `s1-state-model-join-spine#6.2` is stored as `…+236.2` and the sqlite id of task `add-login#1` becomes `add-login+231` (ledger_naming_01, ledger_migrate_10). layout.rs's module doc says a task id's `#` is escaped, but the accepted design's R6 names only free-text components (session id, regime key segment, handoff id) and says typed kebab/dot ids never need it. The behaviour is consistent with R6's mechanism and round-trips; the design doc should say every typed or free-text component is escaped and give the task-id example, so readers of names and object keys are not surprised.",
+  "worktree_dirty": false
+}
