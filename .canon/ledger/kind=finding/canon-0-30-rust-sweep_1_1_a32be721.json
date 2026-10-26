@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-030-chore",
+    "role": "reviewer",
+    "session_id": "rev-030-chore-2026-10-26"
+  },
+  "at": "2026-10-26T21:00:32.285856303Z",
+  "change_id": "canon-0-30-rust-sweep",
+  "code_tree": "b121948f5c80ce540c71b72d1870da2d387702b1",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/dashboard.rs:498",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "f422bbbcf878916f2a88762880cf6d84bc80e53a",
+  "reviewer": "rev-030-chore",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "Poisoned locks still recover in 3 production sites at f422bbbc (and HEAD): dashboard.rs:498 (the approvals lock) and inventory.rs FEATURE_MEMO (HEAD lines 634, 648) call lock().unwrap_or_else(PoisonError::into_inner). The brief's Invariants say the dashboard approval lock propagates the poisoned state, and rust-coding-rules.md §5 lists these sites among the 7 to convert. Only artifact_store.rs and git_tier.rs were converted to lock().expect(...); step 1's clippy --fix only rewrote the closures into PoisonError::into_inner. Fix: lock().expect(\"<lock> lock poisoned\") at the three sites. Blast radius: output differs only after an earlier panic; no test covers it.",
+  "worktree_dirty": false
+}

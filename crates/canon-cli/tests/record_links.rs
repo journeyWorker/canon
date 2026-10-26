@@ -910,3 +910,20 @@ fn hand_written_finding_add_blocker_and_should_fix_examples_name_the_introducing
     assert!(seen >= 5, "found only {seen} `canon finding add` examples");
     assert!(problems.is_empty(), "these examples raise a blocker or should-fix without --introduced-rev or --introduced-unknown:\n{}", problems.join("\n"));
 }
+
+/// ingest.sessions.16: the hot store line names only a write that went
+/// there. With only `change` routed hot, `subject new` writes the subject to
+/// the ledger and prints no hot store line; `subject adopt` rewrites the
+/// change in the hot store and prints it.
+#[test]
+fn ingest_sessions_16c_a_subject_write_routed_to_the_ledger_prints_no_hot_store_line() {
+    let routing = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  subject: local\n  change: hot\n";
+    let dir = init_repo(routing);
+    let repo = dir.path();
+    git(repo, &["init", "-q", "-b", "main"]);
+    let new = canon(&["subject", "new", "demo", "--domain", "d", "--title", "T", "--actor-id", "a"], repo);
+    assert!(new.status.success(), "{}", text(&new));
+    assert!(!text(&new).contains("hot store:"), "{}", text(&new));
+    let new_json = json(&canon(&["subject", "new", "other", "--domain", "d", "--title", "T", "--actor-id", "a", "--json"], repo));
+    assert!(new_json["meta"].get("hotStore").is_none(), "{new_json}");
+}

@@ -495,7 +495,7 @@ fn read_and_approve(reader: &mut impl Read, length: usize, server: &Server) -> R
     if reader.read_exact(&mut body).is_err() {
         return bad_request("the body is shorter than its Content-Length");
     }
-    let _approving = server.approvals.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _approving = server.approvals.lock().expect("dashboard approvals lock poisoned");
     crate::dashboard_briefs::approve(&server.repo, &body)
 }
 

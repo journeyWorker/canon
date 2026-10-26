@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-030-chore",
+    "role": "reviewer",
+    "session_id": "rev-030-chore-2026-10-26"
+  },
+  "at": "2026-10-26T21:00:32.788947937Z",
+  "change_id": "canon-0-30-rust-sweep",
+  "code_tree": "b121948f5c80ce540c71b72d1870da2d387702b1",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/paging.rs:114",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "f422bbbcf878916f2a88762880cf6d84bc80e53a",
+  "reviewer": "rev-030-chore",
+  "round": 1,
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "Checks item 'record before/after CPU and peak RSS at the same bench points for the 3 cost fixes' is only partly met. The numbers live in untracked target/030-baseline/bench-{0.29.0,sweep}.tsv, and the tree has only the commit message ('within noise'). The small grid measures gate check, status and evidence add, which reach validate_evidence_batch and live_bindings_of; no bench point reaches paginate (paging.rs), so that fix has no measurement. Reviewer re-run (release f422bbbc vs 0.29.0, small grid, idle CPU): all points within noise; check_shape passes (cpu x <=5.4, rss x <=3.2). Fix: record the table in the tree and add or name a paginate measurement.",
+  "worktree_dirty": false
+}

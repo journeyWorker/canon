@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-030-ln",
+    "role": "reviewer",
+    "session_id": "rev-030-ln-r3-2026-10-26"
+  },
+  "at": "2026-10-26T20:46:13.678218868Z",
+  "change_id": "canon-0-30-ledger-naming",
+  "code_tree": "a63296920ba393b2da8dc7715fead8017ec5435e",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/query.rs:352-356; crates/canon-cli/tests/ledger_migrate.rs:670",
+  "introduced_by": "927f80d34cea422d9f9572d7e9dc034819180d33",
+  "kind": "finding",
+  "reason": "round 3: latest-only query reproduces 0.29's order (query.rs:388-436,505); fresh migrate of 927f80d3: evidence, finding, scenario, subject order identical to 0.29, review differs only in 5 positions sharing one at; ledger_migrate 06b checks every kind",
+  "resolution_code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "resolution_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "63a5e3c4e25e58d42ca9db7cc692b02490f43ee5",
+  "reviewer": "rev-030-ln",
+  "round": 1,
+  "scenario_ids": [
+    "ledger.migrate.06"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[spec fidelity] Latest-only `canon query` of the folded kinds (subject, finding, scenario, change) now sorts by `at` instead of the natural key, so on canon's own repo the order changes far beyond records sharing an `at`. Reproduced: 0.29.0 (built from 6f438b9a) on 927f80d3 vs this binary on the re-migrated tree: `query --kind subject --all` starts authoring-scaffold, context-capability, dispatch-manifest... in 0.29 and format-corpus, ingest-pipelines, vocab-typed... now; `--kind finding` starts canon-0-13-1-codex-skills_1_1 vs s42-close-the-open-loops_8_1; the `at` sequences differ (review and evidence keep the same `at` sequence, so their differences are ties only). Brief F4 acceptance and ledger.migrate.06's Then allow only names, the kind name and the order of records sharing an `at` to differ; test 06b compares counts only, and b42cf3d7's 'query records equal for every kind' holds as sets, not as output. Conformance query-subject-json/1.out and subject-adopt-second-subject/7.out were regenerated to the new order. Fix: order the folded output by the typed components (numbers as numbers) then `at` then digest, which is body-field order and reproduces 0.29's zero-padded key order; or the human amends F4 to accept the `at` order. Blast radius: every agent or script that pages `query --kind finding|subject` sees a different first page.",
+  "worktree_dirty": false
+}

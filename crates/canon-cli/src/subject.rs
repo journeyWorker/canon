@@ -295,8 +295,10 @@ fn report_subject_warning(
     human: &str,
     warnings: &[String],
 ) {
-    // `written`: `None` for a dry run, else whether a record was written. Where the record went, when that is the hot store.
-    let hot = written.filter(|wrote| *wrote).and_then(|_| crate::hot_store::HotStore::written_by(&resolve_canon_yaml(repo), &[RecordKind::Subject, RecordKind::Change]));
+    // `written`: `None` for a dry run, else whether a record was written. Where the record went, when that is the hot store:
+    // `new` and `move` write the subject only; `adopt` and `unadopt` also rewrite the change's subject list.
+    let kinds: &[RecordKind] = if matches!(verb, "adopt" | "unadopt") { &[RecordKind::Subject, RecordKind::Change] } else { &[RecordKind::Subject] };
+    let hot = written.filter(|wrote| *wrote).and_then(|_| crate::hot_store::HotStore::written_by(&resolve_canon_yaml(repo), kinds));
     let dry_run = written.is_none();
     if !json {
         println!("{human}");

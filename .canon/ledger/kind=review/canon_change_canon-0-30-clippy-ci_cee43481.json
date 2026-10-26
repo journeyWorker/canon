@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-030-chore",
+    "role": "reviewer",
+    "session_id": "rev-030-chore-2026-10-26"
+  },
+  "at": "2026-10-26T20:59:30.999391785Z",
+  "change_id": "canon-0-30-clippy-ci",
+  "code_tree": "3c71dd4ac12ff9af6c0e758e6af3ac71e106fa28",
+  "kind": "review",
+  "pin": "6f438b9acf4594e03de81fc742e11eb20a01c563",
+  "pins": {
+    "checks": [],
+    "scenario_digest": "5cf93b91990fd421737fe44ffaae79b12c41c6b9e9cf083e8f9ddf085ce34efe",
+    "scenario_digest_scope": "brief"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-30-clippy-ci/brief.md"
+  },
+  "review_id": "01M5X05QSQP0HGMB4JHVN7MP6E",
+  "reviewer": "rev-030-chore",
+  "schema": 2,
+  "worktree_dirty": false
+}

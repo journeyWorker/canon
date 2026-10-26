@@ -1,0 +1,30 @@
+{
+  "actor": {
+    "agent_id": "rev-030-rl",
+    "role": "reviewer",
+    "session_id": "rev-030-rl-r2-2026-10-26"
+  },
+  "at": "2026-10-26T20:46:32.837798052Z",
+  "change_id": "canon-0-30-record-links",
+  "code_tree": "86779563bdaf9bb2a2dfff7f4bc7cd6f8f2b60a7",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/record_links.rs:386-404",
+  "introduced_by": "230eac79859c234ccf89c88aeb786d911ea5cec5",
+  "kind": "finding",
+  "reason": "round 2: the Then names danglingReferences; record_links context_status_84 makes all five kinds dangle and asserts 1 each, 5 in total, same JSON in a fresh clone",
+  "resolution_code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "resolution_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "resolution_worktree_dirty": false,
+  "review_id": "01M5WVXD2Z94A6RC55YKS9WS0Q",
+  "reviewed_sha": "bdf0ac42680d33c7a44b528115190303445447ab",
+  "reviewer": "rev-030-rl",
+  "round": 1,
+  "scenario_ids": [
+    "context.status.84"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "context.status.84: its Then names status JSON key `dangling` but status emits `danglingReferences` (query emits `dangling`); and the test's fixture dangles only finding.change_id, so finding.review_id, evidence.task_id, evidence.scenario_id and subject.change_ids are never counted through status (they work: probe gave all four). Align the key or the spec, and seed the four other kinds",
+  "worktree_dirty": false
+}

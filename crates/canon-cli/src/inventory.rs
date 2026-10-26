@@ -631,7 +631,7 @@ type MemoEntry = (canon_store::git_tier::FileStamp, std::sync::Arc<FeatureFileSc
 pub fn feature_file_scan(path: &Path) -> Option<std::sync::Arc<FeatureFileScan>> {
     let stamp = std::fs::metadata(path).ok().and_then(|metadata| canon_store::git_tier::FileStamp::of(&metadata));
     if let Some(stamp) = stamp {
-        let memo = FEATURE_MEMO.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let memo = FEATURE_MEMO.lock().expect("feature-file memo lock poisoned");
         if let Some((_, file)) = memo.get(path).filter(|(seen, _)| *seen == stamp) {
             return Some(std::sync::Arc::clone(file));
         }
@@ -645,7 +645,7 @@ pub fn feature_file_scan(path: &Path) -> Option<std::sync::Arc<FeatureFileScan>>
         steps: canon_fmt::steps::scenario_steps(text),
     });
     if let Some(stamp) = stamp {
-        FEATURE_MEMO.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(path.to_path_buf(), (stamp, std::sync::Arc::clone(&file)));
+        FEATURE_MEMO.lock().expect("feature-file memo lock poisoned").insert(path.to_path_buf(), (stamp, std::sync::Arc::clone(&file)));
     }
     Some(file)
 }

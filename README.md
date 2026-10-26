@@ -89,10 +89,65 @@ them in git history, e.g. `git show 0977bce1:<path>`.
 
 ## 0.30.0 release
 
-One naming rule for every stored record. Design: `docs/design/ledger-layout.md`;
-change: `canon-0-30-ledger-naming`.
+0.30 is canon's first release planned and shipped through canon itself: six
+changes under `.canon/changes/canon-0-30-*`, each with an approved brief,
+scenarios or chore checks, evidence and an independent review.
 
-### Naming rule
+| Change | Kind | What it does |
+|---|---|---|
+| `canon-0-30-plans-cutover` | chore | canon's own plans live in `.canon/changes`; `openspec/` and `docs/superpowers/` are gone from this repo (git history keeps them); `plans.sources: []` |
+| `canon-0-30-spec-backfill` | feature | every CLI leaf has a success and a failure scenario (60 new scenarios; `tests/leaf_coverage.rs` checks it against the command spec) |
+| `canon-0-30-rust-sweep` | chore | `docs/design/rust-coding-rules.md` applied to every crate; output byte-identical to 0.29.0 |
+| `canon-0-30-clippy-ci` | chore | pinned `clippy` CI job (toolchain 1.99.1) and `scripts/check_visibility.sh` |
+| `canon-0-30-ledger-naming` | feature | one naming rule for every stored record, `evidence_record` → `evidence`, `canon migrate` / `--revert` |
+| `canon-0-30-record-links` | feature | review ids, finding → review links, introducing commit required, scenario steps in the index, dangling references, hot store location |
+
+### Rust coding rules (sweep)
+
+Measured at 0.29.0 and at 0.30.0 with `scripts/lint-counts.sh` (toolchain
+1.99.1, every target and the live-tier features):
+
+| Count | 0.29.0 | 0.30.0 |
+|---|---:|---:|
+| §1 workspace lints (src / tests) | 1,120 / 184 | 0 / 0 |
+| default clippy lints (one `never_loop` error) | 114 | 0 |
+| production `unwrap()` | 13 | 0 |
+| `pub(super)` / `pub(in …)` | 19 | 0 |
+| `pub fn … -> Result<_, String>` | 52 (66 found by a looser match) | 0 |
+
+Root causes were fixed rather than allowed: `CliError` boxes its optional
+detail (`result_large_err`), exit codes are `u8` (234 `as u8` casts gone),
+errors are `thiserror` types whose `Display` keeps the old message, colliding
+error names are crate-unique, and poisoned locks propagate. Every step was
+checked byte for byte against 0.29.0's `gate check`, `status`, `schema` and
+`schema --errors` output on canon's corpus and a synthetic one.
+
+Three cost fixes rode along (evidence deserialized once, `live_bindings_of`
+borrows, `paginate` builds keys only to the page end). The 0.29 bench small
+grid shows no change beyond noise (CPU s / peak RSS MB, 0.29.0 → 0.30.0):
+gate check at 1000 scenarios 0.32 → 0.31 / 49 → 50; status at 1000
+0.34 → 0.32 / 50 → 50; `evidence add --all-scenarios` batch 100 0.78 → 0.73 /
+63 → 63. No bench point exercises `paginate`.
+
+### Record links
+
+- `review scenario` / `review change` give one review id per run (a ULID in
+  the record body; a skipped repeat shows the earlier id; `canon migrate`
+  keeps it). `finding add --review-id` links a finding to its review.
+- A new blocker or should-fix finding needs `--introduced-rev <rev>` or
+  `--introduced-unknown`.
+- Scenario index records carry their Given/When/Then steps, parsed with the
+  `gherkin` crate; scenario digests are unchanged.
+- `canon query` marks references to records no committed source holds, and
+  `canon status --json` counts them in `danglingReferences`.
+- `canon init --check` and every command that writes to the hot store print
+  where it is.
+
+### Ledger names
+
+Design: `docs/design/ledger-layout.md`; change: `canon-0-30-ledger-naming`.
+
+#### Naming rule
 
 Every store (git ledger, archive and staging, plugin overlays, sqlite and
 Postgres keys, R2 object keys) names a record
@@ -112,13 +167,13 @@ Postgres keys, R2 object keys) names a record
 
 Example: `kind=review/canon_scenario_gate.check.104_e7f52dd1.json`.
 
-### Kind rename
+#### Kind rename
 
 `evidence_record` is now `evidence` on disk, in the record's `kind` field,
 the schema, `canon.yaml` `routing:`/aging keys and report views. Evidence with
 no task, scenario or run key is refused by the model.
 
-### Migration
+#### Migration
 
 A 0.29 repo warns on read commands and refuses write commands, each naming
 `canon migrate` as the first next step. Then:
