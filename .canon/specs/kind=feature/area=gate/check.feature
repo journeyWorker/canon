@@ -504,9 +504,9 @@ Feature: gate check
   Scenario: Gate install-hooks with --dry-run reports what it would install and writes nothing
     Given a git work tree with a canon.yaml and no hook files
     When canon gate install-hooks --dry-run is run
-    Then it exits 0 with dryRun true, installed true and preCommitScriptWritten true
-    And no file or directory was created
-    And the same command without --dry-run then writes the files the preview named
+    Then it exits 0 and reports only three fields: dryRun true, installed true and preCommitScriptWritten true
+    And it names no file, and no file or directory was created in the tree
+    And the same command without --dry-run then exits 0 with dryRun false and writes .claude/settings.json, .codex/hooks.json and .canon/scripts/canon-gate-pre-commit.sh
 
   # canon: {"schema":1,"at":"2026-10-26T11:43:34Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
   @subject:gate-trust-spine

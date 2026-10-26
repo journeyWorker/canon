@@ -619,13 +619,19 @@ fn gate_check_106_gate_install_hooks_with_dry_run_reports_what_it_would_install_
     let out = canon_in(repo, &["gate", "install-hooks", "--dry-run", "--json"]);
     assert_eq!(out.status.code(), Some(0), "{}", text(&out));
     let body = stdout_json(&out);
+    let mut fields: Vec<&str> = body["data"].as_object().unwrap().keys().map(String::as_str).collect();
+    fields.sort_unstable();
+    assert_eq!(fields, ["dryRun", "installed", "preCommitScriptWritten"], "the preview reports three fields and names no file: {body}");
     assert_eq!((body["data"]["dryRun"].as_bool(), body["data"]["installed"].as_bool(), body["data"]["preCommitScriptWritten"].as_bool()), (Some(true), Some(true), Some(true)), "{body}");
     assert_eq!(snapshot(repo), before, "the preview writes nothing");
     assert!(!repo.join(".claude").exists() && !repo.join(".codex").exists() && !repo.join(".canon").exists());
 
     let real = canon_in(repo, &["gate", "install-hooks", "--json"]);
     assert_eq!(real.status.code(), Some(0), "{}", text(&real));
-    assert_ne!(snapshot(repo), before, "the real run then writes the files the preview named");
+    assert_eq!(stdout_json(&real)["data"]["dryRun"], false);
+    let written: Vec<PathBuf> = snapshot(repo).into_keys().filter(|p| !before.contains_key(p)).collect();
+    let expected: Vec<PathBuf> = [".canon/scripts/canon-gate-pre-commit.sh", ".claude/settings.json", ".codex/hooks.json"].iter().map(PathBuf::from).collect();
+    assert_eq!(written, expected, "the real run writes exactly these files");
 }
 
 #[test]

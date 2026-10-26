@@ -246,7 +246,7 @@ fn learn_promotion_12_a_rollback_of_a_promoted_strategy_signed_by_the_pinned_app
 }
 
 #[test]
-fn learn_promotion_13_a_rollback_with_an_unreadable_signature_an_unknown_strategy_or_a_malformed_timestamp_is_refused_and_writes_nothing() {
+fn learn_promotion_13_a_rollback_with_an_unreadable_or_invalid_signature_or_a_malformed_timestamp_is_refused_and_writes_nothing() {
     let signing = Signing::new();
     let repo = signing.repo.path();
     let (candidate, _) = candidate_and_evaluation(repo);
@@ -259,9 +259,11 @@ fn learn_promotion_13_a_rollback_with_an_unreadable_signature_an_unknown_strateg
     let unreadable = rollback(&id, "missing.sig", "2030-01-01T00:00:00Z");
     assert_eq!(unreadable.status.code(), Some(2));
     assert_eq!(error_code(&unreadable), "LEARN_SIGNATURE_UNREADABLE");
-    let unknown = rollback(UNKNOWN_STRATEGY, "bad.sig", "2030-01-01T00:00:00Z");
-    assert_eq!(unknown.status.code(), Some(1));
-    assert_eq!(error_code(&unknown), "LEARN_ROLLBACK_FAILED");
+    let bad_signature = rollback(&id, "bad.sig", "2030-01-01T00:00:00Z");
+    assert_eq!(bad_signature.status.code(), Some(1));
+    assert_eq!(error_code(&bad_signature), "LEARN_ROLLBACK_FAILED");
+    let message = json(&bad_signature)["error"]["message"].as_str().unwrap().to_string();
+    assert!(message.contains("ssh signature verification failed"), "{message}");
     let bad_time = rollback(&id, "bad.sig", "yesterday");
     assert_eq!(bad_time.status.code(), Some(2));
     assert_eq!(error_code(&bad_time), "USAGE");

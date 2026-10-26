@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "rev-030-sb",
+    "role": "reviewer",
+    "session_id": "rev-030-sb-2026-10-26"
+  },
+  "at": "2026-10-26T13:08:11.480706625Z",
+  "change_id": "canon-0-30-spec-backfill",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "7f9f15df9b2287e3743828cd184d6cdc3e83d05c",
+  "reviewer": "rev-030-sb",
+  "round": 1,
+  "schema": 1,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "[brief acceptance] Desired outcome and acceptance say no subject has zero scenarios, and Questions assumes (a): move the covering scenarios into flywheel-execution-graph and spec-derived-worklist. canon status at 7f9f15df still reports both with scenarios 0 (status specced); this change carries no retag for them. Either do (a) here or record why it moves to another change.",
+  "worktree_dirty": false
+}

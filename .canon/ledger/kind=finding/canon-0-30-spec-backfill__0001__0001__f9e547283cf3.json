@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-030-sb",
+    "role": "reviewer",
+    "session_id": "rev-030-sb-2026-10-26"
+  },
+  "at": "2026-10-26T13:10:11.003426478Z",
+  "change_id": "canon-0-30-spec-backfill",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/spec030_reads.rs:262",
+  "introduced_by": "0d6c97587f5f0a53feaa0cdc5fe77b072bc76499",
+  "kind": "finding",
+  "resolution_code_tree": "3d45c26a51c33ee4ffa26007ec25ba5978dbd691",
+  "resolution_sha": "7f9f15df9b2287e3743828cd184d6cdc3e83d05c",
+  "resolution_worktree_dirty": true,
+  "reviewed_sha": "7f9f15df9b2287e3743828cd184d6cdc3e83d05c",
+  "reviewer": "rev-030-sb",
+  "round": 1,
+  "scenario_ids": [
+    "learn.promotion.13"
+  ],
+  "schema": 1,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[standards] learn.promotion.13's unknown-strategy case never reaches the strategy lookup: it passes bad.sig, and rollback_strategy_authenticated verifies the signature (canon-learn/src/promotion/rollback.rs:76) before find_by_id (:78), so the exit-1 LEARN_ROLLBACK_FAILED it asserts is the signature failure (ran the binary: message 'ssh signature verification failed'). Deleting the UnknownStrategyId branch keeps the test green. Fix: sign a valid rollback payload for the unknown id and assert the message names the unknown strategy. Also: an unknown id exits 1 here but 2 (LEARN_STRATEGY_NOT_FOUND) in strategy approval-payload; per the brief's assumption a bug-looking exit belongs in a finding, not a pinned Then.",
+  "worktree_dirty": false
+}

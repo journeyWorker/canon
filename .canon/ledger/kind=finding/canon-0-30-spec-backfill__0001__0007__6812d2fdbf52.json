@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-030-sb",
+    "role": "reviewer",
+    "session_id": "rev-030-sb-2026-10-26"
+  },
+  "at": "2026-10-26T13:08:14.258450951Z",
+  "change_id": "canon-0-30-spec-backfill",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "disposition": "open",
+  "file_ref": "examples/platformer/tests/levels.test.tsx",
+  "kind": "finding",
+  "reviewed_sha": "7f9f15df9b2287e3743828cd184d6cdc3e83d05c",
+  "reviewer": "rev-030-sb",
+  "round": 1,
+  "scenario_ids": [
+    "platformer.levels.03"
+  ],
+  "schema": 1,
+  "seq": 7,
+  "severity": "note",
+  "summary": "[spec fidelity] platformer.levels.03's test also pins unlockedLevel 0 and a non-object best discarding all progress, which the scenario's Given does not state; add them to the Given or drop them from the test.",
+  "worktree_dirty": false
+}

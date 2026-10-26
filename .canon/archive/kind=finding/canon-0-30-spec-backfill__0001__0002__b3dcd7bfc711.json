@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-030-sb",
+    "role": "reviewer",
+    "session_id": "rev-030-sb-2026-10-26"
+  },
+  "at": "2026-10-26T13:08:10.767780903Z",
+  "change_id": "canon-0-30-spec-backfill",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "disposition": "open",
+  "file_ref": ".canon/specs/kind=feature/area=gate/check.feature",
+  "introduced_by": "0d6c97587f5f0a53feaa0cdc5fe77b072bc76499",
+  "kind": "finding",
+  "reviewed_sha": "7f9f15df9b2287e3743828cd184d6cdc3e83d05c",
+  "reviewer": "rev-030-sb",
+  "round": 1,
+  "scenario_ids": [
+    "gate.check.106"
+  ],
+  "schema": 1,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[spec fidelity] gate.check.106 Then says the real run 'writes the files the preview named', but install-hooks --dry-run --json prints only {dryRun, installed, preCommitScriptWritten} and names no file (ran it); the test can only assert the snapshot differs. Reword the Then to what is observable (the real run writes .claude/settings.json, .codex/hooks.json and the pre-commit script) and assert those files.",
+  "worktree_dirty": false
+}
