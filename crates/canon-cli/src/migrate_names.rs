@@ -49,6 +49,12 @@ use crate::safety::Effect;
 /// The file in the backup directory that lets [`revert`] undo the renaming.
 pub const JOURNAL: &str = "names-journal.json";
 
+/// The manifest of the whole-tree snapshot `canon migrate --revert` restores (see [`snapshot`]).
+pub const MANIFEST: &str = "tree-manifest.json";
+
+/// The directory of the backup that holds the snapshot's copies, by repo-relative path.
+pub const SNAPSHOT_DIR: &str = ".snapshot";
+
 /// The frozen 0.29 name functions (design: "a frozen copy"). They exist only to
 /// judge pre-0.23 review pins, which hold the 0.29 key and 12-hex digest of the
 /// evidence files they saw; the live functions of `canon-store` compute the 0.30
@@ -425,7 +431,7 @@ fn git_tracked(repo: &Path, dirs_or_files: &[String]) -> BTreeSet<String> {
     if dirs_or_files.is_empty() {
         return BTreeSet::new();
     }
-    let kind_dirs: BTreeSet<String> = dirs_or_files.iter().filter_map(|p| p.find("/kind=").map(|i| p[..i + 1 + p[i + 1..].find('/').map_or(p.len() - i - 1, |j| j)].to_string())).collect();
+    let kind_dirs: BTreeSet<String> = dirs_or_files.iter().filter_map(|p| p.find("/kind=").map(|i| p[..i + 1 + p[i + 1..].find('/').unwrap_or(p.len() - i - 1)].to_string())).collect();
     let Ok(out) = Command::new("git").args(["ls-files", "-z", "--"]).args(&kind_dirs).current_dir(repo).output() else { return BTreeSet::new() };
     if !out.status.success() {
         return BTreeSet::new();
@@ -476,7 +482,7 @@ fn plan_databases(repo: &Path, policy: &TierPolicy, plan: &mut Plan) -> Result<(
                 if !cfg.path.is_file() {
                     continue;
                 }
-                let tier = SqliteTier::connect(&cfg.path).map_err(|e| format!("cannot open {}: {e}", rel(repo, &cfg.path)))?;
+                let tier = SqliteTier::connect_read_only(&cfg.path).map_err(|e| format!("cannot open {}: {e}", rel(repo, &cfg.path)))?;
                 let rows = tier.all_rows().map_err(|e| e.to_string())?;
                 if let Some(rows) = plan_rows(rows)? {
                     plan.sqlite = Some((cfg.path.clone(), rows));
@@ -733,7 +739,7 @@ fn apply_steps(repo: &Path, plan: &Plan, git_tree: bool) -> Result<(), String> {
         tier.checkpoint().map_err(|e| e.to_string())?;
     }
     if let Some((dsn_env, schema, rows)) = &plan.postgres {
-        let dsn = std::env::var(dsn_env).map_err(|_| format!("`{dsn_env}` is unset"))?;
+        let dsn = std::env::var(dsn_env).ok().ok_or_else(|| format!("`{dsn_env}` is unset"))?;
         canon_store::pg_tier::PgTier::connect(&dsn, schema).and_then(|tier| tier.rekey(&rows.rekeys)).map_err(|e| format!("could not re-key postgres rows: {e}"))?;
     }
     if let Some(objects) = &plan.s3 {
@@ -770,12 +776,8 @@ fn remove_empty_dirs<'a>(repo: &Path, paths: impl Iterator<Item = &'a str>) {
     }
 }
 
-/// Undo [`apply`] from the journal in `backup`: the sqlite file, `canon.yaml`, `.gitignore` and every rewritten
-/// file are restored from their copies, the moves are reverted, and Postgres rows and R2 objects get their old
-/// keys back (their old keys and bodies are in the journal).
-pub fn revert(repo: &Path, backup: &Path) -> Result<(), String> {
-    let text = std::fs::read_to_string(backup.join(JOURNAL)).map_err(|e| format!("no renaming journal in {}: {e}", backup.display()))?;
-    let journal: Journal = serde_json::from_str(&text).map_err(|e| format!("the journal in {} is unreadable: {e}", backup.display()))?;
+/// Postgres rows and R2 objects get their old keys back (their old keys and bodies are in the journal).
+fn revert_remote(repo: &Path, journal: &Journal) -> Result<(), String> {
     if let Some((dsn_env, schema, rows)) = &journal.postgres {
         let undo: Vec<RowRekey> = rows.rows.iter().map(|r| RowRekey { from: r.to.clone(), to: r.from.clone(), body: r.old_body.clone() }).collect();
         if let Ok(dsn) = std::env::var(dsn_env) {
@@ -790,6 +792,16 @@ pub fn revert(repo: &Path, backup: &Path) -> Result<(), String> {
             .collect();
         attached_s3(repo)?.rekey_objects(&undo).map_err(|e| format!("could not restore s3 keys: {e}"))?;
     }
+    Ok(())
+}
+
+/// Undo [`apply`] from the journal in `backup`: the sqlite file, `canon.yaml`, `.gitignore` and every rewritten
+/// file are restored from their copies, the moves are reverted, and Postgres rows and R2 objects get their old
+/// keys back (their old keys and bodies are in the journal).
+pub fn revert(repo: &Path, backup: &Path) -> Result<(), String> {
+    let text = std::fs::read_to_string(backup.join(JOURNAL)).map_err(|e| format!("no renaming journal in {}: {e}", backup.display()))?;
+    let journal: Journal = serde_json::from_str(&text).map_err(|e| format!("the journal in {} is unreadable: {e}", backup.display()))?;
+    revert_remote(repo, &journal)?;
     // Files: reverse each move; a rewritten file comes back from its copy.
     for file in journal.moves.iter().rev() {
         let (from, to) = (repo.join(&file.from), repo.join(&file.to));
@@ -807,7 +819,7 @@ pub fn revert(repo: &Path, backup: &Path) -> Result<(), String> {
     files_under(backup, &mut copies);
     for copy in copies {
         let relative = copy.strip_prefix(backup).unwrap_or(&copy);
-        if relative == Path::new(JOURNAL) {
+        if relative == Path::new(JOURNAL) || relative == Path::new(MANIFEST) || relative.starts_with(SNAPSHOT_DIR) {
             continue;
         }
         let target = repo.join(relative);
@@ -902,4 +914,394 @@ pub fn scratch(repo: &Path, config: &str, plan: &Plan) -> Result<Scratch, String
             Err(format!("could not build the preview of the renamed ledger: {e}"))
         }
     }
+}
+
+// ------------------------------------------------------- the revert of the whole migrate
+
+/// One file of the snapshot: what [`revert_plan`] compares the tree against.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct Entry {
+    sha256: String,
+    /// Unix permission bits (0 where the platform has none).
+    mode: u32,
+    /// The target of a symlink (then `sha256` is of the target text).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    link: Option<String>,
+}
+
+/// The state of everything `canon migrate` may touch, taken before it acts ([`snapshot`]).
+#[derive(Debug, Serialize, Deserialize)]
+struct Manifest {
+    /// Repo-relative files and directories the snapshot covers.
+    scope: Vec<String>,
+    files: BTreeMap<String, Entry>,
+    dirs: BTreeSet<String>,
+    /// `git ls-files -s` entries of the scope (absent outside a git work tree).
+    index: Option<Vec<String>>,
+}
+
+/// What [`scan`] found.
+#[derive(Debug, Default)]
+struct Tree {
+    files: BTreeMap<String, Entry>,
+    dirs: BTreeSet<String>,
+}
+
+/// Paths the snapshot leaves out: the backups themselves, the content-addressed artifact store (migrate does not
+/// touch it) and the sqlite sidecars (transient; the snapshot folds them into `hot.db` first).
+fn skipped(relative: &str) -> bool {
+    let under = |dir: &str| relative == dir || relative.strip_prefix(dir).is_some_and(|rest| rest.starts_with('/'));
+    under(canon_model::paths::MIGRATE_BACKUP_DIR)
+        || under(canon_model::paths::ARTIFACTS_SHA256_DIR)
+        || relative == format!("{}-wal", canon_model::paths::HOT_DB_FILE)
+        || relative == format!("{}-shm", canon_model::paths::HOT_DB_FILE)
+}
+
+fn in_scope(scope: &[String], relative: &str) -> bool {
+    !skipped(relative) && scope.iter().any(|s| relative == s || relative.strip_prefix(s.as_str()).is_some_and(|rest| rest.starts_with('/')))
+}
+
+/// The scope of the snapshot: `canon.yaml`, `.gitignore`, `AGENTS.md`, `.canon/` and every path in `extra` (the
+/// places the other migrate steps read and write: spec roots, openspec changes, hooks, the skill install), repo-relative
+/// and without the paths another entry holds.
+pub fn scope(repo: &Path, extra: impl IntoIterator<Item = PathBuf>) -> Vec<String> {
+    let mut all: BTreeSet<String> = [".canon", "canon.yaml", ".gitignore", "AGENTS.md"].into_iter().map(str::to_string).collect();
+    for path in extra {
+        let relative = if path.is_absolute() { path.strip_prefix(repo).map(Path::to_path_buf).ok() } else { Some(path) };
+        if let Some(relative) = relative {
+            let text = relative.components().map(|c| c.as_os_str().to_string_lossy().into_owned()).collect::<Vec<_>>().join("/");
+            if !text.is_empty() && !text.starts_with("..") {
+                all.insert(text);
+            }
+        }
+    }
+    let kept: Vec<String> = all.iter().filter(|p| !all.iter().any(|other| other != *p && p.strip_prefix(other.as_str()).is_some_and(|rest| rest.starts_with('/')))).cloned().collect();
+    kept
+}
+
+#[cfg(unix)]
+fn mode_of(meta: &std::fs::Metadata) -> u32 {
+    use std::os::unix::fs::PermissionsExt;
+    meta.permissions().mode() & 0o7777
+}
+
+#[cfg(not(unix))]
+fn mode_of(_: &std::fs::Metadata) -> u32 {
+    0
+}
+
+fn walk(repo: &Path, relative: &str, tree: &mut Tree) -> Result<(), String> {
+    if skipped(relative) {
+        return Ok(());
+    }
+    let path = repo.join(relative);
+    let Ok(meta) = std::fs::symlink_metadata(&path) else { return Ok(()) };
+    if meta.is_dir() {
+        tree.dirs.insert(relative.to_string());
+        let mut names: Vec<String> = std::fs::read_dir(&path).map_err(|e| format!("could not read {relative}: {e}"))?.filter_map(Result::ok).map(|e| e.file_name().to_string_lossy().into_owned()).collect();
+        names.sort();
+        for name in names {
+            walk(repo, &format!("{relative}/{name}"), tree)?;
+        }
+    } else if meta.file_type().is_symlink() {
+        let target = std::fs::read_link(&path).map_err(|e| format!("could not read the link {relative}: {e}"))?.to_string_lossy().into_owned();
+        tree.files.insert(relative.to_string(), Entry { sha256: sha256_hex(target.as_bytes()), mode: 0, link: Some(target) });
+    } else if meta.is_file() {
+        let bytes = std::fs::read(&path).map_err(|e| format!("could not read {relative}: {e}"))?;
+        tree.files.insert(relative.to_string(), Entry { sha256: sha256_hex(&bytes), mode: mode_of(&meta), link: None });
+    }
+    Ok(())
+}
+
+fn scan(repo: &Path, scope: &[String]) -> Result<Tree, String> {
+    let mut tree = Tree::default();
+    for entry in scope {
+        walk(repo, entry, &mut tree)?;
+    }
+    Ok(tree)
+}
+
+/// `git ls-files -s` entries (`<mode> <sha> <stage>\t<path>`) of the scope.
+fn index_entries(repo: &Path, scope: &[String]) -> Result<Vec<String>, String> {
+    let out = Command::new("git").args(["ls-files", "-s", "-z"]).current_dir(repo).output().map_err(|e| format!("could not run git: {e}"))?;
+    if !out.status.success() {
+        return Err(format!("`git ls-files` failed: {}", String::from_utf8_lossy(&out.stderr).trim()));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).split('\0').filter(|e| e.split_once('\t').is_some_and(|(_, path)| in_scope(scope, path))).map(str::to_string).collect())
+}
+
+/// Copy everything `canon migrate` may touch (`scope`), and the git index entries of it, under `backup`, before the
+/// first step acts: [`revert_plan`] and [`revert_apply`] restore exactly this state, whatever the steps did (the
+/// renaming, spec and change moves, hooks and skill, the ledger compaction, the review pins, the index rebuild).
+pub fn snapshot(repo: &Path, backup: &Path, scope: &[String]) -> Result<(), String> {
+    let hot = repo.join(canon_model::paths::HOT_DB_FILE);
+    if hot.is_file() {
+        SqliteTier::connect(&hot).and_then(|tier| tier.checkpoint()).map_err(|e| format!("could not checkpoint {}: {e}", hot.display()))?;
+    }
+    let tree = scan(repo, scope)?;
+    let copies = backup.join(SNAPSHOT_DIR);
+    for (relative, entry) in &tree.files {
+        if entry.link.is_some() {
+            continue;
+        }
+        let to = copies.join(relative);
+        if let Some(parent) = to.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("could not create {}: {e}", parent.display()))?;
+        }
+        std::fs::copy(repo.join(relative), &to).map_err(|e| format!("could not copy {relative} into the backup: {e}"))?;
+    }
+    let index = if is_git_tree(repo) { Some(index_entries(repo, scope)?) } else { None };
+    let manifest = Manifest { scope: scope.to_vec(), files: tree.files, dirs: tree.dirs, index };
+    let text = serde_json::to_string(&manifest).map_err(|e| e.to_string())?;
+    std::fs::write(backup.join(MANIFEST), text).map_err(|e| format!("could not write the tree manifest: {e}"))
+}
+
+/// What the tree differs from the snapshot by.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct Diff {
+    /// Files changed or gone since the snapshot, and directories gone (trailing `/`).
+    restore: Vec<String>,
+    /// Files (and directories, trailing `/`) the snapshot did not have.
+    remove: Vec<String>,
+    /// The git index entries of the scope differ.
+    index: bool,
+}
+
+impl Diff {
+    fn is_empty(&self) -> bool {
+        *self == Diff::default()
+    }
+}
+
+fn diff(repo: &Path, manifest: &Manifest) -> Result<Diff, String> {
+    let now = scan(repo, &manifest.scope)?;
+    let mut out = Diff::default();
+    for (path, entry) in &manifest.files {
+        if now.files.get(path) != Some(entry) {
+            out.restore.push(path.clone());
+        }
+    }
+    out.restore.extend(manifest.dirs.iter().filter(|d| !now.dirs.contains(*d)).map(|d| format!("{d}/")));
+    out.remove.extend(now.files.keys().filter(|p| !manifest.files.contains_key(*p)).cloned());
+    out.remove.extend(now.dirs.iter().filter(|d| !manifest.dirs.contains(*d)).map(|d| format!("{d}/")));
+    if let Some(saved) = &manifest.index {
+        out.index = is_git_tree(repo) && index_entries(repo, &manifest.scope)? != *saved;
+    }
+    Ok(out)
+}
+
+/// What `canon migrate --revert` would do: restore the tree and the git index to the snapshot and give Postgres rows
+/// and R2 objects their old keys back from the journal.
+#[derive(Debug)]
+pub struct RevertPlan {
+    backup: PathBuf,
+    manifest: Manifest,
+    diff: Diff,
+    journal: Option<Journal>,
+}
+
+impl RevertPlan {
+    /// The backup directory the plan restores from.
+    pub fn backup(&self) -> &Path {
+        &self.backup
+    }
+
+    /// Nothing differs: the repo already is as the snapshot recorded it.
+    pub fn is_empty(&self) -> bool {
+        self.diff.is_empty()
+    }
+
+    /// The plan as effects, in the order [`revert_apply`] acts.
+    pub fn effects(&self) -> Vec<Effect> {
+        let mut out = Vec::new();
+        if let Some(journal) = &self.journal {
+            if let Some((_, schema, rows)) = &journal.postgres {
+                for row in &rows.rows {
+                    out.push(Effect::record("rekey", format!("postgres:{schema}:{}:{}:{}", row.to.0, row.to.1, row.to.2)).detail(format!("back to {}:{}:{}", row.from.0, row.from.1, row.from.2)));
+                }
+            }
+            for object in &journal.s3 {
+                out.push(Effect::record("rekey", format!("s3:{}", object.to)).detail(format!("back to {}", object.from)));
+            }
+        }
+        out.extend(self.diff.remove.iter().map(|p| Effect::path("remove", p.clone()).detail("not there before the migrate")));
+        out.extend(self.diff.restore.iter().map(|p| Effect::path("restore", p.clone()).detail("from the backup")));
+        if self.diff.index {
+            out.push(Effect::record("restore", "git index").detail("the staged paths of the migrate's scope, as before (the `git mv`s undone)"));
+        }
+        out
+    }
+}
+
+/// The backup `--revert` restores: `given` (repo-relative or absolute), else the newest one holding a tree manifest.
+pub fn find_backup(repo: &Path, given: Option<&Path>) -> Result<PathBuf, String> {
+    if let Some(dir) = given {
+        let dir = if dir.is_absolute() { dir.to_path_buf() } else { repo.join(dir) };
+        return if dir.join(MANIFEST).is_file() { Ok(dir) } else { Err(format!("{} holds no {MANIFEST}: it is not a backup `canon migrate` 0.30 took", dir.display())) };
+    }
+    let base = repo.join(canon_model::paths::MIGRATE_BACKUP_DIR);
+    let mut found: Vec<(String, u32, PathBuf)> = std::fs::read_dir(&base)
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .filter(|e| e.path().join(MANIFEST).is_file())
+        .map(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            let (stamp, n) = name.split_once('-').map_or((name.clone(), 0), |(s, n)| (s.to_string(), n.parse().unwrap_or(0)));
+            (stamp, n, e.path())
+        })
+        .collect();
+    found.sort();
+    found.pop().map(|(_, _, dir)| dir).ok_or_else(|| format!("no backup under {}/ holds a tree manifest: `canon migrate --commit` has not run here (or ran before 0.30)", canon_model::paths::MIGRATE_BACKUP_DIR))
+}
+
+/// The plan that restores `repo` to the snapshot in `backup`, or why it cannot.
+pub fn revert_plan(repo: &Path, backup: &Path) -> Result<RevertPlan, String> {
+    let text = std::fs::read_to_string(backup.join(MANIFEST)).map_err(|e| format!("no tree manifest in {}: {e}", backup.display()))?;
+    let manifest: Manifest = serde_json::from_str(&text).map_err(|e| format!("the tree manifest in {} is unreadable: {e}", backup.display()))?;
+    for (path, entry) in &manifest.files {
+        if entry.link.is_none() && !backup.join(SNAPSHOT_DIR).join(path).is_file() {
+            return Err(format!("the backup {} lacks its copy of {path}; it cannot restore the repo", backup.display()));
+        }
+    }
+    let diff = diff(repo, &manifest)?;
+    let journal = match std::fs::read_to_string(backup.join(JOURNAL)) {
+        Ok(text) if !diff.is_empty() => Some(serde_json::from_str::<Journal>(&text).map_err(|e| format!("the journal in {} is unreadable: {e}", backup.display()))?),
+        _ => None,
+    };
+    if let Some((dsn_env, _, rows)) = journal.as_ref().and_then(|j| j.postgres.as_ref()) {
+        if !rows.rows.is_empty() && std::env::var(dsn_env).is_err() {
+            return Err(format!("the migrate re-keyed Postgres rows and ${dsn_env} is not set, so their old keys cannot be restored; set it and run the revert again"));
+        }
+    }
+    Ok(RevertPlan { backup: backup.to_path_buf(), manifest, diff, journal })
+}
+
+#[cfg(unix)]
+fn restore_file(target: &Path, copy: &Path, entry: &Entry) -> Result<(), String> {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+    if let Some(link) = &entry.link {
+        symlink(link, target).map_err(|e| format!("could not restore the link {}: {e}", target.display()))
+    } else {
+        std::fs::copy(copy, target).map_err(|e| format!("could not restore {}: {e}", target.display()))?;
+        std::fs::set_permissions(target, std::fs::Permissions::from_mode(entry.mode)).map_err(|e| format!("could not restore the mode of {}: {e}", target.display()))
+    }
+}
+
+#[cfg(not(unix))]
+fn restore_file(target: &Path, copy: &Path, _: &Entry) -> Result<(), String> {
+    std::fs::copy(copy, target).map(|_| ()).map_err(|e| format!("could not restore {}: {e}", target.display()))
+}
+
+/// Undo every step of `canon migrate`: R2 objects and Postgres rows get their old keys back, files the migrate wrote
+/// or moved are removed, every file it rewrote, moved or removed comes back from the backup (`hot.db` included, its
+/// sidecars dropped), and the git index returns to its entries (the `git mv`s undone). It then re-reads the tree and
+/// refuses to say done unless it equals the snapshot.
+pub fn revert_apply(repo: &Path, plan: &RevertPlan) -> Result<(), String> {
+    if let Some(journal) = &plan.journal {
+        revert_remote(repo, journal)?;
+    }
+    let (manifest, copies) = (&plan.manifest, plan.backup.join(SNAPSHOT_DIR));
+    for path in plan.diff.remove.iter().filter(|p| !p.ends_with('/')) {
+        let target = repo.join(path);
+        std::fs::remove_file(&target).map_err(|e| format!("could not remove {path}: {e}"))?;
+    }
+    let mut gone_dirs: Vec<&str> = plan.diff.remove.iter().filter_map(|p| p.strip_suffix('/')).collect();
+    gone_dirs.sort_by_key(|d| std::cmp::Reverse(d.matches('/').count()));
+    for dir in gone_dirs {
+        let _ = std::fs::remove_dir(repo.join(dir));
+    }
+    for dir in plan.diff.restore.iter().filter_map(|p| p.strip_suffix('/')) {
+        std::fs::create_dir_all(repo.join(dir)).map_err(|e| format!("could not recreate {dir}: {e}"))?;
+    }
+    for path in plan.diff.restore.iter().filter(|p| !p.ends_with('/')) {
+        let entry = &manifest.files[path];
+        let target = repo.join(path);
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("could not create {}: {e}", parent.display()))?;
+        }
+        match std::fs::symlink_metadata(&target) {
+            Ok(meta) if meta.is_dir() => std::fs::remove_dir_all(&target).map_err(|e| format!("could not clear {path}: {e}"))?,
+            Ok(_) => std::fs::remove_file(&target).map_err(|e| format!("could not clear {path}: {e}"))?,
+            Err(_) => {}
+        }
+        restore_file(&target, &copies.join(path), entry)?;
+        if path == canon_model::paths::HOT_DB_FILE {
+            for sidecar in ["-wal", "-shm"] {
+                let _ = std::fs::remove_file(repo.join(format!("{path}{sidecar}")));
+            }
+        }
+    }
+    if let (true, Some(saved)) = (is_git_tree(repo), &manifest.index) {
+        let now = index_entries(repo, &manifest.scope)?;
+        let paths: String = now.iter().filter_map(|e| e.split_once('\t')).map(|(_, p)| format!("{p}\0")).collect();
+        if !paths.is_empty() {
+            git(repo, &["update-index", "--force-remove", "-z", "--stdin"], Some(&paths))?;
+        }
+        let info: String = saved.iter().map(|e| format!("{e}\0")).collect();
+        if !info.is_empty() {
+            git(repo, &["update-index", "-z", "--index-info"], Some(&info))?;
+        }
+    }
+    let left = diff(repo, manifest)?;
+    if left.is_empty() {
+        Ok(())
+    } else {
+        Err(format!("the revert ran but the repo still differs from the backup in {} file(s), {} unexpected and {} index state; restore from {}", left.restore.len(), left.remove.len(), if left.index { "the" } else { "no" }, plan.backup.display()))
+    }
+}
+
+/// `canon migrate --revert [--backup <DIR>] [--commit --plan-digest D]`: preview, then act.
+pub fn run_revert(repo_args: &crate::cli::RepoArgs, backup: Option<&Path>, mode: &crate::safety::Mode, json: bool) -> u8 {
+    use crate::cli_error::CliError;
+    use crate::migrate::MigrateReport;
+    use crate::safety;
+    let mut base = format!("{} --revert", safety::command("migrate", &[], repo_args));
+    if let Some(dir) = backup {
+        base.push_str(&format!(" --backup {}", safety::quote(&dir.display().to_string())));
+    }
+    let repo = crate::context::resolve_repo_root(repo_args);
+    let refused = |message: String| CliError::refused("MIGRATE_REFUSED", message).hint("run `canon migrate --revert` in a repo `canon migrate --commit` ran in, or name its backup with `--backup .canon/migrate-backup/<timestamp>`").emit("canon migrate", json);
+    let dir = match find_backup(&repo, backup) {
+        Ok(dir) => dir,
+        Err(e) => return refused(e),
+    };
+    let plan = match revert_plan(&repo, &dir) {
+        Ok(plan) => plan,
+        Err(e) => return refused(e),
+    };
+    let relative = rel(&repo, plan.backup());
+    let safe_plan = safety::Plan::new(plan.effects());
+    let commit = match safe_plan.gate(mode, &base) {
+        Ok(commit) => commit,
+        Err(e) => return e.emit("canon migrate", json),
+    };
+    let mut log = crate::json_out::Log::new(json);
+    if !commit {
+        log.line(format!("canon migrate --revert: restores the repo to the state {relative}/ recorded before `canon migrate --commit`; anything written under those paths since is discarded"));
+        for effect in safe_plan.effects.iter().take(50) {
+            log.line(safety::effect_line(effect));
+        }
+        if safe_plan.effects.len() > 50 {
+            log.line(format!("  ... and {} more (`--json` lists every effect)", safe_plan.effects.len() - 50));
+        }
+        if plan.is_empty() {
+            log.line("canon migrate --revert: the repo already is as the backup recorded it; nothing to restore");
+        }
+        log.line(safe_plan.commit_hint(&base));
+        let report = MigrateReport { steps: log.into_lines(), backup_dir: Some(relative), index_records_written: None, index: None, plan: safe_plan };
+        if json {
+            crate::json_out::data_with_next("migrate", &report, &report.plan.next_step(&base, "the plan only lists what the revert would restore; applying it takes its planDigest"));
+        }
+        return 0;
+    }
+    let safe_plan = safe_plan.committed();
+    if let Err(e) = revert_apply(&repo, &plan) {
+        return CliError::refused("MIGRATE_STOPPED", e).hint("the backup is intact: fix what the message names, then run `canon migrate --revert` again").emit("canon migrate", json);
+    }
+    log.line(format!("canon migrate --revert: restored {} path(s) and removed {} from {relative}/", safe_plan.effects.iter().filter(|e| e.action == "restore").count(), safe_plan.effects.iter().filter(|e| e.action == "remove").count()));
+    if json {
+        crate::json_out::data("migrate", &MigrateReport { steps: log.into_lines(), backup_dir: Some(relative), index_records_written: None, index: None, plan: safe_plan });
+    }
+    0
 }

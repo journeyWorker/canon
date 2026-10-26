@@ -301,12 +301,11 @@ fn fold_pg_routed_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
 /// same trade-off: a kind that gains a re-writing verb must be added
 /// here or its `canon query` result regresses to N-independent-versions.
 ///
-/// `review` is deliberately ABSENT and is not an oversight: its natural
-/// key carries the pinned sha
-/// (`{project_id}__{scenario_id}__{pin}`), so two attestations of one
-/// scenario at two commits are two DISTINCT keys, not two versions of
-/// one. Folding by key would collapse nothing today and would silently
-/// start dropping attestations the day two reviews share a pin.
+/// `review` is deliberately ABSENT and is not an oversight: the pin is not
+/// in its name (0.30 R2), so two attestations of one scenario at two
+/// commits are two records under one key prefix, told apart by digest —
+/// both are history to read, not versions of one. Folding by key would
+/// silently drop every attestation but the newest.
 fn fold_rewritten_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
     if !matches!(kind, RecordKind::Subject | RecordKind::Finding | RecordKind::Scenario | RecordKind::Change) {
         return records;
@@ -350,7 +349,11 @@ fn fold_latest_by_natural_key(kind: RecordKind, records: Vec<RawRecord>) -> Vec<
         let digest = canon_store::partition::content_digest(&record.0);
         Candidate { key, at, schema, digest, record }
     });
-    fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str()).into_values().map(|c| c.record).collect()
+    let mut folded: Vec<RawRecord> = fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str()).into_values().map(|c| c.record).collect();
+    // The fold keys a map by the natural-key STRING, which puts `x_10_1` before `x_2_1`; the
+    // store's read order (R5: `at`, then typed components, then digest) is what a reader sees.
+    folded.sort_by_cached_key(|raw| canon_store::partition::record_order(kind, raw));
+    folded
 }
 
 /// Post-tier-merge scope application (design D5/D6, tasks 3.4/3.6;
@@ -412,7 +415,7 @@ pub fn run(
         let archived = canon_store::tier::Tier::read(&archive, &query)?;
         result.records.extend(archived.records);
         result.violations.extend(archived.violations);
-        result.records.sort_by_key(canon_store::tier::raw_record_at);
+        result.records.sort_by_cached_key(|raw| canon_store::partition::record_order(kind, raw));
     }
     let violation_count = result.violations.len();
     let records = if history { result.records } else { fold_rewritten_kind(kind, fold_pg_routed_kind(kind, result.records)) };
@@ -447,6 +450,12 @@ fn record_key(kind: RecordKind, raw: &RawRecord) -> String {
     format!("{}|{id}|{}", canon_store::tier::raw_record_at(raw).to_rfc3339(), canon_store::partition::content_digest(&raw.0))
 }
 
+/// Whether a cursor's record key (`<at>|<id>|<digest>#<n>`) ends in a 0.29 12-hex digest; 0.30 digests are 8 hex.
+fn names_a_029_record(key: &str) -> bool {
+    let digest = key.rsplit('|').next().and_then(|tail| tail.split('#').next()).unwrap_or("");
+    digest.len() == 12 && digest.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
 /// Applies `--limit`/`--cursor`/`--all` and `--fields` to a finished query:
 /// `outcome.records` becomes the requested page, in the order the query
 /// returned them, and `page` records what remains. `--fields` is checked
@@ -456,6 +465,9 @@ pub fn page_outcome(mut outcome: QueryOutcome, page: &Page, fields: Option<Vec<S
         paging::check_fields("canon query", requested, &known_fields(outcome.kind, plugin))?;
     }
     let kind = outcome.kind;
+    if page.cursor.as_deref().and_then(paging::cursor_key).is_some_and(|key| names_a_029_record(&key)) {
+        return Err(CliError::refused("INVALID_CURSOR", "the cursor names records by 0.29 names (an id with `__` parts and a 12-hex digest), which canon 0.30 no longer uses").hint("drop --cursor and start from the first page"));
+    }
     let (records, meta) = paging::paginate(&format!("query:{}", kind.as_str()), std::mem::take(&mut outcome.records), |raw| record_key(kind, raw), page)?;
     outcome.records = records;
     outcome.page = Some(meta);

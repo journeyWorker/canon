@@ -44,6 +44,12 @@ pub struct MigrateArgs {
     pub repo: crate::cli::RepoArgs,
     #[command(flatten)]
     pub safety: crate::cli::SafetyArgs,
+    /// Undo the last committed migrate (restores what it backed up, undoes its moves and its Postgres and R2 re-keying); previews first, `--commit --plan-digest` acts
+    #[arg(long)]
+    pub revert: bool,
+    /// With --revert, the backup directory to restore (default: the newest under .canon/migrate-backup/)
+    #[arg(long, value_name = "DIR", requires = "revert")]
+    pub backup: Option<PathBuf>,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,

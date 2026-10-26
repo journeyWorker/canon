@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-old",
+    "role": "reviewer"
+  },
+  "at": "2026-10-26T17:10:01.000000Z",
+  "kind": "review",
+  "pin": "2222222222222222222222222222222222222222",
+  "pins": {
+    "evidence": [
+      {
+        "digest": "0d75c144dd76",
+        "key": "auth.login.03"
+      }
+    ],
+    "scenario_digest": "b35933cccfd20c6521a722f5b422fb3ae5756c75042527c8474625fd6a2fbe51"
+  },
+  "project_id": "root",
+  "provenance_ref": {
+    "original_spec_ref": "specs/old.feature"
+  },
+  "reviewer": "rev-old",
+  "scenario_id": "auth.login.03",
+  "schema": 1
+}

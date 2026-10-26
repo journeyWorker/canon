@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-26T17:03:42.443503300Z",
+  "change_ids": [
+    "add-login",
+    "tidy"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "proposed",
+  "subject_id": "demo",
+  "summary": "",
+  "title": "Demo"
+}

@@ -268,10 +268,10 @@ pub fn template(kind: RecordKind) -> String {
         RecordKind::Run | RecordKind::Trajectory => "{run_id}",
         RecordKind::Event => "{run_id}_{seq}",
         RecordKind::Handoff => "{id}",
-        RecordKind::Review => "{project_id}_scenario_{scenario_id}` or `{project_id}_change_{change_id}",
+        RecordKind::Review => "{project_id}_(scenario_{scenario_id}|change_{change_id})",
         RecordKind::Divergence => "{project_id}_{scenario_id}_{run_seq}_{round}",
         RecordKind::StrategyItem => "{regime_key}",
-        RecordKind::Evidence => "{project_id|-}_task_{task_id}` or `{project_id|-}_scenario_{scenario_id}` or `{project_id|-}_run_{run_id}",
+        RecordKind::Evidence => "{project_id|-}_(task_{task_id}|scenario_{scenario_id}|run_{run_id})",
         RecordKind::Subject => "{subject_id}",
         RecordKind::Finding => "{change_id}_{round}_{seq}",
     };

@@ -103,6 +103,11 @@ fn decode(cursor: &str) -> Option<(String, String)> {
     text.split_once(SEPARATOR).map(|(scope, key)| (scope.to_string(), key.to_string()))
 }
 
+/// The record key a cursor points after, when the cursor is one canon issued.
+pub fn cursor_key(cursor: &str) -> Option<String> {
+    decode(cursor).map(|(_, key)| key)
+}
+
 fn invalid_cursor(why: &str) -> CliError {
     CliError::refused("INVALID_CURSOR", why.to_string()).hint("drop --cursor to start from the first page, or pass the `nextCursor` this same command returned")
 }

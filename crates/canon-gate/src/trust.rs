@@ -398,7 +398,7 @@ mod tests {
         let record = EvidenceRecord::new(
             Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("test-agent", RoleId::parse("implementer").unwrap())),
             None,
-            None,
+            Some(canon_model::ScenarioId::parse("cart.add.01").unwrap()),
             None,
             EvidenceVerdict::Faithful,
         );

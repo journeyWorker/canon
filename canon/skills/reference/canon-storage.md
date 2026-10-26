@@ -48,7 +48,7 @@ canon.yaml TierPolicy: `git` is a BACKEND name, not a rung — canon.yaml's
 ## Routing a record kind
 
 `routing:` is the only place a kind's rung is decided. Keys are the
-stable snake_case kind wire strings (`change`, `evidence_record`,
+stable snake_case kind wire strings (`change`, `evidence`,
 `strategy_item`, …) — the same string the record's own `kind` field
 serializes to. Values are `local`/`hot`/`cold`.
 
@@ -131,6 +131,23 @@ has no archive and keeps every version.
 
 **Done when:** after `canon ledger compact --commit --plan-digest <digest
 from the preview>`, a bare `canon ledger compact` previews no effect.
+
+## How a record is named
+
+Every store names a record the same way: `kind=<kind>/<key>_…_<digest8>.json`.
+One directory level (no `area=`), the kind's key components joined by `_`
+(a record with a `project_id` starts with it, `-` when absent; alternative
+keys carry a tag: `scenario`, `change`, `task`, `run`), and the first 8 hex
+digits of the content's SHA-256 last. Example:
+`kind=review/canon_scenario_gate.check.104_e7f52dd1.json`. A review's pin is
+in its body, not its name, so two reviews of one scenario share a key prefix
+and differ by digest. Free-text ids escape bytes outside `[a-z0-9.-]` as `+`
+and two hex digits. The same key with different content is refused in every
+store. Readers take the digest from the record body, never the name. Evidence
+is `evidence` everywhere (the 0.29 spelling `evidence_record` is gone). A
+0.29 repo warns on read and refuses writes until `canon migrate` (preview),
+then `canon migrate --commit --plan-digest <digest>`, moves it. Full rule:
+`docs/design/ledger-layout.md`.
 
 ## Where artifact bytes live (`artifact_store:`)
 

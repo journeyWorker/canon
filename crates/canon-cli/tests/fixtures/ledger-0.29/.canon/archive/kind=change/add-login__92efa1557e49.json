@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-plan-import-canon"
+  },
+  "at": "2026-10-26T17:02:55.915343815Z",
+  "change_id": "add-login",
+  "kind": "change",
+  "schema": 2,
+  "status": "proposed",
+  "subject_ids": [
+    "demo"
+  ],
+  "summary": "Add login",
+  "title": "add-login"
+}

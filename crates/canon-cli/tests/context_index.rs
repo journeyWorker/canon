@@ -35,7 +35,7 @@ fn kinds_are_every_record_kind_under_its_user_facing_name() {
     let expected: BTreeSet<String> = RecordKind::ALL.iter().map(|k| k.as_str().to_string()).collect();
     assert_eq!(names(&doc["kinds"]), expected);
     assert_eq!(names(&doc["cel"]), expected);
-    assert!(expected.contains("evidence") && !expected.contains("evidence"));
+    assert!(expected.contains("evidence") && !expected.contains("evidence_record"));
     assert_eq!(doc["capabilityVersion"], 6);
 }
 

@@ -1,5 +1,5 @@
 ---
-status: Proposed
+status: Accepted
 ---
 
 # Ledger file naming
@@ -14,6 +14,9 @@ status: Proposed
   archive: 3,145 files. Every file matches today's code (digest suffix equals
   the content digest, `area=` matches the content's `scenario_id`). The data
   is consistent with the code; the code has no single rule.
+- **Implemented:** canon 0.30.0 (`canon-0-30-ledger-naming`): rules R1–R10,
+  the `canon migrate` rename/rekey steps and the old-layout read-side
+  detection are in the tree.
 - **Reviewed:** two independent reviews, 2026-10-26 (findings folded in
   below).
 
@@ -214,10 +217,14 @@ Specified as scenarios in the change, since they are output:
    Postgres rows and R2 objects, through the same plan.
 7. **Rewrites `.gitignore`** negations that name a renamed kind directory
    (`!.canon/ledger/kind=evidence_record/`), or reports them when it cannot.
-8. **Backs up** every rewritten file under `.canon/migrate-backup/`, and
-   `hot.db` as a whole file. Down path: restore the backup and revert the
-   moves; R2 and Postgres rows keep their old keys until the migrate commit
-   step and are restored from the plan's recorded old keys.
+8. **Backs up** by whole-tree snapshot before a committed migrate:
+   `.canon/migrate-backup/<stamp>/{tree-manifest.json,.snapshot/}` holds
+   `canon.yaml`, `.gitignore`, `AGENTS.md`, `.canon/` (`hot.db` included), spec
+   roots, openspec changes, hook and skill paths, and the git index entries.
+   `canon migrate --revert [--backup DIR]` previews the undo; `--revert
+   --commit --plan-digest D` restores the snapshot, undoes the moves and
+   `git mv`s, and re-keys Postgres rows and R2 objects back from
+   `names-journal.json`.
 9. Running it again reports nothing to move.
 
 Path references inside records stay as strings: free-text `file_ref`s

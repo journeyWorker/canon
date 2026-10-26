@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl",
+    "role": "implementer",
+    "session_id": "s1"
+  },
+  "at": "2026-10-26T17:03:49.897404450Z",
+  "code_tree": "82dc20c92bb6f464273daf4093866a517a84d0fc",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "npm test 04"
+  },
+  "evidence_note": {
+    "summary": "04 hot"
+  },
+  "evidence_sha": "78c4ae0b565453a98ac671ab231ac18ea07db208",
+  "kind": "evidence_record",
+  "project_id": "root",
+  "run_seq": 6,
+  "scenario_id": "auth.login.04",
+  "schema": 1,
+  "staging_id": "6e6ffa480620",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

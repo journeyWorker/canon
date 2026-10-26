@@ -156,6 +156,21 @@ pub struct SqliteTier {
     path: PathBuf,
     pool: sqlx::SqlitePool,
     rt: tokio::runtime::Runtime,
+    /// Sidecar files (`-wal`, `-shm`) that a read-only open created; removed
+    /// on drop so a preview leaves the tree as it found it.
+    created_sidecars: Vec<PathBuf>,
+}
+
+impl Drop for SqliteTier {
+    fn drop(&mut self) {
+        if self.created_sidecars.is_empty() {
+            return;
+        }
+        self.rt.block_on(self.pool.close());
+        for sidecar in &self.created_sidecars {
+            let _ = std::fs::remove_file(sidecar);
+        }
+    }
 }
 
 impl SqliteTier {
@@ -199,6 +214,29 @@ impl SqliteTier {
         Self::open(path, !absent)
     }
 
+    /// Open an EXISTING db file strictly read-only (`SQLITE_OPEN_READ_ONLY`):
+    /// no create, no journal-mode change, no `CREATE TABLE`, no write of any
+    /// kind. A WAL-mode db still needs its `-wal`/`-shm` to read the latest
+    /// rows; sidecars this open creates are removed when the tier drops, so
+    /// the tree is byte-identical afterwards. An absent file reads as empty,
+    /// like [`SqliteTier::connect_for_read`].
+    pub fn connect_read_only(path: &Path) -> Result<Self, StoreError> {
+        if matches!(std::fs::symlink_metadata(path), Err(e) if e.kind() == std::io::ErrorKind::NotFound) {
+            return Self::open(path, false);
+        }
+        let rt = tokio::runtime::Runtime::new().map_err(StoreError::Io)?;
+        let unavailable = |e: String| StoreError::tier_unavailable(Rung::Hot, Some(Backend::Sqlite), format!("{}: {e}", path.display()));
+        let sidecar = |suffix: &str| {
+            let mut name = path.as_os_str().to_os_string();
+            name.push(suffix);
+            PathBuf::from(name)
+        };
+        let created_sidecars: Vec<PathBuf> = ["-wal", "-shm"].into_iter().map(sidecar).filter(|p| !p.exists()).collect();
+        let opts = sqlx::sqlite::SqliteConnectOptions::new().filename(path).read_only(true).create_if_missing(false).busy_timeout(BUSY_TIMEOUT);
+        let pool = rt.block_on(sqlx::sqlite::SqlitePoolOptions::new().max_connections(1).connect_with(opts)).map_err(|e| unavailable(e.to_string()))?;
+        Ok(Self { path: path.to_path_buf(), pool, rt, created_sidecars })
+    }
+
     fn open(path: &Path, on_disk: bool) -> Result<Self, StoreError> {
         let rt = tokio::runtime::Runtime::new().map_err(StoreError::Io)?;
         let path_owned = path.to_path_buf();
@@ -225,7 +263,7 @@ impl SqliteTier {
             sqlx::query(create_index_sql()).execute(&pool).await.map_err(|e| StoreError::Sql(e.to_string()))?;
             Ok::<_, StoreError>(pool)
         })?;
-        Ok(Self { path: path_owned, pool, rt })
+        Ok(Self { path: path_owned, pool, rt, created_sidecars: Vec::new() })
     }
 
     /// The resolved db-file path this tier was opened against —
@@ -443,13 +481,15 @@ impl Tier for SqliteTier {
     }
     fn purge_keys(&self, kind: RecordKind, before: DateTime<Utc>) -> Result<Vec<String>, StoreError> {
         self.rt.block_on(async {
-            let rows = sqlx::query("SELECT id, digest FROM records_history WHERE kind = ? AND at < ? ORDER BY id, digest")
+            let rows = sqlx::query("SELECT id, body FROM records_history WHERE kind = ? AND at < ? ORDER BY id, digest")
                 .bind(kind.as_str())
                 .bind(before)
                 .fetch_all(&self.pool)
                 .await
                 .map_err(|e| StoreError::Sql(e.to_string()))?;
-            Ok(rows.iter().map(|r| format!("{}#{}", r.get::<String, _>("id"), r.get::<String, _>("digest"))).collect())
+            Ok(rows.iter()
+                .map(|r| crate::partition::purge_id(kind, &RawRecord(r.get::<sqlx::types::Json<serde_json::Value>, _>("body").0), &r.get::<String, _>("id")))
+                .collect())
         })
     }
     fn purge_before(&self, kind: RecordKind, before: DateTime<Utc>, dry_run: bool) -> Result<PurgeCount, StoreError> {
@@ -641,6 +681,79 @@ mod tests {
 
         let result = tier.read(&TierQuery::kind(RecordKind::Change)).unwrap();
         assert_eq!(result.records.len(), 1, "row count must be unchanged after the resubmission");
+    }
+
+    /// R7: a key held by DIFFERENT canonical JSON is a loud conflict, not a
+    /// silent `DO NOTHING`.
+    #[test]
+    fn a_key_held_by_other_json_is_a_key_conflict() {
+        let dir = tempfile::tempdir().unwrap();
+        let tier = SqliteTier::connect(&dir.path().join("hot.db")).unwrap();
+        let record = change(Utc::now(), "r7-conflict");
+        tier.write(&record).unwrap();
+        tier.rt
+            .block_on(async { sqlx::query("UPDATE records_history SET body = ?").bind(sqlx::types::Json(serde_json::json!({"tampered": true}))).execute(&tier.pool).await })
+            .unwrap();
+
+        let err = tier.write(&record).unwrap_err();
+        assert!(matches!(err, StoreError::KeyConflict { .. }), "got {err:?}");
+    }
+
+    /// `canon migrate`'s rekey: a free target moves the row, a target held by
+    /// other JSON conflicts and keeps the old row.
+    #[test]
+    fn rekey_moves_a_row_and_refuses_a_target_held_by_other_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let tier = SqliteTier::connect(&dir.path().join("hot.db")).unwrap();
+        let a = change(Utc::now(), "rekey-a");
+        let b = change(Utc::now(), "rekey-b");
+        let ra = tier.write(&a).unwrap();
+        let rb = tier.write(&b).unwrap();
+        let key_of = |id: &str, digest: &str| ("change".to_string(), id.to_string(), digest.to_string());
+        let from = key_of("rekey-a", &ra.digest);
+
+        let conflict = RowRekey { from: from.clone(), to: key_of("rekey-b", &rb.digest), body: a.to_raw().0 };
+        let err = tier.rekey(&[conflict]).unwrap_err();
+        assert!(matches!(err, StoreError::KeyConflict { .. }), "got {err:?}");
+        assert_eq!(tier.read(&TierQuery::kind(RecordKind::Change)).unwrap().records.len(), 2, "a refused rekey changes nothing");
+
+        let moved = RowRekey { from, to: key_of("rekey-a2", "deadbeef"), body: a.to_raw().0 };
+        tier.rekey(&[moved]).unwrap();
+        let ids: Vec<String> = tier
+            .rt
+            .block_on(async { sqlx::query("SELECT id FROM records_history ORDER BY id").fetch_all(&tier.pool).await })
+            .unwrap()
+            .into_iter()
+            .map(|r| r.get::<String, _>("id"))
+            .collect();
+        assert_eq!(ids, vec!["rekey-a2".to_string(), "rekey-b".to_string()]);
+    }
+
+    /// A read-only open reads the rows and leaves the tree as it found it:
+    /// no sidecar files, db bytes unchanged.
+    #[test]
+    fn connect_read_only_reads_rows_and_leaves_no_sidecars() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("hot.db");
+        let writer = SqliteTier::connect(&db).unwrap();
+        writer.write(&change(Utc::now(), "ro-read")).unwrap();
+        writer.checkpoint().unwrap();
+        drop(writer);
+        // A clean close of the last connection removes the sidecars.
+        let _ = std::fs::remove_file(dir.path().join("hot.db-wal"));
+        let _ = std::fs::remove_file(dir.path().join("hot.db-shm"));
+        let before = std::fs::read(&db).unwrap();
+
+        let tier = SqliteTier::connect_read_only(&db).unwrap();
+        assert_eq!(tier.read(&TierQuery::kind(RecordKind::Change)).unwrap().records.len(), 1);
+        drop(tier);
+
+        let mut names: Vec<String> = std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        names.sort();
+        assert_eq!(names, vec!["hot.db".to_string()], "no -wal/-shm left behind");
+        assert_eq!(std::fs::read(&db).unwrap(), before, "the db file is byte-identical");
+        assert!(SqliteTier::connect_read_only(&dir.path().join("absent.db")).unwrap().read(&TierQuery::kind(RecordKind::Change)).unwrap().records.is_empty());
+        assert!(!dir.path().join("absent.db").exists());
     }
 
     /// s32 tasks.md 1.3: "write_batch == write loop" — a

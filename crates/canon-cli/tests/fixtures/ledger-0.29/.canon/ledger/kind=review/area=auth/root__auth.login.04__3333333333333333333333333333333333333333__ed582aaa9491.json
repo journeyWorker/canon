@@ -1,0 +1,16 @@
+{
+  "actor": {
+    "agent_id": "rev-old",
+    "role": "reviewer"
+  },
+  "at": "2026-10-26T17:10:02.000000Z",
+  "kind": "review",
+  "pin": "3333333333333333333333333333333333333333",
+  "project_id": "root",
+  "provenance_ref": {
+    "original_spec_ref": "specs/old.feature"
+  },
+  "reviewer": "rev-old",
+  "scenario_id": "auth.login.04",
+  "schema": 1
+}

@@ -1518,7 +1518,7 @@ mod tests {
 
         assert_eq!(report.promoted.len(), 1, "exactly one may become durable: {:?}", report.promoted);
         assert_eq!(report.refused.len(), 1, "the other must be refused, not silently dropped: {:?}", report.refused);
-        assert_eq!(report.refused[0].violation.subject, "s43-findings-are-records__0002__0005");
+        assert_eq!(report.refused[0].violation.subject, "s43-findings-are-records_2_5");
         assert!(
             report.refused[0].violation.detail.contains("two finding records under one identity"),
             "the refusal must say what the harm is: {}",

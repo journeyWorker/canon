@@ -455,7 +455,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let tier = GitTier::new(dir.path());
         let receipt = write_overlay(&tier, &coverage_decl(), well_formed_body()).unwrap();
-        assert!(receipt.location.starts_with("kind=porting.coverage/root__world.hotdeal.01__"), "got {}", receipt.location);
+        assert!(receipt.location.starts_with("kind=porting.coverage/root_world.hotdeal.01_"), "got {}", receipt.location);
     }
 
     #[test]

@@ -114,7 +114,7 @@ fn normalized(text: &str) -> String {
             i += 26;
             continue;
         }
-        if boundary && (word >= 40 || word == 12) && rest[..word].iter().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()) && rest[..word].iter().any(char::is_ascii_digit) {
+        if boundary && (word >= 40 || word == 12 || word == 8) && rest[..word].iter().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()) && rest[..word].iter().any(char::is_ascii_digit) {
             out.push_str("<hex>");
             i += word;
             continue;

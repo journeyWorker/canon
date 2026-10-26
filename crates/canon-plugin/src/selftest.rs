@@ -313,10 +313,10 @@ fn check_overlay_shape(run: &FixtureRun) -> Result<(), String> {
 }
 
 fn check_writes(run: &FixtureRun) -> Result<(), String> {
-    if !run.covered_receipt_location.starts_with("kind=selftest.coverage/root__world.selftest.01__") {
+    if !run.covered_receipt_location.starts_with("kind=selftest.coverage/root_world.selftest.01_") {
         return Err(format!("unexpected covered receipt location `{}`", run.covered_receipt_location));
     }
-    if !run.uncovered_receipt_location.starts_with("kind=selftest.coverage/root__world.selftest.02__") {
+    if !run.uncovered_receipt_location.starts_with("kind=selftest.coverage/root_world.selftest.02_") {
         return Err(format!("unexpected uncovered receipt location `{}`", run.uncovered_receipt_location));
     }
     if run.pre_injection_record_count != 2 || run.pre_injection_violation_count != 0 {

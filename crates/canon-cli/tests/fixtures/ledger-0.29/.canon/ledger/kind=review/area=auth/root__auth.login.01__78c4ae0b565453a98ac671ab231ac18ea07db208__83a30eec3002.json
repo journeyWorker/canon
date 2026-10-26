@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev",
+    "role": "reviewer"
+  },
+  "at": "2026-10-26T17:03:42.625118359Z",
+  "code_tree": "acd7450dd0cf7b248320eae870bed06ae161823a",
+  "kind": "review",
+  "pin": "78c4ae0b565453a98ac671ab231ac18ea07db208",
+  "pins": {
+    "checks": [
+      {
+        "checks": [],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "d06387dbde4a4492ee535e6fae15638e02bc7b1a8c2ab86378fb8c4bb93d2bfd",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "root",
+  "provenance_ref": {
+    "upstream_ref": "routes/login#a"
+  },
+  "reviewer": "rev",
+  "scenario_id": "auth.login.01",
+  "schema": 1,
+  "worktree_dirty": false
+}

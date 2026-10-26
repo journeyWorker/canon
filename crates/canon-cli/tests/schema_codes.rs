@@ -84,6 +84,8 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("run/skills.rs", &["skills install", "skills check", "skills doctor"]),
     ("run/tier.rs", &[]),
     ("migrate.rs", &["migrate"]),
+    // Every code is next to its emit.
+    ("migrate_names.rs", &[]),
     ("policy_approval.rs", &["brief approve", "policy approve"]),
     ("paging.rs", &["query", "finding list", "divergence list", "export"]),
     // `ScopeError::to_cli_error`, emitted by `query`.

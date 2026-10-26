@@ -13,6 +13,7 @@ artifact	PATH	file bound to a record by its sha256
 as	ROLE	the role the invoker acts as
 as-of	TIMESTAMP	point in time a deferral's expiry is judged at
 audit-result	RESULT	outcome of an external audit
+backup	DIR	with migrate --revert: the backup directory to restore
 before	TIMESTAMP	upper time bound, exclusive
 case	NAME	case tag of a scenario
 change-id	CHANGE_ID	change
@@ -90,6 +91,7 @@ report-case	NAME	case of a test report
 resolution-rev	REV	commit that resolved a finding
 response	FILE	adapter response document
 rev	REV	commit a record is about
+revert	-	mode: undo the last committed migrate (preview, then --commit --plan-digest)
 review-outcome	REVIEW_OUTCOME	outcome of a review
 reviewer-harness	NAME	reviewer's harness
 reviewer-model	NAME	reviewer's model

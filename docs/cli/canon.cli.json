@@ -370,6 +370,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "UNKNOWN_ROLE",
         "USAGE"
@@ -961,6 +962,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "SUBJECT_NOT_FOUND",
         "UNKNOWN_ROLE",
@@ -2021,6 +2023,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "PLAN_CORPUS_UNREADABLE",
         "PLAN_SOURCES_MISSING",
         "SERIALIZE_FAILED",
@@ -2347,6 +2350,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "PLAN_CORPUS_UNREADABLE",
         "PLAN_SOURCES_MISSING",
         "SERIALIZE_FAILED",
@@ -2515,6 +2519,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
@@ -2726,6 +2731,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
@@ -3026,6 +3032,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
@@ -3393,6 +3400,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
@@ -3635,6 +3643,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "REPO_UNREADABLE",
@@ -4251,6 +4260,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "REPO_UNREADABLE",
@@ -4885,6 +4895,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "LAYOUT_MIGRATION_REQUIRED",
+        "OLD_LAYOUT",
         "SPEC_ROOT_UNRESOLVED",
         "UNKNOWN_ROLE",
         "USAGE",
@@ -5083,6 +5094,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "REPO_UNREADABLE",
         "UNKNOWN_ROLE",
@@ -5422,6 +5434,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "REPO_UNREADABLE",
         "UNKNOWN_ROLE",
@@ -6188,6 +6201,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "UNKNOWN_ROLE",
@@ -6343,6 +6357,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
@@ -6491,6 +6506,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
@@ -6646,6 +6662,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
@@ -7065,6 +7082,7 @@
         "INPUT_UNREADABLE",
         "INVENTORY_ABORTED",
         "INVENTORY_FAILED",
+        "OLD_LAYOUT",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
@@ -7213,6 +7231,7 @@
         "INPUT_UNREADABLE",
         "LEDGER_ARCHIVE_UNAVAILABLE",
         "LEDGER_COMPACT_FAILED",
+        "OLD_LAYOUT",
         "PLAN_CHANGED",
         "UNKNOWN_ROLE",
         "USAGE"
@@ -7427,6 +7446,30 @@
         {
           "aliases": [],
           "default": [],
+          "help": "Undo the last committed migrate (restores what it backed up, undoes its moves and its Postgres and R2 re-keying); previews first, `--commit --plan-digest` acts",
+          "kind": "flag",
+          "name": "revert",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "With --revert, the backup directory to restore (default: the newest under .canon/migrate-backup/)",
+          "kind": "value",
+          "name": "backup",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--revert"
+          ],
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
@@ -7492,6 +7535,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "PLUGIN_SYNC_ERRORS",
         "PLUGIN_SYNC_FAILED",
         "UNKNOWN_ROLE",
@@ -8116,6 +8160,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "PLAN_CHANGED",
         "RETENTION_PURGE_FAILED",
         "UNKNOWN_ROLE",
@@ -9101,6 +9146,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "REVIEW_ARTIFACT_REFUSED",
         "REVIEW_INVALID_ARGUMENT",
         "REVIEW_SCENARIO_NOT_INDEXED",
@@ -9402,6 +9448,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "REVIEW_ARTIFACT_REFUSED",
         "REVIEW_INVALID_ARGUMENT",
         "REVIEW_SCENARIO_NOT_INDEXED",
@@ -9715,6 +9762,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "LAYOUT_MIGRATION_REQUIRED",
+        "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "SCAFFOLD_INVALID_ARGUMENT",
         "SCENARIO_TAG_EXISTS",
@@ -10860,6 +10908,7 @@
         "LEARN_PROMOTION_BLOCKED",
         "LEARN_PROMOTION_FAILED",
         "LEARN_SIGNATURE_UNREADABLE",
+        "OLD_LAYOUT",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
@@ -11043,6 +11092,7 @@
         "LEARN_ROLLBACK_FAILED",
         "LEARN_SIGNATURE_UNREADABLE",
         "LEARN_TRAJECTORY_NOT_FOUND",
+        "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "UNKNOWN_ROLE",
         "USAGE"
@@ -11246,6 +11296,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
         "UNKNOWN_ROLE",
@@ -11398,6 +11449,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "POLICY_APPROVAL_UNREADABLE",
         "POLICY_CHANGED_SINCE_APPROVAL",
         "REPO_UNREADABLE",
@@ -11598,6 +11650,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "SUBJECT_EXISTS",
         "SUBJECT_GATE_VIOLATION",
@@ -11907,6 +11960,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
         "SUBJECT_UNADOPT_REFUSED",
@@ -12223,6 +12277,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "PLAN_CHANGED",
         "TIER_FAILED",
         "UNKNOWN_ROLE",
@@ -13624,6 +13679,13 @@
       "retryable": false
     },
     {
+      "code": "OLD_LAYOUT",
+      "exit": 2,
+      "fix": "Run `canon migrate --json` to preview the move, then `canon migrate --commit --plan-digest <digest>`.",
+      "meaning": "a command that writes records was refused in a repo whose ledger is laid out by canon 0.29; nothing was written",
+      "retryable": false
+    },
+    {
       "code": "PLAN_CHANGED",
       "exit": 2,
       "fix": "Run the command again without --commit to preview the new plan, then act with `--commit --plan-digest <DIGEST>`.",
@@ -14070,85 +14132,85 @@
     "kinds": [
       {
         "kind": "change",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=change/{change_id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/change.schema.json",
         "schemaVersion": 2
       },
       {
         "kind": "task",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=task/{task_id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/task.schema.json",
         "schemaVersion": 2
       },
       {
         "kind": "scenario",
-        "partition": "kind={kind}/area={area}/{id}.json",
+        "partition": "kind=scenario/{project_id}_{scenario_id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/scenario.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "session",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=session/{session_id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/session.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "run",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=run/{run_id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/run.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "event",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=event/{run_id}_{seq}_{digest8}.json",
         "schema": "crates/canon-model/schemas/event.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "handoff",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=handoff/{id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/handoff.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "review",
-        "partition": "kind={kind}/area={area}/{id}.json",
+        "partition": "kind=review/{project_id}_(scenario_{scenario_id}|change_{change_id})_{digest8}.json",
         "schema": "crates/canon-model/schemas/review.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "divergence",
-        "partition": "kind={kind}/area={area}/{id}.json",
+        "partition": "kind=divergence/{project_id}_{scenario_id}_{run_seq}_{round}_{digest8}.json",
         "schema": "crates/canon-model/schemas/divergence.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "trajectory",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=trajectory/{run_id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/trajectory.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "strategy_item",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=strategy_item/{regime_key}_{digest8}.json",
         "schema": "crates/canon-model/schemas/strategy_item.schema.json",
         "schemaVersion": 1
       },
       {
-        "kind": "evidence_record",
-        "partition": "kind={kind}/{id}.json",
-        "schema": "crates/canon-model/schemas/evidence_record.schema.json",
+        "kind": "evidence",
+        "partition": "kind=evidence/{project_id|-}_(task_{task_id}|scenario_{scenario_id}|run_{run_id})_{digest8}.json",
+        "schema": "crates/canon-model/schemas/evidence.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "subject",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=subject/{subject_id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/subject.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "finding",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=finding/{change_id}_{round}_{seq}_{digest8}.json",
         "schema": "crates/canon-model/schemas/finding.schema.json",
         "schemaVersion": 1
       }
@@ -20530,7 +20592,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -24416,7 +24478,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -24839,7 +24901,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -25262,7 +25324,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -25685,7 +25747,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -27493,20 +27555,15 @@
           "description": "A record field's literal value (plugin §7 lineage, from the donor manifest\nlayer's types): the runtime shape [`type_accepts`] judges an authored\nYAML value against a declared [`Type`]. `Map` carries `evidence`'s\n`{kind, ref}` structure (and any other future record-shaped attr)."
         },
         "PartitionLayout": {
-          "description": "The Hive-style partition layout one record kind's git-tier files follow —\ndesign D3's `partition: LayoutDescriptor`, built from\n[`RecordKind::partition_template`]/[`RecordKind::is_area_scoped`] (S1's\nown registry — never a second, hand-written layout table).",
+          "description": "The name layout one record kind's files follow in every store —\ndesign D3's `partition: LayoutDescriptor`, built from\n[`RecordKind::partition_template`] (canon-model's component table — never\na second, hand-written layout table).",
           "properties": {
-            "areaScoped": {
-              "description": "Whether `template` requires the `area={area}/` segment.",
-              "type": "boolean"
-            },
             "template": {
-              "description": "The path template, e.g. `kind={kind}/{id}.json` or\n`kind={kind}/area={area}/{id}.json`.",
+              "description": "The path template, e.g. `kind=change/{change_id}_{digest8}.json`.",
               "type": "string"
             }
           },
           "required": [
-            "template",
-            "areaScoped"
+            "template"
           ],
           "type": "object"
         },
@@ -28081,7 +28138,7 @@
           "additionalProperties": {
             "$ref": "#/$defs/KindSurface"
           },
-          "description": "By the name `--kind` takes ([`crate::query::kind_cli_name`]): every\n`RecordKind::ALL` member. The wire string (`evidence_record`) stays\nstorage.",
+          "description": "By the one name every surface uses ([`RecordKind::as_str`]): every\n`RecordKind::ALL` member.",
           "type": "object"
         },
         "policy": {
@@ -31711,7 +31768,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -32965,7 +33022,19 @@
       "$id": "urn:canon:input:MigrateInput",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
-      "properties": {},
+      "properties": {
+        "backup": {
+          "description": "With --revert, the backup directory to restore (default: the newest under .canon/migrate-backup/)",
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "revert": {
+          "description": "Undo the last committed migrate (restores what it backed up, undoes its moves and its Postgres and R2 re-keying); previews first, `--commit --plan-digest` acts",
+          "type": "boolean"
+        }
+      },
       "title": "`canon migrate` --input document",
       "type": "object"
     },
@@ -36605,7 +36674,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -36968,7 +37037,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -37322,7 +37391,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -37602,7 +37671,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -37918,7 +37987,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],

@@ -1,0 +1,13 @@
+.canon/hot.db*
+.canon/audit/
+.canon/scenario-index.lock
+.canon/artifact-store.lock
+.canon/ledger/*
+!.canon/ledger/kind=evidence_record/
+!.canon/ledger/kind=finding/
+!.canon/ledger/kind=review/
+!.canon/ledger/kind=subject/
+!.canon/ledger/kind=change/
+!.canon/ledger/kind=divergence/
+!.canon/ledger/kind=porting.coverage/
+!.canon/ledger/_staging/

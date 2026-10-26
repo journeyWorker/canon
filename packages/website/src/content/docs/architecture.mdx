@@ -160,7 +160,7 @@ Every repo canon operates on carries its own config at the repo root:
 ```
 <repo>/canon.yaml           # tier endpoints, specs.roots[], plans: sources
 <repo>/.canon/policy.yaml   # required-cell derivation for evidence gating
-<repo>/.canon/ledger/       # Hive: kind=<kind>/area=<area>/*.json, append-only
+<repo>/.canon/ledger/       # Hive: kind=<kind>/<key>_<digest8>.json, append-only
 <repo>/.canon/strategies/   # promoted strategy items (git tier, PR-reviewed)
 <repo>/.canon/plugins/      # <id>/plugin.yaml ledger-overlay manifests
 ```

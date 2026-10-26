@@ -87,6 +87,55 @@ Since 0.30 canon plans its own work as canon changes in
 cite under `docs/superpowers/` and `openspec/` were removed in 0.30; read
 them in git history, e.g. `git show 0977bce1:<path>`.
 
+## 0.30.0 release
+
+One naming rule for every stored record. Design: `docs/design/ledger-layout.md`;
+change: `canon-0-30-ledger-naming`.
+
+### Naming rule
+
+Every store (git ledger, archive and staging, plugin overlays, sqlite and
+Postgres keys, R2 object keys) names a record
+`kind=<kind>/<key components joined by _>_<digest8>.json`:
+
+- one directory level; the `area=` level is gone from ledger paths (spec
+  `.feature` trees keep theirs);
+- a kind with a `project_id` starts with it (`-` when absent); alternative
+  keys are tagged `scenario`, `change`, `task` or `run`;
+- the last part is the first 8 hex digits of the content's SHA-256; a review's
+  40-hex pin leaves the name (two reviews at two pins are two records under
+  one key prefix, told apart by digest);
+- free-text ids escape bytes outside `[a-z0-9.-]` as `+` and two hex digits;
+- the same key with different content is refused in every store;
+- readers take the digest from the record body, never the name; records
+  order by body fields, then by key components, then by digest.
+
+Example: `kind=review/canon_scenario_gate.check.104_e7f52dd1.json`.
+
+### Kind rename
+
+`evidence_record` is now `evidence` on disk, in the record's `kind` field,
+the schema, `canon.yaml` `routing:`/aging keys and report views. Evidence with
+no task, scenario or run key is refused by the model.
+
+### Migration
+
+A 0.29 repo warns on read commands and refuses write commands, each naming
+`canon migrate` as the first next step. Then:
+
+```bash
+canon migrate
+canon migrate --commit --plan-digest <digest from the preview>
+```
+
+The bare run writes nothing and prints the plan and its digest. The commit
+moves ledger, archive, staging and overlay files, rewrites evidence bodies and
+`canon.yaml` keys and `.gitignore` lines, rekeys sqlite rows (and configured
+Postgres and R2 keys), and backs up rewritten files under
+`.canon/migrate-backup/<stamp>/` (a whole-tree snapshot). `canon migrate --revert [--backup DIR]` previews the undo of the last committed migrate; `--revert --commit --plan-digest <digest>` restores the snapshot and re-keys Postgres and R2 back. Verdicts, queries and reports match those before the
+migration apart from names and the kind spelling. Query cursors from 0.29 are
+rejected with a hint to start the query again.
+
 ## 0.29.0 release
 
 Shared derived data. `canon gate check`, `canon status` and a batch

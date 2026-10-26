@@ -89,6 +89,14 @@ pub fn content_digest(json: &Value) -> String {
     hex
 }
 
+/// The identity a purge reports for one record: `<kind>:<components>:<digest8>`,
+/// the components UNescaped (typed display form) and the digest taken from the
+/// body. `fallback_key` stands in for a body whose components cannot resolve.
+pub fn purge_id(kind: RecordKind, raw: &RawRecord, fallback_key: &str) -> String {
+    let key = resolve_partition(kind, &raw.0).map_or_else(|_| fallback_key.to_string(), |p| p.natural_key);
+    format!("{}:{key}:{}", kind.as_str(), content_digest(&raw.0))
+}
+
 /// The total order every place that orders records uses (R5): the body's
 /// `at`, then its typed name components in table order, then the body
 /// digest. Never the file name or the order a store happened to scan in.
@@ -481,6 +489,6 @@ mod tests {
         assert!(overlay_key_matches_body(&["root".into(), "world.hotdeal.99".into()], &body).is_err());
         assert!(overlay_name_matches_body("root_world.hotdeal.01", &body));
         assert!(!overlay_name_matches_body("root_world.hotdeal.99", &body));
-        assert!(overlay_components(&[]).is_err());
+        overlay_components(&[]).unwrap_err();
     }
 }

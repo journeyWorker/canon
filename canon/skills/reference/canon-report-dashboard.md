@@ -182,7 +182,7 @@ In `canon report`'s own render order. Each panel names the view that
 computes it; nothing here is derived a second time.
 
 - **Trust matrix** (`mart_trust_matrix`) — Change/task coverage × green × who.
-  `covered` means at least one `evidence_record` exists for this `task_id`,
+  `covered` means at least one `evidence` record exists for this `task_id`,
   NOT that policy's REQUIRED evidence is present — that is `canon gate
   check`'s question, and this view deliberately does not answer it. `green`
   is the plain `verdict = 'faithful'` proxy over the latest attestation, not
@@ -258,7 +258,7 @@ computes it; nothing here is derived a second time.
 - **Review rounds** (`mart_review_rounds`) — one row per `(change_id, round)`
   over `Finding` records (`canon finding add`, then `canon finding close` to
   move a finding's disposition), folded to the latest version
-  of each `{change_id}__{round}__{seq}` finding first, so a finding raised
+  of each `(change_id, round, seq)` finding first, so a finding raised
   `open` and later closed is counted once and in one disposition bucket.
   A round that found
   nothing wrote no `Finding` and so has no row: the table

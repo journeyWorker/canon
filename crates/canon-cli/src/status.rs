@@ -549,7 +549,11 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     for kind in &routed_away {
         warnings.push(format!("`{kind}` routes away from the `local` rung status reads, so its records are not counted"));
     }
-    let unreadable = ctx.violations.len() + ctx.corpus_violations.len();
+    let old_layout = ctx.violations.iter().chain(ctx.corpus_violations.iter().map(|(_, v)| v)).filter(|v| v.class == canon_model::FailureClass::OldLayout).count();
+    if old_layout > 0 {
+        warnings.push(format!("{old_layout} ledger record file(s) are named by the 0.29 rule and are not counted; run `canon migrate --json` to preview the rename, then `canon migrate --commit --plan-digest <digest>`"));
+    }
+    let unreadable = ctx.violations.len() + ctx.corpus_violations.len() - old_layout;
     if unreadable > 0 {
         warnings.push(format!("{unreadable} ledger record(s) could not be read and are not counted; `canon gate check` names them"));
     }

@@ -509,13 +509,15 @@ impl Tier for PgTier {
     }
     fn purge_keys(&self, kind: canon_model::envelope::RecordKind, before: DateTime<Utc>) -> Result<Vec<String>, StoreError> {
         self.rt.block_on(async {
-            let rows = sqlx::query(sqlx::AssertSqlSafe(format!("SELECT id, digest FROM {}.records_history WHERE kind = $1 AND at < $2 ORDER BY id, digest", self.schema)))
+            let rows = sqlx::query(sqlx::AssertSqlSafe(format!("SELECT id, body FROM {}.records_history WHERE kind = $1 AND at < $2 ORDER BY id, digest", self.schema)))
                 .bind(kind.as_str())
                 .bind(before)
                 .fetch_all(&self.pool)
                 .await
                 .map_err(|e| StoreError::Sql(e.to_string()))?;
-            Ok(rows.iter().map(|r| format!("{}#{}", r.get::<String, _>("id"), r.get::<String, _>("digest"))).collect())
+            Ok(rows.iter()
+                .map(|r| crate::partition::purge_id(kind, &RawRecord(r.get::<sqlx::types::Json<serde_json::Value>, _>("body").0), &r.get::<String, _>("id")))
+                .collect())
         })
     }
     fn purge_before(&self, kind: canon_model::envelope::RecordKind, before: DateTime<Utc>, dry_run: bool) -> Result<PurgeCount, StoreError> {
@@ -597,6 +599,24 @@ mod tests {
         assert!(sql.contains("VALUES ($1, $2, $3, $4, $5), ($6, $7, $8, $9, $10), ($11, $12, $13, $14, $15)"), "each row is its own 5-placeholder tuple, numbered contiguously: {sql}");
         assert!(sql.contains("RETURNING kind, id, digest"), "the caller reconstructs each row's own receipt by full identity, not by return-row ordinal");
         assert!(sql.contains("INSERT INTO canon_v1.records_history"));
+    }
+
+    #[test]
+    fn a_key_conflict_is_decided_by_comparing_the_stored_jsonb_body_to_the_incoming_one() {
+        // R7: `DO NOTHING` alone would report a digest collision as deduped;
+        // the writer reads the held row's body by its FULL identity and
+        // compares parsed JSON values (JSONB keeps no bytes).
+        let sql = select_body_sql("canon_v1");
+        assert!(sql.contains("SELECT body FROM canon_v1.records_history"));
+        assert!(sql.contains("kind = $1 AND id = $2 AND digest = $3"), "{sql}");
+    }
+
+    #[test]
+    fn rekey_sql_changes_the_key_and_body_of_exactly_one_row_identity() {
+        let sql = rekey_sql("canon_v1");
+        assert!(sql.starts_with("UPDATE canon_v1.records_history SET kind = $1, id = $2, digest = $3, body = $4"), "{sql}");
+        assert!(sql.ends_with("WHERE kind = $5 AND id = $6 AND digest = $7"), "the old row is selected by its full identity: {sql}");
+        assert!(!sql.contains(" at "), "`at` never changes");
     }
 
     #[test]

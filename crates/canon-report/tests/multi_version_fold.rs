@@ -1028,7 +1028,7 @@ fn scope_status_ranks_a_lowercase_rfc3339_stamp_at_its_real_instant() {
 /// A 12-hex digest that sorts strictly above every real
 /// `content_digest` output, so a row planted with it wins the third
 /// rung outright.
-const TAMPERED_DIGEST: &str = "ffffffffffff";
+const TAMPERED_DIGEST: &str = "ffffffff";
 
 /// Rewrites one r2 object's materialized `digest` COLUMN in place,
 /// leaving `body` byte-identical — precisely the row shape
@@ -1083,7 +1083,7 @@ fn digest_residual_task(task_id: &TaskId, at: DateTime<Utc>, status: TaskStatus)
 ///
 /// `content_digest` hashes a canonical serialization DuckDB cannot
 /// reproduce, so each staging view reads a STORED copy of that number
-/// instead: the git FILENAME's `__{digest12}` suffix, and the r2
+/// instead: the git FILENAME's `_{digest8}` suffix, and the r2
 /// parquet `digest` COLUMN. Each copy is enforced against the content
 /// by that root's own reader — `GitTier::scan_kind_where`'s
 /// `expected != relative` layout gate refuses the whole FILE,
@@ -1099,7 +1099,7 @@ fn digest_residual_task(task_id: &TaskId, at: DateTime<Utc>, status: TaskStatus)
 /// desirable. Narrowing either residual is legitimate — but it must
 /// land together with the header note, and this test failing is how
 /// that gets noticed. In particular, r2's object key carries the same
-/// `__{digest12}` suffix the git filename does
+/// `_{digest8}` suffix the git filename does
 /// (`partition::hive_object_key`), and cross-checking it against the
 /// column here is deliberately NOT done: `R2Tier::read` never
 /// validates the key, so enforcing key == column in SQL would newly
@@ -1119,29 +1119,29 @@ fn both_roots_fold_a_digest_the_rust_reader_refuses_to_return() {
     let tied = at(2026, 5, 8, 9);
 
     // ── git root: the refused version is a file RENAMED so its
-    //    `__{digest12}` suffix no longer matches its own body.
+    //    `_{digest8}` suffix no longer matches its own body.
     let git_task = TaskId::parse("fold-dig-git#1").unwrap();
     let git_tier = GitTier::new(&git_root);
-    let git_kept = git_tier.write(&digest_residual_task(&git_task, tied, TaskStatus::Done)).unwrap();
-    let git_refused = git_tier.write(&digest_residual_task(&git_task, tied, TaskStatus::Open)).unwrap();
-    assert_ne!(git_kept.digest, git_refused.digest, "two differing bodies must be two distinct objects");
-    assert!(
-        git_kept.digest.as_str() < TAMPERED_DIGEST && git_refused.digest.as_str() < TAMPERED_DIGEST,
-        "the planted digest must out-rank both real ones ({} / {})",
-        git_kept.digest,
-        git_refused.digest
-    );
+    let git_done = git_tier.write(&digest_residual_task(&git_task, tied, TaskStatus::Done)).unwrap();
+    let git_open = git_tier.write(&digest_residual_task(&git_task, tied, TaskStatus::Open)).unwrap();
+    assert_ne!(git_done.digest, git_open.digest, "two differing bodies must be two distinct objects");
+    // The views take the digest from the BODY (R10), so the renamed file
+    // folds at its real digest: rename the version whose real digest
+    // out-ranks its sibling, so the mart still reports the version the
+    // Rust reader refused.
+    let (git_refused, git_refused_status) = if git_open.digest > git_done.digest { (git_open, "open") } else { (git_done, "done") };
+    let git_kept_status = if git_refused_status == "open" { "done" } else { "open" };
     std::fs::rename(
         git_root.join(&git_refused.location),
-        git_root.join(git_refused.location.replace(&format!("__{}.json", git_refused.digest), &format!("__{TAMPERED_DIGEST}.json"))),
+        git_root.join(git_refused.location.replace(&format!("_{}.json", git_refused.digest), &format!("_{TAMPERED_DIGEST}.json"))),
     )
     .unwrap();
 
     let git_read = git_tier.read(&TierQuery::kind(RecordKind::Task)).unwrap();
     assert_eq!(git_read.records.len(), 1, "the renamed file must be refused, leaving one readable version, got {:?}", git_read.records);
-    assert_eq!(git_read.records[0].0["status"], "done", "the readable version is the one whose name still matches its body");
+    assert_eq!(git_read.records[0].0["status"], git_kept_status, "the readable version is the one whose name still matches its body");
     assert_eq!(git_read.violations.len(), 1, "…and refused LOUDLY: {:?}", git_read.violations);
-    assert_eq!(git_read.violations[0].subject, "layout", "git refuses it through the layout gate, got {:?}", git_read.violations[0]);
+    assert!(git_read.violations[0].detail.starts_with("layout:"), "git refuses it through the layout gate, got {:?}", git_read.violations[0]);
 
     // ── r2 root: the refused version is a row whose materialized
     //    `digest` column no longer matches its own body.
@@ -1180,7 +1180,7 @@ fn both_roots_fold_a_digest_the_rust_reader_refuses_to_return() {
     };
     assert_eq!(
         status_of("fold-dig-git#1"),
-        json!("open"),
+        json!(git_refused_status),
         "documented git residual: `canon query` drops the renamed file as a layout violation, these views fold it at its filename digest"
     );
     assert_eq!(

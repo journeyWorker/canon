@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "rev",
+    "role": "reviewer"
+  },
+  "at": "2026-10-26T17:04:44.143768312Z",
+  "code_tree": "acd7450dd0cf7b248320eae870bed06ae161823a",
+  "kind": "divergence",
+  "project_id": "root",
+  "reviewer": "rev",
+  "round": 2,
+  "run_seq": 0,
+  "scenario_id": "auth.login.02",
+  "schema": 1,
+  "sha": "78c4ae0b565453a98ac671ab231ac18ea07db208",
+  "status": "open",
+  "worktree_dirty": false
+}

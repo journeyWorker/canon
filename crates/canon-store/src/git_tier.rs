@@ -772,7 +772,7 @@ impl Tier for GitTier {
 
     fn purge_keys(&self, kind: RecordKind, before: chrono::DateTime<chrono::Utc>) -> Result<Vec<String>, StoreError> {
         let (candidates, _) = self.scan_kind_where(kind, |at| at < before)?;
-        let mut keys: Vec<String> = candidates.iter().map(|(relative, raw)| format!("{}#{}", relative.display(), content_digest(&raw.0))).collect();
+        let mut keys: Vec<String> = candidates.iter().map(|(relative, raw)| crate::partition::purge_id(kind, raw, &relative.display().to_string())).collect();
         keys.sort();
         Ok(keys)
     }
@@ -939,7 +939,7 @@ mod tests {
     }
 
     #[test]
-    fn write_then_read_round_trips_an_area_scoped_kind_area_from_scenario_id() {
+    fn write_then_read_round_trips_a_scenario_named_by_project_and_scenario_id() {
         let dir = tempfile::tempdir().unwrap();
         let tier = GitTier::new(dir.path());
         let scenario = Scenario::new(
@@ -951,7 +951,7 @@ mod tests {
             SpecDigest::of(b"fixture .feature bytes"),
         );
         let receipt = tier.write(&scenario).unwrap();
-        assert!(receipt.location.starts_with("kind=scenario/area=world/"), "got {}", receipt.location);
+        assert!(receipt.location.starts_with("kind=scenario/root_world.firstbuy-hotdeal.26_"), "no area= level (R1), got {}", receipt.location);
 
         let result = tier.read(&TierQuery::kind(RecordKind::Scenario)).unwrap();
         assert_eq!(result.records.len(), 1);
@@ -1063,16 +1063,16 @@ mod tests {
     }
 
     #[test]
-    fn area_mismatch_between_directory_and_content_is_a_layout_violation() {
+    fn a_name_disagreeing_with_the_content_key_is_a_layout_violation() {
         let dir = tempfile::tempdir().unwrap();
         let tier = GitTier::new(dir.path());
-        // Directory says `area=world`, but content's scenario_id area
-        // is `promise-date` — exactly the parity-harness six-mismatch
-        // gotcha, planted directly.
-        let bad_dir = dir.path().join("kind=scenario").join("area=world");
-        std::fs::create_dir_all(&bad_dir).unwrap();
+        // The name says `world.firstbuy-hotdeal.26`, but the content's
+        // scenario_id is `promise-date.play.03` — the parity-harness
+        // six-mismatch gotcha, planted directly.
+        let kind_dir = dir.path().join("kind=scenario");
+        std::fs::create_dir_all(&kind_dir).unwrap();
         std::fs::write(
-            bad_dir.join("promise-date.play.03__aaaaaaaaaaaa.json"),
+            kind_dir.join("root_world.firstbuy-hotdeal.26_aaaaaaaa.json"),
             serde_json::json!({
                 "schema": 1, "kind": "scenario", "at": Utc::now().to_rfc3339(),
                 "actor": {"agent_id": "a", "role": "implementer"},
@@ -1085,7 +1085,7 @@ mod tests {
         let result = tier.read(&TierQuery::kind(RecordKind::Scenario)).unwrap();
         assert!(result.records.is_empty());
         assert_eq!(result.violations.len(), 1);
-        assert!(result.violations[0].detail.contains("area=promise-date"), "detail: {}", result.violations[0].detail);
+        assert!(result.violations[0].detail.contains("root_promise-date.play.03_"), "detail: {}", result.violations[0].detail);
     }
 
     #[test]
@@ -1242,7 +1242,7 @@ mod tests {
         let receipt = tier.write_namespaced("porting.coverage", &["root".to_string(), "world.hotdeal.01".to_string()], body).unwrap();
         assert!(!receipt.deduped);
         assert_eq!(receipt.namespaced_kind, "porting.coverage");
-        assert!(receipt.location.starts_with("kind=porting.coverage/root__world.hotdeal.01__"), "got {}", receipt.location);
+        assert!(receipt.location.starts_with("kind=porting.coverage/root_world.hotdeal.01_"), "got {}", receipt.location);
 
         let (records, violations) = tier.scan_namespaced_kind("porting.coverage").unwrap();
         assert!(violations.is_empty(), "unexpected violations: {violations:?}");
@@ -1301,7 +1301,7 @@ mod tests {
         // identical resubmission would normally dedupe, but the file
         // now sitting there is NOT what it claims to be.
         let err = tier.write_namespaced("porting.coverage", &["root".to_string(), "world.hotdeal.01".to_string()], body()).unwrap_err();
-        assert!(matches!(err, StoreError::Layout(_)), "expected a loud Layout rejection, got {err:?}");
+        assert!(matches!(err, StoreError::KeyConflict { .. }), "expected a loud KeyConflict rejection (R7), got {err:?}");
     }
 
     #[test]
@@ -1335,7 +1335,7 @@ mod tests {
         std::fs::write(dir.path().join(&receipt.location), &compact).unwrap();
 
         let err = tier.write_namespaced("porting.coverage", &["root".to_string(), "world.hotdeal.01".to_string()], body()).unwrap_err();
-        assert!(matches!(err, StoreError::Layout(_)), "a same-Value but non-canonical-bytes file must be a loud Layout rejection, got {err:?}");
+        assert!(matches!(err, StoreError::KeyConflict { .. }), "a same-Value but non-canonical-bytes file must be a loud KeyConflict rejection, got {err:?}");
     }
 
     #[test]

@@ -1,0 +1,12 @@
+schema: 1
+kind: inventory
+at: "2026-07-10T00:00:00Z"
+actor:
+  agent_id: test
+auth.login.header:
+  upstream:
+    pin: a
+    file: f.tsx
+    symbol: S
+    lines: "1-2"
+  covered_by: [auth.login.01]

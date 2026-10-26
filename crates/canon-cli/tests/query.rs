@@ -66,17 +66,18 @@ fn since_filters_to_records_at_or_after_the_given_timestamp() {
 }
 
 /// query.read.04: two otherwise-identical attestations of one scenario at
-/// two pinned commits are stored under two distinct natural keys and
+/// two pinned commits are stored as two records under one key (they differ by digest) and
 /// `canon query --kind review` returns BOTH — reviews are never folded
 /// by key, so neither attestation is dropped as a stale version.
 #[test]
-fn two_reviews_of_one_scenario_at_two_pins_are_two_keys_and_both_read_back() {
+fn two_reviews_of_one_scenario_at_two_pins_are_two_records_and_both_read_back() {
     let fixture = support::Fixture::new("  review: local\n", "");
     let at = Utc::now() - Duration::hours(1);
     let first = fixture.plant_review_in_git("app-a", "world.place-lock.01", "abc123", at);
     let second = fixture.plant_review_in_git("app-a", "world.place-lock.01", "def456", at);
-    assert!(first.location.contains("app-a__world.place-lock.01__abc123__"), "{}", first.location);
-    assert!(second.location.contains("app-a__world.place-lock.01__def456__"), "{}", second.location);
+    // The pin is not in the name (0.30 R2): both land under one key prefix, told apart by digest.
+    assert!(first.location.starts_with("kind=review/app-a_scenario_world.place-lock.01_"), "{}", first.location);
+    assert!(second.location.starts_with("kind=review/app-a_scenario_world.place-lock.01_"), "{}", second.location);
     assert_ne!(first.location, second.location);
 
     let output = fixture.run_canon(&["query", "--kind", "review", "--json"]);
@@ -92,7 +93,10 @@ fn two_reviews_of_one_scenario_at_two_pins_are_two_keys_and_both_read_back() {
         .map(|record| canon_store::partition::resolve_partition(canon_model::envelope::RecordKind::Review, record).unwrap().natural_key)
         .collect();
     keys.sort();
-    assert_eq!(keys, vec!["app-a__world.place-lock.01__abc123".to_string(), "app-a__world.place-lock.01__def456".to_string()]);
+    assert_eq!(keys, vec!["app-a_scenario_world.place-lock.01".to_string(); 2], "two records under one key");
+    let mut pins: Vec<&str> = records.iter().map(|r| r["pin"].as_str().unwrap()).collect();
+    pins.sort_unstable();
+    assert_eq!(pins, ["abc123", "def456"], "the pin stays in the body");
     for record in records {
         assert_eq!(record["project_id"], "app-a");
         assert_eq!(record["scenario_id"], "world.place-lock.01");

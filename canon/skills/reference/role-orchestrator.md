@@ -227,7 +227,7 @@ canon ledger compact
 ```
 ```text
 # Bring a repo from an earlier canon up to date
-canon migrate [--commit --plan-digest <DIGEST>] [--input]
+canon migrate [--commit --plan-digest <DIGEST>] [--revert] [--backup <DIR> (with --revert)] [--input]
 # a bare run previews and prints planDigest; `--commit --plan-digest <DIGEST>` with that digest acts
 ```
 ```bash

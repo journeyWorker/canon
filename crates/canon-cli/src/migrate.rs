@@ -344,7 +344,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
         Err(e) => return e.emit("canon migrate", json),
     };
     let old_world = names.old_evidence();
-    let pins = migrate_pins::run_in(&repo, world.as_ref().map(|w| w.ledger_root()), &old_world, false);
+    let pins = migrate_pins::run_in(&repo, world.as_ref().map(migrate_names::Scratch::ledger_root), &old_world, false);
     let safe_plan = safety::Plan::new(effects(&repo, &plan, &names, config != text, ledger_effects, pins.as_ref().ok(), index_changes));
     let commit = match safe_plan.gate(mode, &base) {
         Ok(commit) => commit,
@@ -388,7 +388,10 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
         Ok(dir) => dir,
         Err(e) => return CliError::refused("WRITE_FAILED", format!("{e}; nothing was rewritten")).hint("check that .canon/ is writable and the disk has room, then run `canon migrate` again").emit("canon migrate", json),
     };
-    let backup_path = if names.renames() {
+    // Everything a step may touch is copied once more, whole, so `canon migrate --revert` can undo every step; a
+    // repeat that only rebuilds the index leaves no snapshot (the newest one stays the one to revert).
+    let snapshotted = safe_plan.effects.iter().any(|effect| effect.action != "rebuild");
+    let backup_path = if names.renames() || snapshotted {
         match migrate_names::backup_dir(&repo, backup_path) {
             Ok(dir) => Some(dir),
             Err(e) => return CliError::refused("WRITE_FAILED", format!("{e}; nothing was rewritten")).hint("check that .canon/ is writable and the disk has room, then run `canon migrate` again").emit("canon migrate", json),
@@ -396,6 +399,12 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
     } else {
         backup_path
     };
+    if let Some(dir) = backup_path.as_ref().filter(|_| snapshotted) {
+        let extra = snapshot_paths(&plan, &names);
+        if let Err(e) = migrate_names::snapshot(&repo, dir, &migrate_names::scope(&repo, extra)) {
+            return CliError::refused("WRITE_FAILED", format!("{e}; nothing was rewritten")).hint("check that .canon/ is writable and the disk has room, then run `canon migrate` again").emit("canon migrate", json);
+        }
+    }
     let backup_dir = backup_path.as_ref().map(|dir| {
         log.line(format!("canon migrate: backed up {} file(s) it rewrites under {}/", backed_up.len(), canon_model::paths::MIGRATE_BACKUP_DIR));
         rel(&repo, dir)
@@ -1354,6 +1363,30 @@ fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Plan,
             CliError::refused("MIGRATE_INDEX_FAILED", format!("the files moved, but the scenario index was not rebuilt: {e}; run `canon inventory sync`")).hint("run `canon inventory sync` and fix what it reports").emit("canon migrate", json)
         }
     }
+}
+
+/// The paths outside the default scope (`canon.yaml`, `.gitignore`, `AGENTS.md`, `.canon/`) the run's steps read and
+/// write, which the snapshot for `canon migrate --revert` covers too.
+fn snapshot_paths(plan: &Plan, names: &migrate_names::Plan) -> Vec<PathBuf> {
+    let mut out: Vec<PathBuf> = plan.moved_paths.clone();
+    for root in &plan.roots {
+        out.extend(root.from.iter().cloned());
+        out.push(root.to.clone());
+        out.extend(root.emptied.iter().cloned());
+    }
+    for change in plan.changes.iter().chain(&plan.renames) {
+        out.push(change.from.clone());
+        out.push(change.to.clone());
+    }
+    out.extend(plan.briefs.iter().map(|brief| brief.path.clone()));
+    if plan.drop_source.is_some() {
+        out.push(PathBuf::from("openspec"));
+    }
+    out.extend(plan.gitkeep.iter().cloned());
+    out.extend(plan.legacy.effects().into_iter().filter_map(|effect| effect.path).map(PathBuf::from));
+    out.extend(plan.legacy.backed_up().into_iter().map(PathBuf::from));
+    out.extend(names.moves.iter().flat_map(|m| [PathBuf::from(&m.from), PathBuf::from(&m.to)]));
+    out
 }
 
 #[cfg(test)]

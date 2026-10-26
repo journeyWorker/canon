@@ -1,0 +1,73 @@
+# canon.yaml -- scaffolded by `canon init` (s19 canon-init-scaffold).
+# `local` (git-backed) and `hot` (sqlite-backed, s32 sqlite-hot-
+# backend) both need zero operator-supplied credentials, so every
+# kind below is already routed -- task/handoff/session/run/event to
+# `hot`, everything else to `local`. Flip a `routing:` line to `cold`
+# once you have a real `bucket_env` credential `init` cannot guess
+# (see the commented `tiers.cold` stanza below; s27
+# tier-role-backend-split: routing/aging name a capability RUNG, the
+# backend is tagged separately via `tiers.<rung>.backend`).
+tiers:
+  local:
+    backend: git
+    root: .canon/ledger
+  hot:
+    backend: sqlite
+    path: .canon/hot.db
+  # hot (same-class swap for team-scale multi-agent concurrency --
+  # sqlite's WAL journal mode already covers concurrent batch
+  # ingest from a single operator; swap to postgres once you need a
+  # real server -- comment out the live `hot:` block above and
+  # uncomment this one):
+  #   backend: postgres
+  #   dsn_env: CANON_PG_DSN
+  #   schema: canon_v1
+  # cold:
+  #   backend: s3
+  #   bucket_env: CANON_R2_BUCKET
+  #   prefix: "canon/"
+routing:
+  change: local
+  task: hot
+  scenario: local
+  session: hot
+  run: hot
+  event: hot
+  handoff: hot
+  review: local
+  divergence: local
+  trajectory: local
+  strategy_item: local
+  evidence_record: local
+  subject: local
+  finding: local
+specs:
+  # The .feature corpus: <root>/kind=feature/area=<area>/<surface>.feature.
+  roots:
+    - id: root
+      root: .canon/specs
+plans:
+  # canon's own changes live in .canon/changes/<slug>/ (`canon change
+  # new` writes brief.md there); every reader reads them
+  # with no entry here. `sources` lists external plans you prepare,
+  # which canon only reads: it never writes into them, except that
+  # `canon task done` flips a task's checkbox in their tasks.md.
+  # Their briefs and approvals live in .canon/changes/<change>/brief.md.
+  #   - dialect: openspec      # openspec/changes/<change>/proposal.md + tasks.md
+  #     root: .
+  #   - dialect: superpowers   # writing-plans documents
+  #     root: docs/superpowers/plans
+  sources: []
+write:
+  # Staged writes (`canon evidence add`, `canon finding add|close`,
+  # `canon divergence add`) promote in the same run. `manual` keeps
+  # them staged until `canon gate promote`; `--no-promote` keeps one.
+  promote: auto
+# The language briefs are written in: templates and prose rules ship for
+# `en` and `ko`; any other tag gets `en` headings and the structure rules.
+# language: en
+# Harnesses the canon skill is installed for: any of claude, codex, omp, pi
+# (`[]` for none). `canon skills install|check|doctor` follow this list;
+# `canon skills install --providers=<list>` rewrites it.
+skills:
+  providers: []

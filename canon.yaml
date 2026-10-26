@@ -39,9 +39,9 @@ routing:
   scenario: local
   review: local
   divergence: local
-  evidence_record: local
+  evidence: local
   # finding (s43): one code-review finding. `local` for the same reason
-  # `divergence`/`review`/`evidence_record` are — it is durable,
+  # `divergence`/`review`/`evidence` are — it is durable,
   # append-only review evidence that must be diffable in the repo,
   # readable offline with zero operator credentials, and committed
   # alongside the corpus it judges. It is also the SOURCE a release

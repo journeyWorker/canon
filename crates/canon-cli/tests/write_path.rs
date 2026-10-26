@@ -115,7 +115,7 @@ fn promote_flag_commits_in_the_same_run_and_a_later_gate_promote_is_a_no_op() {
     let out = ok(repo, &with(evidence("game.run.01"), &["--promote"]));
     let text = stdout(&out);
     assert_eq!(without_next(&text).lines().count(), 1, "one success line:\n{text}");
-    assert!(text.starts_with("canon evidence add: wrote kind=evidence/game.run.01__") && text.contains(PROMOTED), "the success line names the committed record and the promotion:\n{text}");
+    assert!(text.starts_with("canon evidence add: wrote kind=evidence/root_scenario_game.run.01_") && text.contains(PROMOTED), "the success line names the committed record and the promotion:\n{text}");
     assert!(!text.contains("canon gate promote:"), "a promote on write reports its own record, not a batch tally:\n{text}");
     assert_eq!(staged(repo), 0);
     assert_eq!(committed(repo, "evidence"), 1);

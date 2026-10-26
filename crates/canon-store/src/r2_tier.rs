@@ -590,8 +590,8 @@ impl Tier for R2Tier {
                 result.bytes().await.map_err(|e| StoreError::ObjectStore(e.to_string()))
             })?;
             let Ok((rows, _)) = decode_rows(bytes, &path, kind) else { continue };
-            if rows.iter().any(|raw| raw_record_at(raw) < before) {
-                keys.push(path.to_string());
+            for raw in rows.iter().filter(|raw| raw_record_at(raw) < before) {
+                keys.push(crate::partition::purge_id(kind, raw, path.as_ref()));
             }
         }
         keys.sort();
@@ -794,6 +794,63 @@ mod tests {
         let result = tier.read(&TierQuery::kind(RecordKind::Trajectory)).unwrap();
         assert_eq!(result.records.len(), 1);
         assert_eq!(result.records[0].0["reward"], 0.9);
+    }
+
+    fn change_record(id: &str, summary: &str) -> Change {
+        Change::new(Envelope::new(1, RecordKind::Change, Utc::now(), actor()), ChangeId::parse(id).unwrap(), "t", summary, ChangeStatus::Proposed)
+    }
+
+    /// R7: an object already at the resolved key but holding other rows is a
+    /// key conflict, never `deduped`.
+    #[test]
+    fn a_resubmission_over_an_object_holding_other_content_is_a_key_conflict() {
+        let dir = tempfile::tempdir().unwrap();
+        let tier = R2Tier::local(dir.path(), "").unwrap();
+        let record = change_record("r7-conflict", "one");
+        let first = tier.write(&record).unwrap();
+        // Overwrite the object at the same key with a different body.
+        let other = change_record("r7-conflict", "two").to_raw().0;
+        let path = ObjectPath::from(first.location.clone());
+        let bytes = encode_row("change", "r7-conflict", &Utc::now().to_rfc3339(), &first.digest, &serde_json::to_string(&other).unwrap()).unwrap();
+        tier.rt.block_on(async { tier.store.put(&path, PutPayload::from(bytes)).await }).unwrap();
+
+        let err = tier.write(&record).unwrap_err();
+        assert!(matches!(err, StoreError::KeyConflict { .. }), "got {err:?}");
+    }
+
+    /// `canon migrate`'s rekey: free target moves, a target holding other JSON conflicts.
+    #[test]
+    fn rekey_objects_moves_an_object_and_refuses_a_target_holding_other_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let tier = R2Tier::local(dir.path(), "").unwrap();
+        let body_a = serde_json::json!({"a": 1});
+        let body_b = serde_json::json!({"a": 2});
+        let at = Utc::now().to_rfc3339();
+        let put = |key: &str, body: &serde_json::Value| {
+            let bytes = encode_row("change", "k", &at, "00000000", &serde_json::to_string(body).unwrap()).unwrap();
+            tier.rt.block_on(async { tier.store.put(&ObjectPath::from(key.to_string()), PutPayload::from(bytes)).await }).unwrap();
+        };
+        put("kind=change/old_00000000.parquet", &body_a);
+        let mv = |to: &str, body: &serde_json::Value| ObjectRekey {
+            from: "kind=change/old_00000000.parquet".into(),
+            to: to.into(),
+            kind: "change".into(),
+            natural_key: "k".into(),
+            digest: "11111111".into(),
+            at: at.clone(),
+            body: body.clone(),
+        };
+
+        // Target holds different JSON: refused, nothing moved.
+        put("kind=change/new_11111111.parquet", &body_b);
+        let err = tier.rekey_objects(&[mv("kind=change/new_11111111.parquet", &body_a)]).unwrap_err();
+        assert!(matches!(err, StoreError::KeyConflict { .. }), "got {err:?}");
+        assert!(tier.exists(&ObjectPath::from("kind=change/old_00000000.parquet")).unwrap(), "a refused rekey keeps the old object");
+
+        // Free target: the object is moved.
+        tier.rekey_objects(&[mv("kind=change/free_11111111.parquet", &body_a)]).unwrap();
+        assert!(!tier.exists(&ObjectPath::from("kind=change/old_00000000.parquet")).unwrap());
+        assert!(tier.exists(&ObjectPath::from("kind=change/free_11111111.parquet")).unwrap());
     }
 
     #[test]

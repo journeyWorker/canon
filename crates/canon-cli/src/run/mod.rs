@@ -90,7 +90,7 @@ pub fn run(cli: Cli) -> ExitCode {
             };
             run_init(&repo, check, crate::init::InitOptions { agents_md: !no_agents_md, policy, skills, language, dry_run: dry_run.dry_run }, json)
         }
-        Command::Migrate(MigrateArgs { repo, safety, json, .. }) => ExitCode::from(crate::migrate::run(&repo, &safety.mode(), json)),
+        Command::Migrate(MigrateArgs { repo, safety, json, revert, backup, .. }) => ExitCode::from(if revert { crate::migrate_names::run_revert(&repo, backup.as_deref(), &safety.mode(), json) } else { crate::migrate::run(&repo, &safety.mode(), json) }),
         Command::Retrieve(RetrieveArgs { for_role, regime, domain, subject_id, limit, repo, json }) => run_retrieve(&repo, &for_role, regime.as_ref(), domain.as_deref(), subject_id.as_ref(), limit, json),
         Command::Dashboard(DashboardArgs { repo, snapshot, port, json, .. }) => run_dashboard(&repo, snapshot.as_deref(), port, json),
         Command::Selftest(SelftestArgs { suite, json }) => crate::selftest::run_selftest(suite.as_deref(), json),
