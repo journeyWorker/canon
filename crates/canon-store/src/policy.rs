@@ -112,21 +112,19 @@ impl Rung {
     /// Loud, hint-carrying rejection of a legacy backend name used
     /// where a rung is expected (s27 design D3) — `git`/`pg`/`r2` are
     /// BACKEND names now, never a valid `routing`/`aging`/`tiers` key.
-    pub fn parse(s: &str) -> Result<Self, PolicyError> {
+    pub fn parse(s: &str) -> Result<Self, TierPolicyError> {
         match s {
             "local" => Ok(Rung::Local),
             "hot" => Ok(Rung::Hot),
             "cold" => Ok(Rung::Cold),
-            "git" | "pg" | "r2" => Err(PolicyError(format!(
-                "`{s}` is a BACKEND name, not a rung — canon.yaml's `routing`/`aging`/`tiers` keys now name a capability rung (local/hot/cold); declare the backend separately via `tiers.<rung>.backend: {s}`"
-            ))),
-            other => Err(PolicyError(format!("unknown rung `{other}` (expected one of local/hot/cold)"))),
+            "git" | "pg" | "r2" => Err(TierPolicyError::BackendNameAsRung { name: s.to_string() }),
+            other => Err(TierPolicyError::UnknownRung { name: other.to_string() }),
         }
     }
 
     /// The [`BackendClass`] `tiers.<rung>`'s configured backend MUST
     /// belong to (s28 design D1) — `TierPolicy::from_yaml` rejects any
-    /// other class with a loud, hint-carrying `PolicyError`. Today this
+    /// other class with a loud, hint-carrying `TierPolicyError`. Today this
     /// pins `local`→git, `hot`→postgres, `cold`→s3 (the SAME default
     /// pairing s27 already documented as "today's convention"), but
     /// now as an ENFORCED compatibility constraint, not just a
@@ -174,7 +172,7 @@ impl BackendClass {
     }
 
     /// The human-readable phrase `TierPolicy::from_yaml`'s class-
-    /// mismatch `PolicyError` names this class by.
+    /// mismatch `TierPolicyError` names this class by.
     fn describe(self) -> &'static str {
         match self {
             BackendClass::LocalFile => "a local-file backend",
@@ -209,13 +207,13 @@ impl Backend {
         }
     }
 
-    pub fn parse(s: &str) -> Result<Self, PolicyError> {
+    pub fn parse(s: &str) -> Result<Self, TierPolicyError> {
         match s {
             "git" => Ok(Backend::Git),
             "postgres" => Ok(Backend::Postgres),
             "s3" => Ok(Backend::S3),
             "sqlite" => Ok(Backend::Sqlite),
-            other => Err(PolicyError(format!("unknown backend `{other}` (expected one of git/postgres/s3/sqlite)"))),
+            other => Err(TierPolicyError::UnknownBackend { name: other.to_string() }),
         }
     }
 
@@ -347,9 +345,75 @@ struct TierPolicyRaw {
     aging: HashMap<String, AgingRuleRaw>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("canon.yaml TierPolicy: {0}")]
-pub struct PolicyError(pub String);
+/// A `canon.yaml` tier-policy (or `artifact_store:`) refusal. Every
+/// message carries the `canon.yaml TierPolicy: ` prefix the CLI shows.
+#[derive(Debug, thiserror::Error)]
+pub enum TierPolicyError {
+    /// `canon.yaml` is not parseable YAML for the section being read.
+    #[error("canon.yaml TierPolicy: {0}")]
+    Yaml(#[from] serde_yaml::Error),
+    /// A legacy backend name (`git`/`pg`/`r2`) used where a rung is expected.
+    #[error("canon.yaml TierPolicy: `{name}` is a BACKEND name, not a rung — canon.yaml's `routing`/`aging`/`tiers` keys now name a capability rung (local/hot/cold); declare the backend separately via `tiers.<rung>.backend: {name}`")]
+    BackendNameAsRung { name: String },
+    #[error("canon.yaml TierPolicy: unknown rung `{name}` (expected one of local/hot/cold)")]
+    UnknownRung { name: String },
+    #[error("canon.yaml TierPolicy: unknown backend `{name}` (expected one of git/postgres/s3/sqlite)")]
+    UnknownBackend { name: String },
+    #[error("canon.yaml TierPolicy: aging `after: {after}` is not `<integer><d|h|m|s>` (e.g. `30d`)")]
+    AgingAfterNotInteger {
+        after: String,
+        #[source]
+        source: std::num::ParseIntError,
+    },
+    #[error("canon.yaml TierPolicy: aging `after: {after}` is negative — a duration magnitude must be non-negative")]
+    AgingAfterNegative { after: String },
+    #[error("canon.yaml TierPolicy: aging `after: {after}` is out of range for a `chrono::Duration`")]
+    AgingAfterOutOfRange { after: String },
+    #[error("canon.yaml TierPolicy: aging `after: {after}` has unknown unit `{unit}` (expected d/h/m/s)")]
+    AgingAfterUnknownUnit { after: String, unit: String },
+    #[error("canon.yaml TierPolicy: routing/aging key `{key}` is not one of canon-model's fourteen record kinds")]
+    UnknownRecordKind { key: String },
+    #[error("canon.yaml TierPolicy: canon.yaml's `tiers.{rung_key}` block is missing its required `backend: git|postgres|s3|sqlite` key")]
+    MissingBackendTag { rung_key: String },
+    /// A `tiers.<rung>` block the YAML decoder rejected.
+    #[error("canon.yaml TierPolicy: canon.yaml's `tiers.{rung_key}`: {source}")]
+    TierBlock {
+        rung_key: String,
+        #[source]
+        source: serde_yaml::Error,
+    },
+    #[error(
+        "canon.yaml TierPolicy: canon.yaml `tiers.{rung_key}`: backend `{}` is {}, but the `{rung_key}` rung expects {} ({})",
+        .backend.as_str(),
+        .backend.class().describe(),
+        .expected.describe(),
+        .expected.example_backends_hint()
+    )]
+    BackendClassMismatch { rung_key: String, backend: Backend, expected: BackendClass },
+    #[error("canon.yaml TierPolicy: canon.yaml `aging.{kind}` has no matching `routing.{kind}` entry — an aging rule for an unrouted kind is meaningless")]
+    AgingWithoutRouting { kind: String },
+    #[error(
+        "canon.yaml TierPolicy: canon.yaml `aging.{kind}.to: {}` is not strictly colder than `routing.{kind}: {}` — aging must move forward under the rule `local < hot < cold`",
+        .to.as_str(),
+        .routed.as_str()
+    )]
+    AgingNotColder { kind: String, to: Rung, routed: Rung },
+    #[error("canon.yaml TierPolicy: canon.yaml `artifact_store.prefix` only applies to an object-store backend; set `artifact_store.backend` to the name of an s3 tier (e.g. `cold`) or drop the prefix")]
+    ArtifactPrefixWithoutObjectStore,
+    /// `artifact_store.backend` names neither `local` nor a tier rung.
+    #[error("canon.yaml TierPolicy: canon.yaml `artifact_store.backend: {backend}` is neither `local` nor the name of a tier in `tiers:` (local/hot/cold)")]
+    ArtifactBackendUnknown {
+        backend: String,
+        #[source]
+        source: Box<TierPolicyError>,
+    },
+    #[error("canon.yaml TierPolicy: canon.yaml `artifact_store.backend: {backend}` names tier `{backend}`, which is not an object store; artifacts live in an `s3` tier (`tiers.{backend}.backend: s3`) or `local`")]
+    ArtifactBackendNotObjectStore { backend: String },
+    #[error("canon.yaml TierPolicy: canon.yaml `artifact_store.backend: {backend}` names tier `{backend}`, but `tiers:` declares no such tier; add `tiers.{backend}` with `backend: s3` or use `local`")]
+    ArtifactBackendUndeclared { backend: String },
+    #[error("canon.yaml TierPolicy: canon.yaml `artifact_store.prefix: {raw}` must be a relative key prefix such as `artifacts/` (no leading `/`, empty, `.` or `..` segment)")]
+    ArtifactPrefixInvalid { raw: String },
+}
 
 #[derive(Debug, Clone)]
 pub struct GitTierConfig {
@@ -447,52 +511,45 @@ pub struct TierPolicy {
 /// future-dated aging cutoff) is rejected before construction, and
 /// the `chrono::Duration::try_*` constructors replace the panicking
 /// `Duration::{days,hours,minutes,seconds}` — an out-of-range magnitude
-/// (e.g. `i64::MAX` days) becomes a `PolicyError` naming the literal
+/// (e.g. `i64::MAX` days) becomes a `TierPolicyError` naming the literal
 /// instead of a panic.
-fn parse_duration_shorthand(s: &str) -> Result<chrono::Duration, PolicyError> {
+fn parse_duration_shorthand(s: &str) -> Result<chrono::Duration, TierPolicyError> {
     let trimmed = s.trim();
     let (digits, unit) = trimmed.split_at(trimmed.len().saturating_sub(1));
-    let magnitude: i64 = digits
-        .parse()
-        .map_err(|_err| PolicyError(format!("aging `after: {s}` is not `<integer><d|h|m|s>` (e.g. `30d`)")))?;
+    let magnitude: i64 = digits.parse().map_err(|source| TierPolicyError::AgingAfterNotInteger { after: s.to_string(), source })?;
     if magnitude < 0 {
-        return Err(PolicyError(format!("aging `after: {s}` is negative — a duration magnitude must be non-negative")));
+        return Err(TierPolicyError::AgingAfterNegative { after: s.to_string() });
     }
-    let out_of_range = || PolicyError(format!("aging `after: {s}` is out of range for a `chrono::Duration`"));
+    let out_of_range = || TierPolicyError::AgingAfterOutOfRange { after: s.to_string() };
     match unit {
         "d" => chrono::Duration::try_days(magnitude).ok_or_else(out_of_range),
         "h" => chrono::Duration::try_hours(magnitude).ok_or_else(out_of_range),
         "m" => chrono::Duration::try_minutes(magnitude).ok_or_else(out_of_range),
         "s" => chrono::Duration::try_seconds(magnitude).ok_or_else(out_of_range),
-        other => Err(PolicyError(format!("aging `after: {s}` has unknown unit `{other}` (expected d/h/m/s)"))),
+        other => Err(TierPolicyError::AgingAfterUnknownUnit { after: s.to_string(), unit: other.to_string() }),
     }
 }
 
-fn parse_kind(s: &str) -> Result<RecordKind, PolicyError> {
-    RecordKind::ALL
-        .into_iter()
-        .find(|k| k.as_str() == s)
-        .ok_or_else(|| PolicyError(format!("routing/aging key `{s}` is not one of canon-model's fourteen record kinds")))
+fn parse_kind(s: &str) -> Result<RecordKind, TierPolicyError> {
+    RecordKind::ALL.into_iter().find(|k| k.as_str() == s).ok_or_else(|| TierPolicyError::UnknownRecordKind { key: s.to_string() })
 }
 
 /// Decode one `tiers.<rung_key>` raw YAML value into a [`BackendConfig`]
 /// (s27 design D1/D3 mechanism 3): a block with no `backend:` key at
 /// all (the pre-s27 `{ root: ... }`/`{ dsn_env: ..., schema: ... }`
-/// bodies had none) fails with an explicit, friendly `PolicyError`
+/// bodies had none) fails with an explicit, friendly `TierPolicyError`
 /// naming the required key — never a raw, unmodified `serde_yaml`
 /// "missing field `backend`" message. `canon_yaml_dir` is used ONLY
 /// to resolve a decoded [`BackendConfig::Sqlite`]'s `path` to an
 /// already-absolute form (s32 design: unlike `GitTierConfig::root`,
 /// which stays relative and is resolved later by the CLI) — every
 /// other backend variant ignores it.
-fn decode_backend_config(rung_key: &str, value: serde_yaml::Value, canon_yaml_dir: &Path) -> Result<BackendConfig, PolicyError> {
+fn decode_backend_config(rung_key: &str, value: serde_yaml::Value, canon_yaml_dir: &Path) -> Result<BackendConfig, TierPolicyError> {
     let has_backend_tag = value.as_mapping().is_some_and(|m| m.contains_key(serde_yaml::Value::String("backend".to_string())));
     if !has_backend_tag {
-        return Err(PolicyError(format!(
-            "canon.yaml's `tiers.{rung_key}` block is missing its required `backend: git|postgres|s3|sqlite` key"
-        )));
+        return Err(TierPolicyError::MissingBackendTag { rung_key: rung_key.to_string() });
     }
-    let raw: BackendConfigRaw = serde_yaml::from_value(value).map_err(|e| PolicyError(format!("canon.yaml's `tiers.{rung_key}`: {e}")))?;
+    let raw: BackendConfigRaw = serde_yaml::from_value(value).map_err(|source| TierPolicyError::TierBlock { rung_key: rung_key.to_string(), source })?;
     let mut cfg: BackendConfig = raw.into();
     if let BackendConfig::Sqlite(sqlite) = &mut cfg {
         sqlite.path = resolve_sqlite_path(&sqlite.path, canon_yaml_dir);
@@ -528,7 +585,7 @@ impl TierPolicy {
     /// path:` resolves against the repo, not an arbitrary CWD. See
     /// [`Self::from_yaml_at`] for the full fail-loud contract this
     /// delegates to.
-    pub fn from_yaml(canon_yaml: &str) -> Result<Self, PolicyError> {
+    pub fn from_yaml(canon_yaml: &str) -> Result<Self, TierPolicyError> {
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         Self::from_yaml_at(canon_yaml, &cwd)
     }
@@ -557,8 +614,8 @@ impl TierPolicy {
     /// aging rule at all, since `cold` has no colder rung), or a
     /// malformed/negative/out-of-range `aging.*.after` duration (s29
     /// design D3).
-    pub fn from_yaml_at(canon_yaml: &str, canon_yaml_dir: &Path) -> Result<Self, PolicyError> {
-        let raw: TierPolicyRaw = serde_yaml::from_str(canon_yaml).map_err(|e| PolicyError(e.to_string()))?;
+    pub fn from_yaml_at(canon_yaml: &str, canon_yaml_dir: &Path) -> Result<Self, TierPolicyError> {
+        let raw: TierPolicyRaw = serde_yaml::from_str(canon_yaml)?;
 
         let mut tiers = HashMap::new();
         for (rung_key, value) in raw.tiers {
@@ -567,13 +624,7 @@ impl TierPolicy {
             let actual = cfg.backend();
             let expected_class = rung.expected_backend_class();
             if actual.class() != expected_class {
-                return Err(PolicyError(format!(
-                    "canon.yaml `tiers.{rung_key}`: backend `{}` is {}, but the `{rung_key}` rung expects {} ({})",
-                    actual.as_str(),
-                    actual.class().describe(),
-                    expected_class.describe(),
-                    expected_class.example_backends_hint(),
-                )));
+                return Err(TierPolicyError::BackendClassMismatch { rung_key, backend: actual, expected: expected_class });
             }
             tiers.insert(rung, cfg);
         }
@@ -587,17 +638,9 @@ impl TierPolicy {
         for (kind_str, rule) in &raw.aging {
             let kind = parse_kind(kind_str)?;
             let to = Rung::parse(&rule.to)?;
-            let routed = routing.get(&kind).copied().ok_or_else(|| {
-                PolicyError(format!(
-                    "canon.yaml `aging.{kind_str}` has no matching `routing.{kind_str}` entry — an aging rule for an unrouted kind is meaningless"
-                ))
-            })?;
+            let routed = routing.get(&kind).copied().ok_or_else(|| TierPolicyError::AgingWithoutRouting { kind: kind_str.clone() })?;
             if to <= routed {
-                return Err(PolicyError(format!(
-                    "canon.yaml `aging.{kind_str}.to: {}` is not strictly colder than `routing.{kind_str}: {}` — aging must move forward under the rule `local < hot < cold`",
-                    to.as_str(),
-                    routed.as_str(),
-                )));
+                return Err(TierPolicyError::AgingNotColder { kind: kind_str.clone(), to, routed });
             }
             aging.insert(kind, AgingRuleConfig { after: parse_duration_shorthand(&rule.after)?, to });
         }
@@ -688,14 +731,14 @@ aging:
     fn unknown_kind_name_in_routing_fails_loud() {
         let bad = SAMPLE.replace("evidence_record: local", "not-a-kind: local");
         let err = TierPolicy::from_yaml(&bad).unwrap_err();
-        assert!(err.0.contains("not-a-kind"));
+        assert!(err.to_string().contains("not-a-kind"));
     }
 
     #[test]
     fn malformed_duration_fails_loud() {
         let bad = SAMPLE.replace("after: 30d", "after: thirty-days");
         let err = TierPolicy::from_yaml(&bad).unwrap_err();
-        assert!(err.0.contains("thirty-days"));
+        assert!(err.to_string().contains("thirty-days"));
     }
 
     /// s29 `store-hardening` spec scenario "Same-rung aging is
@@ -713,15 +756,15 @@ aging:
   task: { after: 30d, to: hot }
 "#;
         let err = TierPolicy::from_yaml(yaml).unwrap_err();
-        assert!(err.0.contains("task"), "{err}");
-        assert!(err.0.contains("hot"), "{err}");
-        assert!(err.0.contains("local < hot < cold"), "{err}");
+        assert!(err.to_string().contains("task"), "{err}");
+        assert!(err.to_string().contains("hot"), "{err}");
+        assert!(err.to_string().contains("local < hot < cold"), "{err}");
     }
 
     /// s29 `store-hardening` spec scenario "Backward aging is
     /// rejected instead of silently dead": `routing.scenario: cold`
     /// with `aging.scenario: { after: 30d, to: hot }` must reject with
-    /// the same `PolicyError` class — a `cold → hot` rule can never
+    /// the same `TierPolicyError` class — a `cold → hot` rule can never
     /// fire (`canon tier age` only moves records forward), so it
     /// would silently do nothing forever.
     #[test]
@@ -733,10 +776,10 @@ aging:
   scenario: { after: 30d, to: hot }
 "#;
         let err = TierPolicy::from_yaml(yaml).unwrap_err();
-        assert!(err.0.contains("scenario"), "{err}");
-        assert!(err.0.contains("cold"), "{err}");
-        assert!(err.0.contains("hot"), "{err}");
-        assert!(err.0.contains("local < hot < cold"), "{err}");
+        assert!(err.to_string().contains("scenario"), "{err}");
+        assert!(err.to_string().contains("cold"), "{err}");
+        assert!(err.to_string().contains("hot"), "{err}");
+        assert!(err.to_string().contains("local < hot < cold"), "{err}");
     }
 
     /// s29 design D2: an `aging.<kind>` entry for a kind with no
@@ -752,8 +795,8 @@ aging:
   event: { after: 7d, to: cold }
 "#;
         let err = TierPolicy::from_yaml(yaml).unwrap_err();
-        assert!(err.0.contains("event"), "{err}");
-        assert!(err.0.contains("routing.event"), "{err}");
+        assert!(err.to_string().contains("event"), "{err}");
+        assert!(err.to_string().contains("routing.event"), "{err}");
     }
 
     /// s29 design D2 counter-case: a valid forward `hot → cold` aging
@@ -789,19 +832,19 @@ aging:
     fn negative_duration_magnitude_rejects() {
         let bad = SAMPLE.replace("after: 30d", "after: -1d");
         let err = TierPolicy::from_yaml(&bad).unwrap_err();
-        assert!(err.0.contains("-1d"), "{err}");
-        assert!(err.0.contains("negative"), "{err}");
+        assert!(err.to_string().contains("-1d"), "{err}");
+        assert!(err.to_string().contains("negative"), "{err}");
     }
 
     /// s29 spec scenario: an out-of-range magnitude (`i64::MAX` days,
     /// which overflows `chrono::Duration`'s internal millisecond
-    /// representation) maps to a `PolicyError` naming the literal
+    /// representation) maps to a `TierPolicyError` naming the literal
     /// instead of panicking via the old `Duration::days` path.
     #[test]
     fn overflowing_duration_magnitude_rejects_without_panicking() {
         let bad = SAMPLE.replace("after: 30d", "after: 9223372036854775807d");
         let err = TierPolicy::from_yaml(&bad).unwrap_err();
-        assert!(err.0.contains("9223372036854775807d"), "{err}");
+        assert!(err.to_string().contains("9223372036854775807d"), "{err}");
     }
 
     /// s29 design D3 counter-case: a valid, in-range duration (`30d`,
@@ -827,12 +870,12 @@ routing:
   trajectory: cold
 "#;
         let err = TierPolicy::from_yaml(yaml).unwrap_err();
-        assert!(err.0.contains("tiers.cold"), "{err}");
-        assert!(err.0.contains("backend `postgres`"), "{err}");
-        assert!(err.0.contains("live-database backend"), "{err}");
-        assert!(err.0.contains("the `cold` rung expects"), "{err}");
-        assert!(err.0.contains("object-store backend"), "{err}");
-        assert!(err.0.contains("`s3`"), "{err}");
+        assert!(err.to_string().contains("tiers.cold"), "{err}");
+        assert!(err.to_string().contains("backend `postgres`"), "{err}");
+        assert!(err.to_string().contains("live-database backend"), "{err}");
+        assert!(err.to_string().contains("the `cold` rung expects"), "{err}");
+        assert!(err.to_string().contains("object-store backend"), "{err}");
+        assert!(err.to_string().contains("`s3`"), "{err}");
     }
 
     /// s28 spec scenario: every class-correct rung/backend pairing
@@ -883,9 +926,9 @@ routing:
     fn legacy_pg_routing_value_fails_loud_with_a_hint() {
         let bad = SAMPLE.replace("handoff: hot", "handoff: pg");
         let err = TierPolicy::from_yaml(&bad).unwrap_err();
-        assert!(err.0.contains("pg"), "{err}");
-        assert!(err.0.contains("BACKEND name, not a rung"), "{err}");
-        assert!(err.0.contains("local/hot/cold"), "{err}");
+        assert!(err.to_string().contains("pg"), "{err}");
+        assert!(err.to_string().contains("BACKEND name, not a rung"), "{err}");
+        assert!(err.to_string().contains("local/hot/cold"), "{err}");
     }
 
     /// s27 spec scenario: a legacy `r2` aging destination fails loud
@@ -894,8 +937,8 @@ routing:
     fn legacy_r2_aging_destination_fails_loud_with_a_hint() {
         let bad = SAMPLE.replace("to: cold", "to: r2");
         let err = TierPolicy::from_yaml(&bad).unwrap_err();
-        assert!(err.0.contains("r2"), "{err}");
-        assert!(err.0.contains("BACKEND name, not a rung"), "{err}");
+        assert!(err.to_string().contains("r2"), "{err}");
+        assert!(err.to_string().contains("BACKEND name, not a rung"), "{err}");
     }
 
     /// s27 spec scenario: a legacy `git`-named top-level `tiers` key
@@ -910,8 +953,8 @@ routing:
   change: local
 "#;
         let err = TierPolicy::from_yaml(bad).unwrap_err();
-        assert!(err.0.contains("git"), "{err}");
-        assert!(err.0.contains("BACKEND name, not a rung"), "{err}");
+        assert!(err.to_string().contains("git"), "{err}");
+        assert!(err.to_string().contains("BACKEND name, not a rung"), "{err}");
     }
 
     /// s27 spec scenario: a rung block missing its `backend:` tag
@@ -925,8 +968,8 @@ routing:
   task: hot
 "#;
         let err = TierPolicy::from_yaml(bad).unwrap_err();
-        assert!(err.0.contains("backend: git|postgres|s3|sqlite"), "{err}");
-        assert!(err.0.contains("tiers.hot"), "{err}");
+        assert!(err.to_string().contains("backend: git|postgres|s3|sqlite"), "{err}");
+        assert!(err.to_string().contains("tiers.hot"), "{err}");
     }
 
     /// s32 `sqlite-hot-backend` spec scenario "Hot rung on sqlite
@@ -960,12 +1003,12 @@ routing:
   change: local
 "#;
         let err = TierPolicy::from_yaml(yaml).unwrap_err();
-        assert!(err.0.contains("tiers.local"), "{err}");
-        assert!(err.0.contains("backend `sqlite`"), "{err}");
-        assert!(err.0.contains("live-database backend"), "{err}");
-        assert!(err.0.contains("the `local` rung expects"), "{err}");
-        assert!(err.0.contains("local-file backend"), "{err}");
-        assert!(err.0.contains("`git`"), "{err}");
+        assert!(err.to_string().contains("tiers.local"), "{err}");
+        assert!(err.to_string().contains("backend `sqlite`"), "{err}");
+        assert!(err.to_string().contains("live-database backend"), "{err}");
+        assert!(err.to_string().contains("the `local` rung expects"), "{err}");
+        assert!(err.to_string().contains("local-file backend"), "{err}");
+        assert!(err.to_string().contains("`git`"), "{err}");
     }
 
     /// s32 spec: a `tiers.<rung>` sqlite block missing `path:` fails
@@ -980,8 +1023,8 @@ routing:
   session: hot
 "#;
         let err = TierPolicy::from_yaml(yaml).unwrap_err();
-        assert!(err.0.contains("path"), "{err}");
-        assert!(err.0.contains("tiers.hot"), "{err}");
+        assert!(err.to_string().contains("path"), "{err}");
+        assert!(err.to_string().contains("tiers.hot"), "{err}");
     }
 
     /// s32 design: `BackendConfig::Sqlite.path` is ALREADY absolute
@@ -1015,5 +1058,59 @@ routing:
         let policy = TierPolicy::from_yaml_at(&yaml, other_dir.path()).unwrap();
         let BackendConfig::Sqlite(cfg) = policy.tiers.get(&Rung::Hot).unwrap() else { panic!("expected a sqlite config") };
         assert_eq!(cfg.path, absolute);
+    }
+
+    /// `TierPolicyError` replaced the `PolicyError(String)` tuple struct; every
+    /// message the CLI shows is the old string, byte for byte.
+    #[test]
+    fn tier_policy_error_messages_are_the_old_strings() {
+        let msg = |r: Result<TierPolicy, TierPolicyError>| r.unwrap_err().to_string();
+        assert_eq!(
+            Rung::parse("pg").unwrap_err().to_string(),
+            "canon.yaml TierPolicy: `pg` is a BACKEND name, not a rung — canon.yaml's `routing`/`aging`/`tiers` keys now name a capability rung (local/hot/cold); declare the backend separately via `tiers.<rung>.backend: pg`"
+        );
+        assert_eq!(Rung::parse("warm").unwrap_err().to_string(), "canon.yaml TierPolicy: unknown rung `warm` (expected one of local/hot/cold)");
+        assert_eq!(Backend::parse("mysql").unwrap_err().to_string(), "canon.yaml TierPolicy: unknown backend `mysql` (expected one of git/postgres/s3/sqlite)");
+        assert_eq!(
+            msg(TierPolicy::from_yaml("routing:\n  nope: local\n")),
+            "canon.yaml TierPolicy: routing/aging key `nope` is not one of canon-model's fourteen record kinds"
+        );
+        assert_eq!(
+            msg(TierPolicy::from_yaml("tiers:\n  hot: { dsn_env: X }\n")),
+            "canon.yaml TierPolicy: canon.yaml's `tiers.hot` block is missing its required `backend: git|postgres|s3|sqlite` key"
+        );
+        assert_eq!(
+            msg(TierPolicy::from_yaml("tiers:\n  cold: { backend: postgres, dsn_env: X, schema: s }\n")),
+            "canon.yaml TierPolicy: canon.yaml `tiers.cold`: backend `postgres` is a live-database backend, but the `cold` rung expects an object-store backend (`s3`)"
+        );
+        let aging = |after: &str, to: &str| format!("tiers:\n  local: {{ backend: git, root: r }}\n  hot: {{ backend: sqlite, path: h.db }}\nrouting:\n  event: local\naging:\n  event: {{ after: {after}, to: {to} }}\n");
+        assert_eq!(msg(TierPolicy::from_yaml(&aging("30x", "hot"))), "canon.yaml TierPolicy: aging `after: 30x` has unknown unit `x` (expected d/h/m/s)");
+        assert_eq!(msg(TierPolicy::from_yaml(&aging("abcd", "hot"))), "canon.yaml TierPolicy: aging `after: abcd` is not `<integer><d|h|m|s>` (e.g. `30d`)");
+        assert_eq!(
+            msg(TierPolicy::from_yaml(&aging("-1d", "hot"))),
+            "canon.yaml TierPolicy: aging `after: -1d` is negative — a duration magnitude must be non-negative"
+        );
+        assert_eq!(
+            msg(TierPolicy::from_yaml(&aging("9223372036854775807d", "hot"))),
+            "canon.yaml TierPolicy: aging `after: 9223372036854775807d` is out of range for a `chrono::Duration`"
+        );
+        assert_eq!(
+            msg(TierPolicy::from_yaml(&aging("30d", "local"))),
+            "canon.yaml TierPolicy: canon.yaml `aging.event.to: local` is not strictly colder than `routing.event: local` — aging must move forward under the rule `local < hot < cold`"
+        );
+        assert_eq!(
+            msg(TierPolicy::from_yaml("aging:\n  event: { after: 30d, to: hot }\n")),
+            "canon.yaml TierPolicy: canon.yaml `aging.event` has no matching `routing.event` entry — an aging rule for an unrouted kind is meaningless"
+        );
+    }
+
+    #[test]
+    fn tier_policy_error_keeps_the_cause_where_there_is_one() {
+        let not_integer = TierPolicy::from_yaml("routing:\n  event: local\naging:\n  event: { after: abcd, to: hot }\n").unwrap_err();
+        assert!(matches!(not_integer, TierPolicyError::AgingAfterNotInteger { .. }), "{not_integer}");
+        assert!(std::error::Error::source(&not_integer).is_some());
+        let yaml = TierPolicy::from_yaml("tiers: [").unwrap_err();
+        assert!(yaml.to_string().starts_with("canon.yaml TierPolicy: "), "{yaml}");
+        assert!(std::error::Error::source(&yaml).is_some());
     }
 }

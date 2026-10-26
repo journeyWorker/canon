@@ -103,7 +103,7 @@ pub enum CanonYamlError {
     #[error("reading `{}`: {source}", path.display())]
     Read { path: PathBuf, source: std::io::Error },
     #[error("parsing `{}`: {source}", path.display())]
-    Policy { path: PathBuf, source: canon_store::policy::PolicyError },
+    Policy { path: PathBuf, source: canon_store::policy::TierPolicyError },
 }
 
 /// The canonical `<repo>/canon.yaml`'s [`TierPolicy`], parsed with S2's

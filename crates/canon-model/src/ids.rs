@@ -568,9 +568,9 @@ impl RunId {
     }
 
     pub fn parse(s: impl AsRef<str>) -> Result<Self, JoinKeyError> {
-        ulid::Ulid::from_string(s.as_ref())
-            .map(Self)
-            .map_err(|_ulid_err| JoinKeyError { key: "RunId", value: s.as_ref().to_string(), grammar: Self::GRAMMAR })
+        #[expect(clippy::map_err_ignore, reason = "`JoinKeyError` names the key, value and grammar and has no field for a cause; the ULID decoder's error says nothing more than that the value is not a ULID")]
+        let ulid = ulid::Ulid::from_string(s.as_ref()).map_err(|_| JoinKeyError { key: "RunId", value: s.as_ref().to_string(), grammar: Self::GRAMMAR })?;
+        Ok(Self(ulid))
     }
 
     pub fn as_ulid(&self) -> ulid::Ulid {

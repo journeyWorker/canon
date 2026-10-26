@@ -53,12 +53,17 @@ pub struct ActivePlugin {
     pub options: BTreeMap<String, Literal>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, thiserror::Error)]
 pub enum ResolveError {
+    #[error("unknown profile `{0}`")]
     UnknownProfile(String),
+    #[error("profile `{0}` extends itself through a cycle")]
     ExtendsCycle(String),
+    #[error("plugin `{plugin}` depends on `{dep}`, which is not installed")]
     UnresolvedDepends { plugin: String, dep: String },
+    #[error("plugin `{plugin}` needs `{dep}` {need}, found {found}")]
     DependsVersionMismatch { plugin: String, dep: String, need: String, found: String },
+    #[error("plugin dependency cycle through `{0}`")]
     DependsCycle(String),
 }
 
@@ -301,6 +306,27 @@ mod tests {
         let graph = ProfileGraph::empty("default");
         let err = resolve_activation(&graph, "default", &installed).unwrap_err();
         assert_eq!(err.code(), "E-DEPENDS-UNRESOLVED");
+    }
+
+    #[test]
+    fn resolve_error_display_names_every_variant_and_leaves_debug_untouched() {
+        let cases = [
+            (ResolveError::UnknownProfile("p".into()), "unknown profile `p`"),
+            (ResolveError::ExtendsCycle("p".into()), "profile `p` extends itself through a cycle"),
+            (ResolveError::UnresolvedDepends { plugin: "a".into(), dep: "b".into() }, "plugin `a` depends on `b`, which is not installed"),
+            (
+                ResolveError::DependsVersionMismatch { plugin: "a".into(), dep: "b".into(), need: "^1.0.0".into(), found: "2.0.0".into() },
+                "plugin `a` needs `b` ^1.0.0, found 2.0.0",
+            ),
+            (ResolveError::DependsCycle("b".into()), "plugin dependency cycle through `b`"),
+        ];
+        for (err, expected) in cases {
+            assert_eq!(err.to_string(), expected);
+            let as_error: &dyn std::error::Error = &err;
+            assert!(as_error.source().is_none());
+        }
+        // `resolve_snapshot` renders diagnostics with `{:?}`; that text is a user-visible byte-identity invariant.
+        assert_eq!(format!("{:?}", ResolveError::UnknownProfile("p".into())), r#"UnknownProfile("p")"#);
     }
 
     #[test]

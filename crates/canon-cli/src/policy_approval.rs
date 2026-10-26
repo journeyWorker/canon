@@ -23,7 +23,7 @@
 //! and a gate that failed on it would only teach agents to run it.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use canon_model::paths;
 use schemars::JsonSchema;
@@ -249,21 +249,46 @@ pub fn matching_approval(repo: &Path, by: &str, note: Option<&str>) -> Option<Po
     }
 }
 
+/// Why a policy approval could not be recorded.
+#[derive(Debug, thiserror::Error)]
+pub enum PolicyApprovalError {
+    /// `--approver` is blank.
+    #[error("--approver must name who approved the policy")]
+    BlankApprover,
+    /// The repo has no policy file.
+    #[error("{} does not exist, so there is no policy to approve; `canon init` writes a starter policy", path.display())]
+    NoPolicy { path: PathBuf },
+    /// The policy file exists but cannot be read.
+    #[error("cannot read {}: {source}", path.display())]
+    ReadPolicy {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    /// The approval record cannot be written.
+    #[error("cannot write {}: {source}", path.display())]
+    WriteApproval {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+}
+
 /// Writes the policy approval record for `by` under an already-resolved
-/// repo root. `Err` carries the refusal text (no policy to approve, an
+/// repo root. `Err` carries the refusal (no policy to approve, an
 /// empty `by`, or a read/write failure). Shared by `canon policy approve`
 /// and `canon brief approve`, which records both in one call.
-pub fn record(repo: &Path, by: &str, note: Option<&str>) -> Result<PolicyApproval, String> {
+pub fn record(repo: &Path, by: &str, note: Option<&str>) -> Result<PolicyApproval, PolicyApprovalError> {
     if by.trim().is_empty() {
-        return Err("--approver must name who approved the policy".to_string());
+        return Err(PolicyApprovalError::BlankApprover);
     }
     let policy_path = repo.join(paths::POLICY_FILE);
     let policy = match fs::read(&policy_path) {
         Ok(bytes) => bytes,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return Err(format!("{} does not exist, so there is no policy to approve; `canon init` writes a starter policy", policy_path.display()));
+            return Err(PolicyApprovalError::NoPolicy { path: policy_path });
         }
-        Err(e) => return Err(format!("cannot read {}: {e}", policy_path.display())),
+        Err(source) => return Err(PolicyApprovalError::ReadPolicy { path: policy_path, source }),
     };
     // Approving what is approved already, by the same approver in the same words, writes nothing: the record keeps its time.
     if let ApprovalState::Approved(existing) = approval_state(repo) {
@@ -280,7 +305,7 @@ pub fn record(repo: &Path, by: &str, note: Option<&str>) -> Result<PolicyApprova
     let approval_path = repo.join(paths::POLICY_APPROVAL_FILE);
     let mut body = serde_json::to_string_pretty(&approval).expect("a PolicyApproval always serializes");
     body.push('\n');
-    fs::write(&approval_path, body).map_err(|e| format!("cannot write {}: {e}", approval_path.display()))?;
+    fs::write(&approval_path, body).map_err(|source| PolicyApprovalError::WriteApproval { path: approval_path, source })?;
     Ok(approval)
 }
 
@@ -312,7 +337,7 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> u8 
             0
         }
         Err(e) => {
-            CliError::refused("POLICY_APPROVAL_FAILED", e.clone()).hint("with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --approver <name>` again").emit("canon policy approve", json)
+            CliError::refused("POLICY_APPROVAL_FAILED", e.to_string()).hint("with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --approver <name>` again").emit("canon policy approve", json)
         }
     }
 }
@@ -320,6 +345,19 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> u8 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_refusals_read_as_before() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(record(dir.path(), " ", None).unwrap_err().to_string(), "--approver must name who approved the policy");
+        let missing = record(dir.path(), "me", None).unwrap_err();
+        assert_eq!(missing.to_string(), format!("{} does not exist, so there is no policy to approve; `canon init` writes a starter policy", dir.path().join(paths::POLICY_FILE).display()));
+        let unreadable = tempfile::tempdir().unwrap();
+        fs::create_dir_all(unreadable.path().join(paths::POLICY_FILE)).unwrap();
+        let read = record(unreadable.path(), "me", None).unwrap_err();
+        assert!(read.to_string().starts_with(&format!("cannot read {}: ", unreadable.path().join(paths::POLICY_FILE).display())), "{read}");
+        assert!(std::error::Error::source(&read).is_some());
+    }
 
     fn repo_with_policy(policy: &str) -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();

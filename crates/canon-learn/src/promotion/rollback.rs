@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::error::LearnError;
+use crate::error::{LearnError, PromotionEvidenceError};
 use crate::ids::{StrategyId, TrajectoryId};
 use crate::store::StrategyStore;
 use crate::strategy::{DemotionEvidence, StrategyLifecycle};
@@ -34,7 +34,7 @@ pub fn rollback_strategy(
     _contradicting_trajectory_id: Option<TrajectoryId>,
     _git_tier_root: &Path,
 ) -> Result<RollbackRecord, LearnError> {
-    Err(LearnError::InvalidPromotionEvidence("rollback requires a detached SSH signature and policy-pinned approval verifier".into()))
+    Err(PromotionEvidenceError::RollbackUnauthenticated.into())
 }
 
 #[expect(clippy::too_many_arguments, reason = "public signature shared with canon-cli; each argument is a distinct input of the signed rollback")]
@@ -49,23 +49,23 @@ pub fn rollback_strategy_authenticated(
     approved_at: DateTime<Utc>,
 ) -> Result<RollbackRecord, LearnError> {
     if reason.trim().is_empty() || actor.trim().is_empty() {
-        return Err(LearnError::InvalidPromotionEvidence("rollback reason and actor are required".into()));
+        return Err(PromotionEvidenceError::RollbackReasonAndActor.into());
     }
     let repo_root = git_tier_root.parent().and_then(Path::parent).unwrap_or(git_tier_root);
     let allowed_signers = canon_gate::policy::allowed_signers_path(repo_root)
-        .map_err(LearnError::InvalidPromotionEvidence)?
-        .ok_or_else(|| LearnError::InvalidPromotionEvidence("no policy-pinned approval.allowed_signers verifier is configured".into()))?;
+        .map_err(PromotionEvidenceError::AllowedSigners)?
+        .ok_or(PromotionEvidenceError::NoVerifierConfigured)?;
     let authorized = fs::read_to_string(&allowed_signers)
-        .map_err(|error| LearnError::InvalidPromotionEvidence(format!("cannot read approval.allowed_signers: {error}")))?
+        .map_err(PromotionEvidenceError::AllowedSignersUnreadable)?
         .lines()
         .filter(|line| !line.trim().is_empty() && !line.trim_start().starts_with('#'))
         .filter_map(|line| line.split_whitespace().next())
         .any(|principal| principal == actor);
     if !authorized {
-        return Err(LearnError::InvalidPromotionEvidence("rollback actor is not listed in policy-pinned approval.allowed_signers".into()));
+        return Err(PromotionEvidenceError::RollbackActorNotListed.into());
     }
     if signature.trim().is_empty() {
-        return Err(LearnError::InvalidPromotionEvidence("rollback detached signature is required".into()));
+        return Err(PromotionEvidenceError::RollbackSignatureRequired.into());
     }
     let reason_digest = format!("{:x}", Sha256::digest(reason.as_bytes()));
     let payload = canon_model::approval_payload_bytes(
@@ -79,8 +79,7 @@ pub fn rollback_strategy_authenticated(
         actor,
         &approved_at,
     );
-    canon_gate::verify_ssh_signature("canon-learning-approval-v1", &payload, signature.as_bytes(), actor, &allowed_signers)
-        .map_err(LearnError::InvalidPromotionEvidence)?;
+    canon_gate::verify_ssh_signature("canon-learning-approval-v1", &payload, signature.as_bytes(), actor, &allowed_signers).map_err(PromotionEvidenceError::Signature)?;
     let Some(item) = strategy_store.find_by_id(&strategy_id)? else {
         return Err(LearnError::UnknownStrategyId(strategy_id.to_string()));
     };

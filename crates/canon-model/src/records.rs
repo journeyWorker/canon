@@ -1085,16 +1085,20 @@ impl ReviewOutcome {
         }
     }
 
-    pub fn parse(s: &str) -> Result<Self, String> {
-        Self::ALL
-            .into_iter()
-            .find(|o| o.as_str() == s)
-            .ok_or_else(|| format!("unknown review outcome `{s}` (expected one of: signed, indeterminate, unavailable)"))
+    pub fn parse(s: &str) -> Result<Self, ReviewOutcomeError> {
+        Self::ALL.into_iter().find(|o| o.as_str() == s).ok_or_else(|| ReviewOutcomeError { value: s.to_string() })
     }
 
     pub fn is_signed(&self) -> bool {
         *self == ReviewOutcome::Signed
     }
+}
+
+/// `s` names no [`ReviewOutcome`].
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("unknown review outcome `{value}` (expected one of: signed, indeterminate, unavailable)")]
+pub struct ReviewOutcomeError {
+    pub value: String,
 }
 
 /// A divergence's fold-relevant state (design D8). `Open`/`Resolved`
@@ -2938,7 +2942,7 @@ mod tests {
         bad["outcome"] = serde_json::json!("approved");
         serde_json::from_value::<Review>(bad).unwrap_err();
         assert_eq!(ReviewOutcome::parse("unavailable"), Ok(ReviewOutcome::Unavailable));
-        ReviewOutcome::parse("approved").unwrap_err();
+        assert_eq!(ReviewOutcome::parse("approved").unwrap_err().to_string(), "unknown review outcome `approved` (expected one of: signed, indeterminate, unavailable)");
     }
 
     round_trip_test!(

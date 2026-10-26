@@ -94,7 +94,7 @@ pub struct EvidenceAddArgs {
     #[arg(long, value_name = "NAME")]
     pub approver: Option<String>,
     /// Approval role; only human is eligible for risk approval.
-    #[arg(long, value_parser = crate::cli_error::closed_set(["human"], |word| RoleId::parse(word).map_err(|e| e.to_string())), value_name = "ROLE")]
+    #[arg(long, value_parser = crate::cli_error::closed_set(["human"], |word| RoleId::parse(word)), value_name = "ROLE")]
     pub approval_role: Option<RoleId>,
     /// Armored SSH detached signature file. Canon never signs on the user's behalf.
     #[arg(long, value_name = "FILE")]

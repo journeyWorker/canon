@@ -300,47 +300,64 @@ pub fn disposition_parser() -> impl clap::builder::TypedValueParser<Value = Find
     crate::cli_error::closed_set(DISPOSITION_VALUES, parse_disposition)
 }
 
+/// A `canon finding` value that no parser accepts.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum FindingArgError {
+    /// `--severity` outside [`SEVERITY_VALUES`].
+    #[error("`{0}` is not a finding severity — expected one of: {allowed}", allowed = SEVERITY_VALUES.join(", "))]
+    UnknownSeverity(String),
+    /// `--disposition` outside [`DISPOSITION_VALUES`].
+    #[error("`{0}` is not a finding disposition — expected one of: {allowed}", allowed = DISPOSITION_VALUES.join(", "))]
+    UnknownDisposition(String),
+    /// `--introduced-rev self`.
+    #[error("--introduced-rev names the COMMIT that introduced the defect, not who found it; to record a defect you found in your own work, set --actor-id to your own id, and leave --introduced-rev unset unless the introducing commit was sourced")]
+    IntroducedRevIsSelf,
+    /// `--introduced-rev` empty or blank.
+    #[error("--introduced-rev must name a git revision")]
+    IntroducedRevBlank,
+}
+
 /// `--severity`'s clap `value_parser`. Kebab-cased on the CLI, matching
 /// `crate::divergence::parse_status`'s established spelling for a
 /// snake_case-serialized model enum, and exhaustive over
 /// [`FindingSeverity`].
-pub fn parse_severity(s: &str) -> Result<FindingSeverity, String> {
+pub fn parse_severity(s: &str) -> Result<FindingSeverity, FindingArgError> {
     match s {
         "blocker" => Ok(FindingSeverity::Blocker),
         "should-fix" => Ok(FindingSeverity::ShouldFix),
         "note" => Ok(FindingSeverity::Note),
-        other => Err(format!("`{other}` is not a finding severity — expected one of: {}", SEVERITY_VALUES.join(", "))),
+        other => Err(FindingArgError::UnknownSeverity(other.to_string())),
     }
 }
 
 /// `--disposition`'s clap `value_parser`, exhaustive over
 /// [`FindingDisposition`].
-pub fn parse_disposition(s: &str) -> Result<FindingDisposition, String> {
+pub fn parse_disposition(s: &str) -> Result<FindingDisposition, FindingArgError> {
     match s {
         "open" => Ok(FindingDisposition::Open),
         "fixed" => Ok(FindingDisposition::Fixed),
         "rejected" => Ok(FindingDisposition::Rejected),
         "deferred" => Ok(FindingDisposition::Deferred),
-        other => Err(format!("`{other}` is not a finding disposition — expected one of: {}", DISPOSITION_VALUES.join(", "))),
+        other => Err(FindingArgError::UnknownDisposition(other.to_string())),
     }
 }
 
 /// `--change-id`'s clap `value_parser` — grammar-level
 /// [`ChangeId::parse`], the same shape `crate::query::parse_change_id`
 /// and `crate::subject::parse_change_id` already expose.
-pub fn parse_change_id(s: &str) -> Result<ChangeId, String> {
-    ChangeId::parse(s).map_err(|e| e.to_string())
+pub fn parse_change_id(s: &str) -> Result<ChangeId, canon_model::ids::JoinKeyError> {
+    ChangeId::parse(s)
 }
 
 /// `--introduced-rev`'s value parser: any revision, except that `self` (the
 /// spelling an author reaches for when recording its own defect) is refused
 /// with a pointer to the option that records who found it.
-pub fn parse_introduced_rev(s: &str) -> Result<String, String> {
+pub fn parse_introduced_rev(s: &str) -> Result<String, FindingArgError> {
     if s == "self" {
-        return Err("--introduced-rev names the COMMIT that introduced the defect, not who found it; to record a defect you found in your own work, set --actor-id to your own id, and leave --introduced-rev unset unless the introducing commit was sourced".to_string());
+        return Err(FindingArgError::IntroducedRevIsSelf);
     }
     if s.trim().is_empty() {
-        return Err("--introduced-rev must name a git revision".to_string());
+        return Err(FindingArgError::IntroducedRevBlank);
     }
     Ok(s.to_string())
 }
@@ -516,7 +533,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding add", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding add", args.json);
         }
     };
 
@@ -772,7 +789,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding close", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding close", args.json);
         }
     };
 
@@ -1271,6 +1288,15 @@ fn severity_slug(severity: FindingSeverity) -> &'static str {
 mod tests {
     use std::process::Command;
     use super::*;
+
+    #[test]
+    fn the_value_parsers_refuse_in_their_old_words() {
+        assert_eq!(parse_severity("minor").unwrap_err().to_string(), "`minor` is not a finding severity — expected one of: blocker, should-fix, note");
+        assert_eq!(parse_disposition("wontfix").unwrap_err().to_string(), "`wontfix` is not a finding disposition — expected one of: open, fixed, rejected, deferred");
+        assert_eq!(parse_introduced_rev("self").unwrap_err().to_string(), "--introduced-rev names the COMMIT that introduced the defect, not who found it; to record a defect you found in your own work, set --actor-id to your own id, and leave --introduced-rev unset unless the introducing commit was sourced");
+        assert_eq!(parse_introduced_rev(" ").unwrap_err().to_string(), "--introduced-rev must name a git revision");
+        assert_eq!(parse_change_id("Bad Id").unwrap_err().to_string(), format!("invalid ChangeId: \"Bad Id\" does not match grammar `{}`", ChangeId::GRAMMAR));
+    }
 
     fn args(change_id: &str, round: u32, seq: u32) -> FindingArgs {
         FindingArgs {

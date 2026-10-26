@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::error::PromotionEvidenceError;
 use crate::ids::{StrategyId, TrajectoryId};
 use crate::strategy::{StrategyItem, StrategyLifecycle};
 
@@ -155,31 +156,31 @@ impl PromotionEvaluation {
         self.integrity_digest.clone()
     }
 
-    pub fn validate_for(&self, candidate: &StrategyItem) -> Result<(), String> {
+    pub fn validate_for(&self, candidate: &StrategyItem) -> Result<(), PromotionEvidenceError> {
         if self.schema_version != PROMOTION_EVALUATION_VERSION {
-            return Err("unsupported promotion evaluation version".into());
+            return Err(PromotionEvidenceError::EvaluationVersion);
         }
         if self.candidate_strategy_id != candidate.id {
-            return Err("evaluation candidate strategy id does not match".into());
+            return Err(PromotionEvidenceError::EvaluationCandidateId);
         }
         if self.candidate_lifecycle != StrategyLifecycle::Quarantined {
-            return Err("evaluation candidate lifecycle is not quarantined".into());
+            return Err(PromotionEvidenceError::EvaluationNotQuarantined);
         }
         if self.candidate_digest != strategy_digest(candidate) {
-            return Err("evaluation candidate digest does not match strategy".into());
+            return Err(PromotionEvidenceError::EvaluationCandidateDigest);
         }
         if self.source_trajectory_ids.is_empty() || self.source_trajectory_ids != candidate.source_trajectory_ids {
-            return Err("evaluation source trajectory provenance is missing or mismatched".into());
+            return Err(PromotionEvidenceError::EvaluationSourceTrajectories);
         }
         if self.baseline_result_digests.is_empty()
             || self.candidate_result_digests.is_empty()
             || self.baseline_result_digests.len() != self.candidate_result_digests.len()
         {
-            return Err("paired evaluation result provenance is missing or unpaired".into());
+            return Err(PromotionEvidenceError::PairedResultsUnpaired);
         }
         let result_digests = self.baseline_result_digests.iter().chain(self.candidate_result_digests.iter());
         if result_digests.clone().any(|digest| digest.trim().is_empty()) {
-            return Err("paired evaluation contains an empty result digest".into());
+            return Err(PromotionEvidenceError::PairedEmptyDigest);
         }
         if self.baseline_result_digests.iter().any(|digest| self.candidate_result_digests.contains(digest))
             || self.baseline_result_digests.iter().chain(self.candidate_result_digests.iter()).any(|digest| {
@@ -187,28 +188,28 @@ impl PromotionEvaluation {
                     || self.candidate_result_digests.iter().filter(|other| *other == digest).count() > 1
             })
         {
-            return Err("paired evaluation result digests are duplicated or shared across variants".into());
+            return Err(PromotionEvidenceError::PairedDuplicateDigests);
         }
         for provenance in [&self.corpus_version, &self.eval_version, &self.context_digest, &self.policy_digest, &self.model_digest, &self.tool_digest] {
             if provenance.trim().is_empty() {
-                return Err("evaluation provenance is missing".into());
+                return Err(PromotionEvidenceError::EvaluationProvenanceMissing);
             }
         }
         if self.paired_metrics.is_empty() || self.paired_metrics.values().any(|value| !value.is_finite()) {
-            return Err("paired evaluation metrics are missing or unknown".into());
+            return Err(PromotionEvidenceError::PairedMetricsMissing);
         }
-        let pairs = self.paired_metrics.get("pairs").copied().ok_or("paired evaluation pair count is missing")?;
-        let uplift = self.paired_metrics.get("uplift").copied().ok_or("paired evaluation uplift is missing")?;
-        let regressions = self.paired_metrics.get("regressions").copied().ok_or("paired evaluation regression count is missing")?;
+        let pairs = self.paired_metrics.get("pairs").copied().ok_or(PromotionEvidenceError::PairCountMissing)?;
+        let uplift = self.paired_metrics.get("uplift").copied().ok_or(PromotionEvidenceError::UpliftMissing)?;
+        let regressions = self.paired_metrics.get("regressions").copied().ok_or(PromotionEvidenceError::RegressionCountMissing)?;
         if pairs <= 0.0 || pairs != self.baseline_result_digests.len() as f64 || uplift <= 0.0 || regressions != 0.0 {
-            return Err("paired evaluation is not a positive, non-regressing measured uplift".into());
+            return Err(PromotionEvidenceError::NoMeasuredUplift);
         }
         let derived_pass = pairs > 0.0 && uplift > 0.0 && regressions == 0.0;
         if self.passed != derived_pass || !matches!(self.decision.as_str(), "pass" | "promote" | "approved") {
-            return Err("evaluation decision does not match measured paired evidence".into());
+            return Err(PromotionEvidenceError::DecisionMismatch);
         }
         if self.integrity_digest != self.recomputed_integrity_digest() {
-            return Err("promotion evaluation integrity digest is invalid".into());
+            return Err(PromotionEvidenceError::EvaluationIntegrity);
         }
         Ok(())
     }
@@ -247,31 +248,31 @@ impl PromotionApproval {
     }
 
 
-    pub fn validate_for(&self, candidate: &StrategyItem, evaluation: &PromotionEvaluation) -> Result<(), String> {
+    pub fn validate_for(&self, candidate: &StrategyItem, evaluation: &PromotionEvaluation) -> Result<(), PromotionEvidenceError> {
         if self.schema_version != PROMOTION_APPROVAL_VERSION {
-            return Err("unsupported promotion approval version".into());
+            return Err(PromotionEvidenceError::ApprovalVersion);
         }
         if self.signature.as_ref().is_none_or(std::string::String::is_empty) || self.signer_key.as_ref().is_none_or(std::string::String::is_empty) {
-            return Err("promotion approval signature and signer key are required".into());
+            return Err(PromotionEvidenceError::ApprovalSignatureRequired);
         }
         if self.candidate_strategy_id != candidate.id || self.evaluation_digest != evaluation.digest() {
-            return Err("promotion approval is not bound to this candidate evaluation".into());
+            return Err(PromotionEvidenceError::ApprovalNotBound);
         }
         if self.approver_identity.trim().is_empty() || self.approver_role != "human" {
-            return Err("promotion approval requires a nonempty human approver".into());
+            return Err(PromotionEvidenceError::ApproverNotHuman);
         }
         if self.signer_key.as_deref() != Some(self.approver_identity.as_str()) {
-            return Err("signed approval actor must equal the approval principal".into());
+            return Err(PromotionEvidenceError::ApprovalActorMismatch);
         }
         if self.integrity_digest != self.recomputed_integrity_digest() {
-            return Err("promotion approval integrity digest is invalid".into());
+            return Err(PromotionEvidenceError::ApprovalIntegrity);
         }
         Ok(())
     }
 
-    pub fn verify_signature(&self, candidate: &StrategyItem, allowed_signers: &Path) -> Result<(), String> {
+    pub fn verify_signature(&self, candidate: &StrategyItem, allowed_signers: &Path) -> Result<(), PromotionEvidenceError> {
         if self.signature.is_none() || self.signer_key.is_none() {
-            return Err("promotion approval signature is missing".into());
+            return Err(PromotionEvidenceError::ApprovalSignatureMissing);
         }
         let payload = canon_model::approval::approval_payload_bytes(
             "canon-learning-approval-v1",
@@ -284,13 +285,13 @@ impl PromotionApproval {
             &self.approver_identity,
             &self.approved_at,
         );
-        canon_gate::verify_ssh_signature(
+        Ok(canon_gate::verify_ssh_signature(
             "canon-learning-approval-v1",
             &payload,
             self.signature.as_ref().expect("checked above").as_bytes(),
             self.signer_key.as_ref().expect("checked above"),
             allowed_signers,
-        )
+        )?)
     }
 }
 
@@ -307,3 +308,91 @@ pub fn strategy_digest(candidate: &StrategyItem) -> String {
     }))
 }
 
+
+#[cfg(test)]
+mod tests {
+    use canon_model::ids::{regime_key, RegimeKey, RoleId};
+
+    use super::*;
+
+    fn candidate() -> StrategyItem {
+        let rk = RegimeKey::parse(regime_key("dev", "canon", "join-spine", "9c93d024b1a2")).unwrap();
+        StrategyItem::new(StrategyId::new(), rk, RoleId::parse("dev").unwrap(), "title", "description", "content", vec![TrajectoryId::new()], Utc::now())
+            .with_lifecycle(StrategyLifecycle::Quarantined)
+    }
+
+    fn evaluation(candidate: &StrategyItem) -> PromotionEvaluation {
+        let metrics = BTreeMap::from([("pairs".to_string(), 1.0), ("uplift".to_string(), 0.1), ("regressions".to_string(), 0.0)]);
+        PromotionEvaluation::new(candidate, "v2", vec!["b0".into()], vec!["c0".into()], "corpus", "eval", "ctx", "policy", "model", "tool", metrics, true, "pass")
+    }
+
+    #[test]
+    fn evaluation_validate_for_keeps_its_messages() {
+        let candidate = candidate();
+        evaluation(&candidate).validate_for(&candidate).unwrap();
+
+        let mut wrong_version = evaluation(&candidate);
+        wrong_version.schema_version = 0;
+        assert_eq!(wrong_version.validate_for(&candidate).unwrap_err().to_string(), "unsupported promotion evaluation version");
+
+        let other = self::candidate();
+        assert_eq!(evaluation(&candidate).validate_for(&other).unwrap_err().to_string(), "evaluation candidate strategy id does not match");
+
+        let mut active = evaluation(&candidate);
+        active.candidate_lifecycle = StrategyLifecycle::Active;
+        assert_eq!(active.validate_for(&candidate).unwrap_err().to_string(), "evaluation candidate lifecycle is not quarantined");
+
+        let mut no_pairs = evaluation(&candidate);
+        no_pairs.baseline_result_digests.clear();
+        assert_eq!(no_pairs.validate_for(&candidate).unwrap_err().to_string(), "paired evaluation result provenance is missing or unpaired");
+
+        let mut tampered = evaluation(&candidate);
+        tampered.decision = "rejected".into();
+        assert_eq!(tampered.validate_for(&candidate).unwrap_err().to_string(), "evaluation decision does not match measured paired evidence");
+
+        let mut stale = evaluation(&candidate);
+        stale.integrity_digest = "stale".into();
+        assert_eq!(stale.validate_for(&candidate).unwrap_err().to_string(), "promotion evaluation integrity digest is invalid");
+    }
+
+    #[test]
+    fn approval_validate_for_and_verify_signature_keep_their_messages() {
+        let candidate = candidate();
+        let evaluation = evaluation(&candidate);
+        let approval = || PromotionApproval::new(candidate.id, evaluation.digest(), "alice", "human", true, Utc::now());
+
+        assert_eq!(approval().validate_for(&candidate, &evaluation).unwrap_err().to_string(), "promotion approval signature and signer key are required");
+        assert_eq!(approval().verify_signature(&candidate, Path::new("signers")).unwrap_err().to_string(), "promotion approval signature is missing");
+
+        let mut signed = approval();
+        signed.signature = Some("sig".into());
+        signed.signer_key = Some("bob".into());
+        assert_eq!(signed.validate_for(&candidate, &evaluation).unwrap_err().to_string(), "signed approval actor must equal the approval principal");
+
+        signed.signer_key = Some("alice".into());
+        signed.evaluation_digest = "elsewhere".into();
+        assert_eq!(signed.validate_for(&candidate, &evaluation).unwrap_err().to_string(), "promotion approval is not bound to this candidate evaluation");
+
+        let mut machine = approval();
+        machine.signature = Some("sig".into());
+        machine.signer_key = Some("alice".into());
+        machine.approver_role = "agent".into();
+        assert_eq!(machine.validate_for(&candidate, &evaluation).unwrap_err().to_string(), "promotion approval requires a nonempty human approver");
+
+        let mut stale = approval();
+        stale.signature = Some("sig".into());
+        stale.signer_key = Some("alice".into());
+        assert_eq!(stale.validate_for(&candidate, &evaluation).unwrap_err().to_string(), "promotion approval integrity digest is invalid");
+
+        let mut bad_version = approval();
+        bad_version.schema_version = 0;
+        assert_eq!(bad_version.validate_for(&candidate, &evaluation).unwrap_err().to_string(), "unsupported promotion approval version");
+
+        let mut unsigned_path = approval();
+        unsigned_path.signature = Some("sig".into());
+        unsigned_path.signer_key = Some("alice".into());
+        let err = unsigned_path.verify_signature(&candidate, Path::new("/nonexistent/allowed_signers")).unwrap_err();
+        assert_eq!(err.to_string(), "allowed signers file is missing: /nonexistent/allowed_signers");
+        assert!(std::error::Error::source(&err).is_none(), "transparent wrapper forwards the inner source, which has none");
+    }
+}

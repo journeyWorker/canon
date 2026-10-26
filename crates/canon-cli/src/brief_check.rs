@@ -251,6 +251,38 @@ pub struct FlowScenario {
 /// Flow step id (`F1`) → the scenarios tagged `@flow:<change>.<F-id>`.
 pub type FlowIndex = BTreeMap<String, Vec<FlowScenario>>;
 
+/// Why a flow lookup could not answer.
+#[derive(Debug, thiserror::Error)]
+pub enum FlowError {
+    /// `canon.yaml`'s spec roots cannot be read.
+    #[error(transparent)]
+    SpecRoots(#[from] crate::inventory::InventoryError),
+    /// No operand named the change and the repo's only live change could not be picked.
+    #[error("{} — {}; name the change as the operand", .0.code, .0.message)]
+    ChangeUnresolved(#[source] CliError),
+    /// The change has no `brief.md` to read flow steps from.
+    #[error("change `{change}` has no brief at {}/{change}/brief.md; write it with `canon change new`", paths::CHANGES_DIR)]
+    NoBrief { change: String },
+    /// The brief defines no flow step at all.
+    #[error("the brief of change `{change}` defines no flow steps (`F1`, `F2`, …); write the flow first")]
+    NoFlowSteps { change: String },
+    /// The brief defines steps, but not the one asked for.
+    #[error("the brief of change `{change}` defines no flow step `{flow}` (it has {known})")]
+    UnknownFlowStep { change: String, flow: String, known: String },
+    /// `canon.yaml` cannot be read into a gate context.
+    #[error(transparent)]
+    Config(#[from] canon_gate::CanonYamlError),
+    /// The ledger cannot be read into a gate context.
+    #[error(transparent)]
+    Ledger(#[from] canon_gate::GateContextError),
+    /// No subject carries the id.
+    #[error("no subject `{0}`")]
+    NoSubject(String),
+    /// The subject has adopted no change.
+    #[error("subject `{0}` has not adopted a change; run `canon change new <slug> --subject-id {0}`")]
+    NoAdoptedChange(String),
+}
+
 /// The scenarios pointing at `change`'s flow steps (module doc, "Flow
 /// coverage"): the one function the `@flow:` tag lookup lives in. It
 /// reads the `.feature` files under the spec roots through the same
@@ -258,8 +290,8 @@ pub type FlowIndex = BTreeMap<String, Vec<FlowScenario>>;
 /// file per process, [`crate::inventory::feature_file_scan`]), so the
 /// gate, status and the brief rules cannot disagree, and a tag written a
 /// moment ago counts without a sync.
-pub fn flow_scenarios(repo: &Path, change: &ChangeId) -> Result<FlowIndex, String> {
-    let roots = crate::inventory::load_spec_roots(&repo.join("canon.yaml")).map_err(|e| e.to_string())?;
+pub fn flow_scenarios(repo: &Path, change: &ChangeId) -> Result<FlowIndex, FlowError> {
+    let roots = crate::inventory::load_spec_roots(&repo.join("canon.yaml"))?;
     let prefix = format!("{}.", change.as_str());
     let mut index = FlowIndex::new();
     for root in roots {
@@ -364,34 +396,34 @@ pub fn flow_ids(repo: &Path, change: &ChangeId) -> Vec<String> {
 /// --flow <flow>` writes. The change is `change` when given, else the
 /// newest change `subject` adopted, else the repo's only live change.
 /// Refuses a flow id the change's brief does not define.
-pub fn flow_tag_value(repo: &Path, subject: Option<&canon_model::SubjectId>, change: Option<&ChangeId>, flow: &str) -> Result<String, String> {
+pub fn flow_tag_value(repo: &Path, subject: Option<&canon_model::SubjectId>, change: Option<&ChangeId>, flow: &str) -> Result<String, FlowError> {
     let change = match (change, subject) {
         (Some(change), _) => change.clone(),
         (None, Some(subject)) => newest_change_of(repo, subject)?,
-        (None, None) => resolve_change(repo, None).map(|(change, _)| change).map_err(|e| format!("{} — {}; name the change as the operand", e.code, e.message))?,
+        (None, None) => resolve_change(repo, None).map(|(change, _)| change).map_err(FlowError::ChangeUnresolved)?,
     };
     if crate::brief::canon_brief(repo, &change).is_none() {
-        return Err(format!("change `{}` has no brief at {}/{}/brief.md; write it with `canon change new`", change.as_str(), paths::CHANGES_DIR, change.as_str()));
+        return Err(FlowError::NoBrief { change: change.as_str().to_string() });
     }
     let ids = flow_ids(repo, &change);
     if ids.iter().any(|id| id == flow) {
         return Ok(format!("{}.{flow}", change.as_str()));
     }
     Err(if ids.is_empty() {
-        format!("the brief of change `{}` defines no flow steps (`F1`, `F2`, …); write the flow first", change.as_str())
+        FlowError::NoFlowSteps { change: change.as_str().to_string() }
     } else {
-        format!("the brief of change `{}` defines no flow step `{flow}` (it has {})", change.as_str(), ids.join(", "))
+        FlowError::UnknownFlowStep { change: change.as_str().to_string(), flow: flow.to_string(), known: ids.join(", ") }
     })
 }
 
 /// The newest change `subject` adopted ([`canon_gate::spec_coverage::subject_change_ids`]'s last).
-pub fn newest_change_of(repo: &Path, subject: &canon_model::SubjectId) -> Result<ChangeId, String> {
+pub fn newest_change_of(repo: &Path, subject: &canon_model::SubjectId) -> Result<ChangeId, FlowError> {
     use canon_gate::spec_coverage::{latest_subjects, subject_change_ids};
     use canon_gate::{GateContext, GateCtx};
     let registry = canon_policy::SchemaRegistry::load();
-    let ctx = GateCtx::from_repo(repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &registry, chrono::Utc::now()).map_err(|e| e.to_string()))?;
-    let found = latest_subjects(&ctx).into_iter().find(|s| &s.subject_id == subject).ok_or_else(|| format!("no subject `{}`", subject.as_str()))?;
-    subject_change_ids(&ctx, found).pop().ok_or_else(|| format!("subject `{}` has not adopted a change; run `canon change new <slug> --subject-id {}`", subject.as_str(), subject.as_str()))
+    let ctx = GateContext::load(GateCtx::from_repo(repo)?, &registry, chrono::Utc::now())?;
+    let found = latest_subjects(&ctx).into_iter().find(|s| &s.subject_id == subject).ok_or_else(|| FlowError::NoSubject(subject.as_str().to_string()))?;
+    subject_change_ids(&ctx, found).pop().ok_or_else(|| FlowError::NoAdoptedChange(subject.as_str().to_string()))
 }
 
 // ───────────────────────────── document scan ─────────────────────────────
@@ -1832,7 +1864,7 @@ pub fn check(repo: &Path, requested: Option<&ChangeId>) -> Result<Checked, CliEr
 /// Judges `text`, the brief of `change` read from `path`: [`check`] for a
 /// caller that has already read the file and must judge those same bytes.
 pub fn check_text(repo: &Path, change: ChangeId, path: &Path, text: &str) -> Result<Checked, CliError> {
-    let resolved = crate::language::for_brief(repo, text).map_err(|e| CliError::failed("CONFIG_UNREADABLE", e).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again"))?;
+    let resolved = crate::language::for_brief(repo, text).map_err(|e| CliError::failed("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again"))?;
     let phase = phase_of(repo, &change, text);
     let flows = match phase {
         Phase::Building if !is_chore(text) => Some(flow_scenarios(repo, &change).map_err(|e| CliError::failed("SPEC_ROOTS_UNREADABLE", format!("cannot read the scenarios the flow steps point at: {e}")).hint("fix `specs.roots` in canon.yaml (`canon init --check` reports what is wrong), then run the command again"))?),
@@ -2132,6 +2164,21 @@ pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn flow_refusals_read_as_before() {
+        let dir = tempfile::tempdir().unwrap();
+        let change = ChangeId::parse("add-cart").unwrap();
+        let missing = flow_tag_value(dir.path(), None, Some(&change), "F1").unwrap_err();
+        assert_eq!(missing.to_string(), "change `add-cart` has no brief at .canon/changes/add-cart/brief.md; write it with `canon change new`");
+        let message = |error: FlowError| error.to_string();
+        let c = || "add-cart".to_string();
+        assert_eq!(message(FlowError::NoFlowSteps { change: c() }), "the brief of change `add-cart` defines no flow steps (`F1`, `F2`, …); write the flow first");
+        assert_eq!(message(FlowError::UnknownFlowStep { change: c(), flow: "F9".to_string(), known: "F1, F2".to_string() }), "the brief of change `add-cart` defines no flow step `F9` (it has F1, F2)");
+        assert_eq!(message(FlowError::NoSubject("cart".to_string())), "no subject `cart`");
+        assert_eq!(message(FlowError::NoAdoptedChange("cart".to_string())), "subject `cart` has not adopted a change; run `canon change new <slug> --subject-id cart`");
+        assert_eq!(message(FlowError::ChangeUnresolved(CliError::refused("USAGE", "no live change"))), "USAGE — no live change; name the change as the operand");
+    }
 
     fn cited(s: &str) -> Vec<String> {
         citations(s)

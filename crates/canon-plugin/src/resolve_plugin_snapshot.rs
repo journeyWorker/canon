@@ -34,7 +34,7 @@ pub fn resolve_plugin_snapshot(project_dir: &Path) -> (PluginSnapshot, Vec<Diagn
     let plugins_dir = project_dir.join(PLUGINS_DIR_RELATIVE_PATH);
 
     let (installed, load_errs) = load_plugins_dir(&plugins_dir);
-    diags.extend(load_errs.iter().map(super::manifest::loader::LoadError::diagnostic));
+    diags.extend(load_errs.iter().map(super::manifest::loader::PluginLoadError::diagnostic));
 
     let (snapshot, assemble_diags) = assemble_snapshot(&installed);
     diags.extend(assemble_diags);

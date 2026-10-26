@@ -5,7 +5,7 @@
 //! sorted directory order, per-package, a duplicate manifest `id` DROPS
 //! the later package as a diagnostic, never a silent overwrite. No
 //! `canon-vocab` crate dependency (design.md D2/R4). Never panics: every
-//! failure is a [`LoadError`] in the returned vec, and a missing `dir`
+//! failure is a [`PluginLoadError`] in the returned vec, and a missing `dir`
 //! yields an empty registry rather than an `Err`.
 
 use std::collections::BTreeMap;
@@ -20,54 +20,51 @@ pub struct LoadedPlugin {
     pub dir: PathBuf,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum LoadError {
+#[derive(Clone, Debug, PartialEq, thiserror::Error)]
+pub enum PluginLoadError {
     /// `plugin.yaml` is missing, unreadable, or fails to parse as
     /// [`PluginManifest`] (including a missing required field).
+    #[error("failed to load plugin.yaml in {dir}: {msg}")]
     Manifest { dir: String, msg: String },
     /// A second `.canon/plugins/<dir>/plugin.yaml` declared the same
     /// manifest `id` as an earlier (directory-sort order) package.
+    #[error("duplicate plugin id `{id}`: keeping {first_dir}, dropping {second_dir}")]
     DuplicateId { id: String, first_dir: String, second_dir: String },
 }
 
-impl LoadError {
+impl PluginLoadError {
     pub fn code(&self) -> &'static str {
         match self {
-            LoadError::Manifest { .. } => E_PLUGIN_MANIFEST,
-            LoadError::DuplicateId { .. } => E_PLUGIN_DUP_ID,
+            PluginLoadError::Manifest { .. } => E_PLUGIN_MANIFEST,
+            PluginLoadError::DuplicateId { .. } => E_PLUGIN_DUP_ID,
         }
     }
 
     pub fn diagnostic(&self) -> Diagnostic {
-        match self {
-            LoadError::Manifest { dir, msg } => {
-                Diagnostic::error(self.code(), format!("failed to load plugin.yaml in {dir}: {msg}"), dir.clone())
-            }
-            LoadError::DuplicateId { id, first_dir, second_dir } => Diagnostic::error(
-                self.code(),
-                format!("duplicate plugin id `{id}`: keeping {first_dir}, dropping {second_dir}"),
-                id.clone(),
-            ),
-        }
+        let subject = match self {
+            PluginLoadError::Manifest { dir, .. } => dir.clone(),
+            PluginLoadError::DuplicateId { id, .. } => id.clone(),
+        };
+        Diagnostic::error(self.code(), self.to_string(), subject)
     }
 }
 
 /// Read one plugin package. `dir` MUST contain `plugin.yaml`.
-pub fn load_plugin_dir(dir: &Path) -> Result<LoadedPlugin, LoadError> {
+pub fn load_plugin_dir(dir: &Path) -> Result<LoadedPlugin, PluginLoadError> {
     let manifest_path = dir.join("plugin.yaml");
     let text = std::fs::read_to_string(&manifest_path)
-        .map_err(|e| LoadError::Manifest { dir: dir.display().to_string(), msg: e.to_string() })?;
+        .map_err(|e| PluginLoadError::Manifest { dir: dir.display().to_string(), msg: e.to_string() })?;
     let manifest: PluginManifest = serde_yaml::from_str(&text)
-        .map_err(|e| LoadError::Manifest { dir: dir.display().to_string(), msg: e.to_string() })?;
+        .map_err(|e| PluginLoadError::Manifest { dir: dir.display().to_string(), msg: e.to_string() })?;
     Ok(LoadedPlugin { manifest, dir: dir.to_path_buf() })
 }
 
 /// Scan `dir` for plugin packages (each immediate subdirectory
 /// containing a `plugin.yaml`), in sorted directory order, indexed by
 /// manifest id. A duplicate id across packages drops the later package
-/// ([`LoadError::DuplicateId`]). A missing `dir` yields an empty
+/// ([`PluginLoadError::DuplicateId`]). A missing `dir` yields an empty
 /// registry -- never a panic.
-pub fn load_plugins_dir(dir: &Path) -> (BTreeMap<String, LoadedPlugin>, Vec<LoadError>) {
+pub fn load_plugins_dir(dir: &Path) -> (BTreeMap<String, LoadedPlugin>, Vec<PluginLoadError>) {
     let mut out = BTreeMap::new();
     let mut errs = Vec::new();
     let mut subs: Vec<PathBuf> = match std::fs::read_dir(dir) {
@@ -84,7 +81,7 @@ pub fn load_plugins_dir(dir: &Path) -> (BTreeMap<String, LoadedPlugin>, Vec<Load
                 let id = loaded.manifest.id.clone();
                 match out.entry(id) {
                     std::collections::btree_map::Entry::Occupied(e) => {
-                        errs.push(LoadError::DuplicateId {
+                        errs.push(PluginLoadError::DuplicateId {
                             id: e.key().clone(),
                             first_dir: e.get().dir.display().to_string(),
                             second_dir: loaded.dir.display().to_string(),
@@ -168,9 +165,20 @@ mod tests {
         assert_eq!(errs.len(), 1);
         assert_eq!(errs[0].code(), "E-PLUGIN-DUP-ID");
         match &errs[0] {
-            LoadError::DuplicateId { id, .. } => assert_eq!(id, "porting"),
+            PluginLoadError::DuplicateId { id, .. } => assert_eq!(id, "porting"),
             other => panic!("expected DuplicateId, got {other:?}"),
         }
+        assert_eq!(errs[0].to_string(), format!("duplicate plugin id `porting`: keeping {}, dropping {}", tmp.path().join("pkg-a").display(), tmp.path().join("pkg-b").display()));
+    }
+
+    #[test]
+    fn error_display_is_the_diagnostic_message_byte_for_byte() {
+        let manifest = PluginLoadError::Manifest { dir: "/p/x".into(), msg: "boom".into() };
+        assert_eq!(manifest.to_string(), "failed to load plugin.yaml in /p/x: boom");
+        let diag = manifest.diagnostic();
+        assert_eq!(diag.message, manifest.to_string());
+        let as_error: &dyn std::error::Error = &manifest;
+        assert!(as_error.source().is_none());
     }
 
     #[test]

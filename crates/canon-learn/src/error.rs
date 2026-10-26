@@ -99,7 +99,7 @@ pub enum LearnError {
     PromotionApprovalRequired,
 
     #[error("promotion evidence invalid: {0}")]
-    InvalidPromotionEvidence(String),
+    InvalidPromotionEvidence(#[from] PromotionEvidenceError),
     /// `mark_trajectory_verdict` was called with `VerdictOutcome::
     /// Pending` — `Pending` is only the trajectory's unset default,
     /// never a value a covering-verdict write may set (S7 design D2:
@@ -134,4 +134,76 @@ pub enum LearnError {
     /// sample, which is NOT an error).
     #[error("CRN statistics input: {0}")]
     InvalidCrnInput(String),
+}
+
+/// Why a promotion evaluation, approval, activation or rollback was refused as
+/// evidence. Each message is shown to the user as written.
+#[derive(Debug, thiserror::Error)]
+pub enum PromotionEvidenceError {
+    #[error("unsupported promotion evaluation version")]
+    EvaluationVersion,
+    #[error("evaluation candidate strategy id does not match")]
+    EvaluationCandidateId,
+    #[error("evaluation candidate lifecycle is not quarantined")]
+    EvaluationNotQuarantined,
+    #[error("evaluation candidate digest does not match strategy")]
+    EvaluationCandidateDigest,
+    #[error("evaluation source trajectory provenance is missing or mismatched")]
+    EvaluationSourceTrajectories,
+    #[error("paired evaluation result provenance is missing or unpaired")]
+    PairedResultsUnpaired,
+    #[error("paired evaluation contains an empty result digest")]
+    PairedEmptyDigest,
+    #[error("paired evaluation result digests are duplicated or shared across variants")]
+    PairedDuplicateDigests,
+    #[error("evaluation provenance is missing")]
+    EvaluationProvenanceMissing,
+    #[error("paired evaluation metrics are missing or unknown")]
+    PairedMetricsMissing,
+    #[error("paired evaluation pair count is missing")]
+    PairCountMissing,
+    #[error("paired evaluation uplift is missing")]
+    UpliftMissing,
+    #[error("paired evaluation regression count is missing")]
+    RegressionCountMissing,
+    #[error("paired evaluation is not a positive, non-regressing measured uplift")]
+    NoMeasuredUplift,
+    #[error("evaluation decision does not match measured paired evidence")]
+    DecisionMismatch,
+    #[error("promotion evaluation integrity digest is invalid")]
+    EvaluationIntegrity,
+    #[error("unsupported promotion approval version")]
+    ApprovalVersion,
+    #[error("promotion approval signature and signer key are required")]
+    ApprovalSignatureRequired,
+    #[error("promotion approval is not bound to this candidate evaluation")]
+    ApprovalNotBound,
+    #[error("promotion approval requires a nonempty human approver")]
+    ApproverNotHuman,
+    #[error("signed approval actor must equal the approval principal")]
+    ApprovalActorMismatch,
+    #[error("promotion approval integrity digest is invalid")]
+    ApprovalIntegrity,
+    #[error("promotion approval signature is missing")]
+    ApprovalSignatureMissing,
+    /// The detached SSH signature did not verify.
+    #[error(transparent)]
+    Signature(#[from] canon_gate::ApprovalError),
+    /// `policy.yaml` names no usable allowed-signers file.
+    #[error(transparent)]
+    AllowedSigners(#[from] canon_gate::AllowedSignersError),
+    #[error("no policy-pinned approval.allowed_signers verifier is configured")]
+    NoVerifierConfigured,
+    #[error("activation target already exists; rollback or remove the stale target before activation")]
+    ActivationTargetExists,
+    #[error("rollback requires a detached SSH signature and policy-pinned approval verifier")]
+    RollbackUnauthenticated,
+    #[error("rollback reason and actor are required")]
+    RollbackReasonAndActor,
+    #[error("cannot read approval.allowed_signers: {0}")]
+    AllowedSignersUnreadable(#[source] std::io::Error),
+    #[error("rollback actor is not listed in policy-pinned approval.allowed_signers")]
+    RollbackActorNotListed,
+    #[error("rollback detached signature is required")]
+    RollbackSignatureRequired,
 }

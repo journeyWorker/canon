@@ -344,12 +344,19 @@ pub enum SkillsError {
     CanonicalSourceMissing(PathBuf),
     #[error("invalid provider `{0}`; expected one of: claude, codex, omp, pi, or none")]
     InvalidProvider(String),
-    #[error("{0}")]
-    Config(String),
+    #[error(transparent)]
+    Config(#[from] SkillsConfigError),
     #[error("canonical bundle has an unsupported or unsafe symlink at {0}")]
     UnsafeSymlink(PathBuf),
     #[error("refusing to overwrite a symlink at {0}")]
     RefuseSymlink(PathBuf),
+    /// A path that is not under the target directory is refused the same way: nothing can be shown to be no symlink.
+    #[error("refusing to overwrite a symlink at {path}")]
+    PathOutsideTarget {
+        path: PathBuf,
+        #[source]
+        source: std::path::StripPrefixError,
+    },
     #[error("malformed lock file at {path}: {source}")]
     LockParse {
         path: PathBuf,
@@ -394,10 +401,9 @@ fn reject_symlink_path(path: &Path) -> Result<(), SkillsError> {
 }
 
 fn reject_symlink_path_under(target_dir: &Path, path: &Path) -> Result<(), SkillsError> {
-    #[expect(clippy::map_err_ignore, reason = "`StripPrefixError` only says `path` is not under `target_dir`; the refusal names `path` and its message has no slot for a cause")]
     let relative = path
         .strip_prefix(target_dir)
-        .map_err(|_| SkillsError::RefuseSymlink(path.to_path_buf()))?;
+        .map_err(|source| SkillsError::PathOutsideTarget { path: path.to_path_buf(), source })?;
     let mut current = target_dir.to_path_buf();
     if let Ok(metadata) = fs::symlink_metadata(&current) {
         if metadata.file_type().is_symlink() {
@@ -687,20 +693,38 @@ struct RawSkillsSection {
 /// The shape a `skills:` section must have, for diagnostics.
 const SKILLS_SECTION_SHAPE: &str = "`skills: { providers: [claude, codex, omp, pi] }`, any subset, `[]` for none";
 
-fn configured_providers_in(text: &str) -> Result<Option<Vec<Provider>>, String> {
-    let doc: serde_yaml::Value =
-        serde_yaml::from_str(text).map_err(|e| format!("canon.yaml is not valid YAML: {e}"))?;
+/// Why `canon.yaml`'s `skills:` section cannot be read or rewritten.
+#[derive(Debug, thiserror::Error)]
+pub enum SkillsConfigError {
+    /// `canon.yaml` is not YAML.
+    #[error("canon.yaml is not valid YAML: {0}")]
+    Yaml(#[source] serde_yaml::Error),
+    /// `skills:` is not [`SKILLS_SECTION_SHAPE`].
+    #[error("canon.yaml `skills:` section is malformed (expected {shape}): {0}", shape = SKILLS_SECTION_SHAPE)]
+    Section(#[source] serde_yaml::Error),
+    /// `skills.providers` names a harness canon does not ship for.
+    #[error("canon.yaml `skills.providers` names `{0}`; expected any of claude, codex, omp, pi")]
+    UnknownProvider(String),
+    /// The rewritten section would not read back as the chosen providers.
+    #[error("could not rewrite the `skills:` section of canon.yaml safely; set it by hand to `skills: {{ providers: [{providers}] }}`")]
+    Unrewritable {
+        /// The chosen providers, comma-separated.
+        providers: String,
+    },
+}
+
+fn configured_providers_in(text: &str) -> Result<Option<Vec<Provider>>, SkillsConfigError> {
+    let doc: serde_yaml::Value = serde_yaml::from_str(text).map_err(SkillsConfigError::Yaml)?;
     let Some(section) = doc.get("skills") else {
         return Ok(None);
     };
-    let raw: RawSkillsSection = serde_yaml::from_value(section.clone())
-        .map_err(|e| format!("canon.yaml `skills:` section is malformed (expected {SKILLS_SECTION_SHAPE}): {e}"))?;
+    let raw: RawSkillsSection = serde_yaml::from_value(section.clone()).map_err(SkillsConfigError::Section)?;
     let mut providers = Vec::new();
     for name in &raw.providers {
         let provider = ALL_PROVIDERS
             .into_iter()
             .find(|provider| provider.as_str() == name)
-            .ok_or_else(|| format!("canon.yaml `skills.providers` names `{name}`; expected any of claude, codex, omp, pi"))?;
+            .ok_or_else(|| SkillsConfigError::UnknownProvider(name.clone()))?;
         providers.push(provider);
     }
     providers.sort();
@@ -711,7 +735,7 @@ fn configured_providers_in(text: &str) -> Result<Option<Vec<Provider>>, String> 
 /// `skills.providers` from the `canon.yaml` at `canon_yaml`: `None` when
 /// the file or its `skills:` key is absent. A present section that is not
 /// [`SKILLS_SECTION_SHAPE`], or names an unknown provider, fails loud.
-pub fn configured_providers(canon_yaml: &Path) -> Result<Option<Vec<Provider>>, String> {
+pub fn configured_providers(canon_yaml: &Path) -> Result<Option<Vec<Provider>>, SkillsConfigError> {
     let Ok(text) = fs::read_to_string(canon_yaml) else {
         return Ok(None);
     };
@@ -742,7 +766,7 @@ pub fn skills_config_block(providers: &[Provider]) -> String {
 /// line belongs to it only when an indented line follows. The result is
 /// refused unless it parses to exactly `providers` with every other key
 /// unchanged.
-pub(crate) fn rewrite_skills_section(text: &str, providers: &[Provider]) -> Result<String, String> {
+pub(crate) fn rewrite_skills_section(text: &str, providers: &[Provider]) -> Result<String, SkillsConfigError> {
     let newline = if text.contains("\r\n") { "\r\n" } else { "\n" };
     let block = skills_config_block(providers).replace('\n', newline);
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
@@ -775,12 +799,7 @@ pub(crate) fn rewrite_skills_section(text: &str, providers: &[Provider]) -> Resu
             out
         }
     };
-    let refuse = || {
-        format!(
-            "could not rewrite the `skills:` section of canon.yaml safely; set it by hand to `skills: {{ providers: [{}] }}`",
-            providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", ")
-        )
-    };
+    let refuse = || SkillsConfigError::Unrewritable { providers: providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", ") };
     let without_skills = |text: &str| -> Option<serde_yaml::Value> {
         let mut doc: serde_yaml::Value = serde_yaml::from_str(text).ok()?;
         if let Some(map) = doc.as_mapping_mut() {
@@ -807,7 +826,7 @@ fn planned_config(target_dir: &Path, providers: &[Provider]) -> Result<Option<(P
     if configured_providers_in(&text).ok().flatten().as_deref() == Some(providers) {
         return Ok(None);
     }
-    let rewritten = rewrite_skills_section(&text, providers).map_err(SkillsError::Config)?;
+    let rewritten = rewrite_skills_section(&text, providers)?;
     Ok(Some((path, rewritten)))
 }
 
@@ -820,7 +839,7 @@ pub fn select_providers(target_dir: &Path, flag: Option<&str>) -> Result<Provide
     if let Some(value) = flag {
         return Ok(ProviderSelection { providers: parse_provider_list(value)?, origin: ProviderOrigin::Flag });
     }
-    if let Some(providers) = configured_providers(&target_dir.join("canon.yaml")).map_err(SkillsError::Config)? {
+    if let Some(providers) = configured_providers(&target_dir.join("canon.yaml"))? {
         return Ok(ProviderSelection { providers, origin: ProviderOrigin::Config });
     }
     // A lock canon cannot parse leaves the choice to detection; `check`
@@ -2042,6 +2061,25 @@ impl crate::json_out::Report for SkillsShowReport {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_path_outside_the_target_is_refused_as_a_symlink_and_keeps_its_cause() {
+        let error = reject_symlink_path_under(Path::new("/target"), Path::new("/elsewhere/file")).unwrap_err();
+        assert_eq!(error.to_string(), "refusing to overwrite a symlink at /elsewhere/file");
+        assert!(std::error::Error::source(&error).is_some());
+    }
+
+    #[test]
+    fn the_skills_section_refusals_read_as_before() {
+        let message = |text: &str| configured_providers_in(text).unwrap_err().to_string();
+        assert_eq!(message("skills:\n  providers: [vim]\n"), "canon.yaml `skills.providers` names `vim`; expected any of claude, codex, omp, pi");
+        assert!(message("skills: 3\n").starts_with("canon.yaml `skills:` section is malformed (expected `skills: { providers: [claude, codex, omp, pi] }`, any subset, `[]` for none): "));
+        assert!(message("skills: [\n").starts_with("canon.yaml is not valid YAML: "));
+        let unrewritable = SkillsConfigError::Unrewritable { providers: "claude, omp".to_string() };
+        assert_eq!(unrewritable.to_string(), "could not rewrite the `skills:` section of canon.yaml safely; set it by hand to `skills: { providers: [claude, omp] }`");
+        assert_eq!(SkillsError::from(unrewritable).to_string(), "could not rewrite the `skills:` section of canon.yaml safely; set it by hand to `skills: { providers: [claude, omp] }`");
+        assert!(std::error::Error::source(&configured_providers_in("skills: 3\n").unwrap_err()).is_some());
+    }
 
     #[test]
     fn legacy_codex_keys_are_confined_to_the_legacy_projection() {

@@ -135,14 +135,14 @@ const EXIT_GATED: u8 = 1;
 
 /// `<id>` / `--subject-id`'s `clap` value parser — grammar-level
 /// [`SubjectId::parse`] (kebab-case slug).
-pub fn parse_subject_id(s: &str) -> Result<SubjectId, String> {
-    SubjectId::parse(s).map_err(|e| e.to_string())
+pub fn parse_subject_id(s: &str) -> Result<SubjectId, canon_model::ids::JoinKeyError> {
+    SubjectId::parse(s)
 }
 
 /// `<change_id>`'s `clap` value parser — grammar-level
 /// [`ChangeId::parse`].
-pub fn parse_change_id(s: &str) -> Result<ChangeId, String> {
-    ChangeId::parse(s).map_err(|e| e.to_string())
+pub fn parse_change_id(s: &str) -> Result<ChangeId, canon_model::ids::JoinKeyError> {
+    ChangeId::parse(s)
 }
 
 /// `<state>`'s `clap` value parser — the closed [`SubjectStatus`]
@@ -152,8 +152,15 @@ pub fn status_parser() -> impl clap::builder::TypedValueParser<Value = SubjectSt
     crate::cli_error::closed_set(["proposed", "specced", "building", "verifying", "shipped", "retired"], parse_status)
 }
 
+/// `<state>` named no subject status.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum SubjectMoveError {
+    #[error("unknown subject move `{0}` (expected one of: proposed, specced, building, verifying, shipped, retired)")]
+    Unknown(String),
+}
+
 /// A subject move, as the CLI spells it.
-pub fn parse_status(s: &str) -> Result<SubjectStatus, String> {
+pub fn parse_status(s: &str) -> Result<SubjectStatus, SubjectMoveError> {
     match s {
         "proposed" => Ok(SubjectStatus::Proposed),
         "specced" => Ok(SubjectStatus::Specced),
@@ -161,9 +168,7 @@ pub fn parse_status(s: &str) -> Result<SubjectStatus, String> {
         "verifying" => Ok(SubjectStatus::Verifying),
         "shipped" => Ok(SubjectStatus::Shipped),
         "retired" => Ok(SubjectStatus::Retired),
-        _ => Err(format!(
-            "unknown subject move `{s}` (expected one of: proposed, specced, building, verifying, shipped, retired)"
-        )),
+        _ => Err(SubjectMoveError::Unknown(s.to_string())),
     }
 }
 
@@ -762,12 +767,20 @@ pub(crate) fn adopt_command(change_id: &ChangeId, subject_id: &SubjectId) -> Str
 
 /// A failed [`persist_adoption`]: the store error, and whether the
 /// subject record had already been written when the change write failed.
+#[derive(Debug, thiserror::Error)]
+#[error("{source}")]
 pub(crate) struct AdoptionWriteError {
     pub(crate) subject_written: bool,
-    pub(crate) message: String,
+    /// The tier registry or store error that stopped the write.
+    #[source]
+    source: Box<dyn std::error::Error + Send + Sync>,
 }
 
 impl AdoptionWriteError {
+    fn new(subject_written: bool, source: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self { subject_written, source: Box::new(source) }
+    }
+
     /// The operator-facing message (no command prefix). Before any write:
     /// the error and that nothing was written. Between the two writes:
     /// which record exists, and `repair`, the command that completes the
@@ -778,10 +791,10 @@ impl AdoptionWriteError {
                 "subject `{}` now lists change `{}`, but the change record could not be written: {}; complete the link with `{repair}`",
                 subject_id.as_str(),
                 change_id.as_str(),
-                self.message
+                self.source
             )
         } else {
-            format!("failed to record the adoption: {}; nothing was written", self.message)
+            format!("failed to record the adoption: {}; nothing was written", self.source)
         }
     }
 }
@@ -823,19 +836,19 @@ pub(crate) fn persist_adoption(repo: &Path, mut change: Change, mut subject: Sub
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = resolve_canon_yaml(&repo);
     let registry = registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject])
-        .map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
+        .map_err(|e| AdoptionWriteError::new(false, e))?;
 
     let now = Utc::now();
     if needs_subject {
         subject.change_ids.push(change.change_id.clone());
         subject.envelope.at = now;
-        registry.persist(&subject).map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
+        registry.persist(&subject).map_err(|e| AdoptionWriteError::new(false, e))?;
     }
     if needs_change {
         change.subject_ids.push(subject.subject_id.clone());
         change.envelope.at = now;
         change.envelope.schema = RecordKind::Change.schema_version();
-        registry.persist(&change).map_err(|e| AdoptionWriteError { subject_written: needs_subject, message: e.to_string() })?;
+        registry.persist(&change).map_err(|e| AdoptionWriteError::new(needs_subject, e))?;
     }
     Ok((subject, change, true))
 }
@@ -850,13 +863,13 @@ fn preview_adoption(repo: &Path, mut change: Change, mut subject: Subject) -> Re
     }
     let repo = resolve_repo_root(repo);
     let registry = registry_for(&resolve_canon_yaml(&repo), &[RecordKind::Change, RecordKind::Subject])
-        .map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
+        .map_err(|e| AdoptionWriteError::new(false, e))?;
     if needs_subject {
-        registry.check_persist::<Subject>().map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
+        registry.check_persist::<Subject>().map_err(|e| AdoptionWriteError::new(false, e))?;
         subject.change_ids.push(change.change_id.clone());
     }
     if needs_change {
-        registry.check_persist::<Change>().map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
+        registry.check_persist::<Change>().map_err(|e| AdoptionWriteError::new(false, e))?;
         change.subject_ids.push(subject.subject_id.clone());
     }
     Ok((subject, change, true))
@@ -1389,6 +1402,22 @@ fn brief_gap(repo: &Path, subject: &Subject, changes: &[ChangeId], transition: &
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_value_parsers_and_the_adoption_error_read_as_before() {
+        assert_eq!(parse_status("sideways").unwrap_err().to_string(), "unknown subject move `sideways` (expected one of: proposed, specced, building, verifying, shipped, retired)");
+        assert_eq!(parse_subject_id("Bad Id").unwrap_err().to_string(), format!("invalid SubjectId: \"Bad Id\" does not match grammar `{}`", SubjectId::GRAMMAR));
+        assert_eq!(parse_change_id("Bad Id").unwrap_err().to_string(), format!("invalid ChangeId: \"Bad Id\" does not match grammar `{}`", ChangeId::GRAMMAR));
+        let change = ChangeId::parse("c").unwrap();
+        let subject = SubjectId::parse("s").unwrap();
+        let cause = || std::io::Error::other("disk full");
+        let before = AdoptionWriteError::new(false, cause());
+        assert_eq!(before.to_string(), "disk full");
+        assert!(std::error::Error::source(&before).is_some());
+        assert_eq!(before.describe(&change, &subject, "fix"), "failed to record the adoption: disk full; nothing was written");
+        let between = AdoptionWriteError::new(true, cause());
+        assert_eq!(between.describe(&change, &subject, "fix"), "subject `s` now lists change `c`, but the change record could not be written: disk full; complete the link with `fix`");
+    }
 
     #[test]
     fn the_forward_chain_and_the_reopen_are_the_only_paths() {

@@ -248,7 +248,7 @@ fn fabricated(violations: &[Violation]) -> CliError {
 fn bind_refusal(error: &crate::evidence_attach::BindError) -> CliError {
     use crate::evidence_attach::BindError;
     match error {
-        BindError::Usage { message, hint, field } => {
+        BindError::Usage { message, hint, field, .. } => {
             let refusal = CliError::refused("EVIDENCE_BIND_REFUSED", message.as_str()).hint(hint.as_str());
             match field {
                 Some(flag) => refusal.field(*flag),
@@ -322,13 +322,30 @@ pub fn verdict_parser() -> impl clap::builder::TypedValueParser<Value = Evidence
     crate::cli_error::closed_set(["faithful", "not-applicable", "divergent"], parse_verdict)
 }
 
+/// A `canon evidence add` value that no parser accepts.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum EvidenceArgError {
+    /// `--verdict` outside the three verdicts.
+    #[error("`{0}` is not an evidence verdict — expected one of: faithful, not-applicable, divergent")]
+    UnknownVerdict(String),
+    /// A `--surface-ref` that is empty, padded or multi-line.
+    #[error("surface refs must be non-empty, trimmed, and contain no line separators or NUL")]
+    SurfaceRefMalformed,
+    /// An `effect:` ref whose slug is not kebab-case.
+    #[error("effect surface refs must use `effect:<kebab-slug>`")]
+    EffectRefMalformed,
+    /// A path ref that is absolute or leaves the repository.
+    #[error("path surface refs must be repository-relative and stay inside the repository")]
+    PathRefOutside,
+}
+
 /// `--verdict`'s clap `value_parser`.
-pub fn parse_verdict(s: &str) -> Result<EvidenceVerdict, String> {
+pub fn parse_verdict(s: &str) -> Result<EvidenceVerdict, EvidenceArgError> {
     match s {
         "faithful" => Ok(EvidenceVerdict::Faithful),
         "not-applicable" => Ok(EvidenceVerdict::NotApplicable),
         "divergent" => Ok(EvidenceVerdict::Divergent),
-        other => Err(format!("`{other}` is not an evidence verdict — expected one of: faithful, not-applicable, divergent")),
+        other => Err(EvidenceArgError::UnknownVerdict(other.to_string())),
     }
 }
 
@@ -336,19 +353,19 @@ pub fn parse_verdict(s: &str) -> Result<EvidenceVerdict, String> {
 /// `effect:<kebab-slug>` form; all other refs are repository-relative paths.
 /// This validates shape only — the CLI still records an attestation, not
 /// proof that the caller's ref equals the changed paths.
-pub fn parse_surface_ref(s: &str) -> Result<String, String> {
+pub fn parse_surface_ref(s: &str) -> Result<String, EvidenceArgError> {
     if s.is_empty() || s.trim() != s || s.contains('\n') || s.contains('\r') || s.contains('\0') {
-        return Err("surface refs must be non-empty, trimmed, and contain no line separators or NUL".to_string());
+        return Err(EvidenceArgError::SurfaceRefMalformed);
     }
     if let Some(effect) = s.strip_prefix("effect:") {
         if effect.is_empty() || !effect.split('-').all(|part| !part.is_empty() && part.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit())) {
-            return Err("effect surface refs must use `effect:<kebab-slug>`".to_string());
+            return Err(EvidenceArgError::EffectRefMalformed);
         }
         return Ok(s.to_string());
     }
     let path = std::path::Path::new(s);
     if path.is_absolute() || path.components().any(|component| matches!(component, std::path::Component::ParentDir | std::path::Component::RootDir | std::path::Component::Prefix(_))) {
-        return Err("path surface refs must be repository-relative and stay inside the repository".to_string());
+        return Err(EvidenceArgError::PathRefOutside);
     }
     Ok(s.to_string())
 }
@@ -623,9 +640,9 @@ fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<ApprovalB
     if let Some(task) = &args.task_id {
         crate::dispatch::validate_task_binding(repo, task).map_err(|error| error.to_string())?;
     }
-    let mut surface = canon_gate::risk::artifact_changed_paths(repo, &args.artifact_sha)?;
+    let mut surface = canon_gate::risk::artifact_changed_paths(repo, &args.artifact_sha).map_err(|error| error.to_string())?;
     for value in &args.surface_ref {
-        parse_surface_ref(value)?;
+        parse_surface_ref(value).map_err(|error| error.to_string())?;
         if value.starts_with("effect:") {
             surface.push(value.clone());
         }
@@ -762,7 +779,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&args.full(), args.json);
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&args.full(), args.json);
         }
     };
 
@@ -1025,7 +1042,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
             }
         };
         if let Err(error) = verify_risk_approval(&payload, &signature, approver, &allowed_signers) {
-            return CliError::failed("EVIDENCE_APPROVAL_INVALID", error.clone()).hint("sign the exact bytes `canon evidence approval-payload` prints with a key listed in the policy's allowed_signers, then record the approval again").emit(&args.full(), args.json);
+            return CliError::failed("EVIDENCE_APPROVAL_INVALID", error.to_string()).hint("sign the exact bytes `canon evidence approval-payload` prints with a key listed in the policy's allowed_signers, then record the approval again").emit(&args.full(), args.json);
         }
         let Ok(signature) = String::from_utf8(signature) else {
             return CliError::refused("EVIDENCE_APPROVAL_INVALID", "detached signature must be UTF-8 armored SSH signature text").hint("sign the bytes `canon evidence approval-payload` prints with `ssh-keygen -Y sign` and pass the armored output as --signature-file").emit(&args.full(), args.json);
@@ -1647,7 +1664,7 @@ fn repin_command(review: &Review) -> String {
 /// gate's question, and a superseded record's lost file never does. `2`
 /// when the ledger cannot be read or a write fails.
 pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) -> u8 {
-    use canon_gate::artifact_store::{working_tree_path, ArtifactStore, Observed, StoreError, StoreLock, StoreOutcome, MIB};
+    use canon_gate::artifact_store::{working_tree_path, ArtifactStore, ArtifactStoreError, Observed, StoreLock, StoreOutcome, MIB};
 
     let repo = resolve_repo_root(repo);
     // The gate's own context, so the reviews vaulted are exactly the ones
@@ -1725,7 +1742,7 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
         match outcome {
             Ok(StoreOutcome::Stored) => stored.push(format!("{} <- {path}", store.display(sha256))),
             Ok(StoreOutcome::AlreadyStored) => already += 1,
-            Err(StoreError::Changed { actual, .. }) => missing.push(format!("{path} (recorded sha256 {sha256}): working tree: {actual}")),
+            Err(ArtifactStoreError::Changed { actual, .. }) => missing.push(format!("{path} (recorded sha256 {sha256}): working tree: {actual}")),
             Err(e) => {
                 return CliError::refused("ARTIFACTS_STORE_FAILED", format!("could not write {}: {e}", store.display(sha256))).hint(e.hint()).emit("canon artifacts store", json);
             }
@@ -1798,6 +1815,14 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+
+    #[test]
+    fn the_value_parsers_refuse_in_their_old_words() {
+        assert_eq!(parse_verdict("maybe").unwrap_err().to_string(), "`maybe` is not an evidence verdict — expected one of: faithful, not-applicable, divergent");
+        assert_eq!(parse_surface_ref(" x").unwrap_err().to_string(), "surface refs must be non-empty, trimmed, and contain no line separators or NUL");
+        assert_eq!(parse_surface_ref("effect:Bad").unwrap_err().to_string(), "effect surface refs must use `effect:<kebab-slug>`");
+        assert_eq!(parse_surface_ref("../x").unwrap_err().to_string(), "path surface refs must be repository-relative and stay inside the repository");
+    }
 
     /// The smallest repo `canon evidence add` → `canon gate promote` →
     /// `canon task done` can actually run against: one configured
@@ -2009,7 +2034,7 @@ mod tests {
             let verdict = parse_verdict(slug).expect("an accepted spelling");
             assert_eq!(verdict_slug(verdict), slug);
         }
-        let err = parse_verdict("passing").expect_err("an unknown verdict is refused");
+        let err = parse_verdict("passing").expect_err("an unknown verdict is refused").to_string();
         assert!(err.contains("faithful"), "the refusal must name the domain: {err}");
     }
 

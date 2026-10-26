@@ -1037,7 +1037,7 @@ mod tests {
         TierPolicy::from_yaml_at(&text, dir.path()).unwrap();
         crate::inventory::load_spec_roots(&canon_yaml_path).unwrap();
         crate::plans::load_plan_sources_from_config(&canon_yaml_path, dir.path()).unwrap();
-        assert_eq!(crate::write_mode::configured_promote_mode(&canon_yaml_path), Ok(crate::write_mode::PromoteMode::Auto), "a new repo promotes on write");
+        assert_eq!(crate::write_mode::configured_promote_mode(&canon_yaml_path).unwrap(), crate::write_mode::PromoteMode::Auto, "a new repo promotes on write");
     }
 
     fn has_every_gitignore_line(text: &str) -> bool {

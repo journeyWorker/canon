@@ -247,7 +247,7 @@ fn parse_partitioned_record(record: &LedgerRecord, kind: &str, components: &[Str
     if components[2] != format!("{}.json", scenario.as_str()) {
         return None;
     }
-    let at = parse_at(record.at.as_deref()?).ok()?;
+    let at = parse_at(record.at.as_deref()?)?;
 
     let event_kind = match kind {
         "review" => ArtifactEventKind::ReviewPromotion,
@@ -296,8 +296,8 @@ fn area_of(scenario: &ScenarioId) -> String {
     scenario.as_str().split('.').next().expect("ScenarioId grammar guarantees at least one dot-segment").to_string()
 }
 
-fn parse_at(raw: &str) -> Result<DateTime<Utc>, ()> {
-    DateTime::parse_from_rfc3339(raw).map(|dt| dt.with_timezone(&Utc)).map_err(|_err| ())
+fn parse_at(raw: &str) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(raw).ok().map(|dt| dt.with_timezone(&Utc))
 }
 
 /// Resolve a `run`/`drill` record's timestamp: prefer the record's own
@@ -309,7 +309,7 @@ fn parse_at(raw: &str) -> Result<DateTime<Utc>, ()> {
 /// timestamp source, not a second required field.
 fn resolve_at(raw: Option<&str>, path: &Path) -> Option<DateTime<Utc>> {
     if let Some(raw) = raw {
-        if let Ok(at) = parse_at(raw) {
+        if let Some(at) = parse_at(raw) {
             return Some(at);
         }
     }

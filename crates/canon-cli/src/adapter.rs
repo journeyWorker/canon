@@ -140,6 +140,12 @@ pub enum AdapterError {
     Json(#[from] serde_json::Error),
     #[error("adapter response validation failed: {0}")]
     Validation(String),
+    #[error("adapter response validation failed: {label} must be an RFC3339 timestamp")]
+    Timestamp {
+        label: String,
+        #[source]
+        source: chrono::ParseError,
+    },
     #[error("cannot read adapter response `{path}`: {source}")]
     Io { path: String, source: std::io::Error },
 }
@@ -295,10 +301,9 @@ fn validate_telemetry(telemetry: &AdapterTelemetry) -> Result<(), AdapterError> 
     Ok(())
 }
 
-#[expect(clippy::map_err_ignore, reason = "`AdapterError::Validation` carries a message only; the timestamp parser's detail is not part of the pinned wording")]
 fn parse_timestamp(label: &str, value: &str) -> Result<DateTime<FixedOffset>, AdapterError> {
     DateTime::parse_from_rfc3339(value)
-        .map_err(|_| AdapterError::Validation(format!("{label} must be an RFC3339 timestamp")))
+        .map_err(|source| AdapterError::Timestamp { label: label.to_string(), source })
 }
 
 /// Parse and validate an adapter response from UTF-8 JSON.
@@ -450,6 +455,13 @@ pub fn authorize_response<P: AsRef<Path>, R: AsRef<Path>>(response_path: P, repo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_bad_timestamp_reads_as_before_and_keeps_its_cause() {
+        let error = parse_timestamp("telemetry.started_at", "yesterday").unwrap_err();
+        assert_eq!(error.to_string(), "adapter response validation failed: telemetry.started_at must be an RFC3339 timestamp");
+        assert!(std::error::Error::source(&error).is_some());
+    }
 
     fn response() -> serde_json::Value {
         serde_json::json!({

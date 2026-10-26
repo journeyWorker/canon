@@ -27,7 +27,7 @@ use object_store::{Attribute, Attributes, GetOptions, ObjectStore, ObjectStoreEx
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use crate::policy::{BackendConfig, PolicyError, R2TierConfig, Rung, TierPolicy};
+use crate::policy::{BackendConfig, R2TierConfig, Rung, TierPolicy, TierPolicyError};
 use crate::r2_tier::R2Tier;
 use crate::tier::StoreError;
 
@@ -83,31 +83,25 @@ impl ArtifactsConfig {
     /// the tier policy. Any other `backend` must name a tier of
     /// `tiers:` whose backend is `s3`; `base` resolves the policy the
     /// way every other reader of `canon.yaml` does.
-    pub fn from_yaml_at(canon_yaml: &str, base: &std::path::Path) -> Result<Self, PolicyError> {
-        let root: YamlRoot = serde_yaml::from_str(canon_yaml).map_err(|e| PolicyError(e.to_string()))?;
+    pub fn from_yaml_at(canon_yaml: &str, base: &std::path::Path) -> Result<Self, TierPolicyError> {
+        let root: YamlRoot = serde_yaml::from_str(canon_yaml)?;
         let Some(block) = root.artifact_store else { return Ok(Self::local()) };
         let backend = block.backend.as_deref().unwrap_or("local");
         if backend == "local" {
             if block.prefix.is_some() {
-                return Err(PolicyError("canon.yaml `artifact_store.prefix` only applies to an object-store backend; set `artifact_store.backend` to the name of an s3 tier (e.g. `cold`) or drop the prefix".to_string()));
+                return Err(TierPolicyError::ArtifactPrefixWithoutObjectStore);
             }
             return Ok(Self::local());
         }
-        let rung = Rung::parse(backend).map_err(|_err| {
-            PolicyError(format!("canon.yaml `artifact_store.backend: {backend}` is neither `local` nor the name of a tier in `tiers:` (local/hot/cold)"))
-        })?;
+        let rung = Rung::parse(backend).map_err(|source| TierPolicyError::ArtifactBackendUnknown { backend: backend.to_string(), source: Box::new(source) })?;
         let policy = TierPolicy::from_yaml_at(canon_yaml, base)?;
         let config = match policy.tiers.get(&rung) {
             Some(BackendConfig::S3(cfg)) => cfg.clone(),
             Some(_) => {
-                return Err(PolicyError(format!(
-                    "canon.yaml `artifact_store.backend: {backend}` names tier `{backend}`, which is not an object store; artifacts live in an `s3` tier (`tiers.{backend}.backend: s3`) or `local`"
-                )))
+                return Err(TierPolicyError::ArtifactBackendNotObjectStore { backend: backend.to_string() })
             }
             None => {
-                return Err(PolicyError(format!(
-                    "canon.yaml `artifact_store.backend: {backend}` names tier `{backend}`, but `tiers:` declares no such tier; add `tiers.{backend}` with `backend: s3` or use `local`"
-                )))
+                return Err(TierPolicyError::ArtifactBackendUndeclared { backend: backend.to_string() })
             }
         };
         let prefix = normalize_prefix(block.prefix.as_deref().unwrap_or(DEFAULT_PREFIX))?;
@@ -117,14 +111,14 @@ impl ArtifactsConfig {
 
 /// `""` or a `/`-terminated relative key prefix with no empty, `.` or
 /// `..` segment.
-fn normalize_prefix(raw: &str) -> Result<String, PolicyError> {
+fn normalize_prefix(raw: &str) -> Result<String, TierPolicyError> {
     let trimmed = raw.trim_end_matches('/');
     if trimmed.is_empty() {
         return Ok(String::new());
     }
     let bad = trimmed.starts_with('/') || trimmed.contains('\\') || trimmed.split('/').any(|s| s.is_empty() || s == "." || s == "..");
     if bad {
-        return Err(PolicyError(format!("canon.yaml `artifact_store.prefix: {raw}` must be a relative key prefix such as `artifacts/` (no leading `/`, empty, `.` or `..` segment)")));
+        return Err(TierPolicyError::ArtifactPrefixInvalid { raw: raw.to_string() });
     }
     Ok(format!("{trimmed}/"))
 }
@@ -327,7 +321,7 @@ mod tests {
 
     const CANON_YAML: &str = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  cold: { backend: s3, bucket_env: CANON_R2_BUCKET, prefix: \"canon/\" }\n";
 
-    fn config(artifacts: &str) -> Result<ArtifactsConfig, PolicyError> {
+    fn config(artifacts: &str) -> Result<ArtifactsConfig, TierPolicyError> {
         ArtifactsConfig::from_yaml_at(&format!("{CANON_YAML}{artifacts}"), std::path::Path::new("."))
     }
 
@@ -335,6 +329,42 @@ mod tests {
     fn no_artifacts_block_or_backend_local_is_the_local_default() {
         assert!(matches!(config("").unwrap().backend, ArtifactsBackend::Local));
         assert!(matches!(config("artifact_store: { backend: local }\n").unwrap().backend, ArtifactsBackend::Local));
+    }
+
+    #[test]
+    fn artifact_config_errors_are_the_old_strings() {
+        let msg = |artifacts: &str| config(artifacts).unwrap_err().to_string();
+        assert_eq!(
+            msg("artifact_store: { backend: local, prefix: x/ }\n"),
+            "canon.yaml TierPolicy: canon.yaml `artifact_store.prefix` only applies to an object-store backend; set `artifact_store.backend` to the name of an s3 tier (e.g. `cold`) or drop the prefix"
+        );
+        let unknown = config("artifact_store: { backend: warm }\n").unwrap_err();
+        assert_eq!(
+            unknown.to_string(),
+            "canon.yaml TierPolicy: canon.yaml `artifact_store.backend: warm` is neither `local` nor the name of a tier in `tiers:` (local/hot/cold)"
+        );
+        assert!(std::error::Error::source(&unknown).is_some(), "the rung parse failure stays reachable as the cause");
+        assert_eq!(
+            msg("artifact_store: { backend: local-tier }\n"),
+            "canon.yaml TierPolicy: canon.yaml `artifact_store.backend: local-tier` is neither `local` nor the name of a tier in `tiers:` (local/hot/cold)"
+        );
+        assert_eq!(
+            msg("artifact_store: { backend: hot }\n"),
+            "canon.yaml TierPolicy: canon.yaml `artifact_store.backend: hot` names tier `hot`, but `tiers:` declares no such tier; add `tiers.hot` with `backend: s3` or use `local`"
+        );
+        let not_object_store = ArtifactsConfig::from_yaml_at(
+            "tiers:\n  hot: { backend: sqlite, path: h.db }\nartifact_store: { backend: hot }\n",
+            std::path::Path::new("."),
+        )
+        .unwrap_err();
+        assert_eq!(
+            not_object_store.to_string(),
+            "canon.yaml TierPolicy: canon.yaml `artifact_store.backend: hot` names tier `hot`, which is not an object store; artifacts live in an `s3` tier (`tiers.hot.backend: s3`) or `local`"
+        );
+        assert_eq!(
+            msg("artifact_store: { backend: cold, prefix: ../x }\n"),
+            "canon.yaml TierPolicy: canon.yaml `artifact_store.prefix: ../x` must be a relative key prefix such as `artifacts/` (no leading `/`, empty, `.` or `..` segment)"
+        );
     }
 
     #[test]

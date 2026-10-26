@@ -84,6 +84,6 @@ fn run_divergence_add(args: DivergenceAddArgs) -> ExitCode {
     };
     match crate::divergence::parse_status(&state, reason.as_deref(), expiry) {
         Ok(status) => ExitCode::from(crate::divergence::run_stage(&repo, &project_id, &scenario_id, &commit, status, round, &actor_id, detail.as_deref().unwrap_or_default(), &actor_id, &role, session.session_id.as_ref(), promote.flag(), json)),
-        Err(e) => ExitCode::from(CliError::refused("DIVERGENCE_INVALID_ARGUMENT", e.clone()).hint("`canon schema divergence add` lists the accepted arguments and their forms").emit("canon divergence add", json)),
+        Err(e) => ExitCode::from(CliError::refused("DIVERGENCE_INVALID_ARGUMENT", e.to_string()).hint("`canon schema divergence add` lists the accepted arguments and their forms").emit("canon divergence add", json)),
     }
 }

@@ -57,7 +57,7 @@ pub enum TierCliError {
     #[error("reading `{path}`: {source}")]
     ReadCanonYaml { path: String, source: std::io::Error },
     #[error("parsing `{path}`: {source}")]
-    Policy { path: String, source: canon_store::policy::PolicyError },
+    Policy { path: String, source: canon_store::policy::TierPolicyError },
     #[error(transparent)]
     Store(#[from] StoreError),
 }

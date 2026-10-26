@@ -60,6 +60,7 @@ use std::path::{Path, PathBuf};
 use canon_gate::freshness::current_pins;
 use canon_gate::spec_coverage::latest_scenarios;
 use canon_gate::{GateContext, GateCtx};
+use canon_model::ids::JoinKeyError;
 use canon_model::{Actor, ChangeId, Envelope, PinnedSpec, ProjectId, ProvenanceRef, RecordKind, Review, ReviewArtifact, ReviewPins, ReviewOutcome, RoleId, ScenarioId, SessionId};
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
@@ -72,21 +73,21 @@ use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 
 /// `--project-id`'s `clap` value parser.
-pub fn parse_project_id(s: &str) -> Result<ProjectId, String> {
-    ProjectId::parse(s).map_err(|e| e.to_string())
+pub fn parse_project_id(s: &str) -> Result<ProjectId, JoinKeyError> {
+    ProjectId::parse(s)
 }
 
 /// `--scenario-id`'s `clap` value parser.
-pub fn parse_scenario_id(s: &str) -> Result<ScenarioId, String> {
-    ScenarioId::parse(s).map_err(|e| e.to_string())
+pub fn parse_scenario_id(s: &str) -> Result<ScenarioId, JoinKeyError> {
+    ScenarioId::parse(s)
 }
 
 /// `--session-id`'s `clap` value parser, shared by every command that
 /// records an actor (`evidence add`, `review add`, `finding add|close`).
 /// The grammar is [`SessionId`]'s: one non-empty opaque token, no
 /// surrounding whitespace, no control characters.
-pub fn parse_session_id(s: &str) -> Result<SessionId, String> {
-    SessionId::parse(s).map_err(|e| e.to_string())
+pub fn parse_session_id(s: &str) -> Result<SessionId, JoinKeyError> {
+    SessionId::parse(s)
 }
 
 /// `--review-outcome`'s `clap` value parser: one of the three outcomes, so the spec lists them as `possibleValues`.
@@ -94,11 +95,18 @@ pub fn outcome_parser() -> impl clap::builder::TypedValueParser<Value = ReviewOu
     crate::cli_error::closed_set(ReviewOutcome::ALL.iter().map(|o| o.as_str()).collect::<Vec<_>>(), ReviewOutcome::parse)
 }
 
+/// `--reviewer-provider|model|harness` was not a clean label.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum RuntimeLabelError {
+    #[error("`{0}` is not a runtime label: it must be non-empty, without surrounding whitespace or control characters")]
+    Malformed(String),
+}
+
 /// `--reviewer-provider|model|harness`'s `clap` value parser: one
 /// non-empty label, no surrounding whitespace, no control characters.
-pub fn parse_runtime_label(s: &str) -> Result<String, String> {
+pub fn parse_runtime_label(s: &str) -> Result<String, RuntimeLabelError> {
     if s.is_empty() || s.trim() != s || s.chars().any(char::is_control) {
-        return Err(format!("`{s}` is not a runtime label: it must be non-empty, without surrounding whitespace or control characters"));
+        return Err(RuntimeLabelError::Malformed(s.to_string()));
     }
     Ok(s.to_string())
 }
@@ -445,6 +453,14 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+
+    #[test]
+    fn the_value_parsers_refuse_in_their_old_words() {
+        assert_eq!(parse_runtime_label(" x").unwrap_err().to_string(), "` x` is not a runtime label: it must be non-empty, without surrounding whitespace or control characters");
+        assert_eq!(parse_project_id("Bad Id").unwrap_err().to_string(), format!("invalid ProjectId: \"Bad Id\" does not match grammar `{}`", ProjectId::GRAMMAR));
+        assert_eq!(parse_scenario_id("nope").unwrap_err().to_string(), format!("invalid ScenarioId: \"nope\" does not match grammar `{}`", ScenarioId::GRAMMAR));
+        assert_eq!(parse_session_id("").unwrap_err().to_string(), format!("invalid SessionId: \"\" does not match grammar `{}`", SessionId::GRAMMAR));
+    }
 
     /// A repo whose `canon.yaml` configures the spec root `app-a`, the
     /// project id these tests write under (`--project-id` must name one).

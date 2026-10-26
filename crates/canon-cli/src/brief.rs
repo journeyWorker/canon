@@ -260,10 +260,9 @@ impl BriefStatus {
 /// sources (an absent `plans:` section falls back to the repo root).
 /// `Err` names why `canon.yaml`'s `plans:` section cannot be read; then
 /// no external proposal is found.
-pub fn plan_roots(repo: &Path) -> Result<Vec<PathBuf>, String> {
+pub fn plan_roots(repo: &Path) -> Result<Vec<PathBuf>, crate::plans::PlansError> {
     crate::plans::load_plan_sources_for_gate(repo)
         .map(|sources| sources.iter().filter(|source| source.dialect() == "openspec").map(|source| source.root().to_path_buf()).collect())
-        .map_err(|e| e.to_string())
 }
 
 /// `change`'s canon `brief.md` under `repo`'s `.canon/changes/`, a live
@@ -582,6 +581,14 @@ pub fn override_lines(ctx: &GateContext) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::approved_at;
+
+    #[test]
+    fn an_unreadable_plans_section_is_refused_in_its_old_words() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("canon.yaml"), "plans: 3\n").unwrap();
+        let message = super::plan_roots(dir.path()).unwrap_err().to_string();
+        assert!(message.starts_with("canon.yaml `plans:` section is malformed (fail-loud -- a silent fallback would scan zero sources while appearing configured): "), "{message}");
+    }
 
     #[test]
     fn the_approval_time_reads_as_a_time_or_a_date_and_never_from_the_note() {

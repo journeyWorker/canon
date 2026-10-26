@@ -35,7 +35,7 @@
 use std::path::{Path, PathBuf};
 
 use canon_gate::artifact_store::{
-    artifacts_config, bound_files, check_bound_files, is_sha256_hex, sha256_reader, store_dir, ArtifactStore, FileStatus, Observed, StoreError, StoreLock, StoreOutcome, OBJECT_STORE_HINT,
+    artifacts_config, bound_files, check_bound_files, is_sha256_hex, sha256_reader, store_dir, ArtifactStore, ArtifactStoreError, FileStatus, Observed, StoreLock, StoreOutcome, OBJECT_STORE_HINT,
 };
 use canon_gate::{GateContext, GateCtx};
 use canon_policy::SchemaRegistry;
@@ -55,9 +55,9 @@ const GITIGNORE_LINE: &str = ".canon/artifacts/";
 
 /// A refusal for a store that cannot be opened (an unusable `artifact_store:`
 /// block) or attached; the caller emits it under its own command.
-fn store_error(e: &StoreError) -> CliError {
+fn store_error(e: &ArtifactStoreError) -> CliError {
     let code = match e {
-        StoreError::Config(_) => "CONFIG_UNREADABLE",
+        ArtifactStoreError::Config(_) => "CONFIG_UNREADABLE",
         _ => "ARTIFACTS_STORE_UNREACHABLE",
     };
     CliError::refused(code, e.to_string()).hint(e.hint())
@@ -403,14 +403,14 @@ pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) 
     let (mut uploaded, mut already) = (0usize, 0usize);
     let mut uploads: Vec<&LocalBlob> = Vec::new();
     for blob in &verified {
-        let outcome = match std::fs::File::open(&blob.path).map_err(StoreError::from).and_then(|file| object.upload(&blob.digest, file)) {
+        let outcome = match std::fs::File::open(&blob.path).map_err(ArtifactStoreError::from).and_then(|file| object.upload(&blob.digest, file)) {
             Ok(outcome) => outcome,
-            Err(e @ (StoreError::Remote { .. } | StoreError::Unattached { .. })) => {
+            Err(e @ (ArtifactStoreError::Remote { .. } | ArtifactStoreError::Unattached { .. })) => {
                 return CliError::refused("ARTIFACTS_STORE_UNREACHABLE", format!("uploading {} failed after {uploaded} upload(s): {e}", store.display(&blob.digest)))
                     .hint(format!("{OBJECT_STORE_HINT}; no local blob was removed, and a second run resumes where this one stopped"))
                     .emit("canon artifacts move", json);
             }
-            Err(StoreError::Changed { actual, .. }) => {
+            Err(ArtifactStoreError::Changed { actual, .. }) => {
                 problems.push(format!("{}: its bytes changed while being read (now {actual}); it is not moved", blob.digest));
                 continue;
             }

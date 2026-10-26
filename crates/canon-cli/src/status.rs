@@ -684,7 +684,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     // index: the next step is writing features and scenarios, so each
     // subject gets its `scenario new … --subject-id` step below.
     let corpus_has_scenarios = || spec_roots.iter().any(|root| !scan_feature_corpus(&root.root).is_empty());
-    let promote_manual = crate::write_mode::configured_promote_mode(&repo.join("canon.yaml")) != Ok(crate::write_mode::PromoteMode::Auto);
+    let promote_manual = !matches!(crate::write_mode::configured_promote_mode(&repo.join("canon.yaml")), Ok(crate::write_mode::PromoteMode::Auto));
     let mut owners: Vec<(std::ops::Range<usize>, String)> = Vec::new();
     if scenarios.is_empty() && !subjects.is_empty() && corpus_has_scenarios() {
         warnings.push("the ledger holds no scenario records, so every subject reads as owning none".into());

@@ -124,11 +124,11 @@ impl FromPolicyValue for bool {
 
 impl FromPolicyValue for u32 {
     fn from_policy_value(value: &PolicyValue) -> Result<Self, PolicyResolveError> {
-        let mismatch = || PolicyResolveError::TypeMismatch { expected: "u32", got: format!("{value:?}") };
+        let out_of_range = |source| PolicyResolveError::OutOfRange { expected: "u32", got: format!("{value:?}"), source };
         match value {
-            PolicyValue::UInt(n) => u32::try_from(*n).map_err(|_err| mismatch()),
-            PolicyValue::Int(n) if *n >= 0 => u32::try_from(*n).map_err(|_err| mismatch()),
-            _ => Err(mismatch()),
+            PolicyValue::UInt(n) => u32::try_from(*n).map_err(out_of_range),
+            PolicyValue::Int(n) if *n >= 0 => u32::try_from(*n).map_err(out_of_range),
+            _ => Err(PolicyResolveError::TypeMismatch { expected: "u32", got: format!("{value:?}") }),
         }
     }
 }
@@ -188,6 +188,15 @@ pub enum PolicyResolveError {
     Eval(#[from] canon_policy::PolicyError),
     #[error("policy predicate resolved to a value not matching the field's expected type `{expected}` (got {got})")]
     TypeMismatch { expected: &'static str, got: String },
+    /// A number of the right kind that does not fit `expected`; same message as
+    /// [`PolicyResolveError::TypeMismatch`], with the conversion failure as its cause.
+    #[error("policy predicate resolved to a value not matching the field's expected type `{expected}` (got {got})")]
+    OutOfRange {
+        expected: &'static str,
+        got: String,
+        #[source]
+        source: std::num::TryFromIntError,
+    },
 }
 
 /// `staleness.max_commits_behind`/`staleness.surface_scoped`, each
@@ -415,19 +424,43 @@ fn resolve_risk_tiers(raw: Option<serde_yaml::Value>, diagnostics: &mut Vec<Poli
     }
     resolved
 }
+
+/// Why the policy-pinned allowed-signers file could not be resolved.
+#[derive(Debug, thiserror::Error)]
+pub enum AllowedSignersError {
+    #[error("read policy {}: {source}", path.display())]
+    Read {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("parse policy {}: {source}", path.display())]
+    Parse {
+        path: PathBuf,
+        #[source]
+        source: serde_yaml::Error,
+    },
+    #[error("policy {} must be a mapping", .0.display())]
+    NotMapping(PathBuf),
+    #[error("approval.allowed_signers must be a path string")]
+    NotPathString,
+    #[error("approval.allowed_signers must not be empty")]
+    Empty,
+}
+
 /// Resolve the policy-pinned SSH allowed-signers file. Supported spelling is
 /// `approval: { allowed_signers: path }`; `risk_approvals` and a top-level
 /// `allowed_signers` are accepted as compatibility aliases. A malformed
 /// policy is an error, never an absent verifier.
-pub fn allowed_signers_path(repo: &Path) -> Result<Option<PathBuf>, String> {
+pub fn allowed_signers_path(repo: &Path) -> Result<Option<PathBuf>, AllowedSignersError> {
     let path = repo.join(POLICY_YAML_RELATIVE_PATH);
     let content = match std::fs::read_to_string(&path) {
         Ok(content) => content,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(format!("read policy {}: {error}", path.display())),
+        Err(source) => return Err(AllowedSignersError::Read { path, source }),
     };
-    let value: serde_yaml::Value = serde_yaml::from_str(&content).map_err(|error| format!("parse policy {}: {error}", path.display()))?;
-    let mapping = value.as_mapping().ok_or_else(|| format!("policy {} must be a mapping", path.display()))?;
+    let value: serde_yaml::Value = serde_yaml::from_str(&content).map_err(|source| AllowedSignersError::Parse { path: path.clone(), source })?;
+    let mapping = value.as_mapping().ok_or_else(|| AllowedSignersError::NotMapping(path.clone()))?;
     let key = |name: &str| serde_yaml::Value::String(name.to_string());
     let configured = mapping
         .get(key("approval"))
@@ -436,9 +469,9 @@ pub fn allowed_signers_path(repo: &Path) -> Result<Option<PathBuf>, String> {
         .and_then(|map| map.get(key("allowed_signers")))
         .or_else(|| mapping.get(key("allowed_signers")));
     let Some(configured) = configured else { return Ok(None) };
-    let configured = configured.as_str().ok_or_else(|| "approval.allowed_signers must be a path string".to_string())?;
+    let configured = configured.as_str().ok_or(AllowedSignersError::NotPathString)?;
     if configured.trim().is_empty() {
-        return Err("approval.allowed_signers must not be empty".into());
+        return Err(AllowedSignersError::Empty);
     }
     let path = PathBuf::from(configured);
     Ok(Some(if path.is_absolute() { path } else { repo.join(path) }))
@@ -1131,6 +1164,34 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+
+    #[test]
+    fn u32_out_of_range_keeps_the_type_mismatch_message_and_its_cause() {
+        let too_big = PolicyValue::UInt(u64::from(u32::MAX) + 1);
+        let err = u32::from_policy_value(&too_big).unwrap_err();
+        assert_eq!(err.to_string(), format!("policy predicate resolved to a value not matching the field's expected type `u32` (got {too_big:?})"));
+        assert!(std::error::Error::source(&err).is_some());
+    }
+
+    fn allowed_signers_error(policy_yaml: &str) -> (String, std::path::PathBuf) {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join(POLICY_YAML_RELATIVE_PATH);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, policy_yaml).unwrap();
+        (allowed_signers_path(dir.path()).unwrap_err().to_string(), path)
+    }
+
+    #[test]
+    fn allowed_signers_path_errors_keep_their_messages() {
+        let (message, path) = allowed_signers_error("- not\n- a\n- mapping\n");
+        assert_eq!(message, format!("policy {} must be a mapping", path.display()));
+        let (message, _) = allowed_signers_error("approval: { allowed_signers: [1] }\n");
+        assert_eq!(message, "approval.allowed_signers must be a path string");
+        let (message, _) = allowed_signers_error("approval: { allowed_signers: \"  \" }\n");
+        assert_eq!(message, "approval.allowed_signers must not be empty");
+        let (message, path) = allowed_signers_error("approval: [unterminated\n");
+        assert!(message.starts_with(&format!("parse policy {}: ", path.display())), "{message}");
+    }
 
     fn fixture_record(verdict: &str, at: DateTime<Utc>) -> serde_json::Value {
         json!({

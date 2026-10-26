@@ -130,7 +130,7 @@ pub mod write;
 
 pub use config::{DemotionConfig, LearnConfig, PromotionMode, PromotionRoleConfig};
 pub use distill::{distill_namespace, distill_trajectory};
-pub use error::LearnError;
+pub use error::{LearnError, PromotionEvidenceError};
 pub use guidance::{DEFAULT_K, manifest_guidance_for_replay, retrieve_first_nonempty, retrieve_guidance};
 pub use ids::{StrategyId, StrategyIdentity, TrajectoryId};
 pub use mark_verdict::mark_trajectory_verdict;

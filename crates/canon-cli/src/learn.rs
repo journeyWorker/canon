@@ -67,8 +67,8 @@ use crate::context::resolve_repo_root;
 /// clap `value_parser` for the positional `<strategy_id>` — a ULID
 /// ([`canon_learn::StrategyId::parse`]); a malformed id is a clap usage
 /// error (exit `2`), never reaching [`run_promote`].
-pub fn parse_strategy_id(s: &str) -> Result<StrategyId, String> {
-    StrategyId::parse(s).map_err(|e| e.to_string())
+pub fn parse_strategy_id(s: &str) -> Result<StrategyId, LearnError> {
+    StrategyId::parse(s)
 }
 
 /// `canon strategy promote <strategy_id> [--repo <dir>] [--dry-run]`.
@@ -475,4 +475,14 @@ fn promotion_decision(
         PromotionMode::Occurrence => evaluate_now(&OccurrencePromotionGate::from_config(promotion_config), &item.regime_key, &samples),
     };
     Ok(Some(decision))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_malformed_strategy_id_is_refused_in_its_old_words() {
+        assert_eq!(parse_strategy_id("nope").unwrap_err().to_string(), "invalid id \"nope\": invalid length");
+    }
 }

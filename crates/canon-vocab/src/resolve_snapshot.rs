@@ -47,7 +47,7 @@ pub fn resolve_snapshot(project_dir: &Path, profile: Option<&str>) -> (Capabilit
     let project = match load_project(project_dir) {
         Ok(p) => p,
         Err(e) => {
-            diags.push(resolve_diag("E-PROJECT-MALFORMED", e));
+            diags.push(resolve_diag("E-PROJECT-MALFORMED", e.to_string()));
             None
         }
     };

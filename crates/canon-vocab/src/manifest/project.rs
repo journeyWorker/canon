@@ -52,18 +52,27 @@ fn plugin_options(value: &serde_yaml::Value) -> BTreeMap<String, Literal> {
     }
 }
 
+/// Why [`load_project`] could not produce a [`ProjectConfig`].
+#[derive(Debug, thiserror::Error)]
+pub enum ProjectConfigError {
+    #[error("cannot read {}: {source}", path.display())]
+    Read { path: PathBuf, #[source] source: std::io::Error },
+    #[error("invalid {}: {source}", path.display())]
+    Invalid { path: PathBuf, #[source] source: serde_yaml::Error },
+}
+
 /// Read `<project_dir>/canon.project.yaml` into a [`ProjectConfig`].
 /// Distinguishes an absent config (`Ok(None)`, legitimately resolves
 /// core-only) from a broken one (`Err`, so the caller surfaces it instead of
 /// silently mis-validating) from a valid one (`Ok(Some(cfg))`). Never panics.
-pub fn load_project(project_dir: &Path) -> Result<Option<ProjectConfig>, String> {
+pub fn load_project(project_dir: &Path) -> Result<Option<ProjectConfig>, ProjectConfigError> {
     let path = project_dir.join(PROJECT_YAML_RELATIVE_PATH);
     let text = match std::fs::read_to_string(&path) {
         Ok(t) => t,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(format!("cannot read {}: {e}", path.display())),
+        Err(source) => return Err(ProjectConfigError::Read { path, source }),
     };
-    let raw: RawProject = serde_yaml::from_str(&text).map_err(|e| format!("invalid {}: {e}", path.display()))?;
+    let raw: RawProject = serde_yaml::from_str(&text).map_err(|source| ProjectConfigError::Invalid { path, source })?;
 
     let mut profiles = BTreeMap::new();
     for (name, rp) in raw.profiles {
@@ -92,6 +101,29 @@ mod tests {
         let tmp = tempfile::TempDir::new().unwrap();
         std::fs::write(tmp.path().join(PROJECT_YAML_RELATIVE_PATH), "not: [valid").unwrap();
         load_project(tmp.path()).unwrap_err();
+    }
+
+    #[test]
+    fn invalid_project_yaml_error_string_matches_the_old_format() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join(PROJECT_YAML_RELATIVE_PATH);
+        std::fs::write(&path, "not: [valid").unwrap();
+        let yaml_err = serde_yaml::from_str::<RawProject>("not: [valid").unwrap_err();
+        let err = load_project(tmp.path()).unwrap_err();
+        assert_eq!(err.to_string(), format!("invalid {}: {yaml_err}", path.display()));
+        assert!(std::error::Error::source(&err).is_some());
+    }
+
+    #[test]
+    fn unreadable_project_yaml_error_string_matches_the_old_format() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join(PROJECT_YAML_RELATIVE_PATH);
+        // A directory at the config path: readable-by-name but not as a file.
+        std::fs::create_dir(&path).unwrap();
+        let io_err = std::fs::read_to_string(&path).unwrap_err();
+        let err = load_project(tmp.path()).unwrap_err();
+        assert_eq!(err.to_string(), format!("cannot read {}: {io_err}", path.display()));
+        assert!(std::error::Error::source(&err).is_some());
     }
 
     #[test]

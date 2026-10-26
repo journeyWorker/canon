@@ -244,6 +244,18 @@ impl CliError {
     }
 }
 
+/// `<CODE>: <message>`: the form for logs and `?` chains, without the command
+/// prefix or the hint. Every user-visible rendering goes through
+/// [`CliError::human`] or the envelope ([`CliError::body`]) instead, never
+/// through this.
+impl std::fmt::Display for CliError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.code, self.message)
+    }
+}
+
+impl std::error::Error for CliError {}
+
 /// What a `received` value may keep: argument names that carry secrets lose the
 /// whole value, `NAME=value` environment assignments keep only the name, and a
 /// token-shaped word (a well-known prefix, or 24 or more mixed-case letters and
@@ -282,7 +294,11 @@ pub fn redact(field: Option<&str>, received: &str) -> String {
 /// words. clap then knows the set: a bad value is refused with
 /// `possible values`, `canon schema` lists them as `possibleValues`, and the
 /// `--json` usage error carries them as `expected`.
-pub fn closed_set<T: Clone + Send + Sync + 'static>(values: impl Into<clap::builder::PossibleValuesParser>, parse: fn(&str) -> Result<T, String>) -> impl clap::builder::TypedValueParser<Value = T> {
+pub fn closed_set<T, E>(values: impl Into<clap::builder::PossibleValuesParser>, parse: fn(&str) -> Result<T, E>) -> impl clap::builder::TypedValueParser<Value = T>
+where
+    T: Clone + Send + Sync + 'static,
+    E: Into<Box<dyn std::error::Error + Send + Sync + 'static>> + 'static,
+{
     use clap::builder::TypedValueParser;
     clap::builder::PossibleValuesParser::new(values).try_map(move |word: String| parse(&word))
 }
@@ -496,5 +512,19 @@ mod fix_tests {
             assert_eq!(info.fix, info.fix.trim_end(), "{} fix ends in whitespace", info.code);
             assert!(!info.fix.contains("...") && !info.fix.contains('\u{2026}'), "{} fix has an ellipsis", info.code);
         }
+    }
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::CliError;
+
+    #[test]
+    fn display_is_code_and_message_only_and_leaves_the_human_form_alone() {
+        let error = CliError::refused("USAGE", "bad flag").hint("pass --x");
+        assert_eq!(error.to_string(), "USAGE: bad flag");
+        assert_eq!(error.human("canon x"), "canon x: USAGE — bad flag\nhint: pass --x");
+        let as_error: &dyn std::error::Error = &error;
+        assert!(as_error.source().is_none());
     }
 }

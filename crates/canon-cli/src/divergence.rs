@@ -28,6 +28,7 @@ use canon_model::{Actor, Divergence, DivergenceStatus, Envelope, ProjectId, Reco
 use canon_store::tier::Tier;
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
+use canon_model::ids::JoinKeyError;
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -35,16 +36,31 @@ use serde::Serialize;
 pub use crate::review::{parse_project_id, parse_scenario_id};
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
+use crate::timestamp::TimestampError;
 
 /// `--sha`'s `clap` value parser.
-pub fn parse_sha(s: &str) -> Result<Sha, String> {
-    Sha::parse(s).map_err(|e| e.to_string())
+pub fn parse_sha(s: &str) -> Result<Sha, JoinKeyError> {
+    Sha::parse(s)
 }
 
 /// `--expiry`'s and `--as-of`'s `clap` value parser: the shared `<TIMESTAMP>`
 /// grammar (RFC3339 or `YYYY-MM-DD`).
-pub fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, String> {
+pub fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, TimestampError> {
     crate::timestamp::parse(s)
+}
+
+/// `canon divergence add --state <state>` refused.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum DivergenceStateError {
+    /// `--state deferred` without `--reason`.
+    #[error("`--state deferred` requires `--reason`")]
+    DeferredNeedsReason,
+    /// `--state deferred` without `--expiry`.
+    #[error("`--state deferred` requires `--expiry`")]
+    DeferredNeedsExpiry,
+    /// A state that is none of the four.
+    #[error("unknown --state `{0}` (expected one of: open, still-divergent, resolved, deferred)")]
+    Unknown(String),
 }
 
 /// `canon divergence add --state <state>`'s state-string ->
@@ -52,17 +68,17 @@ pub fn parse_timestamp(s: &str) -> Result<DateTime<Utc>, String> {
 /// status, not only `Open`). `--reason`/`--expiry` are REQUIRED
 /// together only when `status == "deferred"` — an `Err` here is a
 /// usage refusal, never a synthesized reason/expiry.
-pub fn parse_status(status: &str, reason: Option<&str>, expiry: Option<DateTime<Utc>>) -> Result<DivergenceStatus, String> {
+pub fn parse_status(status: &str, reason: Option<&str>, expiry: Option<DateTime<Utc>>) -> Result<DivergenceStatus, DivergenceStateError> {
     match status {
         "open" => Ok(DivergenceStatus::Open),
         "still-divergent" => Ok(DivergenceStatus::StillDivergent),
         "resolved" => Ok(DivergenceStatus::Resolved),
         "deferred" => {
-            let reason = reason.ok_or("`--state deferred` requires `--reason`")?;
-            let expiry = expiry.ok_or("`--state deferred` requires `--expiry`")?;
+            let reason = reason.ok_or(DivergenceStateError::DeferredNeedsReason)?;
+            let expiry = expiry.ok_or(DivergenceStateError::DeferredNeedsExpiry)?;
             Ok(DivergenceStatus::Deferred { reason: reason.to_string(), expiry })
         }
-        other => Err(format!("unknown --state `{other}` (expected one of: open, still-divergent, resolved, deferred)")),
+        other => Err(DivergenceStateError::Unknown(other.to_string())),
     }
 }
 
@@ -191,7 +207,7 @@ pub fn run_stage(
     let promote = match crate::write_mode::should_promote(&repo, promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence add", json);
+            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence add", json);
         }
     };
     let gate_ctx = match GateCtx::from_repo(&repo) {
@@ -646,6 +662,15 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+
+    #[test]
+    fn the_value_parsers_refuse_in_their_old_words() {
+        assert_eq!(parse_status("bogus", None, None).unwrap_err().to_string(), "unknown --state `bogus` (expected one of: open, still-divergent, resolved, deferred)");
+        assert_eq!(parse_status("deferred", None, None).unwrap_err().to_string(), "`--state deferred` requires `--reason`");
+        assert_eq!(parse_status("deferred", Some("why"), None).unwrap_err().to_string(), "`--state deferred` requires `--expiry`");
+        assert_eq!(parse_timestamp("tomorrow").unwrap_err().to_string(), "invalid timestamp `tomorrow`: want RFC3339 or YYYY-MM-DD");
+        assert!(parse_sha("nope").unwrap_err().to_string().starts_with("invalid Sha: \"nope\" does not match grammar"));
+    }
 
     /// A repo whose `canon.yaml` configures the spec root `app-a`, the
     /// project id these tests write under (`--project-id` must name one).

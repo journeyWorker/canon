@@ -139,7 +139,7 @@ use canon_model::envelope::{CanonRecord, RecordKind};
 use canon_model::ids::{ChangeId, SubjectId};
 use canon_model::records::{Change, Task};
 use canon_store::cursor::{file_digest, CursorStore, SourceCursor};
-use canon_store::policy::{PolicyError, TierPolicy};
+use canon_store::policy::{TierPolicy, TierPolicyError};
 use canon_store::registry::TierRegistry;
 use canon_store::tier::StoreError;
 use schemars::JsonSchema;
@@ -159,7 +159,7 @@ pub enum PlansError {
     #[error("{0}")]
     Config(String),
     #[error(transparent)]
-    Policy(#[from] PolicyError),
+    Policy(#[from] TierPolicyError),
     #[error(transparent)]
     Store(#[from] StoreError),
 }

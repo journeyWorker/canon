@@ -516,11 +516,25 @@ pub struct DispatchMetadata {
     pub prompt_bundle: Option<PromptBundleSelection>,
 }
 
+/// A `canon dispatch` value that no parser accepts.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum DispatchArgError {
+    /// `--prompt-bundle` without an `@`.
+    #[error("prompt bundle must be NAME@VERSION")]
+    PromptBundleShape,
+    /// `--prompt-bundle` with an empty name or version, or a second `@`.
+    #[error("prompt bundle must be NAME@VERSION with non-empty name and version")]
+    PromptBundleParts,
+    /// `--status` other than `succeeded` or `failed`.
+    #[error("`{0}` is not a terminal run status — expected one of: succeeded, failed")]
+    UnknownRunStatus(String),
+}
+
 /// Parse the CLI's `name@version` prompt bundle selector.
-pub fn parse_prompt_bundle(value: &str) -> Result<PromptBundleSelection, String> {
-    let (name, version) = value.split_once('@').ok_or_else(|| "prompt bundle must be NAME@VERSION".to_string())?;
+pub fn parse_prompt_bundle(value: &str) -> Result<PromptBundleSelection, DispatchArgError> {
+    let (name, version) = value.split_once('@').ok_or(DispatchArgError::PromptBundleShape)?;
     if name.is_empty() || version.is_empty() || version.contains('@') {
-        return Err("prompt bundle must be NAME@VERSION with non-empty name and version".to_string());
+        return Err(DispatchArgError::PromptBundleParts);
     }
     Ok(PromptBundleSelection { name: name.to_string(), version: version.to_string() })
 }
@@ -926,16 +940,16 @@ pub fn run_begin(
 /// GRAMMAR check only — `<change_id>#<n>`. Whether such a task EXISTS
 /// is [`validate_task_binding`]'s job at dispatch time, against the
 /// live plan corpus, because clap has not resolved `--repo` yet.
-pub fn parse_task_id(s: &str) -> Result<TaskId, String> {
-    TaskId::parse(s).map_err(|e| e.to_string())
+pub fn parse_task_id(s: &str) -> Result<TaskId, canon_model::ids::JoinKeyError> {
+    TaskId::parse(s)
 }
 
 /// `--parent-run-id`'s and `--run-id`'s clap `value_parser`: the `RunId`
 /// grammar (a ULID). For `--parent-run-id` this is the ONLY check there
 /// is — see [`DispatchBinding::parent_run_id`] for why the parent's
 /// existence is deliberately not verified.
-pub fn parse_run_id(s: &str) -> Result<RunId, String> {
-    RunId::parse(s).map_err(|e| e.to_string())
+pub fn parse_run_id(s: &str) -> Result<RunId, canon_model::ids::JoinKeyError> {
+    RunId::parse(s)
 }
 
 /// `canon dispatch end --status`'s clap `value_parser`. The domain is
@@ -948,11 +962,11 @@ pub fn run_status_parser() -> impl clap::builder::TypedValueParser<Value = RunSt
 }
 
 /// A terminal run status, as `--status` spells it.
-pub fn parse_run_status(s: &str) -> Result<RunStatus, String> {
+pub fn parse_run_status(s: &str) -> Result<RunStatus, DispatchArgError> {
     match s {
         "succeeded" => Ok(RunStatus::Succeeded),
         "failed" => Ok(RunStatus::Failed),
-        other => Err(format!("`{other}` is not a terminal run status — expected one of: succeeded, failed")),
+        other => Err(DispatchArgError::UnknownRunStatus(other.to_string())),
     }
 }
 
@@ -1990,6 +2004,15 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+
+    #[test]
+    fn the_value_parsers_refuse_in_their_old_words() {
+        assert_eq!(parse_prompt_bundle("plain").unwrap_err().to_string(), "prompt bundle must be NAME@VERSION");
+        assert_eq!(parse_prompt_bundle("a@").unwrap_err().to_string(), "prompt bundle must be NAME@VERSION with non-empty name and version");
+        assert_eq!(parse_run_status("running").unwrap_err().to_string(), "`running` is not a terminal run status — expected one of: succeeded, failed");
+        assert_eq!(parse_task_id("nope").unwrap_err().to_string(), format!("invalid TaskId: \"nope\" does not match grammar `{}`", TaskId::GRAMMAR));
+        assert!(parse_run_id("nope").unwrap_err().to_string().starts_with("invalid RunId: \"nope\" does not match grammar"));
+    }
 
     /// A plan `Task` record's diff-relevant shape: its own id plus the
     /// ids it declares as antecedents.

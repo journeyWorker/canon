@@ -450,7 +450,7 @@ fn plan(repo: &Path, text: &str) -> Result<Plan, String> {
         plan.providers = Some(selection.providers);
     }
     plan.gitignore = crate::init::missing_gitignore_lines(repo).into_iter().map(|(_, line)| line).collect();
-    plan.legacy = crate::legacy::plan(repo)?;
+    plan.legacy = crate::legacy::plan(repo).map_err(|e| e.to_string())?;
     Ok(plan)
 }
 
@@ -806,7 +806,7 @@ fn render_config(text: &str, plan: &Plan, roots_done: usize, drop_source: bool) 
         }
     }
     if let Some(providers) = &plan.providers {
-        out = skills::rewrite_skills_section(&out, providers)?;
+        out = skills::rewrite_skills_section(&out, providers).map_err(|e| e.to_string())?;
     }
     Ok(out)
 }

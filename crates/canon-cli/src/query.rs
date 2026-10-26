@@ -69,11 +69,15 @@ pub struct QueryOutcome {
 /// [`kind_cli_name`] (e.g. `handoff`, `strategy_item`, `evidence`): the
 /// snake_case wire string of `canon.yaml`'s own `routing`/`aging` keys
 /// (`canon-store`'s `policy` module doc) without the `_record` suffix.
-pub fn parse_kind(s: &str) -> Result<RecordKind, String> {
-    RecordKind::ALL.into_iter().find(|k| kind_cli_name(*k) == s).ok_or_else(|| {
-        let known = RecordKind::ALL.iter().map(|k| kind_cli_name(*k)).collect::<Vec<_>>().join(", ");
-        format!("unknown record kind `{s}` (expected one of: {known})")
-    })
+pub fn parse_kind(s: &str) -> Result<RecordKind, RecordKindError> {
+    RecordKind::ALL.into_iter().find(|k| kind_cli_name(*k) == s).ok_or_else(|| RecordKindError::Unknown(s.to_string()))
+}
+
+/// `--kind` named no record kind.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum RecordKindError {
+    #[error("unknown record kind `{0}` (expected one of: {known})", known = RecordKind::ALL.iter().map(|k| kind_cli_name(*k)).collect::<Vec<_>>().join(", "))]
+    Unknown(String),
 }
 
 /// A record kind as `--kind` spells it: the wire string without the
@@ -107,8 +111,8 @@ pub fn purgeable_kind_parser() -> impl clap::builder::TypedValueParser<Value = R
 /// `--kind`) happens in [`validate_scope`], not here, so a malformed
 /// grammar and an inapplicable kind produce two distinctly-worded
 /// errors (design D5).
-pub fn parse_change_id(s: &str) -> Result<ChangeId, String> {
-    ChangeId::parse(s).map_err(|e| e.to_string())
+pub fn parse_change_id(s: &str) -> Result<ChangeId, canon_model::ids::JoinKeyError> {
+    ChangeId::parse(s)
 }
 
 const TASK_STATUSES: [&str; 2] = ["open", "done"];
@@ -932,6 +936,13 @@ pub fn format_human_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_value_parsers_refuse_in_their_old_words() {
+        let known = RecordKind::ALL.iter().map(|k| kind_cli_name(*k)).collect::<Vec<_>>().join(", ");
+        assert_eq!(parse_kind("bogus").unwrap_err().to_string(), format!("unknown record kind `bogus` (expected one of: {known})"));
+        assert_eq!(parse_change_id("Bad Id").unwrap_err().to_string(), format!("invalid ChangeId: \"Bad Id\" does not match grammar `{}`", ChangeId::GRAMMAR));
+    }
 
     fn event_outcome() -> QueryOutcome {
         QueryOutcome {

@@ -70,29 +70,29 @@ use sha2::{Digest, Sha256};
 
 use canon_learn::guidance::{retrieve_first_nonempty, retrieve_guidance};
 use canon_learn::{LearnConfig, ParquetStrategyStore};
-use canon_model::ids::regime_key;
+use canon_model::ids::{regime_key, JoinKeyError};
 use canon_model::{RegimeKey, RoleId, StrategyRef, SubjectId};
 
 use crate::context::resolve_repo_root;
 
 /// `--role`'s clap value parser.
-pub fn parse_role(s: &str) -> Result<RoleId, String> {
-    RoleId::parse(s).map_err(|e| e.to_string())
+pub fn parse_role(s: &str) -> Result<RoleId, JoinKeyError> {
+    RoleId::parse(s)
 }
 
 /// `--regime`'s `clap` value parser — the full `regime_key` string
 /// (`<role>/<repo>/<area>/<hash>`), the SAME canonical serialization
 /// S6's write side produces (design decision 1: "no second key
 /// derivation").
-pub fn parse_regime(s: &str) -> Result<RegimeKey, String> {
-    RegimeKey::parse(s).map_err(|e| e.to_string())
+pub fn parse_regime(s: &str) -> Result<RegimeKey, JoinKeyError> {
+    RegimeKey::parse(s)
 }
 
 /// `--subject-id`'s `clap` value parser — a [`SubjectId`] kebab slug (s36
 /// `subject-domain-loop`). Validated here so a malformed subject id is
 /// a clean clap usage error, never a silently-coerced regime segment.
-pub fn parse_subject(s: &str) -> Result<SubjectId, String> {
-    SubjectId::parse(s).map_err(|e| e.to_string())
+pub fn parse_subject(s: &str) -> Result<SubjectId, JoinKeyError> {
+    SubjectId::parse(s)
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -372,6 +372,13 @@ mod tests {
     use chrono::Utc;
 
     use super::*;
+
+    #[test]
+    fn the_value_parsers_refuse_in_their_old_words() {
+        assert_eq!(parse_role("Bad Role").unwrap_err().to_string(), format!("invalid RoleId: \"Bad Role\" does not match grammar `{}`", RoleId::GRAMMAR));
+        assert_eq!(parse_regime("nope").unwrap_err().to_string(), format!("invalid RegimeKey: \"nope\" does not match grammar `{}`", RegimeKey::GRAMMAR));
+        assert_eq!(parse_subject("Bad Subject").unwrap_err().to_string(), format!("invalid SubjectId: \"Bad Subject\" does not match grammar `{}`", SubjectId::GRAMMAR));
+    }
 
     fn role(s: &str) -> RoleId {
         RoleId::parse(s).unwrap()

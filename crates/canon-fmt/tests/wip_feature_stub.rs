@@ -53,7 +53,7 @@ fn an_unrelated_layout_grammar_cause_keeps_its_original_phrasing() {
     // tagged scenario present (so `resolve_feature` succeeds and the
     // violation comes from `layout_problem`'s path-shape check, a
     // completely different code path than the empty-stub detector,
-    // which only ever fires from the zero-scenario `Err(ResolveError)`
+    // which only ever fires from the zero-scenario `Err(FmtResolveError)`
     // arm).
     let text = format!("Feature: idolive hub\n{PROV}\n\n  @idolive.hub.01\n  Scenario: Opens the hub\n{PROV}\n    Given a step\n");
     write(dir.path(), "kind=feature/idolive-hub.feature", &text);

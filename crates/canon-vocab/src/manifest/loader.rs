@@ -25,14 +25,20 @@ pub struct LoadedPlugin {
     pub enums: BTreeMap<String, Vec<String>>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, thiserror::Error)]
 pub enum LoadError {
+    #[error("failed to load plugin.yaml in {dir}: {msg}")]
     Manifest { dir: String, msg: String },
+    #[error("failed to parse {file}: {msg}")]
     Parse { file: String, msg: String },
+    #[error("duplicate {kind} id `{id}`")]
     DuplicateId { kind: String, id: String },
+    #[error("export `{export}` points at a missing directory: {path}")]
     MissingExportDir { export: String, path: String },
+    #[error("failed to read {path}: {msg}")]
     Io { path: String, msg: String },
     /// A directive manifest bug ([`crate::manifest::schema::duplicate_attr_names`]).
+    #[error("directive `{directive}` declares attribute `{attr}` more than once")]
     DuplicateAttr { directive: String, attr: String },
 }
 
@@ -200,6 +206,25 @@ mod tests {
         let path = dir.join(rel);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, contents).unwrap();
+    }
+
+    #[test]
+    fn load_error_display_names_every_variant_and_leaves_debug_untouched() {
+        let cases = [
+            (LoadError::Manifest { dir: "d".into(), msg: "m".into() }, "failed to load plugin.yaml in d: m"),
+            (LoadError::Parse { file: "f.yaml".into(), msg: "m".into() }, "failed to parse f.yaml: m"),
+            (LoadError::DuplicateId { kind: "plugin".into(), id: "x".into() }, "duplicate plugin id `x`"),
+            (LoadError::MissingExportDir { export: "directives".into(), path: "p".into() }, "export `directives` points at a missing directory: p"),
+            (LoadError::Io { path: "p".into(), msg: "m".into() }, "failed to read p: m"),
+            (LoadError::DuplicateAttr { directive: "task".into(), attr: "desc".into() }, "directive `task` declares attribute `desc` more than once"),
+        ];
+        for (err, expected) in cases {
+            assert_eq!(err.to_string(), expected);
+            let as_error: &dyn std::error::Error = &err;
+            assert!(as_error.source().is_none());
+        }
+        // `resolve_snapshot` renders diagnostics with `{:?}`; that text is a user-visible byte-identity invariant.
+        assert_eq!(format!("{:?}", LoadError::Io { path: "p".into(), msg: "m".into() }), r#"Io { path: "p", msg: "m" }"#);
     }
 
     #[test]

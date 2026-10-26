@@ -13,7 +13,7 @@ use canon_model::family::{layout_problem, FamilyKind, LedgerKind};
 
 use crate::gherkin;
 use crate::report::{FmtFailureClass, FmtReport, Violation, PROVENANCE_FIX};
-use crate::resolve::{self, ResolveError};
+use crate::resolve;
 use crate::schema_registry::{self, SchemaCheck};
 use crate::sha::is_full_sha;
 use crate::util::{feature_files, pre_0_17_feature_file, pre_0_17_layout_detail, relative, walk_files, PRE_0_17_FEATURES_DIR};
@@ -96,8 +96,8 @@ fn check_ledger(root: &Path, report: &mut FmtReport) -> BTreeMap<PathBuf, BTreeS
                     report.violations.push(Violation::new(FmtFailureClass::LayoutGrammar, &rel, format!("{}: {}", v.expected, v.detail)));
                 }
             }
-            Err(ResolveError(detail)) => {
-                report.violations.push(Violation::new(FmtFailureClass::LayoutGrammar, &rel, detail));
+            Err(err) => {
+                report.violations.push(Violation::new(FmtFailureClass::LayoutGrammar, &rel, err.to_string()));
             }
         }
 
@@ -212,8 +212,8 @@ fn check_divergences(root: &Path, report: &mut FmtReport, ledger_backrefs: &BTre
                         report.violations.push(Violation::new(FmtFailureClass::LayoutGrammar, &rel, format!("{}: {}", v.expected, v.detail)));
                     }
                 }
-                Err(ResolveError(detail)) => {
-                    report.violations.push(Violation::new(FmtFailureClass::LayoutGrammar, &rel, detail));
+                Err(err) => {
+                    report.violations.push(Violation::new(FmtFailureClass::LayoutGrammar, &rel, err.to_string()));
                 }
             }
 
@@ -279,7 +279,8 @@ fn check_features(root: &Path, report: &mut FmtReport) {
                     report.violations.push(Violation::new(FmtFailureClass::LayoutGrammar, &rel, format!("{}: {}", v.expected, v.detail)));
                 }
             }
-            Err(ResolveError(detail)) => {
+            Err(err) => {
+                let detail = err.to_string();
                 let message = if is_fresh_feature_stub(&text, &scan) {
                     format!("empty feature stub (not yet a valid corpus entry): {detail}")
                 } else {
@@ -359,8 +360,8 @@ fn check_inventory(root: &Path, report: &mut FmtReport) {
                     report.violations.push(Violation::new(FmtFailureClass::LayoutGrammar, &rel, format!("{}: {}", v.expected, v.detail)));
                 }
             }
-            Err(ResolveError(detail)) => {
-                report.violations.push(Violation::new(FmtFailureClass::LayoutGrammar, &rel, detail));
+            Err(err) => {
+                report.violations.push(Violation::new(FmtFailureClass::LayoutGrammar, &rel, err.to_string()));
             }
         }
         check_envelope_keys(obj, &rel, report);

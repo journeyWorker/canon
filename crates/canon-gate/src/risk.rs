@@ -62,7 +62,7 @@ impl GateCheck for RiskApprovalCheck {
                 groups.entry((subject, record.project_id.as_ref().map(ToString::to_string))).or_default().push(record);
             }
         }
-        let mut changed_paths: BTreeMap<String, Result<Vec<String>, String>> = BTreeMap::new();
+        let mut changed_paths: BTreeMap<String, Option<Vec<String>>> = BTreeMap::new();
 
         groups
             .into_iter()
@@ -81,12 +81,12 @@ impl GateCheck for RiskApprovalCheck {
                     None => Vec::new(),
                 };
                 let analysis = match current.evidence_sha.as_ref() {
-                    None => Err("missing artifact Git SHA".to_string()),
+                    None => None,
                     // Groups of one generation share a commit: two git
                     // processes per commit, not per group.
-                    Some(sha) => changed_paths.entry(sha.to_string()).or_insert_with(|| artifact_changed_paths(&ctx.ctx.repo, sha)).clone(),
+                    Some(sha) => changed_paths.entry(sha.to_string()).or_insert_with(|| artifact_changed_paths(&ctx.ctx.repo, sha).ok()).clone(),
                 };
-                let analysis_known = analysis.is_ok();
+                let analysis_known = analysis.is_some();
                 let mut derived_surfaces = analysis.unwrap_or_default();
                 // Effects are supplemental; self-declared paths cannot hide
                 // security-sensitive changes present in the verified commit.
@@ -139,25 +139,41 @@ impl GateCheck for RiskApprovalCheck {
             .collect()
     }
 }
-pub fn artifact_changed_paths(repo: &Path, sha: &canon_model::Sha) -> Result<Vec<String>, String> {
+
+/// Why the paths a commit changed could not be derived.
+#[derive(Debug, thiserror::Error)]
+pub enum ArtifactPathsError {
+    #[error("resolve artifact SHA: {0}")]
+    Resolve(#[source] std::io::Error),
+    #[error("artifact SHA is not a commit: {0}")]
+    NotACommit(String),
+    #[error("derive artifact paths: {0}")]
+    Derive(#[source] std::io::Error),
+    #[error("cannot derive changed paths for artifact SHA: {0}")]
+    Underivable(String),
+    #[error("artifact path output is not UTF-8: {0}")]
+    NotUtf8(#[from] std::string::FromUtf8Error),
+}
+
+pub fn artifact_changed_paths(repo: &Path, sha: &canon_model::Sha) -> Result<Vec<String>, ArtifactPathsError> {
     let sha = sha.to_string();
     let resolved = Command::new("git")
         .arg("-C").arg(repo)
         .args(["rev-parse", "--verify", &format!("{sha}^{{commit}}")])
         .output()
-        .map_err(|error| format!("resolve artifact SHA: {error}"))?;
+        .map_err(ArtifactPathsError::Resolve)?;
     if !resolved.status.success() {
-        return Err(format!("artifact SHA is not a commit: {sha}"));
+        return Err(ArtifactPathsError::NotACommit(sha));
     }
     let output = Command::new("git")
         .arg("-C").arg(repo)
         .args(["diff-tree", "--root", "--no-commit-id", "-r", "-m", "--no-renames", "--name-only", &sha])
         .output()
-        .map_err(|error| format!("derive artifact paths: {error}"))?;
+        .map_err(ArtifactPathsError::Derive)?;
     if !output.status.success() {
-        return Err(format!("cannot derive changed paths for artifact SHA: {sha}"));
+        return Err(ArtifactPathsError::Underivable(sha));
     }
-    let text = String::from_utf8(output.stdout).map_err(|error| format!("artifact path output is not UTF-8: {error}"))?;
+    let text = String::from_utf8(output.stdout)?;
     let mut paths: Vec<String> = text.lines().map(str::trim).filter(|path| !path.is_empty()).map(str::to_string).collect();
     paths.sort_unstable();
     paths.dedup();
@@ -274,6 +290,18 @@ mod tests {
     use crate::context::GateCtx;
     use crate::policy::{PolicyField, PolicyResolution, StalenessPolicy};
     use super::*;
+
+    #[test]
+    fn artifact_changed_paths_errors_keep_their_messages() {
+        let sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let dir = tempfile::TempDir::new().unwrap();
+        let err = artifact_changed_paths(dir.path(), &Sha::parse(sha).unwrap()).unwrap_err();
+        assert_eq!(err.to_string(), format!("artifact SHA is not a commit: {sha}"));
+        assert_eq!(ArtifactPathsError::Underivable(sha.to_string()).to_string(), format!("cannot derive changed paths for artifact SHA: {sha}"));
+        let io = std::io::Error::other("boom");
+        assert_eq!(ArtifactPathsError::Resolve(io).to_string(), "resolve artifact SHA: boom");
+        assert_eq!(ArtifactPathsError::Derive(std::io::Error::other("boom")).to_string(), "derive artifact paths: boom");
+    }
 
     fn now() -> DateTime<Utc> {
         "2026-10-01T00:00:00Z".parse().unwrap()
