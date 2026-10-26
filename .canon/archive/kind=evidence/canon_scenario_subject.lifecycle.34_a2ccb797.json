@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "018-n2-impl",
+    "role": "implementer",
+    "session_id": "018-n2-impl"
+  },
+  "at": "2026-10-12T14:02:46.812532Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject subject_lifecycle_34_a_pre_0_18_change_reads_as_a_one_element_list_and_a_second_adopt_appends"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 35,
+  "scenario_id": "subject.lifecycle.34",
+  "schema": 1,
+  "staging_id": "a08a9f08491f",
+  "verdict": "faithful"
+}

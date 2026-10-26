@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-023",
+    "role": "implementer",
+    "session_id": "canon-impl-023-1"
+  },
+  "at": "2026-10-17T20:04:21.196924Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_batch evidence_add_83_any_refusal_refuses_the_whole_batch && cargo test -p canon-cli --lib evidence::tests::evidence_add_83_a_batch_that_fails_partway_leaves_nothing_behind"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 69,
+  "scenario_id": "evidence.add.83",
+  "schema": 1,
+  "staging_id": "aa48a1e23782",
+  "verdict": "faithful"
+}

@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-023",
+    "role": "implementer",
+    "session_id": "canon-impl-023-1"
+  },
+  "at": "2026-10-17T20:04:19.988793Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test write_path evidence_add_67_a_promoted_write_names_only_its_committed_record"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 68,
+  "scenario_id": "evidence.add.67",
+  "schema": 1,
+  "staging_id": "66e3f956f608",
+  "verdict": "faithful"
+}

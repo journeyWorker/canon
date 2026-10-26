@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "017-p2-impl",
+    "role": "implementer",
+    "session_id": "017-p2-impl"
+  },
+  "at": "2026-10-12T10:41:11.077472Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test init init_scaffolds_a_working_config_in_a_fresh_repo"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 19,
+  "scenario_id": "authoring.init.01",
+  "schema": 1,
+  "staging_id": "f12fd5bf99b5",
+  "verdict": "faithful"
+}

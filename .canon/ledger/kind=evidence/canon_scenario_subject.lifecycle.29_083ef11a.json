@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "018-n2-impl",
+    "role": "implementer",
+    "session_id": "018-n2-impl"
+  },
+  "at": "2026-10-12T14:02:42.527101Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject subject_lifecycle_29_a_shipped_subject_reopens_inside_its_approved_scope_and_records_why"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 30,
+  "scenario_id": "subject.lifecycle.29",
+  "schema": 1,
+  "staging_id": "4be7ad8bfe6a",
+  "verdict": "faithful"
+}

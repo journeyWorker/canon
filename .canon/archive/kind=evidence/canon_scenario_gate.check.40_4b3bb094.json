@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-023",
+    "role": "implementer",
+    "session_id": "canon-impl-023-1"
+  },
+  "at": "2026-10-17T20:04:22.655324Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject an_unmigrated_review_does_not_count_and_every_surface_names_migrate && cargo test -p canon-cli --test migrate_pins migrate_pins_01 && cargo test -p canon-gate --lib a_review_pinned_before_0_23_does_not_count_until_migrated"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 44,
+  "scenario_id": "gate.check.40",
+  "schema": 1,
+  "staging_id": "7dd1ef856b61",
+  "verdict": "faithful"
+}

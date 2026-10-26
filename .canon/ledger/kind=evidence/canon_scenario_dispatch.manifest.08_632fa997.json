@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-sb-f1",
+    "role": "implementer",
+    "session_id": "sb-f1-2026-10-26"
+  },
+  "at": "2026-10-26T13:00:59.886800168Z",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_dispatch_demo dispatch_manifest_08_adapter_authorize_reports_execution_authorized_when_the_policy_budget_covers_the_declared_capabilities"
+  },
+  "evidence_sha": "b5bb0837c492eabacbbdfeb303af3aa97bbbcc58",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 10,
+  "scenario_id": "dispatch.manifest.08",
+  "schema": 1,
+  "staging_id": "c3ad83f9477a",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

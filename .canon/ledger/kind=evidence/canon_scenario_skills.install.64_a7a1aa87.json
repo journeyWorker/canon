@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T17:02:10.947036608Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test skills_install skills_install_64"
+  },
+  "evidence_note": {
+    "summary": "skills_install: 1 passed, 39 filtered out, 0 failed @ 5df188d"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 44,
+  "scenario_id": "skills.install.64",
+  "schema": 1,
+  "staging_id": "98d563102383",
+  "verdict": "faithful"
+}

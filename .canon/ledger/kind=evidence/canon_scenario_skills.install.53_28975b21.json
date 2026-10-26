@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "017-p3-impl"
+  },
+  "at": "2026-10-12T10:41:15.574577Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test skills_install skills_install_53"
+  },
+  "evidence_note": {
+    "summary": "pre-0.17 repo: providers from the lock; check 0, doctor healthy, install unchanged, files byte-identical"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 25,
+  "scenario_id": "skills.install.53",
+  "schema": 1,
+  "staging_id": "7e1368db59c8",
+  "verdict": "faithful"
+}

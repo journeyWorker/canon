@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-sb-f2",
+    "role": "implementer",
+    "session_id": "sb-f2-2026-10-26"
+  },
+  "at": "2026-10-26T13:09:41.771992747Z",
+  "code_tree": "3d45c26a51c33ee4ffa26007ec25ba5978dbd691",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_storage_gate gate_check_106_gate_install_hooks_with_dry_run_reports_what_it_would_install_and_writes_nothing"
+  },
+  "evidence_sha": "7f9f15df9b2287e3743828cd184d6cdc3e83d05c",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 100,
+  "scenario_id": "gate.check.106",
+  "schema": 1,
+  "staging_id": "ef8f197c5d91",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

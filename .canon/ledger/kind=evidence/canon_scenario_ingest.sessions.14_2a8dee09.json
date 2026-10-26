@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-3"
+  },
+  "at": "2026-10-23T15:39:39.635121463Z",
+  "code_tree": "9baa0e0a3d5d2d041b671df81a4940cfa73ac977",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test ingest capture_privacy"
+  },
+  "evidence_note": {
+    "summary": "ingest capture_privacy: 2 passed, 0 failed, 4 filtered out @ 500f8e29"
+  },
+  "evidence_sha": "500f8e296652e95a103b94289d04c7e8654f0a6c",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 18,
+  "scenario_id": "ingest.sessions.14",
+  "schema": 1,
+  "staging_id": "1f68d82c0361",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

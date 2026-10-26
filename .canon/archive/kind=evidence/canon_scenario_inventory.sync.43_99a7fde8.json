@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-2"
+  },
+  "at": "2026-10-23T14:25:34.925455345Z",
+  "code_tree": "54e8398434596ae2a031bdb2368efe1b8b19aff3",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test write_path a_deleted_scenario_is_removed_the_same_way_by_a_refresh_and_by_a_full_sync"
+  },
+  "evidence_note": {
+    "summary": "write_path a_deleted_scenario_is_removed_the_same_way_by_a_refresh_and_by_a_full: 1 passed, 0 failed, 16 filtered out @ 271f2054"
+  },
+  "evidence_sha": "271f205407c281f5b00a7f62309c3f24a7fdb5bc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 39,
+  "scenario_id": "inventory.sync.43",
+  "schema": 1,
+  "staging_id": "1b8d979c9adf",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

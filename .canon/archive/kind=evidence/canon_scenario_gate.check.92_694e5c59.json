@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "m5-impl"
+  },
+  "at": "2026-10-11T16:35:34.336816Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test legacy_pins a_legacy_review_older_than_its_scenarios_evidence_is_stale; cargo test -p canon-gate a_legacy_review_is_current_stale_or_undecidable"
+  },
+  "evidence_note": {
+    "summary": "evidence newer than the legacy review: stale"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 39,
+  "scenario_id": "gate.check.92",
+  "schema": 1,
+  "staging_id": "6d90d35b6212",
+  "verdict": "faithful"
+}

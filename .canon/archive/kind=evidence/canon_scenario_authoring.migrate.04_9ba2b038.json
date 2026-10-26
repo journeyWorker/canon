@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "017-p4-impl",
+    "role": "implementer",
+    "session_id": "017-p4-impl"
+  },
+  "at": "2026-10-12T11:49:45.909343Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test migrate authoring_migrate_04_an_existing_destination_is_refused"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 4,
+  "scenario_id": "authoring.migrate.04",
+  "schema": 1,
+  "staging_id": "c2c7a805a55a",
+  "verdict": "faithful"
+}

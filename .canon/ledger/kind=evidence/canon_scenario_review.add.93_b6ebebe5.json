@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-2"
+  },
+  "at": "2026-10-23T14:26:47.824195881Z",
+  "code_tree": "54e8398434596ae2a031bdb2368efe1b8b19aff3",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec028_a review_scenario_93_an_object_is_one_report_and_an_array_is_a_batch"
+  },
+  "evidence_note": {
+    "summary": "spec028_a review_scenario_93_an_object_is_one_report_and_an_array_is_a_batch: 1 passed, 0 failed, 13 filtered out @ 271f2054"
+  },
+  "evidence_sha": "271f205407c281f5b00a7f62309c3f24a7fdb5bc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 68,
+  "scenario_id": "review.add.93",
+  "schema": 1,
+  "staging_id": "2cb95e32ecbd",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

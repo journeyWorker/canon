@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-1"
+  },
+  "at": "2026-10-23T12:29:44.755183277Z",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test brief_scope evidence_add_101_an_unapproved_only_change_and_an_edited_approval_still_refuse"
+  },
+  "evidence_note": {
+    "summary": "brief_scope evidence_add_101_an_unapproved_only_change_and_an_edited_approval_st: 1 passed, 0 failed, 15 filtered out @ 2c0fb497"
+  },
+  "evidence_sha": "2c0fb4972782486f9ee8a638db56be81405f3bda",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 52,
+  "scenario_id": "skills.install.44",
+  "schema": 1,
+  "staging_id": "055e6f5afef3",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

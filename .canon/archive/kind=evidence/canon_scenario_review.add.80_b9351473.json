@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "018-n1-impl",
+    "role": "implementer",
+    "session_id": "018-n1-impl"
+  },
+  "at": "2026-10-12T14:00:32.857243Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_batch review_add_80_one_review_add_signs_off_several_scenarios"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 29,
+  "scenario_id": "review.add.80",
+  "schema": 1,
+  "staging_id": "0b6306151691",
+  "verdict": "faithful"
+}

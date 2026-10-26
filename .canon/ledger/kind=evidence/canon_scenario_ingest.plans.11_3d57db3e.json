@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "017-p2-impl",
+    "role": "implementer",
+    "session_id": "017-p2-impl"
+  },
+  "at": "2026-10-12T10:41:19.946296Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test plans_ingest ingest_plans_11_canon_changes_are_read_first_with_no_plans_entry"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 11,
+  "scenario_id": "ingest.plans.11",
+  "schema": 1,
+  "staging_id": "f6e5980bee15",
+  "verdict": "faithful"
+}

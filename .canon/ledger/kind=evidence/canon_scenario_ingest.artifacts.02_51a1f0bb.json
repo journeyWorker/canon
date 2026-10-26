@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-2"
+  },
+  "at": "2026-10-23T14:25:16.632531408Z",
+  "code_tree": "54e8398434596ae2a031bdb2368efe1b8b19aff3",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test artifact_ingest ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_real_marts"
+  },
+  "evidence_note": {
+    "summary": "artifact_ingest ingest_artifacts_drives_both_source_shapes_persists_trajectories: 1 passed, 0 failed, 8 filtered out @ 271f2054"
+  },
+  "evidence_sha": "271f205407c281f5b00a7f62309c3f24a7fdb5bc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 14,
+  "scenario_id": "ingest.artifacts.02",
+  "schema": 1,
+  "staging_id": "3c61b23f624b",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

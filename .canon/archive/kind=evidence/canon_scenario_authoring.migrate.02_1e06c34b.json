@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "017-p4-impl",
+    "role": "implementer",
+    "session_id": "017-p4-impl"
+  },
+  "at": "2026-10-12T11:49:44.639463Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test migrate authoring_migrate_02_another_root_only_drops_its_features_level"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 2,
+  "scenario_id": "authoring.migrate.02",
+  "schema": 1,
+  "staging_id": "393f50f99845",
+  "verdict": "faithful"
+}

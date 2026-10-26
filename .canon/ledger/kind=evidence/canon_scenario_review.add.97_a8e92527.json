@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-2"
+  },
+  "at": "2026-10-23T14:26:55.743647078Z",
+  "code_tree": "54e8398434596ae2a031bdb2368efe1b8b19aff3",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test commits an_explicit_short_sha_branch_and_head_tilde_one_record_the_full_sha"
+  },
+  "evidence_note": {
+    "summary": "commits an_explicit_short_sha_branch_and_head_tilde_one_record_the_full_sha: 1 passed, 0 failed, 3 filtered out @ 271f2054"
+  },
+  "evidence_sha": "271f205407c281f5b00a7f62309c3f24a7fdb5bc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 72,
+  "scenario_id": "review.add.97",
+  "schema": 1,
+  "staging_id": "f34c467a7fc6",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-1"
+  },
+  "at": "2026-10-23T12:26:29.109502061Z",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test finding finding_add_refuses_a_resolution_rev_on_every_non_fixed_disposition"
+  },
+  "evidence_note": {
+    "summary": "finding finding_add_refuses_a_resolution_rev_on_every_non_fixed_disposition: 1 passed, 0 failed, 32 filtered out @ 2c0fb497"
+  },
+  "evidence_sha": "2c0fb4972782486f9ee8a638db56be81405f3bda",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 18,
+  "scenario_id": "finding.add.04",
+  "schema": 1,
+  "staging_id": "7f02cd211379",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

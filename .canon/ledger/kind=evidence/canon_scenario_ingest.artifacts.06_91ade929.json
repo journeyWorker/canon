@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-2"
+  },
+  "at": "2026-10-23T14:25:18.589697704Z",
+  "code_tree": "54e8398434596ae2a031bdb2368efe1b8b19aff3",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test artifact_ingest a_second_ingest_over_an_unchanged_corpus_persists_zero_new_trajectories"
+  },
+  "evidence_note": {
+    "summary": "artifact_ingest a_second_ingest_over_an_unchanged_corpus_persists_zero_new_traje: 1 passed, 0 failed, 8 filtered out @ 271f2054"
+  },
+  "evidence_sha": "271f205407c281f5b00a7f62309c3f24a7fdb5bc",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 15,
+  "scenario_id": "ingest.artifacts.06",
+  "schema": 1,
+  "staging_id": "b5e17ce22bd2",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

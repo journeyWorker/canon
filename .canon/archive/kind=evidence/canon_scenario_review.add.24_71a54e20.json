@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-1"
+  },
+  "at": "2026-10-23T12:27:13.966971158Z",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject an_unavailable_review_is_a_gap_at_the_gate_and_the_status_guard"
+  },
+  "evidence_note": {
+    "summary": "subject an_unavailable_review_is_a_gap_at_the_gate_and_the_status_guard: 1 passed, 0 failed, 52 filtered out @ 2c0fb497"
+  },
+  "evidence_sha": "2c0fb4972782486f9ee8a638db56be81405f3bda",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 38,
+  "scenario_id": "review.add.24",
+  "schema": 1,
+  "staging_id": "54df4509efe8",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T19:42:14.058352122Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test brief_prose authoring_brief_check_12"
+  },
+  "evidence_note": {
+    "summary": "brief_prose: 1 passed, 16 filtered out, 0 failed @ 3bcaef6"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 42,
+  "scenario_id": "authoring.brief-check.12",
+  "schema": 1,
+  "staging_id": "07a3c2101e8c",
+  "verdict": "faithful"
+}

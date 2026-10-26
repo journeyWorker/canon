@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "017-p2-impl",
+    "role": "implementer",
+    "session_id": "017-p2-impl"
+  },
+  "at": "2026-10-12T10:41:13.115787Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test status context_status_63_a_line_that_only_mentions_approval_does_not_approve"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 43,
+  "scenario_id": "context.status.63",
+  "schema": 1,
+  "staging_id": "589d6bb4f9f8",
+  "verdict": "faithful"
+}

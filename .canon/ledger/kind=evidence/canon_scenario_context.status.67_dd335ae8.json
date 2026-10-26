@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "017-p2-impl",
+    "role": "implementer",
+    "session_id": "017-p2-impl"
+  },
+  "at": "2026-10-12T10:41:15.176775Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test status context_status_67_a_proposed_subject_with_no_brief_keeps_its_steps_and_its_brief_adds_no_transition_check"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 47,
+  "scenario_id": "context.status.67",
+  "schema": 1,
+  "staging_id": "694dbfd978b4",
+  "verdict": "faithful"
+}

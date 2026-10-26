@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-023",
+    "role": "implementer",
+    "session_id": "canon-impl-023-1"
+  },
+  "at": "2026-10-17T20:04:17.527017Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_audit a_reattest_binds_exactly_the_files_it_names"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 64,
+  "scenario_id": "evidence.add.40",
+  "schema": 1,
+  "staging_id": "98936e4660ac",
+  "verdict": "faithful"
+}
