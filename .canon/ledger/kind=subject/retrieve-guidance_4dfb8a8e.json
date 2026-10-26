@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-26T21:11:31.324029896Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-spec-backfill"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "shipped",
+  "subject_id": "retrieve-guidance",
+  "summary": "",
+  "title": "Retrieve: role and regime scoped strategy memory"
+}

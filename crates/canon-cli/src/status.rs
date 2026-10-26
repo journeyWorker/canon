@@ -565,9 +565,24 @@ fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusRep
     if old_layout > 0 {
         warnings.push(format!("{old_layout} ledger record file(s) are named by the 0.29 rule and are not counted; run `canon migrate --json` to preview the rename, then `canon migrate --commit --plan-digest <digest>`"));
     }
-    let unreadable = ctx.violations.len() + ctx.corpus_violations.len() - old_layout;
-    if unreadable > 0 {
-        warnings.push(format!("{unreadable} ledger record(s) could not be read and are not counted; `canon gate check` names them"));
+    // The always-on ledger check names what is in `violations`; a corpus-kind file is named by the gate only
+    // as a layout violation under a `spec_coverage` section that judges the corpus. `canon query` reports all.
+    let named = ctx.violations.len() - ctx.violations.iter().filter(|v| v.class == canon_model::FailureClass::OldLayout).count();
+    if named > 0 {
+        warnings.push(format!("{named} ledger record(s) could not be read and are not counted; `canon gate check` names them"));
+    }
+    let corpus: Vec<_> = ctx.corpus_violations.iter().filter(|(_, v)| v.class != canon_model::FailureClass::OldLayout).collect();
+    if !corpus.is_empty() {
+        let mut kinds: Vec<&str> = corpus.iter().map(|(kind, _)| kind.as_str()).collect();
+        kinds.sort_unstable();
+        kinds.dedup();
+        let queries = kinds.iter().map(|k| format!("`canon query --kind {k}`")).collect::<Vec<_>>().join(", ");
+        let who = if canon_gate::spec_coverage::judges_corpus(&ctx) {
+            format!("`canon gate check` names the misnamed ones, and {queries} reports each")
+        } else {
+            format!("`canon gate check` does not judge them without a `spec_coverage` section; {queries} reports each")
+        };
+        warnings.push(format!("{} ledger record(s) of kind {} could not be read and are not counted; {who}", corpus.len(), kinds.join(", ")));
     }
     if let Some(note) = canon_gate::review_gate::unmigrated_review_note(&ctx) {
         warnings.push(note);

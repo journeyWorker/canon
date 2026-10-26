@@ -148,6 +148,13 @@ pub fn is_old_stem(stem: &str) -> bool {
     stem.rsplit_once("__").is_some_and(|(_, digest)| digest.len() == 12 && digest.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)))
 }
 
+/// Whether `violation` is a layout violation: a record file whose name or directory is not the one its
+/// own body computes (what [`validate_layout`] and the kind-directory check report, once a scan has put
+/// the file's path in front of the detail). Every read skips such a file and `canon gate check` names it.
+pub fn is_layout_violation(violation: &EvidenceViolation) -> bool {
+    violation.class == FailureClass::Malformed && violation.detail.starts_with("layout: ")
+}
+
 /// Validate that `actual_path` (relative to the git tier's `root`) is
 /// EXACTLY the path `json`'s own content resolves to for `kind` — the
 /// git-tier-layout-enforcement spec's core check, shared by

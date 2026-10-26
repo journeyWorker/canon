@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-26T21:11:39.794337602Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-spec-backfill"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "shipped",
+  "subject_id": "subject-lifecycle",
+  "summary": "",
+  "title": "Subject: the durable product unit and its status ladder"
+}

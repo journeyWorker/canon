@@ -197,7 +197,9 @@ pub struct GateContext {
     /// change — the opposite of `spec_coverage` being opt-in. Only an
     /// opted-in rule reads this: [`crate::review_gate`] blocks on the
     /// `Finding` entries when `require_review.block_on_findings` is on,
-    /// because a finding it cannot read might be an open blocker.
+    /// because a finding it cannot read might be an open blocker, and
+    /// [`crate::spec_coverage::SpecCoverageCheck`] names the layout violations
+    /// (a file not named by what its body computes) once the section judges the corpus.
     pub corpus_violations: Vec<(RecordKind, EvidenceViolation)>,
     /// Kinds whose configured routing sends them somewhere this
     /// context's [`GitTier`] does not read, so their vector above is

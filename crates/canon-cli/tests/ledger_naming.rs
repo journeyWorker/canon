@@ -1148,3 +1148,42 @@ fn ledger_naming_22_a_canon_yaml_key_spelled_evidence_record_sends_the_user_to_m
     assert!(doc["error"]["hint"].as_str().is_some_and(|h| h.contains("canon migrate")), "{doc}");
     assert_eq!(files(&repo.join(".canon")), before, "nothing is written");
 }
+
+// ── ledger.naming.23 ─────────────────────────────────────────────────────
+
+/// ledger.naming.23: a divergence file whose name says another round than its body is a layout violation:
+/// the reads skip it, and with `spec_coverage` on `canon gate check` names the file and exits 1. With no
+/// `spec_coverage` section the gate stays green and `canon status` points at `canon query`.
+#[test]
+fn ledger_naming_23_a_misnamed_divergence_is_a_layout_violation_that_gate_check_names() {
+    let dir = repo30(1);
+    let repo = dir.path();
+    ok(repo, &["divergence", "add", "auth.login.01", "--actor-id", "r", "--round", "1", "--role", "reviewer", "--detail", "d"]);
+    let ledger = repo.join(".canon/ledger/kind=divergence");
+    let name = ledger_names(&ledger).remove(0);
+    assert!(name.starts_with("root_auth.login.01_1_1_"), "{name}");
+    let wrong = name.replacen("_1_1_", "_1_2_", 1);
+    std::fs::rename(ledger.join(&name), ledger.join(&wrong)).unwrap();
+    assert!(std::fs::read_to_string(repo.join(".canon/policy.yaml")).unwrap().contains("spec_coverage:"), "the scaffolded policy turns spec coverage on");
+
+    let gate = canon_in(repo, &["gate", "check", "--json"], &[]);
+    assert_eq!(gate.status.code(), Some(1), "{}", text(&gate));
+    let doc = json_of(&gate);
+    let violations = doc["data"]["violations"].as_array().unwrap();
+    let named = violations.iter().find(|v| v["subject"] == format!("kind=divergence/{wrong}")).unwrap_or_else(|| panic!("the file is named: {doc}"));
+    let message = named["message"].as_str().unwrap();
+    assert!(message.contains("layout: expected") && message.contains(&name), "{message}");
+
+    let query = json_of(&canon_in(repo, &["query", "--kind", "divergence", "--json"], &[]));
+    assert_eq!(query["data"]["records"].as_array().unwrap().len(), 0, "the misnamed divergence is not read: {query}");
+    assert_eq!(query["data"]["violations"], 1, "{query}");
+
+    // No `spec_coverage` section: the corpus is not being judged, the gate stays green, and status says what reports the file.
+    std::fs::remove_file(repo.join(".canon/policy.yaml")).unwrap();
+    let gate = canon_in(repo, &["gate", "check", "--json"], &[]);
+    assert_eq!(gate.status.code(), Some(0), "{}", text(&gate));
+    assert!(!text(&gate).contains(&wrong), "{}", text(&gate));
+    let status = text(&canon_in(repo, &["status"], &[]));
+    assert!(status.contains("`canon query --kind divergence`") && status.contains("does not judge them without a `spec_coverage` section"), "{status}");
+    assert!(!status.contains("`canon gate check` names them"), "{status}");
+}

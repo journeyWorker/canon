@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-26T21:10:51.380915258Z",
+  "change_ids": [
+    "canon-0-30-spec-backfill",
+    "canon-0-30-rust-sweep",
+    "canon-0-30-ledger-naming",
+    "canon-0-30-record-links"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "shipped",
+  "subject_id": "context-capability",
+  "summary": "",
+  "title": "Context: the authoring-surface capability query"
+}

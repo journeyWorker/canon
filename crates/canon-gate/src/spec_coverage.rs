@@ -79,6 +79,17 @@ use crate::derived::{latest_of, stamps_of};
 use crate::ledger::{latest_verdicts, verdicts_of};
 use crate::policy::SpecCoverage;
 
+/// Whether `canon gate check` judges the spec corpus under this context's policy: a `spec_coverage` section
+/// that asks for something. When it does not, the gate names no corpus-kind layout violation.
+pub fn judges_corpus(ctx: &GateContext) -> bool {
+    match &ctx.policy.spec_coverage {
+        Some(SpecCoverage::Active { require_evidence, require_cases, require_review, require_audit, .. }) => {
+            *require_evidence || !require_cases.is_empty() || require_review.is_some() || require_audit.is_some()
+        }
+        _ => false,
+    }
+}
+
 /// The spec-corpus coverage check. Silent unless `policy.yaml` declares
 /// a `spec_coverage:` section (module doc).
 #[derive(Debug)]
@@ -136,7 +147,17 @@ impl GateCheck for SpecCoverageCheck {
         let verdicts = latest_verdicts(ctx);
         let subject_status: BTreeMap<&str, SubjectStatus> = latest_subjects(ctx).into_iter().map(|s| (s.subject_id.as_str(), s.status)).collect();
 
-        let mut violations = Vec::new();
+        // A corpus file whose name is not the one its body computes is skipped by every read, so the corpus being
+        // judged here is missing it: name it (R9/F1). Without the section the gate stays as it was (`canon query`
+        // and `canon status` report it).
+        let mut violations: Vec<Violation> = ctx
+            .corpus_violations
+            .iter()
+            .filter(|(_, violation)| canon_store::partition::is_layout_violation(violation))
+            .map(|(_, violation)| {
+                Violation::new(FailureClass::MalformedEvidence, violation.subject.clone(), format!("{} ({})", violation.detail, violation.class.as_str()))
+            })
+            .collect();
         let mut in_scope = Vec::new();
         for scenario in latest_scenarios(ctx) {
             match scope_decision(scope, scenario.subject_id.as_ref(), &subject_status) {

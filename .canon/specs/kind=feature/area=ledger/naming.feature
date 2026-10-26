@@ -238,3 +238,14 @@ Feature: ledger naming
     When `canon context --json` runs
     Then it exits 0, warns that `canon.yaml` spells `evidence_record` the 0.29 way, and its first next step is `canon migrate --json`
     And `canon evidence add` exits 2 with `OLD_LAYOUT`, a hint naming `canon migrate`, and writes nothing
+
+  # canon: {"schema":1,"at":"2026-10-26T21:17:31Z","actor":{"agent_id":"impl-030-ln-fix","role":"implementer","session_id":"ln-fix-2026-10-26c"}}
+  @subject:divergence-lifecycle
+  @case:failure
+  @flow:canon-0-30-ledger-naming.F1
+  @ledger.naming.23
+  Scenario: A divergence file whose name is not the one its body computes is a layout violation, reported and not read
+    Given a promoted divergence whose file name says another round than its body, in a repo whose policy turns `spec_coverage` on
+    When the reads scan the divergence kind and `canon gate check` runs
+    Then the divergence is skipped and not counted, and `canon gate check` names the file as a layout violation and exits 1
+    And with no `spec_coverage` section `canon gate check` stays green, while `canon status` says `canon query --kind divergence` reports the file
