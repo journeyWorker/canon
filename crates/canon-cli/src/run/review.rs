@@ -1,6 +1,6 @@
 //! `canon review` — the handlers of the group.
 
-use crate::cli::review::*;
+use crate::cli::review::{ReviewCommand, ReviewScenarioArgs, ReviewChangeArgs, ReviewOptions};
 use canon_model::{ChangeId, ScenarioId};
 use std::process::ExitCode;
 use super::record_role;

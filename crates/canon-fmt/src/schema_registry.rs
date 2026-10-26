@@ -99,9 +99,9 @@ fn format_violation(kind_str: &str, error: &jsonschema::ValidationError<'_>) -> 
     if let ValidationErrorKind::Enum { options } = error.kind() {
         if let (Some(field), Some(members)) = (last_path_segment(error.instance_path().as_str()), options.as_array()) {
             if !members.is_empty() {
-                let render = |m: &serde_json::Value| m.as_str().map(str::to_string).unwrap_or_else(|| m.to_string());
+                let render = |m: &serde_json::Value| m.as_str().map_or_else(|| m.to_string(), str::to_string);
                 let rendered = members.iter().map(render).collect::<Vec<_>>().join(", ");
-                let got = error.instance().as_str().map(str::to_string).unwrap_or_else(|| error.instance().to_string());
+                let got = error.instance().as_str().map_or_else(|| error.instance().to_string(), str::to_string);
                 return format!("`{got}` is not a valid value for `{field}` of `{kind_str}` (expected one of: {rendered})");
             }
         }

@@ -615,7 +615,7 @@ static FEATURE_MEMO: std::sync::LazyLock<std::sync::Mutex<BTreeMap<PathBuf, (can
 pub fn feature_file_scan(path: &Path) -> Option<std::sync::Arc<FeatureFileScan>> {
     let stamp = std::fs::metadata(path).ok().and_then(|metadata| canon_store::git_tier::FileStamp::of(&metadata));
     if let Some(stamp) = stamp {
-        let memo = FEATURE_MEMO.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let memo = FEATURE_MEMO.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some((_, file)) = memo.get(path).filter(|(seen, _)| *seen == stamp) {
             return Some(file.clone());
         }
@@ -628,7 +628,7 @@ pub fn feature_file_scan(path: &Path) -> Option<std::sync::Arc<FeatureFileScan>>
         scenario_digests: canon_fmt::gherkin::scenario_digests(text),
     });
     if let Some(stamp) = stamp {
-        FEATURE_MEMO.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).insert(path.to_path_buf(), (stamp, file.clone()));
+        FEATURE_MEMO.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(path.to_path_buf(), (stamp, file.clone()));
     }
     Some(file)
 }
@@ -810,7 +810,7 @@ struct RootPlan {
 /// Decide what syncing `spec_root` writes against the index as it stands
 /// (`folded`, read only when the root is not refused), without writing.
 /// [`sync_one_root`] writes it; [`overlay_stale_index`] only reads it.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn plan_one_root<'f>(
     folded: impl FnOnce() -> Result<std::borrow::Cow<'f, BTreeMap<(ProjectId, ScenarioId), Scenario>>, InventoryError>,
     repo: &Path,
@@ -914,7 +914,7 @@ fn plan_one_root<'f>(
     Ok(RootPlan { outcome, records })
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn sync_one_root(
     tier: &GitTier,
     repo: &Path,
@@ -1046,8 +1046,8 @@ pub fn format_json(outcome: &SyncOutcome) -> InventorySyncReport<'_> {
             written: root.written,
             removed: root.removed,
             violations: root.violations.iter().map(crate::fmt::ViolationEntry::of).collect(),
-            sync_errors: root.sync_errors.iter().map(|e| e.to_string()).collect(),
-            tag_diagnostics: root.tag_diagnostics.iter().map(|d| d.to_string()).collect(),
+            sync_errors: root.sync_errors.clone(),
+            tag_diagnostics: root.tag_diagnostics.clone(),
         })
         .collect();
     InventorySyncReport { dry_run: outcome.dry_run, clean: outcome.is_clean(), total_written: outcome.total_written(), roots }
@@ -1098,7 +1098,7 @@ fn stale_roots_against(latest: &BTreeMap<(ProjectId, ScenarioId), Scenario>, roo
             })
             .map(|candidate| candidate.path.clone())
             .collect();
-        let removed: Vec<ScenarioId> = removed_from_corpus(&latest, &root.id, &corpus[&root.id]).into_iter().map(|scenario| scenario.scenario_id.clone()).collect();
+        let removed: Vec<ScenarioId> = removed_from_corpus(latest, &root.id, &corpus[&root.id]).into_iter().map(|scenario| scenario.scenario_id.clone()).collect();
         if !files.is_empty() || !removed.is_empty() {
             stale.push(StaleRoot { root: root.clone(), scanned, files, removed });
         }

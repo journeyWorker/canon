@@ -202,7 +202,7 @@ pub fn run_promote_with_evidence(
                 crate::say!(json, "promoted {strategy_id} -> {}", path.display());
             }
             if json {
-                crate::json_out::data("strategy promote", &StrategyPromoteReport { strategy_id: strategy_id.to_string(), path: path.display().to_string(), dry_run, advisories: warnings.iter().map(|w| w.to_string()).collect() });
+                crate::json_out::data("strategy promote", &StrategyPromoteReport { strategy_id: strategy_id.to_string(), path: path.display().to_string(), dry_run, advisories: warnings.clone() });
             }
             ExitCode::SUCCESS
         }

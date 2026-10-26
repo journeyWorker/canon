@@ -195,6 +195,6 @@ mod tests {
     #[test]
     fn a_task_not_compiled_by_canon_vocab_fails_to_decompile_instead_of_guessing() {
         let task = Task::new(envelope(), canon_model::TaskId::parse("s10-typed-authoring-vocabulary#9.9").unwrap(), "hand-authored", TaskStatus::Open, Some("just a note".to_string()));
-        assert!(decompile_task(&task).is_err());
+        decompile_task(&task).unwrap_err();
     }
 }

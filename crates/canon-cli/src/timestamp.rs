@@ -28,8 +28,8 @@ mod tests {
     #[test]
     fn a_date_is_utc_midnight_and_rfc3339_is_kept() {
         assert_eq!(parse("2030-01-01").unwrap().to_rfc3339(), "2030-01-01T00:00:00+00:00");
-        assert!(parse("2030-01-01T10:00:00+02:00").is_ok());
-        assert!(parse("tomorrow").is_err());
+        parse("2030-01-01T10:00:00+02:00").unwrap();
+        parse("tomorrow").unwrap_err();
         assert_eq!(normalize("2030-01-01").unwrap(), "2030-01-01T00:00:00Z");
         assert_eq!(normalize("2030-01-01T10:00:00Z").unwrap(), "2030-01-01T10:00:00Z");
     }

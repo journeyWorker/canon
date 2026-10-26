@@ -284,7 +284,7 @@ mod tests {
         Some(EvidenceBinding::Active {
             mode,
             strength,
-            cases: cases.iter().map(|s| s.to_string()).collect(),
+            cases: cases.iter().map(std::string::ToString::to_string).collect(),
             lanes: Vec::new(),
             scope: Vec::new(),
         })

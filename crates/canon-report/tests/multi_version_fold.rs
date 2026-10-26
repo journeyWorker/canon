@@ -543,7 +543,7 @@ fn scope_status_reports_each_projects_own_coverage_for_a_shared_scenario_id() {
     // rows — the driving side now carries the project.
     for (project_id, covered) in [("alpha", true), ("beta", false)] {
         write_scenario(&git_root, project_id, SHARED_SCENARIO);
-        let natural_key = format!("{project_id}__{}", SHARED_SCENARIO);
+        let natural_key = format!("{project_id}__{SHARED_SCENARIO}");
         tier.write_namespaced("porting.coverage", &natural_key, coverage_overlay(project_id, SHARED_SCENARIO, covered)).unwrap();
     }
 
@@ -1277,7 +1277,7 @@ fn review_rounds_counts_a_refixed_finding_once_at_its_latest_disposition() {
         result
             .rows
             .iter()
-            .find(|r| r.get("round").and_then(|v| v.as_i64()) == Some(round))
+            .find(|r| r.get("round").and_then(serde_json::Value::as_i64) == Some(round))
             .unwrap_or_else(|| panic!("no review-rounds row for round {round}: {:?}", result.rows))
     };
 

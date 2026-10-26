@@ -347,9 +347,9 @@ mod tests {
 
     #[test]
     fn a_malformed_tag_or_value_is_an_error() {
-        assert!(Language::parse("korean language").is_err());
-        assert!(Language::parse("k").is_err());
-        assert!(from_yaml("language: [ko]\n").is_err());
+        Language::parse("korean language").unwrap_err();
+        Language::parse("k").unwrap_err();
+        from_yaml("language: [ko]\n").unwrap_err();
         assert_eq!(from_yaml("tiers: {}\n").unwrap(), Language::unset());
         assert_eq!(from_yaml("language: ko\n").unwrap().tag, "ko");
         assert_eq!(declared_from_yaml("tiers: {}\n").unwrap(), None);

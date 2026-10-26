@@ -161,7 +161,7 @@ fn link_dir(target: &Path, link: &Path) -> Result<(), ReportError> {
     #[cfg(unix)]
     {
         std::os::unix::fs::symlink(target, link)?;
-    }
+    };
     #[cfg(not(unix))]
     {
         fn copy(from: &Path, to: &Path) -> std::io::Result<()> {

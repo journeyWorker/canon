@@ -281,7 +281,7 @@ impl StatusOverride {
 }
 
 impl Subject {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         envelope: Envelope,
         subject_id: SubjectId,
@@ -1182,7 +1182,7 @@ impl Divergence {
         self
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         envelope: Envelope,
         project_id: ProjectId,
@@ -1229,7 +1229,7 @@ pub struct Trajectory {
 }
 
 impl Trajectory {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         envelope: Envelope,
         run_id: RunId,
@@ -1998,7 +1998,7 @@ impl Finding {
     /// [`Self::fixed_by`]/[`Self::rejected`]/[`Self::deferred`], which
     /// is what makes the `disposition`/`resolution_sha` pairing
     /// unconstructible-wrong through this API (see the type doc).
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         envelope: Envelope,
         change_id: ChangeId,
@@ -2486,7 +2486,7 @@ mod tests {
 
         let mut bad = value;
         bad["attachments"][0]["sha256"] = serde_json::json!("not-a-digest");
-        assert!(serde_json::from_value::<EvidenceRecord>(bad).is_err());
+        serde_json::from_value::<EvidenceRecord>(bad).unwrap_err();
     }
 
     /// A pre-s36 `Change` (no subject key at all) still deserializes to
@@ -2529,7 +2529,7 @@ mod tests {
             "status": "building",
             "owner_role": "implementer"
         });
-        assert!(serde_json::from_value::<Subject>(json).is_err());
+        serde_json::from_value::<Subject>(json).unwrap_err();
     }
 
     round_trip_test!(
@@ -2697,7 +2697,7 @@ mod tests {
             "source_digest": SpecDigest::of(b"fixture .feature bytes").to_string(),
             "lane": "Not-a-lane",
         });
-        assert!(serde_json::from_value::<Scenario>(json).is_err());
+        serde_json::from_value::<Scenario>(json).unwrap_err();
     }
 
     round_trip_test!(
@@ -2941,9 +2941,9 @@ mod tests {
 
         let mut bad = json;
         bad["outcome"] = serde_json::json!("approved");
-        assert!(serde_json::from_value::<Review>(bad).is_err());
+        serde_json::from_value::<Review>(bad).unwrap_err();
         assert_eq!(ReviewOutcome::parse("unavailable"), Ok(ReviewOutcome::Unavailable));
-        assert!(ReviewOutcome::parse("approved").is_err());
+        ReviewOutcome::parse("approved").unwrap_err();
     }
 
     round_trip_test!(
@@ -3028,7 +3028,7 @@ mod tests {
         ] {
             let mut candidate = legacy.clone();
             candidate["approval"] = malformed;
-            assert!(serde_json::from_value::<EvidenceRecord>(candidate).is_err());
+            serde_json::from_value::<EvidenceRecord>(candidate).unwrap_err();
         }
     }
 

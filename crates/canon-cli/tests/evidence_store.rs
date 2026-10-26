@@ -233,7 +233,7 @@ fn a_fabrication_marker_refusal_reads_refused_and_exits_1() {
     assert!(lines[0].contains("summary field contains fabrication marker \"tbd\"") && lines[1].contains("command_result field contains fabrication marker \"n/a\""), "{stderr}");
     assert!(committed_records(repo).is_empty(), "a refused add writes nothing");
     let staged = repo.join(".canon/ledger/_staging/kind=evidence_record");
-    assert!(std::fs::read_dir(&staged).map(|mut entries| entries.next().is_none()).unwrap_or(true), "a refused add stages nothing");
+    assert!(std::fs::read_dir(&staged).map_or(true, |mut entries| entries.next().is_none()), "a refused add stages nothing");
 }
 
 /// Dogfood F15: one `--report-case` hid the other cases for the same

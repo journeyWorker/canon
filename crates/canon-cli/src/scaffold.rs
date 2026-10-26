@@ -575,12 +575,12 @@ pub fn run_feature_new(
     let root = match resolve_spec_root("canon feature new", &roots, project) {
         Ok(root) => root,
         Err(msg) => {
-            return CliError::refused("SPEC_ROOT_UNRESOLVED", msg.to_string()).hint("pass --project-id <id> naming a configured spec root (`specs.roots[]` in canon.yaml)").emit("canon feature new", json);
+            return CliError::refused("SPEC_ROOT_UNRESOLVED", msg.clone()).hint("pass --project-id <id> naming a configured spec root (`specs.roots[]` in canon.yaml)").emit("canon feature new", json);
         }
     };
 
     if let Err(msg) = refuse_pre_0_17(&repo_root, root) {
-        return CliError::refused("LAYOUT_MIGRATION_REQUIRED", msg.to_string()).hint("run `canon migrate` to move the repository to the current layout").emit("canon feature new", json);
+        return CliError::refused("LAYOUT_MIGRATION_REQUIRED", msg.clone()).hint("run `canon migrate` to move the repository to the current layout").emit("canon feature new", json);
     }
 
     let feature_path = resolve_feature_path(root, &area_surface.area, &area_surface.surface);
@@ -640,13 +640,13 @@ mod tests {
 
     #[test]
     fn area_surface_rejects_a_three_segment_scenario_id_shaped_string() {
-        assert!(AreaSurface::parse("world.hotdeal.42").is_err());
+        AreaSurface::parse("world.hotdeal.42").unwrap_err();
     }
 
     #[test]
     fn area_surface_rejects_an_empty_segment() {
-        assert!(AreaSurface::parse("world.").is_err());
-        assert!(AreaSurface::parse(".hotdeal").is_err());
+        AreaSurface::parse("world.").unwrap_err();
+        AreaSurface::parse(".hotdeal").unwrap_err();
     }
 
     fn actor() -> Actor {
@@ -655,8 +655,8 @@ mod tests {
 
     #[test]
     fn area_surface_rejects_uppercase_or_underscore() {
-        assert!(AreaSurface::parse("World.hotdeal").is_err());
-        assert!(AreaSurface::parse("world.hot_deal").is_err());
+        AreaSurface::parse("World.hotdeal").unwrap_err();
+        AreaSurface::parse("world.hot_deal").unwrap_err();
     }
 
     #[test]
@@ -668,13 +668,13 @@ mod tests {
 
     #[test]
     fn parse_scenario_tag_rejects_a_malformed_tag_with_or_without_the_at_prefix() {
-        assert!(parse_scenario_tag("@Story.X.01").is_err());
-        assert!(parse_scenario_tag("Story.X.01").is_err());
+        parse_scenario_tag("@Story.X.01").unwrap_err();
+        parse_scenario_tag("Story.X.01").unwrap_err();
     }
 
     #[test]
     fn parse_scenario_tag_rejects_a_double_at_prefix() {
-        assert!(parse_scenario_tag("@@story.x.01").is_err());
+        parse_scenario_tag("@@story.x.01").unwrap_err();
     }
 
     #[test]

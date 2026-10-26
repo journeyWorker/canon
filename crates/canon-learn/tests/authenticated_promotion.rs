@@ -235,20 +235,20 @@ fn tampered_candidate_evaluation_and_signature_leave_zero_active_writes() -> Tes
     let mut tampered_candidate = candidate.clone();
     tampered_candidate.content.push_str(" tampered");
     strategies.append(&tampered_candidate)?;
-    assert!(promote_strategy_approved(&strategies, &candidate.id, &git_tier, &evaluation, &approval).is_err());
+    promote_strategy_approved(&strategies, &candidate.id, &git_tier, &evaluation, &approval).unwrap_err();
     assert_eq!(strategies.find_by_id(&candidate.id)?.unwrap().lifecycle, Some(StrategyLifecycle::Quarantined));
     assert!(!target.exists());
 
     strategies.append(&candidate)?;
     let mut tampered_evaluation = evaluation.clone();
     tampered_evaluation.candidate_digest = "tampered-candidate-digest".to_string();
-    assert!(promote_strategy_approved(&strategies, &candidate.id, &git_tier, &tampered_evaluation, &approval).is_err());
+    promote_strategy_approved(&strategies, &candidate.id, &git_tier, &tampered_evaluation, &approval).unwrap_err();
     assert_eq!(strategies.find_by_id(&candidate.id)?.unwrap().lifecycle, Some(StrategyLifecycle::Quarantined));
     assert!(!target.exists());
 
     let mut tampered_approval = approval.clone();
     tampered_approval.signature = Some("-----BEGIN SSH SIGNATURE-----\ntampered\n-----END SSH SIGNATURE-----\n".to_string());
-    assert!(promote_strategy_approved(&strategies, &candidate.id, &git_tier, &evaluation, &tampered_approval).is_err());
+    promote_strategy_approved(&strategies, &candidate.id, &git_tier, &evaluation, &tampered_approval).unwrap_err();
     assert_eq!(strategies.find_by_id(&candidate.id)?.unwrap().lifecycle, Some(StrategyLifecycle::Quarantined));
     assert!(!target.exists());
     Ok(())

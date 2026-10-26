@@ -104,7 +104,7 @@ fn check_ledger(root: &Path, report: &mut FmtReport) -> BTreeMap<PathBuf, BTreeS
         check_actor_present(&json, &rel, report);
 
         if kind.is_run_shaped() {
-            let evidence_is_empty = json.get("evidence").and_then(|v| v.as_array()).map(|a| a.is_empty()).unwrap_or(true);
+            let evidence_is_empty = json.get("evidence").and_then(|v| v.as_array()).is_none_or(std::vec::Vec::is_empty);
             if evidence_is_empty {
                 report.violations.push(Violation::new(FmtFailureClass::UnspecifiedEvidence, &rel, "`evidence` is absent or an empty, untyped array"));
             }

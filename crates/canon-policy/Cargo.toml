@@ -26,3 +26,6 @@ sha2 = { workspace = true }
 # crates.io package starting v0.11; it has no dependency on `cel-parser` or on
 # the donor's CEL crates.
 cel = { version = "0.14", default-features = false, features = ["chrono"] }
+
+[lints]
+workspace = true

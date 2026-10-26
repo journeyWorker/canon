@@ -510,7 +510,7 @@ fn subject_lifecycle_36_unadopt_removes_the_link_on_both_sides() {
     assert!(
         change_b["subject_ids"]
             .as_array()
-            .is_none_or(|ids| ids.is_empty()),
+            .is_none_or(std::vec::Vec::is_empty),
         "{change_b}"
     );
     let status = stdout(&run(repo, &["status"]));

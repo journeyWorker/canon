@@ -188,7 +188,7 @@ impl ProviderSelection {
             ProviderOrigin::Config => "from canon.yaml skills.providers".into(),
             ProviderOrigin::Lock => "from the install lock; canon.yaml has no skills: key".into(),
             ProviderOrigin::Detected if self.providers.is_empty() => {
-                format!("no {} directory found", MARKER_LIST)
+                format!("no {MARKER_LIST} directory found")
             }
             ProviderOrigin::Detected => format!(
                 "detected: {}",
@@ -469,7 +469,7 @@ pub fn discover_skills(source_dir: &Path) -> Result<Vec<DiscoveredSkill>, Skills
             path: source_dir.to_path_buf(),
             source,
         })?;
-        if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+        if !entry.file_type().is_ok_and(|t| t.is_dir()) {
             continue;
         }
         if entry.path().join("SKILL.md").is_file() {

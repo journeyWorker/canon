@@ -1,6 +1,6 @@
 //! `canon prompt` — the handlers of the group.
 
-use crate::cli::prompt::*;
+use crate::cli::prompt::{PromptCommand, PromptShowArgs, PromptAddArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: PromptCommand) -> ExitCode {

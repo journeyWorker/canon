@@ -117,7 +117,7 @@ impl SessionAdapter for HermesAdapter {
         let profiles_dir = home.join(".hermes/profiles");
         if let Ok(entries) = std::fs::read_dir(&profiles_dir) {
             let mut profile_dbs: Vec<PathBuf> = entries
-                .filter_map(|entry| entry.ok())
+                .filter_map(std::result::Result::ok)
                 .filter(|entry| entry.path().is_dir())
                 .map(|entry| entry.path().join("state.db"))
                 .collect();
@@ -510,7 +510,7 @@ mod tests {
         conn
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn insert_session(
         conn: &Connection,
         id: &str,
@@ -706,6 +706,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(unsafe_code, reason = "std::env::set_var/remove_var are unsafe fns; the SAFETY comments below say why this test cannot race")]
     fn scan_roots_hermes_home_env_is_additive_and_gated_by_use_env_roots() {
         // Both assertions share ONE test function deliberately: Rust's
         // default test harness runs functions in parallel across
@@ -715,8 +716,10 @@ mod tests {
         // `--test-threads=1`) — merging avoids the race entirely
         // rather than papering over it with a serialization crate.
         //
-        // SAFETY: test-only, and this function never yields across an
-        // await/thread boundary while the var is set.
+        // SAFETY: this is the only test that touches `HERMES_HOME_ENV` or calls the
+        // hermes adapter's `scan_roots` with `use_env_roots = true`, so no other thread
+        // reads the variable while it is set. Rust's `std::env` serializes its own
+        // accessors and nothing here calls libc `getenv` directly.
         unsafe { std::env::set_var(HERMES_HOME_ENV, "/custom/hermes/home") };
         let adapter = HermesAdapter;
         let home = Path::new("/home/example");
@@ -729,6 +732,7 @@ mod tests {
         assert!(additive.contains(&home.join(".hermes/state.db")));
         assert!(additive.contains(&PathBuf::from("/custom/hermes/home/state.db")));
 
+        // SAFETY: same as the `set_var` above; this test is the variable's only user.
         unsafe { std::env::remove_var(HERMES_HOME_ENV) };
     }
 

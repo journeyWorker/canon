@@ -598,7 +598,7 @@ mod tests {
 
     #[test]
     fn schema_identifier_is_validated_against_sql_injection() {
-        assert!(validate_schema_ident("canon_v1").is_ok());
+        validate_schema_ident("canon_v1").unwrap();
         assert!(validate_schema_ident("canon_v1; DROP TABLE users; --").is_err());
         assert!(validate_schema_ident("").is_err());
     }

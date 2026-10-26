@@ -856,7 +856,7 @@ fn hand_typed_count(text: &str) -> Option<String> {
         return None;
     }
     let last = words.len() - 1;
-    let at = |i: usize| words.get(i).map(String::as_str).unwrap_or("");
+    let at = |i: usize| words.get(i).map_or("", String::as_str);
     // Punctuation-only tokens drop out of the reported span, so the
     // message names the claim rather than the markup carrying it.
     let span = |from: usize, to: usize| words[from..=to.min(last)].iter().filter(|w| !w.is_empty()).cloned().collect::<Vec<String>>().join(" ");
@@ -1239,7 +1239,7 @@ fn an_empty_help_invocation_is_refused_rather_than_passing_vacuously() {
 
     // And the ordinary invocation still reads, so this is not a blanket
     // refusal: the marker is present in real help.
-    assert!(checked_help(&run_canon(&["finding", "--help"], dir.path()), PARENT_HELP_MARKER).is_ok());
+    checked_help(&run_canon(&["finding", "--help"], dir.path()), PARENT_HELP_MARKER).unwrap();
 }
 
 /// Three findings on one change, two committed and one still staged:

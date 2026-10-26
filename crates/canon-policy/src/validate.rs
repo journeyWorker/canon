@@ -586,7 +586,7 @@ mod tests {
     #[test]
     fn accepts_a_valid_field_comparison() {
         let bindings = task_bindings();
-        assert!(compile("record.title == 'x'", &bindings).is_ok());
+        compile("record.title == 'x'", &bindings).unwrap();
     }
 
     #[test]
@@ -618,7 +618,7 @@ mod tests {
     #[test]
     fn accepts_age_days_on_a_timestamp_field() {
         let bindings = task_bindings();
-        assert!(compile("age_days(record.at) > 30", &bindings).is_ok());
+        compile("age_days(record.at) > 30", &bindings).unwrap();
     }
 
     #[test]
@@ -645,7 +645,7 @@ mod tests {
     #[test]
     fn has_macro_validates_the_underlying_field() {
         let bindings = task_bindings();
-        assert!(compile("has(record.title)", &bindings).is_ok());
+        compile("has(record.title)", &bindings).unwrap();
         let errors = compile("has(record.severty)", &bindings).unwrap_err();
         assert!(matches!(&errors[0], Diagnostic::UndeclaredField { field, .. } if field == "severty"));
     }
@@ -656,7 +656,7 @@ mod tests {
         // `title` is a string; `.map` over a string isn't meaningful CEL,
         // but this only exercises that `x` (the macro-local var) doesn't
         // trip the undeclared-variable check.
-        assert!(compile("[1, 2, 3].map(x, x * 2) != []", &bindings).is_ok());
+        compile("[1, 2, 3].map(x, x * 2) != []", &bindings).unwrap();
     }
 
     #[test]
@@ -689,7 +689,7 @@ mod tests {
         // off it must NOT be write-time rejected (contrast with the two
         // tests above, whose operand types ARE known and concrete).
         let bindings = bindings_for(RecordKind::Handoff, &SchemaRegistry::load());
-        assert!(compile("record.body.fields.anything == 'x'", &bindings).is_ok());
+        compile("record.body.fields.anything == 'x'", &bindings).unwrap();
     }
 
     #[test]
@@ -716,8 +716,8 @@ mod tests {
         // Same operators, VALID operand pairs — proves `check_operator`
         // doesn't over-reject: string + string (`+`), and uint < uint.
         let bindings = task_bindings();
-        assert!(compile("record.title + 'x' == 'x'", &bindings).is_ok());
-        assert!(compile("record.schema < 5", &bindings).is_ok());
+        compile("record.title + 'x' == 'x'", &bindings).unwrap();
+        compile("record.schema < 5", &bindings).unwrap();
     }
 
     #[test]
@@ -746,7 +746,7 @@ mod tests {
         // budget_exceeded_never_blocks_the_caller`) uses exactly this
         // shape.
         let bindings = task_bindings();
-        assert!(compile("[1,2,3,4,5,6,7,8,9,10].map(x, x * 2).map(x, x * 2).map(x, x * 2) != []", &bindings).is_ok());
+        compile("[1,2,3,4,5,6,7,8,9,10].map(x, x * 2).map(x, x * 2).map(x, x * 2) != []", &bindings).unwrap();
     }
 
     #[test]
@@ -783,9 +783,9 @@ mod tests {
         // Same operators, VALID operand shapes — proves the new checks
         // don't over-reject.
         let bindings = task_bindings();
-        assert!(compile("record.status == 'done' && !(record.title == 'x')", &bindings).is_ok());
-        assert!(compile("(record.schema > 0) ? record.title : 'default'", &bindings).is_ok());
-        assert!(compile("-1 == record.schema", &bindings).is_ok());
+        compile("record.status == 'done' && !(record.title == 'x')", &bindings).unwrap();
+        compile("(record.schema > 0) ? record.title : 'default'", &bindings).unwrap();
+        compile("-1 == record.schema", &bindings).unwrap();
     }
 
     #[test]
@@ -796,6 +796,6 @@ mod tests {
         // infer operator-call return types, so this must NOT be
         // rejected (mirrors `check_operator`'s own doc rationale).
         let bindings = task_bindings();
-        assert!(compile("record.status == 'done' && age_days(record.at) > 7", &bindings).is_ok());
+        compile("record.status == 'done' && age_days(record.at) > 7", &bindings).unwrap();
     }
 }

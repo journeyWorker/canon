@@ -1,6 +1,6 @@
 //! `canon task` — the handlers of the group.
 
-use crate::cli::task::*;
+use crate::cli::task::{TaskCommand, TaskDoneArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: TaskCommand) -> ExitCode {

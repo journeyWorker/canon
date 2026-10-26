@@ -485,7 +485,7 @@ fn print_error(code: &str, json: bool) -> u8 {
         let nearest: Vec<&str> = crate::cli_error::all_codes().iter().map(|info| info.code).filter(|known| known.contains(code) || code.contains(known)).take(5).collect();
         let mut error = crate::cli_error::CliError::refused("UNKNOWN_ERROR_CODE", format!("`{code}` is not an error code canon has")).field("--error").received(code).hint("`canon schema --errors` lists every code");
         if !nearest.is_empty() {
-            error = error.suggestions(nearest.iter().map(|c| c.to_string()).collect::<Vec<_>>());
+            error = error.suggestions(nearest.iter().map(std::string::ToString::to_string).collect::<Vec<_>>());
         }
         return error.emit("canon schema", json) as u8;
     };

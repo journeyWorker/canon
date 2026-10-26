@@ -35,3 +35,6 @@ thiserror.workspace = true
 # `canon-learn` at runtime (design D1: view consumption only).
 canon-learn.workspace = true
 canon-ingest.workspace = true
+
+[lints]
+workspace = true

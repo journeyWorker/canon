@@ -103,8 +103,7 @@ pub fn retrieve_guidance(store: &dyn StrategyStore, role: &RoleId, regime_key: &
     debug_assert_eq!(
         regime_key.role(),
         role.as_str(),
-        "retrieve_guidance: role {:?} does not match regime_key {regime_key}'s own role segment",
-        role
+        "retrieve_guidance: role {role:?} does not match regime_key {regime_key}'s own role segment"
     );
     let k = k.unwrap_or(DEFAULT_K);
 

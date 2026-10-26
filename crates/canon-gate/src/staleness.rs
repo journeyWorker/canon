@@ -301,7 +301,7 @@ mod tests {
         let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent", RoleId::parse(role).unwrap()));
         let record = EvidenceRecord::new(envelope, Some(TaskId::parse(task).unwrap()), None, None, EvidenceVerdict::Faithful)
             .with_evidence_sha(Sha::parse(evidence_sha).unwrap())
-            .with_surface_ref(surface_ref.iter().map(|s| s.to_string()).collect());
+            .with_surface_ref(surface_ref.iter().map(std::string::ToString::to_string).collect());
         GitTier::new(ledger_root).write(&record).expect("write evidence record");
     }
 
@@ -314,7 +314,7 @@ mod tests {
         let envelope = Envelope::new(1, RecordKind::EvidenceRecord, at, Actor::new("agent", RoleId::parse(role).unwrap()));
         let record = EvidenceRecord::new(envelope, Some(TaskId::parse(task).unwrap()), None, None, verdict)
             .with_evidence_sha(Sha::parse(evidence_sha).unwrap())
-            .with_surface_ref(surface_ref.iter().map(|s| s.to_string()).collect());
+            .with_surface_ref(surface_ref.iter().map(std::string::ToString::to_string).collect());
         GitTier::new(ledger_root).write(&record).expect("write evidence record");
     }
 

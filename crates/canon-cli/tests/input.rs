@@ -266,7 +266,7 @@ fn every_spec_example_document_writes_what_its_flags_write() {
     let leaves: Vec<String> = write_leaves(base.path(), home.path()).into_iter().filter(|leaf| !NOT_RUN.contains(&leaf.as_str())).collect();
     // One thread per slice of leaves; each leaf runs its four variants at its own path, so a
     // record that embeds its repo path still matches across the variants of that leaf.
-    let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).min(8);
+    let threads = std::thread::available_parallelism().map_or(4, std::num::NonZero::get).min(8);
     let next = std::sync::atomic::AtomicUsize::new(0);
     let problems = std::sync::Mutex::new(Vec::new());
     std::thread::scope(|scope| {
@@ -709,7 +709,7 @@ fn the_destructive_leaves_take_one_object_and_never_a_commit() {
     for leaf in ["purge", "artifacts move", "migrate", "ledger compact", "tier age"] {
         let words: Vec<&str> = leaf.split(' ').collect();
         let doc_args = |doc: &str| -> Vec<String> {
-            let mut argv: Vec<String> = words.iter().map(|w| w.to_string()).collect();
+            let mut argv: Vec<String> = words.iter().map(std::string::ToString::to_string).collect();
             argv.extend(["--input".to_string(), doc.to_string(), "--json".to_string()]);
             argv
         };

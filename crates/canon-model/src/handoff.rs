@@ -58,9 +58,8 @@ impl HandoffState {
     pub fn can_transition_to(self, next: HandoffState) -> bool {
         matches!(
             (self, next),
-            (HandoffState::Pending, HandoffState::InProgress)
-                | (HandoffState::InProgress, HandoffState::Done)
-                | (HandoffState::InProgress, HandoffState::Abandoned)
+            (HandoffState::Pending, HandoffState::InProgress) |
+(HandoffState::InProgress, HandoffState::Done | HandoffState::Abandoned)
         )
     }
 
@@ -370,7 +369,7 @@ pub struct Handoff {
 }
 
 impl Handoff {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         envelope: Envelope,
         id: HandoffId,
@@ -737,7 +736,7 @@ mod tests {
     fn gihoek_domain_with_valid_fields_validates_and_renders() {
         let registry = registry_with_gihoek();
         let body = sample_body(valid_gihoek_fields());
-        assert!(registry.validate_body(&body).is_ok());
+        registry.validate_body(&body).unwrap();
         let rendered = registry.render_body(&body).unwrap();
         assert!(rendered.contains("Ship S1"));
         assert!(rendered.contains("round trips"));

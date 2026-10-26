@@ -131,7 +131,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     let language = match crate::language::configured(&repo) {
         Ok(language) => language,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon change new", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon change new", json);
         }
     };
 
@@ -144,7 +144,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         }
         Ok((Some(subject), None)) => subject,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon change new", json);
+            return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon change new", json);
         }
     };
 
@@ -161,7 +161,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     let change = match stage_change(&staging_path, slug, kind, title, &language) {
         Ok(change) => change,
         Err(e) => {
-            return CliError::refused("CHANGE_INVALID_ARGUMENT", e.to_string()).hint("`canon schema change new` lists the accepted arguments and their forms").emit("canon change new", json);
+            return CliError::refused("CHANGE_INVALID_ARGUMENT", e.clone()).hint("`canon schema change new` lists the accepted arguments and their forms").emit("canon change new", json);
         }
     };
 

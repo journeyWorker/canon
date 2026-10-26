@@ -32,7 +32,7 @@ where
     let mut paths: Vec<PathBuf> = WalkDir::new(root)
         .into_iter()
         .par_bridge()
-        .filter_map(|entry| entry.ok())
+        .filter_map(std::result::Result::ok)
         .filter(|entry| entry.path().is_file() && matches(entry.path()))
         .map(|entry| entry.path().to_path_buf())
         .collect();

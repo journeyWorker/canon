@@ -37,7 +37,7 @@ pub use report::{FmtFailureClass, FmtReport, Violation, PROVENANCE_FIX};
 /// surface. Never panics; the fixture path is embedded at compile time
 /// (no live consumer-repo read).
 pub fn selftest() -> Result<usize, Vec<String>> {
-    use report::FmtFailureClass::*;
+    use report::FmtFailureClass::{LayoutGrammar, MissingEnvelope, MissingProvenance, MissingActor, UnspecifiedEvidence, FreeTextRef, JoinedRef, AbbreviatedSha, OneWayBackref, MissingJoinIdentity};
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/consumer-corpus/pre/spec");
     let report = check::check(&root);
     let observed: std::collections::BTreeSet<&str> = report.observed_classes().iter().map(|c| c.as_str()).collect();

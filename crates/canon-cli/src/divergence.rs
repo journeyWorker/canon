@@ -168,7 +168,7 @@ impl crate::reports::Report for DivergenceListFieldsReport {}
 /// promotes that one candidate (`canon_gate::promote_staged_divergence`)
 /// and leaves every other staged candidate for `canon divergence
 /// promote` ([`crate::write_mode`]).
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn run_stage(
     repo: &Path,
     project_id: &canon_model::ProjectId,
@@ -191,7 +191,7 @@ pub fn run_stage(
     let promote = match crate::write_mode::should_promote(&repo, promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence add", json);
+            return CliError::refused("CONFIG_UNREADABLE", error.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon divergence add", json);
         }
     };
     let gate_ctx = match GateCtx::from_repo(&repo) {
@@ -230,7 +230,7 @@ pub fn run_stage(
 
 /// The staged shape of one divergence: the full record, `run_seq` not yet
 /// assigned.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn candidate(project_id: &ProjectId, scenario_id: &ScenarioId, sha: &Sha, code: Option<(&str, bool)>, status: DivergenceStatus, round: u32, reviewer: &str, detail: &str, actor: Actor, at: DateTime<Utc>) -> Divergence {
     let record = Divergence::new(
         Envelope::new(1, RecordKind::Divergence, at, actor),
@@ -271,7 +271,7 @@ fn stage_and_promote(ledger_root: &Path, candidate: &Divergence) -> Result<std::
 
 /// Shared `resolve`/`defer` path (module doc): build one
 /// divergence with `status`, stage it and promote that one record.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn run_commit(
     verb: &str,
     repo: &Path,
@@ -324,7 +324,7 @@ fn actor_in(actor_id: &str, role: &RoleId, session: Option<&SessionId>) -> Actor
 
 /// `canon divergence resolve` (module doc): stages and promotes a
 /// `Resolved` record.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn run_resolve(
     repo: &Path,
     project_id: &canon_model::ProjectId,
@@ -343,7 +343,7 @@ pub fn run_resolve(
 
 /// `canon divergence defer --reason <..> --expiry <..>` (module doc):
 /// stages and promotes a `Deferred { reason, expiry }` record.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn run_defer(
     repo: &Path,
     project_id: &canon_model::ProjectId,
@@ -476,7 +476,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
             // The commit the divergent evidence was attested against; an
             // acceptance binds to evidence, not to an app state, so a
             // scenario whose evidence carries no commit gets the null one.
-            &canon_gate::acceptance::evidence_sha(&context, scenario).unwrap_or_else(|| Sha::parse(&"0".repeat(40)).expect("forty hex digits")),
+            &canon_gate::acceptance::evidence_sha(&context, scenario).unwrap_or_else(|| Sha::parse("0".repeat(40)).expect("forty hex digits")),
             None,
             DivergenceStatus::Accepted {
                 reason: args.reason.clone(),
@@ -514,7 +514,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
     for (scenario, target) in &wrote {
         crate::say!(args.json, "canon divergence accept: {scenario} accepted as a known gap ({}) -> {} — {}", args.tracking, target.display(), crate::write_mode::PROMOTED);
     }
-    let accepted: Vec<AcceptedScenario> = wrote.iter().map(|(scenario, target)| AcceptedScenario { scenario_id: scenario.to_string(), location: target.display().to_string() }).collect();
+    let accepted: Vec<AcceptedScenario> = wrote.iter().map(|(scenario, target)| AcceptedScenario { scenario_id: scenario.clone(), location: target.display().to_string() }).collect();
     let scope = crate::next::Scope::Scenarios(wrote.iter().map(|(scenario, _)| scenario.clone()).collect());
     crate::next::finish(
         &repo,
@@ -681,7 +681,7 @@ mod tests {
         let committed = GitTier::new(&gate_ctx.ledger_root);
         let landed = committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap();
         assert_eq!(landed.records.len(), 2);
-        let mut seqs: Vec<u64> = landed.records.iter().filter_map(|r| r.0.get("run_seq").and_then(|v| v.as_u64())).collect();
+        let mut seqs: Vec<u64> = landed.records.iter().filter_map(|r| r.0.get("run_seq").and_then(serde_json::Value::as_u64)).collect();
         seqs.sort_unstable();
         assert_eq!(seqs, vec![1, 2]);
 
@@ -719,7 +719,7 @@ mod tests {
         let committed = GitTier::new(&gate_ctx.ledger_root);
         let landed = committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap();
         assert_eq!(landed.records.len(), 1);
-        let run_seq = landed.records[0].0.get("run_seq").and_then(|v| v.as_u64()).unwrap();
+        let run_seq = landed.records[0].0.get("run_seq").and_then(serde_json::Value::as_u64).unwrap();
         assert_eq!(run_seq, 1, "the refused candidate must not have consumed run_seq 1");
     }
 

@@ -750,7 +750,7 @@ fn read_kind_records(
     missing_config_reason: Option<&str>,
 ) -> Result<Vec<RawRecord>, String> {
     let Some(store) = store else {
-        return Err(missing_config_reason.map(str::to_string).unwrap_or_else(|| "canon.yaml is missing or unreadable — no live tiers configured".to_string()));
+        return Err(missing_config_reason.map_or_else(|| "canon.yaml is missing or unreadable — no live tiers configured".to_string(), str::to_string));
     };
     let policy = policy.expect("policy is always Some whenever store is Some -- built together in run()");
     if let Ok(rung) = policy.tier_for(kind) {
@@ -993,8 +993,7 @@ fn raw_record_at_or_min(record: &RawRecord) -> DateTime<Utc> {
         .get("at")
         .and_then(|value| value.as_str())
         .and_then(|at| DateTime::parse_from_rfc3339(at).ok())
-        .map(|at| at.with_timezone(&Utc))
-        .unwrap_or(DateTime::<Utc>::MIN_UTC)
+        .map_or(DateTime::<Utc>::MIN_UTC, |at| at.with_timezone(&Utc))
 }
 
 /// Collapses whitespace runs to single spaces, trims, and caps at
@@ -2184,7 +2183,7 @@ fn plan_trajectory(
     let canonical = canonical_driver_row(existing, &derivation);
     let already_persisted = match canonical {
         Some(id) => existing.iter().any(|stored| stored.id == id && carries_identity(stored)),
-        None => existing.iter().any(|stored| carries_identity(stored)),
+        None => existing.iter().any(carries_identity),
     };
     if already_persisted {
         // Two arms, because the namespace can still hold this driver's own
@@ -2205,7 +2204,7 @@ fn plan_trajectory(
     }
 
     let trajectory = Trajectory::new(
-        canonical.unwrap_or_else(TrajectoryId::new),
+        canonical.unwrap_or_default(),
         regime_key.clone(),
         task,
         context,

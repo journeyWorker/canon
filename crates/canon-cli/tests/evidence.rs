@@ -64,7 +64,7 @@ fn tasks_md(repo: &Path, change_id: &str) -> String {
 /// canon's layout beyond the one path the CLI documents.
 fn staging_is_empty(repo: &Path) -> bool {
     let staged = repo.join(".canon/ledger/_staging/kind=evidence_record");
-    std::fs::read_dir(&staged).map(|mut entries| entries.next().is_none()).unwrap_or(true)
+    std::fs::read_dir(&staged).map_or(true, |mut entries| entries.next().is_none())
 }
 
 fn committed_evidence_files(repo: &Path) -> Vec<std::path::PathBuf> {

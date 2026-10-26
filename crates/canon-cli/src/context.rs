@@ -567,8 +567,8 @@ fn summarize_review(policy: &PolicyResolution, kinds: &BTreeMap<String, KindSurf
         _ => None,
     };
     ReviewSurface {
-        finding_severities: crate::finding::SEVERITY_VALUES.iter().map(|s| s.to_string()).collect(),
-        finding_dispositions: crate::finding::DISPOSITION_VALUES.iter().map(|s| s.to_string()).collect(),
+        finding_severities: crate::finding::SEVERITY_VALUES.iter().map(std::string::ToString::to_string).collect(),
+        finding_dispositions: crate::finding::DISPOSITION_VALUES.iter().map(std::string::ToString::to_string).collect(),
         review_fields: kinds.get(crate::query::kind_cli_name(canon_model::RecordKind::Review)).map(|k| k.envelope_fields.clone()).unwrap_or_default(),
         require_review,
     }

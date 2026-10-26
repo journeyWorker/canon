@@ -32,7 +32,7 @@ fn snapshot() -> CapabilitySnapshot {
         },
     );
     snap.enums.insert("task-status".to_string(), vec!["open".into(), "done".into()]);
-    snap.evidence_kinds = EVIDENCE_KINDS.iter().map(|s| s.to_string()).collect();
+    snap.evidence_kinds = EVIDENCE_KINDS.iter().map(std::string::ToString::to_string).collect();
     snap
 }
 

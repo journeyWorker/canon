@@ -349,7 +349,7 @@ fn context_status_81_the_polish_step_comes_before_the_human_stop() {
 
     let scenario = ok(repo, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--subject-id", "demo", "--case", "happy", "--flow", "F1", "--json"]);
     let next = meta_next(&scenario);
-    assert_eq!(&next[..2], &steps[..], "meta.next names the same two steps");
+    assert_eq!(&next[..2], &*steps, "meta.next names the same two steps");
 
     // Blockers still win: only the check step, no polish and no human step.
     std::fs::write(repo.join(".canon/changes/add-login/brief.md"), brief_with_an_advisory().replace("## Out of scope\n\nSocial sign-in.", "## Out of scope\n\nTBD")).unwrap();

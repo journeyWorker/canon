@@ -175,7 +175,7 @@ impl Fixture {
     /// appended after the subcommand path, never before it.
     pub fn run_canon(&self, subcommand_args: &[&str]) -> Output {
         let bin = Path::new(env!("CARGO_BIN_EXE_canon"));
-        let mut args: Vec<String> = subcommand_args.iter().map(|s| s.to_string()).collect();
+        let mut args: Vec<String> = subcommand_args.iter().map(std::string::ToString::to_string).collect();
         args.push("--repo".to_string());
         args.push(self.root.path().display().to_string());
         Command::new(bin).args(&args).env("CANON_R2_LOCAL_ROOT", self.r2_root()).output().expect("spawning the built `canon` binary")

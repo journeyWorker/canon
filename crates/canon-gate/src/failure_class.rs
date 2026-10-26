@@ -208,7 +208,7 @@ mod tests {
     fn failure_classes_const_matches_enum_exactly() {
         let from_enum: Vec<&str> = FailureClass::ALL.iter().map(|c| c.as_str()).collect();
         assert_eq!(from_enum, FAILURE_CLASSES.to_vec());
-        for &s in FAILURE_CLASSES.iter() {
+        for &s in &FAILURE_CLASSES {
             assert_eq!(FailureClass::from_str_exact(s).map(FailureClass::as_str), Some(s));
         }
         assert_eq!(FailureClass::from_str_exact("not-a-real-class"), None);

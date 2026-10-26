@@ -14,7 +14,7 @@ use std::process::ExitCode;
 /// returns is printed to stderr regardless of whether a projection actually
 /// resolved, and stdout uses the matching core/overlay formatter with the
 /// same sensitive-output authorization.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(super) fn run_query(
     repo: &std::path::Path,
     kind: RecordKind,

@@ -57,8 +57,7 @@ fn endpoint_host_port(endpoint: &str) -> (String, u16) {
 fn tcp_reachable(host: &str, port: u16) -> bool {
     (host, port)
         .to_socket_addrs()
-        .map(|addrs| addrs.into_iter().any(|addr| TcpStream::connect_timeout(&addr, Duration::from_millis(800)).is_ok()))
-        .unwrap_or(false)
+        .is_ok_and(|addrs| addrs.into_iter().any(|addr| TcpStream::connect_timeout(&addr, Duration::from_millis(800)).is_ok()))
 }
 
 #[test]

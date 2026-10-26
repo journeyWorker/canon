@@ -1,6 +1,6 @@
 //! `canon policy` — the handlers of the group.
 
-use crate::cli::policy::*;
+use crate::cli::policy::{PolicyCommand, PolicyShowArgs, PolicyApproveArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: PolicyCommand) -> ExitCode {

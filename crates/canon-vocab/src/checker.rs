@@ -144,7 +144,7 @@ fn check_evidence_value(tag: &str, key: &str, value: &serde_yaml::Value, snapsho
     let ref_key = serde_yaml::Value::String("ref".into());
     for map_key in map.keys() {
         if *map_key != kind_key && *map_key != ref_key {
-            let shown = map_key.as_str().map(str::to_string).unwrap_or_else(|| format!("{map_key:?}"));
+            let shown = map_key.as_str().map_or_else(|| format!("{map_key:?}"), str::to_string);
             diags.push(diag(
                 E_UNKNOWN_ATTR,
                 format!("evidence `{key}` of `::{tag}` has no field `{shown}` (expected one of: kind, ref)"),

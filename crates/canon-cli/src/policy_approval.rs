@@ -312,7 +312,7 @@ pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> i32
             0
         }
         Err(e) => {
-            CliError::refused("POLICY_APPROVAL_FAILED", e.to_string()).hint("with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --approver <name>` again").emit("canon policy approve", json)
+            CliError::refused("POLICY_APPROVAL_FAILED", e.clone()).hint("with no policy, `canon init` writes a starter one; otherwise check that .canon/policy.yaml is readable and writable, then run `canon policy approve --approver <name>` again").emit("canon policy approve", json)
         }
     }
 }

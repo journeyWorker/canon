@@ -162,9 +162,7 @@ fn file_modified_at(path: &Path) -> DateTime<Utc> {
     let ms = fs::metadata(path)
         .and_then(|meta| meta.modified())
         .ok()
-        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
-        .map(|duration| duration.as_millis() as i64)
-        .unwrap_or_else(|| Utc::now().timestamp_millis());
+        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok()).map_or_else(|| Utc::now().timestamp_millis(), |duration| duration.as_millis() as i64);
     Utc.timestamp_millis_opt(ms).single().unwrap_or_else(Utc::now)
 }
 

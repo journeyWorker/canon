@@ -1,6 +1,6 @@
 //! `canon ledger` — the handlers of the group.
 
-use crate::cli::ledger::*;
+use crate::cli::ledger::{LedgerCommand, LedgerCompactArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: LedgerCommand) -> ExitCode {

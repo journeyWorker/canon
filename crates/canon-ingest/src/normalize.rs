@@ -753,7 +753,7 @@ pub fn normalize_workspace_key(raw: &str) -> Option<String> {
 /// The last non-empty path segment of an already-normalized workspace
 /// key — ported verbatim from the donor's `workspace_label_from_key`.
 pub fn workspace_label_from_key(key: &str) -> Option<String> {
-    key.rsplit('/').find(|segment| !segment.is_empty()).map(|segment| segment.to_string())
+    key.rsplit('/').find(|segment| !segment.is_empty()).map(std::string::ToString::to_string)
 }
 
 /// A stable sha256-derived content digest over a normalized record's

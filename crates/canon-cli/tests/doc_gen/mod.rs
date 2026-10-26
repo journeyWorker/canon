@@ -121,7 +121,7 @@ fn kind_word(kind: &str) -> String {
 fn operand_cell(leaf: &Value) -> String {
     let parts: Vec<String> = leaf["operands"]
         .as_array()
-        .map(|a| a.as_slice())
+        .map(std::vec::Vec::as_slice)
         .unwrap_or_default()
         .iter()
         .map(|o| {
@@ -148,8 +148,8 @@ fn option_syntax(o: &Value) -> String {
 }
 
 fn required_cell(leaf: &Value) -> String {
-    let mut parts: Vec<String> = leaf["options"].as_array().map(|a| a.as_slice()).unwrap_or_default().iter().filter(|o| o["required"] == true).map(option_syntax).collect();
-    for group in leaf["requiredOneOf"].as_array().map(|a| a.as_slice()).unwrap_or_default() {
+    let mut parts: Vec<String> = leaf["options"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default().iter().filter(|o| o["required"] == true).map(option_syntax).collect();
+    for group in leaf["requiredOneOf"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default() {
         let names: Vec<String> = group.as_array().expect("group").iter().map(|n| format!("`{}`", n.as_str().expect("name"))).collect();
         parts.push(format!("one of {}", names.join(" or ")));
     }
@@ -188,11 +188,11 @@ pub fn cli_table(spec: &Value, group: &str, ko: bool) -> String {
 const SHARED: [&str; 3] = ["repo", "json", "input"];
 
 fn options_of(leaf: &Value) -> &[Value] {
-    leaf["options"].as_array().map(|a| a.as_slice()).unwrap_or_default()
+    leaf["options"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default()
 }
 
 fn names_of<'a>(o: &'a Value, key: &str) -> Vec<&'a str> {
-    o[key].as_array().map(|a| a.as_slice()).unwrap_or_default().iter().filter_map(Value::as_str).map(|n| n.trim_start_matches("--")).collect()
+    o[key].as_array().map(std::vec::Vec::as_slice).unwrap_or_default().iter().filter_map(Value::as_str).map(|n| n.trim_start_matches("--")).collect()
 }
 
 fn find_option<'a>(leaf: &'a Value, name: &str) -> Option<&'a Value> {
@@ -205,13 +205,13 @@ fn atom(o: &Value) -> String {
     if o["kind"] != "value" {
         return format!("--{name}");
     }
-    let set: Vec<&str> = o["possibleValues"].as_array().map(|a| a.as_slice()).unwrap_or_default().iter().filter_map(Value::as_str).collect();
+    let set: Vec<&str> = o["possibleValues"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default().iter().filter_map(Value::as_str).collect();
     if set.is_empty() { format!("--{name} <{}>", o["valueName"].as_str().unwrap_or("VALUE")) } else { format!("--{name} <{}>", set.join("|")) }
 }
 
 fn is_required(leaf: &Value, o: &Value) -> bool {
     let name = o["name"].as_str().unwrap_or_default();
-    o["required"] == true || leaf["requiredOneOf"].as_array().map(|a| a.as_slice()).unwrap_or_default().iter().any(|g| g.as_array().is_some_and(|g| g.iter().any(|n| n.as_str().is_some_and(|n| n.trim_start_matches("--") == name))))
+    o["required"] == true || leaf["requiredOneOf"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default().iter().any(|g| g.as_array().is_some_and(|g| g.iter().any(|n| n.as_str().is_some_and(|n| n.trim_start_matches("--") == name))))
 }
 
 /// The syntax line of a leaf: operands, required options, then the optional ones with
@@ -219,7 +219,7 @@ fn is_required(leaf: &Value, o: &Value) -> bool {
 /// block's header (`--input` is flagged on the lines that take it).
 fn syntax_line(leaf: &Value) -> String {
     let mut parts: Vec<String> = vec![format!("canon {}", leaf["command"].as_str().expect("command"))];
-    for o in leaf["operands"].as_array().map(|a| a.as_slice()).unwrap_or_default() {
+    for o in leaf["operands"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default() {
         let word = format!("<{}>", o["kind"].as_str().unwrap_or("VALUE"));
         let (required, repeatable) = (o["required"] == true, o["repeatable"] == true);
         parts.push(match (required, repeatable) {
@@ -233,7 +233,7 @@ fn syntax_line(leaf: &Value) -> String {
     for o in opts.iter().filter(|o| o["required"] == true) {
         parts.push(atom(o));
     }
-    for group in leaf["requiredOneOf"].as_array().map(|a| a.as_slice()).unwrap_or_default() {
+    for group in leaf["requiredOneOf"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default() {
         let alts: Vec<String> = group.as_array().expect("group").iter().filter_map(|n| find_option(leaf, n.as_str().expect("name").trim_start_matches("--"))).map(atom).collect();
         parts.push(format!("({})", alts.join(" | ")));
     }
@@ -311,7 +311,7 @@ pub fn removed_table(spec: &Value) -> String {
         }
         let old = row["old"].as_str().expect("old");
         let new = row["new"].as_str().expect("new");
-        let scope: Vec<&str> = row["scope"].as_array().map(|a| a.as_slice()).unwrap_or_default().iter().filter_map(Value::as_str).collect();
+        let scope: Vec<&str> = row["scope"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default().iter().filter_map(Value::as_str).collect();
         let (old, new) = match row["kind"].as_str() {
             Some("option") => {
                 let on = scope.iter().map(|s| format!("`canon {s}`")).collect::<Vec<_>>().join(", ");

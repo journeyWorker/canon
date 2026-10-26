@@ -50,7 +50,7 @@ pub struct OmpAdapter;
 /// Ported from `pi.rs:16-26`.
 #[derive(Debug, Deserialize)]
 struct PiSessionHeader {
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     #[serde(rename = "type")]
     entry_type: String,
     id: String,
@@ -274,8 +274,7 @@ fn parse_pi_file(path: &Path) -> ParseOutcome {
             .timestamp
             .as_deref()
             .and_then(|ts| chrono::DateTime::parse_from_rfc3339(ts).ok())
-            .map(|dt| dt.timestamp_millis())
-            .unwrap_or(fallback_timestamp);
+            .map_or(fallback_timestamp, |dt| dt.timestamp_millis());
 
         // s31 D4: a `user`-role message carries no token usage — it
         // NEVER becomes a `UnifiedRow` — but its (possibly empty)
@@ -408,9 +407,7 @@ fn file_modified_timestamp_ms(path: &Path) -> i64 {
     std::fs::metadata(path)
         .and_then(|meta| meta.modified())
         .ok()
-        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
-        .map(|duration| duration.as_millis() as i64)
-        .unwrap_or_else(|| chrono::Utc::now().timestamp_millis())
+        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok()).map_or_else(|| chrono::Utc::now().timestamp_millis(), |duration| duration.as_millis() as i64)
 }
 
 /// Ported from the donor session-parser project's provider-identity module
@@ -567,12 +564,17 @@ not valid json
     }
 
     #[test]
+    #[expect(unsafe_code, reason = "std::env::set_var/remove_var are unsafe fns; the SAFETY comments below say why this test cannot race")]
     fn scan_roots_ignores_env_override_when_use_env_roots_is_false() {
-        // SAFETY: test-only, single-threaded within this process's
-        // test harness invocation for this var name.
+        // SAFETY: `EXTRA_SESSIONS_DIR_ENV` is read only inside `scan_roots` when
+        // `use_env_roots` is true, and no test in this crate passes `true` for the
+        // omp adapter, so no other thread reads this variable while it is set.
+        // Rust's `std::env` serializes its own accessors and nothing here calls libc
+        // `getenv` directly.
         unsafe { std::env::set_var(EXTRA_SESSIONS_DIR_ENV, "/should/not/appear") };
         let adapter = OmpAdapter;
         let roots = adapter.scan_roots(Path::new("/home/example"), false);
+        // SAFETY: same as the `set_var` above; this test is the variable's only user.
         unsafe { std::env::remove_var(EXTRA_SESSIONS_DIR_ENV) };
         assert!(!roots.iter().any(|r| r == Path::new("/should/not/appear")));
     }

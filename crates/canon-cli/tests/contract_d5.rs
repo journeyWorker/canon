@@ -53,7 +53,7 @@ fn keys(value: &Value) -> Vec<String> {
 /// These tests ask whether a write happened, so they count versions.
 fn files_under(dir: &Path, kind: &str) -> usize {
     fn count(path: &Path) -> usize {
-        std::fs::read_dir(path).map(|entries| entries.flatten().map(|e| if e.path().is_dir() { count(&e.path()) } else { 1 }).sum()).unwrap_or(0)
+        std::fs::read_dir(path).map_or(0, |entries| entries.flatten().map(|e| if e.path().is_dir() { count(&e.path()) } else { 1 }).sum())
     }
     [".canon/ledger", ".canon/archive"].iter().map(|root| count(&dir.join(root).join(format!("kind={kind}")))).sum()
 }

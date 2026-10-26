@@ -205,7 +205,7 @@ fn adopt_refuses_an_unknown_change() {
 
 fn ledger_file_count(repo: &Path) -> usize {
     fn walk(dir: &Path) -> usize {
-        std::fs::read_dir(dir).map(|entries| entries.filter_map(Result::ok).map(|e| if e.path().is_dir() { walk(&e.path()) } else { 1 }).sum()).unwrap_or(0)
+        std::fs::read_dir(dir).map_or(0, |entries| entries.filter_map(Result::ok).map(|e| if e.path().is_dir() { walk(&e.path()) } else { 1 }).sum())
     }
     walk(&repo.join(".canon/ledger"))
 }

@@ -1,6 +1,6 @@
 //! `canon dispatch` — the handlers of the group.
 
-use crate::cli::dispatch::*;
+use crate::cli::dispatch::{DispatchCommand, DispatchBeginArgs, DispatchEndArgs, DispatchDiffArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: DispatchCommand) -> ExitCode {

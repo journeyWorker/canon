@@ -91,7 +91,7 @@ mod tests {
     fn malformed_project_yaml_is_an_err_not_a_panic() {
         let tmp = tempfile::TempDir::new().unwrap();
         std::fs::write(tmp.path().join(PROJECT_YAML_RELATIVE_PATH), "not: [valid").unwrap();
-        assert!(load_project(tmp.path()).is_err());
+        load_project(tmp.path()).unwrap_err();
     }
 
     #[test]

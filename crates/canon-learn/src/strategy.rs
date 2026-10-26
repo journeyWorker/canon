@@ -96,7 +96,7 @@ pub struct StrategyItem {
 }
 
 impl StrategyItem {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         id: StrategyId,
         regime_key: RegimeKey,
@@ -127,7 +127,7 @@ impl StrategyItem {
     }
 
     pub fn is_retrievable(&self) -> bool {
-        self.demotion.is_none() && self.lifecycle.map_or(true, StrategyLifecycle::retrievable)
+        self.demotion.is_none() && self.lifecycle.is_none_or(StrategyLifecycle::retrievable)
     }
 
     /// Constructs a distilled item whose `id` is DERIVED from the rest

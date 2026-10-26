@@ -95,7 +95,7 @@ fn encode(scope: &str, key: &str) -> String {
 }
 
 fn decode(cursor: &str) -> Option<(String, String)> {
-    if cursor.is_empty() || cursor.len() % 2 != 0 || !cursor.is_ascii() {
+    if cursor.is_empty() || !cursor.len().is_multiple_of(2) || !cursor.is_ascii() {
         return None;
     }
     let bytes: Option<Vec<u8>> = (0..cursor.len()).step_by(2).map(|i| u8::from_str_radix(&cursor[i..i + 2], 16).ok()).collect();
@@ -181,7 +181,7 @@ pub fn check_fields(command: &str, requested: &[String], known: &BTreeSet<String
 
 /// [`check_fields`] against a fixed list of field names.
 pub fn check_known(command: &str, requested: &[String], known: &[&str]) -> Result<(), CliError> {
-    check_fields(command, requested, &known.iter().map(|f| f.to_string()).collect())
+    check_fields(command, requested, &known.iter().map(std::string::ToString::to_string).collect())
 }
 
 /// Whether `fields` names `member`, in either case style.
@@ -218,7 +218,7 @@ mod tests {
         let mut cursor = None;
         let mut got = Vec::new();
         loop {
-            let (rows, meta) = paginate("t", items.clone(), |s| s.to_string(), &page(Some(2), cursor.clone())).unwrap();
+            let (rows, meta) = paginate("t", items.clone(), std::string::ToString::to_string, &page(Some(2), cursor.clone())).unwrap();
             got.extend(rows);
             match meta.next_cursor {
                 Some(next) => cursor = Some(next),
@@ -231,10 +231,10 @@ mod tests {
     #[test]
     fn a_cursor_from_another_scope_or_garbage_is_refused() {
         let items = vec!["a", "b", "c"];
-        let (_, meta) = paginate("query:handoff", items.clone(), |s| s.to_string(), &page(Some(1), None)).unwrap();
+        let (_, meta) = paginate("query:handoff", items.clone(), std::string::ToString::to_string, &page(Some(1), None)).unwrap();
         let cursor = meta.next_cursor.unwrap();
         for bad in [cursor.clone(), "zz".to_string(), String::new()] {
-            let err = paginate("query:run", items.clone(), |s| s.to_string(), &page(Some(1), Some(bad))).unwrap_err();
+            let err = paginate("query:run", items.clone(), std::string::ToString::to_string, &page(Some(1), Some(bad))).unwrap_err();
             assert_eq!(err.code, "INVALID_CURSOR");
         }
     }

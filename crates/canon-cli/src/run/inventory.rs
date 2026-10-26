@@ -1,6 +1,6 @@
 //! `canon inventory` — the handlers of the group.
 
-use crate::cli::inventory::*;
+use crate::cli::inventory::{InventoryCommand, InventorySyncArgs};
 use super::top::with_provenance_fix;
 use crate::cli_error::CliError;
 use std::process::ExitCode;

@@ -1,6 +1,6 @@
 //! `canon strategy` — the handlers of the group.
 
-use crate::cli::strategy::*;
+use crate::cli::strategy::{StrategyCommand, StrategyPromoteArgs, StrategyApprovalPayloadArgs, StrategyRollbackArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: StrategyCommand) -> ExitCode {

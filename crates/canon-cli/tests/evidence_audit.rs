@@ -101,7 +101,7 @@ fn record(repo: &Path, args: &[&str]) {
 }
 
 fn staged(repo: &Path) -> usize {
-    std::fs::read_dir(repo.join(".canon/ledger/_staging/kind=evidence_record")).map(|d| d.count()).unwrap_or(0)
+    std::fs::read_dir(repo.join(".canon/ledger/_staging/kind=evidence_record")).map_or(0, std::iter::Iterator::count)
 }
 
 fn committed(repo: &Path) -> Vec<serde_json::Value> {
@@ -284,7 +284,7 @@ fn a_new_audit_replaces_a_refutation_and_binds_only_what_it_names() {
 
     record(repo, &audit_args("game.run.01", "confirmed", &[]));
     let confirmed = committed(repo).pop().unwrap();
-    assert!(confirmed["attachments"].as_array().is_none_or(|a| a.is_empty()), "the counterexample is not carried: {confirmed}");
+    assert!(confirmed["attachments"].as_array().is_none_or(std::vec::Vec::is_empty), "the counterexample is not carried: {confirmed}");
     let gate = canon(repo, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(0), "{}", text(&gate));
 }
@@ -299,7 +299,7 @@ fn expected_sample(seed: &str, rate: f64, ids: &[&str]) -> Vec<String> {
             let digest = Sha256::digest([seed.as_bytes(), b"\0", b"root", b"\0", id.as_bytes()].concat());
             u128::from(u64::from_be_bytes(digest[..8].try_into().unwrap())) < threshold
         })
-        .map(|id| id.to_string())
+        .map(std::string::ToString::to_string)
         .collect()
 }
 

@@ -233,7 +233,7 @@ pub fn canon_in(dir: &Path, home: &Path, args: &[String], envs: &[(&str, &str)])
 }
 
 pub fn strs(args: &[&str]) -> Vec<String> {
-    args.iter().map(|a| a.to_string()).collect()
+    args.iter().map(std::string::ToString::to_string).collect()
 }
 
 /// `canon <args>` that must exit 0.

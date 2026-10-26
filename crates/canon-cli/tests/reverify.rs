@@ -353,7 +353,7 @@ fn a_chore_review_goes_stale_when_the_brief_changes_and_a_feature_change_is_refu
 
     let refused = change_review(r, "c-demo");
     assert_eq!(refused.status.code(), Some(2), "{}", stderr(&refused));
-    let reviews = |r: &Path| std::fs::read_dir(r.join(".canon/ledger/kind=review")).map(|d| d.count()).unwrap_or(0);
+    let reviews = |r: &Path| std::fs::read_dir(r.join(".canon/ledger/kind=review")).map_or(0, std::iter::Iterator::count);
     let json = run(r, &["review", "change", "c-demo", "--project-id", "demo", "--original-spec-ref", ".canon/changes/brief.md", "--actor-id", "reviewer-3", "--role", "reviewer", "--json"]);
     assert_eq!(json.status.code(), Some(2));
     assert!(stdout(&json).contains("REVIEW_INVALID_ARGUMENT"), "{}", stdout(&json));

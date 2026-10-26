@@ -168,7 +168,7 @@ pub fn validate_scope(kind: RecordKind, change_id: Option<&ChangeId>, status: Op
     if let Some(value) = status {
         let allowed = status_domain(kind);
         if !allowed.contains(&value) {
-            return Err(ScopeError::InvalidStatus { kind, value: value.to_string(), valid: allowed.iter().map(|s| s.to_string()).collect() });
+            return Err(ScopeError::InvalidStatus { kind, value: value.to_string(), valid: allowed.iter().map(std::string::ToString::to_string).collect() });
         }
     }
     Ok(())
@@ -395,7 +395,7 @@ fn rollup_for(kind: RecordKind, records: &[RawRecord]) -> Option<(usize, usize)>
 /// ([`canon_store::git_tier::GitTier::read_history`]), unfolded, oldest
 /// first. Without it, the current records only: the ledger holds one
 /// version per key, so this is the working set the gate reads.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn run(
     repo: &Path,
     kind: RecordKind,
@@ -483,7 +483,7 @@ pub fn format_human(outcome: &QueryOutcome) -> String {
 /// event bodies even when sensitive output was authorized for another
 /// formatter.
 pub fn format_human_with_sensitive(outcome: &QueryOutcome, _include_sensitive: bool) -> String {
-    let since_desc = outcome.since.map(|s| s.to_rfc3339()).unwrap_or_else(|| "none".to_string());
+    let since_desc = outcome.since.map_or_else(|| "none".to_string(), |s| s.to_rfc3339());
     let mut out = format!("canon query --kind {} --since {}: {} record(s)", kind_cli_name(outcome.kind), since_desc, outcome.records.len());
     if outcome.violation_count > 0 {
         out.push_str(&format!("  ({} violation(s) reported, excluded)", outcome.violation_count));
@@ -500,12 +500,10 @@ pub fn format_human_with_sensitive(outcome: &QueryOutcome, _include_sensitive: b
     out.push_str("\nAT                             ID                              DIGEST\n");
     for raw in &outcome.records {
         let at = canon_store::tier::raw_record_at(raw);
-        let id = canon_store::partition::resolve_partition(outcome.kind, &raw.0)
-            .map(|p| match p.area {
+        let id = canon_store::partition::resolve_partition(outcome.kind, &raw.0).map_or_else(|_| "-".to_string(), |p| match p.area {
                 Some(area) => format!("area={area}/{}", p.natural_key),
                 None => p.natural_key,
-            })
-            .unwrap_or_else(|_| "-".to_string());
+            });
         let digest = canon_store::partition::content_digest12(&raw.0);
         out.push_str(&format!("{:<30} {:<30} {}\n", at.to_rfc3339(), id, digest));
     }
@@ -552,7 +550,7 @@ fn redact_event_detail(value: &mut Value) {
 }
 
 fn sensitive_detail_key(key: &str) -> bool {
-    let compact = key.chars().filter(|character| character.is_ascii_alphanumeric()).map(|character| character.to_ascii_lowercase()).collect::<String>();
+    let compact = key.chars().filter(char::is_ascii_alphanumeric).map(|character| character.to_ascii_lowercase()).collect::<String>();
     matches!(
         compact.as_str(),
         "credential"
@@ -893,7 +891,7 @@ pub fn format_human_with_overlay(outcome: &QueryOutcome, plugin_id: &str, projec
 }
 
 pub fn format_human_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id: &str, projections: &[OverlayProjection], _include_sensitive: bool) -> String {
-    let since_desc = outcome.since.map(|s| s.to_rfc3339()).unwrap_or_else(|| "none".to_string());
+    let since_desc = outcome.since.map_or_else(|| "none".to_string(), |s| s.to_rfc3339());
     let mut out =
         format!("canon query --kind {} --since {} --plugin {}: {} record(s)", kind_cli_name(outcome.kind), since_desc, plugin_id, outcome.records.len());
     if outcome.violation_count > 0 {
@@ -911,15 +909,12 @@ pub fn format_human_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id
     out.push_str("\nAT                             ID                              DIGEST           OVERLAY\n");
     for raw in &outcome.records {
         let at = canon_store::tier::raw_record_at(raw);
-        let id = canon_store::partition::resolve_partition(outcome.kind, &raw.0)
-            .map(|p| match p.area {
+        let id = canon_store::partition::resolve_partition(outcome.kind, &raw.0).map_or_else(|_| "-".to_string(), |p| match p.area {
                 Some(area) => format!("area={area}/{}", p.natural_key),
                 None => p.natural_key,
-            })
-            .unwrap_or_else(|_| "-".to_string());
+            });
         let digest = canon_store::partition::content_digest12(&raw.0);
-        let overlay_desc = scenario_key(raw)
-            .map(|key| {
+        let overlay_desc = scenario_key(raw).map_or_else(|| "-".to_string(), |key| {
                 let mut obj = serde_json::Map::new();
                 for projection in projections {
                     if let Some(fields) = projection.projected.get(&key) {
@@ -927,8 +922,7 @@ pub fn format_human_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id
                     }
                 }
                 if obj.is_empty() { "-".to_string() } else { Value::Object(obj).to_string() }
-            })
-            .unwrap_or_else(|| "-".to_string());
+            });
         out.push_str(&format!("{:<30} {:<30} {:<16} {}\n", at.to_rfc3339(), id, digest, overlay_desc));
     }
     finish_human(out, outcome)

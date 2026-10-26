@@ -201,6 +201,7 @@ struct RawIngestSessions {
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
+#[derive(Default)]
 struct RawDirectivePrivacy {
     #[serde(default)]
     capture_user_directives: bool,
@@ -208,11 +209,6 @@ struct RawDirectivePrivacy {
     max_directive_chars: Option<usize>,
 }
 
-impl Default for RawDirectivePrivacy {
-    fn default() -> Self {
-        Self { capture_user_directives: false, max_directive_chars: None }
-    }
-}
 
 #[derive(Debug, Default, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -266,7 +262,7 @@ impl IngestSourceConfig {
                  wrong corpus): {e}"
             ))
         })?;
-        let known: BTreeSet<&str> = registry().iter().map(|e| e.client_id()).collect();
+        let known: BTreeSet<&str> = registry().iter().map(canon_ingest::AdapterEntry::client_id).collect();
         if let Some(id) = ingest.sources.keys().find(|id| !known.contains(id.as_str())) {
             let mut names: Vec<&str> = known.into_iter().collect();
             names.sort_unstable();
@@ -486,7 +482,7 @@ fn absolutize(path: &Path) -> PathBuf {
     if path.is_absolute() {
         return path.to_path_buf();
     }
-    std::env::current_dir().map(|cwd| cwd.join(path)).unwrap_or_else(|_| path.to_path_buf())
+    std::env::current_dir().map_or_else(|_| path.to_path_buf(), |cwd| cwd.join(path))
 }
 
 /// `git worktree list --porcelain` -> every worktree root, main
@@ -830,7 +826,7 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
 fn file_stat(path: &Path) -> (i64, u64) {
     match std::fs::metadata(path) {
         Ok(meta) => {
-            let mtime_ms = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0);
+            let mtime_ms = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_millis() as i64);
             (mtime_ms, meta.len())
         }
         Err(_) => (0, 0),
@@ -990,7 +986,7 @@ fn safe_tier_degrade_reason(rung: canon_store::policy::Rung, backend: Option<can
         let name = name.strip_prefix('`').and_then(|name| name.strip_suffix('`')).unwrap_or(name);
         (!name.is_empty() && name.bytes().all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_')).then_some(name)
     });
-    let reason = safe_reason.map(|name| format!("{name} is unset")).unwrap_or_else(|| backend.map(|value| value.default_unattached_reason().to_string()).unwrap_or_else(|| "unavailable".to_string()));
+    let reason = safe_reason.map_or_else(|| backend.map_or_else(|| "unavailable".to_string(), |value| value.default_unattached_reason().to_string()), |name| format!("{name} is unset"));
     StoreError::tier_unavailable(rung, backend, reason).to_string()
 }
 

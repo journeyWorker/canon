@@ -89,7 +89,7 @@ fn sha256<T: Serialize>(value: &T) -> String {
 }
 
 impl PromotionEvaluation {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         candidate: &StrategyItem,
         candidate_version: impl Into<String>,
@@ -251,7 +251,7 @@ impl PromotionApproval {
         if self.schema_version != PROMOTION_APPROVAL_VERSION {
             return Err("unsupported promotion approval version".into());
         }
-        if self.signature.as_ref().map_or(true, |value| value.is_empty()) || self.signer_key.as_ref().map_or(true, |value| value.is_empty()) {
+        if self.signature.as_ref().is_none_or(std::string::String::is_empty) || self.signer_key.as_ref().is_none_or(std::string::String::is_empty) {
             return Err("promotion approval signature and signer key are required".into());
         }
         if self.candidate_strategy_id != candidate.id || self.evaluation_digest != evaluation.digest() {

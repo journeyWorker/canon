@@ -27,7 +27,7 @@ fn spec_leaves() -> BTreeSet<String> {
                 && node
                     .get("children")
                     .and_then(|c| c.as_array())
-                    .map_or(true, Vec::is_empty)
+                    .is_none_or(Vec::is_empty)
         })
         .map(|node| node["command"].as_str().expect("leaf has a command id").to_string())
         .collect()
@@ -165,7 +165,7 @@ fn every_leaf_has_a_success_and_a_failure_scenario() {
             match corpus.get(id) {
                 None => problems.push(format!("leaf `{leaf}`: happy scenario `{id}` does not exist in the corpus")),
                 Some(cases) if cases.contains("failure") => {
-                    problems.push(format!("leaf `{leaf}`: happy scenario `{id}` is tagged @case:failure"))
+                    problems.push(format!("leaf `{leaf}`: happy scenario `{id}` is tagged @case:failure"));
                 }
                 Some(_) => {}
             }
@@ -174,7 +174,7 @@ fn every_leaf_has_a_success_and_a_failure_scenario() {
             match corpus.get(id) {
                 None => problems.push(format!("leaf `{leaf}`: failure scenario `{id}` does not exist in the corpus")),
                 Some(cases) if !cases.contains("failure") => {
-                    problems.push(format!("leaf `{leaf}`: failure scenario `{id}` is not tagged @case:failure"))
+                    problems.push(format!("leaf `{leaf}`: failure scenario `{id}` is not tagged @case:failure"));
                 }
                 Some(_) => {}
             }

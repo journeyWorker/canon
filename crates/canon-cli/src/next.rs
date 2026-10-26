@@ -259,7 +259,7 @@ pub fn finish_with_meta<R: Report>(repo: &Path, command: &str, scope: &Scope, st
 }
 
 /// [`finish_with_meta`] with `extra` steps ([`after_with`]).
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn finish_with_steps<R: Report>(repo: &Path, command: &str, scope: &Scope, staged: bool, json: bool, data: &R, extra_meta: Value, extra: Vec<NextStep>) {
     let after = after_with(repo, scope, staged, extra);
     if json {

@@ -219,7 +219,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&args.full(), args.json);
+            return CliError::refused("CONFIG_UNREADABLE", e.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&args.full(), args.json);
         }
     };
     let brief_digest = match &args.change {
@@ -349,7 +349,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     let (stored, written) = match write_reviews(&repo, &gate_context.ctx.ledger_root, &files, &only_reviews, &mut |tier, review| tier.write(review)) {
         Ok(landed) => landed,
         Err(error) => {
-            let mut error = CliError::refused("WRITE_FAILED", error.to_string()).hint("check that the path is writable and the disk has room, then run the command again");
+            let mut error = CliError::refused("WRITE_FAILED", error.clone()).hint("check that the path is writable and the disk has room, then run the command again");
             if reviews.len() > 1 {
                 error = error.hint("no review is written: every review and blob this run wrote or stored was removed");
             }
@@ -506,7 +506,7 @@ mod tests {
         assert_eq!(reviews.len(), 1);
         let review = &reviews[0];
         assert_eq!(review.envelope.actor.agent_id, "agent-x");
-        assert_eq!(review.envelope.actor.role.as_ref().map(|r| r.as_str()), Some("reviewer"));
+        assert_eq!(review.envelope.actor.role.as_ref().map(canon_model::RoleId::as_str), Some("reviewer"));
         assert_eq!(review.envelope.actor.session_id.as_ref(), Some(&session));
         assert_eq!(review.provenance_ref, ProvenanceRef::UpstreamRef("routes/world.firstbuy-hotdeal.26#onReview".to_string()));
         assert_eq!(review.outcome, ReviewOutcome::Signed);
@@ -593,7 +593,7 @@ mod tests {
         let files: Vec<crate::evidence_attach::BoundFile> =
             crate::evidence_attach::bind_artifacts(dir.path(), &[dir.path().join("shot.png")], 1024).unwrap().into_iter().map(|(_, file)| file).collect();
         let store = canon_gate::artifact_store::store_dir(dir.path());
-        let blobs = || std::fs::read_dir(&store).map(|d| d.count()).unwrap_or(0);
+        let blobs = || std::fs::read_dir(&store).map_or(0, std::iter::Iterator::count);
         let review = |scenario: &str| {
             let a = args();
             Review::new(

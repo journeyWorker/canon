@@ -254,7 +254,7 @@ mod tests {
     }
 
     fn find_in(args: &[&str]) -> Option<Removed> {
-        find(&tree(), &args.iter().map(|a| a.to_string()).collect::<Vec<_>>())
+        find(&tree(), &args.iter().map(std::string::ToString::to_string).collect::<Vec<_>>())
     }
 
     #[test]

@@ -58,7 +58,7 @@ fn finding(change: &ChangeId, round: u32, seq: u32, hour: u32, summary: &str) ->
 }
 
 fn n(row: &query::Row, column: &str) -> i64 {
-    row.get(column).and_then(|value| value.as_i64()).unwrap_or_else(|| panic!("{column} is not an integer in {row:?}"))
+    row.get(column).and_then(serde_json::Value::as_i64).unwrap_or_else(|| panic!("{column} is not an integer in {row:?}"))
 }
 
 /// A `Finding` JSON document, as a single-line SQL string literal —

@@ -124,7 +124,7 @@ pub fn rollback_strategy_authenticated(
         let mut content = fs::read_to_string(&path)?;
         if content.starts_with("---\n") {
             content = content.replacen("status: active", "status: rolled_back", 1);
-            content = content.replacen("---\n", &format!("---\nrollback_reason: {:?}\nrollback_actor: {:?}\n", reason, actor), 1);
+            content = content.replacen("---\n", &format!("---\nrollback_reason: {reason:?}\nrollback_actor: {actor:?}\n"), 1);
             fs::write(path, content)?;
         }
     }

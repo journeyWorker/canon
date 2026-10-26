@@ -100,7 +100,7 @@ fn reviews(repo: &Path) -> Vec<Value> {
 }
 
 fn stored_blobs(repo: &Path) -> usize {
-    std::fs::read_dir(repo.join(".canon/artifacts/sha256")).map(|d| d.count()).unwrap_or(0)
+    std::fs::read_dir(repo.join(".canon/artifacts/sha256")).map_or(0, std::iter::Iterator::count)
 }
 
 /// `canon evidence add --all-scenarios` over `report`, plus `extra`.
@@ -669,9 +669,7 @@ fn evidence_add_86_a_write_that_stales_a_pinned_review_names_the_re_pin() {
 
     let out = canon(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent", "--verdict", "not-applicable", "--summary", "skipped in this run"]);
     assert!(out.status.success(), "{}", stderr(&out));
-    let expected = format!(
-        "canon evidence add: review by `reviewer-2` of shop.cart.01 is now stale (this record's verdict or checks differ from what it saw); re-pin it: canon review scenario shop.cart.01 --project-id root --actor-id reviewer-2 --role reviewer --session-id sess-review --upstream-ref 'tests/cart.rs#shop_cart_01'"
-    );
+    let expected = "canon evidence add: review by `reviewer-2` of shop.cart.01 is now stale (this record's verdict or checks differ from what it saw); re-pin it: canon review scenario shop.cart.01 --project-id root --actor-id reviewer-2 --role reviewer --session-id sess-review --upstream-ref 'tests/cart.rs#shop_cart_01'".to_string();
     let text = stdout(&out);
     let line = text.lines().find(|l| l.contains("is now stale")).unwrap_or_else(|| panic!("no stale-review line: {text}"));
     assert_eq!(line, expected);

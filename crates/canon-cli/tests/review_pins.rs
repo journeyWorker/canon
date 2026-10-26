@@ -144,7 +144,7 @@ fn record_suite(repo: &Path, report: &str) {
 fn evidence_records(repo: &Path) -> usize {
     [".canon/ledger/kind=evidence_record", ".canon/archive/kind=evidence_record"]
         .iter()
-        .map(|dir| std::fs::read_dir(repo.join(dir)).map(|d| d.count()).unwrap_or(0))
+        .map(|dir| std::fs::read_dir(repo.join(dir)).map_or(0, std::iter::Iterator::count))
         .sum()
 }
 

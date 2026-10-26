@@ -230,7 +230,7 @@ fn every_env_var_the_sources_read_is_in_the_spec_or_the_internal_allowlist() {
         }
     }
     let documented: BTreeSet<String> = spec::env_var_names().map(str::to_string).collect();
-    let internal: BTreeSet<String> = INTERNAL_ENV.iter().map(|s| s.to_string()).collect();
+    let internal: BTreeSet<String> = INTERNAL_ENV.iter().map(std::string::ToString::to_string).collect();
     assert!(documented.is_disjoint(&internal), "a variable is both user-facing and internal: {:?}", documented.intersection(&internal).collect::<Vec<_>>());
     let unaccounted: Vec<&String> = read.iter().filter(|v| !documented.contains(*v) && !internal.contains(*v)).collect();
     assert!(unaccounted.is_empty(), "read under crates/ but neither in the spec nor internal: {unaccounted:?}");

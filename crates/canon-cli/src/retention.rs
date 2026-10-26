@@ -73,7 +73,7 @@ fn audit_path(repo: &Path) -> Option<PathBuf> {
 /// record bodies. New audit files are created mode 0600. Silently writes
 /// nothing when there is no `canon.yaml` to scope the event to
 /// ([`audit_path`]).
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn append_access_audit(
     repo: &Path,
     operation: &str,
@@ -565,6 +565,13 @@ impl<E: Into<RetentionError>> From<E> for ExportFailure {
     }
 }
 
+/// The access event for one `canon query`, scoped like every other
+/// event ([`audit_path`]). Written only for a query that reached the store: a
+/// refused one leaves no line (O7).
+pub fn audit_query(repo: &Path, kind: RecordKind, since: Option<DateTime<Utc>>, sensitive: bool, matched: usize) -> Result<(), RetentionError> {
+    append_access_audit(repo, "query", Some(kind), if since.is_some() { "since" } else { "all" }, sensitive, matched, 0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -640,11 +647,4 @@ mod tests {
         append_access_audit(dir.path(), "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
         assert!(fs::read_dir(dir.path()).unwrap().next().is_none(), "a directory without canon.yaml must be left untouched");
     }
-}
-
-/// The access event for one `canon query`, scoped like every other
-/// event ([`audit_path`]). Written only for a query that reached the store: a
-/// refused one leaves no line (O7).
-pub fn audit_query(repo: &Path, kind: RecordKind, since: Option<DateTime<Utc>>, sensitive: bool, matched: usize) -> Result<(), RetentionError> {
-    append_access_audit(repo, "query", Some(kind), if since.is_some() { "since" } else { "all" }, sensitive, matched, 0)
 }

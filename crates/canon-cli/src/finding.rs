@@ -515,7 +515,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding add", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", error.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding add", args.json);
         }
     };
 
@@ -609,7 +609,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
     let natural_key = match resolve_partition(RecordKind::Finding, &body) {
         Ok(key) => key.natural_key,
         Err(violation) => {
-            return CliError::refused("FINDING_INVALID_ARGUMENT", violation.detail.to_string()).hint("`canon schema finding add` lists the accepted arguments and their forms").emit("canon finding add", args.json);
+            return CliError::refused("FINDING_INVALID_ARGUMENT", violation.detail.clone()).hint("`canon schema finding add` lists the accepted arguments and their forms").emit("canon finding add", args.json);
         }
     };
 
@@ -771,7 +771,7 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
         Err(error) => {
-            return CliError::refused("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding close", args.json);
+            return CliError::refused("CONFIG_UNREADABLE", error.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding close", args.json);
         }
     };
 
@@ -1029,7 +1029,7 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
         findings.retain(|f| f.disposition() == FindingDisposition::Open);
     }
     if let Some(requested) = &args.fields {
-        let known: std::collections::BTreeSet<String> = LIST_FIELDS.iter().map(|f| f.to_string()).collect();
+        let known: std::collections::BTreeSet<String> = LIST_FIELDS.iter().map(std::string::ToString::to_string).collect();
         if let Err(e) = crate::paging::check_fields("canon finding list", requested, &known) {
             return e.emit("canon finding list", args.json);
         }
@@ -1048,7 +1048,7 @@ pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
             disposition: f.disposition().as_str(),
             reviewer: &f.reviewer,
             summary: &f.summary,
-            resolution_sha: f.resolution_sha().map(|sha| sha.as_str()),
+            resolution_sha: f.resolution_sha().map(canon_model::Sha::as_str),
             file_ref: f.file_ref.as_deref(),
             reason: f.reason.as_deref(),
         });

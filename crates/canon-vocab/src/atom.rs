@@ -101,7 +101,7 @@ mod tests {
 
     #[test]
     fn malformed_yaml_is_a_parse_error_not_a_panic() {
-        assert!(parse_atoms_file("- id: [this is not").is_err());
+        parse_atoms_file("- id: [this is not").unwrap_err();
     }
 
     #[test]

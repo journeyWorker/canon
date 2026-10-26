@@ -68,7 +68,7 @@ fn run_hook(repo: &Path, stdin_json: &str) -> Output {
     {
         use std::io::Write;
         child.stdin.take().unwrap().write_all(stdin_json.as_bytes()).expect("write stdin");
-    }
+    };
     child.wait_with_output().expect("wait for pre-dispatch.sh")
 }
 

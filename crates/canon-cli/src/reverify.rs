@@ -302,7 +302,7 @@ pub fn hint(repo: &Path, ctx: Option<&GateContext>, code_tree: &CodeTreeMemo, su
         many => format!("record the suite again for the scenarios named, once per spec root: {}", many.iter().map(|c| format!("`{c}`")).collect::<Vec<_>>().join("; ")),
     };
     let review = chore_review_commands(repo, ctx, subject).first().map_or_else(
-        || String::new(),
+        String::new,
         |change| format!("; a chore also needs its change-level review (`canon review change {change}`)"),
     );
     Some(format!("{how}; reviews stay current while a scenario's verdict and checks are unchanged{review}, then ship"))

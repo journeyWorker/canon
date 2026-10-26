@@ -354,7 +354,7 @@ fn partition_key(record: &EvidenceRecord) -> Option<(RoleId, String)> {
     let surface = record
         .scenario_id
         .as_ref()
-        .map(|scenario_id| scenario_id.surface_key())
+        .map(canon_model::ScenarioId::surface_key)
         .or_else(|| record.task_id.as_ref().map(|task_id| task_id.change_id().to_string()))?;
     Some((role, surface))
 }
@@ -1571,7 +1571,7 @@ mod tests {
         staging.write(&open).unwrap();
         assert_eq!(promote(&staging, &committed, false).unwrap().promoted.len(), 1);
 
-        let mut fixed = open.clone().fixed_by(Sha::parse(&"a".repeat(40)).unwrap());
+        let mut fixed = open.clone().fixed_by(Sha::parse("a".repeat(40)).unwrap());
         fixed.envelope.at = open.envelope.at + chrono::Duration::hours(1);
         staging.write(&fixed).unwrap();
 
@@ -1599,7 +1599,7 @@ mod tests {
     fn a_resubmitted_current_disposition_is_refused_against_the_latest_version() {
         let dir = TempDir::new().unwrap();
         let (staging, committed) = tiers(&dir);
-        let sha = Sha::parse(&"a".repeat(40)).unwrap();
+        let sha = Sha::parse("a".repeat(40)).unwrap();
 
         let open = finding("s44-spec-derived-worklist", 1, 1);
         staging.write(&open).unwrap();
@@ -1633,7 +1633,7 @@ mod tests {
         staging.write(&open).unwrap();
         promote(&staging, &committed, false).unwrap();
 
-        let mut fixed = open.clone().fixed_by(Sha::parse(&"a".repeat(40)).unwrap());
+        let mut fixed = open.clone().fixed_by(Sha::parse("a".repeat(40)).unwrap());
         fixed.envelope.at = open.envelope.at + chrono::Duration::hours(1);
         let mut rejected = open.clone().rejected();
         rejected.envelope.at = open.envelope.at + chrono::Duration::hours(2);
@@ -1791,7 +1791,7 @@ mod tests {
         let report = promote(&staging, &committed, false).unwrap();
         assert!(report.is_clean(), "refused: {:?}", report.refused);
         assert_eq!(report.promoted.len(), 2);
-        let mut seqs: Vec<Option<u64>> = report.promoted.iter().map(|p| p.run_seq()).collect();
+        let mut seqs: Vec<Option<u64>> = report.promoted.iter().map(super::Promoted::run_seq).collect();
         seqs.sort_unstable();
         assert_eq!(seqs, vec![Some(1), Some(2)], "no gaps, strictly increasing");
 
@@ -2008,7 +2008,7 @@ mod tests {
             Envelope::new(1, RecordKind::Divergence, chrono::Utc::now(), actor),
             ProjectId::parse(project_id).unwrap(),
             ScenarioId::parse(scenario_id).unwrap(),
-            canon_model::Sha::parse(&"a".repeat(40)).unwrap(),
+            canon_model::Sha::parse("a".repeat(40)).unwrap(),
             canon_model::DivergenceStatus::Open,
             canon_model::TotalOrder::new(UNASSIGNED_RUN_SEQ),
             round,
@@ -2026,7 +2026,7 @@ mod tests {
 
         let report = promote(&staging, &committed, false).unwrap();
         assert!(report.is_clean(), "refused: {:?}", report.refused);
-        let mut seqs: Vec<Option<u64>> = report.promoted.iter().map(|p| p.run_seq()).collect();
+        let mut seqs: Vec<Option<u64>> = report.promoted.iter().map(super::Promoted::run_seq).collect();
         seqs.sort_unstable();
         assert_eq!(seqs, vec![Some(1), Some(2)]);
         assert!(staging.read(&TierQuery::kind(RecordKind::Divergence)).unwrap().records.is_empty());
@@ -2132,7 +2132,7 @@ mod tests {
         let open = finding("s44-spec-derived-worklist", 1, 1);
         staging.write(&open).unwrap();
         promote(&staging, &committed, false).unwrap();
-        let mut fixed = open.clone().fixed_by(Sha::parse(&"a".repeat(40)).unwrap());
+        let mut fixed = open.clone().fixed_by(Sha::parse("a".repeat(40)).unwrap());
         fixed.envelope.at = open.envelope.at + chrono::Duration::hours(1);
         staging.write(&fixed).unwrap();
         promote(&staging, &committed, false).unwrap();

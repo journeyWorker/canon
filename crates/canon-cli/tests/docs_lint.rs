@@ -226,7 +226,7 @@ fn placeholder_in(text: &str) -> Option<String> {
     }
     let b = text.as_bytes();
     for (i, c) in text.char_indices() {
-        if c == '<' && b.get(i + 1).is_some_and(|n| n.is_ascii_alphabetic()) {
+        if c == '<' && b.get(i + 1).is_some_and(u8::is_ascii_alphabetic) {
             if let Some(end) = text[i..].find('>') {
                 if !text[i + 1..i + end].contains(char::is_whitespace) || text[i + 1..i + end].len() < 40 {
                     return Some(format!("a placeholder {}", &text[i..=i + end]));
@@ -362,7 +362,7 @@ fn run(dir: &Path, home: &Path, args: &[String]) -> std::process::Output {
 }
 
 fn ok(dir: &Path, home: &Path, args: &[&str]) {
-    let out = run(dir, home, &args.iter().map(|a| a.to_string()).collect::<Vec<_>>());
+    let out = run(dir, home, &args.iter().map(std::string::ToString::to_string).collect::<Vec<_>>());
     assert!(out.status.success(), "{args:?}: {}", String::from_utf8_lossy(&out.stdout));
 }
 
@@ -404,7 +404,7 @@ fn next_commands(spec: &Value) -> Vec<Cmd> {
         argv.push("--json".into());
         let output = run(&cwd, home.path(), &argv);
         let Ok(doc) = serde_json::from_slice::<Value>(&output.stdout) else { continue };
-        for step in doc["meta"]["next"].as_array().map(|a| a.as_slice()).unwrap_or_default() {
+        for step in doc["meta"]["next"].as_array().map(std::vec::Vec::as_slice).unwrap_or_default() {
             if step["actor"] == "agent" && step["command"].as_str().is_some_and(|c| c.starts_with("canon ")) {
                 let text = step["command"].as_str().unwrap().to_string();
                 if seen.insert(text.clone()) {
@@ -443,7 +443,7 @@ fn assert_all_parse(root: &clap::Command, commands: &[Cmd], stale_pending: bool)
     let mut problems = Vec::new();
     let mut hit = BTreeSet::new();
     for cmd in commands {
-        if let Some(problem) = check(&root, cmd) {
+        if let Some(problem) = check(root, cmd) {
             match PENDING.iter().position(|(src, sub)| pending(&cmd.source, &cmd.text) && cmd.source.contains(src) && cmd.text.contains(sub)) {
                 Some(i) => {
                     hit.insert(i);
@@ -482,7 +482,7 @@ fn the_extractor_reads_what_the_convention_says() {
 /// points at a `reference/<file>.md` path; it names `canon skills show <name>` instead. Every name it shows exists.
 #[test]
 fn the_guides_point_at_skills_show_and_every_name_exists() {
-    let names: BTreeSet<String> = canon_cli::guide::names().iter().map(|n| n.to_string()).collect();
+    let names: BTreeSet<String> = canon_cli::guide::names().iter().map(std::string::ToString::to_string).collect();
     let mut problems = Vec::new();
     for (path, text) in canon_cli::guide::files() {
         if !path.ends_with(".md") {

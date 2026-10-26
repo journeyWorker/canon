@@ -989,7 +989,7 @@ pub fn parse_junit(text: &str) -> Result<Vec<ReportCase>, String> {
                     match e.local_name().as_ref() {
                         b"failure" | b"error" => case.outcome = ReportOutcome::Failed,
                         b"skipped" if case.outcome != ReportOutcome::Failed => {
-                            case.outcome = ReportOutcome::Skipped
+                            case.outcome = ReportOutcome::Skipped;
                         }
                         _ => {}
                     }
@@ -1027,7 +1027,7 @@ fn testcase(e: &BytesStart<'_>) -> Result<ReportCase, String> {
         match e.try_get_attribute(name).map_err(|err| err.to_string())? {
             Some(a) => a
                 .normalized_value(quick_xml::XmlVersion::Implicit1_0)
-                .map(|v| v.into_owned())
+                .map(std::borrow::Cow::into_owned)
                 .map_err(|err| err.to_string()),
             None => Ok(String::new()),
         }
@@ -1297,10 +1297,10 @@ pub fn parse_swift_testing(text: &str) -> Result<Vec<ReportCase>, String> {
 /// the stream carries it, else an issue that is neither a known issue nor
 /// a warning.
 fn issue_is_failure(issue: &serde_json::Value) -> bool {
-    if let Some(failure) = issue.get("isFailure").and_then(|v| v.as_bool()) {
+    if let Some(failure) = issue.get("isFailure").and_then(serde_json::Value::as_bool) {
         return failure;
     }
-    let known = issue.get("isKnown").and_then(|v| v.as_bool()).unwrap_or(false);
+    let known = issue.get("isKnown").and_then(serde_json::Value::as_bool).unwrap_or(false);
     let warning = issue.get("severity").and_then(|v| v.as_str()) == Some("warning");
     !known && !warning
 }
@@ -1343,7 +1343,7 @@ mod tests {
             parse_junit("<testsuites/>").is_err(),
             "a report with no case binds nothing"
         );
-        assert!(parse_junit("<testsuite><testcase name=\"x\">").is_err());
+        parse_junit("<testsuite><testcase name=\"x\">").unwrap_err();
     }
 
     fn names(matched: &[&ReportCase]) -> Vec<(String, ReportOutcome)> {
@@ -1371,7 +1371,7 @@ mod tests {
             "spec_coverage::tests::cart_add_04_refuses_out_of_stock",
             "--report-case names a Rust test by its function"
         );
-        assert!(match_cases(&cases, &[], None).is_err());
+        match_cases(&cases, &[], None).unwrap_err();
     }
 
     /// 0.14 acceptance rerun G7: a case binds only to its OWN leading
@@ -1457,7 +1457,7 @@ mod tests {
             names(&match_cases(&cases, &[], Some("cart.add.04")).unwrap()),
             vec![("Outline".to_string(), ReportOutcome::Passed), ("Outline".to_string(), ReportOutcome::Failed)]
         );
-        assert!(parse_cucumber("{}").is_err());
+        parse_cucumber("{}").unwrap_err();
     }
 
     fn request<'a>(
@@ -1560,9 +1560,9 @@ mod tests {
             parse_report_spec("junit:target/nextest/junit.xml").unwrap(),
             (ReportFormat::Junit, PathBuf::from("target/nextest/junit.xml"))
         );
-        assert!(parse_report_spec("tap:out.tap").is_err());
-        assert!(parse_report_spec("junit:").is_err());
-        assert!(parse_report_spec("junit.xml").is_err());
+        parse_report_spec("tap:out.tap").unwrap_err();
+        parse_report_spec("junit:").unwrap_err();
+        parse_report_spec("junit.xml").unwrap_err();
         assert_eq!(
             parse_report_spec("swift-testing:.build/events.jsonl").unwrap(),
             (ReportFormat::SwiftTesting, PathBuf::from(".build/events.jsonl"))

@@ -309,7 +309,7 @@ mod tests {
 
     #[test]
     fn well_formed_body_passes_validation() {
-        assert!(validate_overlay_body(&coverage_decl(), &well_formed_body()).is_ok());
+        validate_overlay_body(&coverage_decl(), &well_formed_body()).unwrap();
     }
 
     #[test]

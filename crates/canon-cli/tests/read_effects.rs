@@ -69,7 +69,7 @@ fn canon(dir: &Path, home: &Path, args: &[String]) -> Output {
 }
 
 fn ok(dir: &Path, home: &Path, args: &[&str]) {
-    let out = canon(dir, home, &args.iter().map(|a| a.to_string()).collect::<Vec<_>>());
+    let out = canon(dir, home, &args.iter().map(std::string::ToString::to_string).collect::<Vec<_>>());
     assert!(out.status.success(), "{args:?}: {}", String::from_utf8_lossy(&out.stderr));
 }
 
@@ -198,7 +198,7 @@ fn words(line: &str) -> Vec<String> {
 
 fn schema(dir: &Path, home: &Path, args: &[&str]) -> Value {
     let mut argv: Vec<String> = vec!["schema".into()];
-    argv.extend(args.iter().map(|a| a.to_string()));
+    argv.extend(args.iter().map(std::string::ToString::to_string));
     argv.push("--json".into());
     let out = canon(dir, home, &argv);
     serde_json::from_slice::<Value>(&out.stdout).unwrap_or_else(|e| panic!("{argv:?}: {e}"))["data"].clone()
@@ -231,7 +231,7 @@ fn every_read_leaf_leaves_the_repo_tree_unchanged_or_declares_its_write() {
         argv.remove(0);
         invocations.push((leaf.clone(), argv));
     }
-    for line in EXTRA_INVOCATIONS.iter() {
+    for line in EXTRA_INVOCATIONS {
         let argv = words(line);
         let leaf = leaves.iter().filter(|l| line.starts_with(l.as_str())).max_by_key(|l| l.len()).unwrap_or_else(|| panic!("`{line}` belongs to no read leaf")).clone();
         invocations.push((leaf, argv));
@@ -285,7 +285,7 @@ fn stdout_on_copy(base: &Path, home: &Path, sync_first: bool, args: &[&str]) -> 
     if sync_first {
         ok(&repo, home, &["inventory", "sync"]);
     }
-    let out = canon(&repo, home, &args.iter().map(|a| a.to_string()).collect::<Vec<_>>());
+    let out = canon(&repo, home, &args.iter().map(std::string::ToString::to_string).collect::<Vec<_>>());
     String::from_utf8_lossy(&out.stdout).into_owned()
 }
 
@@ -296,7 +296,7 @@ fn stale_index_status_and_gate_check_grade_a_stale_index_as_a_sync_would_leave_i
     for args in [&["gate", "check", "--json"][..], &["gate", "check"][..], &["status", "--json"][..], &["status"][..]] {
         let stale = stdout_on_copy(base.path(), home.path(), false, args);
         let synced = stdout_on_copy(base.path(), home.path(), true, args);
-        let (changed, _, _, out) = run_on_copy(base.path(), home.path(), &args.iter().map(|a| a.to_string()).collect::<Vec<_>>());
+        let (changed, _, _, out) = run_on_copy(base.path(), home.path(), &args.iter().map(std::string::ToString::to_string).collect::<Vec<_>>());
         assert!(changed.is_empty(), "{args:?} must not write the index or its archive: {changed:?}");
         let stderr = String::from_utf8_lossy(&out.stderr);
         assert!(!stderr.contains("scenario index"), "{args:?} writes no index, so it prints no refresh line: {stderr}");
@@ -310,7 +310,7 @@ fn stale_index_status_and_gate_check_grade_a_stale_index_as_a_sync_would_leave_i
 fn stale_index_a_recording_command_refreshes_it_and_says_so_in_one_line() {
     let home = TempDir::new().unwrap();
     let base = fixture(home.path());
-    let argv: Vec<String> = ["artifacts", "store"].iter().map(|a| a.to_string()).collect();
+    let argv: Vec<String> = ["artifacts", "store"].iter().map(std::string::ToString::to_string).collect();
     let (changed, _, _, out) = run_on_copy(base.path(), home.path(), &argv);
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     assert!(!changed.is_empty(), "the stale index is rebuilt by a command that records something");
@@ -324,7 +324,7 @@ fn dispatch_diff_answers_from_an_empty_hot_tier_without_creating_the_file() {
     let home = TempDir::new().unwrap();
     let base = fixture(home.path());
     assert!(!base.path().join(".canon/hot.db").exists(), "the fixture has never written the hot tier");
-    let argv: Vec<String> = ["dispatch", "diff", "--json"].iter().map(|a| a.to_string()).collect();
+    let argv: Vec<String> = ["dispatch", "diff", "--json"].iter().map(std::string::ToString::to_string).collect();
     let (changed, _, _, out) = run_on_copy(base.path(), home.path(), &argv);
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     assert!(changed.is_empty(), "no hot.db, no WAL sidecar: {changed:?}");
@@ -350,7 +350,7 @@ fn a_hot_path_that_exists_but_is_not_a_database_is_an_error_never_an_empty_read(
             std::fs::write(&hot, b"this is not a sqlite database, just bytes").unwrap();
         }
         for args in [&["query", "--kind", "task", "--json"][..], &["dispatch", "diff", "--json"][..]] {
-            let out = canon(&repo, home.path(), &args.iter().map(|a| a.to_string()).collect::<Vec<_>>());
+            let out = canon(&repo, home.path(), &args.iter().map(std::string::ToString::to_string).collect::<Vec<_>>());
             let text = String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr);
             if args[0] == "query" {
                 assert!(!out.status.success(), "{what}: {args:?} must not succeed with an empty result: {text}");

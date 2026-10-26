@@ -226,7 +226,7 @@ fn flywheel_funnel_never_widens() {
 
     assert!(!result.rows.is_empty(), "an empty funnel would satisfy the invariant vacuously");
     for row in &result.rows {
-        let count = |column: &str| row.get(column).and_then(|v| v.as_i64()).unwrap_or_else(|| panic!("missing `{column}` in {row:?}"));
+        let count = |column: &str| row.get(column).and_then(serde_json::Value::as_i64).unwrap_or_else(|| panic!("missing `{column}` in {row:?}"));
         assert!(count("applied") <= count("retrieved"), "applied must never exceed retrieved: {row:?}");
         assert!(count("retrieved") <= count("distilled"), "retrieved must never exceed distilled: {row:?}");
         assert_eq!(
@@ -294,7 +294,7 @@ fn scope_status_matches_the_fixture_corpus_exactly() {
     assert_eq!(unauthored["evidence_covered"], corpus::scope_status::UNAUTHORED_EVIDENCE_COVERED);
     assert_eq!(unauthored["green"], corpus::scope_status::UNAUTHORED_GREEN);
     assert!(
-        unauthored.get("spec_covered").is_none_or(|v| v.is_null()),
+        unauthored.get("spec_covered").is_none_or(serde_json::Value::is_null),
         "spec_covered must be an honest NULL when no porting.coverage overlay exists, got {:?}",
         unauthored.get("spec_covered")
     );
@@ -363,7 +363,7 @@ fn review_rounds_matches_the_fixture_corpus_exactly() {
         result
             .rows
             .iter()
-            .find(|r| r.get("change_id").and_then(|v| v.as_str()) == Some(change_id) && r.get("round").and_then(|v| v.as_i64()) == Some(round))
+            .find(|r| r.get("change_id").and_then(|v| v.as_str()) == Some(change_id) && r.get("round").and_then(serde_json::Value::as_i64) == Some(round))
             .unwrap_or_else(|| panic!("missing row for {change_id} round {round} in {:?}", result.rows))
     };
     let assert_row = |label: &str, r: &canon_report::query::Row, expected: &corpus::review_rounds::Row| {
@@ -423,7 +423,7 @@ fn review_rounds_separates_matched_sourced_and_unsourced_introducing_commits() {
     let round_2 = result
         .rows
         .iter()
-        .find(|r| r.get("change_id").and_then(|v| v.as_str()) == Some(corpus::review_rounds::CHANGE_ID) && r.get("round").and_then(|v| v.as_i64()) == Some(2))
+        .find(|r| r.get("change_id").and_then(|v| v.as_str()) == Some(corpus::review_rounds::CHANGE_ID) && r.get("round").and_then(serde_json::Value::as_i64) == Some(2))
         .expect("round 2 row");
 
     // Three findings, three distinct shapes: one matched, one sourced
@@ -451,7 +451,7 @@ fn review_rounds_never_counts_a_finding_against_itself_or_across_changes() {
         result
             .rows
             .iter()
-            .find(|r| r.get("change_id").and_then(|v| v.as_str()) == Some(change_id) && r.get("round").and_then(|v| v.as_i64()) == Some(round))
+            .find(|r| r.get("change_id").and_then(|v| v.as_str()) == Some(change_id) && r.get("round").and_then(serde_json::Value::as_i64) == Some(round))
             .unwrap_or_else(|| panic!("missing row for {change_id} round {round}"))
     };
 
@@ -489,7 +489,7 @@ fn review_totals_are_exactly_the_per_change_sum_of_the_review_rounds_rows() {
     let rounds = marts::fetch_review_rounds(&roots).unwrap();
     let totals = marts::fetch_review_totals(&roots).unwrap();
 
-    let n = |row: &canon_report::query::Row, column: &str| row.get(column).and_then(|v| v.as_i64()).unwrap_or_else(|| panic!("{column} is not an integer in {row:?}"));
+    let n = |row: &canon_report::query::Row, column: &str| row.get(column).and_then(serde_json::Value::as_i64).unwrap_or_else(|| panic!("{column} is not an integer in {row:?}"));
 
     // Same change set, no more and no fewer: a change with rounds but
     // no totals row would leave a release note with nothing to copy,
@@ -579,7 +579,7 @@ fn the_fix_of_fix_total_is_the_sum_of_the_per_round_fix_of_fix_values() {
     let roots = inputs(dir.path()).roots;
     let rounds = marts::fetch_review_rounds(&roots).unwrap();
     let totals = marts::fetch_review_totals(&roots).unwrap();
-    let n = |row: &canon_report::query::Row, column: &str| row.get(column).and_then(|v| v.as_i64()).unwrap();
+    let n = |row: &canon_report::query::Row, column: &str| row.get(column).and_then(serde_json::Value::as_i64).unwrap();
 
     for total in &totals.rows {
         let change = total["change_id"].as_str().unwrap();

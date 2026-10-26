@@ -22,7 +22,7 @@ fn canon(dir: &Path, args: &[String]) -> Output {
 }
 
 fn run(dir: &Path, args: &[&str]) -> Output {
-    canon(dir, &args.iter().map(|a| a.to_string()).collect::<Vec<_>>())
+    canon(dir, &args.iter().map(std::string::ToString::to_string).collect::<Vec<_>>())
 }
 
 fn ok(dir: &Path, args: &[&str]) {

@@ -215,7 +215,7 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     if let Some(review) = canon_gate::review_advisories(&gate_context) {
         crate::say_raw!(json, "{}", format_review_advisories(&review));
         if !review.is_empty() {
-            advisories.push(advisory("review_waivers", format!("{} waived review gap(s) — not failing the gate", review.len()), review.iter().map(|a| a.line()).collect()));
+            advisories.push(advisory("review_waivers", format!("{} waived review gap(s) — not failing the gate", review.len()), review.iter().map(canon_gate::ReviewAdvisory::line).collect()));
         }
     }
     let accepted = canon_gate::acceptance::accepted_divergences(&gate_context);
@@ -239,7 +239,7 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
         advisories.push(advisory(
             "unstored_attachments",
             format!("{} bound file(s) not in the artifact store; run `canon artifacts store` to store them", unstored.len()),
-            unstored.iter().map(|a| a.line()).collect(),
+            unstored.iter().map(canon_gate::UnstoredAttachment::line).collect(),
         ));
     }
     let violations: Vec<GateViolation> = report
@@ -393,7 +393,7 @@ fn format_gate_report(report: &GateReport) -> String {
     let mut out = format!("canon gate check: {} violation(s)\n", report.violations.len());
     for class_str in FAILURE_CLASSES {
         let class = FailureClass::from_str_exact(class_str).expect("FAILURE_CLASSES round-trips to FailureClass");
-        let lines: Vec<String> = report.by_class(class).map(|v| v.line()).collect();
+        let lines: Vec<String> = report.by_class(class).map(canon_gate::Violation::line).collect();
         if lines.is_empty() {
             continue;
         }
@@ -513,7 +513,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
     let LocatedTask { write_back, document_path, source_root } = match locate_task(&repo, &task_id) {
         Ok(located) => located,
         Err(e) => {
-            return CliError::refused("TASK_NOT_FOUND", e.to_string()).hint("task ids look like <change_id>#<n>; open the change's plan document to find the right number").emit("canon task done", json);
+            return CliError::refused("TASK_NOT_FOUND", e.clone()).hint("task ids look like <change_id>#<n>; open the change's plan document to find the right number").emit("canon task done", json);
         }
     };
 
@@ -565,7 +565,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
         Ok(Some(atom)) => match typed_path_evidence(&repo, &atom, &raw_records, &task_id) {
             Ok(pair) => pair,
             Err(e) => {
-                return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
+                return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.clone()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
             }
         },
         Ok(None) => {
@@ -573,13 +573,13 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
             let notes = match notes_of(same_task_id, &task_id) {
                 Ok(n) => n,
                 Err(e) => {
-                    return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
+                    return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.clone()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
                 }
             };
             (canon_gate::history::evidence_history(&gate_context).to_vec(), notes)
         }
         Err(e) => {
-            return CliError::refused("TYPED_ATOMS_INVALID", e.to_string()).hint("fix the typed evidence atom in the plan task (the message names it), then run the command again").emit("canon task done", json);
+            return CliError::refused("TYPED_ATOMS_INVALID", e.clone()).hint("fix the typed evidence atom in the plan task (the message names it), then run the command again").emit("canon task done", json);
         }
     };
 
@@ -643,7 +643,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
             0
         }
         TaskFlipDecision::Blocked { violations } => {
-            CliError::failed("GATE_TASK_BLOCKED", violations.iter().map(|v| v.line()).collect::<Vec<_>>().join("\n")).hint("record the missing evidence with `canon evidence add --task-id <id> ...`, then run `canon task done` again").emit("canon task done", json)
+            CliError::failed("GATE_TASK_BLOCKED", violations.iter().map(canon_gate::Violation::line).collect::<Vec<_>>().join("\n")).hint("record the missing evidence with `canon evidence add --task-id <id> ...`, then run `canon task done` again").emit("canon task done", json)
         }
     }
 }
@@ -1233,7 +1233,7 @@ impl crate::reports::Report for GateInstallHooksReport {}
 /// `canon-gate-pre-commit.sh` (`PRE_COMMIT_SCRIPT`, task 4.2) into
 /// `<repo>/.canon/scripts/`, matching spec.md's "a non-donor repo gets a generic
 /// pre-commit script" scenario.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, command: &str, timeout: u32, dry_run: bool, json: bool) -> i32 {
     let repo = resolve_repo_root(repo);
     let entry = HookEntry::new(event, matcher.map(str::to_string), command, timeout);
@@ -1335,7 +1335,7 @@ fn write_pre_commit_script(path: &Path) -> std::io::Result<()> {
         let mut perms = std::fs::metadata(path)?.permissions();
         perms.set_mode(0o755);
         std::fs::set_permissions(path, perms)?;
-    }
+    };
     Ok(())
 }
 

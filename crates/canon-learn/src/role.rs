@@ -110,8 +110,8 @@ mod tests {
     #[test]
     fn extra_roles_widen_the_registry() {
         let registry = RoleRegistry::builtin().with_extra_roles([RoleId::parse("triage").unwrap()]);
-        assert!(registry.validate(&RoleId::parse("triage").unwrap()).is_ok());
+        registry.validate(&RoleId::parse("triage").unwrap()).unwrap();
         // still registers every built-in role too.
-        assert!(registry.validate(&RoleId::parse("dev").unwrap()).is_ok());
+        registry.validate(&RoleId::parse("dev").unwrap()).unwrap();
     }
 }

@@ -32,7 +32,7 @@ fn require_live() -> bool {
 /// retrofit).
 fn dsn_host_port(dsn: &str) -> (String, u16) {
     let after_scheme = dsn.split("://").nth(1).unwrap_or(dsn);
-    let after_creds = after_scheme.rsplit_once('@').map(|(_, rest)| rest).unwrap_or(after_scheme);
+    let after_creds = after_scheme.rsplit_once('@').map_or(after_scheme, |(_, rest)| rest);
     let host_port = after_creds.split('/').next().unwrap_or(after_creds);
     match host_port.rsplit_once(':') {
         Some((host, port)) => (host.to_string(), port.parse().unwrap_or(5432)),
@@ -47,8 +47,7 @@ fn dsn_host_port(dsn: &str) -> (String, u16) {
 fn tcp_reachable(host: &str, port: u16) -> bool {
     (host, port)
         .to_socket_addrs()
-        .map(|addrs| addrs.into_iter().any(|addr| TcpStream::connect_timeout(&addr, StdDuration::from_millis(800)).is_ok()))
-        .unwrap_or(false)
+        .is_ok_and(|addrs| addrs.into_iter().any(|addr| TcpStream::connect_timeout(&addr, StdDuration::from_millis(800)).is_ok()))
 }
 
 #[test]

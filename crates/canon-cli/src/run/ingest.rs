@@ -1,7 +1,7 @@
 //! `canon ingest` — the handlers of the group.
 
 use canon_model::{RunId};
-use crate::cli::ingest::*;
+use crate::cli::ingest::{IngestCommand, IngestSessionsArgs, IngestRecordsArgs, IngestPlansArgs};
 use crate::cli_error::CliError;
 use std::path::PathBuf;
 use std::process::ExitCode;

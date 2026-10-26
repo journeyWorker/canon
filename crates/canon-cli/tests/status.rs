@@ -426,7 +426,7 @@ fn status_next_names_the_command_for_each_gap() {
 
     // The human form: each command line directly under its `# why` line.
     let text = stdout(&run(dir.path(), &["status"]));
-    let block = text.split_once("\nnext:\n").map(|(_, rest)| rest).unwrap_or_else(|| panic!("no next: block\n{text}"));
+    let block = text.split_once("\nnext:\n").map_or_else(|| panic!("no next: block\n{text}"), |(_, rest)| rest);
     let lines: Vec<&str> = block.lines().collect();
     assert_eq!(lines.len(), 10, "five `# why` + command pairs:\n{block}");
     for (pair, step) in lines.chunks(2).zip(report["next"].as_array().unwrap()) {
@@ -928,7 +928,7 @@ fn status_reports_an_unreadable_canon_yaml_and_is_unverifiable() {
     assert_eq!(report["ok"], false, "{report}");
     assert_eq!(report["error"]["code"], "UNVERIFIABLE", "{report}");
     assert!(report["data"]["warnings"].as_array().unwrap().iter().any(|w| w.as_str().unwrap().starts_with("cannot read this repo's ledger: parsing `")), "{report}");
-    assert_eq!(report["meta"]["coverage"]["skipped"].as_array().map(|a| a.is_empty()), Some(false), "{report}");
+    assert_eq!(report["meta"]["coverage"]["skipped"].as_array().map(std::vec::Vec::is_empty), Some(false), "{report}");
 }
 
 #[test]

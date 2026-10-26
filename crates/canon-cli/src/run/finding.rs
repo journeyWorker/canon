@@ -1,6 +1,6 @@
 //! `canon finding` — the handlers of the group.
 
-use crate::cli::finding::*;
+use crate::cli::finding::{FindingCommand, FindingAddArgs, FindingCloseArgs, FindingListArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: FindingCommand) -> ExitCode {

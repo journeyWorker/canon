@@ -191,11 +191,12 @@ fn status_str(status: SubjectStatus) -> &'static str {
 /// shipped` EVIDENCE gate is a SEPARATE, additional requirement layered
 /// on top of this pure step check (see [`ship_gate_violations`]).
 pub fn is_valid_transition(from: SubjectStatus, to: SubjectStatus) -> bool {
-    use SubjectStatus::*;
+    use SubjectStatus::{Retired, Proposed, Specced, Building, Verifying, Shipped};
     if to == Retired {
         return from != Retired;
     }
-    matches!((from, to), (Proposed, Specced) | (Specced, Building) | (Building, Verifying) | (Verifying, Shipped) | (Shipped, Verifying))
+    matches!((from, to), (Proposed, Specced) | (Specced, Building) | (Building | Shipped, Verifying) |
+(Verifying, Shipped))
 }
 
 /// Build a [`TierRegistry`] over exactly `kinds`' routed rungs, via the
@@ -280,7 +281,7 @@ fn report_subject(repo: &Path, subject: &Subject, verb: &str, dry_run: bool, jso
 
 /// [`report_subject`] with `warnings`: said on stderr, and in `--json`
 /// carried in `meta.warnings` ([`crate::json_out::warnings_meta`]).
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn report_subject_warning(
     repo: &Path,
     subject: &Subject,
@@ -445,7 +446,7 @@ fn domain_membership_violation(repo: &Path, domain: &str) -> Option<String> {
 /// enum ([`domain_membership_violation`]). A `subject_id` already
 /// present in the store is a loud refusal (exit `2`), never a silent
 /// second append.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, summary: &str, owner_role: &RoleId, actor_id: &str, session: Option<&canon_model::SessionId>, json: bool) -> i32 {
     // `domain` shares `SubjectId`'s kebab-slug grammar (design D2: the
     // model validates the SAME shape via `is_kebab_slug`); validate it
@@ -461,7 +462,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
 
     let repo = resolve_repo_root(repo);
     if let Some(violation) = domain_membership_violation(&repo, domain) {
-        return CliError::refused("SUBJECT_INVALID_ARGUMENT", violation.to_string()).hint("`canon schema subject new` lists the accepted arguments and their forms").emit("canon subject new", json);
+        return CliError::refused("SUBJECT_INVALID_ARGUMENT", violation.clone()).hint("`canon schema subject new` lists the accepted arguments and their forms").emit("canon subject new", json);
     }
     let canon_yaml_path = resolve_canon_yaml(&repo);
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
@@ -477,7 +478,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
         }
         Ok(None) => {}
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject new", json);
+            return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject new", json);
         }
     }
 
@@ -528,7 +529,7 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_
             0
         }
         Err(e) => {
-            CliError::refused("SUBJECT_ADOPT_REFUSED", e.to_string()).hint("fix what the message names, then run `canon subject adopt` again").emit("canon subject adopt", json)
+            CliError::refused("SUBJECT_ADOPT_REFUSED", e.clone()).hint("fix what the message names, then run `canon subject adopt` again").emit("canon subject adopt", json)
         }
     }
 }
@@ -859,7 +860,7 @@ fn preview_adoption(repo: &Path, mut change: Change, mut subject: Subject) -> Re
 /// runs no review guard, and records [`Reopen`]. A successful transition
 /// re-stamps the subject (fresh `at`) and persists it through the routed
 /// tier.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn run_move(
     repo: &Path,
     subject_id: &SubjectId,
@@ -894,7 +895,7 @@ pub fn run_move(
             return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).hint("`canon subject new <id> --domain <domain> --title <title>` creates it; check the id against the subjects `canon status` lists").emit("canon subject move", json);
         }
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject move", json);
+            return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject move", json);
         }
     };
 
@@ -944,7 +945,7 @@ pub fn run_move(
                 Some(ctx)
             }
             Err(e) => {
-                return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject move", json);
+                return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject move", json);
             }
         }
     } else {
@@ -1108,7 +1109,7 @@ pub fn run_show(repo: &Path, subject_id: &SubjectId, json: bool) -> i32 {
     let subject = match find_subject(&registry, subject_id) {
         Ok(Some(s)) => s,
         Ok(None) => return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).hint("`canon subject new <id> --domain <domain> --title <title>` creates it; check the id against the subjects `canon status` lists").emit("canon subject show", json),
-        Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject show", json),
+        Err(e) => return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject show", json),
     };
     if json {
         crate::json_out::data("subject show", &SubjectReport(&subject));
@@ -1119,7 +1120,7 @@ pub fn run_show(repo: &Path, subject_id: &SubjectId, json: bool) -> i32 {
         }
         println!("  owner: {}", subject.owner_role.as_str());
         if !subject.change_ids.is_empty() {
-            println!("  changes: {}", subject.change_ids.iter().map(|c| c.as_str()).collect::<Vec<_>>().join(", "));
+            println!("  changes: {}", subject.change_ids.iter().map(canon_model::ChangeId::as_str).collect::<Vec<_>>().join(", "));
         }
         if let Some(reopen) = &subject.reopen {
             println!("  reopened: {}", reopen.reason);
@@ -1412,6 +1413,6 @@ mod tests {
         ] {
             assert_eq!(parse_status(status_str(status)).unwrap(), status);
         }
-        assert!(parse_status("not-a-state").is_err());
+        parse_status("not-a-state").unwrap_err();
     }
 }

@@ -1,6 +1,6 @@
 //! `canon gate` — the handlers of the group.
 
-use crate::cli::gate::*;
+use crate::cli::gate::{GateCommand, GateCheckArgs, GatePromoteArgs, PromoteKind, GateInstallHooksArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: GateCommand) -> ExitCode {

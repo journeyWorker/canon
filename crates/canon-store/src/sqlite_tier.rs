@@ -657,8 +657,8 @@ mod tests {
         let path = dir.path().join("hot.db");
         {
             let tier = SqliteTier::connect(&path).unwrap();
-            tier.write(&change(Utc::now(), "s32-reconnect-test")).unwrap();
-        }
+            tier.write(&change(Utc::now(), "s32-reconnect-test")).unwrap()
+        };
         let reopened = SqliteTier::connect(&path).unwrap();
         let result = reopened.read(&TierQuery::kind(RecordKind::Change)).unwrap();
         assert_eq!(result.records.len(), 1);

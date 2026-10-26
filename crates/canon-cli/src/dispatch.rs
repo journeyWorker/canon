@@ -560,7 +560,7 @@ fn capture_lineage(
     spec.task_ref = task_ref;
     spec.injected_guidance = guidance.to_vec();
     let (pack, _) = create_dispatch_pack(repo, &spec, &context_bytes, surface.capability_version)?;
-    let policy_digest = pack.policy.as_ref().map(|file| file.content.digest.clone()).unwrap_or_else(|| "sha256:absent".to_string());
+    let policy_digest = pack.policy.as_ref().map_or_else(|| "sha256:absent".to_string(), |file| file.content.digest.clone());
     Ok(RunLineage {
         provider: metadata.provider.clone().or(pack.provider.clone()),
         model: metadata.model.clone().or(pack.model.clone()),
@@ -1812,7 +1812,7 @@ fn reconcile_runs(tier: Vec<Value>, manifests: Vec<Value>, notes: &mut Vec<Strin
             // `record` is over before either branch below MOVES it —
             // a `let ... else` on the borrow directly would keep the
             // initializer's temporaries alive across the `else`.
-            let keyed = str_field(&record, "run_id").map(|run_id| run_id.to_string());
+            let keyed = str_field(&record, "run_id").map(std::string::ToString::to_string);
             let Some(run_id) = keyed else {
                 unkeyed.push(record);
                 continue;
@@ -1862,7 +1862,7 @@ fn describe_divergence(left: &Value, right: &Value) -> String {
         return "the whole record".to_string();
     };
     let differing: BTreeSet<&str> =
-        left.keys().chain(right.keys()).map(|field| field.as_str()).filter(|field| left.get(*field) != right.get(*field)).collect();
+        left.keys().chain(right.keys()).map(std::string::String::as_str).filter(|field| left.get(*field) != right.get(*field)).collect();
     if differing.is_empty() {
         // Two objects that compare unequal must differ on some key,
         // so this is unreachable — but a note reading "differs on: "
@@ -2975,11 +2975,11 @@ mod begin_tests {
 
     #[test]
     fn the_binding_value_parsers_check_grammar_only() {
-        assert!(parse_task_id("demo-change#1.1").is_ok());
+        parse_task_id("demo-change#1.1").unwrap();
         assert!(parse_task_id("no-such-change#9.9").is_ok(), "grammar, not existence — existence is checked at dispatch time");
-        assert!(parse_task_id("missing-the-separator").is_err());
-        assert!(parse_run_id("01ARZ3NDEKTSV4RRFFQ69G5FAV").is_ok());
-        assert!(parse_run_id("not-a-ulid").is_err());
+        parse_task_id("missing-the-separator").unwrap_err();
+        parse_run_id("01ARZ3NDEKTSV4RRFFQ69G5FAV").unwrap();
+        parse_run_id("not-a-ulid").unwrap_err();
     }
 }
 

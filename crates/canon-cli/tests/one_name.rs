@@ -59,7 +59,7 @@ fn one_name_problems(commands: &[Surface]) -> Vec<String> {
 }
 
 fn surface(path: &str, flags: &[&str], kind_values: &[&str]) -> Surface {
-    Surface { path: path.to_string(), flags: flags.iter().map(|f| f.to_string()).collect(), kind_values: kind_values.iter().map(|v| v.to_string()).collect() }
+    Surface { path: path.to_string(), flags: flags.iter().map(std::string::ToString::to_string).collect(), kind_values: kind_values.iter().map(std::string::ToString::to_string).collect() }
 }
 
 /// context.capability.22: the checker reports a split, a bare concept and a

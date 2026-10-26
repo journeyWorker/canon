@@ -706,7 +706,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
         match merge_agents_md(existing.as_deref()) {
             Ok(merged) => Some((existing, merged)),
             Err(e) => {
-                return CliError::refused("INIT_AGENTS_MD_CONFLICT", e.to_string()).hint("resolve the conflict in AGENTS.md by hand, or run `canon init --no-agents-md`").emit(log.command(), json);
+                return CliError::refused("INIT_AGENTS_MD_CONFLICT", e.clone()).hint("resolve the conflict in AGENTS.md by hand, or run `canon init --no-agents-md`").emit(log.command(), json);
             }
         }
     } else {
@@ -720,7 +720,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
         match choose_skills(repo, &options.skills) {
             Ok(skills) => skills,
             Err(e) => {
-                return CliError::refused("INIT_INVALID_ARGUMENT", e.to_string()).hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
+                return CliError::refused("INIT_INVALID_ARGUMENT", e.clone()).hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
             }
         }
     };
@@ -992,7 +992,7 @@ mod tests {
         let chosen = InitSkills { providers: vec![Provider::Codex, Provider::Pi], recorded: true };
         std::fs::write(&canon_yaml, skeleton_yaml() + &skills_section(Some(&chosen))).unwrap();
         assert_eq!(skills::configured_providers(&canon_yaml).unwrap(), Some(vec![Provider::Codex, Provider::Pi]));
-        assert!(TierPolicy::from_yaml_at(&std::fs::read_to_string(&canon_yaml).unwrap(), dir.path()).is_ok());
+        TierPolicy::from_yaml_at(&std::fs::read_to_string(&canon_yaml).unwrap(), dir.path()).unwrap();
         std::fs::write(&canon_yaml, skeleton_yaml() + &skills_section(None)).unwrap();
         assert_eq!(skills::configured_providers(&canon_yaml).unwrap(), None);
     }
@@ -1032,9 +1032,9 @@ mod tests {
         std::fs::write(&canon_yaml_path, skeleton_yaml()).unwrap();
         let text = std::fs::read_to_string(&canon_yaml_path).unwrap();
 
-        assert!(TierPolicy::from_yaml_at(&text, dir.path()).is_ok());
-        assert!(crate::inventory::load_spec_roots(&canon_yaml_path).is_ok());
-        assert!(crate::plans::load_plan_sources_from_config(&canon_yaml_path, dir.path()).is_ok());
+        TierPolicy::from_yaml_at(&text, dir.path()).unwrap();
+        crate::inventory::load_spec_roots(&canon_yaml_path).unwrap();
+        crate::plans::load_plan_sources_from_config(&canon_yaml_path, dir.path()).unwrap();
         assert_eq!(crate::write_mode::configured_promote_mode(&canon_yaml_path), Ok(crate::write_mode::PromoteMode::Auto), "a new repo promotes on write");
     }
 
@@ -1162,6 +1162,6 @@ spec_coverage:
 
     #[test]
     fn merge_agents_md_refuses_a_trailing_unclosed_fence() {
-        assert!(merge_agents_md(Some("# Docs\n\n```\nnever closed\n")).is_err());
+        merge_agents_md(Some("# Docs\n\n```\nnever closed\n")).unwrap_err();
     }
 }

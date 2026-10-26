@@ -667,7 +667,7 @@ mod tests {
         // depends on this staying a hard failure, never silently
         // defaulted, when BOTH the caller's own `bucket_env`-named var
         // AND the generic `S3_BUCKET` tier-2 fallback are unset.
-        let _guard = S3_BUCKET_ENV_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = S3_BUCKET_ENV_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         std::env::remove_var("CANON_R2_TEST_BUCKET_UNSET");
         std::env::remove_var("S3_BUCKET");
         let err = R2Tier::connect_live("CANON_R2_TEST_BUCKET_UNSET", "canon/").unwrap_err();
@@ -699,7 +699,7 @@ mod tests {
         // resolving through tier 2, not just tier 1/tier 3. Serializes
         // on `S3_BUCKET_ENV_LOCK` against the fail-loud test above,
         // the only other test touching `S3_BUCKET`.
-        let _guard = S3_BUCKET_ENV_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = S3_BUCKET_ENV_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         for var in ["CANON_S3_ENDPOINT", "CANON_S3_ACCESS_KEY", "CANON_S3_SECRET_KEY", "CANON_S3_REGION"] {
             std::env::remove_var(var);
         }
@@ -770,7 +770,7 @@ mod tests {
         let conn = S3Connection { endpoint: "http://127.0.0.1:9".into(), access_key_id: "k".into(), secret_access_key: "s".into(), region: "us-east-1".into() };
         let store = s3_store("bucket", conn).unwrap();
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let err = rt.block_on(async { use object_store::ObjectStore; store.head(&object_store::path::Path::from("missing")).await }).unwrap_err().to_string();
+        let err = rt.block_on(async {  store.head(&object_store::path::Path::from("missing")).await }).unwrap_err().to_string();
         assert!(!err.contains("builder error"), "the HTTP client was refused before any request: {err}");
     }
 

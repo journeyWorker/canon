@@ -110,7 +110,7 @@ pub fn bind(repo: &Path, rev: &str) -> Result<Bound, CliError> {
 /// the file or the key is absent). A malformed file or glob is `CONFIG_UNREADABLE`.
 pub fn code_exclude(repo: &Path) -> Result<Vec<String>, CliError> {
     let bad = |why: String| CliError::refused("CONFIG_UNREADABLE", why).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again");
-    let defaults = || DEFAULT_EXCLUDE.iter().map(|g| g.to_string()).collect();
+    let defaults = || DEFAULT_EXCLUDE.iter().map(std::string::ToString::to_string).collect();
     let Ok(raw) = std::fs::read_to_string(repo.join("canon.yaml")) else { return Ok(defaults()) };
     let doc: serde_yaml::Value = serde_yaml::from_str(&raw).map_err(|e| bad(format!("parsing `canon.yaml`: {e}")))?;
     let Some(code) = doc.get("code") else { return Ok(defaults()) };

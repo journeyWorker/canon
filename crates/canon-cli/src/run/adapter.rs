@@ -1,7 +1,7 @@
 //! `canon adapter` — the handlers of the group.
 
 use canon_model::envelope::RecordKind;
-use crate::cli::adapter::*;
+use crate::cli::adapter::{AdapterCommand, AdapterValidateArgs, AdapterAuthorizeArgs};
 use crate::cli_error::CliError;
 use std::process::ExitCode;
 

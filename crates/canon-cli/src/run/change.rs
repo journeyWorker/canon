@@ -1,6 +1,6 @@
 //! `canon change` — the handlers of the group.
 
-use crate::cli::change::*;
+use crate::cli::change::{ChangeCommand, ChangeNewArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: ChangeCommand) -> ExitCode {

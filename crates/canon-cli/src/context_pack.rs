@@ -298,7 +298,7 @@ pub fn create(repo: &Path, spec: &ContextPackSpec) -> Result<ContextPack, Contex
     let repo_identity = repo_identity(&repo)?;
     let knowledge_map = spec.knowledge_map.as_deref().map(|p| capture_file(&repo, p)).transpose()?;
     let knowledge_map_digest = spec.canonical_knowledge_map_digest.clone().unwrap_or_else(|| {
-        knowledge_map.as_ref().map(|f| f.content.digest.clone()).unwrap_or_else(|| digest(b"canonical-knowledge-map:absent"))
+        knowledge_map.as_ref().map_or_else(|| digest(b"canonical-knowledge-map:absent"), |f| f.content.digest.clone())
     });
     let selected_docs = spec.selected_docs.iter().map(|p| capture_file(&repo, p)).collect::<Result<Vec<_>, _>>()?;
     let prompt_bundle = spec.prompt_bundle.as_ref().map(|selection| select_prompt_bundle(&repo, &selection.name, &selection.version)).transpose()?;
@@ -654,9 +654,9 @@ mod tests {
     fn repository_mutation_does_not_change_replay_bytes() {
         let dir = fixture();
         fs::write(dir.path().join("doc.md"), b"before\n").unwrap();
-        let pack = create(&dir.path(), &ContextPackSpec { selected_docs: vec![PathBuf::from("doc.md")], ..Default::default() }).unwrap();
+        let pack = create(dir.path(), &ContextPackSpec { selected_docs: vec![PathBuf::from("doc.md")], ..Default::default() }).unwrap();
         fs::write(dir.path().join("doc.md"), b"after\n").unwrap();
-        assert!(verify(dir.path(), &pack.id).is_ok());
+        verify(dir.path(), &pack.id).unwrap();
     }
 
     #[test]
@@ -683,7 +683,7 @@ mod tests {
     fn tampering_content_object_fails_verification() {
         let dir = fixture();
         fs::write(dir.path().join("doc.md"), b"hello\n").unwrap();
-        let pack = create(&dir.path(), &ContextPackSpec { selected_docs: vec![PathBuf::from("doc.md")], ..Default::default() }).unwrap();
+        let pack = create(dir.path(), &ContextPackSpec { selected_docs: vec![PathBuf::from("doc.md")], ..Default::default() }).unwrap();
         let object = object_path(dir.path(), &pack.selected_docs[0].content.digest);
         fs::write(object, b"{}").unwrap();
         assert!(matches!(verify(dir.path(), &pack.id), Err(ContextPackError::Tampered { .. })));

@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn malformed_id_is_rejected() {
-        assert!(TrajectoryId::parse("not-a-ulid").is_err());
+        TrajectoryId::parse("not-a-ulid").unwrap_err();
     }
 
     /// Fixture identity fields, owned so each test can perturb exactly

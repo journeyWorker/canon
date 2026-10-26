@@ -83,7 +83,7 @@ pub fn raw_record_at(raw: &RawRecord) -> DateTime<Utc> {
 /// `canon_model::validate_envelope_shape` is where a missing `schema`
 /// is reported as `Malformed`.
 pub fn raw_record_schema(raw: &RawRecord) -> u32 {
-    raw.0.get("schema").and_then(|v| v.as_u64()).and_then(|n| u32::try_from(n).ok()).unwrap_or(0)
+    raw.0.get("schema").and_then(serde_json::Value::as_u64).and_then(|n| u32::try_from(n).ok()).unwrap_or(0)
 }
 
 /// Untyped, already-serialized content ready for `Tier::write` — the

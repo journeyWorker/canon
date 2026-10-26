@@ -2,7 +2,7 @@
 
 use std::process::ExitCode;
 
-use crate::cli::brief::*;
+use crate::cli::brief::{BriefCommand, BriefShowArgs, BriefCheckArgs, BriefApproveArgs};
 
 pub fn run(cmd: BriefCommand) -> ExitCode {
     ExitCode::from(match cmd {

@@ -250,7 +250,7 @@ pub fn validate_layout(kind: RecordKind, actual_path: &std::path::Path, json: &V
 /// `canon_model::fixtures::round_trip_well_formed`'s per-kind dispatch
 /// (S1), reused here as the git-tier read path's content-malformed gate.
 pub fn validate_body(kind: RecordKind, raw: &RawRecord) -> Result<(), EvidenceViolation> {
-    use canon_model::records::*;
+    use canon_model::records::{Change, Task, Scenario, Session, Run, Event, Review, Divergence, Trajectory, StrategyItem, Subject, Finding};
     use canon_model::{FailureClass, Handoff};
 
     macro_rules! try_deserialize {
@@ -631,8 +631,8 @@ mod tests {
 
     #[test]
     fn validate_namespaced_kind_accepts_a_conforming_two_token_identity() {
-        assert!(validate_namespaced_kind("porting.coverage").is_ok());
-        assert!(validate_namespaced_kind("a1-b2.c3-d4").is_ok());
+        validate_namespaced_kind("porting.coverage").unwrap();
+        validate_namespaced_kind("a1-b2.c3-d4").unwrap();
     }
 
     #[test]
@@ -651,7 +651,7 @@ mod tests {
 
     #[test]
     fn validate_natural_key_accepts_a_safe_component() {
-        assert!(validate_natural_key("root__world.hotdeal.01").is_ok());
+        validate_natural_key("root__world.hotdeal.01").unwrap();
     }
 
     #[test]
@@ -664,7 +664,7 @@ mod tests {
     #[test]
     fn natural_key_matches_body_accepts_segments_traceable_to_body_fields() {
         let body = json!({"project_id": "root", "scenario_id": "world.hotdeal.01", "covered": true});
-        assert!(natural_key_matches_body("root__world.hotdeal.01", &body).is_ok());
+        natural_key_matches_body("root__world.hotdeal.01", &body).unwrap();
     }
 
     #[test]

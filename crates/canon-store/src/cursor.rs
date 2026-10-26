@@ -79,7 +79,7 @@ use crate::tier::StoreError;
 pub fn file_digest(bytes: &[u8]) -> String {
     let hash = Sha256::digest(bytes);
     let mut hex = String::with_capacity(64);
-    for byte in hash.iter() {
+    for byte in &hash {
         hex.push_str(&format!("{byte:02x}"));
     }
     hex
@@ -246,7 +246,7 @@ impl SourceCursor {
         }
         let hash = hasher.finalize();
         let mut hex = String::with_capacity(64);
-        for byte in hash.iter() {
+        for byte in &hash {
             hex.push_str(&format!("{byte:02x}"));
         }
         self.last_seen_digest = hex;

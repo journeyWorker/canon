@@ -211,7 +211,7 @@ fn the_old_purge_spellings_are_usage_errors_that_name_the_new_form() {
 }
 
 fn first_file_under(dir: &std::path::Path) -> std::path::PathBuf {
-    for entry in std::fs::read_dir(dir).unwrap() {
+    if let Some(entry) = std::fs::read_dir(dir).unwrap().next() {
         let path = entry.unwrap().path();
         if path.is_dir() {
             return first_file_under(&path);

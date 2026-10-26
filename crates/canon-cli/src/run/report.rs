@@ -1,6 +1,6 @@
 //! `canon report` — the handlers of the group.
 
-use crate::cli::report::*;
+use crate::cli::report::{ReportCommand, ReportBuildArgs, ReportCheckArgs, ReportSnapshotArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: ReportCommand) -> ExitCode {

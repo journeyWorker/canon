@@ -579,7 +579,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     let known: BTreeSet<&str> = subjects.iter().map(|s| s.subject_id.as_str()).collect();
     let mut dangling: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for scenario in &scenarios {
-        if let Some(id) = scenario.subject_id.as_ref().map(|id| id.as_str()).filter(|id| !known.contains(*id)) {
+        if let Some(id) = scenario.subject_id.as_ref().map(canon_model::SubjectId::as_str).filter(|id| !known.contains(*id)) {
             dangling.entry(id).or_default().push(scenario.scenario_id.as_str());
         }
     }
@@ -750,7 +750,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     report
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn finish(
     repo: &Path,
     policy: &PolicyResolution,
@@ -1133,7 +1133,7 @@ fn awaits_brief(summary: &SubjectSummary) -> bool {
 /// the gap rules; the status advance only when none fired and
 /// `may_advance` (no blocking policy gap). `promote_manual` is whether
 /// `canon.yaml` keeps writes staged for `canon gate promote`.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn subject_steps(
     ctx: &GateContext,
     joins: &Joins,

@@ -319,7 +319,7 @@ pub(crate) fn brief_path(layout: &ChangeDirLayout, root: &Path, change_id: &Chan
 /// id token a `tasks.md` row carries (mirrors the pre-s35 `gate_task`'s
 /// own `rsplit_once('#')` extraction).
 fn row_number(task_id: &TaskId) -> &str {
-    task_id.as_str().rsplit_once('#').map(|(_, n)| n).unwrap_or_else(|| task_id.as_str())
+    task_id.as_str().rsplit_once('#').map_or_else(|| task_id.as_str(), |(_, n)| n)
 }
 
 fn actor(layout: &ChangeDirLayout) -> Actor {
@@ -369,7 +369,7 @@ fn list_subdirs(dir: &Path) -> Vec<PathBuf> {
     let Ok(entries) = fs::read_dir(dir) else {
         return Vec::new();
     };
-    let mut dirs: Vec<PathBuf> = entries.filter_map(|entry| entry.ok()).map(|entry| entry.path()).filter(|p| p.is_dir()).collect();
+    let mut dirs: Vec<PathBuf> = entries.filter_map(std::result::Result::ok).map(|entry| entry.path()).filter(|p| p.is_dir()).collect();
     dirs.sort_unstable();
     dirs
 }
@@ -422,11 +422,9 @@ fn parse_change_dir(layout: &ChangeDirLayout, dir: &Path, root: &Path, outcome: 
         // `openspec/changes` itself.
         let dir_rel = relative_to_root(dir, root);
         if layout.nested && basename == "changes" {
-            let parent_rel = dir.parent().map(|p| relative_to_root(p, root)).unwrap_or_else(|| dir_rel.clone());
+            let parent_rel = dir.parent().map_or_else(|| dir_rel.clone(), |p| relative_to_root(p, root));
             let hint = format!(
-                "the configured `root:` may be pointing at `{}`, this directory's parent, rather than at (or above) `openspec/changes` itself — point it at `{}` (or a directory whose own `openspec/changes` resolves there) instead",
-                parent_rel,
-                dir_rel,
+                "the configured `root:` may be pointing at `{parent_rel}`, this directory's parent, rather than at (or above) `openspec/changes` itself — point it at `{dir_rel}` (or a directory whose own `openspec/changes` resolves there) instead",
             );
             outcome.record_malformed_with_hint(dir_rel, layout.missing_brief, hint);
         } else {
@@ -514,7 +512,7 @@ fn parse_tasks_file(
             continue;
         };
         let status = if row.checked { TaskStatus::Done } else { TaskStatus::Open };
-        let evidence_note = row.evidence.map(|ev| ev.trim().to_string()).or_else(|| row.annotation.as_ref().map(|a| a.marker_text()));
+        let evidence_note = row.evidence.map(|ev| ev.trim().to_string()).or_else(|| row.annotation.as_ref().map(super::super::task_rows::Annotation::marker_text));
         let title = row.title.trim().to_string();
         for _ in &row.malformed_scenario_refs {
             // One malformed `[covers: …]` token, scoped to THIS row's
@@ -827,9 +825,7 @@ fn file_modified_at(path: &Path) -> DateTime<Utc> {
     let ms = fs::metadata(path)
         .and_then(|meta| meta.modified())
         .ok()
-        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
-        .map(|duration| duration.as_millis() as i64)
-        .unwrap_or_else(|| Utc::now().timestamp_millis());
+        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok()).map_or_else(|| Utc::now().timestamp_millis(), |duration| duration.as_millis() as i64);
     Utc.timestamp_millis_opt(ms).single().unwrap_or_else(Utc::now)
 }
 
@@ -1138,7 +1134,7 @@ mod tests {
     // ── declared dependencies -> Task.depends_on (s37 execution-graph-topology) ──
 
     fn dep_ids(task: &Task) -> Vec<&str> {
-        task.depends_on.iter().map(|t| t.as_str()).collect()
+        task.depends_on.iter().map(canon_model::TaskId::as_str).collect()
     }
 
     #[test]

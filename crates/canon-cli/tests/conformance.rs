@@ -89,7 +89,7 @@ fn discover_cases() -> Result<Vec<Case>, String> {
         Err(_) => return Ok(Vec::new()),
     };
     let mut dirs: Vec<PathBuf> = entries
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
         .map(|e| e.path())
         .filter(|p| p.is_dir())
         .collect();
@@ -564,7 +564,7 @@ fn expectation_files(expected_dir: &Path) -> Result<Vec<PathBuf>, String> {
         Err(_) => return Ok(Vec::new()),
     };
     Ok(entries
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
         .map(|e| e.path())
         .filter(|p| {
             p.extension()

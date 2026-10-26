@@ -308,7 +308,7 @@ struct RawPolicy {
     /// wave-2 consumer of a second schema version exists to validate
     /// against).
     #[serde(default)]
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     schema: Option<u32>,
     #[serde(default)]
     trust_required: BTreeMap<String, RawField<TrustLevel>>,
@@ -397,7 +397,7 @@ fn resolve_risk_tiers(raw: Option<serde_yaml::Value>, diagnostics: &mut Vec<Poli
             Some("rank must be greater than zero".to_string())
         } else if parsed.paths.is_empty() && parsed.effects.is_empty() {
             Some("paths or effects must contain at least one matcher".to_string())
-        } else if parsed.paths.iter().any(|path| path.is_empty()) {
+        } else if parsed.paths.iter().any(std::string::String::is_empty) {
             Some("paths must not contain empty patterns".to_string())
         } else if parsed.effects.iter().any(|effect| !is_kebab_slug(effect)) {
             Some("effects must be non-empty kebab-case slugs".to_string())
@@ -430,11 +430,11 @@ pub fn allowed_signers_path(repo: &Path) -> Result<Option<PathBuf>, String> {
     let mapping = value.as_mapping().ok_or_else(|| format!("policy {} must be a mapping", path.display()))?;
     let key = |name: &str| serde_yaml::Value::String(name.to_string());
     let configured = mapping
-        .get(&key("approval"))
-        .or_else(|| mapping.get(&key("risk_approvals")))
+        .get(key("approval"))
+        .or_else(|| mapping.get(key("risk_approvals")))
         .and_then(serde_yaml::Value::as_mapping)
-        .and_then(|map| map.get(&key("allowed_signers")))
-        .or_else(|| mapping.get(&key("allowed_signers")));
+        .and_then(|map| map.get(key("allowed_signers")))
+        .or_else(|| mapping.get(key("allowed_signers")));
     let Some(configured) = configured else { return Ok(None) };
     let configured = configured.as_str().ok_or_else(|| "approval.allowed_signers must be a path string".to_string())?;
     if configured.trim().is_empty() {

@@ -508,7 +508,7 @@ fn fold_list_matches_pg_routing() {
     let pg_routed: BTreeSet<&str> = RecordKind::ALL
         .iter()
         .filter(|k| {
-            policy.tier_for(**k).ok().and_then(|rung| policy.tiers.get(&rung)).map(|cfg| cfg.backend()) == Some(Backend::Postgres)
+            policy.tier_for(**k).ok().and_then(|rung| policy.tiers.get(&rung)).map(canon_store::policy::BackendConfig::backend) == Some(Backend::Postgres)
         })
         .map(|k| k.as_str())
         .collect();

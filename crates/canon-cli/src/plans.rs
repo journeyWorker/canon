@@ -583,7 +583,7 @@ impl Adoptions {
         if self.0.is_none() {
             let latest = match crate::subject::latest_records(store, RecordKind::Change) {
                 Ok(records) => records,
-                Err(StoreError::TierUnavailable { .. }) | Err(StoreError::UnroutedKind { .. }) => Vec::new(),
+                Err(StoreError::TierUnavailable { .. } | StoreError::UnroutedKind { .. }) => Vec::new(),
                 Err(err) => return Err(PlansError::Store(err)),
             };
             let adopted = latest
@@ -735,7 +735,7 @@ fn ensure_dialect_registered(dialect: &str) -> Result<(), PlansError> {
 }
 
 fn registered_dialect_ids() -> Vec<&'static str> {
-    let mut ids: Vec<&str> = plan_registry::registry().iter().map(|e| e.dialect_id()).collect();
+    let mut ids: Vec<&str> = plan_registry::registry().iter().map(canon_ingest::PlanAdapterEntry::dialect_id).collect();
     ids.sort_unstable();
     ids
 }
@@ -886,7 +886,7 @@ fn plan_source_cursor_id(dialect: &str, parse_version: u32, root: &Path) -> Stri
 fn file_stat(path: &Path) -> (i64, u64) {
     match std::fs::metadata(path) {
         Ok(meta) => {
-            let mtime_ms = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0);
+            let mtime_ms = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_millis() as i64);
             (mtime_ms, meta.len())
         }
         Err(_) => (0, 0),
@@ -919,7 +919,7 @@ fn persist_or_unwritten<T: CanonRecord>(store: &TierRegistry, record: T, dry_run
     match written {
         Ok(()) => Ok(None),
         Err(StoreError::DuplicatePath { .. }) => Ok(None),
-        Err(StoreError::TierUnavailable { .. }) | Err(StoreError::UnroutedKind { .. }) => Ok(Some(record)),
+        Err(StoreError::TierUnavailable { .. } | StoreError::UnroutedKind { .. }) => Ok(Some(record)),
         Err(err) => Err(PlansError::Store(err)),
     }
 }

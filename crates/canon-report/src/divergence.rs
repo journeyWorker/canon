@@ -121,7 +121,7 @@ mod tests {
     // A `#[cfg(test)]` fixture builder mirroring `Divergence`'s own
     // field set — the arg count is inherent to the record it
     // constructs, not a design smell worth a params struct here.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn write_divergence(tier: &GitTier, project_id: &str, scenario_id: &str, sha: &str, status: DivergenceStatus, run_seq: u64, round: u32, at: DateTime<Utc>) {
         let divergence = Divergence::new(
             Envelope::new(1, RecordKind::Divergence, at, actor("reviewer")),

@@ -137,7 +137,7 @@ pub fn validate_envelope_shape(candidate: &RawRecord) -> Result<(), EvidenceViol
     if !obj.get("schema").is_some_and(|v| v.is_u64() || v.is_i64()) {
         return malformed("schema", "missing or non-integer `schema` field");
     }
-    if !obj.get("kind").is_some_and(|v| v.is_string()) {
+    if !obj.get("kind").is_some_and(serde_json::Value::is_string) {
         return malformed("kind", "missing or non-string `kind` field");
     }
     match obj.get("at") {
@@ -150,7 +150,7 @@ pub fn validate_envelope_shape(candidate: &RawRecord) -> Result<(), EvidenceViol
         Some(actor) => actor,
         None => return malformed("actor", "missing or non-object `actor` field"),
     };
-    if !actor.get("agent_id").is_some_and(|v| v.is_string()) {
+    if !actor.get("agent_id").is_some_and(serde_json::Value::is_string) {
         return malformed("actor.agent_id", "missing or non-string `actor.agent_id` field");
     }
     if actor.get("role").is_some_and(|v| !v.is_string()) {
@@ -244,7 +244,7 @@ mod tests {
     #[test]
     fn well_formed_record_validates_with_no_violation() {
         let candidate = RawRecord(well_formed_evidence_json());
-        assert!(validate_evidence(&candidate).is_ok());
+        validate_evidence(&candidate).unwrap();
     }
 
     #[test]

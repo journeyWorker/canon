@@ -1,6 +1,6 @@
 //! `canon plugin` — the handlers of the group.
 
-use crate::cli::plugin::*;
+use crate::cli::plugin::{PluginCommand, PluginSyncArgs};
 use crate::cli_error::CliError;
 use std::process::ExitCode;
 

@@ -1,6 +1,6 @@
 //! `canon demo` — the handlers of the group.
 
-use crate::cli::demo::*;
+use crate::cli::demo::{DemoCommand, DemoInitArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: DemoCommand) -> ExitCode {

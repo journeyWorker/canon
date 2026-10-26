@@ -286,15 +286,15 @@ fn ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_re
         .iter()
         .find(|r| r.get("role").and_then(|v| v.as_str()) == Some("dev") && r.get("regime_key").and_then(|v| v.as_str()) == Some(regime_key_str.as_str()))
         .unwrap_or_else(|| panic!("no mart_role_memory row for regime_key {regime_key_str}: {:?}", role_memory.rows));
-    assert_eq!(dev_row.get("strategy_count").and_then(|v| v.as_i64()), Some(1));
+    assert_eq!(dev_row.get("strategy_count").and_then(serde_json::Value::as_i64), Some(1));
 
     let flywheel = canon_report::marts::fetch_flywheel_funnel(&roots).expect("mart_flywheel_funnel query must succeed");
     assert!(!flywheel.rows.is_empty(), "mart_flywheel_funnel must render non-empty after this ingest");
     let dev_funnel = flywheel.rows.iter().find(|r| r.get("role").and_then(|v| v.as_str()) == Some("dev")).unwrap_or_else(|| {
         panic!("no mart_flywheel_funnel row for role `dev`: {:?}", flywheel.rows)
     });
-    assert_eq!(dev_funnel.get("verdicts").and_then(|v| v.as_i64()), Some(1));
-    assert_eq!(dev_funnel.get("distilled").and_then(|v| v.as_i64()), Some(1));
+    assert_eq!(dev_funnel.get("verdicts").and_then(serde_json::Value::as_i64), Some(1));
+    assert_eq!(dev_funnel.get("distilled").and_then(serde_json::Value::as_i64), Some(1));
 }
 
 /// s42 (`close-the-open-loops`) task 3.2, end to end through the actual

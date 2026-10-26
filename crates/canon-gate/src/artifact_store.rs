@@ -236,7 +236,7 @@ impl Observed {
     fn of(path: &Path) -> Self {
         let stamp = std::fs::metadata(path).ok().and_then(|meta| canon_store::git_tier::FileStamp::of(&meta));
         if let Some(stamp) = stamp {
-            let seen = OBSERVED.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let seen = OBSERVED.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             if let Some((_, sha)) = seen.get(path).filter(|(was, _)| *was == stamp) {
                 return Observed::Sha256(sha.clone());
             }
@@ -244,7 +244,7 @@ impl Observed {
         match File::open(path).and_then(sha256_reader) {
             Ok(sha) => {
                 if let Some(stamp) = stamp {
-                    OBSERVED.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).insert(path.to_path_buf(), (stamp, sha.clone()));
+                    OBSERVED.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(path.to_path_buf(), (stamp, sha.clone()));
                 }
                 Observed::Sha256(sha)
             }
@@ -399,7 +399,7 @@ impl StoreLock {
             return Ok(None);
         }
         let dir = create_store_dir(&self.repo)?;
-        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
         let temp = dir.join(format!(".tmp-{expected}-{}-{nanos}", std::process::id()));
         let mut file = File::options().write(true).create_new(true).open(&temp)?;
         // From here on, dropping `staged` removes the temp file.
@@ -629,11 +629,7 @@ impl ObjectArtifacts {
 /// hand-written record; the CLI only ever records in-repo paths).
 pub fn working_tree_path(repo: &Path, relative: &str) -> Option<PathBuf> {
     let path = Path::new(relative);
-    if path.components().all(|c| matches!(c, Component::Normal(_) | Component::CurDir)) {
-        Some(repo.join(path))
-    } else {
-        None
-    }
+    path.components().all(|c| matches!(c, Component::Normal(_) | Component::CurDir)).then(|| repo.join(path))
 }
 
 fn working_tree(repo: &Path, relative: &str) -> Observed {
@@ -648,12 +644,12 @@ fn latest_records(ctx: &GateContext) -> Vec<&EvidenceRecord> {
     let by_scenario: Vec<&EvidenceRecord> = ctx.evidence.iter().filter(|r| r.scenario_id.is_some()).collect();
     let mut latest: BTreeSet<*const EvidenceRecord> = BTreeSet::new();
     for record in latest_by_key(&by_task, |r| r.task_id.clone()) {
-        latest.insert(*record as *const _);
+        latest.insert(*record as *const canon_model::EvidenceRecord);
     }
     for record in latest_by_key(&by_scenario, |r| (r.project_id.clone(), r.scenario_id.clone())) {
-        latest.insert(*record as *const _);
+        latest.insert(*record as *const canon_model::EvidenceRecord);
     }
-    let declared = ctx.evidence.iter().filter(|r| latest.contains(&(*r as *const _)));
+    let declared = ctx.evidence.iter().filter(|r| latest.contains(&(*r as *const canon_model::EvidenceRecord)));
     let audits = crate::audit::latest_audits(ctx).into_values();
     declared.chain(audits).filter(|r| !r.attachments.is_empty()).collect()
 }
@@ -703,7 +699,7 @@ pub fn bound_files(ctx: &GateContext) -> Vec<BoundFileRef> {
                 sha256: artifact.sha256.clone(),
                 binder: Binder::Review {
                     reviewer: review.reviewer.clone(),
-                    actor: review.envelope.actor.agent_id.to_string(),
+                    actor: review.envelope.actor.agent_id.clone(),
                     at: review.envelope.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
                 },
             });

@@ -323,7 +323,7 @@ fn a_repository_root_source_ignores_trees_outside_openspec_changes() {
     {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(repo.join("node_modules/pkg-3/lib/deep/index.js"), std::fs::Permissions::from_mode(0o000)).unwrap();
-    }
+    };
     let second = ingest_json(repo, &[]);
     assert_eq!(second["sources"][0]["skippedUnchanged"], true, "nothing the dialect reads changed: {second}");
 

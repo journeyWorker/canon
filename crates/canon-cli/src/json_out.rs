@@ -280,7 +280,7 @@ pub fn relative_to_cwd(path: &Path) -> String {
 }
 
 fn context() -> Context {
-    let repo = crate::context::resolve_repo_root(REPO.get().map(PathBuf::as_path).unwrap_or(Path::new(".")));
+    let repo = crate::context::resolve_repo_root(REPO.get().map_or(Path::new("."), PathBuf::as_path));
     Context {
         role: crate::role::Role::current(None).map(|role| role.as_str().to_string()),
         actor: std::env::var("CANON_ACTOR").ok().map(|actor| actor.trim().to_string()).filter(|actor| !actor.is_empty()),

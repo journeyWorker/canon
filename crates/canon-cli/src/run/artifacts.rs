@@ -1,6 +1,6 @@
 //! `canon artifacts` — the handlers of the group.
 
-use crate::cli::artifacts::*;
+use crate::cli::artifacts::{ArtifactsCommand, ArtifactsVerifyArgs, ArtifactsStoreArgs, ArtifactsMoveArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: ArtifactsCommand) -> ExitCode {

@@ -36,8 +36,8 @@ use canon_model::RoleId;
 use crate::cli_error::CliError;
 use std::process::ExitCode;
 use crate::cli::{Cli, Command};
-use top::*;
-use crate::cli::top::*;
+use top::{run_regime_show, run_report, run_query, run_fmt, run_context, run_init, run_retrieve, run_dashboard, run_completion};
+use crate::cli::top::{QueryArgs, ExportArgs, PurgeArgs, FormatArgs, ContextArgs, StatusArgs, InitArgs, MigrateArgs, RetrieveArgs, DashboardArgs, SelftestArgs, SchemaArgs, CompletionArgs};
 
 pub fn run(cli: Cli) -> ExitCode {
     let declared = cli.declared_role;

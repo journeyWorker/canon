@@ -200,7 +200,7 @@ impl Leaf {
                     possible: a.get_possible_values().iter().filter(|v| !v.is_hide_set()).map(|v| v.get_name().to_string()).collect(),
                     negatable: args.iter().any(|o| o.get_long().is_some_and(|l| l.strip_prefix("no-") == Some(long))),
                     required: a.is_required_set(),
-                    help: a.get_help().map(|h| h.to_string()),
+                    help: a.get_help().map(std::string::ToString::to_string),
                     default: if kind == Kind::Value { a.get_default_values().iter().map(|v| v.to_string_lossy().into_owned()).collect() } else { Vec::new() },
                 })
             })
@@ -237,8 +237,8 @@ impl Leaf {
             has_dry_run: keys.iter().any(|k| k.long == "dry-run"),
             keys,
             operands,
-            operand_help: positionals.first().and_then(|a| a.get_help()).map(|h| h.to_string()),
-            operand_names: positionals.iter().flat_map(|a| [a.get_id().to_string(), a.get_value_names().and_then(|v| v.first()).map(|v| v.to_string()).unwrap_or_default()]).collect(),
+            operand_help: positionals.first().and_then(|a| a.get_help()).map(std::string::ToString::to_string),
+            operand_names: positionals.iter().flat_map(|a| [a.get_id().to_string(), a.get_value_names().and_then(|v| v.first()).map(std::string::ToString::to_string).unwrap_or_default()]).collect(),
             one_of,
         }
     }
@@ -324,7 +324,7 @@ struct Lexed {
 }
 
 fn find_long<'a>(cmd: &'a Command, name: &str) -> Option<&'a Arg> {
-    cmd.get_arguments().find(|a| a.get_long() == Some(name) || a.get_all_aliases().is_some_and(|aliases| aliases.iter().any(|alias| *alias == name)))
+    cmd.get_arguments().find(|a| a.get_long() == Some(name) || a.get_all_aliases().is_some_and(|aliases| aliases.contains(&name)))
 }
 
 fn find_short(cmd: &Command, short: char) -> Option<&Arg> {

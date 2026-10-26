@@ -1,7 +1,7 @@
 //! `canon scenario` — the handlers of the group.
 
 use chrono::{Timelike, Utc};
-use crate::cli::scenario::*;
+use crate::cli::scenario::{ScenarioCommand, ScenarioNewArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: ScenarioCommand) -> ExitCode {

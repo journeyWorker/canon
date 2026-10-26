@@ -85,7 +85,7 @@ pub fn render_handoff_body(body: &HandoffBody) -> String {
             serde_json::Value::String(s) => out.push_str(&format!("{s}\n\n")),
             serde_json::Value::Array(items) => {
                 for item in items {
-                    let line = item.as_str().map(str::to_string).unwrap_or_else(|| item.to_string());
+                    let line = item.as_str().map_or_else(|| item.to_string(), str::to_string);
                     out.push_str(&format!("- {line}\n"));
                 }
                 out.push('\n');

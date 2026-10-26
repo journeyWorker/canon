@@ -1162,7 +1162,7 @@ fn phrase_hits(shipped: Shipped, sentence: &str) -> Vec<(&'static str, String)> 
             }
             let lead = s.trim_start_matches(['"', '\'', '(', '“', '‘']);
             if let Some(word) = KO_CONNECTIVES.iter().find(|w| {
-                lead.strip_prefix(**w).is_some_and(|rest| rest.chars().next().is_none_or(|c| c.is_whitespace() || c == ',' || (c == '은' && rest.chars().nth(1).is_none_or(|n| n.is_whitespace()))))
+                lead.strip_prefix(**w).is_some_and(|rest| rest.chars().next().is_none_or(|c| c.is_whitespace() || c == ',' || (c == '은' && rest.chars().nth(1).is_none_or(char::is_whitespace))))
             }) {
                 hits.push(("prose.connective", (*word).to_string()));
             }
@@ -1521,7 +1521,7 @@ fn ko_ending(sentence: &str, item: bool) -> Option<String> {
     // 하자, 주자; outside list items the generic rule below reports it.
     if terminated && !end.contains(':') && end.ends_with('라') {
         if let Some(before) = end.chars().rev().nth(1) {
-            if ('\u{AC00}'..='\u{D7A3}').contains(&before) && (before as u32 - 0xAC00) % 28 == 0 {
+            if ('\u{AC00}'..='\u{D7A3}').contains(&before) && (before as u32 - 0xAC00).is_multiple_of(28) {
                 return tilde("라");
             }
         }
@@ -1882,12 +1882,12 @@ pub fn parse_sections(text: &str) -> Vec<BriefSection> {
                     heading = Some(trimmed.trim_start_matches('#').trim().to_string());
                     continue;
                 }
-                if trimmed.is_empty() && body.last().is_none_or(|last| last.is_empty()) {
+                if trimmed.is_empty() && body.last().is_none_or(std::string::String::is_empty) {
                     continue;
                 }
                 body.push(line.text.trim_end().to_string());
             }
-            while body.last().is_some_and(|last| last.is_empty()) {
+            while body.last().is_some_and(std::string::String::is_empty) {
                 body.pop();
             }
             let mut steps: Vec<FlowStep> = Vec::new();

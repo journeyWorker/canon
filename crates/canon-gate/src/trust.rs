@@ -224,7 +224,7 @@ impl GateCheck for ReleaseTrustCheck {
             let achieved = rung.green();
 
             if achieved.is_none_or(|level| level < required) {
-                let achieved_str = achieved.map(|level| level.as_str()).unwrap_or_else(|| rung.as_str());
+                let achieved_str = achieved.map_or_else(|| rung.as_str(), super::trust_ladder::TrustLevel::as_str);
                 violations.push(Violation::new(
                     FailureClass::TrustBelowRequired,
                     subject,
@@ -313,7 +313,7 @@ mod tests {
     /// top-level key when given — `EvidenceRecord`'s strict
     /// `Deserialize` silently drops it as an unknown field, exactly
     /// as a production write would look.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn write_tagged_evidence(tier: &GitTier, project_id: Option<&str>, scenario_id: &str, actor_role: &str, lifecycle: TrustLifecycle, flagged: bool, class: Option<&str>) {
         let actor = Actor::new("test-agent", RoleId::parse(actor_role).unwrap());
         let mut record = EvidenceRecord::new(
@@ -541,7 +541,7 @@ mod tests {
         // counts; free text never does.
         let forger = Actor::new_unattributed("human-operator");
 
-        assert!(attempt_clear(&overlay, &forger).is_err());
+        attempt_clear(&overlay, &forger).unwrap_err();
     }
 
     #[test]

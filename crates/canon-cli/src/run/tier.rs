@@ -1,6 +1,6 @@
 //! `canon tier` — the handlers of the group.
 
-use crate::cli::tier::*;
+use crate::cli::tier::{TierCommand, TierAgeArgs};
 use crate::cli_error::CliError;
 use crate::safety::{Mode, Plan};
 use std::process::ExitCode;

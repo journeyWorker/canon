@@ -452,7 +452,7 @@ pub fn corroborated_effect(batch: &ContrastBatch) -> bool {
     if batch.samples_by_config.len() == 2 {
         let a = &batch.samples_by_config[0];
         let b = &batch.samples_by_config[1];
-        return paired_contrast(a, b).map(|pc| pc.significant).unwrap_or(false);
+        return paired_contrast(a, b).is_ok_and(|pc| pc.significant);
     }
     true
 }

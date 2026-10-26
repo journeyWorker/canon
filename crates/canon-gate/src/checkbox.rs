@@ -131,7 +131,7 @@ pub fn gate_task(task_id: &TaskId, evidence: &[EvidenceRecord], notes: &[Evidenc
         return TaskFlipDecision::Blocked { violations: scan_violations };
     }
 
-    let latest = task_notes.last().map(|note| note.summary.clone()).unwrap_or_else(|| default_evidence_text(record));
+    let latest = task_notes.last().map_or_else(|| default_evidence_text(record), |note| note.summary.clone());
     TaskFlipDecision::Approved { evidence_note: aggregate_note(&records, &latest) }
 }
 

@@ -186,7 +186,7 @@ fn yaml_files(path: &Path) -> Vec<std::path::PathBuf> {
     };
     let mut files: Vec<_> = rd
         .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.is_file() && matches!(p.extension().and_then(|e| e.to_str()), Some("yaml") | Some("yml")))
+        .filter(|p| p.is_file() && matches!(p.extension().and_then(|e| e.to_str()), Some("yaml" | "yml")))
         .collect();
     files.sort();
     files

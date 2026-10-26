@@ -135,7 +135,7 @@ fn sites(file: &str, text: &str) -> Vec<Site> {
             let k = skip_ws(bytes, j);
             if bytes.get(k) == Some(&b'?') {
                 j = k + 1;
-            } else if bytes.get(k) == Some(&b'.') && bytes.get(k + 1).is_some_and(|b| b.is_ascii_alphabetic()) {
+            } else if bytes.get(k) == Some(&b'.') && bytes.get(k + 1).is_some_and(u8::is_ascii_alphabetic) {
                 let name_start = k + 1;
                 let mut name_end = name_start;
                 while bytes.get(name_end).is_some_and(|b| b.is_ascii_alphanumeric() || *b == b'_') {

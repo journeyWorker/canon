@@ -199,7 +199,7 @@ static FILE_MEMO: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap
 fn load_candidate(kind: RecordKind, candidate: &Candidate) -> Result<Loaded, StoreError> {
     let key = (candidate.absolute.clone(), kind);
     if let Some(stamp) = candidate.stamp {
-        let memo = FILE_MEMO.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let memo = FILE_MEMO.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some((seen, loaded)) = memo.get(&key) {
             if *seen == stamp {
                 return Ok(loaded.clone());
@@ -209,7 +209,7 @@ fn load_candidate(kind: RecordKind, candidate: &Candidate) -> Result<Loaded, Sto
     let bytes = std::fs::read(&candidate.absolute)?;
     let loaded = validate_file(kind, &candidate.relative, &bytes).map(Arc::new);
     if let Some(stamp) = candidate.stamp {
-        FILE_MEMO.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).insert(key, (stamp, loaded.clone()));
+        FILE_MEMO.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(key, (stamp, loaded.clone()));
     }
     Ok(loaded)
 }
@@ -219,7 +219,7 @@ fn load_candidate(kind: RecordKind, candidate: &Candidate) -> Result<Loaded, Sto
 /// path order is the one returned.
 fn load_candidates(kind: RecordKind, candidates: Vec<Candidate>) -> Result<Vec<(PathBuf, Loaded)>, StoreError> {
     const PARALLEL_FROM: usize = 32;
-    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).min(8);
+    let threads = std::thread::available_parallelism().map_or(1, std::num::NonZero::get).min(8);
     let results: Vec<Result<Loaded, StoreError>> = if candidates.len() < PARALLEL_FROM || threads < 2 {
         candidates.iter().map(|candidate| load_candidate(kind, candidate)).collect()
     } else {
@@ -859,7 +859,7 @@ mod tests {
         let first = tier.read_shared(&query).unwrap();
         let second = tier.read_shared(&query).unwrap();
 
-        assert_eq!(first.records.iter().map(|raw| raw.as_ref()).collect::<Vec<_>>(), owned.records.iter().collect::<Vec<_>>());
+        assert_eq!(first.records.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(), owned.records.iter().collect::<Vec<_>>());
         assert!(first.records.iter().zip(&second.records).all(|(a, b)| Arc::ptr_eq(a, b)), "a repeat scan shares the cached rows");
         assert_eq!(second.into_owned().records, owned.records);
     }

@@ -1,6 +1,6 @@
 //! `canon subject` — the handlers of the group.
 
-use crate::cli::subject::*;
+use crate::cli::subject::{SubjectCommand, SubjectNewArgs, SubjectAdoptArgs, SubjectUnadoptArgs, SubjectShowArgs, SubjectMoveArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: SubjectCommand) -> ExitCode {

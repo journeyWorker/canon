@@ -1,6 +1,6 @@
 //! `canon skills` — the handlers of the group.
 
-use crate::cli::skills::*;
+use crate::cli::skills::{SkillsCommand, SkillsInstallArgs, SkillsCheckArgs, SkillsDoctorArgs, SkillsShowArgs};
 use crate::cli_error::CliError;
 use std::process::ExitCode;
 

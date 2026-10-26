@@ -135,7 +135,7 @@ fn cargo_test(work: &Path, target: &Path, tests: &[(&str, &str)]) -> (bool, Stri
 #[test]
 #[ignore = "builds a copy of the workspace; run scripts/check-mutations.sh"]
 fn each_seeded_violation_fails_the_test_that_guards_it() {
-    let target = std::env::var_os("CARGO_TARGET_DIR").map(PathBuf::from).unwrap_or_else(|| repo_root().join("target"));
+    let target = std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| repo_root().join("target"), PathBuf::from);
     let scratch = tempfile::tempdir().unwrap();
     let work = scratch.path().join("repo");
     std::fs::create_dir_all(&work).unwrap();

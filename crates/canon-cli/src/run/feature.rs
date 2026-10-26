@@ -2,7 +2,7 @@
 
 use canon_model::ProjectId;
 use chrono::{Timelike, Utc};
-use crate::cli::feature::*;
+use crate::cli::feature::{FeatureCommand, FeatureNewArgs};
 use crate::scaffold::AreaSurface;
 use std::process::ExitCode;
 

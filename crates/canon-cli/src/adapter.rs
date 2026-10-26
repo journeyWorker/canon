@@ -430,7 +430,7 @@ pub fn authorize_response<P: AsRef<Path>, R: AsRef<Path>>(response_path: P, repo
     let root: serde_yaml::Value = serde_yaml::from_str(&text).map_err(|e| AdapterError::Validation(format!("malformed policy: {e}")))?;
     let root = if root.is_null() { serde_yaml::Value::Mapping(Default::default()) } else { root };
     let root = root.as_mapping().ok_or_else(|| AdapterError::Validation("malformed policy: expected mapping".into()))?;
-    let policy = root.get(&serde_yaml::Value::String("adapter_capabilities".into())).cloned().unwrap_or_else(|| serde_yaml::Value::Mapping(Default::default()));
+    let policy = root.get(serde_yaml::Value::String("adapter_capabilities".into())).cloned().unwrap_or_else(|| serde_yaml::Value::Mapping(Default::default()));
     let policy: CapabilityPolicy = serde_yaml::from_value(policy).map_err(|e| AdapterError::Validation(format!("malformed adapter_capabilities policy: {e}")))?;
     let mut reasons = Vec::new();
     if !policy.runtime_enforced { reasons.push("runtime_enforced=false; no enforcement adapter is available".into()); }
@@ -520,20 +520,20 @@ mod tests {
     fn rejects_unknown_core_field() {
         let mut value = response();
         value["unexpected"] = serde_json::json!(true);
-        assert!(parse_response(value.to_string()).is_err());
+        parse_response(value.to_string()).unwrap_err();
     }
 
     #[test]
     fn rejects_unsafe_reference() {
         let mut value = response();
         value["evidence_refs"][0]["ref"] = serde_json::json!("../secret");
-        assert!(parse_response(value.to_string()).is_err());
+        parse_response(value.to_string()).unwrap_err();
     }
 
     #[test]
     fn accepts_extension_slug_provider() {
         let mut value = response();
         value["provider"] = serde_json::json!("my-provider");
-        assert!(parse_response(value.to_string()).is_ok());
+        parse_response(value.to_string()).unwrap();
     }
 }

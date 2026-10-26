@@ -292,13 +292,13 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> i32 {
     let plan = match plan(&repo, &text) {
         Ok(plan) => plan,
         Err(e) => {
-            return CliError::refused("MIGRATE_REFUSED", e.to_string()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
+            return CliError::refused("MIGRATE_REFUSED", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
         }
     };
     let config = match render_config(&text, &plan, plan.roots.len(), plan.drop_source.is_some()) {
         Ok(config) => config,
         Err(e) => {
-            return CliError::refused("MIGRATE_REFUSED", e.to_string()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
+            return CliError::refused("MIGRATE_REFUSED", e.clone()).hint("fix what the message names, then run `canon migrate` again").emit("canon migrate", json);
         }
     };
     if git {
@@ -683,7 +683,7 @@ fn preflight_change(repo: &Path, dir: &Path) -> Result<(), String> {
         return Err(format!("change dir {shown} already holds a brief.md, so its proposal.md cannot be renamed to it"));
     }
     for path in [dir, dir.parent().unwrap_or(repo)] {
-        if fs::metadata(path).map(|meta| meta.permissions().readonly()).unwrap_or(true) {
+        if fs::metadata(path).map_or(true, |meta| meta.permissions().readonly()) {
             return Err(format!("{} is not writable, so change dir {shown} cannot be moved", rel(repo, path)));
         }
     }
@@ -901,7 +901,7 @@ fn edit_spec_root(text: &str, edit: &RootConfigEdit) -> Result<String, String> {
                 let body = trimmed.strip_prefix("- ").unwrap_or(trimmed);
                 body.strip_prefix(key).is_some_and(|rest| rest.starts_with(':')).then(|| line.len() - body.len())
             };
-            let mut out: Vec<String> = lines.iter().map(|line| line.to_string()).collect();
+            let mut out: Vec<String> = lines.iter().map(std::string::ToString::to_string).collect();
             let ending = |line: &str| if line.ends_with("\r\n") { "\r\n" } else if line.ends_with('\n') { "\n" } else { nl };
             if *explicit_root {
                 let at = (first..last).find(|&i| key_of(lines[i], "root").is_some()).ok_or_else(|| refuse("no `root:` line in the entry"))?;
@@ -980,7 +980,7 @@ fn drop_plan_source(text: &str, index: usize) -> Result<String, String> {
     } {
         last -= 1;
     }
-    let mut out: Vec<String> = lines.iter().map(|line| line.to_string()).collect();
+    let mut out: Vec<String> = lines.iter().map(std::string::ToString::to_string).collect();
     out.drain(first..last);
     if items.len() == 1 {
         let key = (span.0..first).rev().find(|&i| lines[i].trim_start().starts_with("sources:")).ok_or_else(refuse)?;
@@ -1046,7 +1046,7 @@ fn print_plan(repo: &Path, plan: &Plan, config_changes: bool, index_changes: boo
         ));
     }
     if plan.drop_source.is_some() {
-        log.line(format!("  canon.yaml: remove the plans source `{{ dialect: openspec, root: . }}` canon init wrote; no change is left under it"));
+        log.line("  canon.yaml: remove the plans source `{ dialect: openspec, root: . }` canon init wrote; no change is left under it".to_string());
     }
     if let Some(gitkeep) = &plan.gitkeep {
         log.line(format!("  remove {} (canon init's placeholder for that source)", rel(repo, gitkeep)));
@@ -1220,7 +1220,7 @@ fn uncommitted(repo: &Path, paths: &[PathBuf]) -> Option<String> {
 }
 
 fn tracked_index_files(repo: &Path) -> usize {
-    git_output(repo, &["ls-files", "--", paths::SCENARIO_INDEX_GITIGNORE]).map(|out| out.lines().count()).unwrap_or(0)
+    git_output(repo, &["ls-files", "--", paths::SCENARIO_INDEX_GITIGNORE]).map_or(0, |out| out.lines().count())
 }
 
 /// The full index rebuild (module doc). Exit `1` when a root does not

@@ -534,7 +534,7 @@ mod tests {
     #[cfg(debug_assertions)]
     #[test]
     fn debug_build_honors_local_r2_root_env_var_as_a_test_seam() {
-        let _seam = super::R2_SEAM_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _seam = super::R2_SEAM_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = tempfile::tempdir().unwrap();
         std::env::set_var(LOCAL_R2_ROOT_ENV, dir.path());
         let cfg = R2TierConfig { bucket_env: "CANON_R2_BUCKET_UNUSED_IN_THIS_TEST".to_string(), prefix: "canon/".to_string() };
@@ -684,7 +684,7 @@ mod lenient_tier_tests {
     /// still degrades to `None` even though `hot`'s DSN is unset too.
     #[test]
     fn kind_scoped_build_attempts_both_tiers_for_a_hot_routed_cold_aged_kind() {
-        let _seam = super::R2_SEAM_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _seam = super::R2_SEAM_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = tempfile::tempdir().unwrap();
         let canon_yaml = write_multi_tier_canon_yaml(dir.path());
         std::env::remove_var("CANON_PG_DSN_S22_UNIT_UNSET");
@@ -710,7 +710,7 @@ mod lenient_tier_tests {
     #[cfg(debug_assertions)]
     #[test]
     fn kind_scoped_build_actually_attaches_a_reachable_aged_r2_tier() {
-        let _seam = super::R2_SEAM_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _seam = super::R2_SEAM_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = tempfile::tempdir().unwrap();
         let canon_yaml = write_multi_tier_canon_yaml(dir.path());
         let r2_root = tempfile::tempdir().unwrap();
@@ -753,7 +753,7 @@ mod lenient_tier_tests {
     #[cfg(debug_assertions)]
     #[test]
     fn strict_build_names_the_cold_rung_and_s3_backend_for_an_unattached_bucket() {
-        let _seam = super::R2_SEAM_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _seam = super::R2_SEAM_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = tempfile::tempdir().unwrap();
         let canon_yaml = write_local_cold_canon_yaml(dir.path());
         std::env::remove_var("CANON_R2_BUCKET_S27_STRICT_UNSET");

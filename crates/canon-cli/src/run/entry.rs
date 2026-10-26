@@ -12,6 +12,7 @@ use crate::cli_error::CliError;
 /// as other command-line tools do (0.20). `dashboard` serves sockets and
 /// keeps it ignored, so a client that disconnects never kills the server.
 #[cfg(unix)]
+#[expect(unsafe_code, reason = "libc::signal is an unsafe FFI call with no safe std equivalent for restoring SIGPIPE")]
 pub fn set_sigpipe(default: bool) {
     let action = if default { libc::SIG_DFL } else { libc::SIG_IGN };
     // SAFETY: called on the main thread before any other thread exists or

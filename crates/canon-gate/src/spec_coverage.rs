@@ -282,7 +282,7 @@ pub fn case_gaps<'a>(scenarios: impl IntoIterator<Item = &'a Scenario>, required
 /// `Divergence` is deliberately NOT folded this way: its supersession is
 /// `(run_seq, round)`, not `(at, schema, digest)`, and
 /// [`fold_to_current_state`] owns that rule and needs every row.
-pub fn latest_by_key<'a, T: serde::Serialize, K: Ord>(records: &'a [T], key: impl Fn(&T) -> K) -> Vec<&'a T> {
+pub fn latest_by_key<T: serde::Serialize, K: Ord>(records: &[T], key: impl Fn(&T) -> K) -> Vec<&T> {
     latest_of(&stamps_of(records), 0..records.len(), |i| key(&records[i])).into_iter().map(|i| &records[i]).collect()
 }
 
@@ -413,16 +413,16 @@ fn live_bindings(ctx: &GateContext) -> BTreeMap<(ProjectId, ScenarioId), canon_m
 /// `StillDivergent` upstream, so it needs no arm here.
 fn mismatch_detail(state: &FoldedState) -> Option<String> {
     match state {
-        FoldedState::Open { .. } => Some("spec has an open divergence — implementation does not match the spec".to_string()),
-        FoldedState::StillDivergent { .. } => Some("spec divergence was re-checked and is still divergent".to_string()),
+        FoldedState::Open => Some("spec has an open divergence — implementation does not match the spec".to_string()),
+        FoldedState::StillDivergent => Some("spec divergence was re-checked and is still divergent".to_string()),
         // The staleest resolution state: the record claims Resolved, but
         // the app sha it resolved against has moved. Included
         // deliberately — a resolution that no longer binds is a mismatch
         // nobody has looked at since.
-        FoldedState::ResolvedInvalid { .. } => {
+        FoldedState::ResolvedInvalid => {
             Some("spec divergence is marked resolved against an app sha that has since moved — the resolution no longer binds".to_string())
         }
-        FoldedState::Resolved { .. } | FoldedState::Deferred { .. } | FoldedState::Accepted { .. } => None,
+        FoldedState::Resolved | FoldedState::Deferred { .. } | FoldedState::Accepted { .. } => None,
     }
 }
 
@@ -584,8 +584,8 @@ mod tests {
         Some(SpecCoverage::Active {
             require_evidence: false,
             scope: Vec::new(),
-            exclude_lanes: exclude_lanes.iter().map(|s| s.to_string()).collect(),
-            require_cases: cases.iter().map(|s| s.to_string()).collect(),
+            exclude_lanes: exclude_lanes.iter().map(std::string::ToString::to_string).collect(),
+            require_cases: cases.iter().map(std::string::ToString::to_string).collect(),
             require_review: None,
             require_audit: None,
         })
