@@ -112,3 +112,24 @@ Feature: query read
     When canon dispatch diff or canon query reads a kind routed to the hot tier
     Then it answers as if the tier held no records and creates neither the database file nor its write-ahead sidecar
     And the one file a canon query run does write is the read-access audit line, which its effectNote names
+
+  # canon: {"schema":1,"at":"2026-10-26T18:13:17Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:query-reads
+  @case:failure
+  @flow:canon-0-30-record-links.F4
+  @query.read.83
+  Scenario: A query marks a reference to a source that is not committed and counts them
+    Given a finding for a change that has no directory under `.canon/changes`, no plan source entry and no committed change record, and a finding for a change that has one
+    When canon query --kind finding --json is run
+    Then `dangling` lists the missing change with the record, the field, the kind it points at and its id, and counts it under `finding.change_id`
+    And the human table marks the same row
+
+  # canon: {"schema":1,"at":"2026-10-26T18:13:19Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:query-reads
+  @case:happy
+  @flow:canon-0-30-record-links.F4
+  @query.read.84
+  Scenario: A query whose references all resolve marks nothing and counts zero
+    Given findings, evidence and subjects whose changes, reviews, tasks and scenarios all have a committed source
+    When canon query --kind finding, evidence and subject are each run with --json
+    Then `dangling.count` is 0 and no record is marked

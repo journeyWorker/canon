@@ -106,10 +106,13 @@ fn body_at(path: &Path) -> serde_json::Value {
 
 /// The base flags every well-formed add needs, so a test naming a
 /// refusal shows only the flag it is about.
-const BASE: [&str; 8] = ["finding", "add", "--change-id", "s43-findings-are-records", "--severity", "blocker", "--repo", "."];
+const BASE: [&str; 9] = ["finding", "add", "--change-id", "s43-findings-are-records", "--severity", "blocker", "--introduced-unknown", "--repo", "."];
 
 fn add(repo: &Path, extra: &[&str]) -> Output {
     let mut args: Vec<&str> = BASE.to_vec();
+    if extra.contains(&"--introduced-rev") {
+        args.retain(|arg| *arg != "--introduced-unknown");
+    }
     args.extend_from_slice(extra);
     run_canon(&args, repo)
 }
@@ -1251,7 +1254,7 @@ fn listed_repo() -> tempfile::TempDir {
     let repo = dir.path();
     let raise = |change: &str, severity: &str, round: &str, seq: &str, reviewer: &str, summary: &str| {
         let out = run_canon(
-            &["finding", "add", "--change-id", change, "--severity", severity, "--round", round, "--seq", seq, "--actor-id", reviewer, "--summary", summary],
+            &["finding", "add", "--change-id", change, "--severity", severity, "--round", round, "--seq", seq, "--actor-id", reviewer, "--summary", summary, "--introduced-unknown"],
             repo,
         );
         assert!(out.status.success(), "{}", stderr(&out));

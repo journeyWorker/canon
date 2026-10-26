@@ -30,6 +30,16 @@
 //! refused (exit `2`, nothing written): there is nothing to pin. A
 //! scenario with no evidence pins an empty list.
 //!
+//! # One review id per run (0.30 `record-links`)
+//! Each invocation makes one ULID ([`canon_model::ReviewId`]) and stores it in
+//! the body of every review it writes, so the reviews of one run share an id
+//! that no file name carries and no rewrite changes. The output names it for
+//! every scenario. A review the run skips because it repeats the latest one
+//! ([`crate::retry`], which leaves the id out of the comparison as it leaves
+//! out the time) shows the id of the stored review instead, so a run that
+//! mixes written and skipped reviews shows several. `canon finding add
+//! --review-id` takes one of them.
+//!
 //! # A chore is reviewed as a change (0.23 D5)
 //! `--change-id <slug>` writes one review of a chore change instead of one
 //! per scenario: the reviewer signs the chore's invariants and checks
@@ -61,7 +71,7 @@ use canon_gate::freshness::current_pins;
 use canon_gate::spec_coverage::latest_scenarios;
 use canon_gate::{GateContext, GateCtx};
 use canon_model::ids::JoinKeyError;
-use canon_model::{Actor, ChangeId, Envelope, PinnedSpec, ProjectId, ProvenanceRef, RecordKind, Review, ReviewArtifact, ReviewPins, ReviewOutcome, RoleId, ScenarioId, SessionId};
+use canon_model::{Actor, ChangeId, Envelope, PinnedSpec, ProjectId, ProvenanceRef, RecordKind, Review, ReviewArtifact, ReviewId, ReviewPins, ReviewOutcome, RoleId, ScenarioId, SessionId};
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
@@ -176,9 +186,13 @@ pub struct ReviewEntry {
     /// Whether an identical record was already stored (a write).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deduped: Option<bool>,
-    /// The scenario an unchanged repeat is about.
+    /// The scenario (or, for `review change`, the change) the review is of.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scenario_id: Option<String>,
+    /// The review id the record carries (0.30): this run's for a review it wrote, the stored
+    /// review's for one it skipped; absent only for a stored review written before 0.30.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_id: Option<String>,
     /// `true` when an identical review already existed and nothing was written.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unchanged: Option<bool>,
@@ -280,10 +294,12 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
         actor = actor.with_session(session_id.clone());
     }
     let at = Utc::now();
+    let review_id = ReviewId::new();
     let mut reviews: Vec<(Review, String)> = Vec::new();
     if let (Some(change), Some(digest)) = (&args.change, brief_digest) {
-        let mut review = Review::for_change(Envelope::new(1, RecordKind::Review, at, actor.clone()), args.project_id.clone(), change.clone(), &args.reviewer, commit.sha.as_str(), provenance_ref.clone())
-            .with_code(&commit.code_tree, commit.worktree_dirty);
+        let mut review = Review::for_change(Envelope::current(RecordKind::Review, at, actor.clone()), args.project_id.clone(), change.clone(), &args.reviewer, commit.sha.as_str(), provenance_ref.clone())
+            .with_code(&commit.code_tree, commit.worktree_dirty)
+            .with_review_id(review_id);
         review.outcome = args.outcome;
         review.reviewer_provider = args.reviewer_provider.clone();
         review.reviewer_model = args.reviewer_model.clone();
@@ -296,14 +312,15 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
     reviews.extend(found.into_iter().filter_map(|(_, scenario)| scenario.copied()).map(|scenario| {
         let pins = current_pins(&gate_context, scenario);
         let mut review = Review::new(
-            Envelope::new(1, RecordKind::Review, at, actor.clone()),
+            Envelope::current(RecordKind::Review, at, actor.clone()),
             args.project_id.clone(),
             scenario.scenario_id.clone(),
             &args.reviewer,
             commit.sha.as_str(),
             provenance_ref.clone(),
         )
-        .with_code(&commit.code_tree, commit.worktree_dirty);
+        .with_code(&commit.code_tree, commit.worktree_dirty)
+        .with_review_id(review_id);
         review.outcome = args.outcome;
         review.reviewer_provider = args.reviewer_provider.clone();
         review.reviewer_model = args.reviewer_model.clone();
@@ -336,15 +353,20 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
             }, None)
         })
         .collect();
-    let unchanged: Vec<(String, crate::retry::Existing)> =
-        reviews.iter().zip(&repeats).filter_map(|((review, _), repeat)| repeat.clone().map(|existing| (review.target().to_string(), existing))).collect();
-    for (scenario, existing) in &unchanged {
-        crate::say!(args.json, "{cmd}: unchanged — an identical review of {scenario} is already {}; nothing written", existing.describe());
+    // The id a skipped review keeps is the stored review's (module doc).
+    let unchanged: Vec<(String, Option<String>, crate::retry::Existing)> = reviews
+        .iter()
+        .zip(&repeats)
+        .filter_map(|((review, _), repeat)| repeat.clone().map(|existing| (review.target().to_string(), stored_review_id(ledger_root, &existing), existing)))
+        .collect();
+    for (scenario, stored_id, existing) in &unchanged {
+        let id = stored_id.as_deref().map_or_else(String::new, |id| format!(" (review id {id})"));
+        crate::say!(args.json, "{cmd}: unchanged — an identical review of {scenario} is already {}{id}; nothing written", existing.describe());
     }
     let reviews: Vec<(Review, String)> = reviews.into_iter().zip(&repeats).filter(|(_, repeat)| repeat.is_none()).map(|(review, _)| review).collect();
     if reviews.is_empty() {
         if args.json {
-            let wrote: Vec<ReviewEntry> = unchanged.iter().map(|(scenario, existing)| ReviewEntry { location: existing.committed.clone(), deduped: None, scenario_id: Some(scenario.clone()), unchanged: Some(true) }).collect();
+            let wrote: Vec<ReviewEntry> = unchanged.iter().map(|(scenario, stored_id, existing)| ReviewEntry { location: existing.committed.clone(), deduped: None, scenario_id: Some(scenario.clone()), review_id: stored_id.clone(), unchanged: Some(true) }).collect();
             crate::json_out::data_with_meta(args.command(), &ReviewReport { outcome: args.outcome.as_str(), reviews: wrote, blobs_stored: 0 }, serde_json::json!({ "unchanged": true }));
         }
         return 0;
@@ -374,17 +396,28 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
     if !args.outcome.is_signed() {
         crate::say!(args.json, "{cmd}: outcome `{}` is recorded as a review gap, never as an approval", args.outcome.as_str());
     }
-    for (location, deduped) in &written {
-        crate::say!(args.json, "{cmd}: wrote {location} ({}) — {}", if *deduped { "deduped" } else { "new" }, crate::write_mode::DIRECT);
+    for ((location, deduped), (review, _)) in written.iter().zip(&reviews) {
+        crate::say!(args.json, "{cmd}: wrote {location} ({}) — {}; review id {review_id} of {}", if *deduped { "deduped" } else { "new" }, crate::write_mode::DIRECT, review.target());
     }
-    let mut wrote: Vec<ReviewEntry> = written.iter().map(|(location, deduped)| ReviewEntry { location: Some(location.clone()), deduped: Some(*deduped), scenario_id: None, unchanged: None }).collect();
-    wrote.extend(unchanged.iter().map(|(scenario, existing)| ReviewEntry { location: existing.committed.clone(), deduped: None, scenario_id: Some(scenario.clone()), unchanged: Some(true) }));
+    let mut wrote: Vec<ReviewEntry> = written
+        .iter()
+        .zip(&reviews)
+        .map(|((location, deduped), (review, _))| ReviewEntry { location: Some(location.clone()), deduped: Some(*deduped), scenario_id: Some(review.target().to_string()), review_id: Some(review_id.to_string()), unchanged: None })
+        .collect();
+    wrote.extend(unchanged.iter().map(|(scenario, stored_id, existing)| ReviewEntry { location: existing.committed.clone(), deduped: None, scenario_id: Some(scenario.clone()), review_id: stored_id.clone(), unchanged: Some(true) }));
     let scope = match &args.change {
         Some(change) => crate::next::Scope::Change(change.as_str().to_string()),
         None => crate::next::Scope::Scenarios(scenario_ids.iter().map(|id| id.as_str().to_string()).collect()),
     };
     crate::next::finish(&repo, args.command(), &scope, false, args.json, &ReviewReport { outcome: args.outcome.as_str(), reviews: wrote, blobs_stored: stored });
     0
+}
+
+/// The `review_id` of the stored review `existing` names, when it has one.
+fn stored_review_id(ledger_root: &Path, existing: &crate::retry::Existing) -> Option<String> {
+    let bytes = std::fs::read(ledger_root.join(existing.committed.as_deref()?)).ok()?;
+    let body: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    body.get("review_id").and_then(serde_json::Value::as_str).map(str::to_string)
 }
 
 /// The digest a change-level review of `change` pins: its chore brief as

@@ -151,7 +151,7 @@ fn evidence_doc(scenario: &str, reference: &str) -> Value {
 }
 
 fn finding_doc(seq: u32, severity: &str) -> Value {
-    json!({"changeId": CHANGE, "round": 1, "seq": seq, "severity": severity, "actorId": "reviewer-2", "summary": format!("finding {seq}")})
+    json!({"changeId": CHANGE, "round": 1, "seq": seq, "severity": severity, "introducedUnknown": true, "actorId": "reviewer-2", "summary": format!("finding {seq}")})
 }
 
 fn review_doc(scenarios: &[&str]) -> Value {
@@ -297,7 +297,7 @@ fn finding_add_09_a_finding_is_a_recorded_observation_never_checked_against_the_
     let f = fixture();
     let r = f.path();
     f.ok(&[
-        "finding", "add", "--change-id", CHANGE, "--round", "2", "--seq", "3", "--severity", "blocker", "--actor-id", "reviewer-2", "--summary", "the retry loop never ends", "--file-ref",
+        "finding", "add", "--change-id", CHANGE, "--round", "2", "--seq", "3", "--severity", "blocker", "--introduced-unknown", "--actor-id", "reviewer-2", "--summary", "the retry loop never ends", "--file-ref",
         "no/such/file.rs:1-2",
     ]);
     let findings = committed(r, "finding");

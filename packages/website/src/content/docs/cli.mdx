@@ -166,7 +166,7 @@ Record one code-review finding as a durable record.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon finding add` | none | `--change-id <CHANGE_ID>`, `--round <N>`, `--seq <N>`, `--severity <SEVERITY>`, `--actor-id <ACTOR_ID>`, `--summary <TEXT>` | write: Record one code-review finding (promoted in the same run under `write | `canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --actor-id alice --summary "Token is logged"` |
+| `canon finding add` | none | `--change-id <CHANGE_ID>`, `--round <N>`, `--seq <N>`, `--severity <SEVERITY>`, `--actor-id <ACTOR_ID>`, `--summary <TEXT>` | write: Record one code-review finding (promoted in the same run under `write | `canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor-id alice --summary "Token is logged"` |
 | `canon finding close` | `<change-id>` | `--round <N>`, `--seq <N>`, `--disposition <DISPOSITION>` | write: Move an already-committed finding's disposition (promoted in the same run under `write | `canon finding close add-login --round 1 --seq 1 --disposition rejected --reason "works as designed"` |
 | `canon finding list` | none | `--change-id <CHANGE_ID>` | read: List a change's committed findings at their latest version | `canon finding list --change-id add-login` |
 {/* canon:generated cli-finding end */}

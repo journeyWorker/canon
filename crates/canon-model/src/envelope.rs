@@ -136,6 +136,10 @@ impl RecordKind {
     ///   boundary, or the ingested transcript's own instant), so a
     ///   re-derivation always advances `at` and the two generations can
     ///   never tie. No tie, no discriminator needed, no bump owed.
+    /// - **`Review` and `Finding` are `2`** (0.30 `record-links`) — a review
+    ///   gained its `review_id`, and a finding gained `review_id` and
+    ///   `introduced_unknown`. Bumped by decision, not by a tie: it marks the
+    ///   generation that can carry them.
     ///
     /// A field addition that is additive on the wire (`#[serde(default,
     /// skip_serializing_if)]`) still leaves the pre-change corpus
@@ -143,19 +147,17 @@ impl RecordKind {
     /// generation MARKER for the fold, not a migration trigger.
     pub const fn schema_version(self) -> u32 {
         match self {
-            RecordKind::Task | RecordKind::Change => 2,
+            RecordKind::Task | RecordKind::Change | RecordKind::Review | RecordKind::Finding => 2,
             RecordKind::Scenario
             | RecordKind::Session
             | RecordKind::Run
             | RecordKind::Event
             | RecordKind::Handoff
-            | RecordKind::Review
             | RecordKind::Divergence
             | RecordKind::Trajectory
             | RecordKind::StrategyItem
             | RecordKind::Evidence
-            | RecordKind::Subject
-            | RecordKind::Finding => 1,
+            | RecordKind::Subject => 1,
         }
     }
 
@@ -288,13 +290,15 @@ mod tests {
     /// are named explicitly because both DID gain fields on the same
     /// branch that bumped `Task` and both deliberately stayed at `1`.
     #[test]
-    fn only_task_and_change_carry_a_bumped_schema_generation() {
+    fn only_the_bumped_kinds_carry_a_bumped_schema_generation() {
         assert_eq!(RecordKind::Task.schema_version(), 2, "Task gained `depends_on` and its byte-stable `at` can tie");
         assert_eq!(RecordKind::Change.schema_version(), 2, "Change's `subject_id` became `subject_ids` and its plan-import `at` can tie");
+        assert_eq!(RecordKind::Review.schema_version(), 2, "Review gained `review_id` in 0.30");
+        assert_eq!(RecordKind::Finding.schema_version(), 2, "Finding gained `review_id` and `introduced_unknown` in 0.30");
         assert_eq!(RecordKind::Run.schema_version(), 1, "Run's `at` is derivation-time, so its generations can never tie on `at`");
         assert_eq!(RecordKind::Handoff.schema_version(), 1, "Handoff's `at` is derivation-time, so its generations can never tie on `at`");
         for kind in RecordKind::ALL {
-            if matches!(kind, RecordKind::Task | RecordKind::Change) {
+            if matches!(kind, RecordKind::Task | RecordKind::Change | RecordKind::Review | RecordKind::Finding) {
                 continue;
             }
             assert_eq!(kind.schema_version(), 1, "{kind:?} must stay at generation 1 until its records can tie on `at`");

@@ -1,4 +1,5 @@
 [PASS] tiers/routing/aging
+[not configured] hot-store
 [PASS] specs
 [not configured] plans
 [FAIL] write: canon.yaml `write:` section is malformed (expected `write: { promote: auto | manual }`): unknown variant `always`, expected `auto` or `manual`

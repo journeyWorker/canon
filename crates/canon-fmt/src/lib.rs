@@ -20,6 +20,7 @@ pub mod report;
 pub mod resolve;
 pub mod schema_registry;
 pub mod sha;
+pub mod steps;
 pub mod util;
 
 pub use check::check;

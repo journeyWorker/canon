@@ -11,6 +11,8 @@ path = "src/lib.rs"
 
 [dependencies]
 canon-model.workspace = true
+# The step index (0.30 `record-links`): the standard Gherkin parser reads each scenario's steps. The scenario digest stays on the line-based scan in `gherkin.rs`.
+gherkin = "0.16"
 chrono = { version = "0.4.45", features = ["serde"] }
 jsonschema = { version = "0.47.0", default-features = false }
 serde = { workspace = true, features = ["derive"] }

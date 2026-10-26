@@ -160,3 +160,14 @@ Feature: ledger migrate
     Given a 0.29 fixture repo
     When `canon divergence add` and `canon gate promote` run
     Then each is refused OLD_LAYOUT with the `canon migrate` hint and stages or commits nothing
+
+  # canon: {"schema":1,"at":"2026-10-26T18:12:42Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:review-attestation
+  @case:happy
+  @flow:canon-0-30-record-links.F1
+  @ledger.migrate.16
+  Scenario: A review keeps its review id through canon migrate
+    Given a ledger of reviews that carry review ids, and one review written before 0.30 that has none
+    When canon migrate rewrites the repo's records
+    Then every review still carries the same review id in its body
+    And the review written before 0.30 still has none and stays valid

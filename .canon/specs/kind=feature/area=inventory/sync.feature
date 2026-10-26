@@ -275,3 +275,37 @@ Feature: inventory sync
     When canon inventory sync is run with --dry-run and without it
     Then both exit with the same code and the same error code
     And the working tree and .canon are byte-identical after the dry run
+
+  # canon: {"schema":1,"at":"2026-10-26T18:13:12Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:inventory-sync
+  @case:happy
+  @flow:canon-0-30-record-links.F3
+  @inventory.sync.53
+  Scenario: A scenario index record holds the steps in source order, with inherited ones marked
+    Given a feature file with a Feature Background, a Rule with its own Background, and scenarios that use Given, When, Then, And and But
+    When canon inventory sync runs
+    Then each scenario's index record holds `steps`, each with its keyword and its sentence, in source order
+    And the steps taken from the Feature Background and from the Rule Background come first, marked `background` and `rule`
+    And `scenario_digest` is the value it had before steps were indexed
+
+  # canon: {"schema":1,"at":"2026-10-26T18:13:14Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:inventory-sync
+  @case:edge
+  @flow:canon-0-30-record-links.F3
+  @inventory.sync.54
+  Scenario: A 0.29 index record without steps is rewritten with them on the next sync
+    Given a repo whose index was written by 0.29, with scenario records that have no steps and `.feature` files that have not changed
+    When canon inventory sync runs
+    Then every scenario that has steps gets a new record that carries them, and a scenario with no steps writes nothing
+    And a second sync writes nothing
+
+  # canon: {"schema":1,"at":"2026-10-26T18:13:16Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:inventory-sync
+  @case:failure
+  @flow:canon-0-30-record-links.F3
+  @inventory.sync.55
+  Scenario: An edited step replaces the record and the old record goes to the archive
+    Given an indexed scenario whose record carries its steps
+    When one step's sentence is edited in the `.feature` file and canon inventory sync runs
+    Then the index holds a record with the edited step
+    And the earlier record is in the archive

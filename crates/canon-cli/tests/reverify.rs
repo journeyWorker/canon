@@ -529,7 +529,7 @@ fn finding_close_81_inherits_the_scenarios_the_finding_names() {
     let add = run(
         r,
         &[
-            "finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--actor-id", "reviewer-2", "--summary", "double click", "--scenario-id", "world.demo.01",
+            "finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--introduced-unknown", "--actor-id", "reviewer-2", "--summary", "double click", "--scenario-id", "world.demo.01",
             "--scenario-id", "world.demo.01", "--promote",
         ],
     );
@@ -561,7 +561,7 @@ fn finding_add_33_refuses_a_scenario_id_the_index_does_not_know() {
     two_scenarios(r);
     let out = run(
         r,
-        &["finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--actor-id", "r", "--summary", "s", "--scenario-id", "world.demo.99", "--json"],
+        &["finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--introduced-unknown", "--actor-id", "r", "--summary", "s", "--scenario-id", "world.demo.99", "--json"],
     );
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     let body: Value = serde_json::from_str(&stdout(&out)).unwrap();
@@ -579,7 +579,7 @@ fn finding_add_32_records_the_scenarios_it_names_once_each() {
     let dir = repo();
     let r = dir.path();
     two_scenarios(r);
-    let base = ["finding", "add", "--change-id", "c-demo", "--round", "1", "--actor-id", "r", "--summary", "s", "--severity", "should-fix", "--promote"];
+    let base = ["finding", "add", "--change-id", "c-demo", "--round", "1", "--actor-id", "r", "--summary", "s", "--severity", "should-fix", "--introduced-unknown", "--promote"];
     let named = [&base[..], &["--seq", "1", "--scenario-id", "world.demo.02", "--scenario-id", "world.demo.01", "--scenario-id", "world.demo.02"]].concat();
     let plain = [&base[..], &["--seq", "2"]].concat();
     for args in [named, plain] {

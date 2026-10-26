@@ -731,6 +731,7 @@ fn a_blocker_the_author_found_in_its_own_work_is_accepted_and_still_blocks() {
             "1",
             "--severity",
             "blocker",
+            "--introduced-unknown",
             "--actor-id",
             "impl-agent",
             "--summary",

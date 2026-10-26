@@ -1,8 +1,8 @@
 //! The join-spine key newtypes (S1 design D3, tasks 2.1/2.2).
 //!
-//! Nine join-spine keys tie every canon record kind together:
+//! Ten join-spine keys tie every canon record kind together:
 //! `change_id`, `task_id`, `scenario_id`, `session_id`, `run_id`,
-//! `handoff_id`, `sha`/`pr`, `regime_key`, `subject_id`. Each is a
+//! `handoff_id`, `sha`/`pr`, `regime_key`, `subject_id`, `review_id`. Each is a
 //! distinct Rust
 //! (join-spine spec, "Cross-kind join keys share one type per key") — so
 //! a wrongly-shaped join is a compile-time type mismatch, not a runtime
@@ -617,6 +617,69 @@ impl JsonSchema for RunId {
     }
 }
 
+/// `review_id`: a ULID made once per `canon review` run and stored in the
+/// body of every review that run writes (0.30 `record-links`). It is the
+/// key a finding's `review_id` points at: a review is found by this id,
+/// never by its file name, so the id survives a rename, a rewrite and the
+/// move to the archive.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct ReviewId(ulid::Ulid);
+
+impl ReviewId {
+    pub const GRAMMAR: &'static str = "ULID (Crockford base32, 26 chars) — `ulid::Ulid`";
+    pub const JOINS: &'static str = "finding ↔ review";
+
+    pub fn new() -> Self {
+        Self(ulid::Ulid::new())
+    }
+
+    pub fn parse(s: impl AsRef<str>) -> Result<Self, JoinKeyError> {
+        #[expect(clippy::map_err_ignore, reason = "`JoinKeyError` names the key, value and grammar and has no field for a cause; the ULID decoder's error says nothing more than that the value is not a ULID")]
+        let ulid = ulid::Ulid::from_string(s.as_ref()).map_err(|_| JoinKeyError { key: "ReviewId", value: s.as_ref().to_string(), grammar: Self::GRAMMAR })?;
+        Ok(Self(ulid))
+    }
+}
+
+impl Default for ReviewId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TryFrom<String> for ReviewId {
+    type Error = JoinKeyError;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        ReviewId::parse(s)
+    }
+}
+
+impl From<ReviewId> for String {
+    fn from(v: ReviewId) -> String {
+        v.0.to_string()
+    }
+}
+
+impl fmt::Display for ReviewId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl JsonSchema for ReviewId {
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("ReviewId")
+    }
+
+    fn json_schema(_generator: &mut SchemaGenerator) -> schemars::Schema {
+        json_schema!({
+            "type": "string",
+            "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+            "description": "ULID (Crockford base32, 26 chars) — joins: finding ↔ review",
+        })
+    }
+}
+
 /// `pr`: a GitHub pull-request number. Half of the combined `sha`/`pr`
 /// join-spine row (["Joins": "reward signals ↔ trajectory"] on
 /// [`Sha`]) — a positive integer, never a bare `u32` threaded through
@@ -865,6 +928,17 @@ mod tests {
         let s: String = id.into();
         assert_eq!(RunId::parse(&s).unwrap(), id);
         RunId::parse("not-a-ulid").unwrap_err();
+    }
+
+    #[test]
+    fn review_id_round_trips_ulid_and_refuses_anything_else() {
+        let id = ReviewId::new();
+        let s: String = id.into();
+        assert_eq!(s.len(), 26);
+        assert_eq!(ReviewId::parse(&s).unwrap(), id);
+        assert_eq!(serde_json::to_value(id).unwrap(), serde_json::Value::String(s));
+        ReviewId::parse("not-a-ulid").unwrap_err();
+        assert_eq!(ReviewId::parse("nope").unwrap_err().to_string(), format!("invalid ReviewId: \"nope\" does not match grammar `{}`", ReviewId::GRAMMAR));
     }
 
     #[test]

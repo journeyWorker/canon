@@ -159,6 +159,11 @@ pub struct StatusReport {
     /// `require_audit` is off and no latest audit is refuted.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audits: Option<AuditSummary>,
+    /// References of findings, evidence and subjects to a source nothing committed holds
+    /// (0.30 `record-links`), in all and per kind of reference. Absent when they were not
+    /// checked: a run that stopped early, or sources that could not be read (a warning says).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dangling_references: Option<crate::references::DanglingSummary>,
     /// The next steps, role-filtered: carried in `meta.next` (with `nextOmitted` and `waitingOn`), not in `data`.
     #[serde(skip)]
     #[schemars(skip)]
@@ -398,7 +403,7 @@ pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> u8 {
     }
     let repo = resolve_repo_root(repo);
     crate::legacy::announce(&repo);
-    let mut report = resolve_with_pending_index(&repo);
+    let mut report = resolve_for_status(&repo);
     report.apply_role(Role::current(None));
     // A ledger that could not be read gave the report nothing to count (D3): `unverifiable`, never a silent pass.
     let coverage = status_coverage(&repo, &report);
@@ -492,13 +497,13 @@ pub fn split_by_role(steps: Vec<NextStep>, role: Role) -> (Vec<NextStep>, BTreeM
 
 /// The top-level fields of the `--json` report, which `--fields` may name.
 /// `audits` is omitted from a report that has none.
-const REPORT_FIELDS: [&str; 7] = ["statusVersion", "canonVersion", "policy", "warnings", "subjects", "unowned", "audits"];
+const REPORT_FIELDS: [&str; 8] = ["statusVersion", "canonVersion", "policy", "warnings", "subjects", "unowned", "audits", "danglingReferences"];
 
 /// Build the report for an already-resolved repo root. The caller has
 /// refreshed a stale scenario index (a writer that reports does, first);
 /// `canon status` itself reads it with [`resolve_with_pending_index`].
 pub fn resolve(repo: &Path) -> StatusReport {
-    resolve_with(repo, false)
+    resolve_with(repo, false, false)
 }
 
 /// [`resolve`] for a command that wrote `.feature` files and must not
@@ -506,10 +511,17 @@ pub fn resolve(repo: &Path) -> StatusReport {
 /// memory ([`crate::inventory::overlay_stale_index`]), so the report is
 /// the one `canon status` gives after its own refresh.
 pub fn resolve_with_pending_index(repo: &Path) -> StatusReport {
-    resolve_with(repo, true)
+    resolve_with(repo, true, false)
 }
 
-fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
+/// [`resolve_with_pending_index`] for `canon status` itself: it also checks the references of
+/// findings, evidence and subjects against the committed sources ([`crate::references`]), which
+/// the commands that only need the next steps do not pay for.
+fn resolve_for_status(repo: &Path) -> StatusReport {
+    resolve_with(repo, true, true)
+}
+
+fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusReport {
     let registry = SchemaRegistry::load();
     let mut warnings = Vec::new();
     let mut next = Vec::new();
@@ -744,7 +756,9 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     };
     let summaries = summaries.into_iter().map(|(_, summary)| summary).collect();
     let unowned = unowned.iter().map(|s| s.scenario_id.as_str().to_string()).collect();
+    let dangling_references = if references { dangling_references(repo, &ctx, &mut warnings) } else { None };
     let mut report = finish(repo, &ctx.policy, warnings, summaries, unowned, audits, next);
+    report.dangling_references = dangling_references;
     for (range, id) in owners {
         for slot in &mut report.step_subjects[range] {
             *slot = Some(id.clone());
@@ -779,6 +793,7 @@ fn finish(
         subjects,
         unowned,
         audits,
+        dangling_references: None,
         next,
         next_omitted,
         waiting_on: None,
@@ -788,6 +803,23 @@ fn finish(
         change_subjects: BTreeMap::new(),
         examined: true,
     }
+}
+
+/// The references of the ledger's findings, evidence and subjects that no committed source holds
+/// ([`crate::references`]). `None`, with a warning, when the sources cannot be read.
+fn dangling_references(repo: &Path, ctx: &GateContext, warnings: &mut Vec<String>) -> Option<crate::references::DanglingSummary> {
+    let sources = match crate::references::Sources::load(repo) {
+        Ok(sources) => sources,
+        Err(error) => {
+            warnings.push(format!("references to missing sources were not checked: {error}"));
+            return None;
+        }
+    };
+    let mut summary = crate::references::DanglingSummary::default();
+    crate::references::summarize(&sources, RecordKind::Finding, &ctx.findings, &mut summary);
+    crate::references::summarize(&sources, RecordKind::Evidence, ctx.evidence.iter().chain(&ctx.audits), &mut summary);
+    crate::references::summarize(&sources, RecordKind::Subject, latest_subjects(ctx), &mut summary);
+    Some(summary)
 }
 
 /// The `require_audit` sample's state and every refuted latest audit,
@@ -1472,6 +1504,10 @@ pub fn render(report: &StatusReport) -> String {
     }
 
     let _ = writeln!(out);
+    if let Some(kinds) = report.dangling_references.as_ref().and_then(crate::references::DanglingSummary::describe) {
+        let count = report.dangling_references.as_ref().map_or(0, |summary| summary.count);
+        let _ = writeln!(out, "dangling references: {count} point at a source nothing committed holds ({kinds})");
+    }
     let _ = writeln!(out, "subjects ({}):", report.subjects.len());
     for status in DISPLAY_ORDER {
         let name = subject_status_name(status);

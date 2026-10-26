@@ -79,6 +79,23 @@
 //! the same failure as the one in the tag, relocated from prose into a
 //! record where it would look authoritative.
 //!
+//! # A NEW defect finding names its commit or says it is unknown (0.30)
+//! `canon finding add` refuses a new `blocker` or `should-fix` that has
+//! neither `--introduced-rev` nor `--introduced-unknown` (`FINDING_INTRODUCED_REQUIRED`):
+//! a recorded "not known" is information, a silent blank is not, and most
+//! findings in canon's own ledger had a blank. A note needs neither.
+//! `--introduced-unknown` is stored in its own field and never in the commit
+//! slot, so a derived count still reads such a finding as unsourced; the two
+//! options together are refused. The rule is `add`'s alone: `close` copies
+//! both fields and is never blocked by their absence, so a finding written
+//! by 0.29 still closes and reopens.
+//!
+//! # `--review-id` ties a finding to the review it came out of (0.30)
+//! The id is the ULID `canon review scenario|change` printed. `add` refuses an
+//! id that no review in the ledger or the archive carries
+//! (`FINDING_REVIEW_NOT_FOUND`), so a finding can never point at nothing the
+//! moment it is written; `close` copies it. A finding without one is valid.
+//!
 //! What a derived fix-of-fix count MEANS is one sentence, stated here
 //! exactly as `canon_report::render::FIX_OF_FIX_MEANING` states it and
 //! as every other surface repeats it — verbatim, never paraphrased,
@@ -269,7 +286,7 @@
 use std::path::Path;
 use canon_gate::GateCtx;
 use canon_ingest::task_rows::first_row_line_break;
-use canon_model::{Actor, ChangeId, Envelope, Finding, FindingDisposition, FindingSeverity, RawRecord, RecordKind, RoleId, ScenarioId, SessionId, Sha};
+use canon_model::{Actor, ChangeId, Envelope, Finding, FindingDisposition, FindingSeverity, RawRecord, RecordKind, ReviewId, RoleId, ScenarioId, SessionId, Sha};
 use canon_store::fold::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
 use canon_store::partition::{content_digest, resolve_partition};
@@ -362,6 +379,11 @@ pub fn parse_introduced_rev(s: &str) -> Result<String, FindingArgError> {
     Ok(s.to_string())
 }
 
+/// `--review-id`'s clap `value_parser`: the ULID a review run printed.
+pub fn parse_review_id(s: &str) -> Result<ReviewId, canon_model::ids::JoinKeyError> {
+    ReviewId::parse(s)
+}
+
 /// One `canon finding add` invocation's already-parsed flags.
 ///
 /// A named struct rather than a positional parameter list, for
@@ -407,6 +429,13 @@ pub struct FindingArgs {
     /// derived fix-of-fix count UNDER-counts. See the module doc's
     /// canonical sentence before setting this.
     pub introduced_rev: Option<String>,
+    /// `--introduced-unknown` (0.30): the introducing commit is not known.
+    /// Exclusive with `introduced_rev`; a new blocker or should-fix needs
+    /// one of the two (module doc).
+    pub introduced_unknown: bool,
+    /// `--review-id` (0.30): the review this finding came out of, checked
+    /// against the ledger and the archive.
+    pub review_id: Option<ReviewId>,
     /// Where in the tree, as `path/to/file.rs:120-134`. Refused when it
     /// carries a line separator.
     pub file_ref: Option<String>,
@@ -458,6 +487,12 @@ pub struct FindingAddReport<'a> {
     pub disposition: &'static str,
     /// No `--introduced-rev` was given: the finding names no commit that introduced it.
     pub unsourced: bool,
+    /// `--introduced-unknown` was given: the finding says the introducing commit is not known (0.30).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub introduced_unknown: bool,
+    /// The review the finding points at (0.30).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_id: Option<String>,
 }
 
 impl crate::reports::Report for FindingAddReport<'_> {}
@@ -576,6 +611,21 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
         }
     }
 
+    // The 0.30 rule (module doc): a commit or an explicit "not known", never
+    // both, and a defect finding owes one of them.
+    if args.introduced_rev.is_some() && args.introduced_unknown {
+        return CliError::refused("FINDING_INVALID_ARGUMENT", "--introduced-rev and --introduced-unknown are exclusive: a finding names the commit that introduced the defect or says it is not known, never both")
+            .hint("drop --introduced-rev, or drop --introduced-unknown")
+            .field("--introduced-unknown")
+            .emit("canon finding add", args.json);
+    }
+    if args.introduced_rev.is_none() && !args.introduced_unknown && matches!(args.severity, FindingSeverity::Blocker | FindingSeverity::ShouldFix) {
+        return CliError::refused("FINDING_INTRODUCED_REQUIRED", format!("a new {} finding needs --introduced-rev <rev> (the commit that introduced the defect) or --introduced-unknown (it is not known); a note needs neither", severity_slug(args.severity)))
+            .hint("pass --introduced-rev <rev> when the introducing commit was established, else --introduced-unknown; never guess a commit")
+            .field("--introduced-rev")
+            .emit("canon finding add", args.json);
+    }
+
     // Every commit option is resolved by git to the full sha the record
     // stores (module doc); the code tree each saw is recorded with it.
     // Placed after the pure-string refusals and before anything is
@@ -613,6 +663,12 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
     if let Some(sha) = commits.introduced {
         finding = finding.with_introduced_by(sha);
     }
+    if args.introduced_unknown {
+        finding = finding.introduced_unknown();
+    }
+    if let Some(review_id) = args.review_id {
+        finding = finding.raised_in_review(review_id);
+    }
     if let Some(file_ref) = &args.file_ref {
         finding = finding.with_file_ref(file_ref.as_str());
     }
@@ -637,6 +693,20 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
             return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon finding add", args.json);
         }
     };
+    if let Some(review_id) = args.review_id {
+        match review_exists(&ledger_root, review_id) {
+            Ok(true) => {}
+            Ok(false) => {
+                return CliError::refused("FINDING_REVIEW_NOT_FOUND", format!("no review in the ledger or the archive carries review id `{review_id}`; a finding points only at a review that exists"))
+                    .hint("pass the review id `canon review scenario` or `canon review change` printed (`canon query --kind review --json` shows the ids), or leave --review-id out")
+                    .field("--review-id")
+                    .emit("canon finding add", args.json);
+            }
+            Err(e) => {
+                return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon finding add", args.json);
+            }
+        }
+    }
     let staging = GitTier::new(evidence_staging_dir(&ledger_root));
     let committed = GitTier::new(&ledger_root);
     // An identical add repeated (same key, same content, whoever the clock
@@ -653,6 +723,8 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
             severity: severity_slug(args.severity),
             disposition: args.disposition.as_str(),
             unsourced: args.introduced_rev.is_none(),
+            introduced_unknown: args.introduced_unknown,
+            review_id: args.review_id.map(|id| id.to_string()),
         };
         crate::next::finish(&repo, "finding add", &crate::next::Scope::Change(args.change_id.as_str().to_string()), false, args.json, &record);
         return 0;
@@ -683,7 +755,12 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
                 args.disposition.as_str(),
                 settled.suffix()
             );
-            if args.introduced_rev.is_none() {
+            if args.introduced_unknown {
+                crate::say!(
+                    args.json,
+                    "canon finding add: note — --introduced-unknown: the introducing commit is recorded as NOT KNOWN, so this finding is UNSOURCED for fix-of-fix derivation, as the correct record when it was not established; never guess one."
+                );
+            } else if args.introduced_rev.is_none() {
                 // Said on the success path, not only in `--help`: this
                 // is the moment the author still remembers whether the
                 // introducing commit was sourced, and an unsourced
@@ -703,6 +780,8 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
                     severity: severity_slug(args.severity),
                     disposition: args.disposition.as_str(),
                     unsourced: args.introduced_rev.is_none(),
+                    introduced_unknown: args.introduced_unknown,
+                    review_id: args.review_id.map(|id| id.to_string()),
                 };
                 crate::next::finish(&repo, "finding add", &crate::next::Scope::Change(args.change_id.as_str().to_string()), matches!(settled, crate::gate::StagedOutcome::Staged), args.json, &record);
             }
@@ -928,6 +1007,12 @@ pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
     }
     if let Some(sha) = existing.introduced_by.clone() {
         transitioned = transitioned.with_introduced_by(sha);
+    }
+    if existing.introduced_unknown {
+        transitioned = transitioned.introduced_unknown();
+    }
+    if let Some(review_id) = existing.review_id {
+        transitioned = transitioned.raised_in_review(review_id);
     }
     if let Some(file_ref) = &existing.file_ref {
         transitioned = transitioned.with_file_ref(file_ref.as_str());
@@ -1189,6 +1274,18 @@ fn find_finding(args: &FindingCloseArgs, tier: &GitTier) -> Result<Option<Findin
         .next())
 }
 
+/// Whether a review in the ledger or the archive carries `review_id` in its
+/// body (0.30): the one place `--review-id` is checked. The archive is read
+/// because the next review of the same scenario by the same reviewer moves
+/// the earlier one there, and its id still names the review a finding came
+/// out of. A review the tiers report as a violation carries no body to read
+/// an id from and is not matched.
+fn review_exists(ledger_root: &Path, review_id: ReviewId) -> Result<bool, canon_store::tier::StoreError> {
+    let wanted = review_id.to_string();
+    let history = GitTier::new(ledger_root).read_history(RecordKind::Review)?;
+    Ok(history.records.iter().any(|raw| raw.0.get("review_id").and_then(serde_json::Value::as_str) == Some(wanted.as_str())))
+}
+
 /// Which tier, if either, already carries a readable finding at
 /// `natural_key` — the DIAGNOSTIC half of the `--seq` collision story
 /// (module doc), never the enforcement half.
@@ -1310,6 +1407,8 @@ mod tests {
             summary: "the release count was typed from memory".to_string(),
             resolution_rev: None,
             introduced_rev: None,
+            introduced_unknown: true,
+            review_id: None,
             file_ref: None,
             scenario_ids: Vec::new(),
             actor_id: "canon".to_string(),
@@ -1401,6 +1500,7 @@ mod tests {
         let mut resolvable = args("s43-findings-are-records", 2, 11);
         resolvable.rev = head.as_str()[..8].to_string();
         resolvable.introduced_rev = Some("HEAD".to_string());
+        resolvable.introduced_unknown = false;
         resolvable.disposition = FindingDisposition::Fixed;
         resolvable.resolution_rev = Some("main".to_string());
         assert_eq!(run_add(dir.path(), &resolvable), 0);
@@ -1496,6 +1596,7 @@ mod tests {
         let mut fixed = args("s43-findings-are-records", 2, 1);
         fixed.disposition = FindingDisposition::Fixed;
         fixed.resolution_rev = Some("HEAD".to_string());
+        fixed.introduced_unknown = false;
         fixed.introduced_rev = Some("HEAD".to_string());
         assert_eq!(run_add(dir.path(), &fixed), 0);
 
@@ -1639,6 +1740,7 @@ mod tests {
         let mut raised = args("s44-spec-derived-worklist", 1, 1);
         raised.file_ref = Some("crates/canon-cli/src/finding.rs:1-2".to_string());
         raised.introduced_rev = Some(head.clone().to_string());
+        raised.introduced_unknown = false;
         raised.rev = head.clone().to_string();
         assert_eq!(run_add(dir.path(), &raised), 0);
         promote_staged(dir.path());

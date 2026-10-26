@@ -22,12 +22,26 @@
 
 use std::path::Path;
 
+use canon_model::RecordKind;
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
 
 /// Keys a write or a promotion stamps; they never make two records differ.
 const STAMPED: [&str; 3] = ["at", "run_seq", "staging_id"];
+
+/// A review is stamped with the ULID of the run that wrote it (0.30), as it is
+/// with the time: the same review run again is a repeat, whatever id the new
+/// run made. A finding's `review_id` is an argument, so it is never stamped.
+const REVIEW_STAMPED: [&str; 4] = ["at", "run_seq", "staging_id", "review_id"];
+
+fn stamped_keys(kind: &str) -> &'static [&'static str] {
+    if kind == RecordKind::Review.as_str() {
+        &REVIEW_STAMPED
+    } else {
+        &STAMPED
+    }
+}
 
 /// Where a written record lives, as a report says it: the staged location and
 /// the ledger path once promoted (`null` where absent).
@@ -63,11 +77,11 @@ impl Existing {
     }
 }
 
-fn comparable(body: &Value) -> Value {
+fn comparable(body: &Value, stamped: &[&str]) -> Value {
     let mut body = body.clone();
     if let Some(object) = body.as_object_mut() {
-        for key in STAMPED {
-            object.remove(key);
+        for key in stamped {
+            object.remove(*key);
         }
     }
     body
@@ -138,6 +152,8 @@ pub(crate) fn repeats_latest(
 pub(crate) struct RepeatCorpus {
     /// Committed records, then staged ones: the order the newest is picked in.
     stored: Vec<(Existing, Value)>,
+    /// The keys that do not make two records of this kind differ.
+    stamped: &'static [&'static str],
     /// Where the following kind is read from, and what was read.
     later_source: Option<(std::path::PathBuf, String)>,
     later: std::sync::OnceLock<Vec<(String, Value)>>,
@@ -150,7 +166,7 @@ impl RepeatCorpus {
         if let Some(staging) = staging {
             stored.extend(records_under(staging, kind).into_iter().map(|(path, body)| (Existing { staged: Some(path), committed: None }, body)));
         }
-        Self { stored, later_source: later_kind.map(|later| (ledger_root.to_path_buf(), later.to_string())), later: std::sync::OnceLock::new() }
+        Self { stored, stamped: stamped_keys(kind), later_source: later_kind.map(|later| (ledger_root.to_path_buf(), later.to_string())), later: std::sync::OnceLock::new() }
     }
 
     /// [`repeats_latest`]'s answer for `body`, from the records read.
@@ -165,7 +181,7 @@ impl RepeatCorpus {
             }
         }
         let (existing, stored) = latest?;
-        if comparable(stored) != comparable(body) {
+        if comparable(stored, self.stamped) != comparable(body, self.stamped) {
             return None;
         }
         if let Some(matches) = followed_by {

@@ -839,6 +839,16 @@ pub fn run_check_config(repo: &Path, json: bool) -> u8 {
                     report.push_str(&format!("[FAIL] tiers/routing/aging: {e}\n"));
                 }
             }
+            match crate::hot_store::HotStore::from_policy(&policy, repo) {
+                Some(hot) => match hot.check(repo) {
+                    Ok(()) => report.push_str(&format!("[PASS] hot-store: {} ({})\n", hot.location(), hot.note())),
+                    Err(e) => {
+                        all_ok = false;
+                        report.push_str(&format!("[FAIL] hot-store: {e}\n"));
+                    }
+                },
+                None => report.push_str("[not configured] hot-store\n"),
+            }
         }
         Err(e) => {
             all_ok = false;

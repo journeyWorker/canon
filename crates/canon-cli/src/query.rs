@@ -63,6 +63,30 @@ pub struct QueryOutcome {
     pub page: Option<PageMeta>,
     /// `--fields`: the top-level record fields JSON output keeps.
     pub fields: Option<Vec<String>>,
+    /// 0.30 `record-links`: the references of the records this query returned that no committed source
+    /// holds ([`crate::references`]); `None` for a kind whose references are not checked.
+    pub references: Option<ReferenceCheck>,
+}
+
+/// What checking the references of a query's records found.
+#[derive(Debug)]
+pub enum ReferenceCheck {
+    /// Every record was checked.
+    Scanned(crate::references::QueryScan),
+    /// The sources could not be read, so nothing was checked; why.
+    Unchecked(String),
+}
+
+/// Check the references of `records` (of `kind`), when `kind` has any worth checking.
+fn check_references(repo: &Path, kind: RecordKind, records: &[RawRecord]) -> Option<ReferenceCheck> {
+    if !crate::references::is_checked(kind) {
+        return None;
+    }
+    let repo = crate::context::resolve_repo_root(repo);
+    Some(match crate::references::Sources::load(&repo) {
+        Ok(sources) => ReferenceCheck::Scanned(crate::references::QueryScan::of(&sources, kind, records, |raw| record_key(kind, raw))),
+        Err(error) => ReferenceCheck::Unchecked(error.to_string()),
+    })
 }
 
 /// `--kind`'s `clap` value parser — `<k>` is a [`RecordKind`] spelled by
@@ -421,7 +445,8 @@ pub fn run(
     let records = if history { result.records } else { fold_rewritten_kind(kind, fold_pg_routed_kind(kind, result.records)) };
     let records = apply_scope(kind, records, change_id, status, domain);
     let rollup = rollup_for(kind, &records);
-    Ok(QueryOutcome { kind, since, records, violation_count, rollup, page: None, fields: None })
+    let references = check_references(repo, kind, &records);
+    Ok(QueryOutcome { kind, since, records, violation_count, rollup, page: None, fields: None, references })
 }
 
 /// The top-level record fields `--fields` may name for `kind`: what the
@@ -493,6 +518,15 @@ pub fn format_human_with_sensitive(outcome: &QueryOutcome, _include_sensitive: b
         out.push_str(&format!("  ({} violation(s) reported, excluded)", outcome.violation_count));
     }
     out.push('\n');
+    match &outcome.references {
+        Some(ReferenceCheck::Scanned(scan)) => {
+            if let Some(kinds) = scan.summary.describe() {
+                out.push_str(&format!("{} reference(s) to a source nothing committed holds ({kinds})\n", scan.summary.count));
+            }
+        }
+        Some(ReferenceCheck::Unchecked(reason)) => out.push_str(&format!("references not checked: {reason}\n")),
+        None => {}
+    }
     if let Some((done, total)) = outcome.rollup {
         out.push_str(&format!("{done}/{total} done\n"));
     }
@@ -506,7 +540,13 @@ pub fn format_human_with_sensitive(outcome: &QueryOutcome, _include_sensitive: b
         let at = canon_store::tier::raw_record_at(raw);
         let id = canon_store::partition::resolve_partition(outcome.kind, &raw.0).map_or_else(|_| "-".to_string(), |p| p.natural_key);
         let digest = canon_store::partition::content_digest(&raw.0);
-        out.push_str(&format!("{:<30} {:<30} {}\n", at.to_rfc3339(), id, digest));
+        out.push_str(&format!("{:<30} {:<30} {}", at.to_rfc3339(), id, digest));
+        if let Some(ReferenceCheck::Scanned(scan)) = &outcome.references {
+            for reference in scan.by_record.get(&record_key(outcome.kind, raw)).into_iter().flatten() {
+                out.push_str(&format!("  <- {} `{}` ({}) has no committed source", reference.target, reference.id, reference.field));
+            }
+        }
+        out.push('\n');
     }
     finish_human(out, outcome)
 }
@@ -616,9 +656,57 @@ pub struct QueryReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub overlays: Option<Vec<String>>,
     pub records: Vec<LedgerRecord>,
+    /// `--kind finding|evidence|subject` (0.30): the references to a source nothing committed holds.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dangling: Option<QueryDangling>,
     /// `--kind task`: tasks done of tasks listed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rollup: Option<QueryRollup>,
+}
+
+/// The unresolved references of a query (0.30 `record-links`): the count and the count per kind of reference
+/// cover every record the query found, `references` the records of this page.
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryDangling {
+    pub count: usize,
+    /// `<record kind>.<field>` to its count.
+    pub by_reference: BTreeMap<String, usize>,
+    pub references: Vec<DanglingRecord>,
+    /// Why nothing was checked, when the sources could not be read.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unchecked: Option<String>,
+}
+
+/// One record's unresolved reference.
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DanglingRecord {
+    /// The record's id, as the query's ID column shows it.
+    pub record: String,
+    pub field: &'static str,
+    /// The kind of thing the field names: `change`, `review`, `task` or `scenario`.
+    pub target: &'static str,
+    pub id: String,
+}
+
+fn dangling_of(outcome: &QueryOutcome, check: &ReferenceCheck) -> QueryDangling {
+    match check {
+        ReferenceCheck::Scanned(scan) => {
+            let references = outcome
+                .records
+                .iter()
+                .filter_map(|raw| {
+                    let unresolved = scan.by_record.get(&record_key(outcome.kind, raw))?;
+                    let record = canon_store::partition::resolve_partition(outcome.kind, &raw.0).map(|p| p.natural_key).unwrap_or_default();
+                    Some(unresolved.iter().map(move |reference| DanglingRecord { record: record.clone(), field: reference.field, target: reference.target, id: reference.id.clone() }))
+                })
+                .flatten()
+                .collect();
+            QueryDangling { count: scan.summary.count, by_reference: scan.summary.by_reference.clone(), references, unchecked: None }
+        }
+        ReferenceCheck::Unchecked(reason) => QueryDangling { count: 0, by_reference: BTreeMap::new(), references: Vec::new(), unchecked: Some(reason.clone()) },
+    }
 }
 
 impl Report for QueryReport {}
@@ -646,6 +734,7 @@ fn base_report(outcome: &QueryOutcome, records: Vec<LedgerRecord>) -> QueryRepor
         plugin: None,
         overlays: None,
         records,
+        dangling: outcome.references.as_ref().map(|check| dangling_of(outcome, check)),
         rollup: outcome.rollup.map(|(done, total)| QueryRollup { done, total }),
     }
 }
@@ -833,7 +922,8 @@ pub fn run_with_plugin(
     let records = fold_rewritten_kind(kind, records);
     let records = apply_scope(kind, records, change_id, status, domain);
     let rollup = rollup_for(kind, &records);
-    let outcome = QueryOutcome { kind, since, records, violation_count, rollup, page: None, fields: None };
+    let references = check_references(repo, kind, &records);
+    let outcome = QueryOutcome { kind, since, records, violation_count, rollup, page: None, fields: None, references };
 
     let git = git_root.map(GitTier::new);
     let plugin_outcome = resolve_and_project(&project_dir, git.as_ref(), kind, plugin_id, &outcome.records);
@@ -960,6 +1050,7 @@ mod tests {
             rollup: None,
             page: None,
             fields: None,
+            references: None,
         }
     }
 

@@ -344,3 +344,25 @@ Feature: context status
     When canon status runs and canon brief approve runs on the brief that has advisories
     Then the clean brief's only step is the human stop, with no polish step
     And the approval is recorded: advisories never refuse it
+
+  # canon: {"schema":1,"at":"2026-10-26T18:13:21Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:context-capability
+  @case:failure
+  @flow:canon-0-30-record-links.F4
+  @context.status.84
+  Scenario: Status counts references to missing sources per kind and gives the same JSON on every checkout of one commit
+    Given a repo with findings, evidence and a subject that point at changes, a review, a task and a scenario that no committed source has
+    When canon status --json is run in the working tree and in a fresh clone of the same commit
+    Then both print the same `dangling` with its count per kind of reference: `finding.change_id`, `finding.review_id`, `evidence.task_id`, `evidence.scenario_id` and `subject.change_ids`
+    And the human status prints the total on one line
+
+  # canon: {"schema":1,"at":"2026-10-26T18:13:22Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:context-capability
+  @case:edge
+  @flow:canon-0-30-record-links.F4
+  @context.status.85
+  Scenario: A gitignored derived record is not a source, legacy review pins are not checked and gate check is unchanged
+    Given a finding whose change has only a gitignored derived change record, and a review written before 0.23 that pins old evidence record names
+    When canon status, canon query and canon gate check are run
+    Then the finding's change counts as dangling and the old pin is not checked
+    And canon gate check prints and exits as it did before references were reported

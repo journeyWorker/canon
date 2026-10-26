@@ -5080,8 +5080,10 @@
       "errorCodes": [
         "CONFIG_MISSING",
         "CONFIG_UNREADABLE",
+        "FINDING_INTRODUCED_REQUIRED",
         "FINDING_INVALID_ARGUMENT",
         "FINDING_RESOLUTION_REV_UNEXPECTED",
+        "FINDING_REVIEW_NOT_FOUND",
         "FINDING_SEQ_OCCUPIED",
         "FINDING_UNKNOWN_SCENARIO",
         "INPUT_CONFLICT",
@@ -5102,7 +5104,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --actor-id alice --summary \"Token is logged\""
+        "canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor-id alice --summary \"Token is logged\""
       ],
       "exits": [
         {
@@ -5134,6 +5136,7 @@
             {
               "actorId": "reviewer-1",
               "changeId": "add-login",
+              "introducedUnknown": true,
               "round": 1,
               "seq": 2,
               "severity": "blocker",
@@ -5143,6 +5146,7 @@
           "example": {
             "actorId": "alice",
             "changeId": "add-login",
+            "introducedUnknown": true,
             "round": 1,
             "seq": 2,
             "severity": "should-fix",
@@ -5280,6 +5284,27 @@
           "repeatable": false,
           "required": false,
           "valueName": "REV"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Say the introducing commit is not known, instead of --introduced-rev. A new blocker or should-fix needs one of the two; a note needs neither. Stored in its own field, never in the commit slot",
+          "kind": "flag",
+          "name": "introduced-unknown",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The review this finding came out of: the review id `canon review scenario` or `canon review change` printed. Refused when no review in the ledger or the archive carries it; a close copies it",
+          "kind": "value",
+          "name": "review-id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "REVIEW_ID"
         },
         {
           "aliases": [],
@@ -13301,6 +13326,13 @@
       "retryable": false
     },
     {
+      "code": "FINDING_INTRODUCED_REQUIRED",
+      "exit": 2,
+      "fix": "Pass --introduced-rev <rev> when the introducing commit was established, or --introduced-unknown when it was not; a note needs neither.",
+      "meaning": "a new blocker or should-fix finding names no introducing commit and does not say it is unknown",
+      "retryable": false
+    },
+    {
       "code": "FINDING_INVALID_ARGUMENT",
       "exit": 2,
       "fix": "Correct the `canon finding` argument that is empty, malformed or out of range.",
@@ -13326,6 +13358,13 @@
       "exit": 2,
       "fix": "Drop --resolution-rev, or close the finding as fixed.",
       "meaning": "--resolution-rev was given with a disposition other than fixed",
+      "retryable": false
+    },
+    {
+      "code": "FINDING_REVIEW_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass the review id that `canon review scenario` or `canon review change` printed; `canon query --kind review` shows the ids.",
+      "meaning": "--review-id names no review in the ledger or the archive",
       "retryable": false
     },
     {
@@ -14176,7 +14215,7 @@
         "kind": "review",
         "partition": "kind=review/{project_id}_(scenario_{scenario_id}|change_{change_id})_{digest8}.json",
         "schema": "crates/canon-model/schemas/review.schema.json",
-        "schemaVersion": 1
+        "schemaVersion": 2
       },
       {
         "kind": "divergence",
@@ -14212,7 +14251,7 @@
         "kind": "finding",
         "partition": "kind=finding/{change_id}_{round}_{seq}_{digest8}.json",
         "schema": "crates/canon-model/schemas/finding.schema.json",
-        "schemaVersion": 1
+        "schemaVersion": 2
       }
     ]
   },
@@ -19485,6 +19524,17 @@
             "disposition": {
               "type": "string"
             },
+            "introducedUnknown": {
+              "description": "`--introduced-unknown` was given: the finding says the introducing commit is not known (0.30).",
+              "type": "boolean"
+            },
+            "reviewId": {
+              "description": "The review the finding points at (0.30).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "round": {
               "format": "uint32",
               "minimum": 0,
@@ -21202,6 +21252,13 @@
               "minimum": 0,
               "type": "integer"
             },
+            "hotStore": {
+              "description": "Where the hot records go (0.30): the hot store's location; absent on a `--dry-run`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "malformedRecords": {
               "format": "uint",
               "minimum": 0,
@@ -21245,6 +21302,7 @@
             "rowsSkipped",
             "runsWritten",
             "eventsWritten",
+            "hotStore",
             "degradeReason",
             "unwritten"
           ],
@@ -23176,8 +23234,15 @@
                 "null"
               ]
             },
+            "reviewId": {
+              "description": "The review id the record carries (0.30): this run's for a review it wrote, the stored\nreview's for one it skipped; absent only for a stored review written before 0.30.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "scenarioId": {
-              "description": "The scenario an unchanged repeat is about.",
+              "description": "The scenario (or, for `review change`, the change) the review is of.",
               "type": [
                 "string",
                 "null"
@@ -23387,8 +23452,15 @@
                 "null"
               ]
             },
+            "reviewId": {
+              "description": "The review id the record carries (0.30): this run's for a review it wrote, the stored\nreview's for one it skipped; absent only for a stored review written before 0.30.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "scenarioId": {
-              "description": "The scenario an unchanged repeat is about.",
+              "description": "The scenario (or, for `review change`, the change) the review is of.",
               "type": [
                 "string",
                 "null"
@@ -30809,6 +30881,10 @@
             "number"
           ]
         },
+        "introducedUnknown": {
+          "description": "Say the introducing commit is not known, instead of --introduced-rev. A new blocker or should-fix needs one of the two; a note needs neither. Stored in its own field, never in the commit slot",
+          "type": "boolean"
+        },
         "noPromote": {
           "description": "Keep this write staged even under canon.yaml `write: { promote: auto }`",
           "type": "boolean"
@@ -30827,6 +30903,13 @@
         "rev": {
           "default": "HEAD",
           "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "reviewId": {
+          "description": "The review this finding came out of: the review id `canon review scenario` or `canon review change` printed. Refused when no review in the ledger or the archive carries it; a close copies it",
           "type": [
             "string",
             "number"
@@ -30914,6 +30997,17 @@
         },
         "disposition": {
           "type": "string"
+        },
+        "introducedUnknown": {
+          "description": "`--introduced-unknown` was given: the finding says the introducing commit is not known (0.30).",
+          "type": "boolean"
+        },
+        "reviewId": {
+          "description": "The review the finding points at (0.30).",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "round": {
           "format": "uint32",
@@ -32538,6 +32632,13 @@
           "minimum": 0,
           "type": "integer"
         },
+        "hotStore": {
+          "description": "Where the hot records go (0.30): the hot store's location; absent on a `--dry-run`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "malformedRecords": {
           "format": "uint",
           "minimum": 0,
@@ -32581,6 +32682,7 @@
         "rowsSkipped",
         "runsWritten",
         "eventsWritten",
+        "hotStore",
         "degradeReason",
         "unwritten"
       ],
@@ -33938,8 +34040,72 @@
     },
     "QueryReport": {
       "$defs": {
+        "DanglingRecord": {
+          "description": "One record's unresolved reference.",
+          "properties": {
+            "field": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "record": {
+              "description": "The record's id, as the query's ID column shows it.",
+              "type": "string"
+            },
+            "target": {
+              "description": "The kind of thing the field names: `change`, `review`, `task` or `scenario`.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record",
+            "field",
+            "target",
+            "id"
+          ],
+          "type": "object"
+        },
         "LedgerRecord": {
           "description": "A ledger record, verbatim: it keeps its own schema (`crates/canon-model/schemas/<kind>.schema.json`), minus anything redacted or left out by `--fields`",
+          "type": "object"
+        },
+        "QueryDangling": {
+          "description": "The unresolved references of a query (0.30 `record-links`): the count and the count per kind of reference\ncover every record the query found, `references` the records of this page.",
+          "properties": {
+            "byReference": {
+              "additionalProperties": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "`<record kind>.<field>` to its count.",
+              "type": "object"
+            },
+            "count": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "references": {
+              "items": {
+                "$ref": "#/$defs/DanglingRecord"
+              },
+              "type": "array"
+            },
+            "unchecked": {
+              "description": "Why nothing was checked, when the sources could not be read.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "count",
+            "byReference",
+            "references"
+          ],
           "type": "object"
         },
         "QueryRollup": {
@@ -33970,6 +34136,17 @@
           "format": "uint",
           "minimum": 0,
           "type": "integer"
+        },
+        "dangling": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QueryDangling"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`--kind finding|evidence|subject` (0.30): the references to a source nothing committed holds."
         },
         "kind": {
           "type": "string"
@@ -34345,8 +34522,15 @@
                 "null"
               ]
             },
+            "reviewId": {
+              "description": "The review id the record carries (0.30): this run's for a review it wrote, the stored\nreview's for one it skipped; absent only for a stored review written before 0.30.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "scenarioId": {
-              "description": "The scenario an unchanged repeat is about.",
+              "description": "The scenario (or, for `review change`, the change) the review is of.",
               "type": [
                 "string",
                 "null"
@@ -34551,8 +34735,15 @@
                 "null"
               ]
             },
+            "reviewId": {
+              "description": "The review id the record carries (0.30): this run's for a review it wrote, the stored\nreview's for one it skipped; absent only for a stored review written before 0.30.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "scenarioId": {
-              "description": "The scenario an unchanged repeat is about.",
+              "description": "The scenario (or, for `review change`, the change) the review is of.",
               "type": [
                 "string",
                 "null"
@@ -35910,6 +36101,29 @@
           ],
           "type": "object"
         },
+        "DanglingSummary": {
+          "description": "How many references are unresolved, in all and per kind of reference\n(`<record kind>.<field>`, e.g. `finding.change_id`).",
+          "properties": {
+            "byReference": {
+              "additionalProperties": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "count": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "count",
+            "byReference"
+          ],
+          "type": "object"
+        },
         "FlowScenarioState": {
           "description": "One scenario covering a flow step, with the evidence and review state\nthe gate reads for it.",
           "properties": {
@@ -36307,6 +36521,17 @@
         },
         "canonVersion": {
           "type": "string"
+        },
+        "danglingReferences": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DanglingSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "References of findings, evidence and subjects to a source nothing committed holds\n(0.30 `record-links`), in all and per kind of reference. Absent when they were not\nchecked: a run that stopped early, or sources that could not be read (a warning says)."
         },
         "policy": {
           "$ref": "#/$defs/PolicyStatus"

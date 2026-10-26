@@ -15,7 +15,10 @@
 //!    scenario_id)` via the normal append-only `GitTier::write`.
 //!    Idempotence is LOGICAL (design D5): fold latest-per-key first
 //!    (`canon_store::fold_latest_by_key`), no-op when the candidate's
-//!    digests/title/tags already match the latest folded record.
+//!    digests/title/tags/steps already match the latest folded record.
+//!    The steps (0.30 `record-links`) are read with the `gherkin` crate
+//!    ([`canon_fmt::steps`]); a file it refuses is indexed without them and
+//!    the sync says so.
 //!
 //! # General index — never `upstream`/`InventoryEntry.covered_by`
 //! The index derives ONLY from the `.feature` corpus — this module
@@ -36,7 +39,7 @@ use std::path::{Path, PathBuf};
 use canon_fmt::Violation;
 use canon_gate::{GateContext, GateCtx};
 use canon_model::ids::SpecDigest;
-use canon_model::{paths, Actor, Envelope, ProjectId, RecordKind, Scenario, ScenarioId, SubjectId};
+use canon_model::{paths, Actor, Envelope, ProjectId, RecordKind, Scenario, ScenarioId, ScenarioStep, SubjectId};
 use canon_store::file_lock::{FileLock, FileLockError};
 use canon_store::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
@@ -567,6 +570,12 @@ pub struct ScannedScenario {
     pub lane_tags: Vec<String>,
     pub case_tags: Vec<String>,
     pub unknown_namespace_tags: Vec<String>,
+    /// The scenario's steps in source order (0.30); empty when the file has
+    /// none for it or the Gherkin parser refused the file ([`Self::steps_error`]).
+    pub steps: Vec<ScenarioStep>,
+    /// Why the Gherkin parser refused the file, when it did: the sync says
+    /// the steps are not indexed.
+    pub steps_error: Option<String>,
 }
 
 /// The full walk both [`scan_feature_corpus`] and [`sync_one_root`]
@@ -588,6 +597,8 @@ pub fn scan_feature_corpus_detailed(root: &Path) -> Vec<ScannedScenario> {
                     lane_tags: candidate.lane_tags.clone(),
                     case_tags: candidate.case_tags.clone(),
                     unknown_namespace_tags: candidate.unknown_namespace_tags.clone(),
+                    steps: file.steps.as_ref().ok().and_then(|steps| steps.get(&candidate.scenario_id)).cloned().unwrap_or_default(),
+                    steps_error: file.steps.as_ref().err().map(ToString::to_string),
                 });
             }
         }
@@ -601,6 +612,8 @@ pub struct FeatureFileScan {
     pub scan: canon_fmt::gherkin::FeatureScan,
     pub source_digest: SpecDigest,
     pub scenario_digests: BTreeMap<String, SpecDigest>,
+    /// The steps by scenario id, or why the Gherkin parser refused the file.
+    pub steps: Result<BTreeMap<String, Vec<ScenarioStep>>, canon_fmt::steps::StepsError>,
 }
 
 /// What each `.feature` file scanned to, by path, while its size and
@@ -629,6 +642,7 @@ pub fn feature_file_scan(path: &Path) -> Option<std::sync::Arc<FeatureFileScan>>
         scan: canon_fmt::gherkin::scan(text),
         source_digest: canon_fmt::gherkin::source_digest(&bytes),
         scenario_digests: canon_fmt::gherkin::scenario_digests(text),
+        steps: canon_fmt::steps::scenario_steps(text),
     });
     if let Some(stamp) = stamp {
         FEATURE_MEMO.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(path.to_path_buf(), (stamp, std::sync::Arc::clone(&file)));
@@ -863,6 +877,13 @@ fn plan_one_root<'f>(
                 namespace
             ));
         }
+        if let Some(error) = &candidate.steps_error {
+            let shown = candidate.path.strip_prefix(repo).unwrap_or(&candidate.path).display().to_string();
+            let diagnostic = format!("`{shown}` was refused by the Gherkin parser ({error}); its scenarios are indexed without steps");
+            if !tag_diagnostics.contains(&diagnostic) {
+                tag_diagnostics.push(diagnostic);
+            }
+        }
         let key = (spec_root.id.clone(), candidate.scenario_id.clone());
         // The subject join joins the idempotence key: a record written
         // before this field existed (or before the tag was added) gets
@@ -875,6 +896,7 @@ fn plan_one_root<'f>(
                 && latest.subject_id == subject_id
                 && latest.lane.as_deref() == lane.as_deref()
                 && latest.case.as_deref() == case.as_deref()
+                && latest.steps == candidate.steps
         });
         if unchanged {
             continue;
@@ -891,6 +913,7 @@ fn plan_one_root<'f>(
         record.lane = lane;
         record.case = case;
         record.subject_id = subject_id;
+        record.steps = candidate.steps.clone();
         records.push(record);
     }
 
@@ -1097,7 +1120,7 @@ fn stale_roots_against(latest: &BTreeMap<(ProjectId, ScenarioId), Scenario>, roo
             .filter(|candidate| {
                 !latest
                     .get(&(root.id.clone(), candidate.scenario_id.clone()))
-                    .is_some_and(|record| !record.removed && record.source_digest == candidate.source_digest && record.scenario_digest == candidate.scenario_digest)
+                    .is_some_and(|record| !record.removed && record.source_digest == candidate.source_digest && record.scenario_digest == candidate.scenario_digest && record.steps == candidate.steps)
             })
             .map(|candidate| candidate.path.clone())
             .collect();

@@ -35,13 +35,13 @@ pub use evidence::{EvidenceViolation, FailureClass, RawRecord, validate_evidence
 pub use fold::{BindingSnapshot, FoldedState, fold_to_current_state};
 pub use handoff::{DomainId, GihoekTemplate, Handoff, HandoffBody, HandoffFields, HandoffState, HandoffTemplate, TemplateRegistry};
 pub use ids::{
-    ChangeId, HandoffId, JoinKeyError, PrNumber, ProjectId, RegimeKey, RoleId, RunId, ScenarioId, Sha, SessionId,
+    ChangeId, HandoffId, JoinKeyError, PrNumber, ProjectId, RegimeKey, ReviewId, RoleId, RunId, ScenarioId, Sha, SessionId,
     SpecDigest, SubjectId, TaskId, TotalOrder, regime_key,
 };
 pub use records::{
     AuditResult, BriefOverride, Change, ChangeStatus, CheckPin, Divergence, DivergenceFields, DivergenceStatus, Event, EvidenceApproval, EvidenceAttachment, EvidenceAudit, EvidenceRecord,
     EvidenceVerdict, Finding, FindingDisposition, ReportFormat, ReportOutcome,
-    FindingSeverity, ProvenanceRef, Review, ReviewArtifact, ReviewOutcome, ReviewPins, PinnedSpec, EvidencePin, Run, RunLineage, RunStatus, SkillSnapshot, ContextSnapshot, PolicySnapshot, Scenario,
+    FindingSeverity, ProvenanceRef, Review, ReviewArtifact, ReviewOutcome, ReviewPins, PinnedSpec, EvidencePin, Run, RunLineage, RunStatus, SkillSnapshot, ContextSnapshot, PolicySnapshot, Scenario, ScenarioStep, StepOrigin,
     Reopen, Session, StatusOverride, StatusReason, StrategyItem, StrategyRef, Subject, WaivedViolation,
     SubjectStatus, Task, TaskStatus, Trajectory,
 };

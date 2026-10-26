@@ -748,6 +748,24 @@ pub(crate) fn load_plan_sources_from_config(canon_yaml_path: &Path, repo: &Path)
     Ok(PlanSource::native(repo).into_iter().chain(configured).collect())
 }
 
+/// The change ids and the task ids the plan sources declare right now
+/// (canon's own `.canon/changes/`, then `canon.yaml`'s `plans.sources`), read
+/// from the plan documents themselves and not from any stored record: what
+/// `canon query` and `canon status` hold a finding's or an evidence record's
+/// `change_id` and `task_id` against (0.30 `record-links`).
+pub(crate) fn declared_ids(repo: &Path) -> Result<(BTreeSet<String>, BTreeSet<String>), PlansError> {
+    let mut changes = BTreeSet::new();
+    let mut tasks = BTreeSet::new();
+    for source in load_plan_sources_from_config(&repo.join("canon.yaml"), repo)? {
+        let Some(entry) = source.entry() else { continue };
+        let Some(handle) = entry.adapter.resolve_source(&PlanSourceConfig { root: Some(source.root.clone()) }) else { continue };
+        let PlanParseOutcome { changes: parsed_changes, tasks: parsed_tasks, .. } = entry.adapter.parse(&handle);
+        changes.extend(parsed_changes.iter().map(|change| change.change_id.to_string()));
+        tasks.extend(parsed_tasks.iter().map(|task| task.task_id.to_string()));
+    }
+    Ok((changes, tasks))
+}
+
 /// Parse `canon.yaml`'s `plans:` section (task 3.2; see module doc for
 /// the fail-soft-on-absent vs fail-loud-on-present split, mirroring
 /// `crate::ingest::IngestSourceConfig::load`'s established pattern).

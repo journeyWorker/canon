@@ -51,6 +51,8 @@ include-sensitive	-	mode: include sensitive records
 input	JSON|FILE|-	the leaf's arguments as one JSON document
 interval-secs	N	seconds between polls
 introduced-rev	REV	commit that introduced a defect
+introduced-unknown	-	mode: the introducing commit is not known
+review-id	REVIEW_ID	the review a finding came out of
 json	-	mode: print the enveloped document
 kind	KIND	record kind
 lane	NAME	lane tag of a scenario

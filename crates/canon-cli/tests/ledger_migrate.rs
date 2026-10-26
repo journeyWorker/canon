@@ -641,7 +641,8 @@ fn ledger_migrate_06_commit_renames_with_git_and_rewrites_evidence_canon_yaml_an
         if tracked.contains(from) {
             let line = status.iter().find(|l| l.contains(&format!("{from} -> {to}")));
             assert!(line.is_some_and(|l| l.starts_with('R')), "`{from}` -> `{to}` is no git rename; status:\n{}", status.join("\n"));
-        } else {
+        } else if !from.contains("kind=scenario/") {
+            // A derived scenario record is skipped: the index refresh the migrate runs first writes the 0.30 steps onto it, which supersedes it (0.30 `record-links`).
             assert!(repo.path().join(to).is_file(), "the untracked `{from}` did not arrive at `{to}`");
         }
     }

@@ -1058,6 +1058,8 @@ pub struct IngestSessionsReport<'a> {
     pub rows_skipped: usize,
     pub runs_written: usize,
     pub events_written: usize,
+    /// Where the hot records go (0.30): the hot store's location; absent on a `--dry-run`.
+    pub hot_store: Option<String>,
     pub degrade_reason: Option<&'a str>,
     pub unwritten: Option<Unwritten<'a>>,
 }
@@ -1147,8 +1149,9 @@ pub struct Unwritten<'a> {
 }
 
 /// The `--json` data for one ingest pass.
-pub fn summary_json(outcome: &IngestOutcome) -> IngestSessionsReport<'_> {
+pub fn summary_json(outcome: &IngestOutcome, hot_store: Option<String>) -> IngestSessionsReport<'_> {
     IngestSessionsReport {
+        hot_store: hot_store.filter(|_| !outcome.dry_run),
         dry_run: outcome.dry_run,
         scope: &outcome.scope_summary,
         adapters: outcome

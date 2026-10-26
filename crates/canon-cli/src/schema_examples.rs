@@ -40,7 +40,7 @@ pub(crate) const EXAMPLES: &[(&str, &str)] = &[
     ("artifacts store", "canon artifacts store"),
     ("export", "canon export --kind evidence --output evidence.json"),
     ("feature new", "canon feature new billing.invoice --title Invoices"),
-    ("finding add", "canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --actor-id alice --summary \"Token is logged\""),
+    ("finding add", "canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor-id alice --summary \"Token is logged\""),
     ("finding close", "canon finding close add-login --round 1 --seq 1 --disposition rejected --reason \"works as designed\""),
     ("finding list", "canon finding list --change-id add-login"),
     ("format", "canon format .canon/specs"),

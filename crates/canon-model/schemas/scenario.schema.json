@@ -62,6 +62,13 @@
       "description": "sha256-hex over the source `.feature` file's bytes (design D4) —\nthe freshness signal `sync`'s logical-idempotence check compares\nagainst, NOT `ids::Sha` (a 40-hex git commit sha).",
       "$ref": "#/$defs/SpecDigest"
     },
+    "steps": {
+      "description": "The scenario's steps in source order (0.30 `record-links`), as the\n`.feature` file reads them, read by `canon inventory sync` with the\n`gherkin` crate. A step inherited from a `Background:` comes first and\nsays which one ([`ScenarioStep::inherited`]). Part of the index's\n\"unchanged\" check, so a record written before 0.30 (no `steps`) is\nrewritten by the next sync. Additive and skipped when empty; the\nscenario digest never covers it.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ScenarioStep"
+      }
+    },
     "subject_id": {
       "description": "The durable [`Subject`] this scenario is specced against (s36,\nadditive — `#[serde(default, skip_serializing_if =\n\"Option::is_none\")]`, so a pre-s36 `Scenario` is byte-identical\non the wire), mapped from a `.feature` scenario's\n`@subject:<subject-id>` Gherkin tag by `canon inventory sync`\n(mirrors `Change.subject_ids`, which `subject adopt` appends to). A\nplain `pub` field left `None` by [`Scenario::new`] and populated\noutside this crate; a malformed or absent tag simply leaves it\n`None` (fail-soft), never a hard parse error here.",
       "anyOf": [
@@ -158,6 +165,33 @@
       "description": "`<area>.<surface>.<nn>` — `[a-z0-9-]+\\.[a-z0-9-]+\\.\\d{2,}`; never renumbered once assigned — joins: spec ↔ test ↔ ledger ↔ divergence",
       "type": "string"
     },
+    "ScenarioStep": {
+      "description": "One step of a [`Scenario`] (0.30 `record-links`): the keyword as written\n(`Given`, `When`, `Then`, `And`, `But`, or `*`) and the sentence after it.",
+      "type": "object",
+      "properties": {
+        "inherited": {
+          "description": "Where an inherited step comes from; absent on the scenario's own steps.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StepOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "keyword": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "keyword",
+        "text"
+      ]
+    },
     "SessionId": {
       "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
       "type": "string"
@@ -165,6 +199,21 @@
     "SpecDigest": {
       "description": "sha256-hex: exactly 64 lowercase hex characters, over a `.feature` file's raw bytes, or over one scenario's normalized block and inherited context — joins: not a join-spine key; Scenario.source_digest (the inventory-sync freshness signal) and Scenario.scenario_digest (what a review pins)",
       "type": "string"
+    },
+    "StepOrigin": {
+      "description": "The block a [`ScenarioStep`] was inherited from.",
+      "oneOf": [
+        {
+          "description": "The Feature's `Background:`.",
+          "type": "string",
+          "const": "background"
+        },
+        {
+          "description": "The enclosing `Rule:`'s `Background:`.",
+          "type": "string",
+          "const": "rule"
+        }
+      ]
     },
     "SubjectId": {
       "description": "subject slug: kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), the durable product-unit identifier — joins: subject ↔ change ↔ scenario",

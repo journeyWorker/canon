@@ -197,7 +197,7 @@ fn is_scenario_header(trimmed: &str) -> bool {
 /// `is_scenario_id` grammar loosely (this module intentionally doesn't
 /// depend on `ScenarioId::parse` failing softly; a tag that doesn't
 /// look like an id is just not collected, never an error).
-fn looks_like_scenario_id(s: &str) -> bool {
+pub(crate) fn looks_like_scenario_id(s: &str) -> bool {
     let parts: Vec<&str> = s.split('.').collect();
     parts.len() == 3
         && parts.iter().take(2).all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-'))

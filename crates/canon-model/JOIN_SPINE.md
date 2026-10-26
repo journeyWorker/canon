@@ -3,7 +3,7 @@
 
 # canon join spine
 
-The nine keys that join every canon-model record kind together (S1 design D3, extended by s36).
+The ten keys that join every canon-model record kind together (S1 design D3, extended by s36 and 0.30).
 
 | Key | Grammar | Joins |
 |---|---|---|
@@ -16,3 +16,4 @@ The nine keys that join every canon-model record kind together (S1 design D3, ex
 | `sha` / `pr` | git commit SHA-1: exactly 40 lowercase hex characters | reward signals ↔ trajectory |
 | `regime_key` | `<role>/<repo>/<area>/<hash>`, four `/`-separated segments, the last a lowercase-hex digest | strategy write ↔ retrieval (identical at both ends) |
 | `subject_id` | subject slug: kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`), the durable product-unit identifier | subject ↔ change ↔ scenario |
+| `review_id` | ULID (Crockford base32, 26 chars) — `ulid::Ulid` | finding ↔ review |
