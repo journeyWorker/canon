@@ -85,7 +85,7 @@ const HOT_KINDS: [RecordKind; 5] = [RecordKind::Task, RecordKind::Handoff, Recor
 /// object-store stand-in), which would otherwise be untracked after the
 /// first run (#105, #107); and the archive of superseded scenario index
 /// versions, which every rewrite of the derived index fills.
-const GITIGNORE_LINES: [(&str, &str); 9] = [
+const GITIGNORE_LINES: [(&str, &str); 10] = [
     ("# canon's sqlite hot tier (s32 sqlite-hot-backend) -- db file + WAL/SHM sidecars.", paths::HOT_DB_GITIGNORE),
     ("# canon's read-access audit log (canon query/export/purge) -- local, never committed.", paths::AUDIT_GITIGNORE),
     ("# canon's scenario index -- derived from the .feature files, rebuilt by every reader.", paths::SCENARIO_INDEX_GITIGNORE),
@@ -95,6 +95,7 @@ const GITIGNORE_LINES: [(&str, &str); 9] = [
     ("# the snapshot `canon dashboard` and `canon report snapshot` regenerate -- derived, never committed.", paths::DASHBOARD_SNAPSHOT_GITIGNORE),
     ("# canon's learn scratch area -- rebuildable, never committed.", paths::LEARN_GITIGNORE),
     ("# canon's local object-store stand-in -- local state, never committed.", paths::R2_LOCAL_GITIGNORE),
+    ("# the copies `canon migrate` keeps so `--revert` can restore them -- local, never committed.", paths::MIGRATE_BACKUP_GITIGNORE),
 ];
 
 /// D8/D9's skeleton `canon.yaml` body: every one of `RecordKind::ALL`'s

@@ -2,7 +2,7 @@ canon migrate: plan: rename 10 record file(s) to the 0.30 rule (`kind=<kind>/<co
 canon migrate: plan: record the 0.29 key, 12-hex digest and body of each of the 1 evidence file(s) first; the pre-0.23 review pins are judged against that record
 canon migrate: plan: canon.yaml: routing.evidence_record becomes `evidence`
 canon migrate: plan:
-  .gitignore: add .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/
+  .gitignore: add .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/
   canon.yaml: every other byte kept
   rebuild the scenario index (full sync)
   left: .canon stays where it is: the openspec reader cannot read it (invalid-change-id-grammar)
@@ -10,7 +10,7 @@ canon migrate: plan:
 canon migrate: backed up 3 file(s) it rewrites under .canon/migrate-backup/
 canon migrate: renamed 10 record file(s) to the 0.30 rule (kind=<kind>/<components>_<digest8>.json)
 canon migrate: rewrote canon.yaml
-canon migrate: added to .gitignore: .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/
+canon migrate: added to .gitignore: .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/
 canon migrate: note — 1 scenario index file(s) under .canon/ledger/kind=scenario/ are tracked in git; the index is derived and now ignored, so `git rm -r --cached .canon/ledger/kind=scenario/` stops tracking them
   change           moved 1 of 2 file(s) (0.2 KiB); 1 stay
   subject          moved 3 of 4 file(s) (0.8 KiB); 1 stay

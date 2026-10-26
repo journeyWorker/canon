@@ -302,6 +302,9 @@ pub struct PlansOutcome {
     /// stderr WARN per entry and exits non-zero whenever this is
     /// non-empty. Empty for an ordinary clean/partial-success pass.
     pub non_clean_sources: Vec<NonCleanSource>,
+    /// Where the hot records go (0.30): the hot store's location; absent on a `--dry-run` or with no hot rung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hot_store: Option<String>,
 }
 
 impl Report for PlansOutcome {}

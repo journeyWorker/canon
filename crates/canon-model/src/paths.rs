@@ -98,6 +98,9 @@ pub const PRE_COMMIT_SCRIPT: &str = ".canon/scripts/canon-gate-pre-commit.sh";
 /// own relative paths below it (0.28 D9).
 pub const MIGRATE_BACKUP_DIR: &str = ".canon/migrate-backup";
 
+/// The `.gitignore` line covering [`MIGRATE_BACKUP_DIR`]: the backup is local, never committed.
+pub const MIGRATE_BACKUP_GITIGNORE: &str = ".canon/migrate-backup/";
+
 /// Content-addressed store of the bytes `canon evidence add --artifact/
 /// --report` bound, one file per digest at `<ARTIFACTS_SHA256_DIR>/<hex>`.
 /// Authored (no source regenerates a rewritten report's old bytes), so
@@ -172,6 +175,7 @@ mod tests {
             LEARN_GITIGNORE,
             DASHBOARD_SNAPSHOT_GITIGNORE,
             R2_LOCAL_GITIGNORE,
+            MIGRATE_BACKUP_GITIGNORE,
             SCENARIO_INDEX_GITIGNORE,
             SCENARIO_ARCHIVE_GITIGNORE,
             SCENARIO_INDEX_LOCK_FILE,

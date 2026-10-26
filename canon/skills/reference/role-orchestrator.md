@@ -635,14 +635,15 @@ canon skills install
    (which do not count until then; the gate, `status` and `subject move`
    print one advisory naming it) and replaces an old full skill with the
    stub. It backs up every file it rewrites under
-   `.canon/migrate-backup/<timestamp>/`, is safe to run again (a second run
+   `.canon/migrate-backup/<timestamp>/` (local, git-ignored; `--revert` restores from it), is safe to run again (a second run
    finds nothing to move) and refuses uncommitted changes under a path it
    moves: commit first. In CI run it with full history (`fetch-depth: 0`).
 3. `canon skills install` refreshes the stub and the scripts for the selected
    harnesses; `canon skills check` reports a skill written by another canon
    version (exit 1, `SKILLS_DRIFT`), `canon skills doctor` explains it.
 
-Commit what it changes.
+Commit what it changes, except the backup: `.canon/migrate-backup/` is local and
+git-ignored, and `canon migrate --revert` needs it (keep it until you are sure).
 
 **Done when:** `canon migrate` reports nothing left to move, `canon skills
 check` exits 0, and `canon status` and `canon gate check` no longer warn

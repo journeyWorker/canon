@@ -131,17 +131,50 @@ fn review_add_102_running_the_same_review_again_writes_nothing_and_shows_the_ear
     assert_eq!(id_of(&mixed, "cart.add.03"), id_of(&first, "cart.add.03"));
 }
 
+fn copy_tree(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap().flatten() {
+        let target = to.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_tree(&entry.path(), &target);
+        } else {
+            std::fs::copy(entry.path(), &target).unwrap();
+        }
+    }
+}
+
+/// The 0.29 fixture (0.29-named record files, pre-0.23 reviews) where reviews 01 and 02 carry a
+/// review id in their body and 04 has none; `canon migrate --commit` rewrites 02's pins.
 #[test]
 fn ledger_migrate_16_a_review_keeps_its_review_id_through_canon_migrate() {
-    let dir = fixture();
+    const ID_01: &str = "01J9ZXQ4M2K7V8R3T5W6Y0N1PB";
+    const ID_02: &str = "01J9ZXQ4M2K7V8R3T5W6Y0N1PC";
+    let dir = tempfile::tempdir().unwrap();
     let repo = dir.path();
-    let id = review_ids(&review(repo, &["cart.add.01"]))[0].1.clone();
+    copy_tree(&Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ledger-0.29"), repo);
+    std::fs::rename(repo.join("gitignore"), repo.join(".gitignore")).unwrap();
+    let area = repo.join(".canon/ledger/kind=review/area=auth");
+    for (scenario, id) in [("auth.login.01", ID_01), ("auth.login.02", ID_02)] {
+        let file = std::fs::read_dir(&area).unwrap().flatten().map(|e| e.path()).find(|p| p.file_name().unwrap().to_string_lossy().contains(scenario)).unwrap();
+        let mut body: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+        body["review_id"] = id.into();
+        std::fs::write(&file, serde_json::to_vec_pretty(&body).unwrap()).unwrap();
+    }
+    git(repo, &["init", "-q", "-b", "main"]);
     git(repo, &["add", "-A"]);
-    git(repo, &["commit", "-q", "-m", "reviewed"]);
-    let _ = canon(&["migrate", "--json"], repo);
-    let _ = canon(&["migrate", "--commit", "--json"], repo);
-    let all: Vec<Value> = ledger(repo, "review").into_iter().chain(archive(repo, "review")).map(|(_, v)| v).collect();
-    assert!(all.iter().any(|v| v["review_id"] == id.as_str()), "{all:?}");
+    git(repo, &["commit", "-q", "-m", "fixture"]);
+
+    let preview = json(&canon(&["migrate", "--json"], repo));
+    let digest = preview["data"]["planDigest"].as_str().expect("a plan digest").to_string();
+    let done = canon(&["migrate", "--commit", "--plan-digest", &digest, "--json"], repo);
+    assert!(done.status.success(), "{}", text(&done));
+
+    let reviews: Vec<Value> = ledger(repo, "review").into_iter().chain(archive(repo, "review")).map(|(_, v)| v).collect();
+    let of = |scenario: &str| reviews.iter().find(|v| v["scenario_id"] == scenario).unwrap_or_else(|| panic!("review of {scenario}: {reviews:?}"));
+    assert_eq!(of("auth.login.01")["review_id"], ID_01);
+    assert_eq!(of("auth.login.02")["review_id"], ID_02);
+    assert!(of("auth.login.02")["pins"]["checks"].is_array(), "review 02 was rewritten by the migrate: {}", of("auth.login.02"));
+    assert!(of("auth.login.04").get("review_id").is_none(), "the review written before 0.30 still has none");
 }
 
 #[test]
@@ -389,6 +422,8 @@ fn init_repo(yaml: &str) -> tempfile::TempDir {
     dir
 }
 
+const ROUTED_HOT: &str = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  session: hot\n  run: hot\n  event: hot\n  change: hot\n  task: hot\n  trajectory: hot\n";
+
 const WITH_HOT: &str = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\n";
 
 #[test]
@@ -415,10 +450,34 @@ fn authoring_init_102_init_check_says_so_when_no_hot_store_is_configured_and_nam
 
 #[test]
 fn ingest_sessions_15_a_command_that_writes_hot_records_prints_the_hot_store_location() {
-    let dir = init_repo(WITH_HOT);
+    let dir = init_repo(ROUTED_HOT);
     let home = tempfile::tempdir().unwrap();
-    let human = canon(&["ingest", "sessions", "--home", home.path().to_str().unwrap()], dir.path());
+    let transcripts = home.path().join(".claude/projects/-work-app");
+    std::fs::create_dir_all(&transcripts).unwrap();
+    let turn = |kind: &str, at: &str, message: Value| serde_json::json!({"type": kind, "sessionId": "s-15", "timestamp": at, "cwd": "/work/app", "message": message}).to_string();
+    let lines = [
+        turn("user", "2026-10-26T10:00:00Z", serde_json::json!({"role": "user", "content": "go"})),
+        turn("assistant", "2026-10-26T10:00:05Z", serde_json::json!({"role": "assistant", "model": "m", "content": [{"type": "text", "text": "done"}]})),
+    ];
+    std::fs::write(transcripts.join("s-15.jsonl"), lines.join("\n") + "\n").unwrap();
+    let home_arg = home.path().to_str().unwrap();
+
+    let human = canon(&["ingest", "sessions", "--home", home_arg, "--all-workspaces"], dir.path());
     assert!(text(&human).contains("hot store: .canon/hot.db"), "{}", text(&human));
-    let doc = json(&canon(&["ingest", "sessions", "--home", home.path().to_str().unwrap(), "--json"], dir.path()));
+    let doc = json(&canon(&["ingest", "sessions", "--home", home_arg, "--all-workspaces", "--json"], dir.path()));
     assert_eq!(doc["data"]["hotStore"], ".canon/hot.db", "{doc}");
+    let written = canon(&["query", "--kind", "session", "--json"], dir.path());
+    assert!(json(&written)["data"]["records"].as_array().is_some_and(|r| !r.is_empty()), "the session was written: {}", text(&written));
+}
+
+#[test]
+fn ingest_sessions_16_the_other_hot_writers_print_the_hot_store_location_too() {
+    let dir = init_repo(ROUTED_HOT);
+    let repo = dir.path();
+    let plans = canon(&["ingest", "plans", "--json"], repo);
+    assert_eq!(json(&plans)["data"]["hotStore"], ".canon/hot.db", "{}", text(&plans));
+    let records = canon(&["ingest", "records"], repo);
+    assert!(text(&records).contains("hot store: .canon/hot.db"), "{}", text(&records));
+    let begin = canon(&["dispatch", "begin", "--role", "implementer", "--regime", "implementer/app/api/abcdef012345", "--actor-id", "a", "--json"], repo);
+    assert!(text(&begin).contains(".canon/hot.db"), "{}", text(&begin));
 }

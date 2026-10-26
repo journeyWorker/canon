@@ -617,6 +617,9 @@ pub struct ArtifactIngestOutcome {
     /// S7 webhook receiver's no-rollback timer to resolve it. Counted,
     /// never an error.
     pub trajectories_left_pending: usize,
+    /// Where the hot records go (0.30): the hot store's location; absent on a `--dry-run` or with no hot rung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hot_store: Option<String>,
 }
 
 impl Report for ArtifactIngestOutcome {}
@@ -2633,6 +2636,7 @@ fn run_pass(repo: &Path, run_id: Option<&RunId>, dry_run: bool) -> Result<Artifa
         strategy_items_rebuilt,
         trajectories_marked,
         trajectories_left_pending,
+        hot_store: None,
     })
 }
 

@@ -92,11 +92,16 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
 fn run_ingest_records(repo: &std::path::Path, watch: bool, interval_secs: u64, dry_run: bool, json: bool, run_id: Option<&RunId>) -> ExitCode {
     loop {
         match crate::artifact_ingest::run(repo, run_id, dry_run) {
-            Ok(outcome) => {
+            Ok(mut outcome) => {
+                let hot = crate::hot_store::HotStore::of(&repo.join("canon.yaml")).filter(|_| !outcome.dry_run);
+                outcome.hot_store = hot.as_ref().map(crate::hot_store::HotStore::location);
                 if json {
                     crate::next::finish(repo, "ingest records", &crate::next::Scope::Repo, false, true, &outcome);
                 } else {
                     print!("{}", crate::artifact_ingest::format_human(&outcome));
+                    if let Some(hot) = &hot {
+                        println!("{}", hot.line());
+                    }
                 }
             }
             Err(err) => {
@@ -132,7 +137,9 @@ fn run_ingest_records(repo: &std::path::Path, watch: bool, interval_secs: u64, d
 /// exit code before any source is even scanned.
 fn run_ingest_plans(repo: &std::path::Path, dialect: Option<&str>, source: Option<&std::path::Path>, dry_run: bool, json: bool) -> ExitCode {
     match crate::plans::run(repo, dialect, source, dry_run) {
-        Ok(outcome) => {
+        Ok(mut outcome) => {
+            let hot = crate::hot_store::HotStore::of(&repo.join("canon.yaml")).filter(|_| !outcome.dry_run);
+            outcome.hot_store = hot.as_ref().map(crate::hot_store::HotStore::location);
             if json {
                 if outcome.non_clean_sources.is_empty() {
                     crate::next::finish(repo, "ingest plans", &crate::next::Scope::Repo, false, true, &outcome);
@@ -142,6 +149,9 @@ fn run_ingest_plans(repo: &std::path::Path, dialect: Option<&str>, source: Optio
                 }
             } else {
                 print!("{}", crate::plans::format_human(&outcome));
+                if let Some(hot) = &hot {
+                    println!("{}", hot.line());
+                }
                 if let Some(body) = crate::plans::format_unwritten_json(&outcome) {
                     println!("{body}");
                 }

@@ -4,4 +4,4 @@
 [not configured] plans
 [FAIL] write: canon.yaml `write:` section is malformed (expected `write: { promote: auto | manual }`): unknown variant `always`, expected `auto` or `manual`
 [not configured] skills (providers: the install lock's, else the detected harnesses)
-[WARN] gitignore: `.gitignore` lacks .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, which canon writes and git would show as untracked; fix: `canon migrate`
+[WARN] gitignore: `.gitignore` lacks .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/, which canon writes and git would show as untracked; fix: `canon migrate`

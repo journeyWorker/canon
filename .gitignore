@@ -104,3 +104,4 @@ examples/platformer/reports/
 # Change records are derived from .canon/changes (see the ledger rule
 # above); their superseded versions are derived the same way.
 .canon/archive/kind=change/
+.canon/migrate-backup/

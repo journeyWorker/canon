@@ -813,6 +813,9 @@ pub struct DispatchBeginReport<'a> {
     pub parent_run_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tier_degraded: Option<&'a str>,
+    /// Where the run record goes (0.30): the hot store's location; absent with no hot rung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hot_store: Option<String>,
 }
 
 impl crate::reports::Report for DispatchBeginReport<'_> {}
@@ -829,6 +832,9 @@ pub struct DispatchEndReport<'a> {
     pub ended_at: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tier_degraded: Option<&'a str>,
+    /// Where the run record goes (0.30): the hot store's location; absent with no hot rung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hot_store: Option<String>,
 }
 
 impl crate::reports::Report for DispatchEndReport<'_> {}
@@ -890,6 +896,7 @@ pub fn run_begin(
 ) -> ExitCode {
     match begin(repo, role, regime_key, agent_id, binding, metadata) {
         Ok(begun) => {
+            let hot = crate::hot_store::HotStore::of(&repo.join("canon.yaml"));
             if !json {
                 println!(
                     "dispatch {} begun for {} — recorded {} guidance item(s) -> {}",
@@ -904,6 +911,9 @@ pub fn run_begin(
                 if let Some(parent) = begun.run.parent_run_id {
                     println!("  dispatched by run {parent}");
                 }
+                if let Some(hot) = &hot {
+                    println!("{}", hot.line());
+                }
             }
             let report = DispatchBeginReport {
                 run_id: begun.run_id.to_string(),
@@ -913,6 +923,7 @@ pub fn run_begin(
                 task_id: begun.run.task_id.as_ref().map(TaskId::as_str),
                 parent_run_id: begun.run.parent_run_id.map(|parent| parent.to_string()),
                 tier_degraded: begun.tier.degrade_reason(),
+                hot_store: hot.as_ref().map(crate::hot_store::HotStore::location),
             };
             crate::next::finish(repo, "dispatch begin", &crate::next::Scope::Repo, false, json, &report);
             // stderr in BOTH render modes, so stdout stays a clean
@@ -1366,8 +1377,12 @@ pub fn end(repo: &Path, run_id: RunId, status: RunStatus) -> Result<Ended, Dispa
 pub fn run_end(repo: &Path, run_id: RunId, status: RunStatus, json: bool) -> ExitCode {
     match end(repo, run_id, status) {
         Ok(ended) => {
+            let hot = crate::hot_store::HotStore::of(&repo.join("canon.yaml"));
             if !json {
                 println!("dispatch {} ended `{}` -> {}", ended.run_id, status_slug(ended.run.status), ended.manifest_path.display());
+                if let Some(hot) = &hot {
+                    println!("{}", hot.line());
+                }
             }
             let report = DispatchEndReport {
                 run_id: ended.run_id.to_string(),
@@ -1375,6 +1390,7 @@ pub fn run_end(repo: &Path, run_id: RunId, status: RunStatus, json: bool) -> Exi
                 status: status_slug(ended.run.status),
                 ended_at: ended.run.ended_at,
                 tier_degraded: ended.tier.degrade_reason(),
+                hot_store: hot.as_ref().map(crate::hot_store::HotStore::location),
             };
             crate::next::finish(repo, "dispatch end", &crate::next::Scope::Repo, false, json, &report);
             if let Some(reason) = ended.tier.degrade_reason() {

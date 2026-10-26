@@ -17114,6 +17114,13 @@
         "DispatchBeginReport": {
           "description": "`canon dispatch begin`: the run opened. Binding keys are absent when unset;\n`lineage` only when the manifest records it; `tierDegraded` only when the\ntier write degraded.",
           "properties": {
+            "hotStore": {
+              "description": "Where the run record goes (0.30): the hot store's location; absent with no hot rung.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "injectedGuidance": {
               "description": "The strategies injected into the run (ledger records, their own schema).",
               "items": {
@@ -17415,6 +17422,13 @@
           "properties": {
             "endedAt": {
               "format": "date-time",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hotStore": {
+              "description": "Where the run record goes (0.30): the hot store's location; absent with no hot rung.",
               "type": [
                 "string",
                 "null"
@@ -20584,6 +20598,13 @@
               "minimum": 0,
               "type": "integer"
             },
+            "hotStore": {
+              "description": "Where the hot records go (0.30): the hot store's location; absent on a `--dry-run` or with no hot rung.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "nonCleanSources": {
               "description": "Every source this pass flagged non-clean (s18 spec) — the CLI\nlayer (`main.rs::run_ingest_plans`) prints an unconditional\nstderr WARN per entry and exits non-zero whenever this is\nnon-empty. Empty for an ordinary clean/partial-success pass.",
               "items": {
@@ -20817,6 +20838,13 @@
             "dryRun": {
               "description": "A `--dry-run` preview: nothing was written; the counts are what a\nreal pass would do (convergence of superseded copies is not previewed).",
               "type": "boolean"
+            },
+            "hotStore": {
+              "description": "Where the hot records go (0.30): the hot store's location; absent on a `--dry-run` or with no hot rung.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "strategyItemsRebuilt": {
               "description": "Sum of every regime's freshly-distilled `StrategyItem` count\n([`NamespaceConvergence::items`]) — the count that actually lands\nin `stg_strategy_items`, i.e. what makes S9's `mart_role_memory`\nnon-empty.",
@@ -28907,6 +28935,13 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "description": "`canon dispatch begin`: the run opened. Binding keys are absent when unset;\n`lineage` only when the manifest records it; `tierDegraded` only when the\ntier write degraded.",
       "properties": {
+        "hotStore": {
+          "description": "Where the run record goes (0.30): the hot store's location; absent with no hot rung.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "injectedGuidance": {
           "description": "The strategies injected into the run (ledger records, their own schema).",
           "items": {
@@ -29090,6 +29125,13 @@
       "properties": {
         "endedAt": {
           "format": "date-time",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hotStore": {
+          "description": "Where the run record goes (0.30): the hot store's location; absent with no hot rung.",
           "type": [
             "string",
             "null"
@@ -31975,6 +32017,13 @@
           "minimum": 0,
           "type": "integer"
         },
+        "hotStore": {
+          "description": "Where the hot records go (0.30): the hot store's location; absent on a `--dry-run` or with no hot rung.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "nonCleanSources": {
           "description": "Every source this pass flagged non-clean (s18 spec) — the CLI\nlayer (`main.rs::run_ingest_plans`) prints an unconditional\nstderr WARN per entry and exits non-zero whenever this is\nnon-empty. Empty for an ordinary clean/partial-success pass.",
           "items": {
@@ -32171,6 +32220,13 @@
         "dryRun": {
           "description": "A `--dry-run` preview: nothing was written; the counts are what a\nreal pass would do (convergence of superseded copies is not previewed).",
           "type": "boolean"
+        },
+        "hotStore": {
+          "description": "Where the hot records go (0.30): the hot store's location; absent on a `--dry-run` or with no hot rung.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "strategyItemsRebuilt": {
           "description": "Sum of every regime's freshly-distilled `StrategyItem` count\n([`NamespaceConvergence::items`]) — the count that actually lands\nin `stg_strategy_items`, i.e. what makes S9's `mart_role_memory`\nnon-empty.",

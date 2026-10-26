@@ -9,7 +9,9 @@ name: Test
 # 2026-07-10): it spins the repo-root `docker-compose.yml` stack
 # (`postgres` backs `PgTier`, `minio` backs `R2Tier`) and runs
 # `crates/canon-store`'s `live-pg`/`live-r2`-gated integration tests
-# against REAL local services, never real cloud credentials. Both tests'
+# against REAL local services, never real cloud credentials, then `crates/
+# canon-cli/tests/ledger_pg_live.rs` (`canon migrate` over a Postgres hot tier).
+# Both tests'
 # own skip-if-down probes (`tests/pg_tier_live.rs`/`tests/r2_tier_live.rs`)
 # are told to fail hard instead of skipping via `CANON_REQUIRE_LIVE=1` —
 # without it, a docker-compose regression that left the stack unreachable
@@ -346,6 +348,16 @@ jobs:
           CANON_S3_ACCESS_KEY: "canon"
           CANON_S3_SECRET_KEY: "canoncanon"
         run: cargo test -p canon-store --features live-pg,live-r2 --locked
+
+      - name: cargo test -p canon-cli --test ledger_pg_live
+        env:
+          CANON_REQUIRE_LIVE: "1"
+          CANON_PG_DSN: "postgres://canon:canon@127.0.0.1:55432/canon_v1"
+          CANON_S3_ENDPOINT: "http://127.0.0.1:59000"
+          CANON_S3_BUCKET: "canon"
+          CANON_S3_ACCESS_KEY: "canon"
+          CANON_S3_SECRET_KEY: "canoncanon"
+        run: cargo test -p canon-cli --test ledger_pg_live --locked
 
       - name: docker compose down
         if: always()

@@ -671,6 +671,7 @@ pub fn backup_dir(repo: &Path, existing: Option<PathBuf>) -> Result<PathBuf, Str
         dir = base.join(format!("{stamp}-{n}"));
         n += 1;
     }
+    crate::legacy::ensure_backup_ignored(&base).map_err(|e| format!("could not create {}: {e}", base.display()))?;
     std::fs::create_dir_all(&dir).map_err(|e| format!("could not create {}: {e}", dir.display()))?;
     Ok(dir)
 }

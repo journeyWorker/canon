@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-rl",
+    "role": "implementer",
+    "session_id": "rl-fix-2026-10-26b"
+  },
+  "at": "2026-10-26T19:32:24.656851246Z",
+  "code_tree": "7ed66b464a692d29af60dde1cec2c6c6abd7a137",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test record_links ledger_migrate_16"
+  },
+  "evidence_sha": "230eac79859c234ccf89c88aeb786d911ea5cec5",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 22,
+  "scenario_id": "ledger.migrate.16",
+  "schema": 1,
+  "staging_id": "61a4f3c1",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

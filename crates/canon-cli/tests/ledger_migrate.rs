@@ -701,6 +701,38 @@ fn ledger_migrate_06b_judgements_and_records_are_what_0_29_gave() {
         assert_eq!(query["data"]["count"], count, "query --kind {kind}");
         assert_eq!(query["data"]["records"].as_array().map(Vec::len), Some(count), "query --kind {kind}");
     }
+    // The order: 0.29's name order (components, padding aside), not `at`-first. Evidence by name `run id | task id | subject`,
+    // findings by `change, round, seq`; the fixture's file names say what 0.29 gave.
+    let order_of = |kind_dir: &str, identity: &dyn Fn(&Value) -> String| -> Vec<String> {
+        let mut named: Vec<(String, String)> = fixture_record_files()
+            .into_iter()
+            .filter_map(|p| p.strip_prefix(&format!(".canon/ledger/kind={kind_dir}/")).map(str::to_string))
+            .map(|name| {
+                let body: Value = serde_json::from_slice(&fixture_bytes(&format!(".canon/ledger/kind={kind_dir}/{name}"))).unwrap();
+                (name.to_lowercase(), identity(&body))
+            })
+            .collect();
+        named.sort();
+        named.into_iter().map(|(_, id)| id).collect()
+    };
+    let staging = |v: &Value| v["staging_id"].as_str().unwrap().to_string();
+    let round_seq = |v: &Value| format!("{:?}/{:?}", v["round"], v["seq"]);
+    let (evidence, _) = repo.json(&["query", "--kind", "evidence", "--all"]);
+    let got: Vec<String> = evidence["data"]["records"].as_array().unwrap().iter().map(staging).collect();
+    // 0.30 leads an evidence name with the project (`-` when absent) and tags the key (`run`, `scenario`, `task`), which 0.29 did
+    // not: the planned difference is the order of those groups (project-less first, then by tag); within a group the 0.29 name
+    // order holds.
+    let tagged = order_of("evidence_record", &|v: &Value| {
+        let rank = if v.get("project_id").is_none() { 0 } else if v.get("task_id").is_some() { 3 } else if v.get("scenario_id").is_some() { 2 } else { 1 };
+        format!("{rank}|{}", staging(v))
+    });
+    let mut by_tag = tagged.clone();
+    by_tag.sort_by_key(|id| id.chars().next());
+    let expected: Vec<String> = by_tag.into_iter().map(|id| id[2..].to_string()).collect();
+    assert_eq!(got, expected, "evidence order differs from 0.29's (tags aside)");
+    let (findings, _) = repo.json(&["query", "--kind", "finding", "--all"]);
+    let got: Vec<String> = findings["data"]["records"].as_array().unwrap().iter().map(round_seq).collect();
+    assert_eq!(got, order_of("finding", &round_seq), "finding order differs from 0.29's");
     let (evidence, _) = repo.json(&["query", "--kind", "evidence", "--all"]);
     let kinds: BTreeSet<&str> = evidence["data"]["records"].as_array().unwrap().iter().map(|r| r["kind"].as_str().unwrap()).collect();
     assert_eq!(kinds, BTreeSet::from(["evidence"]));
@@ -829,8 +861,9 @@ fn ledger_migrate_09_revert_restores_the_tree_the_sqlite_file_and_the_index() {
     let after = repo.snapshot(true);
     assert_eq!(changed(&before, &after), Vec::<PathBuf>::new(), "the tree differs from before the migration");
     assert_eq!(after.get(Path::new(".canon/hot.db")), before.get(Path::new(".canon/hot.db")), "the sqlite file differs");
-    // Only the backup the migration made is left over; the index is what it was.
-    assert_eq!(repo.status(), vec!["?? .canon/migrate-backup/".to_string()], "git status after the revert");
+    // The backup the migration made is left over but ignored (git shows nothing); the index is what it was.
+    assert_eq!(repo.status(), Vec::<String>::new(), "git status after the revert");
+    assert!(repo.path().join(".canon/migrate-backup").is_dir(), "the revert removed the backup");
     // And the repo reads as 0.29 again.
     let (gate, _) = repo.json(&["gate", "check"]);
     assert!(violations(&gate).iter().any(|(class, _)| class == "old-layout"));

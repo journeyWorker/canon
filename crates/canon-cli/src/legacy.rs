@@ -438,6 +438,7 @@ pub fn backup(repo: &Path, paths: &[String]) -> Result<Option<PathBuf>, LegacyEr
         dir = base.join(format!("{stamp}-{n}"));
         n += 1;
     }
+    ensure_backup_ignored(&base).map_err(|source| LegacyError::BackupDir { path: base.clone(), source })?;
     for path in existing {
         let to = dir.join(path);
         let bytes = fs::read(repo.join(path)).map_err(|source| LegacyError::BackupRead { path: path.clone(), source })?;
@@ -447,6 +448,17 @@ pub fn backup(repo: &Path, paths: &[String]) -> Result<Option<PathBuf>, LegacyEr
         fs::write(&to, bytes).map_err(|source| LegacyError::BackupWrite { path: to.clone(), source })?;
     }
     Ok(Some(dir))
+}
+
+/// Makes git ignore everything under the backup directory `base`, whatever the repo's `.gitignore` says
+/// (a revert restores that file, which would otherwise show the backup as untracked).
+pub fn ensure_backup_ignored(base: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(base)?;
+    let guard = base.join(".gitignore");
+    if !guard.exists() {
+        fs::write(guard, "*\n")?;
+    }
+    Ok(())
 }
 
 /// What a cheap scan found, for the warning.

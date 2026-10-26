@@ -103,7 +103,8 @@ plain number 1. Example: today's review path is 48 tokens, the new one 18.
   Crockford, so it is written lowercase and stays 26 characters). A
   free-text component (session id, regime key segment, handoff id) has every
   byte outside `[a-z0-9.-]` (uppercase and `_` included) replaced by `+` and
-  two lowercase hex digits. `+` is chosen because R2's object-store client
+  two lowercase hex digits; a typed id with such a character (a task id's
+  `#`) is escaped the same way. `+` is chosen because R2's object-store client
   leaves it as is (it percent-encodes `%` and `~`); the key is the same string
   in every store, and names are safe on case-insensitive file systems.
   Reversible. A name over 200 bytes replaces its free-text component with
@@ -224,7 +225,9 @@ Specified as scenarios in the change, since they are output:
    `canon migrate --revert [--backup DIR]` previews the undo; `--revert
    --commit --plan-digest D` restores the snapshot, undoes the moves and
    `git mv`s, and re-keys Postgres rows and R2 objects back from
-   `names-journal.json`.
+   `names-journal.json`. The backup is local: `.canon/migrate-backup/` is
+   git-ignored (the migrate adds the line, `canon init` writes it, and the
+   directory carries its own `.gitignore`), and `--revert` needs it.
 9. Running it again reports nothing to move.
 
 Path references inside records stay as strings: free-text `file_ref`s

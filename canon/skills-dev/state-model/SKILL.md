@@ -105,7 +105,7 @@ changes for identical input.
 
 ## Adding a join-spine key newtype
 
-The nine join-spine keys (`src/ids.rs`) are declared through the
+The ten join-spine keys (`src/ids.rs`) are declared through the
 `join_key_newtype!` macro: one literal `grammar`/`joins` pair per
 invocation, expanded into the type's own rustdoc comment, its
 `GRAMMAR`/`JOINS` associated constants, and its `JsonSchema` impl — all

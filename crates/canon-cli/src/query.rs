@@ -374,10 +374,16 @@ fn fold_latest_by_natural_key(kind: RecordKind, records: Vec<RawRecord>) -> Vec<
         Candidate { key, at, schema, digest, record }
     });
     let mut folded: Vec<RawRecord> = fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str()).into_values().map(|c| c.record).collect();
-    // The fold keys a map by the natural-key STRING, which puts `x_10_1` before `x_2_1`; the
-    // store's read order (R5: `at`, then typed components, then digest) is what a reader sees.
-    folded.sort_by_cached_key(|raw| canon_store::partition::record_order(kind, raw));
+    folded.sort_by_cached_key(|raw| latest_order(kind, raw));
     folded
+}
+
+/// The order `canon query` shows latest-only records in: typed name components in table order (0.29's
+/// key order, with integers compared as numbers), then `at`, then the body digest. `--history` keeps
+/// `record_order` (`at` first).
+fn latest_order(kind: RecordKind, raw: &RawRecord) -> (Vec<canon_model::layout::Component>, DateTime<Utc>, String) {
+    let (at, components, digest) = canon_store::partition::record_order(kind, raw);
+    (components, at, digest)
 }
 
 /// Post-tier-merge scope application (design D5/D6, tasks 3.4/3.6;
@@ -442,7 +448,13 @@ pub fn run(
         result.records.sort_by_cached_key(|raw| canon_store::partition::record_order(kind, raw));
     }
     let violation_count = result.violations.len();
-    let records = if history { result.records } else { fold_rewritten_kind(kind, fold_pg_routed_kind(kind, result.records)) };
+    let records = if history {
+        result.records
+    } else {
+        let mut latest = fold_rewritten_kind(kind, fold_pg_routed_kind(kind, result.records));
+        latest.sort_by_cached_key(|raw| latest_order(kind, raw));
+        latest
+    };
     let records = apply_scope(kind, records, change_id, status, domain);
     let rollup = rollup_for(kind, &records);
     let references = check_references(repo, kind, &records);

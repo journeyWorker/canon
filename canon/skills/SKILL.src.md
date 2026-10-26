@@ -252,7 +252,7 @@ and `canon context` warn when the repo holds 0.27-era state and put
 2. `canon migrate --commit --plan-digest <digest>` with that digest applies it.
    It moves the layout, rewrites canon's own hooks and scripts, compacts the
    ledger, replaces an old full skill with the stub, and backs up every file it
-   rewrites under `.canon/migrate-backup/`. It refuses uncommitted changes
+   rewrites under `.canon/migrate-backup/` (local and git-ignored; `--revert` needs it). It refuses uncommitted changes
    under a path it moves.
 3. `canon skills install` refreshes the stub and the scripts; `canon skills check`
    confirms them.

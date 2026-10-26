@@ -166,3 +166,14 @@ Feature: ingest sessions
     When canon ingest sessions writes the session, run and event records
     Then the output names the hot store path
     And --json carries it as `hotStore`
+
+  # canon: {"schema":1,"at":"2026-10-26T19:30:00Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-fix-2026-10-26"}}
+  @subject:ingest-pipelines
+  @case:happy
+  @flow:canon-0-30-record-links.F5
+  @ingest.sessions.16
+  Scenario: The other commands that write hot records print the hot store location too
+    Given a repo whose hot rung is the sqlite file `.canon/hot.db`
+    When canon ingest plans, ingest records and dispatch begin run
+    Then each output names the hot store path
+    And the --json documents of ingest plans carry it as `hotStore`

@@ -423,7 +423,8 @@ fn ledger_naming_07_an_r2_object_with_other_content_is_a_key_conflict() {
     assert_eq!(files(dir.path()), before, "no object was put");
 }
 
-/// ledger.naming.08 (sqlite; the Postgres tier needs a server and is covered by its own live test):
+/// ledger.naming.08 (sqlite; the Postgres tier needs a server and is covered by `ledger_naming_08_...` in
+/// `crates/canon-store/tests/pg_tier_live.rs`, which CI's live-tier job runs):
 /// a later record landing on a held key with other canonical JSON refuses the batch, one transaction.
 #[test]
 fn ledger_naming_08_sqlite_key_conflict_rolls_the_batch_back() {
