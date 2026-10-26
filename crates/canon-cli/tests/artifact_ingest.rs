@@ -33,6 +33,7 @@ use std::process::{Command, Output};
 
 use canon_ingest::verdict::Polarity;
 use canon_learn::{ParquetTrajectoryStore, TrajectoryStore};
+use canon_model::{DivergenceFields, HandoffFields};
 use canon_model::{
     Actor, Divergence, DivergenceStatus, DomainId, Envelope, Handoff, HandoffBody, HandoffId, HandoffState, ProjectId, ProvenanceRef,
     RecordKind, RegimeKey, Review, RoleId, ScenarioId, Sha, TotalOrder,
@@ -106,7 +107,7 @@ fn plant_handoff_in_git(git_root: &Path) -> HandoffId {
         Actor::new("s14-fixture", RoleId::parse("implementer").unwrap()),
     );
     let body = HandoffBody { domain: DomainId::parse("development").unwrap(), template_version: 1, fields: serde_json::json!({}) };
-    let mut handoff = Handoff::new(envelope, id.clone(), Uuid::new_v4(), None, 1, "S14 fixture handoff", None, body);
+    let mut handoff = Handoff::new(HandoffFields { envelope, id: id.clone(), chain_id: Uuid::new_v4(), parent_handoff_id: None, seq: 1, title: "S14 fixture handoff".into(), openspec_change_slug: None, body });
     handoff.transition_to(HandoffState::InProgress, "2026-07-01T09:11:00Z".parse().unwrap(), Some("s14-agent")).unwrap();
     handoff.transition_to(HandoffState::Done, "2026-07-01T09:20:00Z".parse().unwrap(), None).unwrap();
     GitTier::new(git_root).write(&handoff).expect("write handoff fixture into the git tier");
@@ -153,17 +154,7 @@ fn plant_divergence_resolved_in_git(git_root: &Path) {
         "2026-07-01T09:40:00Z".parse().unwrap(),
         Actor::new("s15-fixture", RoleId::parse("test").unwrap()),
     );
-    let divergence = Divergence::new(
-        envelope,
-        ProjectId::parse("acme-repo").unwrap(),
-        ScenarioId::parse("world.firstbuy-hotdeal.27").unwrap(),
-        Sha::parse("b".repeat(40)).unwrap(),
-        DivergenceStatus::Resolved,
-        TotalOrder::new(1),
-        1,
-        "reviewer-1",
-        "",
-    );
+    let divergence = Divergence::new(DivergenceFields { envelope, project_id: ProjectId::parse("acme-repo").unwrap(), scenario_id: ScenarioId::parse("world.firstbuy-hotdeal.27").unwrap(), sha: Sha::parse("b".repeat(40)).unwrap(), status: DivergenceStatus::Resolved, run_seq: TotalOrder::new(1), round: 1, reviewer: "reviewer-1".into(), detail: "".into() });
     GitTier::new(git_root).write(&divergence).expect("write divergence fixture into the git tier");
 }
 

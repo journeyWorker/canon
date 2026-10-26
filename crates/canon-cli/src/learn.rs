@@ -55,7 +55,7 @@ use std::process::ExitCode;
 use canon_learn::{
     CrnPromotionGate, DemotionPolicy, LearnConfig, LearnError, OccurrencePromotionGate, ParquetStrategyStore, ParquetTrajectoryStore, Promotion,
     PromotionApproval, PromotionDecision, PromotionEvaluation, PromotionMode, StrategyId, StrategyLifecycle, StrategyStore, TrajectoryStore,
-    demote_strategy, evaluate_now, plan_promotion, promote_strategy, promote_strategy_approved, rollback_strategy_authenticated,
+    demote_strategy, evaluate_now, plan_promotion, promote_strategy, promote_strategy_approved, rollback_strategy_authenticated, AuthenticatedRollback,
 };
 use chrono::Utc;
 use schemars::JsonSchema;
@@ -333,10 +333,17 @@ pub fn run_approval_payload(repo: &Path, strategy_id: &StrategyId, evaluation_pa
         return ExitCode::from(CliError::failed("LEARN_EVALUATION_REJECTED", format!("evaluation rejected: {error}")).hint("re-run the paired evaluation so it meets the promotion bar, then run `canon strategy approval-payload` again").emit("canon strategy approval-payload", json));
     }
     let subject = format!("strategy:{strategy_id}");
-    let payload = canon_model::approval_payload_bytes(
-        "canon-learning-approval-v1", &subject, None,
-        &evaluation.digest(), None, &[], &[], approver, &approval_at,
-    );
+    let payload = canon_model::approval_payload_bytes(&canon_model::ApprovalPayload {
+        namespace: "canon-learning-approval-v1",
+        subject: &subject,
+        project: None,
+        artifact_sha: &evaluation.digest(),
+        run_id: None,
+        surface: &[],
+        effects: &[],
+        actor: approver,
+        timestamp: &approval_at,
+    });
     if json {
         let report = StrategyApprovalPayloadReport {
             payload_hex: payload.iter().map(|byte| format!("{byte:02x}")).collect(),
@@ -362,8 +369,21 @@ pub fn run_approval_payload(repo: &Path, strategy_id: &StrategyId, evaluation_pa
     ExitCode::SUCCESS
 }
 
-#[expect(clippy::too_many_arguments, reason = "the signature is the `strategy rollback` flag set, passed one-to-one from `run/strategy.rs`")]
-pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: &str, contradicting: Option<&str>, signature_path: &Path, approved_at: &str, json: bool) -> ExitCode {
+/// The `strategy rollback` flag set, passed from `run/strategy.rs`.
+#[derive(Debug)]
+pub struct RollbackRequest<'a> {
+    pub repo: &'a Path,
+    pub strategy_id: &'a StrategyId,
+    pub reason: &'a str,
+    pub actor: &'a str,
+    pub contradicting: Option<&'a str>,
+    pub signature_path: &'a Path,
+    pub approved_at: &'a str,
+    pub json: bool,
+}
+
+pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
+    let RollbackRequest { repo, strategy_id, reason, actor, contradicting, signature_path, approved_at, json } = *request;
     let repo = resolve_repo_root(repo);
     let config = match LearnConfig::from_manifest(&std::fs::read_to_string(repo.join("canon.yaml")).unwrap_or_default()) {
         Ok(value) => value,
@@ -403,7 +423,7 @@ pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: 
         }
     };
     let was_rolled_back = matches!(store.find_by_id(strategy_id), Ok(Some(item)) if item.lifecycle == Some(StrategyLifecycle::RolledBack));
-    match rollback_strategy_authenticated(&store, *strategy_id, reason, actor, contradicting, &repo.join(&config.strategies_root), &signature, approved_at) {
+    match rollback_strategy_authenticated(AuthenticatedRollback { strategy_store: &store, strategy_id: *strategy_id, reason, actor, contradicting_trajectory_id: contradicting, git_tier_root: &repo.join(&config.strategies_root), signature: &signature, approved_at }) {
         Ok(record) => {
             if was_rolled_back {
                 crate::json_out::mark_unchanged();

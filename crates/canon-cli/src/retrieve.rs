@@ -391,16 +391,7 @@ mod tests {
     fn seed_strategy(repo_dir: &Path, regime_key: &RegimeKey, role: &RoleId, title: &str) {
         let learn_config = LearnConfig::default();
         let store = ParquetStrategyStore::open(repo_dir.join(learn_config.root).join("strategies"));
-        let item = canon_learn::StrategyItem::new(
-            canon_learn::StrategyId::new(),
-            regime_key.clone(),
-            role.clone(),
-            title,
-            "description",
-            "content",
-            vec![canon_learn::TrajectoryId::new()],
-            Utc::now(),
-        );
+        let item = canon_learn::StrategyItem::new(canon_learn::StrategyItemFields { id: canon_learn::StrategyId::new(), regime_key: regime_key.clone(), role: role.clone(), title: title.into(), description: "description".into(), content: "content".into(), source_trajectory_ids: vec![canon_learn::TrajectoryId::new()], recorded_at: Utc::now() });
         store.append(&item).unwrap();
     }
 

@@ -37,17 +37,27 @@ pub fn rollback_strategy(
     Err(PromotionEvidenceError::RollbackUnauthenticated.into())
 }
 
-#[expect(clippy::too_many_arguments, reason = "public signature shared with canon-cli; each argument is a distinct input of the signed rollback")]
-pub fn rollback_strategy_authenticated(
-    strategy_store: &dyn StrategyStore,
-    strategy_id: StrategyId,
-    reason: &str,
-    actor: &str,
-    contradicting_trajectory_id: Option<TrajectoryId>,
-    git_tier_root: &Path,
-    signature: &str,
-    approved_at: DateTime<Utc>,
-) -> Result<RollbackRecord, LearnError> {
+/// Inputs of a signed rollback.
+#[derive(Clone, Copy)]
+pub struct AuthenticatedRollback<'a> {
+    pub strategy_store: &'a dyn StrategyStore,
+    pub strategy_id: StrategyId,
+    pub reason: &'a str,
+    pub actor: &'a str,
+    pub contradicting_trajectory_id: Option<TrajectoryId>,
+    pub git_tier_root: &'a Path,
+    pub signature: &'a str,
+    pub approved_at: DateTime<Utc>,
+}
+
+impl std::fmt::Debug for AuthenticatedRollback<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AuthenticatedRollback").field("strategy_id", &self.strategy_id).field("actor", &self.actor).field("approved_at", &self.approved_at).finish_non_exhaustive()
+    }
+}
+
+pub fn rollback_strategy_authenticated(rollback: AuthenticatedRollback<'_>) -> Result<RollbackRecord, LearnError> {
+    let AuthenticatedRollback { strategy_store, strategy_id, reason, actor, contradicting_trajectory_id, git_tier_root, signature, approved_at } = rollback;
     if reason.trim().is_empty() || actor.trim().is_empty() {
         return Err(PromotionEvidenceError::RollbackReasonAndActor.into());
     }
@@ -68,17 +78,17 @@ pub fn rollback_strategy_authenticated(
         return Err(PromotionEvidenceError::RollbackSignatureRequired.into());
     }
     let reason_digest = format!("{:x}", Sha256::digest(reason.as_bytes()));
-    let payload = canon_model::approval_payload_bytes(
-        "canon-learning-approval-v1",
-        &format!("strategy:{strategy_id}:rollback:{reason_digest}"),
-        None,
-        &reason_digest,
-        None,
-        &[],
-        &[],
+    let payload = canon_model::approval_payload_bytes(&canon_model::ApprovalPayload {
+        namespace: "canon-learning-approval-v1",
+        subject: &format!("strategy:{strategy_id}:rollback:{reason_digest}"),
+        project: None,
+        artifact_sha: &reason_digest,
+        run_id: None,
+        surface: &[],
+        effects: &[],
         actor,
-        &approved_at,
-    );
+        timestamp: &approved_at,
+    });
     canon_gate::verify_ssh_signature("canon-learning-approval-v1", &payload, signature.as_bytes(), actor, &allowed_signers).map_err(PromotionEvidenceError::Signature)?;
     let Some(item) = strategy_store.find_by_id(&strategy_id)? else {
         return Err(LearnError::UnknownStrategyId(strategy_id.to_string()));

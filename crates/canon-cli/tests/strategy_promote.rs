@@ -24,7 +24,7 @@ use std::process::Command;
 
 use canon_ingest::verdict::{Becomes, Polarity, VerdictRow};
 use canon_learn::{
-    ParquetStrategyStore, ParquetTrajectoryStore, PromotionApproval, PromotionEvaluation, StrategyId, StrategyItem, StrategyLifecycle,
+    ParquetStrategyStore, ParquetTrajectoryStore, PromotionApproval, PromotionEvaluation, PromotionEvaluationFields, StrategyId, StrategyItem, StrategyItemFields, StrategyLifecycle,
     StrategyStore, Trajectory, TrajectoryId, TrajectoryStore, TrajectoryVerdict, VerdictOutcome,
 };
 use canon_model::ids::{regime_key, RegimeKey, RoleId};
@@ -45,7 +45,7 @@ fn seed_strategy(repo: &Path, content: &str) -> StrategyId {
     let store = ParquetStrategyStore::open(repo.join(".canon").join("learn").join("strategies"));
     let id = StrategyId::new();
     let item =
-        StrategyItem::new(id, fixture_regime(), dev_role(), "review guidance", "one-liner", content, vec![TrajectoryId::new()], Utc::now());
+        StrategyItem::new(StrategyItemFields { id, regime_key: fixture_regime(), role: dev_role(), title: "review guidance".into(), description: "one-liner".into(), content: content.into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() });
     store.append(&item).expect("seed strategy");
     id
 }
@@ -138,34 +138,20 @@ fn ssh_sign(private_key: &Path, namespace: &str, payload: &[u8]) -> String {
 /// Writes a passing paired evaluation for `candidate` and a human
 /// approval of it signed by `alice`, returning their file paths.
 fn write_approved_bundle(repo: &Path, candidate: &StrategyItem, private_key: &Path) -> (std::path::PathBuf, std::path::PathBuf, PromotionEvaluation, PromotionApproval) {
-    let evaluation = PromotionEvaluation::new(
-        candidate,
-        "candidate-v2",
-        vec!["baseline-panel-0".to_string(), "baseline-panel-1".to_string()],
-        vec!["candidate-panel-0".to_string(), "candidate-panel-1".to_string()],
-        "corpus-v1",
-        "paired-eval-v1",
-        "context-digest-v1",
-        "policy-digest-v1",
-        "model-digest-v1",
-        "tool-digest-v1",
-        [("pairs".to_string(), 2.0), ("uplift".to_string(), 0.75), ("regressions".to_string(), 0.0)].into_iter().collect(),
-        true,
-        "promote",
-    );
+    let evaluation = PromotionEvaluation::new(candidate, PromotionEvaluationFields { candidate_version: "candidate-v2".into(), baseline_result_digests: vec!["baseline-panel-0".to_string(), "baseline-panel-1".to_string()], candidate_result_digests: vec!["candidate-panel-0".to_string(), "candidate-panel-1".to_string()], corpus_version: "corpus-v1".into(), eval_version: "paired-eval-v1".into(), context_digest: "context-digest-v1".into(), policy_digest: "policy-digest-v1".into(), model_digest: "model-digest-v1".into(), tool_digest: "tool-digest-v1".into(), paired_metrics: [("pairs".to_string(), 2.0), ("uplift".to_string(), 0.75), ("regressions".to_string(), 0.0)].into_iter().collect(), passed: true, decision: "promote".into() });
     let approved_at = Utc::now();
     let mut approval = PromotionApproval::new(candidate.id, evaluation.digest(), "alice", "human", true, approved_at);
-    let payload = canon_model::approval_payload_bytes(
-        "canon-learning-approval-v1",
-        &format!("strategy:{}", candidate.id),
-        None,
-        &evaluation.digest(),
-        None,
-        &[],
-        &[],
-        "alice",
-        &approved_at,
-    );
+    let payload = canon_model::approval_payload_bytes(&canon_model::ApprovalPayload {
+        namespace: "canon-learning-approval-v1",
+        subject: &format!("strategy:{}", candidate.id),
+        project: None,
+        artifact_sha: &evaluation.digest(),
+        run_id: None,
+        surface: &[],
+        effects: &[],
+        actor: "alice",
+        timestamp: &approved_at,
+    });
     approval.signature = Some(ssh_sign(private_key, "canon-learning-approval-v1", &payload));
     approval.signer_key = Some("alice".to_string());
     approval.integrity_digest = approval.recomputed_integrity_digest();
@@ -187,16 +173,7 @@ fn promote_materializes_a_seeded_strategy_as_a_git_tier_file() {
     let dir = tempfile::tempdir().unwrap();
     let private_key = pin_approval_signer(dir.path());
     let store = ParquetStrategyStore::open(dir.path().join(".canon").join("learn").join("strategies"));
-    let candidate = StrategyItem::new(
-        StrategyId::new(),
-        fixture_regime(),
-        dev_role(),
-        "review guidance",
-        "one-liner",
-        "prefer the boring, correct option",
-        vec![TrajectoryId::new()],
-        Utc::now(),
-    )
+    let candidate = StrategyItem::new(StrategyItemFields { id: StrategyId::new(), regime_key: fixture_regime(), role: dev_role(), title: "review guidance".into(), description: "one-liner".into(), content: "prefer the boring, correct option".into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() })
     .with_lifecycle(StrategyLifecycle::Quarantined);
     store.append(&candidate).expect("seed strategy");
     let id = candidate.id;
@@ -332,7 +309,7 @@ fn a_failed_demotion_has_its_own_error_code() {
     let dir = tempfile::tempdir().unwrap();
     let store = ParquetStrategyStore::open(dir.path().join(".canon").join("learn").join("strategies"));
     let id = StrategyId::new();
-    let item = StrategyItem::new(id, fixture_regime(), dev_role(), "review guidance", "one-liner", "demotable", vec![TrajectoryId::new()], Utc::now()).with_lifecycle(StrategyLifecycle::Active);
+    let item = StrategyItem::new(StrategyItemFields { id, regime_key: fixture_regime(), role: dev_role(), title: "review guidance".into(), description: "one-liner".into(), content: "demotable".into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() }).with_lifecycle(StrategyLifecycle::Active);
     store.append(&item).expect("seed active strategy");
     seed_proven_regime(dir.path());
     let trajectories = ParquetTrajectoryStore::open(dir.path().join(".canon").join("learn").join("trajectories"));
@@ -355,7 +332,7 @@ fn approval_payload_is_deterministic_and_enveloped_with_json() {
     let dir = tempfile::tempdir().unwrap();
     let private_key = pin_approval_signer(dir.path());
     let store = ParquetStrategyStore::open(dir.path().join(".canon").join("learn").join("strategies"));
-    let candidate = StrategyItem::new(StrategyId::new(), fixture_regime(), dev_role(), "review guidance", "one-liner", "sign me", vec![TrajectoryId::new()], Utc::now())
+    let candidate = StrategyItem::new(StrategyItemFields { id: StrategyId::new(), regime_key: fixture_regime(), role: dev_role(), title: "review guidance".into(), description: "one-liner".into(), content: "sign me".into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() })
         .with_lifecycle(StrategyLifecycle::Quarantined);
     store.append(&candidate).expect("seed strategy");
     let (evaluation_path, _, _, _) = write_approved_bundle(dir.path(), &candidate, &private_key);

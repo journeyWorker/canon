@@ -369,18 +369,22 @@ pub struct Handoff {
     pub body: HandoffBody,
 }
 
+/// Fields of a new [`Handoff`]; [`Handoff::new`] fills the rest with defaults.
+#[derive(Debug, Clone)]
+pub struct HandoffFields {
+    pub envelope: Envelope,
+    pub id: HandoffId,
+    pub chain_id: Uuid,
+    pub parent_handoff_id: Option<HandoffId>,
+    pub seq: i32,
+    pub title: String,
+    pub openspec_change_slug: Option<ChangeId>,
+    pub body: HandoffBody,
+}
+
 impl Handoff {
-    #[expect(clippy::too_many_arguments, reason = "constructor mirrors the record's field list; callers across crates pass each field positionally")]
-    pub fn new(
-        envelope: Envelope,
-        id: HandoffId,
-        chain_id: Uuid,
-        parent_handoff_id: Option<HandoffId>,
-        seq: i32,
-        title: impl Into<String>,
-        openspec_change_slug: Option<ChangeId>,
-        body: HandoffBody,
-    ) -> Self {
+    pub fn new(fields: HandoffFields) -> Self {
+        let HandoffFields { envelope, id, chain_id, parent_handoff_id, seq, title, openspec_change_slug, body } = fields;
         debug_assert_eq!(envelope.kind, RecordKind::Handoff);
         Self {
             envelope,
@@ -396,7 +400,7 @@ impl Handoff {
             openspec_change_slug,
             research_vendor_slug: None,
             tags: Vec::new(),
-            title: title.into(),
+            title,
             from_role: None,
             to_role: None,
             body,
@@ -405,8 +409,7 @@ impl Handoff {
 
     /// Builder for the [`Handoff::from_role`]/[`Handoff::to_role`] edge
     /// endpoints — mirrors [`crate::records::Task::with_scenario_refs`]'s
-    /// additive-field pattern, so `Handoff::new`'s own signature (already
-    /// eight arguments, already `#[allow(clippy::too_many_arguments)]`)
+    /// additive-field pattern, so `Handoff::new`'s own signature
     /// stays unchanged and every existing caller keeps compiling.
     /// Both endpoints move together because a half-typed edge answers
     /// nothing a graph reader can use; pass `None` for an end that is
@@ -484,16 +487,7 @@ mod tests {
 
     #[test]
     fn handoff_round_trips_and_carries_full_envelope() {
-        let handoff = Handoff::new(
-            sample_envelope(),
-            HandoffId::parse("20260710-1432-fix-the-thing-a1b2").unwrap(),
-            Uuid::new_v4(),
-            None,
-            1,
-            "topic",
-            Some(ChangeId::parse("s1-state-model-join-spine").unwrap()),
-            sample_body(valid_gihoek_fields()),
-        );
+        let handoff = Handoff::new(HandoffFields { envelope: sample_envelope(), id: HandoffId::parse("20260710-1432-fix-the-thing-a1b2").unwrap(), chain_id: Uuid::new_v4(), parent_handoff_id: None, seq: 1, title: "topic".into(), openspec_change_slug: Some(ChangeId::parse("s1-state-model-join-spine").unwrap()), body: sample_body(valid_gihoek_fields()) });
         let json = serde_json::to_value(&handoff).unwrap();
         // The donor-mapped columns are unconditional: every one of them
         // always reaches the wire, `null` included.
@@ -524,16 +518,7 @@ mod tests {
     /// free strings, so a round trip also proves the grammar holds.
     #[test]
     fn a_handoff_with_both_role_endpoints_round_trips() {
-        let handoff = Handoff::new(
-            sample_envelope(),
-            HandoffId::parse("20260710-1432-fix-the-thing-a1b2").unwrap(),
-            Uuid::new_v4(),
-            None,
-            1,
-            "topic",
-            None,
-            sample_body(valid_gihoek_fields()),
-        )
+        let handoff = Handoff::new(HandoffFields { envelope: sample_envelope(), id: HandoffId::parse("20260710-1432-fix-the-thing-a1b2").unwrap(), chain_id: Uuid::new_v4(), parent_handoff_id: None, seq: 1, title: "topic".into(), openspec_change_slug: None, body: sample_body(valid_gihoek_fields()) })
         .with_roles(Some(RoleId::parse("implementer").unwrap()), Some(RoleId::parse("reviewer").unwrap()));
 
         let json = serde_json::to_value(&handoff).unwrap();
@@ -557,16 +542,7 @@ mod tests {
     /// `null` keys, so this asserts absence rather than `null`.
     #[test]
     fn a_legacy_handoff_with_no_role_endpoints_still_constructs_and_round_trips() {
-        let handoff = Handoff::new(
-            sample_envelope(),
-            HandoffId::parse("20260710-1432-fix-the-thing-a1b2").unwrap(),
-            Uuid::new_v4(),
-            None,
-            1,
-            "topic",
-            None,
-            sample_body(valid_gihoek_fields()),
-        );
+        let handoff = Handoff::new(HandoffFields { envelope: sample_envelope(), id: HandoffId::parse("20260710-1432-fix-the-thing-a1b2").unwrap(), chain_id: Uuid::new_v4(), parent_handoff_id: None, seq: 1, title: "topic".into(), openspec_change_slug: None, body: sample_body(valid_gihoek_fields()) });
         assert_eq!(handoff.from_role, None, "Handoff::new leaves the endpoints unset — only with_roles sets them");
         assert_eq!(handoff.to_role, None);
         assert_eq!(
@@ -678,16 +654,7 @@ mod tests {
 
     #[test]
     fn valid_transitions_succeed_and_stamp_timestamps() {
-        let mut handoff = Handoff::new(
-            sample_envelope(),
-            HandoffId::parse("20260710-1432-fix-the-thing-a1b2").unwrap(),
-            Uuid::new_v4(),
-            None,
-            1,
-            "topic",
-            None,
-            sample_body(valid_gihoek_fields()),
-        );
+        let mut handoff = Handoff::new(HandoffFields { envelope: sample_envelope(), id: HandoffId::parse("20260710-1432-fix-the-thing-a1b2").unwrap(), chain_id: Uuid::new_v4(), parent_handoff_id: None, seq: 1, title: "topic".into(), openspec_change_slug: None, body: sample_body(valid_gihoek_fields()) });
         let now = Utc::now();
         handoff.transition_to(HandoffState::InProgress, now, Some("session-1")).unwrap();
         assert_eq!(handoff.state, HandoffState::InProgress);
@@ -699,16 +666,7 @@ mod tests {
 
     #[test]
     fn terminal_states_reject_transitions_back_to_pending_or_in_progress() {
-        let mut handoff = Handoff::new(
-            sample_envelope(),
-            HandoffId::parse("20260710-1432-fix-the-thing-a1b2").unwrap(),
-            Uuid::new_v4(),
-            None,
-            1,
-            "topic",
-            None,
-            sample_body(valid_gihoek_fields()),
-        );
+        let mut handoff = Handoff::new(HandoffFields { envelope: sample_envelope(), id: HandoffId::parse("20260710-1432-fix-the-thing-a1b2").unwrap(), chain_id: Uuid::new_v4(), parent_handoff_id: None, seq: 1, title: "topic".into(), openspec_change_slug: None, body: sample_body(valid_gihoek_fields()) });
         let now = Utc::now();
         handoff.transition_to(HandoffState::InProgress, now, None).unwrap();
         handoff.transition_to(HandoffState::Done, now, None).unwrap();
@@ -716,16 +674,7 @@ mod tests {
         let err = handoff.transition_to(HandoffState::Pending, now, None).unwrap_err();
         assert_eq!(err.class, FailureClass::InvalidStateTransition);
 
-        let mut abandoned = Handoff::new(
-            sample_envelope(),
-            HandoffId::parse("20260710-1432-other-topic-c3d4").unwrap(),
-            Uuid::new_v4(),
-            None,
-            1,
-            "topic",
-            None,
-            sample_body(valid_gihoek_fields()),
-        );
+        let mut abandoned = Handoff::new(HandoffFields { envelope: sample_envelope(), id: HandoffId::parse("20260710-1432-other-topic-c3d4").unwrap(), chain_id: Uuid::new_v4(), parent_handoff_id: None, seq: 1, title: "topic".into(), openspec_change_slug: None, body: sample_body(valid_gihoek_fields()) });
         abandoned.transition_to(HandoffState::InProgress, now, None).unwrap();
         abandoned.transition_to(HandoffState::Abandoned, now, None).unwrap();
         let err = abandoned.transition_to(HandoffState::InProgress, now, None).unwrap_err();
@@ -761,28 +710,10 @@ mod tests {
 
     #[test]
     fn two_domains_expose_identical_state_machine_fields() {
-        let a = Handoff::new(
-            sample_envelope(),
-            HandoffId::parse("20260710-1432-a-topic-a1b2").unwrap(),
-            Uuid::new_v4(),
-            None,
-            1,
-            "a",
-            None,
-            sample_body(valid_gihoek_fields()),
-        );
+        let a = Handoff::new(HandoffFields { envelope: sample_envelope(), id: HandoffId::parse("20260710-1432-a-topic-a1b2").unwrap(), chain_id: Uuid::new_v4(), parent_handoff_id: None, seq: 1, title: "a".into(), openspec_change_slug: None, body: sample_body(valid_gihoek_fields()) });
         let mut other_body_fields = valid_gihoek_fields();
         other_body_fields["title"] = serde_json::json!("different domain body");
-        let b = Handoff::new(
-            sample_envelope(),
-            HandoffId::parse("20260710-1432-b-topic-c3d4").unwrap(),
-            Uuid::new_v4(),
-            None,
-            1,
-            "b",
-            None,
-            HandoffBody { domain: DomainId::parse("디자인").unwrap(), template_version: 1, fields: other_body_fields },
-        );
+        let b = Handoff::new(HandoffFields { envelope: sample_envelope(), id: HandoffId::parse("20260710-1432-b-topic-c3d4").unwrap(), chain_id: Uuid::new_v4(), parent_handoff_id: None, seq: 1, title: "b".into(), openspec_change_slug: None, body: HandoffBody { domain: DomainId::parse("디자인").unwrap(), template_version: 1, fields: other_body_fields } });
         let a_json = serde_json::to_value(&a).unwrap();
         let b_json = serde_json::to_value(&b).unwrap();
         for column in ["state", "chain_id", "parent_handoff_id", "seq", "claimed_by", "openspec_change_slug"] {

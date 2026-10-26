@@ -89,40 +89,56 @@ fn sha256<T: Serialize>(value: &T) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+/// Field list for [`PromotionEvaluation::new`].
+#[derive(Debug, Clone)]
+pub struct PromotionEvaluationFields {
+    pub candidate_version: String,
+    pub baseline_result_digests: Vec<String>,
+    pub candidate_result_digests: Vec<String>,
+    pub corpus_version: String,
+    pub eval_version: String,
+    pub context_digest: String,
+    pub policy_digest: String,
+    pub model_digest: String,
+    pub tool_digest: String,
+    pub paired_metrics: BTreeMap<String, f64>,
+    pub passed: bool,
+    pub decision: String,
+}
+
 impl PromotionEvaluation {
-    #[expect(clippy::too_many_arguments, reason = "constructor mirrors the evaluation record's field list; callers pass each field positionally")]
-    pub fn new(
-        candidate: &StrategyItem,
-        candidate_version: impl Into<String>,
-        baseline_result_digests: Vec<String>,
-        candidate_result_digests: Vec<String>,
-        corpus_version: impl Into<String>,
-        eval_version: impl Into<String>,
-        context_digest: impl Into<String>,
-        policy_digest: impl Into<String>,
-        model_digest: impl Into<String>,
-        tool_digest: impl Into<String>,
-        paired_metrics: BTreeMap<String, f64>,
-        passed: bool,
-        decision: impl Into<String>,
-    ) -> Self {
+    pub fn new(candidate: &StrategyItem, fields: PromotionEvaluationFields) -> Self {
+        let PromotionEvaluationFields {
+            candidate_version,
+            baseline_result_digests,
+            candidate_result_digests,
+            corpus_version,
+            eval_version,
+            context_digest,
+            policy_digest,
+            model_digest,
+            tool_digest,
+            paired_metrics,
+            passed,
+            decision,
+        } = fields;
         let mut value = Self {
             schema_version: PROMOTION_EVALUATION_VERSION,
             candidate_strategy_id: candidate.id,
-            candidate_version: candidate_version.into(),
+            candidate_version,
             candidate_lifecycle: candidate.lifecycle.unwrap_or(StrategyLifecycle::Active),
             candidate_digest: strategy_digest(candidate),
             baseline_result_digests,
             candidate_result_digests,
-            corpus_version: corpus_version.into(),
-            eval_version: eval_version.into(),
-            context_digest: context_digest.into(),
-            policy_digest: policy_digest.into(),
-            model_digest: model_digest.into(),
-            tool_digest: tool_digest.into(),
+            corpus_version,
+            eval_version,
+            context_digest,
+            policy_digest,
+            model_digest,
+            tool_digest,
             paired_metrics,
             passed,
-            decision: decision.into(),
+            decision,
             source_trajectory_ids: candidate.source_trajectory_ids.clone(),
             integrity_digest: String::new(),
         };
@@ -274,17 +290,17 @@ impl PromotionApproval {
         if self.signature.is_none() || self.signer_key.is_none() {
             return Err(PromotionEvidenceError::ApprovalSignatureMissing);
         }
-        let payload = canon_model::approval::approval_payload_bytes(
-            "canon-learning-approval-v1",
-            &format!("strategy:{}", candidate.id),
-            None,
-            &self.evaluation_digest,
-            None,
-            &[],
-            &[],
-            &self.approver_identity,
-            &self.approved_at,
-        );
+        let payload = canon_model::approval::approval_payload_bytes(&canon_model::ApprovalPayload {
+            namespace: "canon-learning-approval-v1",
+            subject: &format!("strategy:{}", candidate.id),
+            project: None,
+            artifact_sha: &self.evaluation_digest,
+            run_id: None,
+            surface: &[],
+            effects: &[],
+            actor: &self.approver_identity,
+            timestamp: &self.approved_at,
+        });
         Ok(canon_gate::verify_ssh_signature(
             "canon-learning-approval-v1",
             &payload,
@@ -314,16 +330,17 @@ mod tests {
     use canon_model::ids::{regime_key, RegimeKey, RoleId};
 
     use super::*;
+    use crate::strategy::StrategyItemFields;
 
     fn candidate() -> StrategyItem {
         let rk = RegimeKey::parse(regime_key("dev", "canon", "join-spine", "9c93d024b1a2")).unwrap();
-        StrategyItem::new(StrategyId::new(), rk, RoleId::parse("dev").unwrap(), "title", "description", "content", vec![TrajectoryId::new()], Utc::now())
+        StrategyItem::new(StrategyItemFields { id: StrategyId::new(), regime_key: rk, role: RoleId::parse("dev").unwrap(), title: "title".into(), description: "description".into(), content: "content".into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() })
             .with_lifecycle(StrategyLifecycle::Quarantined)
     }
 
     fn evaluation(candidate: &StrategyItem) -> PromotionEvaluation {
         let metrics = BTreeMap::from([("pairs".to_string(), 1.0), ("uplift".to_string(), 0.1), ("regressions".to_string(), 0.0)]);
-        PromotionEvaluation::new(candidate, "v2", vec!["b0".into()], vec!["c0".into()], "corpus", "eval", "ctx", "policy", "model", "tool", metrics, true, "pass")
+        PromotionEvaluation::new(candidate, PromotionEvaluationFields { candidate_version: "v2".into(), baseline_result_digests: vec!["b0".into()], candidate_result_digests: vec!["c0".into()], corpus_version: "corpus".into(), eval_version: "eval".into(), context_digest: "ctx".into(), policy_digest: "policy".into(), model_digest: "model".into(), tool_digest: "tool".into(), paired_metrics: metrics, passed: true, decision: "pass".into() })
     }
 
     #[test]

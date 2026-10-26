@@ -179,7 +179,7 @@ mod tests {
     /// referenced anywhere else in this module).
     #[test]
     fn handoff_state_machine_is_unaffected_by_a_body_that_fails_the_vocabulary_checker() {
-        use canon_model::{Actor, DomainId, Envelope, Handoff, HandoffId, HandoffState, RecordKind, RoleId};
+        use canon_model::{Actor, DomainId, Envelope, Handoff, HandoffFields, HandoffId, HandoffState, RecordKind, RoleId};
         use chrono::Utc;
 
         let snap = snapshot();
@@ -192,7 +192,7 @@ mod tests {
         let unchecked_body = HandoffBody { domain: DomainId::parse("nonexistent").unwrap(), template_version: 1, fields: serde_json::json!({}) };
         let envelope = Envelope::new(1, RecordKind::Handoff, Utc::now(), Actor::new("test-agent", RoleId::parse("implementer").unwrap()));
         let id = HandoffId::parse("20260711-0000-selftest-abcd").unwrap();
-        let mut handoff = Handoff::new(envelope, id.clone(), uuid::Uuid::nil(), None, 1, "state machine isolation proof", None, unchecked_body);
+        let mut handoff = Handoff::new(HandoffFields { envelope, id: id.clone(), chain_id: uuid::Uuid::nil(), parent_handoff_id: None, seq: 1, title: "state machine isolation proof".into(), openspec_change_slug: None, body: unchecked_body });
 
         assert_eq!(handoff.id, id);
         assert_eq!(handoff.state, HandoffState::Pending);

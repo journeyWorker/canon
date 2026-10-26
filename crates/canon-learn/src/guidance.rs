@@ -195,7 +195,7 @@ mod tests {
     use crate::error::LearnError;
     use crate::ids::{StrategyId, TrajectoryId};
     use crate::store::ParquetStrategyStore;
-    use crate::strategy::{DemotionEvidence, StrategyItem};
+    use crate::strategy::{DemotionEvidence, StrategyItem, StrategyItemFields};
 
     fn role(r: &str) -> RoleId {
         RoleId::parse(r).unwrap()
@@ -206,7 +206,7 @@ mod tests {
     }
 
     fn strategy_at(r: &str, title: &str, at: DateTime<Utc>) -> StrategyItem {
-        StrategyItem::new(StrategyId::new(), regime(r), role(r), title, "d", format!("content-{title}"), vec![TrajectoryId::new()], at)
+        StrategyItem::new(StrategyItemFields { id: StrategyId::new(), regime_key: regime(r), role: role(r), title: title.into(), description: "d".into(), content: format!("content-{title}"), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: at })
     }
 
     /// A synthetic [`StrategyStore`] whose every read fails — simulates a
@@ -346,7 +346,7 @@ mod tests {
     }
 
     fn strategy_in(rk: &RegimeKey, title: &str, at: DateTime<Utc>) -> StrategyItem {
-        StrategyItem::new(StrategyId::new(), rk.clone(), role(rk.role()), title, "d", format!("content-{title}"), vec![TrajectoryId::new()], at)
+        StrategyItem::new(StrategyItemFields { id: StrategyId::new(), regime_key: rk.clone(), role: role(rk.role()), title: title.into(), description: "d".into(), content: format!("content-{title}"), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: at })
     }
 
     #[test]

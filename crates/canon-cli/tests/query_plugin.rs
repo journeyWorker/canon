@@ -17,7 +17,7 @@
 mod support;
 
 use canon_model::envelope::{Actor, Envelope, RecordKind};
-use canon_model::handoff::{DomainId, Handoff, HandoffBody};
+use canon_model::handoff::{DomainId, Handoff, HandoffBody, HandoffFields};
 use canon_model::ids::{HandoffId, RoleId};
 use canon_plugin::overlay::{OverlayEnvelope, compose_overlay_body, write_overlay};
 use canon_plugin::manifest::snapshot::OverlayDecl;
@@ -100,7 +100,7 @@ fn plant_handoff(fixture: &support::Fixture) -> HandoffId {
     let id = HandoffId::parse("20260712-0900-s16-p3-fixture-a1b2").unwrap();
     let envelope = Envelope::new(1, RecordKind::Handoff, Utc::now(), actor());
     let body = HandoffBody { domain: DomainId::parse("development").unwrap(), template_version: 1, fields: serde_json::json!({}) };
-    let handoff = Handoff::new(envelope, id.clone(), Uuid::new_v4(), None, 1, "s16 P3 fixture handoff", None, body);
+    let handoff = Handoff::new(HandoffFields { envelope, id: id.clone(), chain_id: Uuid::new_v4(), parent_handoff_id: None, seq: 1, title: "s16 P3 fixture handoff".into(), openspec_change_slug: None, body });
     GitTier::new(fixture.git_root()).write(&handoff).expect("write handoff fixture into the git tier");
     id
 }

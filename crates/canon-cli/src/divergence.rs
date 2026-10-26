@@ -24,7 +24,7 @@ use std::path::Path;
 
 use canon_gate::promote::UNASSIGNED_RUN_SEQ;
 use canon_gate::GateCtx;
-use canon_model::{Actor, Divergence, DivergenceStatus, Envelope, ProjectId, RecordKind, RoleId, ScenarioId, SessionId, Sha, TotalOrder};
+use canon_model::{Actor, Divergence, DivergenceFields, DivergenceStatus, Envelope, ProjectId, RecordKind, RoleId, ScenarioId, SessionId, Sha, TotalOrder};
 use canon_store::tier::Tier;
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
@@ -184,22 +184,8 @@ impl crate::reports::Report for DivergenceListFieldsReport {}
 /// promotes that one candidate (`canon_gate::promote_staged_divergence`)
 /// and leaves every other staged candidate for `canon divergence
 /// promote` ([`crate::write_mode`]).
-#[expect(clippy::too_many_arguments, reason = "the signature is the `divergence add` flag set, passed one-to-one from `run/divergence.rs`")]
-pub fn run_stage(
-    repo: &Path,
-    project_id: &canon_model::ProjectId,
-    scenario_id: &canon_model::ScenarioId,
-    commit: &crate::git_rev::Bound,
-    status: DivergenceStatus,
-    round: u32,
-    reviewer: &str,
-    detail: &str,
-    actor_id: &str,
-    role: &RoleId,
-    session: Option<&SessionId>,
-    promote: crate::write_mode::PromoteFlag,
-    json: bool,
-) -> u8 {
+pub fn run_stage(args: CommitArgs<'_>, status: DivergenceStatus, promote: crate::write_mode::PromoteFlag) -> u8 {
+    let CommitArgs { repo, project_id, scenario_id, commit, round, reviewer, detail, actor_id, role, session, json } = args;
     let repo = resolve_repo_root(repo);
     if let Err(error) = crate::inventory::require_spec_root(&repo, project_id) {
         return error.emit("canon divergence add", json);
@@ -263,17 +249,17 @@ struct CandidateSpec<'a> {
 /// assigned.
 fn candidate(spec: CandidateSpec<'_>) -> Divergence {
     let CandidateSpec { project_id, scenario_id, sha, code, status, round, reviewer, detail, actor, at } = spec;
-    let record = Divergence::new(
-        Envelope::new(1, RecordKind::Divergence, at, actor),
-        project_id.clone(),
-        scenario_id.clone(),
-        sha.clone(),
+    let record = Divergence::new(DivergenceFields {
+        envelope: Envelope::new(1, RecordKind::Divergence, at, actor),
+        project_id: project_id.clone(),
+        scenario_id: scenario_id.clone(),
+        sha: sha.clone(),
         status,
-        TotalOrder::new(UNASSIGNED_RUN_SEQ),
+        run_seq: TotalOrder::new(UNASSIGNED_RUN_SEQ),
         round,
-        reviewer,
-        detail,
-    );
+        reviewer: reviewer.to_string(),
+        detail: detail.to_string(),
+    });
     match code {
         Some((code_tree, dirty)) => record.with_code(code_tree, dirty),
         None => record,
@@ -300,26 +286,27 @@ fn stage_and_promote(ledger_root: &Path, candidate: &Divergence) -> Result<std::
     }
 }
 
-/// The inputs of [`run_commit`].
-struct CommitArgs<'a> {
-    repo: &'a Path,
-    project_id: &'a canon_model::ProjectId,
-    scenario_id: &'a canon_model::ScenarioId,
-    commit: &'a crate::git_rev::Bound,
-    status: DivergenceStatus,
-    round: u32,
-    reviewer: &'a str,
-    detail: &'a str,
-    actor_id: &'a str,
-    role: &'a RoleId,
-    session: Option<&'a SessionId>,
-    json: bool,
+/// The flags `divergence add`, `resolve` and `defer` share; the verb's own
+/// extras (status, reason, expiry, promote) are passed beside it.
+#[derive(Debug)]
+pub struct CommitArgs<'a> {
+    pub repo: &'a Path,
+    pub project_id: &'a canon_model::ProjectId,
+    pub scenario_id: &'a canon_model::ScenarioId,
+    pub commit: &'a crate::git_rev::Bound,
+    pub round: u32,
+    pub reviewer: &'a str,
+    pub detail: &'a str,
+    pub actor_id: &'a str,
+    pub role: &'a RoleId,
+    pub session: Option<&'a SessionId>,
+    pub json: bool,
 }
 
 /// Shared `resolve`/`defer` path (module doc): build one
 /// divergence with `status`, stage it and promote that one record.
-fn run_commit(verb: &str, args: CommitArgs<'_>) -> u8 {
-    let CommitArgs { repo, project_id, scenario_id, commit, status, round, reviewer, detail, actor_id, role, session, json } = args;
+fn run_commit(verb: &str, status: DivergenceStatus, args: CommitArgs<'_>) -> u8 {
+    let CommitArgs { repo, project_id, scenario_id, commit, round, reviewer, detail, actor_id, role, session, json } = args;
     let repo = resolve_repo_root(repo);
     if let Err(error) = crate::inventory::require_spec_root(&repo, project_id) {
         return error.emit(&format!("canon divergence {verb}"), json);
@@ -357,41 +344,14 @@ fn actor_in(actor_id: &str, role: &RoleId, session: Option<&SessionId>) -> Actor
 
 /// `canon divergence resolve` (module doc): stages and promotes a
 /// `Resolved` record.
-#[expect(clippy::too_many_arguments, reason = "the signature is the `divergence resolve` flag set, passed one-to-one from `run/divergence.rs`")]
-pub fn run_resolve(
-    repo: &Path,
-    project_id: &canon_model::ProjectId,
-    scenario_id: &canon_model::ScenarioId,
-    commit: &crate::git_rev::Bound,
-    round: u32,
-    reviewer: &str,
-    detail: &str,
-    actor_id: &str,
-    role: &RoleId,
-    session: Option<&SessionId>,
-    json: bool,
-) -> u8 {
-    run_commit("resolve", CommitArgs { repo, project_id, scenario_id, commit, status: DivergenceStatus::Resolved, round, reviewer, detail, actor_id, role, session, json })
+pub fn run_resolve(args: CommitArgs<'_>) -> u8 {
+    run_commit("resolve", DivergenceStatus::Resolved, args)
 }
 
 /// `canon divergence defer --reason <..> --expiry <..>` (module doc):
 /// stages and promotes a `Deferred { reason, expiry }` record.
-#[expect(clippy::too_many_arguments, reason = "the signature is the `divergence defer` flag set, passed one-to-one from `run/divergence.rs`")]
-pub fn run_defer(
-    repo: &Path,
-    project_id: &canon_model::ProjectId,
-    scenario_id: &canon_model::ScenarioId,
-    commit: &crate::git_rev::Bound,
-    round: u32,
-    reviewer: &str,
-    reason: &str,
-    expiry: DateTime<Utc>,
-    actor_id: &str,
-    role: &RoleId,
-    session: Option<&SessionId>,
-    json: bool,
-) -> u8 {
-    run_commit("defer", CommitArgs { repo, project_id, scenario_id, commit, status: DivergenceStatus::Deferred { reason: reason.to_string(), expiry }, round, reviewer, detail: "", actor_id, role, session, json })
+pub fn run_defer(args: CommitArgs<'_>, reason: &str, expiry: DateTime<Utc>) -> u8 {
+    run_commit("defer", DivergenceStatus::Deferred { reason: reason.to_string(), expiry }, args)
 }
 
 /// `canon divergence accept`'s arguments.
@@ -684,6 +644,10 @@ mod tests {
         GateCtx::from_repo(dir.path()).unwrap().ledger_root
     }
 
+    fn commit_args<'a>(repo: &'a Path, project_id: &'a ProjectId, scenario_id: &'a ScenarioId, commit: &'a crate::git_rev::Bound, role: &'a RoleId) -> CommitArgs<'a> {
+        CommitArgs { repo, project_id, scenario_id, commit, round: 1, reviewer: "reviewer-1", detail: "", actor_id: "agent-x", role, session: None, json: false }
+    }
+
     fn ids() -> (ProjectId, ScenarioId, RoleId, crate::git_rev::Bound) {
         (
             ProjectId::parse("app-a").unwrap(),
@@ -699,8 +663,8 @@ mod tests {
         let (project_id, scenario_id_a, role, sha) = ids();
         let scenario_id_b = ScenarioId::parse("world.firstbuy-hotdeal.27").unwrap();
 
-        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id_a, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, None, Default::default(), false), 0);
-        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id_b, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, None, Default::default(), false), 0);
+        assert_eq!(run_stage(commit_args(dir.path(), &project_id, &scenario_id_a, &sha, &role), DivergenceStatus::Open, Default::default()), 0);
+        assert_eq!(run_stage(commit_args(dir.path(), &project_id, &scenario_id_b, &sha, &role), DivergenceStatus::Open, Default::default()), 0);
 
         let code = crate::gate::run_promote(dir.path(), Some(RecordKind::Divergence), false, false);
         assert_eq!(code, 0);
@@ -738,7 +702,7 @@ mod tests {
         });
         stage(&gate_ctx_root(&dir), &malformed).unwrap();
 
-        assert_eq!(run_stage(dir.path(), &project_id, &scenario_id, &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, None, Default::default(), false), 0);
+        assert_eq!(run_stage(commit_args(dir.path(), &project_id, &scenario_id, &sha, &role), DivergenceStatus::Open, Default::default()), 0);
 
         let code = crate::gate::run_promote(dir.path(), Some(RecordKind::Divergence), false, false);
         assert_eq!(code, 1, "a refusal reports a non-zero (but not usage-error) exit code");
@@ -778,16 +742,16 @@ mod tests {
         let deferred_id = ScenarioId::parse("world.firstbuy-hotdeal.51").unwrap();
 
         // Something else is mid-`stage`.
-        assert_eq!(run_stage(dir.path(), &project_id, &ScenarioId::parse("world.firstbuy-hotdeal.50").unwrap(), &sha, DivergenceStatus::Open, 1, "reviewer-1", "", "agent-x", &role, None, Default::default(), false), 0);
+        assert_eq!(run_stage(commit_args(dir.path(), &project_id, &ScenarioId::parse("world.firstbuy-hotdeal.50").unwrap(), &sha, &role), DivergenceStatus::Open, Default::default()), 0);
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let staging_dir = crate::gate::evidence_staging_dir(&gate_ctx.ledger_root);
         let staged_before = files_with_bytes(&staging_dir);
         assert_eq!(staged_before.len(), 1, "exactly the one unrelated candidate is staged");
 
-        assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, None, false), 0);
+        assert_eq!(run_resolve(commit_args(dir.path(), &project_id, &scenario_id, &sha, &role)), 0);
         // Whole seconds so the persisted expiry compares exactly.
         let expiry = chrono::DateTime::from_timestamp((Utc::now() + chrono::Duration::days(7)).timestamp(), 0).unwrap();
-        assert_eq!(run_defer(dir.path(), &project_id, &deferred_id, &sha, 1, "reviewer-1", "needs another look", expiry, "agent-x", &role, None, false), 0);
+        assert_eq!(run_defer(commit_args(dir.path(), &project_id, &deferred_id, &sha, &role), "needs another look", expiry), 0);
 
         let committed = GitTier::new(&gate_ctx.ledger_root);
         let landed = committed.read(&TierQuery::kind(RecordKind::Divergence)).unwrap();
@@ -810,7 +774,7 @@ mod tests {
         let dir = repo_dir();
         let (project_id, scenario_id, role, sha) = ids();
 
-        assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, None, false), 0);
+        assert_eq!(run_resolve(commit_args(dir.path(), &project_id, &scenario_id, &sha, &role)), 0);
 
         // Read-only capability query — always exits 0.
         assert_eq!(run_list(dir.path(), None, false, &crate::paging::Page::first_page(), None), 0);
@@ -829,7 +793,7 @@ mod tests {
     fn a_moved_live_binding_reads_resolved_invalid_without_rewriting_the_resolution() {
         let dir = repo_dir();
         let (project_id, scenario_id, role, sha) = ids();
-        assert_eq!(run_resolve(dir.path(), &project_id, &scenario_id, &sha, 1, "reviewer-1", "", "agent-x", &role, None, false), 0);
+        assert_eq!(run_resolve(commit_args(dir.path(), &project_id, &scenario_id, &sha, &role)), 0);
 
         let gate_ctx = GateCtx::from_repo(dir.path()).unwrap();
         let moved = Sha::parse("b".repeat(40)).unwrap();

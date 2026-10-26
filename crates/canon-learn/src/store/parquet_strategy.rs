@@ -207,22 +207,14 @@ mod tests {
 
     use super::*;
     use crate::ids::TrajectoryId;
+    use crate::strategy::StrategyItemFields;
 
     fn regime(role: &str) -> RegimeKey {
         RegimeKey::parse(canon_model::ids::regime_key(role, "repo", "auth", "abc123")).unwrap()
     }
 
     fn strategy_with_role(regime_role: &str, item_role: &str, title: &str) -> StrategyItem {
-        StrategyItem::new(
-            StrategyId::new(),
-            regime(regime_role),
-            RoleId::parse(item_role).unwrap(),
-            title,
-            "description",
-            "content",
-            vec![TrajectoryId::new()],
-            Utc::now(),
-        )
+        StrategyItem::new(StrategyItemFields { id: StrategyId::new(), regime_key: regime(regime_role), role: RoleId::parse(item_role).unwrap(), title: title.into(), description: "description".into(), content: "content".into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() })
     }
 
     fn strategy(role: &str, title: &str) -> StrategyItem {

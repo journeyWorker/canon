@@ -217,7 +217,7 @@ use canon_gate::review_gate::{in_effect_reviews, review_gap, ReviewGapKind};
 use canon_gate::{scan_note_text, verify_risk_approval, FailureClass, GateContext, GateCtx, Violation};
 use canon_ingest::task_rows::first_row_line_break;
 use canon_model::{
-    approval_payload_bytes, Actor, AuditResult, BriefOverride, Envelope, EvidenceApproval, EvidenceAudit, EvidenceRecord, EvidenceVerdict, ProjectId,
+    approval_payload_bytes, ApprovalPayload, Actor, AuditResult, BriefOverride, Envelope, EvidenceApproval, EvidenceAudit, EvidenceRecord, EvidenceVerdict, ProjectId,
     ProvenanceRef, RawRecord, RecordKind, ReportFormat, Review, RoleId, RunId, Scenario, ScenarioId, SessionId, Sha, TaskId, WaivedViolation, APPROVAL_NAMESPACE,
 };
 use canon_policy::SchemaRegistry;
@@ -649,13 +649,17 @@ fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<ApprovalB
     }
     let surface = normalized_strings(&surface);
     let effects = normalized_strings(&surface.iter().filter_map(|value| value.strip_prefix("effect:").map(str::to_string)).collect::<Vec<_>>());
-    let payload = approval_payload_bytes(
-        APPROVAL_NAMESPACE, &subject,
-        args.project_id.as_ref().map(ToString::to_string).as_deref(),
-        &args.artifact_sha.to_string(),
-        args.run_id.as_ref().map(ToString::to_string).as_deref(),
-        &surface, &effects, &args.approval_by, &at,
-    );
+    let payload = approval_payload_bytes(&ApprovalPayload {
+        namespace: APPROVAL_NAMESPACE,
+        subject: &subject,
+        project: args.project_id.as_ref().map(ToString::to_string).as_deref(),
+        artifact_sha: &args.artifact_sha.to_string(),
+        run_id: args.run_id.as_ref().map(ToString::to_string).as_deref(),
+        surface: &surface,
+        effects: &effects,
+        actor: &args.approval_by,
+        timestamp: &at,
+    });
     Ok((payload, surface, effects))
 }
 

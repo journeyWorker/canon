@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::process::Command;
 
-use canon_model::{approval_payload_bytes, EvidenceApproval, EvidenceRecord, EvidenceVerdict};
+use canon_model::{approval_payload_bytes, ApprovalPayload, EvidenceApproval, EvidenceRecord, EvidenceVerdict};
 use canon_store::partition::content_digest12;
 
 use crate::approval::verify_risk_approval;
@@ -203,17 +203,17 @@ fn approval_is_authenticated(
     let artifact_sha = current_sha.to_string();
     let project = current.project_id.as_ref().map(ToString::to_string);
     let run_id = current.run_id.as_ref().map(ToString::to_string);
-    let payload = approval_payload_bytes(
-        canon_model::APPROVAL_NAMESPACE,
-        subject.as_str(),
-        project.as_deref(),
-        &artifact_sha,
-        run_id.as_deref(),
-        &approval.surface,
-        &approval.effects,
-        &approval.approver,
-        &approval.at,
-    );
+    let payload = approval_payload_bytes(&ApprovalPayload {
+        namespace: canon_model::APPROVAL_NAMESPACE,
+        subject: subject.as_str(),
+        project: project.as_deref(),
+        artifact_sha: &artifact_sha,
+        run_id: run_id.as_deref(),
+        surface: &approval.surface,
+        effects: &approval.effects,
+        actor: &approval.approver,
+        timestamp: &approval.at,
+    });
     verify_risk_approval(&payload, approval.signature.as_deref().unwrap_or_default().as_bytes(), &approval.approver, allowed_signers).is_ok()
 }
 

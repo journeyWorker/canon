@@ -85,6 +85,7 @@ mod support;
 use canon_model::envelope::{Actor, Envelope, RecordKind};
 use canon_model::evidence::RawRecord;
 use canon_model::ids::{ChangeId, ProjectId, RoleId, RunId, ScenarioId, Sha, SessionId, SubjectId, TaskId, TotalOrder};
+use canon_model::records::DivergenceFields;
 use canon_model::records::{
     Divergence, DivergenceStatus, Event, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, Run, RunStatus, Session, Subject, SubjectStatus, Task, TaskStatus,
 };
@@ -437,17 +438,7 @@ fn review_burndown_still_reads_every_divergence_version_as_its_own_event() {
     // ONE divergence, opened day 1 and resolved day 3 — two versions at
     // the same natural key (`project__scenario__run_seq__round`).
     for (day, status) in [(1, DivergenceStatus::Open), (3, DivergenceStatus::Resolved)] {
-        tier.write(&Divergence::new(
-            Envelope::new(1, RecordKind::Divergence, at(2026, 5, day, 12), actor("reviewer")),
-            ProjectId::parse("root").unwrap(),
-            ScenarioId::parse("fold.diverge.01").unwrap(),
-            Sha::parse("c".repeat(40)).unwrap(),
-            status,
-            TotalOrder::new(1),
-            1,
-            "reviewer1",
-            "one divergence, opened then resolved",
-        ))
+        tier.write(&Divergence::new(DivergenceFields { envelope: Envelope::new(1, RecordKind::Divergence, at(2026, 5, day, 12), actor("reviewer")), project_id: ProjectId::parse("root").unwrap(), scenario_id: ScenarioId::parse("fold.diverge.01").unwrap(), sha: Sha::parse("c".repeat(40)).unwrap(), status, run_seq: TotalOrder::new(1), round: 1, reviewer: "reviewer1".into(), detail: "one divergence, opened then resolved".into() }))
         .unwrap();
     }
 

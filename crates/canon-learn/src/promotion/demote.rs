@@ -147,23 +147,14 @@ mod tests {
 
     use super::*;
     use crate::store::ParquetStrategyStore;
-    use crate::strategy::StrategyItem;
+    use crate::strategy::{StrategyItem, StrategyItemFields};
 
     fn regime() -> RegimeKey {
         RegimeKey::parse(regime_key("dev", "repo", "auth-flow", "deadbeef")).unwrap()
     }
 
     fn strategy_item() -> StrategyItem {
-        StrategyItem::new(
-            StrategyId::new(),
-            regime(),
-            RoleId::parse("dev").unwrap(),
-            "title",
-            "description",
-            "content",
-            vec![TrajectoryId::new()],
-            Utc::now(),
-        )
+        StrategyItem::new(StrategyItemFields { id: StrategyId::new(), regime_key: regime(), role: RoleId::parse("dev").unwrap(), title: "title".into(), description: "description".into(), content: "content".into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() })
     }
 
     #[test]

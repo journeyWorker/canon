@@ -65,7 +65,7 @@ use canon_store::fold::live_bindings_of;
 pub fn current_states(ledger_root: &Path, as_of: DateTime<Utc>) -> BTreeMap<(ProjectId, ScenarioId), FoldedState> {
     let divergences: Vec<Divergence> = read_kind_fail_soft(ledger_root, RecordKind::Divergence);
     let evidence: Vec<EvidenceRecord> = read_kind_fail_soft(ledger_root, RecordKind::EvidenceRecord);
-    let live_bindings = live_bindings_of(evidence);
+    let live_bindings = live_bindings_of(&evidence);
     fold_to_current_state(&divergences, &live_bindings, as_of)
 }
 
@@ -112,6 +112,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+    use canon_model::DivergenceFields;
 
     fn actor(role: &str) -> Actor {
         Actor::new("selftest-agent", RoleId::parse(role).unwrap())
@@ -122,17 +123,7 @@ mod tests {
     // constructs, not a design smell worth a params struct here.
     #[expect(clippy::too_many_arguments, reason = "test helper whose argument count is the record's field set; a params struct adds nothing")]
     fn write_divergence(tier: &GitTier, project_id: &str, scenario_id: &str, sha: &str, status: DivergenceStatus, run_seq: u64, round: u32, at: DateTime<Utc>) {
-        let divergence = Divergence::new(
-            Envelope::new(1, RecordKind::Divergence, at, actor("reviewer")),
-            ProjectId::parse(project_id).unwrap(),
-            ScenarioId::parse(scenario_id).unwrap(),
-            Sha::parse(sha).unwrap(),
-            status,
-            TotalOrder::new(run_seq),
-            round,
-            "reviewer-1",
-            "",
-        );
+        let divergence = Divergence::new(DivergenceFields { envelope: Envelope::new(1, RecordKind::Divergence, at, actor("reviewer")), project_id: ProjectId::parse(project_id).unwrap(), scenario_id: ScenarioId::parse(scenario_id).unwrap(), sha: Sha::parse(sha).unwrap(), status, run_seq: TotalOrder::new(run_seq), round, reviewer: "reviewer-1".into(), detail: "".into() });
         tier.write(&divergence).expect("write fixture divergence");
     }
 
@@ -206,17 +197,7 @@ mod tests {
         let tier = GitTier::new(&ledger_root);
 
         let expiry = Utc::now() + chrono::Duration::days(1);
-        let divergence = Divergence::new(
-            Envelope::new(1, RecordKind::Divergence, Utc::now(), actor("reviewer")),
-            ProjectId::parse("app-a").unwrap(),
-            ScenarioId::parse("world.firstbuy-hotdeal.33").unwrap(),
-            Sha::parse("a".repeat(40)).unwrap(),
-            DivergenceStatus::Deferred { reason: "waiting on upstream".to_string(), expiry },
-            TotalOrder::new(1),
-            1,
-            "reviewer-1",
-            "",
-        );
+        let divergence = Divergence::new(DivergenceFields { envelope: Envelope::new(1, RecordKind::Divergence, Utc::now(), actor("reviewer")), project_id: ProjectId::parse("app-a").unwrap(), scenario_id: ScenarioId::parse("world.firstbuy-hotdeal.33").unwrap(), sha: Sha::parse("a".repeat(40)).unwrap(), status: DivergenceStatus::Deferred { reason: "waiting on upstream".to_string(), expiry }, run_seq: TotalOrder::new(1), round: 1, reviewer: "reviewer-1".into(), detail: "".into() });
         tier.write(&divergence).unwrap();
 
         let key = (ProjectId::parse("app-a").unwrap(), ScenarioId::parse("world.firstbuy-hotdeal.33").unwrap());

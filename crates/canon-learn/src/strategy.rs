@@ -95,25 +95,29 @@ pub struct StrategyItem {
     pub demotion: Option<DemotionEvidence>,
 }
 
+/// Field list for [`StrategyItem::new`].
+#[derive(Debug, Clone)]
+pub struct StrategyItemFields {
+    pub id: StrategyId,
+    pub regime_key: RegimeKey,
+    pub role: RoleId,
+    pub title: String,
+    pub description: String,
+    pub content: String,
+    pub source_trajectory_ids: Vec<TrajectoryId>,
+    pub recorded_at: DateTime<Utc>,
+}
+
 impl StrategyItem {
-    #[expect(clippy::too_many_arguments, reason = "constructor mirrors the strategy row's field list; callers pass each field positionally")]
-    pub fn new(
-        id: StrategyId,
-        regime_key: RegimeKey,
-        role: RoleId,
-        title: impl Into<String>,
-        description: impl Into<String>,
-        content: impl Into<String>,
-        source_trajectory_ids: Vec<TrajectoryId>,
-        recorded_at: DateTime<Utc>,
-    ) -> Self {
+    pub fn new(fields: StrategyItemFields) -> Self {
+        let StrategyItemFields { id, regime_key, role, title, description, content, source_trajectory_ids, recorded_at } = fields;
         Self {
             id,
             regime_key,
             role,
-            title: title.into(),
-            description: description.into(),
-            content: content.into(),
+            title,
+            description,
+            content,
             source_trajectory_ids,
             recorded_at,
             lifecycle: None,
@@ -199,16 +203,7 @@ mod tests {
 
     #[test]
     fn serde_round_trips() {
-        let item = StrategyItem::new(
-            StrategyId::new(),
-            regime(),
-            RoleId::parse("dev").unwrap(),
-            "title",
-            "description",
-            "content",
-            vec![TrajectoryId::new()],
-            Utc::now(),
-        );
+        let item = StrategyItem::new(StrategyItemFields { id: StrategyId::new(), regime_key: regime(), role: RoleId::parse("dev").unwrap(), title: "title".into(), description: "description".into(), content: "content".into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() });
         let json = serde_json::to_string(&item).unwrap();
         let back: StrategyItem = serde_json::from_str(&json).unwrap();
         assert_eq!(back, item);
@@ -216,16 +211,7 @@ mod tests {
 
     #[test]
     fn demotion_evidence_round_trips_and_defaults_to_none() {
-        let mut item = StrategyItem::new(
-            StrategyId::new(),
-            regime(),
-            RoleId::parse("dev").unwrap(),
-            "title",
-            "description",
-            "content",
-            vec![TrajectoryId::new()],
-            Utc::now(),
-        );
+        let mut item = StrategyItem::new(StrategyItemFields { id: StrategyId::new(), regime_key: regime(), role: RoleId::parse("dev").unwrap(), title: "title".into(), description: "description".into(), content: "content".into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() });
         assert!(item.demotion.is_none());
 
         item = item.with_demotion(DemotionEvidence::new(TrajectoryId::new(), "contradicting failure", Utc::now()));
@@ -237,30 +223,12 @@ mod tests {
 
     #[test]
     fn lifecycle_round_trips_and_legacy_rows_are_active() {
-        let item = StrategyItem::new(
-            StrategyId::new(),
-            regime(),
-            RoleId::parse("dev").unwrap(),
-            "title",
-            "description",
-            "content",
-            vec![TrajectoryId::new()],
-            Utc::now(),
-        )
+        let item = StrategyItem::new(StrategyItemFields { id: StrategyId::new(), regime_key: regime(), role: RoleId::parse("dev").unwrap(), title: "title".into(), description: "description".into(), content: "content".into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() })
         .with_lifecycle(StrategyLifecycle::Quarantined);
         let back: StrategyItem = serde_json::from_str(&serde_json::to_string(&item).unwrap()).unwrap();
         assert_eq!(back.lifecycle, Some(StrategyLifecycle::Quarantined));
         assert!(!back.is_retrievable());
-        let legacy = StrategyItem::new(
-            StrategyId::new(),
-            regime(),
-            RoleId::parse("dev").unwrap(),
-            "title",
-            "description",
-            "content",
-            vec![TrajectoryId::new()],
-            Utc::now(),
-        );
+        let legacy = StrategyItem::new(StrategyItemFields { id: StrategyId::new(), regime_key: regime(), role: RoleId::parse("dev").unwrap(), title: "title".into(), description: "description".into(), content: "content".into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() });
         assert!(legacy.is_retrievable());
     }
 

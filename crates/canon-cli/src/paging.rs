@@ -113,16 +113,18 @@ fn invalid_cursor(why: &str) -> CliError {
 /// command and what it lists — so a cursor from another listing is refused.
 pub fn paginate<T>(scope: &str, items: Vec<T>, key: impl Fn(&T) -> String, page: &Page) -> Result<(Vec<T>, PageMeta), CliError> {
     let total = items.len();
+    // Keys are built in order and only as far as the page needs: up to the
+    // cursor's record (to find it), then up to the page's last record.
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
-    let keys: Vec<String> = items
-        .iter()
-        .map(|item| {
+    let mut keys: Vec<String> = Vec::new();
+    let mut extend_to = |upto: usize, keys: &mut Vec<String>| {
+        for item in &items[keys.len()..upto.min(total)] {
             let base = key(item);
             let n = seen.entry(base.clone()).or_insert(0);
             *n += 1;
-            format!("{base}#{n}")
-        })
-        .collect();
+            keys.push(format!("{base}#{n}"));
+        }
+    };
 
     let start = match &page.cursor {
         None => 0,
@@ -131,14 +133,24 @@ pub fn paginate<T>(scope: &str, items: Vec<T>, key: impl Fn(&T) -> String, page:
             if cursor_scope != scope {
                 return Err(invalid_cursor(&format!("the cursor belongs to `{cursor_scope}`, not `{scope}`")));
             }
-            let at = keys.iter().position(|k| *k == last).ok_or_else(|| invalid_cursor("the record the cursor points after is no longer in the result (the store or the filters changed)"))?;
-            at + 1
+            let mut found = None;
+            while found.is_none() && keys.len() < total {
+                let next = keys.len() + 1;
+                extend_to(next, &mut keys);
+                if keys.last().is_some_and(|k| *k == last) {
+                    found = Some(keys.len() - 1);
+                }
+            }
+            found.ok_or_else(|| invalid_cursor("the record the cursor points after is no longer in the result (the store or the filters changed)"))? + 1
         }
     };
 
     let end = page.limit.map_or(total, |limit| start.saturating_add(limit).min(total));
     let has_more = end < total;
-    let next_cursor = has_more.then(|| encode(scope, &keys[end - 1]));
+    let next_cursor = has_more.then(|| {
+        extend_to(end, &mut keys);
+        encode(scope, &keys[end - 1])
+    });
     let slice: Vec<T> = items.into_iter().skip(start).take(end - start).collect();
     let meta = PageMeta { returned: slice.len(), total, has_more, next_cursor };
     Ok((slice, meta))

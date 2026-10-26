@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use canon_model::{
-    approval_payload_bytes, Actor, Envelope, EvidenceApproval, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord, RecordKind, RoleId, RunId,
+    approval_payload_bytes, ApprovalPayload, Actor, Envelope, EvidenceApproval, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord, RecordKind, RoleId, RunId,
     Sha, TaskId, APPROVAL_NAMESPACE,
 };
 use canon_store::git_tier::GitTier;
@@ -336,17 +336,17 @@ impl RiskRepo {
         let Stamp { task: subject, artifact, run_id, at } = stamp;
         let project = "risk-project";
         let effects: Vec<String> = Vec::new();
-        let payload = approval_payload_bytes(
-            APPROVAL_NAMESPACE,
+        let payload = approval_payload_bytes(&ApprovalPayload {
+            namespace: APPROVAL_NAMESPACE,
             subject,
-            Some(project),
-            artifact,
-            Some(&run_id.to_string()),
+            project: Some(project),
+            artifact_sha: artifact,
+            run_id: Some(&run_id.to_string()),
             surface,
-            &effects,
-            signer,
-            &at,
-        );
+            effects: &effects,
+            actor: signer,
+            timestamp: &at,
+        });
         let payload_file = tempfile::NamedTempFile::new_in(self.root.path()).unwrap();
         std::fs::write(payload_file.path(), payload).unwrap();
         let output = Command::new("ssh-keygen")

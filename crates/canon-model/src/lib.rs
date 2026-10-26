@@ -29,16 +29,16 @@ pub mod schema_export;
 pub mod trust;
 
 pub use envelope::{Actor, CanonRecord, Envelope, RecordKind};
-pub use approval::{approval_payload_bytes, APPROVAL_NAMESPACE};
+pub use approval::{approval_payload_bytes, ApprovalPayload, APPROVAL_NAMESPACE};
 pub use evidence::{EvidenceViolation, FailureClass, RawRecord, validate_evidence, validate_evidence_batch};
 pub use fold::{BindingSnapshot, FoldedState, fold_to_current_state};
-pub use handoff::{DomainId, GihoekTemplate, Handoff, HandoffBody, HandoffState, HandoffTemplate, TemplateRegistry};
+pub use handoff::{DomainId, GihoekTemplate, Handoff, HandoffBody, HandoffFields, HandoffState, HandoffTemplate, TemplateRegistry};
 pub use ids::{
     ChangeId, HandoffId, JoinKeyError, PrNumber, ProjectId, RegimeKey, RoleId, RunId, ScenarioId, Sha, SessionId,
     SpecDigest, SubjectId, TaskId, TotalOrder, regime_key,
 };
 pub use records::{
-    AuditResult, BriefOverride, Change, ChangeStatus, CheckPin, Divergence, DivergenceStatus, Event, EvidenceApproval, EvidenceAttachment, EvidenceAudit, EvidenceRecord,
+    AuditResult, BriefOverride, Change, ChangeStatus, CheckPin, Divergence, DivergenceFields, DivergenceStatus, Event, EvidenceApproval, EvidenceAttachment, EvidenceAudit, EvidenceRecord,
     EvidenceVerdict, Finding, FindingDisposition, ReportFormat, ReportOutcome,
     FindingSeverity, ProvenanceRef, Review, ReviewArtifact, ReviewOutcome, ReviewPins, PinnedSpec, EvidencePin, Run, RunLineage, RunStatus, SkillSnapshot, ContextSnapshot, PolicySnapshot, Scenario,
     Reopen, Session, StatusOverride, StatusReason, StrategyItem, StrategyRef, Subject, WaivedViolation,

@@ -19,7 +19,7 @@ use std::fs;
 use canon_ingest::verdict::{Becomes, Polarity, VerdictRow};
 use canon_learn::{
     DemotionPolicy, LearnConfig, OccurrencePromotionGate, ParquetStrategyStore, ParquetTrajectoryStore, PromotionGate, StrategyId,
-    StrategyItem, StrategyStore, Trajectory, TrajectoryId, TrajectoryStore, TrajectoryVerdict, VerdictOutcome, demote_strategy,
+    StrategyItem, StrategyItemFields, StrategyStore, Trajectory, TrajectoryId, TrajectoryStore, TrajectoryVerdict, VerdictOutcome, demote_strategy,
 };
 use canon_model::ids::{RegimeKey, RoleId, regime_key};
 use chrono::{DateTime, Duration, Utc};
@@ -128,16 +128,7 @@ fn a_contradicting_trajectory_after_promotion_demotes_the_strategy_and_soft_flag
     // task 4.1 / lib.rs module doc — so the fixture stands in for its
     // output directly: a StrategyItem row + a front-matter `.md` file,
     // the exact shape `canon learn promote` would have produced) ---
-    let strategy = StrategyItem::new(
-        StrategyId::new(),
-        dev_regime(),
-        RoleId::parse("dev").unwrap(),
-        "batch the parquet writes",
-        "avoids one fsync per row",
-        "buffer writes and flush once per namespace",
-        stream.iter().map(|t| t.id).collect(),
-        now,
-    );
+    let strategy = StrategyItem::new(StrategyItemFields { id: StrategyId::new(), regime_key: dev_regime(), role: RoleId::parse("dev").unwrap(), title: "batch the parquet writes".into(), description: "avoids one fsync per row".into(), content: "buffer writes and flush once per namespace".into(), source_trajectory_ids: stream.iter().map(|t| t.id).collect(), recorded_at: now });
     strategy_store.append(&strategy).unwrap();
 
     let role_dir = git_tier_root.join("dev");

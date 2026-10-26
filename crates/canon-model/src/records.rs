@@ -1177,6 +1177,20 @@ pub struct Divergence {
     pub worktree_dirty: Option<bool>,
 }
 
+/// Fields of a new [`Divergence`]; [`Divergence::new`] leaves the code-tree stamp unset.
+#[derive(Debug, Clone)]
+pub struct DivergenceFields {
+    pub envelope: Envelope,
+    pub project_id: ProjectId,
+    pub scenario_id: ScenarioId,
+    pub sha: Sha,
+    pub status: DivergenceStatus,
+    pub run_seq: TotalOrder,
+    pub round: u32,
+    pub reviewer: String,
+    pub detail: String,
+}
+
 impl Divergence {
     /// Record the code this divergence was recorded against (0.28 D7b).
     pub fn with_code(mut self, code_tree: impl Into<String>, worktree_dirty: bool) -> Self {
@@ -1185,20 +1199,10 @@ impl Divergence {
         self
     }
 
-    #[expect(clippy::too_many_arguments, reason = "constructor mirrors the record's field list; callers pass each field positionally")]
-    pub fn new(
-        envelope: Envelope,
-        project_id: ProjectId,
-        scenario_id: ScenarioId,
-        sha: Sha,
-        status: DivergenceStatus,
-        run_seq: TotalOrder,
-        round: u32,
-        reviewer: impl Into<String>,
-        detail: impl Into<String>,
-    ) -> Self {
+    pub fn new(fields: DivergenceFields) -> Self {
+        let DivergenceFields { envelope, project_id, scenario_id, sha, status, run_seq, round, reviewer, detail } = fields;
         debug_assert_eq!(envelope.kind, RecordKind::Divergence);
-        Self { envelope, project_id, scenario_id, sha, status, run_seq, round, reviewer: reviewer.into(), detail: detail.into(), code_tree: None, worktree_dirty: None }
+        Self { envelope, project_id, scenario_id, sha, status, run_seq, round, reviewer, detail, code_tree: None, worktree_dirty: None }
     }
 }
 
@@ -2947,17 +2951,7 @@ mod tests {
 
     round_trip_test!(
         divergence_round_trips,
-        Divergence::new(
-            envelope(RecordKind::Divergence),
-            project_id(),
-            ScenarioId::parse("world.place-lock.01").unwrap(),
-            Sha::parse("8c81f9e13e9bda0a6a5ee29ba1b6b5137e7bf552").unwrap(),
-            DivergenceStatus::Open,
-            TotalOrder::new(3),
-            8,
-            "reviewer",
-            "detail"
-        )
+        Divergence::new(DivergenceFields { envelope: envelope(RecordKind::Divergence), project_id: project_id(), scenario_id: ScenarioId::parse("world.place-lock.01").unwrap(), sha: Sha::parse("8c81f9e13e9bda0a6a5ee29ba1b6b5137e7bf552").unwrap(), status: DivergenceStatus::Open, run_seq: TotalOrder::new(3), round: 8, reviewer: "reviewer".into(), detail: "detail".into() })
     );
 
     #[test]

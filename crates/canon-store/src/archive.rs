@@ -499,7 +499,7 @@ impl GitTier {
 mod tests {
     use canon_model::envelope::{Actor, Envelope};
     use canon_model::ids::{ChangeId, ProjectId, RoleId, Sha, TotalOrder};
-    use canon_model::records::{Change, ChangeStatus, Divergence, DivergenceStatus};
+    use canon_model::records::{Change, ChangeStatus, Divergence, DivergenceFields, DivergenceStatus};
     use canon_model::{EvidenceVerdict, FlaggedOverlay, Review, ProvenanceRef};
     use chrono::{Duration, TimeZone, Utc};
 
@@ -690,17 +690,7 @@ mod tests {
     }
 
     fn divergence(run_seq: u64, status: DivergenceStatus, at_offset: i64) -> Divergence {
-        Divergence::new(
-            Envelope::new(1, RecordKind::Divergence, base() + Duration::seconds(at_offset), actor("reviewer")),
-            ProjectId::parse("root").unwrap(),
-            ScenarioId::parse("world.firstbuy-hotdeal.26").unwrap(),
-            Sha::parse("a".repeat(40)).unwrap(),
-            status,
-            TotalOrder::new(run_seq),
-            1,
-            "alice",
-            "detail",
-        )
+        Divergence::new(DivergenceFields { envelope: Envelope::new(1, RecordKind::Divergence, base() + Duration::seconds(at_offset), actor("reviewer")), project_id: ProjectId::parse("root").unwrap(), scenario_id: ScenarioId::parse("world.firstbuy-hotdeal.26").unwrap(), sha: Sha::parse("a".repeat(40)).unwrap(), status, run_seq: TotalOrder::new(run_seq), round: 1, reviewer: "alice".into(), detail: "detail".into() })
     }
 
     #[test]

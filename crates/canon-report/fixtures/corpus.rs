@@ -28,11 +28,12 @@ use std::path::Path;
 use canon_ingest::verdict::{Becomes, Polarity, VerdictRow};
 use canon_model::evidence::RawRecord;
 use canon_learn::store::{ParquetStrategyStore, ParquetTrajectoryStore, StrategyStore, TrajectoryStore};
-use canon_learn::strategy::{DemotionEvidence, StrategyItem as LearnStrategyItem};
+use canon_learn::strategy::{DemotionEvidence, StrategyItem as LearnStrategyItem, StrategyItemFields as LearnStrategyItemFields};
 use canon_learn::trajectory::Trajectory as LearnTrajectory;
 use canon_learn::verdict_outcome::{TrajectoryVerdict, VerdictOutcome};
 use canon_model::envelope::{Actor, Envelope, RecordKind};
 use canon_model::ids::{ChangeId, ProjectId, RegimeKey, RoleId, RunId, ScenarioId, Sha, SessionId, SubjectId, TaskId, TotalOrder};
+use canon_model::records::DivergenceFields;
 use canon_model::records::{
     Divergence, DivergenceStatus, Event, EvidenceRecord, EvidenceVerdict, Finding, FindingSeverity, Review, ProvenanceRef, Run, RunStatus, Session, StrategyRef, Subject,
     SubjectStatus, Task, TaskStatus,
@@ -432,29 +433,9 @@ fn build_git_tier(git_root: &Path) {
     .unwrap();
 
     // ── review burn-down: 1 divergence opened day 1, 1 resolved day 3 ──
-    tier.write(&Divergence::new(
-        Envelope::new(1, RecordKind::Divergence, at(2026, 1, 1, 12), actor("reviewer1", "reviewer")),
-        project_id(),
-        ScenarioId::parse("s9.fixture.01").unwrap(),
-        Sha::parse("a".repeat(40)).unwrap(),
-        DivergenceStatus::Open,
-        TotalOrder::new(1),
-        1,
-        "reviewer1",
-        "opened for fixture",
-    ))
+    tier.write(&Divergence::new(DivergenceFields { envelope: Envelope::new(1, RecordKind::Divergence, at(2026, 1, 1, 12), actor("reviewer1", "reviewer")), project_id: project_id(), scenario_id: ScenarioId::parse("s9.fixture.01").unwrap(), sha: Sha::parse("a".repeat(40)).unwrap(), status: DivergenceStatus::Open, run_seq: TotalOrder::new(1), round: 1, reviewer: "reviewer1".into(), detail: "opened for fixture".into() }))
     .unwrap();
-    tier.write(&Divergence::new(
-        Envelope::new(1, RecordKind::Divergence, at(2026, 1, 3, 12), actor("reviewer1", "reviewer")),
-        project_id(),
-        ScenarioId::parse("s9.fixture.02").unwrap(),
-        Sha::parse("b".repeat(40)).unwrap(),
-        DivergenceStatus::Resolved,
-        TotalOrder::new(1),
-        1,
-        "reviewer1",
-        "resolved for fixture",
-    ))
+    tier.write(&Divergence::new(DivergenceFields { envelope: Envelope::new(1, RecordKind::Divergence, at(2026, 1, 3, 12), actor("reviewer1", "reviewer")), project_id: project_id(), scenario_id: ScenarioId::parse("s9.fixture.02").unwrap(), sha: Sha::parse("b".repeat(40)).unwrap(), status: DivergenceStatus::Resolved, run_seq: TotalOrder::new(1), round: 1, reviewer: "reviewer1".into(), detail: "resolved for fixture".into() }))
     .unwrap();
 
     tier.write(&Review::new(
@@ -769,43 +750,16 @@ fn build_learn_store(learn_root: &Path) {
 
     // ── role memory: dev (1 active + 1 demoted), content (1 active) ──
     strategy_store
-        .append(&LearnStrategyItem::new(
-            dev_strategy_active_id(),
-            regime("dev"),
-            RoleId::parse("dev").unwrap(),
-            "dev strategy (active)",
-            "d",
-            "content",
-            vec![dev_trajectory_1_id()],
-            at(2026, 1, 3, 9),
-        ))
+        .append(&LearnStrategyItem::new(LearnStrategyItemFields { id: dev_strategy_active_id(), regime_key: regime("dev"), role: RoleId::parse("dev").unwrap(), title: "dev strategy (active)".into(), description: "d".into(), content: "content".into(), source_trajectory_ids: vec![dev_trajectory_1_id()], recorded_at: at(2026, 1, 3, 9) }))
         .unwrap();
     strategy_store
         .append(
-            &LearnStrategyItem::new(
-                dev_strategy_demoted_id(),
-                regime("dev"),
-                RoleId::parse("dev").unwrap(),
-                "dev strategy (demoted)",
-                "d",
-                "content",
-                vec![dev_trajectory_2_id()],
-                at(2026, 1, 3, 10),
-            )
+            &LearnStrategyItem::new(LearnStrategyItemFields { id: dev_strategy_demoted_id(), regime_key: regime("dev"), role: RoleId::parse("dev").unwrap(), title: "dev strategy (demoted)".into(), description: "d".into(), content: "content".into(), source_trajectory_ids: vec![dev_trajectory_2_id()], recorded_at: at(2026, 1, 3, 10) })
             .with_demotion(DemotionEvidence::new(dev_trajectory_2_id(), "contradicted by a later trajectory", at(2026, 1, 3, 11))),
         )
         .unwrap();
     strategy_store
-        .append(&LearnStrategyItem::new(
-            content_strategy_id(),
-            regime("content"),
-            RoleId::parse("content").unwrap(),
-            "content strategy (active)",
-            "d",
-            "content",
-            vec![content_trajectory_id()],
-            at(2026, 1, 3, 9),
-        ))
+        .append(&LearnStrategyItem::new(LearnStrategyItemFields { id: content_strategy_id(), regime_key: regime("content"), role: RoleId::parse("content").unwrap(), title: "content strategy (active)".into(), description: "d".into(), content: "content".into(), source_trajectory_ids: vec![content_trajectory_id()], recorded_at: at(2026, 1, 3, 9) }))
         .unwrap();
 
     // ── flywheel funnel: dev (2 trajectories / 3 verdict rows), content
@@ -876,16 +830,7 @@ fn build_learn_store(learn_root: &Path) {
     // task 3.1 asked for and could not express, because
     // `canon_learn::Trajectory` carried no run id at all.
     strategy_store
-        .append(&LearnStrategyItem::new(
-            reviewer_strategy_id(),
-            regime("reviewer"),
-            RoleId::parse("reviewer").unwrap(),
-            "reviewer strategy (active)",
-            "d",
-            "content",
-            vec![reviewer_trajectory_id()],
-            at(2026, 1, 3, 9),
-        ))
+        .append(&LearnStrategyItem::new(LearnStrategyItemFields { id: reviewer_strategy_id(), regime_key: regime("reviewer"), role: RoleId::parse("reviewer").unwrap(), title: "reviewer strategy (active)".into(), description: "d".into(), content: "content".into(), source_trajectory_ids: vec![reviewer_trajectory_id()], recorded_at: at(2026, 1, 3, 9) }))
         .unwrap();
     trajectory_store
         .append(
@@ -910,16 +855,7 @@ fn build_learn_store(learn_root: &Path) {
     // a `Succeeded` run with no trajectory of its own. Attribution wins,
     // so this strategy is counted once — see `flywheel_funnel`'s own doc.
     strategy_store
-        .append(&LearnStrategyItem::new(
-            fixer_strategy_id(),
-            regime("fixer"),
-            RoleId::parse("fixer").unwrap(),
-            "fixer strategy (active)",
-            "d",
-            "content",
-            vec![fixer_trajectory_id()],
-            at(2026, 1, 3, 9),
-        ))
+        .append(&LearnStrategyItem::new(LearnStrategyItemFields { id: fixer_strategy_id(), regime_key: regime("fixer"), role: RoleId::parse("fixer").unwrap(), title: "fixer strategy (active)".into(), description: "d".into(), content: "content".into(), source_trajectory_ids: vec![fixer_trajectory_id()], recorded_at: at(2026, 1, 3, 9) }))
         .unwrap();
     trajectory_store
         .append(

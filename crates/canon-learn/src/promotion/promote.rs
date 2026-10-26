@@ -210,6 +210,7 @@ mod tests {
 
     use super::*;
     use crate::ids::TrajectoryId;
+    use crate::strategy::StrategyItemFields;
     use crate::promotion::{demote_strategy, DemotionPolicy};
     use crate::store::ParquetStrategyStore;
     use canon_model::ids::{regime_key, RegimeKey, RoleId};
@@ -217,7 +218,7 @@ mod tests {
     fn seed(store: &ParquetStrategyStore, content: &str) -> StrategyId {
         let id = StrategyId::new();
         let rk = RegimeKey::parse(regime_key("dev", "canon", "join-spine", "9c93d024b1a2")).unwrap();
-        let item = StrategyItem::new(id, rk, RoleId::parse("dev").unwrap(), "title", "description", content, vec![TrajectoryId::new()], Utc::now())
+        let item = StrategyItem::new(StrategyItemFields { id, regime_key: rk, role: RoleId::parse("dev").unwrap(), title: "title".into(), description: "description".into(), content: content.into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() })
             .with_lifecycle(StrategyLifecycle::Active);
         store.append(&item).unwrap();
         id

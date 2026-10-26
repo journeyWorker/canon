@@ -51,6 +51,7 @@ mod tests {
 
     use super::*;
     use crate::ids::{StrategyId, TrajectoryId};
+    use crate::strategy::StrategyItemFields;
     use crate::store::ParquetStrategyStore;
 
     fn regime(role: &str) -> RegimeKey {
@@ -58,7 +59,7 @@ mod tests {
     }
 
     fn strategy_at(role: &str, title: &str, at: DateTime<Utc>) -> StrategyItem {
-        StrategyItem::new(StrategyId::new(), regime(role), RoleId::parse(role).unwrap(), title, "d", "c", vec![TrajectoryId::new()], at)
+        StrategyItem::new(StrategyItemFields { id: StrategyId::new(), regime_key: regime(role), role: RoleId::parse(role).unwrap(), title: title.into(), description: "d".into(), content: "c".into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: at })
     }
 
     #[test]

@@ -405,7 +405,7 @@ fn evidenced_scenarios(ctx: &GateContext) -> BTreeSet<(ProjectId, ScenarioId)> {
 /// ([`canon_store::fold::live_bindings_of`]) so the two surfaces cannot
 /// disagree about which scenarios are open.
 fn live_bindings(ctx: &GateContext) -> BTreeMap<(ProjectId, ScenarioId), canon_model::fold::BindingSnapshot> {
-    canon_store::fold::live_bindings_of(ctx.evidence.clone())
+    canon_store::fold::live_bindings_of(&ctx.evidence)
 }
 
 /// Whether a folded divergence state counts as mismatched work, and how
@@ -465,6 +465,7 @@ pub(crate) fn scope_decision<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use canon_model::DivergenceFields;
     use crate::policy::{PolicyField, StalenessPolicy};
     use canon_model::{
         Actor, DivergenceStatus, Divergence, Envelope, RecordKind, RoleId, SpecDigest, TotalOrder,
@@ -493,17 +494,7 @@ mod tests {
 
     fn divergence(scenario_id: &str, status: DivergenceStatus) -> Divergence {
         let envelope = Envelope::new(1, RecordKind::Divergence, Utc::now(), Actor::new("reviewer-1", RoleId::parse("reviewer").unwrap()));
-        Divergence::new(
-            envelope,
-            project(),
-            ScenarioId::parse(scenario_id).unwrap(),
-            canon_model::Sha::parse("a".repeat(40)).unwrap(),
-            status,
-            TotalOrder::from(1u64),
-            1,
-            "reviewer-1",
-            "d",
-        )
+        Divergence::new(DivergenceFields { envelope, project_id: project(), scenario_id: ScenarioId::parse(scenario_id).unwrap(), sha: canon_model::Sha::parse("a".repeat(40)).unwrap(), status, run_seq: TotalOrder::from(1u64), round: 1, reviewer: "reviewer-1".into(), detail: "d".into() })
     }
 
     fn subject(id: &str, status: SubjectStatus) -> Subject {

@@ -183,12 +183,16 @@ fn check_optional_scenario_id(candidate: &RawRecord, field: &str) -> Result<(), 
 /// join key as `InvalidJoinKey`, anything else caught by the full
 /// deserialize attempt as `Malformed`).
 pub fn validate_evidence(candidate: &RawRecord) -> Result<(), EvidenceViolation> {
+    parse_evidence(candidate).map(|_| ())
+}
+
+/// The validation of [`validate_evidence`], keeping the one deserialized
+/// record so the batch form does not deserialize a second time.
+fn parse_evidence(candidate: &RawRecord) -> Result<EvidenceRecord, EvidenceViolation> {
     validate_envelope_shape(candidate)?;
     check_optional_scenario_id(candidate, "scenario_id")?;
 
-    serde_json::from_value::<EvidenceRecord>(candidate.0.clone())
-        .map(|_| ())
-        .map_err(|e| EvidenceViolation::new(FailureClass::Malformed, "<candidate>", e.to_string()))
+    EvidenceRecord::deserialize(&candidate.0).map_err(|e| EvidenceViolation::new(FailureClass::Malformed, "<candidate>", e.to_string()))
 }
 
 /// Batch form mirroring `tools/parity.py::_load_ledger`'s skip-not-crash
@@ -200,16 +204,8 @@ pub fn validate_evidence_batch(candidates: &[RawRecord]) -> (Vec<EvidenceRecord>
     let mut accepted = Vec::new();
     let mut violations = Vec::new();
     for candidate in candidates {
-        match validate_evidence(candidate) {
-            Ok(()) => {
-                // `validate_evidence` already proved this deserializes;
-                // re-deserializing here (rather than threading the value
-                // through) keeps the two functions independently
-                // correct and independently testable.
-                if let Ok(record) = serde_json::from_value::<EvidenceRecord>(candidate.0.clone()) {
-                    accepted.push(record);
-                }
-            }
+        match parse_evidence(candidate) {
+            Ok(record) => accepted.push(record),
             Err(violation) => violations.push(violation),
         }
     }

@@ -1309,6 +1309,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+    use canon_model::DivergenceFields;
 
     fn tiers(dir: &TempDir) -> (GitTier, GitTier) {
         let ledger_root = dir.path().join(".canon").join("ledger");
@@ -2006,17 +2007,7 @@ mod tests {
             Some(role) => Actor::new("reviewer-1", RoleId::parse(role).unwrap()),
             None => Actor::new_unattributed("legacy-writer"),
         };
-        Divergence::new(
-            Envelope::new(1, RecordKind::Divergence, chrono::Utc::now(), actor),
-            ProjectId::parse(project_id).unwrap(),
-            ScenarioId::parse(scenario_id).unwrap(),
-            canon_model::Sha::parse("a".repeat(40)).unwrap(),
-            canon_model::DivergenceStatus::Open,
-            canon_model::TotalOrder::new(UNASSIGNED_RUN_SEQ),
-            round,
-            "reviewer-1",
-            "detail",
-        )
+        Divergence::new(DivergenceFields { envelope: Envelope::new(1, RecordKind::Divergence, chrono::Utc::now(), actor), project_id: ProjectId::parse(project_id).unwrap(), scenario_id: ScenarioId::parse(scenario_id).unwrap(), sha: canon_model::Sha::parse("a".repeat(40)).unwrap(), status: canon_model::DivergenceStatus::Open, run_seq: canon_model::TotalOrder::new(UNASSIGNED_RUN_SEQ), round, reviewer: "reviewer-1".into(), detail: "detail".into() })
     }
 
     #[test]

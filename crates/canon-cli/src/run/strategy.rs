@@ -10,6 +10,6 @@ pub fn run(cmd: StrategyCommand) -> ExitCode {
         StrategyCommand::ApprovalPayload(StrategyApprovalPayloadArgs { strategy_id, evaluation, approver, approval_at, repo, json }) =>
             crate::learn::run_approval_payload(&repo, &strategy_id, &evaluation, &approver, approval_at, json),
         StrategyCommand::Rollback(StrategyRollbackArgs { strategy_id, reason, actor_id, signature_file, approval_at, contradicting_trajectory_id, repo, json, .. }) =>
-            crate::learn::run_rollback(&repo, &strategy_id, &reason, &actor_id, contradicting_trajectory_id.as_deref(), &signature_file, &approval_at, json),
+            crate::learn::run_rollback(&crate::learn::RollbackRequest { repo: &repo, strategy_id: &strategy_id, reason: &reason, actor: &actor_id, contradicting: contradicting_trajectory_id.as_deref(), signature_path: &signature_file, approved_at: &approval_at, json }),
     }
 }
