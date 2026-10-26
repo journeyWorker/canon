@@ -24,7 +24,6 @@
 //! newtype-with-validated-grammar pattern.
 
 use std::borrow::Cow;
-use std::convert::TryFrom;
 use std::fmt;
 
 use schemars::{JsonSchema, SchemaGenerator, json_schema};
@@ -571,7 +570,7 @@ impl RunId {
     pub fn parse(s: impl AsRef<str>) -> Result<Self, JoinKeyError> {
         ulid::Ulid::from_string(s.as_ref())
             .map(Self)
-            .map_err(|_| JoinKeyError { key: "RunId", value: s.as_ref().to_string(), grammar: Self::GRAMMAR })
+            .map_err(|_ulid_err| JoinKeyError { key: "RunId", value: s.as_ref().to_string(), grammar: Self::GRAMMAR })
     }
 
     pub fn as_ulid(&self) -> ulid::Ulid {

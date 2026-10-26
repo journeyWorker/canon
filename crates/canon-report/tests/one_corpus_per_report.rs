@@ -150,7 +150,7 @@ fn a_write_landing_between_two_panel_reads_reaches_neither_of_them() {
     assert_eq!(totals.len(), 1, "one change, one totals row: {totals:?}");
     let total = &totals[0];
 
-    assert_eq!(n(total, "rounds_recorded"), rounds.len() as i64, "the total must count exactly the rounds the reader is shown");
+    assert_eq!(n(total, "rounds_recorded"), i64::try_from(rounds.len()).expect("round count fits i64"), "the total must count exactly the rounds the reader is shown");
     assert_eq!(
         n(total, "findings"),
         rounds.iter().map(|row| n(row, "findings")).sum::<i64>(),

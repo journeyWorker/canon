@@ -67,9 +67,9 @@ fn seed_empty_learn_root(learn_root: &std::path::Path) {
         let path = learn_root.join(sub).join("_seed").join("_seed").join("_seed").join("_seed").join("_seed.parquet");
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         let empty: ArrayRef = Arc::new(StringArray::from(Vec::<&str>::new()));
-        let batch = RecordBatch::try_new(schema.clone(), vec![empty.clone(), empty.clone(), empty.clone(), empty.clone(), empty]).unwrap();
+        let batch = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::clone(&empty), Arc::clone(&empty), Arc::clone(&empty), Arc::clone(&empty), empty]).unwrap();
         let file = std::fs::File::create(&path).unwrap();
-        let mut writer = ArrowWriter::try_new(file, schema.clone(), None).unwrap();
+        let mut writer = ArrowWriter::try_new(file, Arc::clone(&schema), None).unwrap();
         writer.write(&batch).unwrap();
         writer.close().unwrap();
     }

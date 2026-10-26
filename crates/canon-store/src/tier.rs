@@ -90,6 +90,7 @@ pub fn raw_record_schema(raw: &RawRecord) -> u32 {
 /// aging/migration write path (module doc: coherence forces this to be
 /// a distinct newtype rather than a second `impl StoredRecord for
 /// RawRecord`).
+#[derive(Debug)]
 pub struct RawWrite(pub RawRecord);
 
 impl StoredRecord for RawWrite {

@@ -137,6 +137,7 @@ fn load_tier_policy(repo: &Path) -> Result<Option<canon_store::policy::TierPolic
 /// release-trust age checks, any time-bearing CEL `age_days(...)`
 /// policy predicate) reads THIS field — never `Utc::now()` internally
 /// — so every check in one gate run agrees on the identical instant.
+#[derive(Debug)]
 pub struct GateContext {
     pub ctx: GateCtx,
     pub policy: PolicyResolution,

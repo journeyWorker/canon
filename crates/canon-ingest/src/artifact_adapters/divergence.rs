@@ -66,6 +66,7 @@ use crate::scanner;
 
 const ADAPTER_ID: &str = "divergence";
 
+#[derive(Debug)]
 pub struct DivergenceAdapter;
 
 impl ArtifactAdapter for DivergenceAdapter {
@@ -165,8 +166,8 @@ fn parse_divergence_file(path: &Path) -> ArtifactParseOutcome {
 /// required field missing for its type) — the caller counts every
 /// `Err` as one skip (design §7).
 fn parse_divergence_line(line: &str, area: Option<&str>, lane: Option<&str>) -> Result<ArtifactEvent, ()> {
-    let value: serde_json::Value = serde_json::from_str(line).map_err(|_| ())?;
-    let probe: DivergenceLineProbe = serde_json::from_value(value.clone()).map_err(|_| ())?;
+    let value: serde_json::Value = serde_json::from_str(line).map_err(|_err| ())?;
+    let probe: DivergenceLineProbe = serde_json::from_value(value.clone()).map_err(|_err| ())?;
     let at = parse_at(probe.at.as_deref().ok_or(())?)?;
 
     let (join_key, kind) = match probe.line_type.as_str() {
@@ -176,7 +177,7 @@ fn parse_divergence_line(line: &str, area: Option<&str>, lane: Option<&str>) -> 
             (ArtifactJoinKey::Scenario(anchor), ArtifactEventKind::NonVerdict)
         }
         "review" => {
-            let scenario = ScenarioId::parse(probe.scenario_id.ok_or(())?).map_err(|_| ())?;
+            let scenario = ScenarioId::parse(probe.scenario_id.ok_or(())?).map_err(|_err| ())?;
             let status = probe.status.as_deref().ok_or(())?;
             let kind = if status == "open" {
                 // Classifies from the file's `lane=` Hive PATH
@@ -199,7 +200,7 @@ fn parse_divergence_line(line: &str, area: Option<&str>, lane: Option<&str>) -> 
             (ArtifactJoinKey::Scenario(scenario), kind)
         }
         "remediation" => {
-            let scenario = ScenarioId::parse(probe.scenario_id.ok_or(())?).map_err(|_| ())?;
+            let scenario = ScenarioId::parse(probe.scenario_id.ok_or(())?).map_err(|_err| ())?;
             let status = probe.status.as_deref().ok_or(())?;
             let kind = if status == "resolved" { ArtifactEventKind::RemediationResolved } else { ArtifactEventKind::NonVerdict };
             (ArtifactJoinKey::Scenario(scenario), kind)
@@ -227,7 +228,7 @@ fn parse_divergence_line(line: &str, area: Option<&str>, lane: Option<&str>) -> 
 }
 
 fn parse_at(raw: &str) -> Result<DateTime<Utc>, ()> {
-    DateTime::parse_from_rfc3339(raw).map(|dt| dt.with_timezone(&Utc)).map_err(|_| ())
+    DateTime::parse_from_rfc3339(raw).map(|dt| dt.with_timezone(&Utc)).map_err(|_err| ())
 }
 
 /// Find a `<key>=<value>` Hive path segment among `path`'s ancestor
@@ -247,7 +248,6 @@ mod tests {
     use canon_model::ids::RoleId;
 
     use super::*;
-    use crate::artifact_adapter::ArtifactSourceHandle;
     use crate::verdict::{Becomes, Polarity, attach_regime_key, derive_verdict};
 
     fn fixture_root() -> PathBuf {

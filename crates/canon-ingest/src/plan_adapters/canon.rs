@@ -37,6 +37,7 @@ const CANON_LAYOUT: ChangeDirLayout = ChangeDirLayout {
     pointer_briefs: true,
 };
 
+#[derive(Debug)]
 pub struct CanonPlanAdapter;
 
 impl PlanAdapter for CanonPlanAdapter {

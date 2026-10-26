@@ -236,7 +236,7 @@ impl Observed {
     fn of(path: &Path) -> Self {
         let stamp = std::fs::metadata(path).ok().and_then(|meta| canon_store::git_tier::FileStamp::of(&meta));
         if let Some(stamp) = stamp {
-            let seen = OBSERVED.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            let seen = OBSERVED.lock().expect("artifact observed-stamp memo lock poisoned");
             if let Some((_, sha)) = seen.get(path).filter(|(was, _)| *was == stamp) {
                 return Observed::Sha256(sha.clone());
             }
@@ -244,7 +244,7 @@ impl Observed {
         match File::open(path).and_then(sha256_reader) {
             Ok(sha) => {
                 if let Some(stamp) = stamp {
-                    OBSERVED.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(path.to_path_buf(), (stamp, sha.clone()));
+                    OBSERVED.lock().expect("artifact observed-stamp memo lock poisoned").insert(path.to_path_buf(), (stamp, sha.clone()));
                 }
                 Observed::Sha256(sha)
             }
@@ -823,6 +823,7 @@ fn distinct_review_files(review: &Review) -> Vec<&ReviewArtifact> {
 }
 
 /// The `canon gate check` arm (module doc).
+#[derive(Debug)]
 pub struct ArtifactStoreCheck;
 
 impl GateCheck for ArtifactStoreCheck {
@@ -889,7 +890,6 @@ fn remedy(blob: &Observed, store: &ArtifactStore, reattest: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
 
     use canon_model::{Actor, Envelope, EvidenceVerdict, ProjectId, RecordKind, RoleId, ScenarioId};
     use chrono::{Duration, Utc};

@@ -281,7 +281,6 @@ impl StatusOverride {
 }
 
 impl Subject {
-    #[expect(clippy::too_many_arguments)]
     pub fn new(
         envelope: Envelope,
         subject_id: SubjectId,
@@ -1182,7 +1181,7 @@ impl Divergence {
         self
     }
 
-    #[expect(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "constructor mirrors the record's field list; callers pass each field positionally")]
     pub fn new(
         envelope: Envelope,
         project_id: ProjectId,
@@ -1229,7 +1228,6 @@ pub struct Trajectory {
 }
 
 impl Trajectory {
-    #[expect(clippy::too_many_arguments)]
     pub fn new(
         envelope: Envelope,
         run_id: RunId,
@@ -1998,7 +1996,6 @@ impl Finding {
     /// [`Self::fixed_by`]/[`Self::rejected`]/[`Self::deferred`], which
     /// is what makes the `disposition`/`resolution_sha` pairing
     /// unconstructible-wrong through this API (see the type doc).
-    #[expect(clippy::too_many_arguments)]
     pub fn new(
         envelope: Envelope,
         change_id: ChangeId,
@@ -2230,8 +2227,6 @@ impl CanonRecord for Finding {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::envelope::Actor;
-    use crate::ids::RoleId;
 
     /// Every round-trip fixture below builds its envelope at the kind's
     /// OWN current generation ([`RecordKind::schema_version`]) — never a

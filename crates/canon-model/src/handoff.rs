@@ -118,7 +118,7 @@ pub struct HandoffBody {
 /// renders `HandoffBody.fields`. Implementations are compiled Rust
 /// registered into a [`TemplateRegistry`], gated per-repo by
 /// `canon.yaml`'s `handoff_templates:` list.
-pub trait HandoffTemplate: Send + Sync {
+pub trait HandoffTemplate: std::fmt::Debug + Send + Sync {
     fn domain(&self) -> DomainId;
     fn validate(&self, fields: &serde_json::Value) -> Result<(), Vec<EvidenceViolation>>;
     fn render(&self, fields: &serde_json::Value) -> String;
@@ -127,6 +127,7 @@ pub trait HandoffTemplate: Send + Sync {
 /// 기획 (planning) — the simplest domain, S1's registry-contract proof
 /// (design D5, task 5.6): `title` + `summary` + `acceptance-criteria`
 /// (a non-empty array), all required.
+#[derive(Debug)]
 pub struct GihoekTemplate;
 
 const GIHOEK_REQUIRED_STRING_FIELDS: [&str; 2] = ["title", "summary"];
@@ -195,7 +196,7 @@ struct HandoffTemplatesManifest {
 /// gated path) or [`TemplateRegistry::new`] + [`TemplateRegistry::register`]
 /// directly (tests, or a caller that has already resolved its own
 /// domain list).
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct TemplateRegistry {
     templates: BTreeMap<DomainId, Box<dyn HandoffTemplate>>,
 }
@@ -369,7 +370,7 @@ pub struct Handoff {
 }
 
 impl Handoff {
-    #[expect(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "constructor mirrors the record's field list; callers across crates pass each field positionally")]
     pub fn new(
         envelope: Envelope,
         id: HandoffId,
@@ -459,7 +460,6 @@ impl CanonRecord for Handoff {
 mod tests {
     use super::*;
     use crate::envelope::Actor;
-    use crate::ids::RoleId;
 
     fn sample_envelope() -> Envelope {
         Envelope::current(RecordKind::Handoff, Utc::now(), Actor::new("codex-cli", RoleId::parse("implementer").unwrap()))

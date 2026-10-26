@@ -125,7 +125,6 @@ impl PromotionGate for OccurrencePromotionGate {
 mod tests {
     use canon_ingest::verdict::{Becomes, Polarity, VerdictRow};
     use canon_model::ids::{RoleId, regime_key};
-    use chrono::{DateTime, Duration};
 
     use super::*;
     use crate::ids::TrajectoryId;

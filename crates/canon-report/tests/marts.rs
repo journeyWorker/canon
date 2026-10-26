@@ -524,7 +524,7 @@ fn review_totals_are_exactly_the_per_change_sum_of_the_review_rounds_rows() {
         let mine: Vec<_> = rounds.rows.iter().filter(|r| r["change_id"].as_str() == Some(change)).collect();
         assert!(!mine.is_empty(), "{change}: totals row with no rounds behind it");
 
-        assert_eq!(n(total, "rounds_recorded"), mine.len() as i64, "{change}: rounds_recorded must be the number of rounds that recorded a finding");
+        assert_eq!(n(total, "rounds_recorded"), i64::try_from(mine.len()).expect("round count fits i64"), "{change}: rounds_recorded must be the number of rounds that recorded a finding");
         assert_eq!(
             n(total, "highest_round"),
             mine.iter().map(|r| n(r, "round")).max().unwrap(),

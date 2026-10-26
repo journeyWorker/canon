@@ -93,7 +93,7 @@ impl ArtifactsConfig {
             }
             return Ok(Self::local());
         }
-        let rung = Rung::parse(backend).map_err(|_| {
+        let rung = Rung::parse(backend).map_err(|_err| {
             PolicyError(format!("canon.yaml `artifact_store.backend: {backend}` is neither `local` nor the name of a tier in `tiers:` (local/hot/cold)"))
         })?;
         let policy = TierPolicy::from_yaml_at(canon_yaml, base)?;
@@ -321,7 +321,7 @@ mod tests {
 
     fn store() -> (Arc<InMemory>, ObjectBlobStore) {
         let memory = Arc::new(InMemory::new());
-        let blobs = ObjectBlobStore::new(memory.clone(), "artifacts/").unwrap();
+        let blobs = ObjectBlobStore::new(Arc::<InMemory>::clone(&memory), "artifacts/").unwrap();
         (memory, blobs)
     }
 

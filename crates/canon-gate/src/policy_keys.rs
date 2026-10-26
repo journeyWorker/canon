@@ -13,6 +13,7 @@ use crate::failure_class::{FailureClass, Violation};
 use crate::policy::{PolicyDiagnostic, KNOWN_TOP_LEVEL_KEYS};
 
 /// One `uncovered-cell` violation per unknown top-level key, in file order.
+#[derive(Debug)]
 pub struct PolicyKeysCheck;
 
 impl GateCheck for PolicyKeysCheck {

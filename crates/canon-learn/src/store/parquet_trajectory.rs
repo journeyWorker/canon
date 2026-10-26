@@ -157,7 +157,7 @@ fn encode_trajectory(trajectory: &Trajectory) -> Result<Vec<u8>, LearnError> {
         Arc::new(StringArray::from(vec![trajectory.recorded_at.to_rfc3339()])),
         Arc::new(StringArray::from(vec![body])),
     ];
-    let batch = RecordBatch::try_new(schema.clone(), columns).map_err(|e| LearnError::Parquet(e.to_string()))?;
+    let batch = RecordBatch::try_new(Arc::clone(&schema), columns).map_err(|e| LearnError::Parquet(e.to_string()))?;
 
     let mut buf = Vec::new();
     let mut writer = ArrowWriter::try_new(&mut buf, schema, None).map_err(|e| LearnError::Parquet(e.to_string()))?;
@@ -396,8 +396,6 @@ fn read_trajectories_in(dir: &Path) -> Result<Vec<Trajectory>, LearnError> {
 
 #[cfg(test)]
 mod tests {
-    use canon_ingest::verdict::{Becomes, Polarity};
-
     use super::*;
 
     fn regime(role: &str) -> RegimeKey {
@@ -682,7 +680,7 @@ mod tests {
             Arc::new(StringArray::from(vec![t.recorded_at.to_rfc3339()])),
             Arc::new(StringArray::from(vec![body])),
         ];
-        let batch = RecordBatch::try_new(schema.clone(), columns).unwrap();
+        let batch = RecordBatch::try_new(Arc::clone(&schema), columns).unwrap();
         let mut buf = Vec::new();
         let mut writer = ArrowWriter::try_new(&mut buf, schema, None).unwrap();
         writer.write(&batch).unwrap();

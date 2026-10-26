@@ -126,8 +126,8 @@ impl FromPolicyValue for u32 {
     fn from_policy_value(value: &PolicyValue) -> Result<Self, PolicyResolveError> {
         let mismatch = || PolicyResolveError::TypeMismatch { expected: "u32", got: format!("{value:?}") };
         match value {
-            PolicyValue::UInt(n) => u32::try_from(*n).map_err(|_| mismatch()),
-            PolicyValue::Int(n) if *n >= 0 => u32::try_from(*n).map_err(|_| mismatch()),
+            PolicyValue::UInt(n) => u32::try_from(*n).map_err(|_err| mismatch()),
+            PolicyValue::Int(n) if *n >= 0 => u32::try_from(*n).map_err(|_err| mismatch()),
             _ => Err(mismatch()),
         }
     }
@@ -308,7 +308,7 @@ struct RawPolicy {
     /// wave-2 consumer of a second schema version exists to validate
     /// against).
     #[serde(default)]
-    #[expect(dead_code)]
+    #[expect(dead_code, reason = "forward-declared schema field; parsed but not yet enforced (see doc above)")]
     schema: Option<u32>,
     #[serde(default)]
     trust_required: BTreeMap<String, RawField<TrustLevel>>,
@@ -571,6 +571,7 @@ impl RequireAudit {
         let mut head = [0u8; 8];
         head.copy_from_slice(&digest[..8]);
         let value = u128::from(u64::from_be_bytes(head));
+        #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "rate is in (0, 1], so the scaled, ceiled value is in (0, 2^64] and fits u128")]
         let threshold = (self.rate.get() * 18_446_744_073_709_551_616.0).ceil() as u128;
         value < threshold
     }
@@ -1126,7 +1127,6 @@ fn compile_single<T>(raw: Option<RawField<T>>, field: &str, default: T, bindings
 
 #[cfg(test)]
 mod tests {
-    use chrono::Utc;
     use serde_json::json;
     use tempfile::TempDir;
 

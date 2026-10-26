@@ -144,6 +144,7 @@ fn ladder_state_of(record: &EvidenceRecord) -> TrustLadderState {
 /// here — spec.md's "draft is never green" is the coverage/ledger
 /// checks' job to report as not-green, not a distinct
 /// `FAILURE_CLASSES` entry this module raises.
+#[derive(Debug)]
 pub struct TrustLadderCheck;
 
 impl GateCheck for TrustLadderCheck {
@@ -186,6 +187,7 @@ impl GateCheck for TrustLadderCheck {
 /// finding only when a release profile additionally registers this
 /// check (a future `canon gate check --profile release`, task 1.9,
 /// not implemented here).
+#[derive(Debug)]
 pub struct ReleaseTrustCheck;
 
 impl GateCheck for ReleaseTrustCheck {
@@ -206,10 +208,7 @@ impl GateCheck for ReleaseTrustCheck {
             // the (potentially malformed-at-the-whole-record-level)
             // native-field deserialize below.
             let Some(class) = raw.0.get("class").and_then(|v| v.as_str()) else { continue };
-            let required = match ctx.policy.trust_required_for(class, &raw.0, now) {
-                Ok(Some(level)) => level,
-                Ok(None) | Err(_) => continue,
-            };
+            let Ok(Some(required)) = ctx.policy.trust_required_for(class, &raw.0, now) else { continue };
 
             // A present-malformed native field fails this whole
             // record's deserialize (module doc) — already reported
@@ -289,7 +288,7 @@ pub fn attempt_clear(current: &FlaggedOverlay, clearing_actor: &Actor) -> Result
 
 #[cfg(test)]
 mod tests {
-    use canon_model::{Envelope, EvidenceVerdict, ProjectId, ProvenanceRef, RoleId};
+    use canon_model::{Envelope, EvidenceVerdict, ProvenanceRef, RoleId};
     use canon_model::Review;
     use canon_store::tier::Tier;
     use chrono::Utc;
@@ -313,7 +312,6 @@ mod tests {
     /// top-level key when given — `EvidenceRecord`'s strict
     /// `Deserialize` silently drops it as an unknown field, exactly
     /// as a production write would look.
-    #[expect(clippy::too_many_arguments)]
     fn write_tagged_evidence(tier: &GitTier, project_id: Option<&str>, scenario_id: &str, actor_role: &str, lifecycle: TrustLifecycle, flagged: bool, class: Option<&str>) {
         let actor = Actor::new("test-agent", RoleId::parse(actor_role).unwrap());
         let mut record = EvidenceRecord::new(

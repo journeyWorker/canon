@@ -144,7 +144,6 @@ fn soft_flag_front_matter(path: &Path, reason: &str) -> Result<(), LearnError> {
 #[cfg(test)]
 mod tests {
     use canon_model::ids::{RegimeKey, RoleId, regime_key};
-    use chrono::Utc;
 
     use super::*;
     use crate::store::ParquetStrategyStore;

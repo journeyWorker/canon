@@ -90,6 +90,7 @@ pub(crate) const DIAG_NOT_A_PLAN_DOC: &str = "not-a-plan-doc";
 /// openspec dialect's own identically-named constant.
 pub(crate) const DIAG_UNRESOLVABLE_TASK_DEP: &str = "unresolvable-task-dep";
 
+#[derive(Debug)]
 pub struct SuperpowersPlanAdapter;
 
 impl PlanAdapter for SuperpowersPlanAdapter {
@@ -633,7 +634,7 @@ fn file_modified_at(path: &Path) -> DateTime<Utc> {
     let ms = fs::metadata(path)
         .and_then(|meta| meta.modified())
         .ok()
-        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok()).map_or_else(|| Utc::now().timestamp_millis(), |duration| duration.as_millis() as i64);
+        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok()).map_or_else(|| Utc::now().timestamp_millis(), |duration| i64::try_from(duration.as_millis()).expect("epoch millis fit in i64"));
     Utc.timestamp_millis_opt(ms).single().unwrap_or_else(Utc::now)
 }
 

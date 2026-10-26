@@ -20,7 +20,7 @@
 // Shared across three separate `tests/*.rs` binaries; each only
 // exercises a subset of these documented expected-value constants —
 // never truly dead, just per-binary partially unused.
-#![allow(dead_code)]
+#![expect(dead_code, reason = "shared across several tests/*.rs binaries; each uses only a subset of these constants")]
 
 
 use std::path::Path;

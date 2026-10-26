@@ -66,7 +66,7 @@ fn encode_row(kind: RecordKind, natural_key: &str, at: &str, digest: &str, body_
         Arc::new(StringArray::from(vec![digest])),
         Arc::new(StringArray::from(vec![body_json])),
     ];
-    let batch = RecordBatch::try_new(schema.clone(), columns).map_err(|e| StoreError::Parquet(e.to_string()))?;
+    let batch = RecordBatch::try_new(Arc::clone(&schema), columns).map_err(|e| StoreError::Parquet(e.to_string()))?;
 
     let mut buf = Vec::new();
     let mut writer = ArrowWriter::try_new(&mut buf, schema, None).map_err(|e| StoreError::Parquet(e.to_string()))?;
@@ -259,14 +259,14 @@ fn resolve_s3_connection(strict: bool, lookup: impl Fn(&str) -> Option<String>) 
     .into_iter()
     .filter_map(|(unset, name)| unset.then_some(name))
     .collect();
-    if !missing.is_empty() {
+    let (Some(endpoint), Some(access_key_id), Some(secret_access_key)) = (endpoint, access_key_id, secret_access_key) else {
         return Err(StoreError::BackendUnattached {
             backend: Backend::S3,
             reason: format!("strict S3 attach requires {} (a release build never defaults S3 credentials, design D1)", missing.join(", ")),
         });
-    }
+    };
 
-    Ok(S3Connection { endpoint: endpoint.unwrap(), access_key_id: access_key_id.unwrap(), secret_access_key: secret_access_key.unwrap(), region })
+    Ok(S3Connection { endpoint, access_key_id, secret_access_key, region })
 }
 
 /// Recognized ONLY by builds with `debug_assertions` — a release `canon`

@@ -20,7 +20,13 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Narrow a text offset to `u32`; source documents are far below 4 GiB.
+fn to_u32(n: usize) -> u32 {
+    u32::try_from(n).expect("text offset fits u32")
+}
+
 /// Precomputed line-start table for byte <-> (line, col, utf16) mapping.
+#[derive(Debug)]
 pub struct TextIndex<'a> {
     text: &'a str,
     line_starts: Vec<usize>, // byte offset of each line start
@@ -57,13 +63,13 @@ impl<'a> TextIndex<'a> {
         };
         let line_start = self.line_starts[line_ix];
         let slice = &self.text[line_start..byte];
-        let byte_col = (byte - line_start) as u32;
-        let utf16_col = slice.chars().map(|c| c.len_utf16() as u32).sum();
-        Position { line: line_ix as u32 + 1, column: byte_col + 1, utf16_col }
+        let byte_col = to_u32(byte - line_start);
+        let utf16_col = slice.chars().map(|c| to_u32(c.len_utf16())).sum();
+        Position { line: to_u32(line_ix) + 1, column: byte_col + 1, utf16_col }
     }
 
     fn utf16_offset(&self, byte: usize) -> u32 {
-        self.text[..byte].chars().map(|c| c.len_utf16() as u32).sum()
+        self.text[..byte].chars().map(|c| to_u32(c.len_utf16())).sum()
     }
 }
 

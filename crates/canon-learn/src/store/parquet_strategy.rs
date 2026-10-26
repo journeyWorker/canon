@@ -52,7 +52,7 @@ fn encode_strategy(item: &StrategyItem) -> Result<Vec<u8>, LearnError> {
         Arc::new(StringArray::from(vec![item.recorded_at.to_rfc3339()])),
         Arc::new(StringArray::from(vec![body])),
     ];
-    let batch = RecordBatch::try_new(schema.clone(), columns).map_err(|e| LearnError::Parquet(e.to_string()))?;
+    let batch = RecordBatch::try_new(Arc::clone(&schema), columns).map_err(|e| LearnError::Parquet(e.to_string()))?;
 
     let mut buf = Vec::new();
     let mut writer = ArrowWriter::try_new(&mut buf, schema, None).map_err(|e| LearnError::Parquet(e.to_string()))?;
@@ -206,7 +206,7 @@ mod tests {
     use chrono::Utc;
 
     use super::*;
-    use crate::ids::{StrategyId, TrajectoryId};
+    use crate::ids::TrajectoryId;
 
     fn regime(role: &str) -> RegimeKey {
         RegimeKey::parse(canon_model::ids::regime_key(role, "repo", "auth", "abc123")).unwrap()

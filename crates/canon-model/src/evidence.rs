@@ -129,9 +129,8 @@ pub fn validate_envelope_shape(candidate: &RawRecord) -> Result<(), EvidenceViol
         Err(EvidenceViolation::new(FailureClass::Malformed, subject, detail))
     };
 
-    let obj = match candidate.0.as_object() {
-        Some(obj) => obj,
-        None => return malformed("<candidate>", "not a JSON object"),
+    let Some(obj) = candidate.0.as_object() else {
+        return malformed("<candidate>", "not a JSON object");
     };
 
     if !obj.get("schema").is_some_and(|v| v.is_u64() || v.is_i64()) {
@@ -146,9 +145,8 @@ pub fn validate_envelope_shape(candidate: &RawRecord) -> Result<(), EvidenceViol
         _ => return malformed("at", "missing or non-string `at` field"),
     }
 
-    let actor = match obj.get("actor").and_then(|v| v.as_object()) {
-        Some(actor) => actor,
-        None => return malformed("actor", "missing or non-object `actor` field"),
+    let Some(actor) = obj.get("actor").and_then(|v| v.as_object()) else {
+        return malformed("actor", "missing or non-object `actor` field");
     };
     if !actor.get("agent_id").is_some_and(serde_json::Value::is_string) {
         return malformed("actor.agent_id", "missing or non-string `actor.agent_id` field");

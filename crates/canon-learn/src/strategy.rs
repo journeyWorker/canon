@@ -96,7 +96,7 @@ pub struct StrategyItem {
 }
 
 impl StrategyItem {
-    #[expect(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "constructor mirrors the strategy row's field list; callers pass each field positionally")]
     pub fn new(
         id: StrategyId,
         regime_key: RegimeKey,

@@ -172,7 +172,7 @@ fn build_trust_below_required(dir: &Path) {
 
     let review = Review::new(
         Envelope::new(1, RecordKind::Review, Utc::now(), Actor::new("selftest-reviewer", RoleId::parse("reviewer").expect("valid RoleId"))),
-        ProjectId::parse("root").unwrap(),
+        ProjectId::parse("root").expect("valid ProjectId"),
         scenario_id,
         "selftest-reviewer",
         "abc123abc123",
@@ -382,6 +382,7 @@ fn parse_expected(text: &str) -> Result<BTreeSet<(FailureClass, String)>, String
 /// exact-set-match oracle (module doc): `missing` (under-detection,
 /// expected but not produced) and `extra` (over-triggering, produced but
 /// not expected).
+#[derive(Debug)]
 pub struct FixtureOutcome {
     pub class: FailureClass,
     pub missing: BTreeSet<(FailureClass, String)>,
@@ -401,6 +402,7 @@ impl FixtureOutcome {
 }
 
 /// Every fixture's outcome from one `canon gate selftest` run.
+#[derive(Debug)]
 pub struct SelftestReport {
     pub outcomes: Vec<FixtureOutcome>,
 }

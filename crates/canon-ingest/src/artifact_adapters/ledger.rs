@@ -86,6 +86,7 @@ use crate::scanner;
 
 const ADAPTER_ID: &str = "ledger";
 
+#[derive(Debug)]
 pub struct LedgerAdapter;
 
 impl ArtifactAdapter for LedgerAdapter {
@@ -296,7 +297,7 @@ fn area_of(scenario: &ScenarioId) -> String {
 }
 
 fn parse_at(raw: &str) -> Result<DateTime<Utc>, ()> {
-    DateTime::parse_from_rfc3339(raw).map(|dt| dt.with_timezone(&Utc)).map_err(|_| ())
+    DateTime::parse_from_rfc3339(raw).map(|dt| dt.with_timezone(&Utc)).map_err(|_err| ())
 }
 
 /// Resolve a `run`/`drill` record's timestamp: prefer the record's own
@@ -338,7 +339,6 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::artifact_adapter::ArtifactSourceHandle;
     use crate::verdict::{Becomes, Polarity, attach_regime_key, derive_verdict};
 
     fn fixture_root() -> PathBuf {

@@ -454,7 +454,7 @@ fn parse_duration_shorthand(s: &str) -> Result<chrono::Duration, PolicyError> {
     let (digits, unit) = trimmed.split_at(trimmed.len().saturating_sub(1));
     let magnitude: i64 = digits
         .parse()
-        .map_err(|_| PolicyError(format!("aging `after: {s}` is not `<integer><d|h|m|s>` (e.g. `30d`)")))?;
+        .map_err(|_err| PolicyError(format!("aging `after: {s}` is not `<integer><d|h|m|s>` (e.g. `30d`)")))?;
     if magnitude < 0 {
         return Err(PolicyError(format!("aging `after: {s}` is negative — a duration magnitude must be non-negative")));
     }

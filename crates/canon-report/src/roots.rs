@@ -180,7 +180,7 @@ fn link_dir(target: &Path, link: &Path) -> Result<(), ReportError> {
 
 fn write_seed_parquet(path: &Path, schema: Arc<Schema>, columns: Vec<ArrayRef>) -> Result<(), ReportError> {
     fs::create_dir_all(path.parent().expect("seed path always has a parent"))?;
-    let batch = RecordBatch::try_new(schema.clone(), columns).map_err(|e| ReportError::Seed(e.to_string()))?;
+    let batch = RecordBatch::try_new(Arc::clone(&schema), columns).map_err(|e| ReportError::Seed(e.to_string()))?;
     let file = fs::File::create(path)?;
     let mut writer = ArrowWriter::try_new(file, schema, None).map_err(|e| ReportError::Seed(e.to_string()))?;
     writer.write(&batch).map_err(|e| ReportError::Seed(e.to_string()))?;
@@ -252,7 +252,7 @@ impl Roots {
             write_seed_parquet(
                 &roots.r2_root.join(format!("kind={SEED_MARKER}")).join(format!("{SEED_MARKER}.parquet")),
                 r2_schema(),
-                vec![empty.clone(), empty.clone(), empty.clone(), empty.clone(), empty],
+                vec![Arc::clone(&empty), Arc::clone(&empty), Arc::clone(&empty), Arc::clone(&empty), empty],
             )?;
         }
 
@@ -270,7 +270,7 @@ impl Roots {
                     write_seed_parquet(
                         &seeded.join(SEED_MARKER).join(SEED_MARKER).join(SEED_MARKER).join(SEED_MARKER).join(format!("{SEED_MARKER}.parquet")),
                         learn_store_schema(),
-                        vec![empty.clone(), empty.clone(), empty.clone(), empty.clone(), empty],
+                        vec![Arc::clone(&empty), Arc::clone(&empty), Arc::clone(&empty), Arc::clone(&empty), empty],
                     )?;
                 }
             }
@@ -323,7 +323,7 @@ mod tests {
         fs::create_dir_all(real.parent().unwrap()).unwrap();
         write_seed_parquet(&real, r2_schema(), {
             let one: ArrayRef = Arc::new(StringArray::from(vec!["x"]));
-            vec![one.clone(), one.clone(), one.clone(), one.clone(), one]
+            vec![Arc::clone(&one), Arc::clone(&one), Arc::clone(&one), Arc::clone(&one), one]
         })
         .unwrap();
 

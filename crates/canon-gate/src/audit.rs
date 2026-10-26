@@ -47,6 +47,7 @@ pub fn latest_audits(ctx: &GateContext) -> BTreeMap<(ProjectId, ScenarioId), &Ev
 
 /// The always-on audit check: `false-success` for every scenario whose
 /// latest audit is `refuted` (module doc).
+#[derive(Debug)]
 pub struct AuditCheck;
 
 impl GateCheck for AuditCheck {
@@ -216,7 +217,6 @@ pub fn subject_audit_gaps(ctx: &GateContext, subject_id: &SubjectId, target: Sub
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
 
     use canon_model::{Actor, Envelope, EvidenceAudit, EvidenceVerdict, RecordKind, RoleId, SpecDigest};
     use chrono::Utc;

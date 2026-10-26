@@ -51,6 +51,7 @@ use crate::artifact_adapter::{
     ArtifactAdapter, ArtifactEvent, ArtifactEventKind, ArtifactJoinKey, ArtifactParseOutcome, ArtifactSourceConfig, ArtifactSourceHandle,
 };
 
+#[derive(Debug)]
 pub struct ReviewFlywheelAdapter;
 
 impl ReviewFlywheelAdapter {

@@ -251,7 +251,7 @@ pub fn validate_layout(kind: RecordKind, actual_path: &std::path::Path, json: &V
 /// (S1), reused here as the git-tier read path's content-malformed gate.
 pub fn validate_body(kind: RecordKind, raw: &RawRecord) -> Result<(), EvidenceViolation> {
     use canon_model::records::{Change, Task, Scenario, Session, Run, Event, Review, Divergence, Trajectory, StrategyItem, Subject, Finding};
-    use canon_model::{FailureClass, Handoff};
+    use canon_model::{Handoff};
 
     macro_rules! try_deserialize {
         ($ty:ty) => {

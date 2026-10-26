@@ -741,7 +741,7 @@ fn promote_verbatim(
         committed_versions,
         |(key, _, _)| key.clone(),
         |(_, _, raw)| record_at(raw),
-        |(_, _, raw)| raw.0.get("schema").and_then(serde_json::Value::as_u64).unwrap_or(0) as u32,
+        |(_, _, raw)| u32::try_from(raw.0.get("schema").and_then(serde_json::Value::as_u64).unwrap_or(0) & u64::from(u32::MAX)).expect("masked to 32 bits"),
         |(_, relative, _)| relative.to_str().unwrap_or_default(),
     )
     .into_iter()
@@ -993,6 +993,7 @@ fn promote_with_run_seq(staging: &GitTier, committed: &GitTier, scope: Scope<'_>
 /// candidate. The recovery index reads the archive too: a committed
 /// attestation that a newer version archived is still "already committed"
 /// (0.23 D2).
+#[derive(Debug)]
 struct EvidenceIndex {
     next_seq: HashMap<(RoleId, String), u64>,
     already_committed: HashMap<String, RecoveredCommit>,
@@ -1146,6 +1147,7 @@ fn promote_evidence_candidates(
 /// made stale and the second made current again stays in the ledger,
 /// where per-record archiving would have moved it. `canon evidence add`'s
 /// batches hold one record per indexed scenario, so they never do.
+#[derive(Debug)]
 pub struct EvidencePromoter<'a> {
     staging: &'a GitTier,
     committed: &'a GitTier,

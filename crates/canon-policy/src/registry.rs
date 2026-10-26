@@ -184,6 +184,7 @@ pub(crate) fn record_fields(schema: &schemars::Schema) -> BTreeMap<String, CelTy
 
 /// Wraps canon-model's schema export (see module doc for why this type
 /// lives here rather than in `canon-model` itself, pending S12).
+#[derive(Debug)]
 pub struct SchemaRegistry {
     schemas: std::collections::HashMap<RecordKind, schemars::Schema>,
 }

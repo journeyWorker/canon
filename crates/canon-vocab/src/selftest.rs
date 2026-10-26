@@ -55,7 +55,7 @@ impl Drop for ScratchDir {
 }
 
 fn repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap().to_path_buf()
+    Path::new(env!("CARGO_MANIFEST_DIR")).parent().and_then(Path::parent).expect("crate sits two levels below the repo root").to_path_buf()
 }
 
 fn fixture(name: &str) -> Result<String, String> {

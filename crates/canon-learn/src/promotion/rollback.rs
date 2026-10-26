@@ -37,6 +37,7 @@ pub fn rollback_strategy(
     Err(LearnError::InvalidPromotionEvidence("rollback requires a detached SSH signature and policy-pinned approval verifier".into()))
 }
 
+#[expect(clippy::too_many_arguments, reason = "public signature shared with canon-cli; each argument is a distinct input of the signed rollback")]
 pub fn rollback_strategy_authenticated(
     strategy_store: &dyn StrategyStore,
     strategy_id: StrategyId,

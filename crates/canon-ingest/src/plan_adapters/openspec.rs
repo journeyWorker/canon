@@ -112,6 +112,7 @@ pub(crate) const DIAG_MALFORMED_SCENARIO_REF: &str = "malformed-scenario-ref";
 /// something the corpus did not mean.
 pub(crate) const DIAG_UNRESOLVABLE_TASK_DEP: &str = "unresolvable-task-dep";
 
+#[derive(Debug)]
 pub struct OpenspecPlanAdapter;
 
 impl PlanAdapter for OpenspecPlanAdapter {
@@ -825,16 +826,14 @@ fn file_modified_at(path: &Path) -> DateTime<Utc> {
     let ms = fs::metadata(path)
         .and_then(|meta| meta.modified())
         .ok()
-        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok()).map_or_else(|| Utc::now().timestamp_millis(), |duration| duration.as_millis() as i64);
+        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok()).map_or_else(|| Utc::now().timestamp_millis(), |duration| i64::try_from(duration.as_millis()).expect("epoch millis fit in i64"));
     Utc.timestamp_millis_opt(ms).single().unwrap_or_else(Utc::now)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
-    use std::path::PathBuf;
 
-    use canon_model::ids::{ScenarioId, TaskId};
+    use canon_model::ids::ScenarioId;
 
     use super::*;
     use crate::artifact_adapter::{ArtifactAdapter, ArtifactJoinKey, ArtifactSourceConfig};

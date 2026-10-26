@@ -159,7 +159,7 @@ fn write_read_upsert_and_age_round_trip_against_a_live_instance() {
 
     let dest_dir = tempfile::tempdir().unwrap();
     let destination: std::sync::Arc<dyn Tier> = std::sync::Arc::new(R2Tier::local(dest_dir.path(), "canon/").unwrap());
-    let rule = AgingRule { kind: RecordKind::Session, after: ChronoDuration::days(30), destination: destination.clone() };
+    let rule = AgingRule { kind: RecordKind::Session, after: ChronoDuration::days(30), destination: std::sync::Arc::clone(&destination) };
     let report = tier.age(&rule).expect("age");
     assert!(report.moved >= 1, "expected the 90d-old aging candidate to have moved (moved={}, already_aged={})", report.moved, report.already_aged);
 

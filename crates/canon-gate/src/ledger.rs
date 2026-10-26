@@ -149,6 +149,7 @@ fn fold_verdicts(ctx: &GateContext) -> BTreeMap<CellKey, LedgerEntry> {
 /// `malformed-evidence` (module doc). Never re-derives pass/fail —
 /// [`latest_verdicts`] is the separate, non-`GateCheck` surface for
 /// that (module doc).
+#[derive(Debug)]
 pub struct LedgerCheck;
 
 impl GateCheck for LedgerCheck {
@@ -168,7 +169,7 @@ impl GateCheck for LedgerCheck {
 mod tests {
     use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceViolation, RecordKind, RoleId, TaskId};
     use canon_model::evidence::FailureClass as EvidenceFailureClass;
-    use chrono::{Duration, Utc};
+    use chrono::Duration;
 
     use super::*;
     use crate::context::GateCtx;

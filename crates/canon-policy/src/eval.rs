@@ -211,7 +211,7 @@ pub fn evaluate(compiled: &CompiledPolicy, record: &serde_json::Value, now: Date
     }
     if compiled.comprehension_nesting > 0 {
         let longest_list = max_list_len(record);
-        let estimated = (longest_list as u64).checked_pow(compiled.comprehension_nesting as u32).unwrap_or(u64::MAX);
+        let estimated = (longest_list as u64).checked_pow(u32::try_from(compiled.comprehension_nesting).unwrap_or(u32::MAX)).unwrap_or(u64::MAX);
         if estimated > MAX_ESTIMATED_COMPREHENSION_WORK {
             return Err(PolicyError::EvalWorkTooLarge {
                 estimated,
@@ -233,9 +233,8 @@ pub fn evaluate(compiled: &CompiledPolicy, record: &serde_json::Value, now: Date
         // on) — a dropped-receiver send error is expected, not a bug.
         let _ = tx.send(outcome);
     });
-    let handle = match spawned {
-        Ok(handle) => handle,
-        Err(_) => return Err(PolicyError::Panicked),
+    let Ok(handle) = spawned else {
+        return Err(PolicyError::Panicked);
     };
 
     match rx.recv_timeout(budget.0) {
@@ -412,7 +411,7 @@ mod tests {
         let bindings = bindings_for(RecordKind::Task, &SchemaRegistry::load());
         let compiled = compile("record.status == 'completed'", &bindings).unwrap();
         let mut record = task_record();
-        record["pathological"] = serde_json::Value::Array((0..(MAX_RECORD_JSON_NODES + 1) as i64).map(serde_json::Value::from).collect());
+        record["pathological"] = serde_json::Value::Array((0..i64::try_from(MAX_RECORD_JSON_NODES + 1).expect("node cap fits i64")).map(serde_json::Value::from).collect());
         let now = Utc::now();
         let result = evaluate(&compiled, &record, now, EvalBudget::default());
         assert!(matches!(result, Err(PolicyError::RecordTooLarge { .. })), "expected RecordTooLarge, got {result:?}");

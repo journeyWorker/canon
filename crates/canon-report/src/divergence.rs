@@ -109,7 +109,6 @@ mod tests {
     use canon_model::envelope::{Actor, Envelope};
     use canon_model::ids::{RoleId, Sha, TotalOrder};
     use canon_model::records::{DivergenceStatus, EvidenceVerdict};
-    use canon_store::tier::Tier;
     use tempfile::TempDir;
 
     use super::*;
@@ -121,7 +120,7 @@ mod tests {
     // A `#[cfg(test)]` fixture builder mirroring `Divergence`'s own
     // field set — the arg count is inherent to the record it
     // constructs, not a design smell worth a params struct here.
-    #[expect(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "test helper whose argument count is the record's field set; a params struct adds nothing")]
     fn write_divergence(tier: &GitTier, project_id: &str, scenario_id: &str, sha: &str, status: DivergenceStatus, run_seq: u64, round: u32, at: DateTime<Utc>) {
         let divergence = Divergence::new(
             Envelope::new(1, RecordKind::Divergence, at, actor("reviewer")),

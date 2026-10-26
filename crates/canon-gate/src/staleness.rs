@@ -196,6 +196,7 @@ fn git_rev_list_count(repo: &Path, sha: &str) -> Option<u32> {
 /// The staleness [`crate::GateCheck`] (D4) — see module doc for the
 /// two-tier decision and the native `evidence_sha`/`surface_ref`
 /// fields.
+#[derive(Debug)]
 pub struct StalenessCheck;
 
 impl GateCheck for StalenessCheck {

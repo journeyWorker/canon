@@ -626,7 +626,6 @@ impl PromotionGate for CrnPromotionGate {
 mod tests {
     use canon_ingest::verdict::{Becomes, Polarity, VerdictRow};
     use canon_model::ids::RoleId;
-    use chrono::{DateTime, Utc};
 
     use super::*;
     use crate::ids::TrajectoryId;

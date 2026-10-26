@@ -81,6 +81,7 @@ use crate::policy::SpecCoverage;
 
 /// The spec-corpus coverage check. Silent unless `policy.yaml` declares
 /// a `spec_coverage:` section (module doc).
+#[derive(Debug)]
 pub struct SpecCoverageCheck;
 
 impl GateCheck for SpecCoverageCheck {
@@ -466,7 +467,7 @@ mod tests {
     use super::*;
     use crate::policy::{PolicyField, StalenessPolicy};
     use canon_model::{
-        Actor, DivergenceStatus, Divergence, Envelope, EvidenceRecord, RecordKind, RoleId, Scenario, SpecDigest, Subject, TotalOrder,
+        Actor, DivergenceStatus, Divergence, Envelope, RecordKind, RoleId, SpecDigest, TotalOrder,
     };
     use chrono::Utc;
 
@@ -917,7 +918,7 @@ mod tests {
     // ── require_review (issue #2) ──
 
     use crate::policy::RequireReview;
-    use canon_model::{ChangeId, Finding, FindingDisposition, FindingSeverity, ProvenanceRef, Review, StatusOverride, WaivedViolation};
+    use canon_model::{Finding, FindingDisposition, FindingSeverity, ProvenanceRef, Review, StatusOverride, WaivedViolation};
 
     fn reviewing(scope: Vec<SubjectStatus>, distinct_actor: bool) -> Option<SpecCoverage> {
         Some(SpecCoverage::Active {

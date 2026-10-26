@@ -225,6 +225,7 @@ fn resolve_pg_dsn(lookup: impl Fn(&str) -> Option<String>) -> String {
     lookup("CANON_PG_DSN").or_else(|| lookup("DATABASE_URL")).unwrap_or_else(|| "postgres://canon:canon@127.0.0.1:55432/canon_v1".to_string())
 }
 
+#[derive(Debug)]
 pub struct PgTier {
     schema: String,
     pool: sqlx::PgPool,
@@ -465,23 +466,25 @@ impl Tier for PgTier {
     }
     fn purge_before(&self, kind: canon_model::envelope::RecordKind, before: DateTime<Utc>, dry_run: bool) -> Result<PurgeCount, StoreError> {
         self.rt.block_on(async {
-            let matched = sqlx::query(sqlx::AssertSqlSafe(purge_count_sql(&self.schema)))
+            let matched = usize::try_from(sqlx::query(sqlx::AssertSqlSafe(purge_count_sql(&self.schema)))
                 .bind(kind.as_str())
                 .bind(before)
                 .fetch_one(&self.pool)
                 .await
                 .map_err(|e| StoreError::Sql(e.to_string()))?
-                .get::<i64, _>("count") as usize;
+                .get::<i64, _>("count"))
+                .expect("a SQL COUNT is non-negative and fits usize");
             let deleted = if dry_run {
                 0
             } else {
-                sqlx::query(sqlx::AssertSqlSafe(purge_delete_sql(&self.schema)))
+                usize::try_from(sqlx::query(sqlx::AssertSqlSafe(purge_delete_sql(&self.schema)))
                     .bind(kind.as_str())
                     .bind(before)
                     .execute(&self.pool)
                     .await
                     .map_err(|e| StoreError::Sql(e.to_string()))?
-                    .rows_affected() as usize
+                    .rows_affected())
+                    .expect("deleted row count fits usize")
             };
             Ok(PurgeCount { matched, deleted })
         })
@@ -640,9 +643,8 @@ mod tests {
     /// fast — no live Postgres, no `live-pg` feature.
     #[test]
     fn connect_time_outage_classifies_as_tier_unavailable_not_sql() {
-        let err = match PgTier::connect("postgres://user@127.0.0.1:1/db", "canon_v1") {
-            Ok(_) => panic!("an unroutable DSN must fail to connect"),
-            Err(e) => e,
+        let Err(err) = PgTier::connect("postgres://user@127.0.0.1:1/db", "canon_v1") else {
+            panic!("an unroutable DSN must fail to connect")
         };
         assert!(
             matches!(err, StoreError::TierUnavailable { backend: Some(Backend::Postgres), .. }),

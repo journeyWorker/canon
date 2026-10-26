@@ -73,6 +73,16 @@ pub struct ArtifactAdapterEntry {
     pub native_verdict: bool,
 }
 
+impl std::fmt::Debug for ArtifactAdapterEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ArtifactAdapterEntry")
+            .field("adapter_id", &self.adapter.adapter_id())
+            .field("source_kind", &self.source_kind)
+            .field("native_verdict", &self.native_verdict)
+            .finish_non_exhaustive()
+    }
+}
+
 impl ArtifactAdapterEntry {
     pub fn adapter_id(&self) -> &'static str {
         self.adapter.adapter_id()

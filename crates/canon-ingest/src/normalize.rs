@@ -712,7 +712,7 @@ fn deterministic_run_id(session_id: &SessionId, agent_id: Option<&str>, started_
     }
     let digest = hasher.finalize();
     let random = u128::from_be_bytes(digest[0..16].try_into().expect("sha256 digest is >= 16 bytes"));
-    let ulid = ulid::Ulid::from_parts(started_at_ms.max(0) as u64, random);
+    let ulid = ulid::Ulid::from_parts(started_at_ms.max(0).cast_unsigned(), random);
     RunId::parse(ulid.to_string()).expect("Ulid::to_string always yields a valid RunId grammar")
 }
 
@@ -1103,7 +1103,7 @@ mod tests {
         assert_eq!(detail["captured_chars"], 3);
         assert_eq!(detail["redaction_counts"]["secret"], 0);
         assert_eq!(detail["redaction_counts"]["pii"], 0);
-        assert_eq!(detail["text"].as_str().unwrap().chars().count(), detail["captured_chars"].as_u64().unwrap() as usize);
+        assert_eq!(detail["text"].as_str().unwrap().chars().count(), usize::try_from(detail["captured_chars"].as_u64().unwrap()).unwrap());
     }
 
     #[test]

@@ -255,6 +255,7 @@ impl SourceCursor {
 
 /// Reads/writes per-source cursors under a local cursor `root`, one
 /// `<source_id>.json` per source, each written atomically.
+#[derive(Debug)]
 pub struct CursorStore {
     root: PathBuf,
 }
@@ -305,7 +306,6 @@ impl CursorStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     fn p(s: &str) -> PathBuf {
         PathBuf::from(s)

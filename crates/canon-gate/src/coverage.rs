@@ -121,6 +121,7 @@ impl CellSubject {
 /// [`FailureClass::UncoveredCell`] for every (artifact, required-role)
 /// pair `ctx.policy.risk_routing` derives as required but with no
 /// matching-role evidence record (module doc).
+#[derive(Debug)]
 pub struct CoverageCheck;
 
 impl GateCheck for CoverageCheck {

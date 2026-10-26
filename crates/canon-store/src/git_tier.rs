@@ -122,6 +122,7 @@ fn validate_namespaced_kind_matches_content(namespaced_kind: &str, json: &serde_
     }
 }
 
+#[derive(Debug)]
 pub struct GitTier {
     root: PathBuf,
 }
@@ -168,7 +169,7 @@ struct Candidate {
 
 /// Size and modification time of a file: what must be unchanged for a
 /// file read earlier in this process to still be the file on disk.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FileStamp {
     len: u64,
     modified: std::time::SystemTime,
@@ -194,12 +195,13 @@ type Loaded = Result<Arc<RawRecord>, EvidenceViolation>;
 /// whose [`FileStamp`] is unchanged is not read and parsed again, and a
 /// new or changed file is, so the result is always what a fresh scan
 /// returns.
-static FILE_MEMO: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<(PathBuf, RecordKind), (FileStamp, Loaded)>>> = std::sync::LazyLock::new(Default::default);
+type FileMemo = std::sync::Mutex<std::collections::HashMap<(PathBuf, RecordKind), (FileStamp, Loaded)>>;
+static FILE_MEMO: std::sync::LazyLock<FileMemo> = std::sync::LazyLock::new(Default::default);
 
 fn load_candidate(kind: RecordKind, candidate: &Candidate) -> Result<Loaded, StoreError> {
     let key = (candidate.absolute.clone(), kind);
     if let Some(stamp) = candidate.stamp {
-        let memo = FILE_MEMO.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let memo = FILE_MEMO.lock().expect("file memo lock poisoned");
         if let Some((seen, loaded)) = memo.get(&key) {
             if *seen == stamp {
                 return Ok(loaded.clone());
@@ -209,7 +211,7 @@ fn load_candidate(kind: RecordKind, candidate: &Candidate) -> Result<Loaded, Sto
     let bytes = std::fs::read(&candidate.absolute)?;
     let loaded = validate_file(kind, &candidate.relative, &bytes).map(Arc::new);
     if let Some(stamp) = candidate.stamp {
-        FILE_MEMO.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(key, (stamp, loaded.clone()));
+        FILE_MEMO.lock().expect("file memo lock poisoned").insert(key, (stamp, loaded.clone()));
     }
     Ok(loaded)
 }
@@ -771,7 +773,7 @@ impl Tier for GitTier {
 
 #[cfg(test)]
 mod tests {
-    use canon_model::envelope::{Actor, Envelope, RecordKind};
+    use canon_model::envelope::{Actor, Envelope};
     use canon_model::ids::{ChangeId, ProjectId, RoleId, ScenarioId, SpecDigest};
     use canon_model::records::{Change, ChangeStatus, Scenario};
     use chrono::Utc;
@@ -830,7 +832,7 @@ mod tests {
         assert_eq!((first.records.len(), first.violations.len()), (3, 0));
 
         let edited_path = dir.path().join(&edited);
-        let same_size_garbage = vec![b'x'; std::fs::metadata(&edited_path).unwrap().len() as usize];
+        let same_size_garbage = vec![b'x'; usize::try_from(std::fs::metadata(&edited_path).unwrap().len()).unwrap()];
         std::fs::write(&edited_path, same_size_garbage).unwrap();
         set_age(&edited_path, hour - std::time::Duration::from_secs(5));
         std::fs::remove_file(dir.path().join(&gone)).unwrap();

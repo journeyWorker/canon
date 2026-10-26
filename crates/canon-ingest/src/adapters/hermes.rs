@@ -64,6 +64,7 @@ use crate::adapter::{CostSource, ParseOutcome, SessionAdapter, TokenBreakdown, U
 /// exist.
 pub const HERMES_HOME_ENV: &str = "HERMES_HOME";
 
+#[derive(Debug)]
 pub struct HermesAdapter;
 
 impl SessionAdapter for HermesAdapter {
@@ -313,7 +314,10 @@ pub fn parse_hermes_sqlite(db_path: &Path) -> ParseOutcome {
 /// ms) pass through; smaller values are assumed to be Unix seconds and
 /// scaled up.
 fn timestamp_secs_to_ms(timestamp: f64) -> i64 {
-    if timestamp > 1e12 { timestamp as i64 } else { (timestamp * 1000.0) as i64 }
+    let ms = if timestamp > 1e12 { timestamp } else { timestamp * 1000.0 };
+    #[expect(clippy::cast_possible_truncation, reason = "saturating float-to-int is the intended behaviour for out-of-range timestamps")]
+    let ms = ms as i64;
+    ms
 }
 
 /// Resolve `UnifiedRow.provider_id`. Ported verbatim from
@@ -510,7 +514,7 @@ mod tests {
         conn
     }
 
-    #[expect(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "test fixture helper; one positional column per sessions-table field")]
     fn insert_session(
         conn: &Connection,
         id: &str,

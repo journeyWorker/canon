@@ -27,6 +27,7 @@ struct CanonicalApprovalPayload<'a> {
 ///
 /// Surface and effect collections are normalized as sorted sets. The timestamp
 /// is RFC3339 with nanosecond precision, as emitted by `DateTime<Utc>`.
+#[expect(clippy::too_many_arguments, reason = "public signature shared by canon-cli, canon-gate and canon-learn callers; every argument is a distinct signed field")]
 pub fn approval_payload_bytes(
     namespace: &str,
     subject: &str,

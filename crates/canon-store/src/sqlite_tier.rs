@@ -156,6 +156,7 @@ fn delete_sql() -> &'static str {
 /// hanging forever.
 const BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
+#[derive(Debug)]
 pub struct SqliteTier {
     path: PathBuf,
     pool: sqlx::SqlitePool,
@@ -392,23 +393,25 @@ impl Tier for SqliteTier {
     }
     fn purge_before(&self, kind: RecordKind, before: DateTime<Utc>, dry_run: bool) -> Result<PurgeCount, StoreError> {
         self.rt.block_on(async {
-            let matched = sqlx::query(purge_count_sql())
+            let matched = usize::try_from(sqlx::query(purge_count_sql())
                 .bind(kind.as_str())
                 .bind(before)
                 .fetch_one(&self.pool)
                 .await
                 .map_err(|e| StoreError::Sql(e.to_string()))?
-                .get::<i64, _>("count") as usize;
+                .get::<i64, _>("count"))
+                .expect("a SQL COUNT is non-negative and fits usize");
             let deleted = if dry_run {
                 0
             } else {
-                sqlx::query(purge_delete_sql())
+                usize::try_from(sqlx::query(purge_delete_sql())
                     .bind(kind.as_str())
                     .bind(before)
                     .execute(&self.pool)
                     .await
                     .map_err(|e| StoreError::Sql(e.to_string()))?
-                    .rows_affected() as usize
+                    .rows_affected())
+                    .expect("deleted row count fits usize")
             };
             Ok(PurgeCount { matched, deleted })
         })
@@ -446,10 +449,9 @@ impl Tier for SqliteTier {
 
 #[cfg(test)]
 mod tests {
-    use canon_model::envelope::{Actor, Envelope, RecordKind};
+    use canon_model::envelope::{Actor, Envelope};
     use canon_model::ids::{ChangeId, RoleId, RunId};
     use canon_model::records::{Change, ChangeStatus, Trajectory};
-    use chrono::Utc;
 
     use super::*;
 
@@ -568,7 +570,7 @@ mod tests {
             (mode.0, timeout.0)
         });
         assert_eq!(journal_mode.to_lowercase(), "wal");
-        assert_eq!(busy_timeout, BUSY_TIMEOUT.as_millis() as i64);
+        assert_eq!(busy_timeout, i64::try_from(BUSY_TIMEOUT.as_millis()).unwrap());
     }
 
     /// s32 tasks.md 1.3: "dedup no-op on byte-identical resubmission".
@@ -678,9 +680,8 @@ mod tests {
         std::fs::write(&blocking_file, b"i am a file, not a directory").unwrap();
         let db_path = blocking_file.join("hot.db");
 
-        let err = match SqliteTier::connect(&db_path) {
-            Ok(_) => panic!("a parent path component that is a plain file must fail to open"),
-            Err(e) => e,
+        let Err(err) = SqliteTier::connect(&db_path) else {
+            panic!("a parent path component that is a plain file must fail to open")
         };
         assert!(
             matches!(err, StoreError::TierUnavailable { backend: Some(Backend::Sqlite), .. }),
@@ -703,7 +704,7 @@ mod tests {
         let old = trajectory(Utc::now() - chrono::Duration::days(30), 0.3);
         source.write(&old).unwrap();
 
-        let report = source.age(&AgingRule { kind: RecordKind::Trajectory, after: chrono::Duration::days(1), destination: dest.clone() }).unwrap();
+        let report = source.age(&AgingRule { kind: RecordKind::Trajectory, after: chrono::Duration::days(1), destination: std::sync::Arc::<SqliteTier>::clone(&dest) }).unwrap();
         assert_eq!(report.moved, 1);
         assert_eq!(report.already_aged, 0);
         assert_eq!(source.read(&TierQuery::kind(RecordKind::Trajectory)).unwrap().records.len(), 0, "the source row must be gone after aging");

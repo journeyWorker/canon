@@ -24,6 +24,7 @@ use crate::policy::{allowed_signers_path, PolicyDiagnostic, RiskTierRule};
 
 /// Verifies minimum distinct human approvals for the highest matching risk
 /// tier in each existing evidence subject group.
+#[derive(Debug)]
 pub struct RiskApprovalCheck;
 
 impl GateCheck for RiskApprovalCheck {
@@ -267,9 +268,8 @@ fn wildcard_matches(pattern: &str, value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
 
-    use canon_model::{Actor, Envelope, EvidenceApproval, EvidenceRecord, EvidenceVerdict, RecordKind, RoleId, ScenarioId, Sha, TaskId};
+    use canon_model::{Actor, Envelope, RecordKind, RoleId, ScenarioId, Sha, TaskId};
     use chrono::{DateTime, Utc};
     use crate::context::GateCtx;
     use crate::policy::{PolicyField, PolicyResolution, StalenessPolicy};

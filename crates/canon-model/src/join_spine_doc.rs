@@ -8,6 +8,7 @@
 use crate::ids::{ChangeId, HandoffId, RegimeKey, RunId, ScenarioId, Sha, SubjectId, TaskId};
 
 /// One join-spine table row.
+#[derive(Debug)]
 pub struct JoinSpineRow {
     pub key: &'static str,
     pub grammar: &'static str,

@@ -401,7 +401,9 @@ impl GitTier {
 
 /// The directory and file-name test bounding which files can share a
 /// group with a freshly written `raw`. `None`: the whole kind.
-fn scope_of(kind: RecordKind, raw: &RawRecord) -> Option<(PathBuf, Box<dyn Fn(&str) -> bool>)> {
+type Scope = (PathBuf, Box<dyn Fn(&str) -> bool>);
+
+fn scope_of(kind: RecordKind, raw: &RawRecord) -> Option<Scope> {
     let relative = crate::partition::expected_relative_path(kind, &raw.0).ok()?;
     let dir = relative.parent()?.to_path_buf();
     match kind {
@@ -496,7 +498,7 @@ impl GitTier {
 #[cfg(test)]
 mod tests {
     use canon_model::envelope::{Actor, Envelope};
-    use canon_model::ids::{ChangeId, ProjectId, RoleId, ScenarioId, Sha, TotalOrder};
+    use canon_model::ids::{ChangeId, ProjectId, RoleId, Sha, TotalOrder};
     use canon_model::records::{Change, ChangeStatus, Divergence, DivergenceStatus};
     use canon_model::{EvidenceVerdict, FlaggedOverlay, Review, ProvenanceRef};
     use chrono::{Duration, TimeZone, Utc};

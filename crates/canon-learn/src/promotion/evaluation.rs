@@ -89,7 +89,7 @@ fn sha256<T: Serialize>(value: &T) -> String {
 }
 
 impl PromotionEvaluation {
-    #[expect(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "constructor mirrors the evaluation record's field list; callers pass each field positionally")]
     pub fn new(
         candidate: &StrategyItem,
         candidate_version: impl Into<String>,

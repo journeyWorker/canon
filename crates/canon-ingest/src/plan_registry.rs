@@ -48,6 +48,15 @@ pub struct PlanAdapterEntry {
     pub write_back: Option<&'static dyn PlanWriteBack>,
 }
 
+impl std::fmt::Debug for PlanAdapterEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PlanAdapterEntry")
+            .field("dialect_id", &self.adapter.dialect_id())
+            .field("write_back", &self.write_back.is_some())
+            .finish_non_exhaustive()
+    }
+}
+
 impl PlanAdapterEntry {
     pub fn dialect_id(&self) -> &'static str {
         self.adapter.dialect_id()

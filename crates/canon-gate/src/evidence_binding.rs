@@ -170,6 +170,7 @@ pub fn binding_summary(ctx: &GateContext) -> Option<BindingSummary> {
 }
 
 /// The `canon gate check` arm (module doc).
+#[derive(Debug)]
 pub struct EvidenceBindingCheck;
 
 impl GateCheck for EvidenceBindingCheck {

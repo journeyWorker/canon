@@ -20,6 +20,7 @@ use crate::roots::Roots;
 /// this workspace enables no `preserve_order` feature anywhere,
 /// verified across every `Cargo.toml`, 2026-07-11) plus every row
 /// `-json` mode returned.
+#[derive(Debug)]
 pub struct MartResult {
     pub columns: &'static [&'static str],
     pub rows: Vec<Row>,
@@ -30,7 +31,7 @@ pub struct MartResult {
 /// renders. [`MartSpec::sql`] is the ONLY place a mart's statement is
 /// built, so the batched all-marts read ([`fetch_all`]) and a targeted
 /// single-mart read cannot issue different SQL for the same panel.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct MartSpec {
     pub view: &'static str,
     pub order_by: &'static str,
@@ -84,7 +85,6 @@ pub fn fetch_run_observability(roots: &Roots) -> Result<MartResult, ReportError>
 
 /// Run observability is appended after the established nine panels so
 /// existing consumers retain their table order.
-
 pub const ROLE_MEMORY_COLUMNS: &[&str] =
     &["role", "regime_key", "strategy_count", "active_count", "demoted_count", "hit_rate", "avg_source_trajectories", "latest_recorded_at"];
 
@@ -421,6 +421,7 @@ pub const REPORT_MARTS: [MartSpec; 10] =
 /// ten are one READ before they are ten panels: [`fetch_all`] is the
 /// only thing that builds this struct, and it builds it from one
 /// corpus.
+#[derive(Debug)]
 pub struct ReportMarts {
     pub trust_matrix: MartResult,
     pub session_costs: MartResult,

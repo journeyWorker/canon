@@ -75,6 +75,7 @@ use crate::normalize::{normalize_workspace_key, workspace_label_from_key};
 /// `clients.rs:190-201`).
 pub const CODEX_HOME_ENV: &str = "CODEX_HOME";
 
+#[derive(Debug)]
 pub struct CodexAdapter;
 
 /// Ported from `codex.rs:26-31`.
@@ -778,9 +779,8 @@ fn flush_pending_model_messages_as_unknown(pending: &mut Vec<(UnifiedRow, bool)>
 /// Ported from `codex.rs:905-923`, adapted to always start from
 /// `CodexParseState::default()` (see module doc — no incremental resume).
 fn parse_codex_file(path: &Path) -> ParseOutcome {
-    let file = match std::fs::File::open(path) {
-        Ok(f) => f,
-        Err(_) => return ParseOutcome::default(),
+    let Ok(file) = std::fs::File::open(path) else {
+        return ParseOutcome::default();
     };
 
     let session_id = session_id_from_path(path);
@@ -862,7 +862,7 @@ fn file_modified_timestamp_ms(path: &Path) -> i64 {
     std::fs::metadata(path)
         .and_then(|meta| meta.modified())
         .ok()
-        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok()).map_or_else(|| chrono::Utc::now().timestamp_millis(), |duration| duration.as_millis() as i64)
+        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok()).map_or_else(|| chrono::Utc::now().timestamp_millis(), |duration| i64::try_from(duration.as_millis()).expect("epoch millis fit in i64"))
 }
 
 /// Ported from the donor session-parser project's provider-identity module
