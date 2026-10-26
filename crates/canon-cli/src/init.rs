@@ -389,7 +389,7 @@ impl InitLog {
         self.steps.push(InitStep { step: step.to_string(), detail: detail.into() });
     }
 
-    fn finish(self, repo: &Path) -> i32 {
+    fn finish(self, repo: &Path) -> u8 {
         if self.emit_data {
             if !self.wrote {
                 crate::json_out::mark_unchanged();
@@ -558,7 +558,7 @@ fn language_section(language: Option<&crate::language::Language>) -> String {
 /// Installs the canon skill for the chosen harnesses through
 /// [`skills::install_canonical`] (which follows the `skills.providers`
 /// just written), and prints what happened. `Err` carries the exit code.
-fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkills, dry_run: bool, log: &mut InitLog) -> Result<(), i32> {
+fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkills, dry_run: bool, log: &mut InitLog) -> Result<(), u8> {
     if chosen.providers.is_empty() {
         if chosen.recorded {
             log.step("skills-none", "skills.providers is []", "canon init: skills.providers is [] — no canon skill installed; change it with `canon skills install --providers=<list>`".to_string());
@@ -676,13 +676,13 @@ fn scaffold_policy(repo: &Path, level: PolicyLevel, dry_run: bool, log: &mut Ini
 /// - A fresh repo also records and installs the harness choice
 ///   ([`SkillsChoice`], 0.17 D5); an install that fails after the writes
 ///   exits `2` naming the retry. A rerun never asks and never installs.
-pub fn run_init(repo: &Path, options: InitOptions, json: bool) -> i32 {
+pub fn run_init(repo: &Path, options: InitOptions, json: bool) -> u8 {
     run_init_in(repo, options, json, true)
 }
 
 /// [`run_init`], with `emit_data: false` leaving the JSON document to the
 /// calling command (`canon demo init`).
-pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_data: bool) -> i32 {
+pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_data: bool) -> u8 {
     let dry_run = options.dry_run;
     let mut log = InitLog::new(json, dry_run, emit_data);
     if let Err(e) = (!dry_run).then(|| fs::create_dir_all(repo)).transpose() {
@@ -809,7 +809,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
 /// least one present section fails -- printing one PASS/FAIL/"not
 /// configured" line per section regardless (never stopping at the
 /// first failure, design D7).
-pub fn run_check_config(repo: &Path, json: bool) -> i32 {
+pub fn run_check_config(repo: &Path, json: bool) -> u8 {
     let canon_yaml_path = repo.join("canon.yaml");
     let Ok(text) = fs::read_to_string(&canon_yaml_path) else {
         return CliError::refused("CONFIG_MISSING", format!("`{}` does not exist; run `canon init` first", canon_yaml_path.display())).hint("run `canon init` in the repository root first").emit("canon init --check", json);

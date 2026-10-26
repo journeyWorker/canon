@@ -706,7 +706,7 @@ pub struct EvidenceAddReport {
 impl crate::reports::Report for EvidenceAddReport {}
 
 /// Emit only the exact signable bytes to stdout; never stage or sign.
-pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> i32 {
+pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> u8 {
     use std::io::Write;
     let repo = resolve_repo_root(repo);
     if let Some(project_id) = &args.project_id {
@@ -749,7 +749,7 @@ pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> i32 {
 /// `canon_gate::stage_divergence`, and it is the honest shape — two
 /// attestations made at two times are two pieces of evidence, not one
 /// re-stated.
-pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
+pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     // `validate_task_binding` resolves `<repo>/canon.yaml` directly, no
     // ancestor walk of its own — so the walk happens HERE, once, exactly
     // as `crate::gate`'s every subcommand does it.
@@ -1277,7 +1277,7 @@ fn check_artifact_scopes(args: &EvidenceArgs) -> Result<(), CliError> {
 /// share the stored report blob and `--artifact` files. Prints one line
 /// per record, then each unindexed scenario id it skipped, then any
 /// review the batch makes stale.
-fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
+fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
     let project_id = args.project_id.as_ref().expect("--all-scenarios requires --project-id, checked by check_all_scenarios_flags");
     let mut gate_context = match load_gate_context(repo) {
         Ok(ctx) => ctx,
@@ -1322,7 +1322,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
     let flow_changes = crate::brief_check::FlowChangesIndex::lazy();
     let refusals: Vec<Vec<BriefRefusal>> = scenario_ids.iter().map(|id| brief_refusals(repo, &gate_context, &flow_changes, None, Some((project_id, id)))).collect();
     if let Err(error) = report_brief_refusals(args, &refusals.concat()) {
-        let hint = format!("no record of the batch is written; {}", error.hint.as_deref().unwrap_or_default());
+        let hint = format!("no record of the batch is written; {}", error.hint_text().unwrap_or_default());
         return error.hint(hint).emit("canon evidence add", args.json);
     }
 
@@ -1460,7 +1460,7 @@ fn land_batch(
     bodies: Vec<serde_json::Value>,
     promote: bool,
     write: &mut dyn FnMut(&GitTier, &RawWrite) -> Result<canon_store::tier::WriteReceipt, canon_store::tier::StoreError>,
-) -> Result<LandedBatch, (String, i32)> {
+) -> Result<LandedBatch, (String, u8)> {
     let staging_root = evidence_staging_dir(ledger_root);
     let kind_dir = format!("kind={}", RecordKind::EvidenceRecord.as_str());
     let mut destinations = vec![staging_root.join(&kind_dir)];
@@ -1644,7 +1644,7 @@ fn repin_command(review: &Review) -> String {
 /// whatever it could store: whether an unstored file matters is the
 /// gate's question, and a superseded record's lost file never does. `2`
 /// when the ledger cannot be read or a write fails.
-pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) -> i32 {
+pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) -> u8 {
     use canon_gate::artifact_store::{working_tree_path, ArtifactStore, Observed, StoreError, StoreLock, StoreOutcome, MIB};
 
     let repo = resolve_repo_root(repo);

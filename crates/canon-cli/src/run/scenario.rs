@@ -10,7 +10,7 @@ pub fn run(cmd: ScenarioCommand) -> ExitCode {
             let at = Utc::now().with_nanosecond(0).expect("0 is a valid nanosecond");
             let actor = crate::role::attributed(&actor_id, None, session.session_id.as_ref());
             let spec = crate::scaffold::ScenarioSpec { tag, title, subject: subject_id, lane, case, flow, change: change_id, feature, project: project_id };
-            ExitCode::from(crate::scaffold::run_scenario_new(&repo, &spec, &actor, at, json) as u8)
+            ExitCode::from(crate::scaffold::run_scenario_new(&repo, &spec, &actor, at, json))
         }
     }
 }

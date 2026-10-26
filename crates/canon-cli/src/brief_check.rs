@@ -103,7 +103,7 @@ use crate::context::resolve_repo_root;
 use crate::language::{Language, Resolved, Shipped, Tally};
 
 /// Exit code for blocker findings (D4: a finding is exit 1).
-const EXIT_BLOCKERS: i32 = crate::cli_error::EXIT_FAILED;
+const EXIT_BLOCKERS: u8 = crate::cli_error::EXIT_FAILED;
 
 /// A finding's severity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
@@ -1951,7 +1951,7 @@ pub fn status_report(repo: &Path, change: &ChangeId, building: bool) -> Option<(
 
 // ───────────────────────────── commands ─────────────────────────────
 
-fn fail(command: &str, json: bool, error: &CliError) -> i32 {
+fn fail(command: &str, json: bool, error: &CliError) -> u8 {
     error.emit(command, json)
 }
 
@@ -1976,7 +1976,7 @@ pub struct BriefCheckReport<'a> {
 impl Report for BriefCheckReport<'_> {}
 
 /// `canon brief check [--change-id <slug>] [--json]`.
-pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
+pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let checked = match check(&repo, change) {
         Ok(checked) => checked,
@@ -2092,7 +2092,7 @@ pub struct BriefShowReport<'a> {
 impl Report for BriefShowReport<'_> {}
 
 /// `canon brief show [<change>] [--json]`: state and next steps.
-pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> i32 {
+pub fn run_next(repo: &Path, change: Option<&ChangeId>, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let checked = match check(&repo, change) {
         Ok(checked) => checked,

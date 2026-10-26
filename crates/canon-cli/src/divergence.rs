@@ -183,7 +183,7 @@ pub fn run_stage(
     session: Option<&SessionId>,
     promote: crate::write_mode::PromoteFlag,
     json: bool,
-) -> i32 {
+) -> u8 {
     let repo = resolve_repo_root(repo);
     if let Err(error) = crate::inventory::require_spec_root(&repo, project_id) {
         return error.emit("canon divergence add", json);
@@ -286,7 +286,7 @@ fn run_commit(
     role: &RoleId,
     session: Option<&SessionId>,
     json: bool,
-) -> i32 {
+) -> u8 {
     let repo = resolve_repo_root(repo);
     if let Err(error) = crate::inventory::require_spec_root(&repo, project_id) {
         return error.emit(&format!("canon divergence {verb}"), json);
@@ -337,7 +337,7 @@ pub fn run_resolve(
     role: &RoleId,
     session: Option<&SessionId>,
     json: bool,
-) -> i32 {
+) -> u8 {
     run_commit("resolve", repo, project_id, scenario_id, commit, DivergenceStatus::Resolved, round, reviewer, detail, actor_id, role, session, json)
 }
 
@@ -357,7 +357,7 @@ pub fn run_defer(
     role: &RoleId,
     session: Option<&SessionId>,
     json: bool,
-) -> i32 {
+) -> u8 {
     run_commit(
         "defer",
         repo,
@@ -399,7 +399,7 @@ pub struct AcceptArgs {
 /// `--reason` or `--tracking`; a scenario with no record; evidence that is
 /// not divergent; the evidence's own actor or session. Returns the exit
 /// code: `0` on success, `2` refused.
-pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
+pub fn run_accept(repo: &Path, args: &AcceptArgs) -> u8 {
     const CMD: &str = "canon divergence accept";
     let invalid = |message: String, field: &str| {
         CliError::refused("DIVERGENCE_INVALID_ARGUMENT", message)
@@ -537,7 +537,7 @@ pub fn run_accept(repo: &Path, args: &AcceptArgs) -> i32 {
 /// The fields of one `divergence list` scenario row, which `--fields` may name.
 const ROW_FIELDS: [&str; 6] = ["projectId", "scenarioId", "state", "reason", "expiry", "tracking"];
 
-pub fn run_list(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &crate::paging::Page, fields: Option<&[String]>) -> i32 {
+pub fn run_list(repo: &Path, as_of: Option<DateTime<Utc>>, json: bool, page: &crate::paging::Page, fields: Option<&[String]>) -> u8 {
     if let Some(requested) = fields {
         if let Err(e) = crate::paging::check_known("canon divergence list", requested, &ROW_FIELDS) {
             return e.emit("canon divergence list", json);

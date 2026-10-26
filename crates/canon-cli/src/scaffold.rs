@@ -500,7 +500,7 @@ impl Report for FeatureNewReport<'_> {}
 /// `spec.project` is `--project-id <id>`: which configured `specs.roots[]`
 /// entry the DERIVED path lands under, selected by the root's `id`
 /// exactly as [`run_feature_new`] selects it ([`resolve_spec_root`]).
-pub fn run_scenario_new(repo: &Path, spec: &ScenarioSpec, actor: &Actor, at: DateTime<Utc>, json: bool) -> i32 {
+pub fn run_scenario_new(repo: &Path, spec: &ScenarioSpec, actor: &Actor, at: DateTime<Utc>, json: bool) -> u8 {
     let repo_root = resolve_repo_root(repo);
     let planned = match Planner::new(&repo_root).and_then(|mut planner| planner.plan(spec)) {
         Ok(planned) => planned,
@@ -564,7 +564,7 @@ pub fn run_feature_new(
     actor: &Actor,
     at: DateTime<Utc>,
     json: bool,
-) -> i32 {
+) -> u8 {
     let repo_root = resolve_repo_root(repo);
     let roots = match SyncCtx::from_repo(&repo_root).and_then(|ctx| ctx.spec_roots(None)) {
         Ok(roots) => roots,

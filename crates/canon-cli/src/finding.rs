@@ -510,7 +510,7 @@ impl crate::reports::Report for FindingListFieldsReport<'_> {}
 /// REFUSED rather than staged as a second record. Two attestations at
 /// two times are two pieces of evidence, but two records claiming to be
 /// the same numbered finding are a corrupted count.
-pub fn run_add(repo: &Path, args: &FindingArgs) -> i32 {
+pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
     let repo = resolve_repo_root(repo);
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
@@ -766,7 +766,7 @@ fn reason_shape(args: &FindingCloseArgs) -> String {
 /// [`Finding::is_disposition_transition_of`] itself, so the exemption is
 /// enforced at the authority and a hand-written body must clear the
 /// same bar as this command's output.
-pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> i32 {
+pub fn run_close(repo: &Path, args: &FindingCloseArgs) -> u8 {
     let repo = resolve_repo_root(repo);
     let promote = match crate::write_mode::should_promote(&repo, args.promote) {
         Ok(promote) => promote,
@@ -1009,7 +1009,7 @@ fn current_findings(tier: &GitTier, change_id: &ChangeId) -> Result<Vec<Finding>
 /// Committed findings only: a staged one is not yet a record, and its
 /// count is named on stderr with the command that commits it. Exit `0`
 /// whether or not anything matched; `2` when the ledger cannot be read.
-pub fn run_list(repo: &Path, args: &FindingListArgs) -> i32 {
+pub fn run_list(repo: &Path, args: &FindingListArgs) -> u8 {
     let repo = resolve_repo_root(repo);
     let ledger_root = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx.ledger_root,

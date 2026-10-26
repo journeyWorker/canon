@@ -226,7 +226,7 @@ pub fn check_spec_root(roots: &[SpecRoot], project_id: &ProjectId) -> Result<(),
 /// the one given, else the only root `canon.yaml` configures. With several
 /// roots and none given the leaf refuses with `code`, naming the roots. The
 /// id given is not checked here ([`require_spec_root`] does that).
-pub fn resolve_project_id(repo: &Path, given: Option<&ProjectId>, code: &'static str, command: &str, json: bool) -> Result<ProjectId, i32> {
+pub fn resolve_project_id(repo: &Path, given: Option<&ProjectId>, code: &'static str, command: &str, json: bool) -> Result<ProjectId, u8> {
     use crate::cli_error::CliError;
     if let Some(id) = given {
         return Ok(id.clone());

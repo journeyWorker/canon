@@ -11,7 +11,7 @@ use super::record_role;
 /// the only root `canon.yaml` configures.
 fn project_for(repo: &Path, given: Option<ProjectId>, command: &str, json: bool) -> Result<ProjectId, ExitCode> {
     let repo = crate::context::resolve_repo_root(repo);
-    crate::inventory::resolve_project_id(&repo, given.as_ref(), "EVIDENCE_INVALID_ARGUMENT", command, json).map_err(|code| ExitCode::from(code as u8))
+    crate::inventory::resolve_project_id(&repo, given.as_ref(), "EVIDENCE_INVALID_ARGUMENT", command, json).map_err(|code| ExitCode::from(code))
 }
 
 pub fn run(cmd: EvidenceCommand) -> ExitCode {
@@ -29,7 +29,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
             };
             let commit = match crate::git_rev::bind(&repo, &rev.rev) {
                 Ok(commit) => commit,
-                Err(error) => return ExitCode::from(error.emit("canon evidence approval-payload", json) as u8),
+                Err(error) => return ExitCode::from(error.emit("canon evidence approval-payload", json)),
             };
             ExitCode::from(crate::evidence::run_approval_payload(
                 &repo,
@@ -37,7 +37,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
                     task_id, scenario_id, project_id, run_id, artifact_sha: commit.sha,
                     surface_ref, approval_by: approver, approval_at, json,
                 },
-            ) as u8)
+            ))
         }
         EvidenceCommand::Add(EvidenceAddArgs {
             task_id,
@@ -76,7 +76,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
                     CliError::refused("EVIDENCE_INVALID_ARGUMENT", "`--class audit` is not an `evidence add` class: an external evaluator's re-audit is its own command")
                         .field("--class")
                         .hint("use `canon evidence audit <SCENARIO_ID> --ref <REF> --evaluator-id <ID> --evaluator-version <TEXT> --evaluator-digest <SHA256> --audit-result <confirmed|refuted|indeterminate>`")
-                        .emit("canon evidence add", json) as u8,
+                        .emit("canon evidence add", json),
                 );
             }
             let project_id = if scenario_id.is_some() || all_scenarios {
@@ -93,7 +93,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
             };
             let commit = match crate::git_rev::bind(&repo, &rev.rev) {
                 Ok(commit) => commit,
-                Err(error) => return ExitCode::from(error.emit("canon evidence add", json) as u8),
+                Err(error) => return ExitCode::from(error.emit("canon evidence add", json)),
             };
             crate::inventory::refresh_stale_index(&repo, "canon evidence add");
             ExitCode::from(
@@ -131,7 +131,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
                         promote: promote.flag(),
                         json,
                     },
-                ) as u8,
+                ),
             )
         }
         EvidenceCommand::Audit(EvidenceAuditArgs {
@@ -169,7 +169,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
             };
             let commit = match crate::git_rev::bind(&repo, &rev.rev) {
                 Ok(commit) => commit,
-                Err(error) => return ExitCode::from(error.emit("canon evidence audit", json) as u8),
+                Err(error) => return ExitCode::from(error.emit("canon evidence audit", json)),
             };
             crate::inventory::refresh_stale_index(&repo, "canon evidence audit");
             ExitCode::from(
@@ -207,7 +207,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
                         promote: promote.flag(),
                         json,
                     },
-                ) as u8,
+                ),
             )
         }
     }

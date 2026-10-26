@@ -31,8 +31,8 @@ use crate::context::resolve_repo_root;
 use crate::policy_approval::ApprovalState;
 use canon_ingest::markdown::{field, without_field};
 
-const EXIT_REFUSED: i32 = 2;
-const EXIT_ERROR: i32 = 1;
+const EXIT_REFUSED: u8 = 2;
+const EXIT_ERROR: u8 = 1;
 
 /// `text` approved: its `Approved:` lines replaced by one that binds the
 /// result's remaining text. `Err` when the line would not be read back
@@ -72,7 +72,7 @@ fn hint_for(code: &str) -> &'static str {
     }
 }
 
-fn refuse(code: &'static str, message: &str, exit: i32) -> CliError {
+fn refuse(code: &'static str, message: &str, exit: u8) -> CliError {
     CliError::failed(code, message).hint(hint_for(code)).with_exit(exit)
 }
 
@@ -156,7 +156,7 @@ fn verify_bytes(brief: &str, bytes: Option<&[u8]>, expected: &str) -> Result<(),
 }
 
 /// `canon brief approve`. Returns the process exit code.
-pub fn run_approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, json: bool) -> i32 {
+pub fn run_approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let (approved, unchanged) = match approve_checked(&repo, change, by, note, None) {
         Ok(done) => done,

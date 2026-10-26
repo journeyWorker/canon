@@ -436,7 +436,7 @@ pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool, error: O
     let tokens: Vec<String> = tokens.iter().flat_map(|t| t.split_whitespace()).map(str::to_string).collect();
     let resolved = match resolve(root, &tokens) {
         Ok(r) => r,
-        Err(Refusal(msg)) => return crate::cli_error::CliError::refused("UNKNOWN_COMMAND", msg).hint("`canon schema` lists every command").emit("canon schema", json) as u8,
+        Err(Refusal(msg)) => return crate::cli_error::CliError::refused("UNKNOWN_COMMAND", msg).hint("`canon schema` lists every command").emit("canon schema", json),
     };
     let nodes = spec::nodes(root);
     match resolved {
@@ -487,7 +487,7 @@ fn print_error(code: &str, json: bool) -> u8 {
         if !nearest.is_empty() {
             error = error.suggestions(nearest.iter().map(std::string::ToString::to_string).collect::<Vec<_>>());
         }
-        return error.emit("canon schema", json) as u8;
+        return error.emit("canon schema", json);
     };
     if json {
         crate::json_out::data("schema", &SchemaReport::Error(ErrorEntry { error: row }));

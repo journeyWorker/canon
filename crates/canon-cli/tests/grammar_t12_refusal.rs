@@ -307,7 +307,7 @@ fn every_write_leaf_has_one_refusal_recipe_naming_a_code_it_lists() {
             problems.push(format!("{}: the spec does not list `{}` among {:?}", row.leaf, row.code, error_codes(node)));
         }
         match registry.iter().find(|info| info.code == row.code) {
-            Some(info) if info.exit == row.exit => {}
+            Some(info) if i32::from(info.exit) == row.exit => {}
             Some(info) => problems.push(format!("{}: `{}` exits {} in the registry, the row says {}", row.leaf, row.code, info.exit, row.exit)),
             None => problems.push(format!("{}: `{}` is not a registered code", row.leaf, row.code)),
         }

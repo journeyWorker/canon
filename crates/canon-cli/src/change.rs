@@ -126,7 +126,7 @@ impl crate::reports::Report for ChangeNewReport<'_> {}
 
 /// `canon change new` (module doc). Exit `0` written + adopted, `2`
 /// refused or failed with nothing left behind.
-pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: ChangeKind, title: &str, json: bool) -> i32 {
+pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: ChangeKind, title: &str, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let language = match crate::language::configured(&repo) {
         Ok(language) => language,

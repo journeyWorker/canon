@@ -46,7 +46,7 @@ pub(super) fn run_query(
             Ok(outcome) => {
                 let outcome = match crate::query::page_outcome(outcome, &page, fields, false) {
                     Ok(outcome) => outcome,
-                    Err(err) => return ExitCode::from(err.emit("canon query", json) as u8),
+                    Err(err) => return ExitCode::from(err.emit("canon query", json)),
                 };
                 let _ = crate::retention::audit_query(repo, kind, since, include_sensitive, outcome.records.len());
                 if json {
@@ -57,7 +57,7 @@ pub(super) fn run_query(
                 ExitCode::SUCCESS
             }
             Err(err) => {
-                ExitCode::from(CliError::failed("QUERY_FAILED", err.to_string()).hint("run `canon inventory sync` to rebuild the index, then run the query again").emit("canon query", json) as u8)
+                ExitCode::from(CliError::failed("QUERY_FAILED", err.to_string()).hint("run `canon inventory sync` to rebuild the index, then run the query again").emit("canon query", json))
             }
         };
     };
@@ -66,7 +66,7 @@ pub(super) fn run_query(
         Ok((outcome, plugin_outcome)) => {
             let outcome = match crate::query::page_outcome(outcome, &page, fields, true) {
                 Ok(outcome) => outcome,
-                Err(err) => return ExitCode::from(err.emit("canon query", json) as u8),
+                Err(err) => return ExitCode::from(err.emit("canon query", json)),
             };
             let _ = crate::retention::audit_query(repo, kind, since, include_sensitive, outcome.records.len());
             for msg in &plugin_outcome.diagnostics {
@@ -87,7 +87,7 @@ pub(super) fn run_query(
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(CliError::failed("QUERY_FAILED", err.to_string()).hint("run `canon inventory sync` to rebuild the index, then run the query again").emit("canon query", json) as u8)
+            ExitCode::from(CliError::failed("QUERY_FAILED", err.to_string()).hint("run `canon inventory sync` to rebuild the index, then run the query again").emit("canon query", json))
         }
     }
 }
@@ -127,7 +127,7 @@ pub(super) fn run_fmt(dir: Option<&std::path::Path>, repo: &crate::cli::RepoArgs
                 let error = CliError::refused("REPO_UNREADABLE", format!("`{}` is not a directory, so there is no corpus to check", resolved.display()))
                     .field("dir")
                     .hint("pass the corpus directory, e.g. `canon format .canon/specs`, relative to the current directory or to --repo");
-                return ExitCode::from(error.emit("canon format", json) as u8);
+                return ExitCode::from(error.emit("canon format", json));
             }
             check("dir", dir.display().to_string(), &resolved, &mut coverage);
         }
@@ -136,7 +136,7 @@ pub(super) fn run_fmt(dir: Option<&std::path::Path>, repo: &crate::cli::RepoArgs
                 Ok(roots) => roots,
                 Err(err) => {
                     let error = CliError::refused("CONFIG_UNREADABLE", err.to_string()).hint("fix `specs.roots` in canon.yaml (`canon init --check` reports what is wrong), or pass the corpus directory: `canon format <DIR>`");
-                    return ExitCode::from(error.emit("canon format", json) as u8);
+                    return ExitCode::from(error.emit("canon format", json));
                 }
             };
             for root in roots {
@@ -155,7 +155,7 @@ pub(super) fn run_fmt(dir: Option<&std::path::Path>, repo: &crate::cli::RepoArgs
     let data = crate::fmt::format_json(&report, unverifiable);
     if unverifiable {
         let error = crate::coverage::unverifiable_error("canon format", "0 files", "author a spec with `canon feature new`, or pass the corpus directory: `canon format <DIR>`");
-        return ExitCode::from(error.emit_with_data_and_meta("canon format", json, &data, coverage.meta()) as u8);
+        return ExitCode::from(error.emit_with_data_and_meta("canon format", json, &data, coverage.meta()));
     }
     if report.is_clean() {
         if json {
@@ -166,7 +166,7 @@ pub(super) fn run_fmt(dir: Option<&std::path::Path>, repo: &crate::cli::RepoArgs
         let missing_provenance = report.violations.iter().any(|v| v.class == canon_fmt::FmtFailureClass::MissingProvenance);
         let hint = with_provenance_fix("fix each violation named in data.violations, then run `canon format` again", missing_provenance);
         let error = CliError::failed("FORMAT_VIOLATIONS", format!("{} violation(s) in {} checked file(s)", report.violations.len(), report.files_checked)).hint(hint);
-        ExitCode::from(error.emit_with_data_and_meta("canon format", json, &data, coverage.meta()) as u8)
+        ExitCode::from(error.emit_with_data_and_meta("canon format", json, &data, coverage.meta()))
     }
 }
 
@@ -180,7 +180,7 @@ pub(super) fn run_fmt(dir: Option<&std::path::Path>, repo: &crate::cli::RepoArgs
 /// present section fails).
 pub(super) fn run_init(repo: &std::path::Path, check_config: bool, options: crate::init::InitOptions, json: bool) -> ExitCode {
     let code = if check_config { crate::init::run_check_config(repo, json) } else { crate::init::run_init(repo, options, json) };
-    ExitCode::from(code as u8)
+    ExitCode::from(code)
 }
 
 /// A capability query, never validation (invariant 1): always
@@ -192,7 +192,7 @@ pub(super) fn run_init(repo: &std::path::Path, check_config: bool, options: crat
 pub(super) fn run_context(repo: &std::path::Path, json: bool, fields: Option<Vec<String>>, role: Option<crate::role::Role>) -> ExitCode {
     if let Some(requested) = &fields {
         if let Err(e) = crate::paging::check_known("canon context", requested, &crate::context::SURFACE_FIELDS) {
-            return ExitCode::from(e.emit("canon context", json) as u8);
+            return ExitCode::from(e.emit("canon context", json));
         }
     }
     let repo = crate::context::resolve_repo_root(repo);
@@ -237,7 +237,7 @@ pub(super) fn run_retrieve(repo: &std::path::Path, role: &RoleId, regime: Option
             ExitCode::SUCCESS
         }
         Err(e) => {
-            ExitCode::from(CliError::refused("RETRIEVE_FAILED", e.to_string()).hint("check --role and --regime (`canon regime show` prints a valid key) and that the ledger is readable").emit("canon retrieve", json) as u8)
+            ExitCode::from(CliError::refused("RETRIEVE_FAILED", e.to_string()).hint("check --role and --regime (`canon regime show` prints a valid key) and that the ledger is readable").emit("canon retrieve", json))
         }
     }
 }
@@ -262,7 +262,7 @@ pub(super) fn run_regime_show(role: &str, repo: &str, area: &str, hash: &str, js
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(CliError::refused("REGIME_KEY_INVALID", err.to_string()).hint("a regime key is <role>/<repo>/<area>/<hash>; `canon regime show --help` lists the inputs").emit("canon regime show", json) as u8)
+            ExitCode::from(CliError::refused("REGIME_KEY_INVALID", err.to_string()).hint("a regime key is <role>/<repo>/<area>/<hash>; `canon regime show --help` lists the inputs").emit("canon regime show", json))
         }
     }
 }
@@ -299,7 +299,7 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
     let (repo, inputs) = match crate::report::resolve_inputs(repo) {
         Ok(resolved) => resolved,
         Err(err) => {
-            return ExitCode::from(CliError::refused("CONFIG_UNREADABLE", err.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(command, json) as u8);
+            return ExitCode::from(CliError::refused("CONFIG_UNREADABLE", err.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(command, json));
         }
     };
 
@@ -321,7 +321,7 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
                 ExitCode::SUCCESS
             }
             Err(err) => {
-                ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).hint("check that the ledger is readable (`canon gate check` shows its state), then run the command again").emit("canon report snapshot", json) as u8)
+                ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).hint("check that the ledger is readable (`canon gate check` shows its state), then run the command again").emit("canon report snapshot", json))
             }
         };
     }
@@ -345,11 +345,11 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
                     ExitCode::SUCCESS
                 } else {
                     let error = CliError::failed("REPORT_STALE", format!("the report is {state}")).hint("regenerate it with `canon report build`");
-                    ExitCode::from(error.emit_with_data("canon report check", json, &data) as u8)
+                    ExitCode::from(error.emit_with_data("canon report check", json, &data))
                 }
             }
             Err(err) => {
-                ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).hint("check that the ledger is readable (`canon gate check` shows its state), then run the command again").emit("canon report check", json) as u8)
+                ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).hint("check that the ledger is readable (`canon gate check` shows its state), then run the command again").emit("canon report check", json))
             }
         };
     }
@@ -363,7 +363,7 @@ pub(super) fn run_report(repo: &std::path::Path, check: bool, snapshot_dir: Opti
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).hint("check that the ledger is readable (`canon gate check` shows its state), then run the command again").emit("canon report build", json) as u8)
+            ExitCode::from(CliError::failed("REPORT_FAILED", err.to_string()).hint("check that the ledger is readable (`canon gate check` shows its state), then run the command again").emit("canon report build", json))
         }
     }
 }
@@ -401,7 +401,7 @@ pub(super) fn run_dashboard(repo: &std::path::Path, snapshot: Option<&std::path:
             bound.serve_forever();
             ExitCode::SUCCESS
         }
-        Err(err) => ExitCode::from(err.to_cli_error().emit("canon dashboard", json) as u8),
+        Err(err) => ExitCode::from(err.to_cli_error().emit("canon dashboard", json)),
     }
 }
 

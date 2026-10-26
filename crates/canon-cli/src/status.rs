@@ -390,7 +390,7 @@ pub fn policy_warning(policy: &PolicyResolution) -> Option<String> {
 }
 
 /// `canon status`: resolve, report, exit `0`.
-pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> i32 {
+pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> u8 {
     if let Some(requested) = fields {
         if let Err(e) = crate::paging::check_known("canon status", requested, &REPORT_FIELDS) {
             return e.emit("canon status", json);

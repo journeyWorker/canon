@@ -112,7 +112,7 @@ impl BindError {
         }
     }
 
-    pub fn exit_code(&self) -> i32 {
+    pub fn exit_code(&self) -> u8 {
         match self {
             BindError::Usage { .. } => 2,
             BindError::Contradiction(_) => 1,

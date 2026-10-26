@@ -298,7 +298,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
     })();
     match result {
         Ok(()) => 0,
-        Err(RetentionError::Refusal(error)) => error.emit("canon purge", json_output) as u8,
+        Err(RetentionError::Refusal(error)) => error.emit("canon purge", json_output),
         Err(err) => {
             let (matched, deleted) = match &err {
                 RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) => (*matched, *deleted),
@@ -320,9 +320,9 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
                 // One document: the partial-purge manifest is `data` beside the shared `error`.
                 Some(manifest) if json_output => {
                     crate::human_err!("{}", error.human("canon purge"));
-                    error.emit_with_data("canon purge", true, &manifest) as u8
+                    error.emit_with_data("canon purge", true, &manifest)
                 }
-                _ => error.emit("canon purge", json_output) as u8,
+                _ => error.emit("canon purge", json_output),
             }
         }
     }
@@ -544,10 +544,10 @@ pub fn run_export(
         }
         // A refused export read and wrote nothing: no audit line (O7).
         Err(ExportFailure::Cursor(err)) => {
-            err.emit("canon export", json_output) as u8
+            err.emit("canon export", json_output)
         }
         Err(ExportFailure::Retention(err)) => {
-            CliError::refused("RETENTION_EXPORT_FAILED", err.to_string()).hint("check that the destination is writable and the ledger is readable, then run `canon export` again").emit("canon export", json_output) as u8
+            CliError::refused("RETENTION_EXPORT_FAILED", err.to_string()).hint("check that the destination is writable and the ledger is readable, then run `canon export` again").emit("canon export", json_output)
         }
     }
 }

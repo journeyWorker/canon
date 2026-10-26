@@ -64,7 +64,7 @@ fn store_error(e: &StoreError) -> CliError {
 }
 
 /// `canon artifacts verify`.
-pub fn run_verify(repo: &Path, full: bool, json: bool) -> i32 {
+pub fn run_verify(repo: &Path, full: bool, json: bool) -> u8 {
     const CMD: &str = "canon artifacts verify";
     let repo = resolve_repo_root(repo);
     let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
@@ -279,7 +279,7 @@ struct MovePlan<'a> {
 
 /// `canon artifacts move --tier <TIER> [--commit --plan-digest D]`: the bare
 /// run previews the uploads and removals; `--commit` does exactly that plan.
-pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) -> i32 {
+pub fn run_move(repo: &crate::cli::RepoArgs, to: &str, mode: &Mode, json: bool) -> u8 {
     const CMD: &str = "canon artifacts move";
     let refuse = |message: String, hint: &str| CliError::refused("ARTIFACTS_MOVE_REFUSED", message).hint(hint.to_string()).emit("canon artifacts move", json);
     let base = crate::safety::command("artifacts move", &[("--tier", to.to_string())], repo);

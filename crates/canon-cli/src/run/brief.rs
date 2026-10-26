@@ -15,5 +15,5 @@ pub fn run(cmd: BriefCommand) -> ExitCode {
             }
             crate::brief_approve::run_approve(&repo, change_id.as_ref(), &approver, &note, json)
         }
-    } as u8)
+    })
 }

@@ -197,7 +197,7 @@ impl crate::reports::Report for PolicyApproveReport<'_> {}
 
 /// `canon policy show [--json]`: the read-back for `canon policy approve`.
 /// Exits `0` whatever the state is: it reports, the gate decides.
-pub fn run_show(repo: &Path, json: bool) -> i32 {
+pub fn run_show(repo: &Path, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let state = approval_state(&repo);
     let current = fs::read(repo.join(paths::POLICY_FILE)).ok().map(|bytes| policy_digest(&bytes));
@@ -287,7 +287,7 @@ pub fn record(repo: &Path, by: &str, note: Option<&str>) -> Result<PolicyApprova
 /// `canon policy approve`. Returns the process exit code: `0` written,
 /// `2` refused (no policy to approve, an empty `--approver`, or a write
 /// failure).
-pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> i32 {
+pub fn run_approve(repo: &Path, by: &str, note: Option<&str>, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let existing = matching_approval(&repo, by, note);
     let unchanged = existing.is_some();

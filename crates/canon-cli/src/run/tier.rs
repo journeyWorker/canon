@@ -15,7 +15,7 @@ pub fn run(cmd: TierCommand) -> ExitCode {
 /// applies exactly that plan.
 fn run_tier_age(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> ExitCode {
     let base = crate::safety::command("tier age", &[], repo);
-    let failed = |err: String| ExitCode::from(CliError::failed("TIER_FAILED", err).hint("check the `tiers` settings in canon.yaml and that the destinations are reachable, then run `canon tier age` again").emit("canon tier age", json) as u8);
+    let failed = |err: String| ExitCode::from(CliError::failed("TIER_FAILED", err).hint("check the `tiers` settings in canon.yaml and that the destinations are reachable, then run `canon tier age` again").emit("canon tier age", json));
     let canon_yaml_path = crate::context::resolve_canon_yaml(repo);
     let loaded = match crate::tiers::build_tiers_for_read(&canon_yaml_path) {
         Ok(loaded) => loaded,
@@ -28,7 +28,7 @@ fn run_tier_age(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> ExitCod
     let plan = Plan::new(effects);
     let commit = match plan.gate(mode, &base) {
         Ok(commit) => commit,
-        Err(err) => return ExitCode::from(err.emit("canon tier age", json) as u8),
+        Err(err) => return ExitCode::from(err.emit("canon tier age", json)),
     };
     if !commit {
         if !json && planned.is_empty() {

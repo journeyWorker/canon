@@ -36,28 +36,40 @@ use serde_json::Value;
 use crate::json_out::Report;
 
 /// A finding, a failed check or an operational failure.
-pub const EXIT_FAILED: i32 = 1;
+pub const EXIT_FAILED: u8 = 1;
 /// A refusal or a usage error.
-pub const EXIT_REFUSED: i32 = 2;
+pub const EXIT_REFUSED: u8 = 2;
 
 /// One refusal or operational failure.
+///
+/// The members every error has stay inline; the optional ones that most errors
+/// leave empty live in one boxed [`CliErrorDetail`], so the `Err` side of a
+/// `Result<_, CliError>` stays small.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CliError {
     pub code: &'static str,
     pub message: String,
-    pub hint: Option<String>,
     /// Whether running the same command again, unchanged, can succeed
     /// (the code's registry row).
     pub retryable: bool,
-    pub exit: i32,
+    /// The process exit code, `0..=255` (the code's registry row unless a site overrides it).
+    pub exit: u8,
+    detail: Option<Box<CliErrorDetail>>,
+}
+
+/// The optional members of a [`CliError`], read through its accessors and set
+/// through its builder methods.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct CliErrorDetail {
+    hint: Option<String>,
     /// The argument or record field that was refused (`--to`, `--kind`).
-    pub field: Option<String>,
+    field: Option<String>,
     /// The values `field` accepts, when the refusal is about a closed set.
-    pub expected: Option<Vec<String>>,
+    expected: Option<Vec<String>>,
     /// The refused value as given; redacted when it is rendered ([`redact`]).
-    pub received: Option<String>,
+    received: Option<String>,
     /// The nearest valid words, closest first ([`crate::suggest`]).
-    pub suggestions: Vec<String>,
+    suggestions: Vec<String>,
 }
 
 /// The `error` member of a failure envelope. Field order is the document
@@ -88,7 +100,7 @@ pub struct ErrorBody {
 impl CliError {
     fn new(code: &'static str, message: impl Into<String>) -> Self {
         let (exit, retryable) = code_info(code).map_or((EXIT_REFUSED, false), |info| (info.exit, info.retryable));
-        Self { code, message: message.into(), hint: None, retryable, exit, field: None, expected: None, received: None, suggestions: Vec::new() }
+        Self { code, message: message.into(), retryable, exit, detail: None }
     }
 
     /// The command was understood and declined. The exit comes from the
@@ -104,15 +116,29 @@ impl CliError {
         Self::new(code, message)
     }
 
+    fn detail_mut(&mut self) -> &mut CliErrorDetail {
+        self.detail.get_or_insert_with(Box::default)
+    }
+
+    /// The hint, if the error has one.
+    pub fn hint_text(&self) -> Option<&str> {
+        self.detail.as_deref()?.hint.as_deref()
+    }
+
+    /// The refused argument or field, if the error names one.
+    pub fn field_name(&self) -> Option<&str> {
+        self.detail.as_deref()?.field.as_deref()
+    }
+
     /// The next step the caller can take.
     pub fn hint(mut self, hint: impl Into<String>) -> Self {
-        self.hint = Some(hint.into());
+        self.detail_mut().hint = Some(hint.into());
         self
     }
 
     /// Names the refused argument or field (`--to`, `--kind`).
     pub fn field(mut self, field: impl Into<String>) -> Self {
-        self.field = Some(field.into());
+        self.detail_mut().field = Some(field.into());
         self
     }
 
@@ -122,13 +148,13 @@ impl CliError {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        self.expected = Some(expected.into_iter().map(Into::into).collect());
+        self.detail_mut().expected = Some(expected.into_iter().map(Into::into).collect());
         self
     }
 
     /// The value that was refused. It is redacted when rendered.
     pub fn received(mut self, received: impl Into<String>) -> Self {
-        self.received = Some(received.into());
+        self.detail_mut().received = Some(received.into());
         self
     }
 
@@ -138,14 +164,14 @@ impl CliError {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        self.suggestions = suggestions.into_iter().map(Into::into).collect();
+        self.detail_mut().suggestions = suggestions.into_iter().map(Into::into).collect();
         self
     }
 
     /// Overrides the registry's exit for one documented site: a batch whose
     /// validation refuses (`2`) and whose write fails later (`1`) is one code
     /// with two exits (`EVIDENCE_BATCH_REFUSED`).
-    pub fn with_exit(mut self, exit: i32) -> Self {
+    pub fn with_exit(mut self, exit: u8) -> Self {
         self.exit = exit;
         self
     }
@@ -154,7 +180,7 @@ impl CliError {
     /// optional `hint:` line. `command` is the full prefix, e.g.
     /// `canon evidence add`.
     pub fn human(&self, command: &str) -> String {
-        match &self.hint {
+        match self.hint_text() {
             Some(hint) => format!("{command}: {} — {}\nhint: {hint}", self.code, self.message),
             None => format!("{command}: {} — {}", self.code, self.message),
         }
@@ -162,18 +188,21 @@ impl CliError {
 
     /// The `error` member of the failure envelope.
     pub fn body(&self) -> ErrorBody {
-        let suggestions = match (&self.expected, &self.received) {
-            (Some(expected), Some(received)) if self.suggestions.is_empty() => crate::suggest::nearest(received, expected.iter().map(String::as_str)),
-            _ => self.suggestions.clone(),
+        let detail = self.detail.as_deref();
+        let field = detail.and_then(|d| d.field.as_deref());
+        let suggestions = match detail {
+            Some(CliErrorDetail { expected: Some(expected), received: Some(received), suggestions, .. }) if suggestions.is_empty() => crate::suggest::nearest(received, expected.iter().map(String::as_str)),
+            Some(d) => d.suggestions.clone(),
+            None => Vec::new(),
         };
         ErrorBody {
             code: self.code.to_string(),
             message: self.message.clone(),
-            field: self.field.as_deref().map(|field| crate::input::field_for_body(field).into_owned()),
-            expected: self.expected.clone(),
-            received: self.received.as_deref().map(|received| redact(self.field.as_deref(), received)),
+            field: field.map(|field| crate::input::field_for_body(field).into_owned()),
+            expected: detail.and_then(|d| d.expected.clone()),
+            received: detail.and_then(|d| d.received.as_deref()).map(|received| redact(field, received)),
             suggestions,
-            hint: self.hint.clone(),
+            hint: detail.and_then(|d| d.hint.clone()),
             retryable: self.retryable,
         }
     }
@@ -185,7 +214,7 @@ impl CliError {
     }
 
     /// Renders the error (see the module docs) and returns the exit code.
-    pub fn emit(&self, command: &str, json: bool) -> i32 {
+    pub fn emit(&self, command: &str, json: bool) -> u8 {
         debug_assert!(is_registered(self.code), "error code {} is not in cli_error::all_codes()", self.code);
         if json {
             crate::json_out::print_failure::<crate::json_out::NoData>(command, self, None);
@@ -200,13 +229,13 @@ impl CliError {
     /// printed that report in its human form, so human mode adds nothing: the
     /// exit code is the whole signal there. In JSON mode the one document
     /// carries `error` (the branch point), `data` (the report) and `meta`.
-    pub fn emit_with_data<R: Report>(&self, command: &str, json: bool, data: &R) -> i32 {
+    pub fn emit_with_data<R: Report>(&self, command: &str, json: bool, data: &R) -> u8 {
         self.emit_with_data_and_meta(command, json, data, serde_json::Value::Null)
     }
 
     /// [`CliError::emit_with_data`] with extra `meta` keys beside `command`
     /// (`coverage`, …).
-    pub fn emit_with_data_and_meta<R: Report>(&self, command: &str, json: bool, data: &R, extra_meta: serde_json::Value) -> i32 {
+    pub fn emit_with_data_and_meta<R: Report>(&self, command: &str, json: bool, data: &R, extra_meta: serde_json::Value) -> u8 {
         debug_assert!(is_registered(self.code), "error code {} is not in cli_error::all_codes()", self.code);
         if json {
             crate::json_out::print_failure_with_meta(command, self, Some(data), extra_meta);
@@ -268,7 +297,7 @@ pub struct CodeInfo {
     pub code: &'static str,
     pub meaning: &'static str,
     /// The process exit code the code carries (`1` or `2`).
-    pub exit: i32,
+    pub exit: u8,
     /// True only where running the same command again can succeed.
     pub retryable: bool,
     /// One imperative sentence telling the caller what to do about the code.

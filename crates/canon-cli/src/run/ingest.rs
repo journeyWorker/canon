@@ -20,7 +20,7 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
         None => match std::env::var_os("HOME") {
             Some(h) => PathBuf::from(h),
             None => {
-                return ExitCode::from(CliError::failed("INGEST_FAILED", "no `--home` given and $HOME is unset").hint("check that the source is readable and run the command again").emit("canon ingest sessions", json) as u8);
+                return ExitCode::from(CliError::failed("INGEST_FAILED", "no `--home` given and $HOME is unset").hint("check that the source is readable and run the command again").emit("canon ingest sessions", json));
             }
         },
     };
@@ -54,7 +54,7 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
                     crate::ingest::IngestError::Config(message) => CliError::refused("CONFIG_UNREADABLE", message.clone()).hint("fix the `ingest:` section of canon.yaml the message names, then run the command again"),
                     _ => CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again"),
                 };
-                return ExitCode::from(error.emit("canon ingest sessions", json) as u8);
+                return ExitCode::from(error.emit("canon ingest sessions", json));
             }
         }
         if !watch {
@@ -83,7 +83,7 @@ fn run_ingest_records(repo: &std::path::Path, watch: bool, interval_secs: u64, d
                 }
             }
             Err(err) => {
-                return ExitCode::from(CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again").emit("canon ingest records", json) as u8);
+                return ExitCode::from(CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again").emit("canon ingest records", json));
             }
         }
         if !watch {
@@ -139,7 +139,7 @@ fn run_ingest_plans(repo: &std::path::Path, dialect: Option<&str>, source: Optio
             if outcome.non_clean_sources.is_empty() { ExitCode::SUCCESS } else { ExitCode::FAILURE }
         }
         Err(err) => {
-            ExitCode::from(CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again").emit("canon ingest plans", json) as u8)
+            ExitCode::from(CliError::failed("INGEST_FAILED", err.to_string()).hint("check that the source is readable and run the command again").emit("canon ingest plans", json))
         }
     }
 }

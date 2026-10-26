@@ -66,7 +66,7 @@ pub fn path(cmd: &Command) -> &'static str {
         Command::Task { action } => match action {
             TaskCommand::Done(_) => "task done",
         },
-        Command::Evidence { action } => match action {
+        Command::Evidence { action } => match &**action {
             EvidenceCommand::ApprovalPayload(_) => "evidence approval-payload",
             EvidenceCommand::Add(_) => "evidence add",
             EvidenceCommand::Audit(_) => "evidence audit",

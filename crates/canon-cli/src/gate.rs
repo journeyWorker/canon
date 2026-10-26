@@ -144,7 +144,7 @@ impl crate::reports::Report for GateCheckReport<'_> {}
 /// `--release` is given — `canon_gate::dispatch`'s own module doc: the
 /// dispatcher never drops `TrustLadderCheck` when a release profile is
 /// engaged) and runs it over the resolved repo's `GateContext`.
-pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
+pub fn run_check(repo: &Path, release: bool, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     crate::legacy::announce(&repo);
     let ctx = match GateCtx::from_repo(&repo) {
@@ -496,7 +496,7 @@ impl crate::reports::Report for TaskDoneReport<'_> {}
 /// the evidence decision — so an already-done row is a success no-op and
 /// a missing row is a gate-red "no matching row" regardless of what the
 /// evidence says (the pre-s35 precedence, preserved).
-pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
+pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let task_id = match TaskId::parse(task_id_str) {
         Ok(t) => t,
@@ -963,7 +963,7 @@ impl crate::reports::Report for GatePromoteReport {}
 /// idempotent per staged candidate (its own recovery section), so a
 /// re-run drains a candidate whose record already landed instead of
 /// committing it twice, and still exits `0`.
-pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: bool) -> i32 {
+pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
@@ -1063,7 +1063,7 @@ impl StagedOutcome {
     }
 
     /// The exit code: a refused promotion is refused-by-policy.
-    pub(crate) fn exit_code(&self) -> i32 {
+    pub(crate) fn exit_code(&self) -> u8 {
         match self {
             Self::Refused => 1,
             Self::Staged | Self::Promoted { .. } => 0,
@@ -1108,30 +1108,30 @@ pub(crate) struct PromoteRefusal {
 
 /// [`promote_after_stage`]'s promotion, without its reporting: the committed
 /// path (relative to the ledger root), or why not.
-pub(crate) fn try_promote(ledger_root: &Path, location: &str) -> Result<String, PromoteRefusal> {
+pub(crate) fn try_promote(ledger_root: &Path, location: &str) -> Result<String, Box<PromoteRefusal>> {
     promotion_outcome(promote_staged(&GitTier::new(evidence_staging_dir(ledger_root)), &GitTier::new(ledger_root), Path::new(location)))
 }
 
 /// [`try_promote`] for one record of a batch, promoted through the batch's
 /// own `EvidencePromoter` (one committed-history read for the batch).
-pub(crate) fn try_promote_in(promoter: &mut canon_gate::promote::EvidencePromoter<'_>, location: &str) -> Result<String, PromoteRefusal> {
+pub(crate) fn try_promote_in(promoter: &mut canon_gate::promote::EvidencePromoter<'_>, location: &str) -> Result<String, Box<PromoteRefusal>> {
     promotion_outcome(promoter.promote(Path::new(location)))
 }
 
-fn promotion_outcome(promoted: Result<PromoteReport, canon_store::tier::StoreError>) -> Result<String, PromoteRefusal> {
+fn promotion_outcome(promoted: Result<PromoteReport, canon_store::tier::StoreError>) -> Result<String, Box<PromoteRefusal>> {
     match promoted {
         // The report carries exactly this one candidate: committed or
         // recovered, or refused.
         Ok(report) => match report.promoted.iter().chain(&report.recovered).next().filter(|_| report.is_clean()) {
             Some(landed) => Ok(landed.target.display().to_string()),
-            None => Err(PromoteRefusal {
+            None => Err(Box::new(PromoteRefusal {
                 lines: format_candidate_lines(&report, false),
                 error: CliError::failed("PROMOTE_REFUSED", "staged, but promotion refused the record; it stays staged")
                     .hint("the refusal is named in data.refused; fix it and run `canon gate promote`"),
                 data: Some(promote_report(&report, false)),
-            }),
+            })),
         },
-        Err(e) => Err(PromoteRefusal { lines: String::new(), error: CliError::failed("PROMOTE_FAILED", format!("staged, but promoting it failed: {e}")).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`"), data: None }),
+        Err(e) => Err(Box::new(PromoteRefusal { lines: String::new(), error: CliError::failed("PROMOTE_FAILED", format!("staged, but promoting it failed: {e}")).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`"), data: None })),
     }
 }
 
@@ -1234,7 +1234,7 @@ impl crate::reports::Report for GateInstallHooksReport {}
 /// `<repo>/.canon/scripts/`, matching spec.md's "a non-donor repo gets a generic
 /// pre-commit script" scenario.
 #[expect(clippy::too_many_arguments)]
-pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, command: &str, timeout: u32, dry_run: bool, json: bool) -> i32 {
+pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, command: &str, timeout: u32, dry_run: bool, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let entry = HookEntry::new(event, matcher.map(str::to_string), command, timeout);
 

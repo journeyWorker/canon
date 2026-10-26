@@ -221,7 +221,7 @@ pub fn run_selftest(suite: Option<&str>, json: bool) -> ExitCode {
         if !report.is_clean() {
             // The failure keeps the summary in `data`.
             let error = crate::cli_error::CliError::failed("SELFTEST_FAILED", "a selftest suite did not pass against its fixtures").hint("the failing fixtures are listed in `data.suites[].failures`; this is a canon defect, so report it with the output");
-            return ExitCode::from(error.emit_with_data("canon selftest", true, &summary) as u8);
+            return ExitCode::from(error.emit_with_data("canon selftest", true, &summary));
         }
         crate::json_out::data("selftest", &summary);
     } else {

@@ -24,7 +24,7 @@ fn run_context_pack_add(args: ContextPackAddArgs) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(error) => {
-            ExitCode::from(error.to_cli_error().emit("canon context-pack add", json) as u8)
+            ExitCode::from(error.to_cli_error().emit("canon context-pack add", json))
         }
     }
 }
@@ -41,7 +41,7 @@ fn run_context_pack_show(repo: &std::path::Path, id: &str, json: bool) -> ExitCo
             ExitCode::SUCCESS
         }
         Err(error) => {
-            ExitCode::from(error.to_cli_error().emit("canon context-pack show", json) as u8)
+            ExitCode::from(error.to_cli_error().emit("canon context-pack show", json))
         }
     }
 }
@@ -58,7 +58,7 @@ fn run_context_pack_verify(repo: &std::path::Path, id: &str, json: bool) -> Exit
             ExitCode::SUCCESS
         }
         Err(error) => {
-            ExitCode::from(error.to_cli_error().emit("canon context-pack verify", json) as u8)
+            ExitCode::from(error.to_cli_error().emit("canon context-pack verify", json))
         }
     }
 }

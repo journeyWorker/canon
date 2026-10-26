@@ -179,7 +179,7 @@ fn exits_of(declared: &[ExitMeta], codes: &[&'static str]) -> Vec<ExitRow> {
         if rows.iter().any(|r| r.code == exit) {
             continue;
         }
-        let named: Vec<&str> = codes.iter().copied().filter(|c| crate::cli_error::code_info(c).is_some_and(|i| i.exit == i32::from(exit))).collect();
+        let named: Vec<&str> = codes.iter().copied().filter(|c| crate::cli_error::code_info(c).is_some_and(|i| i.exit == exit)).collect();
         if !named.is_empty() {
             rows.push(ExitRow { code: exit, meaning: format!("{what}: {}", named.join(", ")) });
         }
@@ -501,7 +501,7 @@ pub struct ErrorRow {
 
 /// Every registered error code, sorted by code.
 pub fn error_rows() -> Vec<ErrorRow> {
-    crate::cli_error::all_codes().iter().map(|info| ErrorRow { code: info.code, meaning: info.meaning, exit: info.exit, retryable: info.retryable, fix: info.fix }).collect()
+    crate::cli_error::all_codes().iter().map(|info| ErrorRow { code: info.code, meaning: info.meaning, exit: i32::from(info.exit), retryable: info.retryable, fix: info.fix }).collect()
 }
 
 /// Every removed spelling with its replacement (the README's Upgrading list

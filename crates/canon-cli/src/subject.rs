@@ -131,7 +131,7 @@ use crate::tiers::{self, TierCliError};
 /// transition is well-formed but the linked scenarios are not covered
 /// by non-`Divergent` verdicts — record unchanged, fail closed
 /// (contract: "violations print by failure class, exit 1").
-const EXIT_GATED: i32 = 1;
+const EXIT_GATED: u8 = 1;
 
 /// `<id>` / `--subject-id`'s `clap` value parser — grammar-level
 /// [`SubjectId::parse`] (kebab-case slug).
@@ -447,7 +447,7 @@ fn domain_membership_violation(repo: &Path, domain: &str) -> Option<String> {
 /// present in the store is a loud refusal (exit `2`), never a silent
 /// second append.
 #[expect(clippy::too_many_arguments)]
-pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, summary: &str, owner_role: &RoleId, actor_id: &str, session: Option<&canon_model::SessionId>, json: bool) -> i32 {
+pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, summary: &str, owner_role: &RoleId, actor_id: &str, session: Option<&canon_model::SessionId>, json: bool) -> u8 {
     // `domain` shares `SubjectId`'s kebab-slug grammar (design D2: the
     // model validates the SAME shape via `is_kebab_slug`); validate it
     // BEFORE `Subject::new` so a malformed value is a clean refusal
@@ -504,7 +504,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
 /// may belong to several subjects (0.18 D4): adopting it under a second
 /// one adds that subject and says the change now belongs to each, never
 /// re-points it.
-pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_run: bool, json: bool) -> i32 {
+pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_run: bool, json: bool) -> u8 {
     match adopt_change(repo, change_id, subject_id, dry_run) {
         Ok((subject, owners, wrote)) => {
             let (link, now_belongs) = if dry_run { ("would link", "would belong") } else { ("linked", "now belongs") };
@@ -538,7 +538,7 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_
 /// the link [`run_adopt`] made back, on both sides. Refused for a change
 /// whose canon brief carries an `Approved:` line: it is the subject's
 /// approved scope. An unlinked pair writes nothing and exits `0`.
-pub fn run_unadopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_run: bool, json: bool) -> i32 {
+pub fn run_unadopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_run: bool, json: bool) -> u8 {
     match unadopt_change(repo, change_id, subject_id, dry_run) {
         Ok(UnadoptOutcome::Refused(message, hint)) => CliError::refused("SUBJECT_UNADOPT_REFUSED", message).hint(hint).emit("canon subject unadopt", json),
         Ok(UnadoptOutcome::Done(subject, wrote)) => {
@@ -558,7 +558,7 @@ pub fn run_unadopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dr
 
 enum UnadoptOutcome {
     /// The subject as it now stands, and whether anything was written.
-    Done(Subject, bool),
+    Done(Box<Subject>, bool),
     /// The refusal message and its hint.
     Refused(String, String),
 }
@@ -590,7 +590,7 @@ fn unadopt_change(
     let on_subject = subject.change_ids.contains(change_id);
     let on_change = change.subject_ids.contains(subject_id);
     if !on_subject && !on_change {
-        return Ok(UnadoptOutcome::Done(subject, false));
+        return Ok(UnadoptOutcome::Done(Box::new(subject), false));
     }
     let resolved = resolve_repo_root(repo);
     if let Some(brief) = crate::brief::canon_brief(&resolved, change_id) {
@@ -653,7 +653,7 @@ fn unadopt_change(
             )
         })?;
     }
-    Ok(UnadoptOutcome::Done(subject, true))
+    Ok(UnadoptOutcome::Done(Box::new(subject), true))
 }
 
 /// The ids of the scenarios `subject_id` owns that carry a
@@ -870,7 +870,7 @@ pub fn run_move(
     actor_id: &str,
     session: Option<&canon_model::SessionId>,
     json: bool,
-) -> i32 {
+) -> u8 {
     for (flag, text, recorded) in [
         ("--override-reason", override_reason, "the accountable reason"),
         ("--reason", reason, "the transition note, with the actor"),
@@ -1099,7 +1099,7 @@ pub fn run_move(
 
 /// `canon subject show <id>` (0.21 D1): show the subject and write
 /// nothing. `--override-reason` and `--reason` belong to `canon subject move`.
-pub fn run_show(repo: &Path, subject_id: &SubjectId, json: bool) -> i32 {
+pub fn run_show(repo: &Path, subject_id: &SubjectId, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = resolve_canon_yaml(&repo);
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {

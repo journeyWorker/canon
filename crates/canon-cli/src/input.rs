@@ -725,7 +725,7 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
     }
     let leaf = Leaf::of(cmd, &path);
     let command_name = leaf.command();
-    let fail = |error: CliError| Expanded::Exit(ExitCode::from(error.emit(&command_name, json) as u8));
+    let fail = |error: CliError| Expanded::Exit(ExitCode::from(error.emit(&command_name, json)));
     let [input] = inputs.as_slice() else {
         return fail(refused("INPUT_INVALID", "`--input` was given more than once", "give one `--input`; a batch is one array or NDJSON file").field("--input"));
     };
@@ -782,13 +782,13 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
 // ---------------------------------------------------------------- batch
 
 /// A failure of the validation pass: the error with its field already a pointer into the batch.
-fn pointed(mut error: CliError, map: &DocMap, prefix: &str) -> CliError {
-    error.field = match error.field.as_deref() {
-        Some(field) => map.pointer(prefix, field).or(error.field),
+fn pointed(error: CliError, map: &DocMap, prefix: &str) -> CliError {
+    let field = match error.field_name() {
+        Some(field) => map.pointer(prefix, field).unwrap_or_else(|| field.to_string()),
         // a refusal about the element as a whole still says which element
-        None => Some(prefix.to_string()),
+        None => prefix.to_string(),
     };
-    error
+    error.field(field)
 }
 
 /// The error of a child's failure envelope, `field` pointed into the batch.
@@ -796,10 +796,18 @@ fn error_of(envelope: &Value, map: &DocMap, prefix: &str) -> CliError {
     let body = &envelope["error"];
     let code = body["code"].as_str().and_then(crate::cli_error::code_info).map_or("INPUT_ELEMENT_FAILED", |info| info.code);
     let mut error = CliError::failed(code, body["message"].as_str().unwrap_or("the element failed without a message")).hint(body["hint"].as_str().unwrap_or("run the element on its own to see its output"));
-    error.field = body["field"].as_str().map(str::to_string);
-    error.received = body["received"].as_str().map(str::to_string);
-    error.expected = body["expected"].as_array().map(|values| values.iter().filter_map(|v| v.as_str().map(str::to_string)).collect());
-    error.suggestions = body["suggestions"].as_array().map(|values| values.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
+    if let Some(field) = body["field"].as_str() {
+        error = error.field(field);
+    }
+    if let Some(received) = body["received"].as_str() {
+        error = error.received(received);
+    }
+    if let Some(values) = body["expected"].as_array() {
+        error = error.expected(values.iter().filter_map(Value::as_str));
+    }
+    if let Some(values) = body["suggestions"].as_array() {
+        error = error.suggestions(values.iter().filter_map(Value::as_str));
+    }
     pointed(error, map, prefix)
 }
 
@@ -828,7 +836,7 @@ fn crashed(child: &Child) -> CliError {
 
 fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: &Lexed, items: Vec<Value>, json: bool) -> Expanded {
     let command_name = leaf.command();
-    let exit_refused = |error: CliError| Expanded::Exit(ExitCode::from(error.emit(&command_name, json) as u8));
+    let exit_refused = |error: CliError| Expanded::Exit(ExitCode::from(error.emit(&command_name, json)));
     let exe = match std::env::current_exe() {
         Ok(exe) => exe,
         Err(e) => return exit_refused(CliError::failed("INPUT_ELEMENT_FAILED", format!("canon cannot find its own executable to run the batch: {e}")).hint("run the elements one by one instead")),
@@ -896,7 +904,7 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
     if json {
         let data = BatchReport { items: report };
         return Expanded::Exit(ExitCode::from(match &failure {
-            Some(error) => error.emit_with_data(&command_name, true, &data) as u8,
+            Some(error) => error.emit_with_data(&command_name, true, &data),
             None => {
                 if all_unchanged {
                     crate::json_out::mark_unchanged();
@@ -913,7 +921,7 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
     match failure {
         Some(error) => {
             eprintln!("{}", error.human(&command_name));
-            Expanded::Exit(ExitCode::from(error.exit as u8))
+            Expanded::Exit(ExitCode::from(error.exit))
         }
         None => Expanded::Exit(ExitCode::SUCCESS),
     }

@@ -280,7 +280,7 @@ fn index_changes(repo: &Path, plan: &Plan) -> bool {
 /// exactly that plan. Exit `0` previewed, migrated or nothing to do, `1`
 /// migrated but the index rebuild found the corpus unclean, `2` refused or
 /// failed.
-pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> i32 {
+pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
     let mut log = crate::json_out::Log::new(json);
     let base = safety::command("migrate", &[], repo);
     let repo = resolve_repo_root(repo);
@@ -1226,7 +1226,7 @@ fn tracked_index_files(repo: &Path) -> usize {
 /// The full index rebuild (module doc). Exit `1` when a root does not
 /// sync clean: the migration stands, and `canon inventory sync` lists
 /// what to fix.
-fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Plan, backup_dir: Option<String>, json: bool) -> i32 {
+fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Plan, backup_dir: Option<String>, json: bool) -> u8 {
     match crate::inventory::rebuild(repo, None) {
         Ok(outcome) if outcome.is_clean() => {
             // Nothing planned but the index rebuild, and the rebuild wrote nothing: a repeat that found the repo migrated.

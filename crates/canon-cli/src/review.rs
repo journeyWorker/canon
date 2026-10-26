@@ -194,7 +194,7 @@ impl crate::reports::Report for ReviewReport {}
 /// artifacts, each pinning its own scenario, all or nothing. Returns the
 /// process exit code: `0` on a successful write, `2` on a
 /// refused/malformed invocation.
-pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
+pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
     let cmd = args.full();
     let provenance_ref = match (&args.upstream_ref, &args.original_spec_ref) {
         (Some(r), None) => ProvenanceRef::UpstreamRef(r.clone()),

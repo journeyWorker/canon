@@ -7,7 +7,7 @@ use std::path::PathBuf;
 #[derive(Subcommand)]
 pub enum DispatchCommand {
     /// Mint a Run manifest with retrieved guidance and context/policy lineage
-    Begin(DispatchBeginArgs),
+    Begin(Box<DispatchBeginArgs>),
     /// Close a dispatched run with a terminal status and an ended_at
     End(DispatchEndArgs),
     /// Diff the declared plan DAG against the observed execution graph

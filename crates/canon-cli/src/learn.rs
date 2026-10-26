@@ -94,7 +94,7 @@ pub fn run_promote_with_evidence(
     let learn_config = match LearnConfig::from_manifest(&canon_yaml_text) {
         Ok(config) => config,
         Err(err) => {
-            return ExitCode::from(CliError::failed("CONFIG_UNREADABLE", err.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon strategy promote", json) as u8);
+            return ExitCode::from(CliError::failed("CONFIG_UNREADABLE", err.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon strategy promote", json));
         }
     };
 
@@ -106,13 +106,13 @@ pub fn run_promote_with_evidence(
             let evaluation: PromotionEvaluation = match read_json(eval) {
                 Ok(value) => value,
                 Err(error) => {
-                    return ExitCode::from(CliError::failed("LEARN_INVALID_INPUT", format!("invalid evaluation: {error}")).hint("fix the JSON file the message names (`canon schema strategy promote` documents the inputs), then run the command again").emit("canon strategy promote", json) as u8);
+                    return ExitCode::from(CliError::failed("LEARN_INVALID_INPUT", format!("invalid evaluation: {error}")).hint("fix the JSON file the message names (`canon schema strategy promote` documents the inputs), then run the command again").emit("canon strategy promote", json));
                 }
             };
             let mut approval: PromotionApproval = match read_json(approval) {
                 Ok(value) => value,
                 Err(error) => {
-                    return ExitCode::from(CliError::failed("LEARN_INVALID_INPUT", format!("invalid approval: {error}")).hint("fix the JSON file the message names (`canon schema strategy promote` documents the inputs), then run the command again").emit("canon strategy promote", json) as u8);
+                    return ExitCode::from(CliError::failed("LEARN_INVALID_INPUT", format!("invalid approval: {error}")).hint("fix the JSON file the message names (`canon schema strategy promote` documents the inputs), then run the command again").emit("canon strategy promote", json));
                 }
             };
             if let Some(signature) = signature_path {
@@ -123,14 +123,14 @@ pub fn run_promote_with_evidence(
                         approval.integrity_digest = approval.recomputed_integrity_digest();
                     }
                     Err(error) => {
-                        return ExitCode::from(CliError::refused("LEARN_SIGNATURE_UNREADABLE", format!("cannot read detached signature: {error}")).hint("pass --signature <file> pointing at a readable detached SSH signature").emit("canon strategy promote", json) as u8);
+                        return ExitCode::from(CliError::refused("LEARN_SIGNATURE_UNREADABLE", format!("cannot read detached signature: {error}")).hint("pass --signature <file> pointing at a readable detached SSH signature").emit("canon strategy promote", json));
                     }
                 }
             }
             Some((evaluation, approval))
         }
         _ => {
-            return ExitCode::from(CliError::failed("LEARN_INVALID_ARGUMENT", "--evaluation and --approval must be supplied together").hint("`canon schema strategy promote` lists the accepted arguments and their forms").emit("canon strategy promote", json) as u8);
+            return ExitCode::from(CliError::failed("LEARN_INVALID_ARGUMENT", "--evaluation and --approval must be supplied together").hint("`canon schema strategy promote` lists the accepted arguments and their forms").emit("canon strategy promote", json));
         }
     };
     let git_tier_root = repo.join(&learn_config.strategies_root);
@@ -142,7 +142,7 @@ pub fn run_promote_with_evidence(
     let decision = match promotion_decision(&repo, &learn_config, &strategy_store, strategy_id) {
         Ok(decision) => decision,
         Err(err) => {
-            return ExitCode::from(CliError::failed("LEARN_PROMOTION_FAILED", err.to_string()).hint("the message names the cause; fix it and run `canon strategy promote` again (`--dry-run` previews)").emit("canon strategy promote", json) as u8);
+            return ExitCode::from(CliError::failed("LEARN_PROMOTION_FAILED", err.to_string()).hint("the message names the cause; fix it and run `canon strategy promote` again (`--dry-run` previews)").emit("canon strategy promote", json));
         }
     };
     let blocked = decision.as_ref().is_some_and(|d| !d.is_promote());
@@ -311,26 +311,26 @@ pub fn run_approval_payload(repo: &Path, strategy_id: &StrategyId, evaluation_pa
     let config = match LearnConfig::from_manifest(&std::fs::read_to_string(repo.join("canon.yaml")).unwrap_or_default()) {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::failed("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon strategy approval-payload", json) as u8);
+            return ExitCode::from(CliError::failed("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon strategy approval-payload", json));
         }
     };
     let store = ParquetStrategyStore::open(repo.join(&config.root).join("strategies"));
     let Some(candidate) = (match store.find_by_id(strategy_id) {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::failed("REPO_UNREADABLE", error.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon strategy approval-payload", json) as u8);
+            return ExitCode::from(CliError::failed("REPO_UNREADABLE", error.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon strategy approval-payload", json));
         }
     }) else {
-        return ExitCode::from(CliError::refused("LEARN_STRATEGY_NOT_FOUND", format!("unknown strategy {strategy_id}")).hint("check the StrategyId (a ULID) against the strategies this repository holds").emit("canon strategy approval-payload", json) as u8);
+        return ExitCode::from(CliError::refused("LEARN_STRATEGY_NOT_FOUND", format!("unknown strategy {strategy_id}")).hint("check the StrategyId (a ULID) against the strategies this repository holds").emit("canon strategy approval-payload", json));
     };
     let evaluation: PromotionEvaluation = match read_json(evaluation_path) {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::failed("LEARN_INVALID_INPUT", format!("invalid evaluation: {error}")).hint("fix the JSON file the message names (`canon schema strategy promote` documents the inputs), then run the command again").emit("canon strategy approval-payload", json) as u8);
+            return ExitCode::from(CliError::failed("LEARN_INVALID_INPUT", format!("invalid evaluation: {error}")).hint("fix the JSON file the message names (`canon schema strategy promote` documents the inputs), then run the command again").emit("canon strategy approval-payload", json));
         }
     };
     if let Err(error) = evaluation.validate_for(&candidate) {
-        return ExitCode::from(CliError::failed("LEARN_EVALUATION_REJECTED", format!("evaluation rejected: {error}")).hint("re-run the paired evaluation so it meets the promotion bar, then run `canon strategy approval-payload` again").emit("canon strategy approval-payload", json) as u8);
+        return ExitCode::from(CliError::failed("LEARN_EVALUATION_REJECTED", format!("evaluation rejected: {error}")).hint("re-run the paired evaluation so it meets the promotion bar, then run `canon strategy approval-payload` again").emit("canon strategy approval-payload", json));
     }
     let subject = format!("strategy:{strategy_id}");
     let payload = canon_model::approval_payload_bytes(
@@ -367,14 +367,14 @@ pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: 
     let config = match LearnConfig::from_manifest(&std::fs::read_to_string(repo.join("canon.yaml")).unwrap_or_default()) {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::failed("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon strategy rollback", json) as u8);
+            return ExitCode::from(CliError::failed("CONFIG_UNREADABLE", error.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon strategy rollback", json));
         }
     };
     let store = ParquetStrategyStore::open(repo.join(&config.root).join("strategies"));
     let contradicting = match contradicting.map(canon_learn::TrajectoryId::parse).transpose() {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::failed("LEARN_INVALID_ARGUMENT", format!("invalid contradicting trajectory id: {error}")).hint("`canon schema strategy rollback` lists the accepted arguments and their forms").emit("canon strategy rollback", json) as u8);
+            return ExitCode::from(CliError::failed("LEARN_INVALID_ARGUMENT", format!("invalid contradicting trajectory id: {error}")).hint("`canon schema strategy rollback` lists the accepted arguments and their forms").emit("canon strategy rollback", json));
         }
     };
     let trajectory_store = ParquetTrajectoryStore::open(repo.join(&config.root).join("trajectories"));
@@ -382,23 +382,23 @@ pub fn run_rollback(repo: &Path, strategy_id: &StrategyId, reason: &str, actor: 
         match trajectory_store.find_by_id(id) {
             Ok(Some(_)) => {}
             Ok(None) => {
-                return ExitCode::from(CliError::refused("LEARN_TRAJECTORY_NOT_FOUND", "contradicting trajectory does not exist").hint("check --contradicting-trajectory-id against the recorded trajectories, or omit it").emit("canon strategy rollback", json) as u8);
+                return ExitCode::from(CliError::refused("LEARN_TRAJECTORY_NOT_FOUND", "contradicting trajectory does not exist").hint("check --contradicting-trajectory-id against the recorded trajectories, or omit it").emit("canon strategy rollback", json));
             }
             Err(error) => {
-                return ExitCode::from(CliError::failed("REPO_UNREADABLE", format!("cannot verify contradicting trajectory: {error}")).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon strategy rollback", json) as u8);
+                return ExitCode::from(CliError::failed("REPO_UNREADABLE", format!("cannot verify contradicting trajectory: {error}")).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon strategy rollback", json));
             }
         }
     }
     let signature = match std::fs::read_to_string(signature_path) {
         Ok(value) => value,
         Err(error) => {
-            return ExitCode::from(CliError::refused("LEARN_SIGNATURE_UNREADABLE", format!("cannot read detached signature: {error}")).hint("pass --signature <file> pointing at a readable detached SSH signature").emit("canon strategy rollback", json) as u8);
+            return ExitCode::from(CliError::refused("LEARN_SIGNATURE_UNREADABLE", format!("cannot read detached signature: {error}")).hint("pass --signature <file> pointing at a readable detached SSH signature").emit("canon strategy rollback", json));
         }
     };
     let approved_at = match chrono::DateTime::parse_from_rfc3339(approved_at) {
         Ok(value) => value.with_timezone(&Utc),
         Err(error) => {
-            return ExitCode::from(CliError::failed("LEARN_INVALID_ARGUMENT", format!("invalid --approval-at timestamp: {error}")).hint("`canon schema strategy rollback` lists the accepted arguments and their forms").emit("canon strategy rollback", json) as u8);
+            return ExitCode::from(CliError::failed("LEARN_INVALID_ARGUMENT", format!("invalid --approval-at timestamp: {error}")).hint("`canon schema strategy rollback` lists the accepted arguments and their forms").emit("canon strategy rollback", json));
         }
     };
     let was_rolled_back = matches!(store.find_by_id(strategy_id), Ok(Some(item)) if item.lifecycle == Some(StrategyLifecycle::RolledBack));
@@ -438,7 +438,7 @@ fn report_block(decision: &PromotionDecision, demotion_failure: Option<&str>, js
              run `canon ingest records` to resolve pending trajectories for this regime, then retry.",
         ),
     };
-    ExitCode::from(error.emit("canon strategy promote", json) as u8)
+    ExitCode::from(error.emit("canon strategy promote", json))
 }
 
 /// Resolves `strategy_id`'s own regime, reads that regime's

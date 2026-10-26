@@ -315,7 +315,7 @@ impl DispatchError {
             Self::SkillDigestWithoutId => "pass --skill-id <id> with --skill-digest, or drop the digest".to_string(),
             Self::Io(_) => "check that the repository's .canon directory is writable, then run the command again".to_string(),
             Self::Serialize(_) => "this is a canon bug: report it together with the command line that produced it".to_string(),
-            Self::ContextPack(inner) => inner.to_cli_error().hint.unwrap_or_default(),
+            Self::ContextPack(inner) => inner.to_cli_error().hint_text().unwrap_or_default().to_string(),
             Self::TaskNotFound { .. } => "task ids look like <change_id>#<n>; open the change's plan document to find the right number".to_string(),
             Self::NoPlanSources { .. } => "write the change's plan document, then run `canon ingest plans` so --task-id can resolve against it".to_string(),
             Self::PlanCorpus { .. } => "fix the plan document the message names, then run the command again".to_string(),
@@ -914,7 +914,7 @@ pub fn run_begin(
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(err.to_cli_error().emit("canon dispatch begin", json) as u8)
+            ExitCode::from(err.to_cli_error().emit("canon dispatch begin", json))
         }
     }
 }
@@ -1373,7 +1373,7 @@ pub fn run_end(repo: &Path, run_id: RunId, status: RunStatus, json: bool) -> Exi
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(err.to_cli_error().emit("canon dispatch end", json) as u8)
+            ExitCode::from(err.to_cli_error().emit("canon dispatch end", json))
         }
     }
 }

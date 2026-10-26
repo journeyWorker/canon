@@ -204,7 +204,7 @@ pub enum Command {
     #[command(after_help = "Examples:\n  canon evidence add --task-id my-change#3.1 --class test-run --ref 'cargo test -p canon-cli' --role implementer\n\nThe loop:\n  canon evidence add ...    Record an EvidenceRecord (promoted in the same run under\n                            `write: { promote: auto }`, which `canon init` writes)\n  canon task done <id>      Flip the checkbox on it\nUnder `write.promote: manual` (no `write:` key), run `canon gate promote` after\neach add to commit it (assigns run_seq).\n\nSee `canon evidence add --help` for exactly what the gate does and does not check.")]
     Evidence {
         #[command(subcommand)]
-        action: EvidenceCommand,
+        action: Box<EvidenceCommand>,
     },
     /// Check or move the evidence artifact store (local, or an object-store tier)
     Artifacts {

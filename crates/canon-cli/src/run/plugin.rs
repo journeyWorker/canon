@@ -30,11 +30,11 @@ fn run_plugin_sync(repo: &std::path::Path, plugin_id: &str, spec_root: Option<&s
                 ExitCode::SUCCESS
             } else {
                 let error = CliError::failed("PLUGIN_SYNC_ERRORS", "some candidates could not be written").hint("data.roots names each error");
-                ExitCode::from(error.emit_with_data("canon plugin sync", json, &data) as u8)
+                ExitCode::from(error.emit_with_data("canon plugin sync", json, &data))
             }
         }
         Err(err) => {
-            ExitCode::from(CliError::refused("PLUGIN_SYNC_FAILED", err.to_string()).hint("check that every plugin listed in canon.yaml resolves, then run `canon plugin sync` again").emit("canon plugin sync", json) as u8)
+            ExitCode::from(CliError::refused("PLUGIN_SYNC_FAILED", err.to_string()).hint("check that every plugin listed in canon.yaml resolves, then run `canon plugin sync` again").emit("canon plugin sync", json))
         }
     }
 }
