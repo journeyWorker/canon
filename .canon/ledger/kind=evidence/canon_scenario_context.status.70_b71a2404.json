@@ -1,0 +1,38 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26"
+  },
+  "at": "2026-10-26T19:41:01.484891119Z",
+  "attachments": [
+    {
+      "case": "context_status_70_the_red_flag_follows_the_ship_guard_audits_in_blockers_only_when_they_block",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/030-junit-canon.xml",
+      "sha256": "3311b701b05709376c4e9249c8ab4219c5603d65062d022a77fe5f84d07e8e47"
+    },
+    {
+      "case": "context_status_70_a_shipped_subject_whose_gate_is_red_is_flagged_and_its_step_is_the_reopen",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/030-junit-canon.xml",
+      "sha256": "3311b701b05709376c4e9249c8ab4219c5603d65062d022a77fe5f84d07e8e47"
+    }
+  ],
+  "code_tree": "86779563bdaf9bb2a2dfff7f4bc7cd6f8f2b60a7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/030-junit-canon.xml"
+  },
+  "evidence_sha": "bdf0ac42680d33c7a44b528115190303445447ab",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 100,
+  "scenario_id": "context.status.70",
+  "schema": 1,
+  "staging_id": "6cc5316c",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

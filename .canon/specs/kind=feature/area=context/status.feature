@@ -353,7 +353,7 @@ Feature: context status
   Scenario: Status counts references to missing sources per kind and gives the same JSON on every checkout of one commit
     Given a repo with findings, evidence and a subject that point at changes, a review, a task and a scenario that no committed source has
     When canon status --json is run in the working tree and in a fresh clone of the same commit
-    Then both print the same `dangling` with its count per kind of reference: `finding.change_id`, `finding.review_id`, `evidence.task_id`, `evidence.scenario_id` and `subject.change_ids`
+    Then both print the same `danglingReferences` with its count per kind of reference: `finding.change_id`, `finding.review_id`, `evidence.task_id`, `evidence.scenario_id` and `subject.change_ids`
     And the human status prints the total on one line
 
   # canon: {"schema":1,"at":"2026-10-26T18:13:22Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}

@@ -280,8 +280,8 @@ fn find_change(registry: &TierRegistry, id: &ChangeId) -> Result<Option<Change>,
 /// Report a written subject: `human` and the `next:` line, or on `--json`
 /// the full record body (the updated record) with `meta.next` for the
 /// subject.
-fn report_subject(repo: &Path, subject: &Subject, verb: &str, dry_run: bool, json: bool, human: &str) {
-    report_subject_warning(repo, subject, verb, dry_run, json, human, &[]);
+fn report_subject(repo: &Path, subject: &Subject, verb: &str, written: Option<bool>, json: bool, human: &str) {
+    report_subject_warning(repo, subject, verb, written, json, human, &[]);
 }
 
 /// [`report_subject`] with `warnings`: said on stderr, and in `--json`
@@ -290,13 +290,28 @@ fn report_subject_warning(
     repo: &Path,
     subject: &Subject,
     verb: &str,
-    dry_run: bool,
+    written: Option<bool>,
     json: bool,
     human: &str,
     warnings: &[String],
 ) {
+    // `written`: `None` for a dry run, else whether a record was written. Where the record went, when that is the hot store.
+    let hot = written.filter(|wrote| *wrote).and_then(|_| crate::hot_store::HotStore::written_by(&resolve_canon_yaml(repo), &[RecordKind::Subject, RecordKind::Change]));
+    let dry_run = written.is_none();
     if !json {
         println!("{human}");
+        if let Some(hot) = &hot {
+            println!("{}", hot.line());
+        }
+    }
+    let mut meta = crate::json_out::warnings_meta(warnings);
+    if let Some(hot) = &hot {
+        let mut object = match meta {
+            serde_json::Value::Object(object) => object,
+            _ => serde_json::Map::new(),
+        };
+        object.insert("hotStore".to_string(), serde_json::Value::String(hot.location()));
+        meta = serde_json::Value::Object(object);
     }
     for warning in warnings {
         crate::human_err!("canon subject {verb}: warning: {warning}");
@@ -304,12 +319,12 @@ fn report_subject_warning(
     let scope = crate::next::Scope::Subject(subject.subject_id.as_str().to_string());
     if dry_run {
         // A preview marks itself: the subject as it would stand, plus `dryRun`.
-        crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &SubjectPreviewReport { subject, dry_run: true }, crate::json_out::warnings_meta(warnings));
+        crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &SubjectPreviewReport { subject, dry_run: true }, meta);
     } else if verb == "move" {
         let overrides = subject.status_override.iter().map(|waiver| crate::reports::Override { code: "SUBJECT_GATE_VIOLATION".to_string(), reason: waiver.reason.clone() }).collect();
-        crate::next::finish_with_meta(repo, "subject move", &scope, false, json, &SubjectMoveReport { subject, overrides }, crate::json_out::warnings_meta(warnings));
+        crate::next::finish_with_meta(repo, "subject move", &scope, false, json, &SubjectMoveReport { subject, overrides }, meta);
     } else {
-        crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &SubjectReport(subject), crate::json_out::warnings_meta(warnings));
+        crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &SubjectReport(subject), meta);
     }
 }
 
@@ -510,7 +525,7 @@ pub fn run_new(repo: &Path, new: &NewSubject, actor: Actor, json: bool) -> u8 {
     match registry.persist(&subject) {
         Ok(_) => {
             let human = format!("canon subject new: {} ({}, {}) — {}", subject.subject_id.as_str(), subject.domain, status_str(subject.status), crate::write_mode::DIRECT);
-            report_subject(&repo, &subject, "new", false, json, &human);
+            report_subject(&repo, &subject, "new", Some(true), json, &human);
             0
         }
         Err(e) => {
@@ -547,7 +562,7 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_
             let warnings: Vec<String> = crate::brief::adoption_warning(repo, &subject, change_id)
                 .into_iter()
                 .collect();
-            report_subject_warning(repo, &subject, "adopt", dry_run, json, &human, &warnings);
+            report_subject_warning(repo, &subject, "adopt", (!dry_run).then_some(wrote), json, &human, &warnings);
             0
         }
         Err(e) => {
@@ -571,7 +586,7 @@ pub fn run_unadopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dr
                 crate::json_out::mark_unchanged();
                 format!("canon subject unadopt: change `{}` is not linked to subject `{}`; nothing written", change_id.as_str(), subject_id.as_str())
             };
-            report_subject(repo, &subject, "unadopt", dry_run, json, &human);
+            report_subject(repo, &subject, "unadopt", (!dry_run).then_some(wrote), json, &human);
             0
         }
         Err(e) => CliError::refused("SUBJECT_ADOPT_REFUSED", e).hint("fix what the message names, then run `canon subject unadopt` again").emit("canon subject unadopt", json),
@@ -1117,7 +1132,7 @@ pub fn run_move(
 
     match registry.persist(&subject) {
         Ok(_) => {
-            report_subject_warning(&repo, &subject, "move", false, json, &format!("canon subject move: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT), &pending_note);
+            report_subject_warning(&repo, &subject, "move", Some(true), json, &format!("canon subject move: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT), &pending_note);
             0
         }
         Err(e) => {

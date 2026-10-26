@@ -174,6 +174,7 @@ Feature: ingest sessions
   @ingest.sessions.16
   Scenario: The other commands that write hot records print the hot store location too
     Given a repo whose hot rung is the sqlite file `.canon/hot.db`
-    When canon ingest plans, ingest records and dispatch begin run
+    When canon ingest plans, ingest records and dispatch begin run, and canon subject new, subject move, subject adopt, subject unadopt and change new write records that are routed to the hot rung
     Then each output names the hot store path
     And the --json documents of ingest plans carry it as `hotStore`
+    And the --json documents of change new carry it as `hotStore`, and those of the subject leaves as `meta.hotStore`

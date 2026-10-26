@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-030-rl",
+    "role": "reviewer",
+    "session_id": "rev-030-rl-2026-10-26"
+  },
+  "at": "2026-10-26T19:45:26.240429345Z",
+  "change_id": "canon-0-30-record-links",
+  "code_tree": "86779563bdaf9bb2a2dfff7f4bc7cd6f8f2b60a7",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/record_links.rs:386-404",
+  "introduced_by": "230eac79859c234ccf89c88aeb786d911ea5cec5",
+  "kind": "finding",
+  "review_id": "01M5WVXD2Z94A6RC55YKS9WS0Q",
+  "reviewed_sha": "bdf0ac42680d33c7a44b528115190303445447ab",
+  "reviewer": "rev-030-rl",
+  "round": 1,
+  "scenario_ids": [
+    "context.status.84"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "context.status.84: its Then names status JSON key `dangling` but status emits `danglingReferences` (query emits `dangling`); and the test's fixture dangles only finding.change_id, so finding.review_id, evidence.task_id, evidence.scenario_id and subject.change_ids are never counted through status (they work: probe gave all four). Align the key or the spec, and seed the four other kinds",
+  "worktree_dirty": false
+}

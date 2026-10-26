@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-030-ln",
+    "role": "reviewer",
+    "session_id": "rev-030-ln-r2-2026-10-26"
+  },
+  "at": "2026-10-26T19:46:03.979425027Z",
+  "change_id": "canon-0-30-ledger-naming",
+  "code_tree": "86779563bdaf9bb2a2dfff7f4bc7cd6f8f2b60a7",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/query.rs:451-457; crates/canon-cli/tests/ledger_migrate.rs:715-732",
+  "introduced_by": "d8876f11f5644941ddcb28f35a62e54658a2f4bd",
+  "kind": "finding",
+  "reviewed_sha": "bdf0ac42680d33c7a44b528115190303445447ab",
+  "reviewer": "rev-030-ln",
+  "round": 2,
+  "scenario_ids": [
+    "ledger.migrate.06"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "The fix for round-1 finding 2 sorts every latest-only kind by name components (query.rs:455, latest_order), not only the folded kinds 0.29 ordered by key. 0.29 returned evidence and review in at order (its fold_latest_by_natural_key ran only for pg-routed/rewritten kinds; other kinds kept the store's at order). On canon's own repo migrated from 927f80d3, canon query --kind evidence --all now differs from 0.29 at 812 of 913 positions and --kind review at 1006 of 1007, both no longer at-sorted; F4 and the ledger.migrate.06 Then allow only same-at reordering. Test 06b (ledger_migrate.rs:715-732) asserts the new name order for evidence and passes only because the fixture's at order coincides. Fix: apply latest_order only where 0.29 sorted by key (the folded kinds), keep record_order for the rest, and check evidence/review order against 0.29's at order.",
+  "worktree_dirty": false
+}

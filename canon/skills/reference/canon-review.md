@@ -27,7 +27,7 @@ The order an agent follows to claim a subject done:
 
    ```bash
    canon finding add --change-id c-demo --round 1 --seq 1 \
-     --severity blocker --disposition open --actor-id reviewer-2 \
+     --severity blocker --introduced-unknown --disposition open --actor-id reviewer-2 \
      --summary "unbounded subprocess wait" --session-id review-session-1
    # ... fix, commit ...
    canon finding close c-demo --round 1 --seq 1 \
@@ -75,7 +75,7 @@ work collapsed into one identity.
 canon finding add --change-id <c> --round <n> --seq <n> \
   --severity blocker|should-fix|note --disposition open \
   --actor-id <who> --summary "<one line>" \
-  [--rev <rev>] [--resolution-rev <rev>] [--introduced-rev <rev>] [--file-ref path/to/file.rs:120-134] [--scenario-id <id>] [--session-id <id>]
+  [--rev <rev>] [--resolution-rev <rev>] [--introduced-rev <rev> | --introduced-unknown] [--file-ref path/to/file.rs:120-134] [--scenario-id <id>] [--session-id <id>]
 canon finding close <c> --round <n> --seq <n> \
   --disposition fixed --resolution-rev <rev> [--actor-id <id>] [--session-id <id>]   # or rejected / deferred / open
 canon finding close <c> --round <n> --seq <n> \
@@ -111,7 +111,8 @@ takes any git revision (`HEAD~1`, a branch, a tag, a full or short sha),
 resolved with `git rev-parse --verify <rev>^{commit}`; the record stores
 the full sha. `--rev` (the commit the round reviewed) defaults to `HEAD`,
 and so does `--resolution-rev` on a `fixed` close; `--introduced-rev` has
-no default and is only sourced, never guessed. A revision that names no
+no default and is only sourced, never guessed. A new `blocker` or `should-fix`
+needs it or `--introduced-unknown` (never both). A revision that names no
 commit is refused (exit `2`). A finding recorded against uncommitted code
 is allowed: the record carries the `codeTree` it saw and `worktreeDirty`.
 Outside git, or in a repository with no commit, the write is refused with

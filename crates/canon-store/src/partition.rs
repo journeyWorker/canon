@@ -335,6 +335,29 @@ mod tests {
         resolve_name(kind, body).unwrap().stem()
     }
 
+    /// review.add.05: the coordinate is resolved from the review's own body
+    /// (its scenario id carries the area); a file under a plausible but
+    /// different directory or name is a layout violation, never accepted.
+    #[test]
+    fn review_add_05_a_reviews_coordinate_comes_from_its_scenario_id_not_a_plausible_directory() {
+        let review = json!({"kind": "review", "project_id": "root", "scenario_id": "promise-date.play.03", "pin": "abc123", "reviewer": "r"});
+        let key = resolve_partition(RecordKind::Review, &review).unwrap();
+        assert_eq!(key.natural_key, "root_scenario_promise-date.play.03", "the key is built from the scenario id alone");
+        let expected = expected_relative_path(RecordKind::Review, &review).unwrap();
+        assert!(expected.to_str().unwrap().starts_with("kind=review/root_scenario_promise-date.play.03_"), "{}", expected.display());
+        validate_layout(RecordKind::Review, &expected, &review).unwrap();
+
+        // The directory guess of the parity-harness audit: `world`, under an `area=` level or in the name.
+        for guess in ["kind=review/area=world/root_scenario_promise-date.play.03.json", "kind=review/root_scenario_world.play.03_0123456789ab.json"] {
+            let err = validate_layout(RecordKind::Review, std::path::Path::new(guess), &review).unwrap_err();
+            assert!(!err.detail.is_empty(), "{guess}");
+        }
+        let wrong = std::path::Path::new("kind=review/root_scenario_world.play.03_0123456789ab.json");
+        let err = validate_layout(RecordKind::Review, wrong, &review).unwrap_err();
+        assert_eq!(err.class, FailureClass::Malformed);
+        assert!(err.detail.contains("expected") && err.detail.contains("promise-date.play.03"), "{}", err.detail);
+    }
+
     #[test]
     fn scenario_review_divergence_keys_start_with_the_project_and_have_no_area() {
         let scenario = json!({"kind": "scenario", "project_id": "app-a", "scenario_id": "world.firstbuy-hotdeal.26"});

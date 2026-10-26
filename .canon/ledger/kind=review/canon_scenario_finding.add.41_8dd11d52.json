@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-030-rl",
+    "role": "reviewer",
+    "session_id": "rev-030-rl-2026-10-26"
+  },
+  "at": "2026-10-26T19:45:03.583580186Z",
+  "code_tree": "86779563bdaf9bb2a2dfff7f4bc7cd6f8f2b60a7",
+  "kind": "review",
+  "pin": "bdf0ac42680d33c7a44b528115190303445447ab",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:finding_add_41_a_new_blocker_or_should_fix_with_no_introducing_commit_and_no_unknown_mark_is_refused"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "1ca197184730f10c229eb3b1025c6258e3c3c93198e8fac42e240284133130db",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": ".canon/changes/canon-0-30-record-links/brief.md"
+  },
+  "review_id": "01M5WVXD2Z94A6RC55YKS9WS0Q",
+  "reviewer": "rev-030-rl",
+  "reviewer_harness": "omp",
+  "scenario_id": "finding.add.41",
+  "schema": 2,
+  "worktree_dirty": false
+}

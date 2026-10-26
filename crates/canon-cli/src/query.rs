@@ -24,7 +24,7 @@ use canon_model::evidence::RawRecord;
 use canon_model::ids::{ChangeId, ProjectId, ScenarioId, TaskId};
 use canon_model::records::Scenario;
 use canon_plugin::manifest::snapshot::OverlayDecl;
-use canon_plugin::{Diagnostic as PluginDiagnostic, project_overlay, resolve_plugin_snapshot};
+use canon_plugin::{project_overlay, resolve_plugin_snapshot, Diagnostic as PluginDiagnostic};
 use canon_store::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
 use canon_store::registry::TierRegistry;
@@ -373,17 +373,67 @@ fn fold_latest_by_natural_key(kind: RecordKind, records: Vec<RawRecord>) -> Vec<
         let digest = canon_store::partition::content_digest(&record.0);
         Candidate { key, at, schema, digest, record }
     });
-    let mut folded: Vec<RawRecord> = fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str()).into_values().map(|c| c.record).collect();
-    folded.sort_by_cached_key(|raw| latest_order(kind, raw));
-    folded
+    fold_latest_by_key(
+        candidates,
+        |c| c.key.clone(),
+        |c| c.at,
+        |c| c.schema,
+        |c| c.digest.as_str(),
+    )
+    .into_values()
+    .map(|c| c.record)
+    .collect()
 }
 
-/// The order `canon query` shows latest-only records in: typed name components in table order (0.29's
-/// key order, with integers compared as numbers), then `at`, then the body digest. `--history` keeps
-/// `record_order` (`at` first).
-fn latest_order(kind: RecordKind, raw: &RawRecord) -> (Vec<canon_model::layout::Component>, DateTime<Utc>, String) {
+/// Whether 0.29 returned `kind`'s latest-only records in natural-key order (the kinds it folded, whose
+/// fold is a key-ordered map) rather than in `at` order.
+fn is_key_ordered(kind: RecordKind) -> bool {
+    matches!(
+        kind,
+        RecordKind::Task
+            | RecordKind::Handoff
+            | RecordKind::Session
+            | RecordKind::Run
+            | RecordKind::Event
+            | RecordKind::Subject
+            | RecordKind::Finding
+            | RecordKind::Scenario
+            | RecordKind::Change
+    )
+}
+
+/// 0.29's joined-key string for a record: components as written, integers zero-padded to ten digits,
+/// joined by `_` (for ordering only; never a name).
+fn legacy_sort_key(components: &[canon_model::layout::Component]) -> String {
+    use canon_model::layout::Component;
+    components
+        .iter()
+        .map(|c| match c {
+            Component::Int(n) => format!("{n:010}"),
+            other => other.value(),
+        })
+        .collect::<Vec<_>>()
+        .join("_")
+}
+
+/// The order `canon query` shows latest-only records in, as 0.29 did: the kinds it folded by their joined
+/// key, every other kind by `at`; ties fall to `at`, the typed components and the body digest.
+fn latest_order(
+    kind: RecordKind,
+    raw: &RawRecord,
+) -> (
+    String,
+    DateTime<Utc>,
+    Vec<canon_model::layout::Component>,
+    String,
+) {
     let (at, components, digest) = canon_store::partition::record_order(kind, raw);
-    (components, at, digest)
+    let key = if is_key_ordered(kind) {
+        legacy_sort_key(&components)
+    } else {
+        String::new()
+    };
+    (key, at, components, digest)
 }
 
 /// Post-tier-merge scope application (design D5/D6, tasks 3.4/3.6;

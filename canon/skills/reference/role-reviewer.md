@@ -187,7 +187,7 @@ Several findings at once are one `--input` array (the keys are option names
 in camelCase):
 
 ```text
-canon finding add --input '[{"changeId":"add-login","round":1,"seq":3,"severity":"note","actorId":"reviewer-1","summary":"Token is logged"},{"changeId":"add-login","round":1,"seq":4,"severity":"should-fix","actorId":"reviewer-1","summary":"Error text leaks the user name"}]'
+canon finding add --input '[{"changeId":"add-login","round":1,"seq":3,"severity":"note","actorId":"reviewer-1","summary":"Token is logged"},{"changeId":"add-login","round":1,"seq":4,"severity":"should-fix","introducedUnknown":true,"actorId":"reviewer-1","summary":"Error text leaks the user name"}]'
 ```
 
 A review pins what you saw: the scenario's digest plus the verdict

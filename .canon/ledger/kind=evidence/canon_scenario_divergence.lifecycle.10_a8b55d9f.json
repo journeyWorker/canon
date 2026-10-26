@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26"
+  },
+  "at": "2026-10-26T19:41:01.484891119Z",
+  "attachments": [
+    {
+      "case": "divergence_lifecycle_10_an_unknown_project_id_is_refused_by_every_writing_divergence_command",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/030-junit-canon.xml",
+      "sha256": "3311b701b05709376c4e9249c8ab4219c5603d65062d022a77fe5f84d07e8e47"
+    }
+  ],
+  "code_tree": "86779563bdaf9bb2a2dfff7f4bc7cd6f8f2b60a7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/030-junit-canon.xml"
+  },
+  "evidence_sha": "bdf0ac42680d33c7a44b528115190303445447ab",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 25,
+  "scenario_id": "divergence.lifecycle.10",
+  "schema": 1,
+  "staging_id": "f06a0076",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

@@ -219,7 +219,7 @@ before anything is written: an invalid element writes nothing and exits 2,
 ```text
 canon scenario new --input '[{"operands":["auth.login.01"],"title":"Logs in","case":"happy"},{"operands":["auth.login.02"],"title":"Wrong password","case":"failure"}]'
 canon evidence add --input '[{"scenarioId":"auth.login.01","class":"test-run","ref":"npm test","role":"implementer"},{"scenarioId":"auth.login.02","class":"test-run","ref":"npm test","role":"implementer"}]'
-canon finding add --input '[{"changeId":"add-login","round":1,"seq":1,"severity":"note","actorId":"reviewer-1","summary":"Token is logged"},{"changeId":"add-login","round":1,"seq":2,"severity":"blocker","actorId":"reviewer-1","summary":"No rate limit"}]'
+canon finding add --input '[{"changeId":"add-login","round":1,"seq":1,"severity":"note","actorId":"reviewer-1","summary":"Token is logged"},{"changeId":"add-login","round":1,"seq":2,"severity":"blocker","introducedUnknown":true,"actorId":"reviewer-1","summary":"No rate limit"}]'
 ```
 
 `--input` never carries `--commit` or `--plan-digest`, and the destructive

@@ -38,6 +38,18 @@ impl HotStore {
         Self::from_policy(&TierPolicy::from_yaml_at(&text, repo).ok()?, repo)
     }
 
+    /// The hot store a write of `kinds` goes to: `Some` when `canon_yaml` configures a hot rung and routes at least one of `kinds` to it.
+    pub fn written_by(canon_yaml: &Path, kinds: &[RecordKind]) -> Option<Self> {
+        let text = std::fs::read_to_string(canon_yaml).ok()?;
+        let repo = crate::tiers::project_dir(canon_yaml);
+        let policy = TierPolicy::from_yaml_at(&text, repo).ok()?;
+        kinds
+            .iter()
+            .any(|kind| policy.routing.get(kind) == Some(&Rung::Hot))
+            .then(|| Self::from_policy(&policy, repo))
+            .flatten()
+    }
+
     /// The hot store of a parsed policy whose relative paths were resolved against `repo`.
     pub fn from_policy(policy: &TierPolicy, repo: &Path) -> Option<Self> {
         Some(match policy.tiers.get(&Rung::Hot)? {

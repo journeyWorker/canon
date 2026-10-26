@@ -16140,6 +16140,13 @@
             "changeId": {
               "type": "string"
             },
+            "hotStore": {
+              "description": "Where the change record went (0.30): the hot store's location; absent when the change is not routed to a hot store.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "subjectId": {
               "type": "string"
             }
@@ -26663,6 +26670,13 @@
         },
         "changeId": {
           "type": "string"
+        },
+        "hotStore": {
+          "description": "Where the change record went (0.30): the hot store's location; absent when the change is not routed to a hot store.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "subjectId": {
           "type": "string"

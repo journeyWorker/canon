@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-refs"
+  },
+  "at": "2026-10-26T19:44:34.852290455Z",
+  "code_tree": "86779563bdaf9bb2a2dfff7f4bc7cd6f8f2b60a7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test init authoring_init_30 && cargo test -p canon-cli --lib init::tests::strict_starter_policy_is_the_pre_level_starter_under_one_level_line"
+  },
+  "evidence_sha": "bdf0ac42680d33c7a44b528115190303445447ab",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 112,
+  "scenario_id": "authoring.init.30",
+  "schema": 1,
+  "staging_id": "8d65418f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

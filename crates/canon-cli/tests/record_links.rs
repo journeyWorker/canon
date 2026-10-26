@@ -120,7 +120,11 @@ fn review_add_102_running_the_same_review_again_writes_nothing_and_shows_the_ear
     let mut expected = first.clone();
     expected.sort();
     assert_eq!(shown, expected);
-    assert!(again["data"]["reviews"].as_array().unwrap().iter().all(|r| r["unchanged"] == true));
+    assert!(again["data"]["reviews"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|r| r["unchanged"] == true));
 
     std::fs::write(feature_path(repo), feature("Given a changed one")).unwrap();
     assert!(canon(&["inventory", "sync"], repo).status.success());
@@ -182,11 +186,27 @@ fn finding_add_38_a_finding_added_with_a_review_id_points_at_that_review_and_a_q
     let dir = fixture();
     let repo = dir.path();
     let id = review_ids(&review(repo, &["cart.add.01"]))[0].1.clone();
-    assert!(add_finding(repo, "kept", "1", "blocker", &["--introduced-unknown", "--review-id", &id]).status.success());
+    assert!(add_finding(
+        repo,
+        "kept",
+        "1",
+        "blocker",
+        &["--introduced-unknown", "--review-id", &id]
+    )
+    .status
+    .success());
     assert!(add_finding(repo, "kept", "2", "note", &[]).status.success());
     let found = ledger(repo, "finding");
-    assert_eq!(found.iter().filter(|(_, v)| v["review_id"] == id.as_str()).count(), 1);
-    assert!(found.iter().any(|(_, v)| v["seq"] == 2 && v.get("review_id").is_none()));
+    assert_eq!(
+        found
+            .iter()
+            .filter(|(_, v)| v["review_id"] == id.as_str())
+            .count(),
+        1
+    );
+    assert!(found
+        .iter()
+        .any(|(_, v)| v["seq"] == 2 && v.get("review_id").is_none()));
     let doc = json(&canon(&["query", "--kind", "finding", "--json"], repo));
     assert!(doc["data"]["records"].as_array().unwrap().iter().any(|r| r["review_id"] == id.as_str()), "{doc}");
 }
@@ -212,8 +232,15 @@ fn finding_add_40_the_id_of_a_review_that_moved_to_the_archive_is_still_accepted
     std::fs::write(feature_path(repo), feature("Given a changed one")).unwrap();
     assert!(canon(&["inventory", "sync"], repo).status.success());
     review(repo, &["cart.add.01"]);
-    assert!(archive(repo, "review").iter().any(|(_, v)| v["review_id"] == old.as_str()), "the earlier review is archived");
-    assert!(!ledger(repo, "review").iter().any(|(_, v)| v["review_id"] == old.as_str()));
+    assert!(
+        archive(repo, "review")
+            .iter()
+            .any(|(_, v)| v["review_id"] == old.as_str()),
+        "the earlier review is archived"
+    );
+    assert!(!ledger(repo, "review")
+        .iter()
+        .any(|(_, v)| v["review_id"] == old.as_str()));
     let out = add_finding(repo, "kept", "1", "note", &["--review-id", &old]);
     assert!(out.status.success(), "{}", text(&out));
 }
@@ -223,8 +250,32 @@ fn finding_close_88_closing_or_reopening_a_finding_copies_its_review_id_and_its_
     let dir = fixture();
     let repo = dir.path();
     let id = review_ids(&review(repo, &["cart.add.01"]))[0].1.clone();
-    assert!(add_finding(repo, "kept", "1", "blocker", &["--introduced-unknown", "--review-id", &id]).status.success());
-    let close = |disposition: &str| canon(&["finding", "close", "kept", "--round", "1", "--seq", "1", "--disposition", disposition, "--promote"], repo);
+    assert!(add_finding(
+        repo,
+        "kept",
+        "1",
+        "blocker",
+        &["--introduced-unknown", "--review-id", &id]
+    )
+    .status
+    .success());
+    let close = |disposition: &str| {
+        canon(
+            &[
+                "finding",
+                "close",
+                "kept",
+                "--round",
+                "1",
+                "--seq",
+                "1",
+                "--disposition",
+                disposition,
+                "--promote",
+            ],
+            repo,
+        )
+    };
     assert!(close("fixed").status.success());
     assert!(close("open").status.success());
     let versions: Vec<Value> = ledger(repo, "finding").into_iter().chain(archive(repo, "finding")).map(|(_, v)| v).collect();
@@ -233,7 +284,8 @@ fn finding_close_88_closing_or_reopening_a_finding_copies_its_review_id_and_its_
 }
 
 #[test]
-fn finding_add_41_a_new_blocker_or_should_fix_with_no_introducing_commit_and_no_unknown_mark_is_refused() {
+fn finding_add_41_a_new_blocker_or_should_fix_with_no_introducing_commit_and_no_unknown_mark_is_refused(
+) {
     let dir = fixture();
     let repo = dir.path();
     for (seq, severity) in [("1", "blocker"), ("2", "should-fix")] {
@@ -246,7 +298,8 @@ fn finding_add_41_a_new_blocker_or_should_fix_with_no_introducing_commit_and_no_
 }
 
 #[test]
-fn finding_add_42_a_new_defect_finding_is_recorded_with_an_introducing_commit_or_the_unknown_mark_and_a_note_needs_neither() {
+fn finding_add_42_a_new_defect_finding_is_recorded_with_an_introducing_commit_or_the_unknown_mark_and_a_note_needs_neither(
+) {
     let dir = fixture();
     let repo = dir.path();
     assert!(add_finding(repo, "kept", "1", "blocker", &["--introduced-rev", "HEAD"]).status.success());
@@ -286,11 +339,14 @@ fn finding_close_89_a_blocker_written_before_0_30_with_neither_field_still_close
     }
     let versions: Vec<Value> = ledger(repo, "finding").into_iter().chain(archive(repo, "finding")).map(|(_, v)| v).collect();
     assert_eq!(versions.len(), 3);
-    assert!(versions.iter().all(|v| v.get("introduced_by").is_none() && v.get("introduced_unknown").is_none()));
+    assert!(versions
+        .iter()
+        .all(|v| v.get("introduced_by").is_none() && v.get("introduced_unknown").is_none()));
 }
 
 #[test]
-fn inventory_sync_53_a_scenario_index_record_holds_the_steps_in_source_order_with_inherited_ones_marked() {
+fn inventory_sync_53_a_scenario_index_record_holds_the_steps_in_source_order_with_inherited_ones_marked(
+) {
     let dir = fixture();
     let steps = scenario_record(dir.path(), "cart.add.03")["steps"].clone();
     let shown: Vec<(String, String, Option<String>)> = steps.as_array().unwrap().iter().map(|s| (s["keyword"].as_str().unwrap().into(), s["text"].as_str().unwrap().into(), s["inherited"].as_str().map(str::to_string))).collect();
@@ -305,7 +361,36 @@ fn inventory_sync_53_a_scenario_index_record_holds_the_steps_in_source_order_wit
             step("But", "nothing is lost", None),
         ]
     );
-    assert!(scenario_record(dir.path(), "cart.add.01")["steps"].as_array().unwrap().iter().any(|s| s["keyword"] == "And"));
+    assert!(scenario_record(dir.path(), "cart.add.01")["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|s| s["keyword"] == "And"));
+
+    // `scenario_digest` is what it was before steps were indexed: a 0.29 record (no `steps`) re-synced keeps its digest.
+    let digests = |repo: &Path| -> Vec<(String, Value)> {
+        ledger(repo, "scenario")
+            .into_iter()
+            .map(|(_, v)| {
+                (
+                    v["scenario_id"].as_str().unwrap().to_string(),
+                    v["scenario_digest"].clone(),
+                )
+            })
+            .collect()
+    };
+    let before = digests(dir.path());
+    assert!(before.iter().all(|(_, d)| d.is_string()), "{before:?}");
+    downgrade_index_to_0_29(dir.path());
+    assert!(canon(&["inventory", "sync"], dir.path()).status.success());
+    assert!(ledger(dir.path(), "scenario")
+        .iter()
+        .all(|(_, v)| v.get("steps").is_some()));
+    let mut after = digests(dir.path());
+    let mut before = before;
+    before.sort_by(|a, b| a.0.cmp(&b.0));
+    after.sort_by(|a, b| a.0.cmp(&b.0));
+    assert_eq!(after, before, "the scenario digest changed with the steps");
 }
 
 /// Rewrite every scenario record of the ledger as 0.29 wrote it: no `steps`.
@@ -326,7 +411,9 @@ fn inventory_sync_54_a_0_29_index_record_without_steps_is_rewritten_with_them_on
     let dir = fixture();
     let repo = dir.path();
     downgrade_index_to_0_29(repo);
-    assert!(ledger(repo, "scenario").iter().all(|(_, v)| v.get("steps").is_none()));
+    assert!(ledger(repo, "scenario")
+        .iter()
+        .all(|(_, v)| v.get("steps").is_none()));
     let out = canon(&["inventory", "sync", "--json"], repo);
     assert!(out.status.success(), "{}", text(&out));
     assert!(ledger(repo, "scenario").iter().all(|(_, v)| v["steps"].as_array().is_some_and(|s| !s.is_empty())), "every scenario has steps now");
@@ -341,8 +428,18 @@ fn inventory_sync_55_an_edited_step_replaces_the_record_and_the_old_record_goes_
     std::fs::write(feature_path(repo), feature("Given an edited step")).unwrap();
     assert!(canon(&["inventory", "sync"], repo).status.success());
     let now = scenario_record(repo, "cart.add.01");
-    assert!(now["steps"].as_array().unwrap().iter().any(|s| s["text"] == "an edited step"));
-    assert!(archive(repo, "scenario").iter().any(|(_, v)| v["scenario_id"] == "cart.add.01" && v["steps"].to_string().contains("\"one\"")), "the old record is archived");
+    assert!(now["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|s| s["text"] == "an edited step"));
+    assert!(
+        archive(repo, "scenario")
+            .iter()
+            .any(|(_, v)| v["scenario_id"] == "cart.add.01"
+                && v["steps"].to_string().contains("\"one\"")),
+        "the old record is archived"
+    );
 }
 
 fn query_findings(repo: &Path) -> Value {
@@ -356,7 +453,9 @@ fn query_read_83_a_query_marks_a_reference_to_a_source_that_is_not_committed_and
     let dir = fixture();
     let repo = dir.path();
     assert!(add_finding(repo, "kept", "1", "note", &[]).status.success());
-    assert!(add_finding(repo, "gone-change", "1", "note", &[]).status.success());
+    assert!(add_finding(repo, "gone-change", "1", "note", &[])
+        .status
+        .success());
     let doc = query_findings(repo);
     let dangling = &doc["data"]["dangling"];
     assert_eq!(dangling["count"], 1, "{doc}");
@@ -383,23 +482,104 @@ fn status_dangling(repo: &Path) -> Value {
     json(&out)["data"]["danglingReferences"].clone()
 }
 
+/// Rewrite every record of `kind` in the ledger with `edit` applied to its body, as a new file named by the new body.
+fn rewrite_ledger(repo: &Path, kind: &str, edit: impl Fn(&mut Value)) {
+    use canon_model::RawRecord;
+    use canon_store::git_tier::GitTier;
+    use canon_store::tier::{RawWrite, Tier};
+    for (path, mut body) in ledger(repo, kind) {
+        std::fs::remove_file(path).unwrap();
+        edit(&mut body);
+        GitTier::new(repo.join(".canon/ledger"))
+            .write(&RawWrite(RawRecord(body)))
+            .unwrap();
+    }
+}
+
 #[test]
-fn context_status_84_status_counts_references_to_missing_sources_per_kind_and_gives_the_same_json_on_every_checkout_of_one_commit() {
+fn context_status_84_status_counts_references_to_missing_sources_per_kind_and_gives_the_same_json_on_every_checkout_of_one_commit(
+) {
     let dir = fixture();
     let repo = dir.path();
-    assert!(add_finding(repo, "gone-change", "1", "note", &[]).status.success());
-    assert!(add_finding(repo, "kept", "2", "note", &["--review-id", &review_ids(&review(repo, &["cart.add.01"]))[0].1]).status.success());
+    std::fs::write(repo.join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  finding: local\n  review: local\n  evidence: local\n  subject: local\n").unwrap();
+    // finding.change_id and finding.review_id: a finding of a change nobody committed, citing a review whose file is then gone.
+    let review_id = review_ids(&review(repo, &["cart.add.01"]))[0].1.clone();
+    assert!(add_finding(
+        repo,
+        "gone-change",
+        "1",
+        "note",
+        &["--review-id", &review_id]
+    )
+    .status
+    .success());
+    assert!(add_finding(repo, "kept", "2", "note", &[]).status.success());
+    rewrite_ledger(repo, "review", |body| {
+        body["review_id"] = "01J9ZXQ4M2K7V8R3T5W6Y0N1PZ".into();
+    });
+    // evidence.task_id and evidence.scenario_id.
+    let out = canon(
+        &[
+            "evidence",
+            "add",
+            "--scenario-id",
+            "cart.add.01",
+            "--class",
+            "test-run",
+            "--ref",
+            "x",
+            "--role",
+            "implementer",
+            "--actor-id",
+            "a",
+            "--promote",
+        ],
+        repo,
+    );
+    assert!(out.status.success(), "{}", text(&out));
+    rewrite_ledger(repo, "evidence", |body| {
+        body["task_id"] = "gone-task#1".into();
+        body["scenario_id"] = "gone.scn.01".into();
+    });
+    // subject.change_ids.
+    let out = canon(
+        &[
+            "subject",
+            "new",
+            "demo",
+            "--domain",
+            "d",
+            "--title",
+            "T",
+            "--actor-id",
+            "a",
+        ],
+        repo,
+    );
+    assert!(out.status.success(), "{}", text(&out));
+    rewrite_ledger(repo, "subject", |body| {
+        body["change_ids"] = serde_json::json!(["gone-change"]);
+    });
     git(repo, &["add", "-A"]);
-    git(repo, &["commit", "-q", "-m", "findings"]);
+    git(repo, &["commit", "-q", "-m", "records"]);
+
     let here = status_dangling(repo);
-    assert_eq!(here["count"], 1, "{here}");
-    assert_eq!(here["byReference"]["finding.change_id"], 1);
+    assert_eq!(here["count"], 5, "{here}");
+    for reference in [
+        "finding.change_id",
+        "finding.review_id",
+        "evidence.task_id",
+        "evidence.scenario_id",
+        "subject.change_ids",
+    ] {
+        assert_eq!(here["byReference"][reference], 1, "{reference}: {here}");
+    }
     let clone = tempfile::tempdir().unwrap();
     git(clone.path().parent().unwrap(), &["clone", "-q", repo.to_str().unwrap(), clone.path().to_str().unwrap()]);
     assert!(canon(&["inventory", "sync"], clone.path()).status.success());
     assert_eq!(status_dangling(clone.path()), here, "a fresh checkout of the commit reports the same");
     let human = text(&canon(&["status"], repo));
-    assert!(human.contains("dangling references: 1"), "{human}");
+    assert!(human.contains("dangling references: 5"), "{human}");
 }
 
 #[test]
@@ -408,12 +588,47 @@ fn context_status_85_a_gitignored_derived_record_is_not_a_source_and_gate_check_
     let repo = dir.path();
     std::fs::write(repo.join(".gitignore"), ".canon/ledger/kind=change/\n").unwrap();
     std::fs::create_dir_all(repo.join(".canon/ledger/kind=change")).unwrap();
-    std::fs::write(repo.join(".canon/ledger/kind=change/derived_00000000.json"), "{\"kind\":\"change\",\"change_id\":\"derived\"}").unwrap();
-    assert!(add_finding(repo, "derived", "1", "note", &[]).status.success());
+    std::fs::write(
+        repo.join(".canon/ledger/kind=change/derived_00000000.json"),
+        "{\"kind\":\"change\",\"change_id\":\"derived\"}",
+    )
+    .unwrap();
+    // A review written before 0.23: it pins evidence record names that no longer exist.
+    {
+        use canon_model::RawRecord;
+        use canon_store::git_tier::GitTier;
+        use canon_store::tier::{RawWrite, Tier};
+        let old = serde_json::json!({
+            "actor": {"agent_id": "rev-old", "role": "reviewer"}, "at": "2026-01-01T00:00:00.000000Z", "kind": "review", "pin": "1111111111111111111111111111111111111111",
+            "pins": {"evidence": [{"digest": "f778690a0216", "key": "cart.add.01"}], "scenario_digest": "b35933cccfd20c6521a722f5b422fb3ae5756c75042527c8474625fd6a2fbe51"},
+            "project_id": "root", "provenance_ref": {"original_spec_ref": "specs/old.feature"}, "reviewer": "rev-old", "scenario_id": "cart.add.01", "schema": 1
+        });
+        GitTier::new(repo.join(".canon/ledger"))
+            .write(&RawWrite(RawRecord(old)))
+            .unwrap()
+    };
+    // The same finding, once pointing at a change that resolves and once at the one that has only a derived record.
+    assert!(add_finding(repo, "kept", "1", "note", &[]).status.success());
+    assert_eq!(status_dangling(repo)["count"], 0);
+    let resolving = canon(&["gate", "check", "--json"], repo);
+    rewrite_ledger(repo, "finding", |body| body["change_id"] = "derived".into());
     assert_eq!(status_dangling(repo)["byReference"]["finding.change_id"], 1);
+    assert_eq!(
+        status_dangling(repo)["count"],
+        1,
+        "the old review's pins are not checked"
+    );
     assert_eq!(query_findings(repo)["data"]["dangling"]["count"], 1);
-    let gate = canon(&["gate", "check", "--json"], repo);
-    assert!(!text(&gate).contains("dangling"), "gate check does not read references");
+    let dangling = canon(&["gate", "check", "--json"], repo);
+    assert!(
+        !text(&dangling).contains("dangling"),
+        "gate check does not read references"
+    );
+    assert_eq!(
+        (dangling.status.code(), &dangling.stdout),
+        (resolving.status.code(), &resolving.stdout),
+        "gate check differs with a dangling reference"
+    );
 }
 
 fn init_repo(yaml: &str) -> tempfile::TempDir {
@@ -437,7 +652,8 @@ fn authoring_init_101_init_check_shows_where_the_hot_store_is() {
 }
 
 #[test]
-fn authoring_init_102_init_check_says_so_when_no_hot_store_is_configured_and_names_a_hot_store_it_cannot_open() {
+fn authoring_init_102_init_check_says_so_when_no_hot_store_is_configured_and_names_a_hot_store_it_cannot_open(
+) {
     let none = init_repo("tiers:\n  local: { backend: git, root: .canon/ledger }\n");
     assert!(text(&canon(&["init", "--check"], none.path())).contains("[not configured] hot-store"));
     let broken = init_repo(WITH_HOT);
@@ -480,4 +696,217 @@ fn ingest_sessions_16_the_other_hot_writers_print_the_hot_store_location_too() {
     assert!(text(&records).contains("hot store: .canon/hot.db"), "{}", text(&records));
     let begin = canon(&["dispatch", "begin", "--role", "implementer", "--regime", "implementer/app/api/abcdef012345", "--actor-id", "a", "--json"], repo);
     assert!(text(&begin).contains(".canon/hot.db"), "{}", text(&begin));
+}
+
+#[test]
+fn ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_location_too() {
+    let hot = "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  subject: hot\n  change: hot\n";
+    let dir = init_repo(hot);
+    let repo = dir.path();
+    git(repo, &["init", "-q", "-b", "main"]);
+    let new = canon(
+        &[
+            "subject",
+            "new",
+            "demo",
+            "--domain",
+            "d",
+            "--title",
+            "T",
+            "--actor-id",
+            "a",
+        ],
+        repo,
+    );
+    assert!(
+        new.status.success() && text(&new).contains("hot store: .canon/hot.db"),
+        "{}",
+        text(&new)
+    );
+    let new_json = json(&canon(
+        &[
+            "subject",
+            "new",
+            "other",
+            "--domain",
+            "d",
+            "--title",
+            "T",
+            "--actor-id",
+            "a",
+            "--json",
+        ],
+        repo,
+    ));
+    assert_eq!(new_json["meta"]["hotStore"], ".canon/hot.db", "{new_json}");
+    let change = canon(
+        &[
+            "change",
+            "new",
+            "add-it",
+            "--subject-id",
+            "demo",
+            "--title",
+            "Add it",
+            "--json",
+        ],
+        repo,
+    );
+    assert_eq!(
+        json(&change)["data"]["hotStore"],
+        ".canon/hot.db",
+        "{}",
+        text(&change)
+    );
+    let human = canon(
+        &[
+            "change",
+            "new",
+            "add-two",
+            "--subject-id",
+            "demo",
+            "--title",
+            "Add two",
+        ],
+        repo,
+    );
+    assert!(
+        text(&human).contains("hot store: .canon/hot.db"),
+        "{}",
+        text(&human)
+    );
+    let adopt = canon(
+        &["subject", "adopt", "other", "--change-id", "add-it"],
+        repo,
+    );
+    assert!(
+        text(&adopt).contains("hot store: .canon/hot.db"),
+        "{}",
+        text(&adopt)
+    );
+    let unadopt = canon(
+        &[
+            "subject",
+            "unadopt",
+            "other",
+            "--change-id",
+            "add-it",
+            "--json",
+        ],
+        repo,
+    );
+    assert_eq!(
+        json(&unadopt)["meta"]["hotStore"],
+        ".canon/hot.db",
+        "{}",
+        text(&unadopt)
+    );
+    let moved = canon(&["subject", "move", "demo", "--to", "specced"], repo);
+    assert!(
+        text(&moved).contains("hot store: .canon/hot.db"),
+        "{}",
+        text(&moved)
+    );
+    // Nothing written, nothing said: a preview and an unchanged repeat.
+    let preview = canon(
+        &[
+            "subject",
+            "adopt",
+            "other",
+            "--change-id",
+            "add-it",
+            "--dry-run",
+        ],
+        repo,
+    );
+    assert!(!text(&preview).contains("hot store:"), "{}", text(&preview));
+    let again = canon(
+        &["subject", "unadopt", "other", "--change-id", "add-it"],
+        repo,
+    );
+    assert!(!text(&again).contains("hot store:"), "{}", text(&again));
+    // Routed to the ledger: no hot store line.
+    let local = init_repo("tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  subject: local\n");
+    let out = canon(
+        &[
+            "subject",
+            "new",
+            "demo",
+            "--domain",
+            "d",
+            "--title",
+            "T",
+            "--actor-id",
+            "a",
+        ],
+        local.path(),
+    );
+    assert!(
+        out.status.success() && !text(&out).contains("hot store:"),
+        "{}",
+        text(&out)
+    );
+}
+
+/// Every `canon finding add` command written by hand in the skill guides (the generated blocks are checked by `docs_generated`)
+/// that raises a blocker or should-fix names the introducing commit, or says it is unknown: `finding add` refuses it otherwise.
+#[test]
+fn hand_written_finding_add_blocker_and_should_fix_examples_name_the_introducing_commit() {
+    fn markdown(dir: &Path, out: &mut Vec<PathBuf>) {
+        for entry in std::fs::read_dir(dir).unwrap().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                markdown(&path, out);
+            } else if path.extension().is_some_and(|e| e == "md") {
+                out.push(path);
+            }
+        }
+    }
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let mut files = vec![root.join("README.md")];
+    markdown(&root.join("canon/skills"), &mut files);
+    let (mut seen, mut problems) = (0, Vec::new());
+    for file in files {
+        let text = std::fs::read_to_string(&file).unwrap();
+        let mut lines = text.lines().enumerate();
+        while let Some((number, line)) = lines.next() {
+            let Some(start) = line
+                .find("canon finding add ")
+                .filter(|_| line.trim_start().starts_with("canon finding add "))
+            else {
+                continue;
+            };
+            let mut command = line[start..].to_string();
+            while command.ends_with('\\') {
+                let Some((_, next)) = lines.next() else { break };
+                command.pop();
+                command.push_str(next.trim());
+            }
+            seen += 1;
+            // Flags: a severity of blocker or should-fix; a template (`blocker|should-fix|note`) is not an example.
+            let words: Vec<&str> = command.split_whitespace().collect();
+            let flagged = words
+                .windows(2)
+                .any(|w| w[0] == "--severity" && matches!(w[1], "blocker" | "should-fix"));
+            // `--input` documents: every object with such a severity.
+            let documents = command.split("{\"").skip(1).filter(|object| {
+                object.contains("\"severity\":\"blocker\"")
+                    || object.contains("\"severity\":\"should-fix\"")
+            });
+            let unnamed_documents = documents
+                .filter(|object| {
+                    !object.contains("\"introducedRev\"")
+                        && !object.contains("\"introducedUnknown\"")
+                })
+                .count();
+            let unnamed_flags = flagged
+                && !command.contains("--introduced-rev")
+                && !command.contains("--introduced-unknown");
+            if unnamed_flags || unnamed_documents > 0 {
+                problems.push(format!("{}:{}: {command}", file.display(), number + 1));
+            }
+        }
+    }
+    assert!(seen >= 5, "found only {seen} `canon finding add` examples");
+    assert!(problems.is_empty(), "these examples raise a blocker or should-fix without --introduced-rev or --introduced-unknown:\n{}", problems.join("\n"));
 }

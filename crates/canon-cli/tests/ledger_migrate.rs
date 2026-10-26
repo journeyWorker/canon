@@ -15,7 +15,7 @@ use std::process::{Command, Output};
 use canon_store::r2_tier::{ObjectRekey, R2Tier};
 use canon_store::sqlite_tier::SqliteTier;
 use canon_store::tier::RowRekey;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
@@ -701,38 +701,76 @@ fn ledger_migrate_06b_judgements_and_records_are_what_0_29_gave() {
         assert_eq!(query["data"]["count"], count, "query --kind {kind}");
         assert_eq!(query["data"]["records"].as_array().map(Vec::len), Some(count), "query --kind {kind}");
     }
-    // The order: 0.29's name order (components, padding aside), not `at`-first. Evidence by name `run id | task id | subject`,
-    // findings by `change, round, seq`; the fixture's file names say what 0.29 gave.
-    let order_of = |kind_dir: &str, identity: &dyn Fn(&Value) -> String| -> Vec<String> {
-        let mut named: Vec<(String, String)> = fixture_record_files()
-            .into_iter()
-            .filter_map(|p| p.strip_prefix(&format!(".canon/ledger/kind={kind_dir}/")).map(str::to_string))
-            .map(|name| {
-                let body: Value = serde_json::from_slice(&fixture_bytes(&format!(".canon/ledger/kind={kind_dir}/{name}"))).unwrap();
-                (name.to_lowercase(), identity(&body))
-            })
-            .collect();
-        named.sort();
-        named.into_iter().map(|(_, id)| id).collect()
+    // The order, kind by kind, against what 0.29 gave: the kinds it folded (key-ordered map) by their joined key, the
+    // others (evidence, review, divergence, ...) by `at`. The fixture's `at` order differs from its name order for evidence
+    // and review, and `at` ties only among scenarios (key-ordered), so the two orders cannot be confused.
+    const KEY_ORDERED: [&str; 4] = ["change", "finding", "scenario", "subject"];
+    let identity = |v: &Value| -> String {
+        [
+            "subject_id",
+            "change_id",
+            "scenario_id",
+            "staging_id",
+            "round",
+            "seq",
+        ]
+        .iter()
+        .filter_map(|f| v.get(*f))
+        .map(Value::to_string)
+        .collect::<Vec<_>>()
+        .join("/")
     };
-    let staging = |v: &Value| v["staging_id"].as_str().unwrap().to_string();
-    let round_seq = |v: &Value| format!("{:?}/{:?}", v["round"], v["seq"]);
-    let (evidence, _) = repo.json(&["query", "--kind", "evidence", "--all"]);
-    let got: Vec<String> = evidence["data"]["records"].as_array().unwrap().iter().map(staging).collect();
-    // 0.30 leads an evidence name with the project (`-` when absent) and tags the key (`run`, `scenario`, `task`), which 0.29 did
-    // not: the planned difference is the order of those groups (project-less first, then by tag); within a group the 0.29 name
-    // order holds.
-    let tagged = order_of("evidence_record", &|v: &Value| {
-        let rank = if v.get("project_id").is_none() { 0 } else if v.get("task_id").is_some() { 3 } else if v.get("scenario_id").is_some() { 2 } else { 1 };
-        format!("{rank}|{}", staging(v))
-    });
-    let mut by_tag = tagged.clone();
-    by_tag.sort_by_key(|id| id.chars().next());
-    let expected: Vec<String> = by_tag.into_iter().map(|id| id[2..].to_string()).collect();
-    assert_eq!(got, expected, "evidence order differs from 0.29's (tags aside)");
-    let (findings, _) = repo.json(&["query", "--kind", "finding", "--all"]);
-    let got: Vec<String> = findings["data"]["records"].as_array().unwrap().iter().map(round_seq).collect();
-    assert_eq!(got, order_of("finding", &round_seq), "finding order differs from 0.29's");
+    for kind in fixture_ledger_counts()
+        .into_keys()
+        .filter(|k| k != "porting.coverage")
+    {
+        let dir = if kind == "evidence" {
+            "evidence_record"
+        } else {
+            kind.as_str()
+        };
+        let mut files: Vec<(String, chrono::DateTime<chrono::Utc>, String)> =
+            fixture_record_files()
+                .into_iter()
+                .filter_map(|p| {
+                    p.strip_prefix(&format!(".canon/ledger/kind={dir}/"))
+                        .map(str::to_string)
+                })
+                .map(|name| {
+                    let body: Value = serde_json::from_slice(&fixture_bytes(&format!(
+                        ".canon/ledger/kind={dir}/{name}"
+                    )))
+                    .unwrap();
+                    let at = body
+                        .get("at")
+                        .or_else(|| body["envelope"].get("at"))
+                        .and_then(Value::as_str)
+                        .unwrap()
+                        .parse()
+                        .unwrap();
+                    let file = name.rsplit('/').next().unwrap();
+                    let key = file.rsplit_once("__").unwrap().0.to_string();
+                    (key, at, identity(&body))
+                })
+                .collect();
+        if KEY_ORDERED.contains(&kind.as_str()) {
+            files.sort_by(|a, b| (&a.0, a.1).cmp(&(&b.0, b.1)));
+        } else {
+            files.sort_by_key(|f| f.1);
+        }
+        let expected: Vec<String> = files.into_iter().map(|f| f.2).collect();
+        let (query, _) = repo.json(&["query", "--kind", &kind, "--all"]);
+        let got: Vec<String> = query["data"]["records"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(&identity)
+            .collect();
+        assert_eq!(
+            got, expected,
+            "`query --kind {kind}` order differs from 0.29's"
+        );
+    }
     let (evidence, _) = repo.json(&["query", "--kind", "evidence", "--all"]);
     let kinds: BTreeSet<&str> = evidence["data"]["records"].as_array().unwrap().iter().map(|r| r["kind"].as_str().unwrap()).collect();
     assert_eq!(kinds, BTreeSet::from(["evidence"]));
@@ -782,7 +820,10 @@ fn ledger_migrate_07_pre_0_23_reviews_keep_their_standing() {
     // 03 (stale): left as it was, and the gate still reports it, alone.
     let (path, stale) = review_of(&repo, "auth.login.03");
     assert_eq!(fs::read(&path).unwrap(), fixture_bytes(".canon/ledger/kind=review/area=auth/root__auth.login.03__2222222222222222222222222222222222222222__d5d475c40d64.json"), "review 03 was rewritten");
-    assert_eq!(stale["pins"]["evidence"], json!([{"key": "auth.login.03", "digest": "0d75c144dd76"}]));
+    assert_eq!(
+        stale["pins"]["evidence"],
+        json!([{"key": "auth.login.03", "digest": "0d75c144dd76"}])
+    );
     let (gate, _) = repo.json(&["gate", "check"]);
     let advisory = gate["data"]["advisories"].as_array().unwrap().iter().find(|a| a["kind"] == "unmigrated_review").expect("the stale review is still reported");
     let message = advisory["message"].as_str().unwrap();
@@ -866,7 +907,9 @@ fn ledger_migrate_09_revert_restores_the_tree_the_sqlite_file_and_the_index() {
     assert!(repo.path().join(".canon/migrate-backup").is_dir(), "the revert removed the backup");
     // And the repo reads as 0.29 again.
     let (gate, _) = repo.json(&["gate", "check"]);
-    assert!(violations(&gate).iter().any(|(class, _)| class == "old-layout"));
+    assert!(violations(&gate)
+        .iter()
+        .any(|(class, _)| class == "old-layout"));
 }
 
 /// ledger.migrate.09 -- Then: `--backup <DIR>` names the backup to restore; a revert with no
@@ -1090,7 +1133,10 @@ fn ledger_migrate_12b_canon_never_writes_the_old_key() {
     for (path, bytes) in fresh.snapshot(false) {
         assert!(!text(&bytes).contains("evidence_record"), "`canon init` wrote `evidence_record` into {}", path.display());
     }
-    assert!(fresh.read("canon.yaml").lines().any(|l| l.trim() == "evidence: local"));
+    assert!(fresh
+        .read("canon.yaml")
+        .lines()
+        .any(|l| l.trim() == "evidence: local"));
 
     // `canon migrate` and then `canon evidence add` on the fixture.
     let repo = Repo::old();
@@ -1102,7 +1148,9 @@ fn ledger_migrate_12b_canon_never_writes_the_old_key() {
         assert!(!repo.read(file).contains("evidence_record"), "{file} names `evidence_record` after migrate and evidence add:\n{}", repo.read(file));
     }
     let new_evidence = add["data"]["records"][0]["committed"].as_str().unwrap();
-    assert!(!repo.read(&format!(".canon/ledger/{new_evidence}")).contains("evidence_record"));
+    assert!(!repo
+        .read(&format!(".canon/ledger/{new_evidence}"))
+        .contains("evidence_record"));
 }
 
 // ---------------------------------------------------------------------------
