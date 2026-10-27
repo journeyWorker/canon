@@ -44,7 +44,7 @@ fn canon(dir: &Path, home: &Path, args: &[String]) -> Output {
 }
 
 fn ok(dir: &Path, home: &Path, args: &[&str]) {
-    let out = canon(dir, home, &args.iter().map(|a| a.to_string()).collect::<Vec<_>>());
+    let out = canon(dir, home, &args.iter().map(std::string::ToString::to_string).collect::<Vec<_>>());
     assert!(out.status.success(), "{args:?}: {}", String::from_utf8_lossy(&out.stderr));
 }
 
@@ -110,7 +110,7 @@ fn words(line: &str) -> Vec<String> {
 
 fn schema(dir: &Path, home: &Path, args: &[&str]) -> Value {
     let mut argv: Vec<String> = vec!["schema".into()];
-    argv.extend(args.iter().map(|a| a.to_string()));
+    argv.extend(args.iter().map(std::string::ToString::to_string));
     argv.push("--json".into());
     let out = canon(dir, home, &argv);
     serde_json::from_slice::<Value>(&out.stdout).unwrap_or_else(|e| panic!("{argv:?}: {e}"))["data"].clone()
@@ -147,12 +147,9 @@ fn every_leaf_has_an_example_and_it_runs_in_a_scratch_repo() {
         let scratch = TempDir::new().unwrap();
         let mut cwd = scratch.path().join("repo");
         copy_dir(base.path(), &cwd);
-        match leaf.as_str() {
-            "init" => {
-                cwd = scratch.path().join("fresh");
-                std::fs::create_dir_all(&cwd).unwrap();
-            }
-            _ => {}
+        if leaf.as_str() == "init" {
+            cwd = scratch.path().join("fresh");
+            std::fs::create_dir_all(&cwd).unwrap();
         }
         let mut argv = words(example);
         argv.remove(0);

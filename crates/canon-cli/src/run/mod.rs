@@ -36,8 +36,8 @@ use canon_model::RoleId;
 use crate::cli_error::CliError;
 use std::process::ExitCode;
 use crate::cli::{Cli, Command};
-use top::*;
-use crate::cli::top::*;
+use top::{run_regime_show, run_report, run_query, run_fmt, run_context, run_init, run_retrieve, run_dashboard, run_completion};
+use crate::cli::top::{PurgeArgs, FormatArgs, ContextArgs, StatusArgs, InitArgs, MigrateArgs, RetrieveArgs, DashboardArgs, SelftestArgs, SchemaArgs, CompletionArgs};
 
 pub fn run(cli: Cli) -> ExitCode {
     let declared = cli.declared_role;
@@ -58,7 +58,7 @@ pub fn run(cli: Cli) -> ExitCode {
         Command::Brief { action } => brief::run(action),
         Command::Inventory { action } => inventory::run(action),
         Command::Gate { action } => gate::run(action),
-        Command::Evidence { action } => evidence::run(action),
+        Command::Evidence { action } => evidence::run(*action),
         Command::Artifacts { action } => artifacts::run(action),
         Command::Finding { action } => finding::run(action),
         Command::Review { action } => review::run(action),
@@ -73,17 +73,15 @@ pub fn run(cli: Cli) -> ExitCode {
         Command::Skills { action } => skills::run(action),
         Command::Tier { action } => tier::run(action),
         Command::Ledger { action } => ledger::run(action),
-        Command::Query(QueryArgs { kind, since, repo, json, plugin_id, history, change_id, status, domain, include_sensitive, page, fields }) => {
-            run_query(&repo, kind, since, json, plugin_id, history, change_id, status, domain, include_sensitive, page.page(), fields)
-        }
-        Command::Export(ExportArgs { kind, before, after, output, repo, json, include_sensitive, page, fields, dry_run, .. }) => ExitCode::from(crate::retention::run_export(&repo, kind, before, after, output.as_deref(), json, include_sensitive, &page.page(), fields.as_deref(), dry_run.dry_run)),
+        Command::Query(args) => run_query(args),
+        Command::Export(args) => ExitCode::from(crate::retention::run_export(args)),
         Command::Purge(PurgeArgs { kind, before, safety, repo, json, .. }) => {
-            let base = crate::safety::command("purge", &[("--kind", crate::query::kind_cli_name(kind).to_string()), ("--before", before.to_rfc3339())], &repo);
+            let base = crate::safety::command("purge", &[("--kind", kind.as_str().to_string()), ("--before", before.to_rfc3339())], &repo);
             ExitCode::from(crate::retention::run_purge(&repo, kind, before, &safety.mode(), &base, json))
         }
         Command::Format(FormatArgs { dir, repo, json }) => run_fmt(dir.as_deref(), &repo, json),
         Command::Context(ContextArgs { repo, json, fields }) => run_context(&repo, json, fields, declared_role),
-        Command::Status(StatusArgs { repo, json, fields }) => ExitCode::from(crate::status::run(&repo, json, fields.as_deref()) as u8),
+        Command::Status(StatusArgs { repo, json, fields }) => ExitCode::from(crate::status::run(&repo, json, fields.as_deref())),
         Command::Init(InitArgs { repo, check, no_agents_md, policy, no_policy, providers, language, dry_run, json, .. }) => {
             let policy = (!no_policy).then(|| policy.unwrap_or(crate::policy_level::PolicyLevel::Strict));
             let skills = match providers {
@@ -92,7 +90,7 @@ pub fn run(cli: Cli) -> ExitCode {
             };
             run_init(&repo, check, crate::init::InitOptions { agents_md: !no_agents_md, policy, skills, language, dry_run: dry_run.dry_run }, json)
         }
-        Command::Migrate(MigrateArgs { repo, safety, json, .. }) => ExitCode::from(crate::migrate::run(&repo, &safety.mode(), json) as u8),
+        Command::Migrate(MigrateArgs { repo, safety, json, revert, backup, .. }) => ExitCode::from(if revert { crate::migrate_names::run_revert(&repo, backup.as_deref(), &safety.mode(), json) } else { crate::migrate::run(&repo, &safety.mode(), json) }),
         Command::Retrieve(RetrieveArgs { for_role, regime, domain, subject_id, limit, repo, json }) => run_retrieve(&repo, &for_role, regime.as_ref(), domain.as_deref(), subject_id.as_ref(), limit, json),
         Command::Dashboard(DashboardArgs { repo, snapshot, port, json, .. }) => run_dashboard(&repo, snapshot.as_deref(), port, json),
         Command::Selftest(SelftestArgs { suite, json }) => crate::selftest::run_selftest(suite.as_deref(), json),
@@ -114,7 +112,7 @@ fn record_role(flag: Option<RoleId>, repo: &std::path::Path, command: &str, json
         None => Err(ExitCode::from(
             CliError::refused("USAGE", "the following required argument was not provided: --role <ROLE>")
                 .hint("pass --role <planner|implementer|reviewer|orchestrator>, or declare the role you act as with --as <role> (or CANON_ROLE)")
-                .emit(command, json) as u8,
+                .emit(command, json),
         )),
     }
 }
@@ -132,6 +130,6 @@ fn human_only(command: &str, human_call: &str, json: bool) -> Result<(), ExitCod
         CliError::refused("HUMAN_ONLY", format!("`{command}` records a human's decision and is not available to the {role} role"))
             .field("--as")
             .hint(format!("report this exact call to the human and wait; the human runs it in their own shell: `{human_call}`; never remove your role (`env -u CANON_ROLE`, dropping --as) to run it yourself"))
-            .emit(command, json) as u8,
+            .emit(command, json),
     ))
 }

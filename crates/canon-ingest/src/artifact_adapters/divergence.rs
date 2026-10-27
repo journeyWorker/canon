@@ -66,6 +66,7 @@ use crate::scanner;
 
 const ADAPTER_ID: &str = "divergence";
 
+#[derive(Debug)]
 pub struct DivergenceAdapter;
 
 impl ArtifactAdapter for DivergenceAdapter {
@@ -151,8 +152,8 @@ fn parse_divergence_file(path: &Path) -> ArtifactParseOutcome {
         }
 
         match parse_divergence_line(trimmed, area.as_deref(), lane.as_deref()) {
-            Ok(event) => events.push(event),
-            Err(()) => skipped += 1,
+            Some(event) => events.push(event),
+            None => skipped += 1,
         }
     }
 
@@ -160,24 +161,24 @@ fn parse_divergence_file(path: &Path) -> ArtifactParseOutcome {
 }
 
 /// Normalize one already-trimmed, non-empty JSONL line into an
-/// `ArtifactEvent`, or `Err(())` when the line is malformed relative
+/// `ArtifactEvent`, or `None` when the line is malformed relative
 /// to this schema (unparseable JSON, unrecognized `"type"`, or a
 /// required field missing for its type) — the caller counts every
-/// `Err` as one skip (design §7).
-fn parse_divergence_line(line: &str, area: Option<&str>, lane: Option<&str>) -> Result<ArtifactEvent, ()> {
-    let value: serde_json::Value = serde_json::from_str(line).map_err(|_| ())?;
-    let probe: DivergenceLineProbe = serde_json::from_value(value.clone()).map_err(|_| ())?;
-    let at = parse_at(probe.at.as_deref().ok_or(())?)?;
+/// `None` as one skip (design §7); why a line is malformed is not reported.
+fn parse_divergence_line(line: &str, area: Option<&str>, lane: Option<&str>) -> Option<ArtifactEvent> {
+    let value: serde_json::Value = serde_json::from_str(line).ok()?;
+    let probe: DivergenceLineProbe = serde_json::from_value(value.clone()).ok()?;
+    let at = parse_at(probe.at.as_deref()?)?;
 
     let (join_key, kind) = match probe.line_type.as_str() {
         "manifest" => {
-            let reviewed_ids = probe.reviewed_ids.ok_or(())?;
-            let anchor = reviewed_ids.iter().find_map(|id| ScenarioId::parse(id.clone()).ok()).ok_or(())?;
+            let reviewed_ids = probe.reviewed_ids?;
+            let anchor = reviewed_ids.iter().find_map(|id| ScenarioId::parse(id.clone()).ok())?;
             (ArtifactJoinKey::Scenario(anchor), ArtifactEventKind::NonVerdict)
         }
         "review" => {
-            let scenario = ScenarioId::parse(probe.scenario_id.ok_or(())?).map_err(|_| ())?;
-            let status = probe.status.as_deref().ok_or(())?;
+            let scenario = ScenarioId::parse(probe.scenario_id?).ok()?;
+            let status = probe.status.as_deref()?;
             let kind = if status == "open" {
                 // Classifies from the file's `lane=` Hive PATH
                 // partition (threaded in from `parse_divergence_file`),
@@ -199,15 +200,15 @@ fn parse_divergence_line(line: &str, area: Option<&str>, lane: Option<&str>) -> 
             (ArtifactJoinKey::Scenario(scenario), kind)
         }
         "remediation" => {
-            let scenario = ScenarioId::parse(probe.scenario_id.ok_or(())?).map_err(|_| ())?;
-            let status = probe.status.as_deref().ok_or(())?;
+            let scenario = ScenarioId::parse(probe.scenario_id?).ok()?;
+            let status = probe.status.as_deref()?;
             let kind = if status == "resolved" { ArtifactEventKind::RemediationResolved } else { ArtifactEventKind::NonVerdict };
             (ArtifactJoinKey::Scenario(scenario), kind)
         }
-        _ => return Err(()),
+        _ => return None,
     };
 
-    Ok(ArtifactEvent {
+    Some(ArtifactEvent {
         adapter_id: ADAPTER_ID,
         join_key,
         kind,
@@ -226,8 +227,8 @@ fn parse_divergence_line(line: &str, area: Option<&str>, lane: Option<&str>) -> 
     })
 }
 
-fn parse_at(raw: &str) -> Result<DateTime<Utc>, ()> {
-    DateTime::parse_from_rfc3339(raw).map(|dt| dt.with_timezone(&Utc)).map_err(|_| ())
+fn parse_at(raw: &str) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(raw).ok().map(|dt| dt.with_timezone(&Utc))
 }
 
 /// Find a `<key>=<value>` Hive path segment among `path`'s ancestor
@@ -247,7 +248,6 @@ mod tests {
     use canon_model::ids::RoleId;
 
     use super::*;
-    use crate::artifact_adapter::ArtifactSourceHandle;
     use crate::verdict::{Becomes, Polarity, attach_regime_key, derive_verdict};
 
     fn fixture_root() -> PathBuf {
@@ -437,25 +437,25 @@ mod tests {
 
     #[test]
     fn malformed_json_line_is_rejected() {
-        assert_eq!(parse_divergence_line("{not json", None, None), Err(()));
+        assert_eq!(parse_divergence_line("{not json", None, None), None);
     }
 
     #[test]
     fn unrecognized_type_is_rejected() {
         let line = r#"{"schema":1,"type":"unknown","at":"2026-07-07T12:00:00Z"}"#;
-        assert_eq!(parse_divergence_line(line, None, None), Err(()));
+        assert_eq!(parse_divergence_line(line, None, None), None);
     }
 
     #[test]
     fn manifest_with_no_parseable_reviewed_id_is_rejected() {
         let line = r#"{"schema":1,"type":"manifest","reviewed_ids":[],"at":"2026-07-07T12:00:00Z"}"#;
-        assert_eq!(parse_divergence_line(line, None, None), Err(()));
+        assert_eq!(parse_divergence_line(line, None, None), None);
     }
 
     #[test]
     fn review_line_missing_scenario_id_is_rejected() {
         let line = r#"{"schema":1,"type":"review","status":"open","lane":"code","at":"2026-07-07T12:00:00Z"}"#;
-        assert_eq!(parse_divergence_line(line, None, None), Err(()));
+        assert_eq!(parse_divergence_line(line, None, None), None);
     }
 
     #[test]

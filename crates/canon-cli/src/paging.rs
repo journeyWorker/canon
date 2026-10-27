@@ -95,12 +95,17 @@ fn encode(scope: &str, key: &str) -> String {
 }
 
 fn decode(cursor: &str) -> Option<(String, String)> {
-    if cursor.is_empty() || cursor.len() % 2 != 0 || !cursor.is_ascii() {
+    if cursor.is_empty() || !cursor.len().is_multiple_of(2) || !cursor.is_ascii() {
         return None;
     }
     let bytes: Option<Vec<u8>> = (0..cursor.len()).step_by(2).map(|i| u8::from_str_radix(&cursor[i..i + 2], 16).ok()).collect();
     let text = String::from_utf8(bytes?).ok()?;
     text.split_once(SEPARATOR).map(|(scope, key)| (scope.to_string(), key.to_string()))
+}
+
+/// The record key a cursor points after, when the cursor is one canon issued.
+pub fn cursor_key(cursor: &str) -> Option<String> {
+    decode(cursor).map(|(_, key)| key)
 }
 
 fn invalid_cursor(why: &str) -> CliError {
@@ -113,16 +118,18 @@ fn invalid_cursor(why: &str) -> CliError {
 /// command and what it lists — so a cursor from another listing is refused.
 pub fn paginate<T>(scope: &str, items: Vec<T>, key: impl Fn(&T) -> String, page: &Page) -> Result<(Vec<T>, PageMeta), CliError> {
     let total = items.len();
+    // Keys are built in order and only as far as the page needs: up to the
+    // cursor's record (to find it), then up to the page's last record.
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
-    let keys: Vec<String> = items
-        .iter()
-        .map(|item| {
+    let mut keys: Vec<String> = Vec::new();
+    let mut extend_to = |upto: usize, keys: &mut Vec<String>| {
+        for item in &items[keys.len()..upto.min(total)] {
             let base = key(item);
             let n = seen.entry(base.clone()).or_insert(0);
             *n += 1;
-            format!("{base}#{n}")
-        })
-        .collect();
+            keys.push(format!("{base}#{n}"));
+        }
+    };
 
     let start = match &page.cursor {
         None => 0,
@@ -131,14 +138,24 @@ pub fn paginate<T>(scope: &str, items: Vec<T>, key: impl Fn(&T) -> String, page:
             if cursor_scope != scope {
                 return Err(invalid_cursor(&format!("the cursor belongs to `{cursor_scope}`, not `{scope}`")));
             }
-            let at = keys.iter().position(|k| *k == last).ok_or_else(|| invalid_cursor("the record the cursor points after is no longer in the result (the store or the filters changed)"))?;
-            at + 1
+            let mut found = None;
+            while found.is_none() && keys.len() < total {
+                let next = keys.len() + 1;
+                extend_to(next, &mut keys);
+                if keys.last().is_some_and(|k| *k == last) {
+                    found = Some(keys.len() - 1);
+                }
+            }
+            found.ok_or_else(|| invalid_cursor("the record the cursor points after is no longer in the result (the store or the filters changed)"))? + 1
         }
     };
 
     let end = page.limit.map_or(total, |limit| start.saturating_add(limit).min(total));
     let has_more = end < total;
-    let next_cursor = has_more.then(|| encode(scope, &keys[end - 1]));
+    let next_cursor = has_more.then(|| {
+        extend_to(end, &mut keys);
+        encode(scope, &keys[end - 1])
+    });
     let slice: Vec<T> = items.into_iter().skip(start).take(end - start).collect();
     let meta = PageMeta { returned: slice.len(), total, has_more, next_cursor };
     Ok((slice, meta))
@@ -181,7 +198,7 @@ pub fn check_fields(command: &str, requested: &[String], known: &BTreeSet<String
 
 /// [`check_fields`] against a fixed list of field names.
 pub fn check_known(command: &str, requested: &[String], known: &[&str]) -> Result<(), CliError> {
-    check_fields(command, requested, &known.iter().map(|f| f.to_string()).collect())
+    check_fields(command, requested, &known.iter().map(std::string::ToString::to_string).collect())
 }
 
 /// Whether `fields` names `member`, in either case style.
@@ -218,7 +235,7 @@ mod tests {
         let mut cursor = None;
         let mut got = Vec::new();
         loop {
-            let (rows, meta) = paginate("t", items.clone(), |s| s.to_string(), &page(Some(2), cursor.clone())).unwrap();
+            let (rows, meta) = paginate("t", items.clone(), std::string::ToString::to_string, &page(Some(2), cursor.clone())).unwrap();
             got.extend(rows);
             match meta.next_cursor {
                 Some(next) => cursor = Some(next),
@@ -231,10 +248,10 @@ mod tests {
     #[test]
     fn a_cursor_from_another_scope_or_garbage_is_refused() {
         let items = vec!["a", "b", "c"];
-        let (_, meta) = paginate("query:handoff", items.clone(), |s| s.to_string(), &page(Some(1), None)).unwrap();
+        let (_, meta) = paginate("query:handoff", items.clone(), std::string::ToString::to_string, &page(Some(1), None)).unwrap();
         let cursor = meta.next_cursor.unwrap();
         for bad in [cursor.clone(), "zz".to_string(), String::new()] {
-            let err = paginate("query:run", items.clone(), |s| s.to_string(), &page(Some(1), Some(bad))).unwrap_err();
+            let err = paginate("query:run", items.clone(), std::string::ToString::to_string, &page(Some(1), Some(bad))).unwrap_err();
             assert_eq!(err.code, "INVALID_CURSOR");
         }
     }

@@ -101,11 +101,11 @@ fn record(repo: &Path, args: &[&str]) {
 }
 
 fn staged(repo: &Path) -> usize {
-    std::fs::read_dir(repo.join(".canon/ledger/_staging/kind=evidence_record")).map(|d| d.count()).unwrap_or(0)
+    std::fs::read_dir(repo.join(".canon/ledger/_staging/kind=evidence")).map_or(0, std::iter::Iterator::count)
 }
 
 fn committed(repo: &Path) -> Vec<serde_json::Value> {
-    let dir = repo.join(".canon/ledger/kind=evidence_record");
+    let dir = repo.join(".canon/ledger/kind=evidence");
     let mut records: Vec<serde_json::Value> =
         std::fs::read_dir(dir).unwrap().filter_map(Result::ok).map(|e| serde_json::from_str(&std::fs::read_to_string(e.path()).unwrap()).unwrap()).collect();
     records.sort_by(|a, b| a["at"].as_str().cmp(&b["at"].as_str()));
@@ -284,7 +284,7 @@ fn a_new_audit_replaces_a_refutation_and_binds_only_what_it_names() {
 
     record(repo, &audit_args("game.run.01", "confirmed", &[]));
     let confirmed = committed(repo).pop().unwrap();
-    assert!(confirmed["attachments"].as_array().is_none_or(|a| a.is_empty()), "the counterexample is not carried: {confirmed}");
+    assert!(confirmed["attachments"].as_array().is_none_or(std::vec::Vec::is_empty), "the counterexample is not carried: {confirmed}");
     let gate = canon(repo, &["gate", "check"]);
     assert_eq!(gate.status.code(), Some(0), "{}", text(&gate));
 }
@@ -293,13 +293,14 @@ fn a_new_audit_replaces_a_refutation_and_binds_only_what_it_names() {
 /// computed here independently of canon: sha256(seed 0x00 project 0x00
 /// scenario), first 8 bytes big-endian, below rate * 2^64.
 fn expected_sample(seed: &str, rate: f64, ids: &[&str]) -> Vec<String> {
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "range: rate is a fraction in [0, 1], so rate * 2^64 is non-negative and fits u128")]
     let threshold = (rate * 18_446_744_073_709_551_616.0).ceil() as u128;
     ids.iter()
         .filter(|id| {
             let digest = Sha256::digest([seed.as_bytes(), b"\0", b"root", b"\0", id.as_bytes()].concat());
             u128::from(u64::from_be_bytes(digest[..8].try_into().unwrap())) < threshold
         })
-        .map(|id| id.to_string())
+        .map(std::string::ToString::to_string)
         .collect()
 }
 

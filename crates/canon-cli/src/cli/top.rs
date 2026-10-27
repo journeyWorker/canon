@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use clap::Args;
 use std::path::PathBuf;
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct InitArgs {
     /// Directory to set up (used as-is)
     #[arg(long, default_value = ".", value_name = "DIR")]
@@ -38,12 +38,18 @@ pub struct InitArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct MigrateArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
     #[command(flatten)]
     pub safety: crate::cli::SafetyArgs,
+    /// Undo the last committed migrate (restores what it backed up, undoes its moves and its Postgres and R2 re-keying); previews first, `--commit --plan-digest` acts
+    #[arg(long)]
+    pub revert: bool,
+    /// With --revert, the backup directory to restore (default: the newest under .canon/migrate-backup/)
+    #[arg(long, value_name = "DIR", requires = "revert")]
+    pub backup: Option<PathBuf>,
     /// Output JSON instead of the human-readable form
     #[arg(long)]
     pub json: bool,
@@ -51,7 +57,7 @@ pub struct MigrateArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct StatusArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -63,7 +69,7 @@ pub struct StatusArgs {
     pub fields: Option<Vec<String>>,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct ContextArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -75,7 +81,7 @@ pub struct ContextArgs {
     pub fields: Option<Vec<String>>,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct FormatArgs {
     /// Corpus directory, e.g. a consumer repo's spec/ directory (default: every configured specs.roots[] entry). A relative path resolves under --repo when given, else the current directory
     #[arg(value_name = "DIR")]
@@ -87,7 +93,7 @@ pub struct FormatArgs {
     pub json: bool,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct RetrieveArgs {
     /// Role scope; with --regime must equal its leading segment
     #[arg(long = "for-role", value_name = "ROLE", value_parser = crate::retrieve::parse_role)]
@@ -111,7 +117,7 @@ pub struct RetrieveArgs {
     pub json: bool,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct QueryArgs {
     /// Record kind to read (e.g. handoff, strategy_item)
     #[arg(long, value_parser = crate::query::kind_parser(), value_name = "KIND")]
@@ -150,7 +156,7 @@ pub struct QueryArgs {
     pub fields: Option<Vec<String>>,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct ExportArgs {
     /// The record kind to export
     #[arg(long, value_parser = crate::query::kind_parser(), value_name = "KIND")]
@@ -183,7 +189,7 @@ pub struct ExportArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct PurgeArgs {
     /// The record kind to purge (session, run, event or trajectory)
     #[arg(long, value_parser = crate::query::purgeable_kind_parser(), value_name = "KIND")]
@@ -202,7 +208,7 @@ pub struct PurgeArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct DashboardArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -219,7 +225,7 @@ pub struct DashboardArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct SelftestArgs {
     /// Run only this suite (default: every suite)
     #[arg(long, value_name = "NAME", value_parser = clap::builder::PossibleValuesParser::new(crate::selftest::SUITE_NAMES.iter().copied()))]
@@ -229,7 +235,7 @@ pub struct SelftestArgs {
     pub json: bool,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct SchemaArgs {
     /// Command path, e.g. `evidence add` (omit to list every command)
     pub path: Vec<String>,
@@ -252,7 +258,7 @@ pub enum CompletionShell {
     Fish,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct CompletionArgs {
     /// Shell to write the completion script for
     #[arg(value_enum, value_name = "SHELL")]

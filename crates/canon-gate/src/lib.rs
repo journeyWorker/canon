@@ -74,11 +74,11 @@ pub mod trust_ladder;
 pub use artifact_store::{unstored_attachments, ArtifactStoreCheck, UnstoredAttachment, DEFAULT_MAX_ARTIFACT_MIB, MAX_ARTIFACT_FLAG};
 pub use audit::AuditCheck;
 pub use checkbox::{gate_task, TaskFlipDecision};
-pub use approval::{verify_risk_approval, verify_ssh_signature};
+pub use approval::{verify_risk_approval, verify_ssh_signature, ApprovalError};
 pub use context::{CanonYamlError, GateCheck, GateContext, GateContextError, GateCtx};
 pub use derived::Derived;
 pub use coverage::CoverageCheck;
-pub use risk::{artifact_changed_paths, RiskApprovalCheck};
+pub use risk::{artifact_changed_paths, ArtifactPathsError, RiskApprovalCheck};
 pub use dispatch::check_set;
 pub use failure_class::{FailureClass, Violation, FAILURE_CLASSES};
 pub use hooks::{install_hooks, HookEntry, InstallOutcome, PRE_COMMIT_SCRIPT};
@@ -86,7 +86,7 @@ pub use ledger::{latest_verdicts, verdicts_of, CellKey, LedgerCheck, LedgerEntry
 pub use markers::{evidence_note_of, scan_fake_markers, scan_note_text, EvidenceNote, FABRICATION_BLOCKLIST};
 pub use evidence_binding::{binding_summary, strength_of, BindingGap, BindingSummary, EvidenceBindingCheck};
 pub use policy::{
-    allowed_signers_path, AuditRate, BindingMode, BindingStrength, EvidenceBinding, FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution,
+    allowed_signers_path, AllowedSignersError, AuditRate, BindingMode, BindingStrength, EvidenceBinding, FromPolicyValue, PolicyDiagnostic, PolicyField, PolicyResolution,
     PolicyResolveError, RequireAudit, RequireReview, RiskTierRule, SpecCoverage, StalenessPolicy, KNOWN_TOP_LEVEL_KEYS,
 };
 pub use policy_keys::PolicyKeysCheck;

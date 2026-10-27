@@ -228,7 +228,7 @@ impl StrategyId {
         // reachable from a hand-built fixture) clamp to 0 rather than
         // wrapping into a nonsense u64 — the same `.max(0)` guard
         // `deterministic_run_id` applies.
-        let millis = identity.recorded_at.timestamp_millis().max(0) as u64;
+        let millis = identity.recorded_at.timestamp_millis().max(0).cast_unsigned();
         Self(Ulid::from_parts(millis, random))
     }
 }
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn malformed_id_is_rejected() {
-        assert!(TrajectoryId::parse("not-a-ulid").is_err());
+        TrajectoryId::parse("not-a-ulid").unwrap_err();
     }
 
     /// Fixture identity fields, owned so each test can perturb exactly

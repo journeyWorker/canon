@@ -123,7 +123,7 @@ mod tests {
 
         let body = serde_json::json!({
             "schema": 1,
-            "kind": "evidence_record",
+            "kind": "evidence",
             "at": chrono::Utc::now().to_rfc3339(),
             "actor": {"agent_id": "test-agent", "role": "implementer"},
             "scenario_id": "world.firstbuy-hotdeal.90",

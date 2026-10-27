@@ -4,17 +4,17 @@ use canon_model::{RegimeKey, RoleId, RunId, RunStatus, TaskId};
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum DispatchCommand {
     /// Mint a Run manifest with retrieved guidance and context/policy lineage
-    Begin(DispatchBeginArgs),
+    Begin(Box<DispatchBeginArgs>),
     /// Close a dispatched run with a terminal status and an ended_at
     End(DispatchEndArgs),
     /// Diff the declared plan DAG against the observed execution graph
     Diff(DispatchDiffArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct DispatchBeginArgs {
     /// Role about to run; must equal --regime's leading segment
     #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
@@ -60,7 +60,7 @@ pub struct DispatchBeginArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct DispatchEndArgs {
     /// The RunId (ULID) minted by `canon dispatch begin`
     #[arg(value_name = "RUN_ID", value_parser = crate::dispatch::parse_run_id)]
@@ -77,7 +77,7 @@ pub struct DispatchEndArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct DispatchDiffArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

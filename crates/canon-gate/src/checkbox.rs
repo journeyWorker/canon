@@ -131,7 +131,7 @@ pub fn gate_task(task_id: &TaskId, evidence: &[EvidenceRecord], notes: &[Evidenc
         return TaskFlipDecision::Blocked { violations: scan_violations };
     }
 
-    let latest = task_notes.last().map(|note| note.summary.clone()).unwrap_or_else(|| default_evidence_text(record));
+    let latest = task_notes.last().map_or_else(|| default_evidence_text(record), |note| note.summary.clone());
     TaskFlipDecision::Approved { evidence_note: aggregate_note(&records, &latest) }
 }
 
@@ -143,7 +143,7 @@ mod tests {
 
     fn evidence_record(task_id: &TaskId, verdict: EvidenceVerdict) -> EvidenceRecord {
         EvidenceRecord::new(
-            Envelope::new(1, RecordKind::EvidenceRecord, chrono::Utc::now(), Actor::new("implementer", RoleId::parse("implementer").unwrap())),
+            Envelope::new(1, RecordKind::Evidence, chrono::Utc::now(), Actor::new("implementer", RoleId::parse("implementer").unwrap())),
             Some(task_id.clone()),
             None,
             None,

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-1"
+  },
+  "at": "2026-10-23T12:28:36.535100274Z",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test change -- change_new_scaffolds_imports_and_adopts_with_no_config_edit a_task_flip_keeps_the_changes_adopted_subject"
+  },
+  "evidence_note": {
+    "summary": "change -- change_new_scaffolds_imports_and_adopts_with_no_config_edit a_task_fli: 2 passed, 0 failed, 7 filtered out @ 2c0fb497"
+  },
+  "evidence_sha": "2c0fb4972782486f9ee8a638db56be81405f3bda",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 15,
+  "scenario_id": "authoring.change.01",
+  "schema": 1,
+  "staging_id": "5e9867b90016",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

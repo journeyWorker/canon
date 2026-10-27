@@ -1,0 +1,13 @@
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "2026-10-26T17:03:49.683181055Z",
+  "kind": "scenario",
+  "project_id": "root",
+  "scenario_digest": "a89964d9d86e09bf42b20ab8138ae639f0b7bc09a4316fe0ca434067fafecd33",
+  "scenario_id": "auth.login.02",
+  "schema": 1,
+  "source_digest": "b35933cccfd20c6521a722f5b422fb3ae5756c75042527c8474625fd6a2fbe51",
+  "title": "Case 02"
+}

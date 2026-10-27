@@ -89,7 +89,7 @@ pub fn scenario_history<'a>(ctx: &'a GateContext, scenario: &Scenario) -> Vec<&'
 /// ledger would have refused or classed as audit.
 pub(crate) fn read_archive(ctx: &GateContext) -> Vec<EvidenceRecord> {
     let Some(archive) = canon_store::git_tier::GitTier::new(&ctx.ctx.ledger_root).archive_tier() else { return Vec::new() };
-    let Ok(read) = archive.read(&TierQuery::kind(RecordKind::EvidenceRecord)) else { return Vec::new() };
+    let Ok(read) = archive.read(&TierQuery::kind(RecordKind::Evidence)) else { return Vec::new() };
     let (records, _violations) = validate_evidence_batch(&read.records);
     records.into_iter().filter(|record| !record.is_audit()).collect()
 }

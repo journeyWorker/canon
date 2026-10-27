@@ -395,3 +395,27 @@ Feature: review scenario
     Then the first review is removed and the blob the call stored is removed, and the error names the second review
     And a read-only review directory is refused before anything is written
     And the same call with nothing failing writes both reviews and stores the blob
+
+  # canon: {"schema":1,"at":"2026-10-26T18:12:35Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:review-attestation
+  @case:happy
+  @flow:canon-0-30-record-links.F1
+  @review.add.101
+  Scenario: One review run gives every scenario it writes the same review id
+    Given three scenarios indexed in one spec root
+    When canon review scenario is run once for the three
+    Then every review record that run wrote carries the same `review_id` in its body, a ULID made for that run
+    And the output shows the review id beside each scenario
+    And no file name holds the review id
+
+  # canon: {"schema":1,"at":"2026-10-26T18:12:37Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:review-attestation
+  @case:edge
+  @flow:canon-0-30-record-links.F1
+  @review.add.102
+  Scenario: Running the same review again writes nothing and shows the earlier review ids
+    Given a review run that wrote one review for each of three scenarios
+    When the identical review is run again, and then once more after the evidence of one scenario changed
+    Then the repeat writes no record and shows the earlier review id of each scenario
+    And the run after the change writes one record with a new review id and shows the earlier ids of the other two
+    And the review id is left out when two reviews are compared, as the time is

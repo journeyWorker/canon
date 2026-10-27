@@ -1,3 +1,3 @@
-promoted evidence_record implementer/it-circular run_seq=1 -> kind=evidence_record/it-circular#1.1__<digest12>.json
+promoted evidence implementer/it-circular run_seq=1 -> kind=evidence/-_task_it-circular+231.1_<digest8>.json
 canon gate promote: promoted evidence=1, finding=0, divergence=0
 next: canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> --session-id <session> — no subject exists yet; a subject is the unit status, review and shipping track

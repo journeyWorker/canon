@@ -4,7 +4,7 @@ use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
 /// The flags of `prompt add`.
-#[derive(clap::Args)]
+#[derive(Debug, clap::Args)]
 pub struct PromptAddArgs {
     /// The bundle to register, `NAME@VERSION`
     #[arg(value_name = "NAME@VERSION", value_parser = crate::dispatch::parse_prompt_bundle)]
@@ -21,7 +21,7 @@ pub struct PromptAddArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum PromptCommand {
     /// Add a prompt bundle from a repository-local JSON manifest
     Add(PromptAddArgs),
@@ -29,7 +29,7 @@ pub enum PromptCommand {
     Show(PromptShowArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct PromptShowArgs {
     /// The bundle to show, `NAME@VERSION`
     #[arg(value_name = "NAME@VERSION", value_parser = crate::dispatch::parse_prompt_bundle)]

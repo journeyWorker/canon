@@ -1,14 +1,11 @@
 //! S10 part2 pilot (task 7.1, design.md "one consumer repo authors a real
-//! change with it"): proves the typed task-atom mechanism against a REAL,
-//! non-canon-vocab-fixture consumer change —
-//! `openspec/changes/s10-vocab-pilot/tasks.vocab.yaml`, resolved against
-//! THIS repo's own real, checked-in `.canon/vocab/canon.core/` +
-//! `.canon/policy.yaml` (not a tempdir copy, unlike
-//! `canon_core_selftest.rs`'s own fixture-corpus proof). Read-only —
-//! never mutates the real repo; the pilot's own `canon gate task` flip
-//! was performed once, manually, against the real binary, and its result
-//! (the flipped `tasks.md` row + the ledger `EvidenceRecord`) is already
-//! committed (`openspec/changes/s10-vocab-pilot/proposal.md`).
+//! change with it"): proves the typed task-atom mechanism against a real
+//! consumer change's atoms file (`fixtures/s10-vocab-pilot.tasks.vocab.yaml`,
+//! the pilot's `tasks.vocab.yaml` kept as a fixture since the repo's
+//! openspec tree was retired in 0.30), resolved against THIS repo's own
+//! real, checked-in `.canon/vocab/canon.core/` + `.canon/policy.yaml` (not a
+//! tempdir copy, unlike `canon_core_selftest.rs`'s own fixture-corpus
+//! proof). Read-only — never mutates the real repo.
 
 use std::path::{Path, PathBuf};
 
@@ -17,7 +14,7 @@ fn repo_root() -> PathBuf {
 }
 
 fn pilot_atoms_file() -> String {
-    std::fs::read_to_string(repo_root().join("openspec/changes/s10-vocab-pilot/tasks.vocab.yaml")).expect("read the real pilot tasks.vocab.yaml")
+    std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/s10-vocab-pilot.tasks.vocab.yaml")).expect("read the pilot tasks.vocab.yaml fixture")
 }
 
 #[test]
@@ -67,16 +64,4 @@ fn the_pilot_atom_compiles_to_the_s1_task_model_and_round_trips() {
 fn the_pilot_atoms_declared_evidence_kind_is_in_the_real_policy_derived_domain() {
     let (snapshot, _) = canon_vocab::resolve_snapshot(&repo_root(), None);
     assert!(snapshot.evidence_kinds.contains(&"test-run".to_string()), "evidence_kinds: {:?}", snapshot.evidence_kinds);
-}
-
-/// The pilot's own `tasks.md` checkbox row was gated and flipped for real
-/// via `canon gate task s10-vocab-pilot#1 --repo .` (this repo's own
-/// committed proof — a fresh evidence-record write/gate run is
-/// `crates/canon-cli/tests/gate.rs`'s own territory, never re-performed
-/// here against the real repo's ledger).
-#[test]
-fn the_pilot_tasks_md_row_was_gated_and_flipped_for_real() {
-    let text = std::fs::read_to_string(repo_root().join("openspec/changes/s10-vocab-pilot/tasks.md")).unwrap();
-    assert!(text.contains("- [x] 1 Author `canon/policy.yaml`"), "{text}");
-    assert!(text.contains("✅ Faithful evidence recorded"), "{text}");
 }

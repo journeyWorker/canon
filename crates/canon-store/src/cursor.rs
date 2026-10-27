@@ -72,14 +72,14 @@ use crate::tier::StoreError;
 
 /// The full 64-hex sha256 of a file's raw bytes — the cursor's
 /// per-file content fingerprint. Distinct from
-/// [`crate::partition::content_digest12`]'s 12-hex git-path suffix: a
+/// [`crate::partition::content_digest`]'s 12-hex git-path suffix: a
 /// cursor is machine-local operator state, never a git path, so it uses
 /// the full digest for a vanishing collision probability. Standard
 /// FIPS 180-4 sha256, byte-for-byte reproducible.
 pub fn file_digest(bytes: &[u8]) -> String {
     let hash = Sha256::digest(bytes);
     let mut hex = String::with_capacity(64);
-    for byte in hash.iter() {
+    for byte in &hash {
         hex.push_str(&format!("{byte:02x}"));
     }
     hex
@@ -246,7 +246,7 @@ impl SourceCursor {
         }
         let hash = hasher.finalize();
         let mut hex = String::with_capacity(64);
-        for byte in hash.iter() {
+        for byte in &hash {
             hex.push_str(&format!("{byte:02x}"));
         }
         self.last_seen_digest = hex;
@@ -255,6 +255,7 @@ impl SourceCursor {
 
 /// Reads/writes per-source cursors under a local cursor `root`, one
 /// `<source_id>.json` per source, each written atomically.
+#[derive(Debug)]
 pub struct CursorStore {
     root: PathBuf,
 }
@@ -305,7 +306,6 @@ impl CursorStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     fn p(s: &str) -> PathBuf {
         PathBuf::from(s)

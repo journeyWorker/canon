@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-030-sb",
+    "role": "reviewer",
+    "session_id": "rev-030-sb-2026-10-26"
+  },
+  "at": "2026-10-26T13:08:12.804767633Z",
+  "change_id": "canon-0-30-spec-backfill",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/spec030_storage_gate.rs:575",
+  "kind": "finding",
+  "reviewed_sha": "7f9f15df9b2287e3743828cd184d6cdc3e83d05c",
+  "reviewer": "rev-030-sb",
+  "round": 1,
+  "scenario_ids": [
+    "tier.storage.16"
+  ],
+  "schema": 1,
+  "seq": 5,
+  "severity": "note",
+  "summary": "[standards] tier.storage.16 checks 'only the record before the cutoff is gone' by git_file_count()==1; a purge that deleted new-session instead would pass. Assert the remaining file is the 2027 session.",
+  "worktree_dirty": false
+}

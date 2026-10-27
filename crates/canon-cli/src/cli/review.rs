@@ -4,7 +4,7 @@ use canon_model::{ChangeId, ProjectId, RoleId, ScenarioId};
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum ReviewCommand {
     /// Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required). A review pins the scenario's digest and what its latest evidence says (verdict and checks); it counts only while both are unchanged. Each scenario must be indexed, or nothing is written (exit 2)
     #[command(group(clap::ArgGroup::new("provenance").args(["upstream_ref", "original_spec_ref"]).required(true).multiple(false)))]
@@ -15,7 +15,7 @@ pub enum ReviewCommand {
 }
 
 /// The flags of `review scenario`.
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct ReviewScenarioArgs {
     /// The reviewed scenarios (`<area>.<surface>.<nn>`), one review each, all or nothing. Each must have a record (`canon inventory sync`), or nothing is written (exit 2)
     #[arg(value_name = "SCENARIO_ID", required = true, value_parser = crate::review::parse_scenario_id)]
@@ -27,7 +27,7 @@ pub struct ReviewScenarioArgs {
 }
 
 /// The flags of `review change`.
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct ReviewChangeArgs {
     /// The chore change to review
     #[arg(value_name = "CHANGE_ID", value_parser = crate::query::parse_change_id)]
@@ -39,7 +39,7 @@ pub struct ReviewChangeArgs {
 }
 
 /// The options both review leaves share.
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct ReviewOptions {
     /// Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root
     #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]

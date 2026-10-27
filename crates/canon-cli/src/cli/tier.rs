@@ -2,13 +2,13 @@
 
 use clap::{Args, Subcommand};
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum TierCommand {
     /// Apply canon.yaml aging rules, moving old records to their destination tier
     Age(TierAgeArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct TierAgeArgs {
     #[command(flatten)]
     pub safety: crate::cli::SafetyArgs,

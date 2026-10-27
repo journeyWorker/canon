@@ -289,10 +289,11 @@ fn migrate_pins_06_a_record_pinned_review_converts_when_its_evidence_is_still_th
         file["scenario_digest"].clone()
     };
     let evidence_pin = |id: &str| {
-        let path = walk(&repo.join(".canon/ledger/kind=evidence_record")).into_iter().find(|p| std::fs::read_to_string(p).unwrap().contains(id)).unwrap();
-        let name = path.file_name().unwrap().to_str().unwrap().trim_end_matches(".json").to_string();
-        let (key, digest) = name.rsplit_once("__").unwrap();
-        serde_json::json!({"key": key, "digest": digest})
+        // The pin names the evidence the way 0.15-0.22 wrote it: the 0.29 key and 12-hex digest of the record.
+        let path = walk(&repo.join(".canon/ledger/kind=evidence")).into_iter().find(|p| std::fs::read_to_string(p).unwrap().contains(id)).unwrap();
+        let record: canon_model::EvidenceRecord = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        let body = serde_json::to_value(&record).unwrap();
+        serde_json::json!({"key": canon_cli::migrate_names::v029::evidence_key(&body), "digest": canon_cli::migrate_names::v029::typed_digest12(&record)})
     };
     for id in ["cart.add.01", "cart.add.02"] {
         let review = serde_json::json!({

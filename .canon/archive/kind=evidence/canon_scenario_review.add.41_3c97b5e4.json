@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "018-n3-impl",
+    "role": "implementer",
+    "session_id": "018-n3-impl"
+  },
+  "at": "2026-10-12T13:48:25.915480Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test review_artifacts a_missing_or_altered_review_artifact_is_stale_evidence_naming_the_review"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 29,
+  "scenario_id": "review.add.41",
+  "schema": 1,
+  "staging_id": "f12844201b36",
+  "verdict": "faithful"
+}

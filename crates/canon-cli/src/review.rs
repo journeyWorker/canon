@@ -30,6 +30,16 @@
 //! refused (exit `2`, nothing written): there is nothing to pin. A
 //! scenario with no evidence pins an empty list.
 //!
+//! # One review id per run (0.30 `record-links`)
+//! Each invocation makes one ULID ([`canon_model::ReviewId`]) and stores it in
+//! the body of every review it writes, so the reviews of one run share an id
+//! that no file name carries and no rewrite changes. The output names it for
+//! every scenario. A review the run skips because it repeats the latest one
+//! ([`crate::retry`], which leaves the id out of the comparison as it leaves
+//! out the time) shows the id of the stored review instead, so a run that
+//! mixes written and skipped reviews shows several. `canon finding add
+//! --review-id` takes one of them.
+//!
 //! # A chore is reviewed as a change (0.23 D5)
 //! `--change-id <slug>` writes one review of a chore change instead of one
 //! per scenario: the reviewer signs the chore's invariants and checks
@@ -60,7 +70,8 @@ use std::path::{Path, PathBuf};
 use canon_gate::freshness::current_pins;
 use canon_gate::spec_coverage::latest_scenarios;
 use canon_gate::{GateContext, GateCtx};
-use canon_model::{Actor, ChangeId, Envelope, PinnedSpec, ProjectId, ProvenanceRef, RecordKind, Review, ReviewArtifact, ReviewPins, ReviewOutcome, RoleId, ScenarioId, SessionId};
+use canon_model::ids::JoinKeyError;
+use canon_model::{Actor, ChangeId, Envelope, PinnedSpec, ProjectId, ProvenanceRef, RecordKind, Review, ReviewArtifact, ReviewId, ReviewPins, ReviewOutcome, RoleId, ScenarioId, SessionId};
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
 use canon_store::tier::Tier;
@@ -72,21 +83,21 @@ use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 
 /// `--project-id`'s `clap` value parser.
-pub fn parse_project_id(s: &str) -> Result<ProjectId, String> {
-    ProjectId::parse(s).map_err(|e| e.to_string())
+pub fn parse_project_id(s: &str) -> Result<ProjectId, JoinKeyError> {
+    ProjectId::parse(s)
 }
 
 /// `--scenario-id`'s `clap` value parser.
-pub fn parse_scenario_id(s: &str) -> Result<ScenarioId, String> {
-    ScenarioId::parse(s).map_err(|e| e.to_string())
+pub fn parse_scenario_id(s: &str) -> Result<ScenarioId, JoinKeyError> {
+    ScenarioId::parse(s)
 }
 
 /// `--session-id`'s `clap` value parser, shared by every command that
 /// records an actor (`evidence add`, `review add`, `finding add|close`).
 /// The grammar is [`SessionId`]'s: one non-empty opaque token, no
 /// surrounding whitespace, no control characters.
-pub fn parse_session_id(s: &str) -> Result<SessionId, String> {
-    SessionId::parse(s).map_err(|e| e.to_string())
+pub fn parse_session_id(s: &str) -> Result<SessionId, JoinKeyError> {
+    SessionId::parse(s)
 }
 
 /// `--review-outcome`'s `clap` value parser: one of the three outcomes, so the spec lists them as `possibleValues`.
@@ -94,11 +105,18 @@ pub fn outcome_parser() -> impl clap::builder::TypedValueParser<Value = ReviewOu
     crate::cli_error::closed_set(ReviewOutcome::ALL.iter().map(|o| o.as_str()).collect::<Vec<_>>(), ReviewOutcome::parse)
 }
 
+/// `--reviewer-provider|model|harness` was not a clean label.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum RuntimeLabelError {
+    #[error("`{0}` is not a runtime label: it must be non-empty, without surrounding whitespace or control characters")]
+    Malformed(String),
+}
+
 /// `--reviewer-provider|model|harness`'s `clap` value parser: one
 /// non-empty label, no surrounding whitespace, no control characters.
-pub fn parse_runtime_label(s: &str) -> Result<String, String> {
+pub fn parse_runtime_label(s: &str) -> Result<String, RuntimeLabelError> {
     if s.is_empty() || s.trim() != s || s.chars().any(char::is_control) {
-        return Err(format!("`{s}` is not a runtime label: it must be non-empty, without surrounding whitespace or control characters"));
+        return Err(RuntimeLabelError::Malformed(s.to_string()));
     }
     Ok(s.to_string())
 }
@@ -107,6 +125,7 @@ pub fn parse_runtime_label(s: &str) -> Result<String, String> {
 /// path, two leaves: a change review sets `change`). `upstream_ref` /
 /// `original_spec_ref` are the raw `--upstream-ref` / `--original-spec-ref`
 /// values — exactly one MUST be `Some`.
+#[derive(Debug)]
 pub struct ReviewAddArgs {
     pub project_id: ProjectId,
     /// The scenarios of `review scenario <SCENARIO_ID>...`: one review per scenario.
@@ -167,9 +186,13 @@ pub struct ReviewEntry {
     /// Whether an identical record was already stored (a write).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deduped: Option<bool>,
-    /// The scenario an unchanged repeat is about.
+    /// The scenario (or, for `review change`, the change) the review is of.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scenario_id: Option<String>,
+    /// The review id the record carries (0.30): this run's for a review it wrote, the stored
+    /// review's for one it skipped; absent only for a stored review written before 0.30.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_id: Option<String>,
     /// `true` when an identical review already existed and nothing was written.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unchanged: Option<bool>,
@@ -194,7 +217,7 @@ impl crate::reports::Report for ReviewReport {}
 /// artifacts, each pinning its own scenario, all or nothing. Returns the
 /// process exit code: `0` on a successful write, `2` on a
 /// refused/malformed invocation.
-pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
+pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
     let cmd = args.full();
     let provenance_ref = match (&args.upstream_ref, &args.original_spec_ref) {
         (Some(r), None) => ProvenanceRef::UpstreamRef(r.clone()),
@@ -219,7 +242,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&args.full(), args.json);
+            return CliError::refused("CONFIG_UNREADABLE", e.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&args.full(), args.json);
         }
     };
     let brief_digest = match &args.change {
@@ -271,10 +294,12 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
         actor = actor.with_session(session_id.clone());
     }
     let at = Utc::now();
+    let review_id = ReviewId::new();
     let mut reviews: Vec<(Review, String)> = Vec::new();
     if let (Some(change), Some(digest)) = (&args.change, brief_digest) {
-        let mut review = Review::for_change(Envelope::new(1, RecordKind::Review, at, actor.clone()), args.project_id.clone(), change.clone(), &args.reviewer, commit.sha.as_str(), provenance_ref.clone())
-            .with_code(&commit.code_tree, commit.worktree_dirty);
+        let mut review = Review::for_change(Envelope::current(RecordKind::Review, at, actor.clone()), args.project_id.clone(), change.clone(), &args.reviewer, commit.sha.as_str(), provenance_ref.clone())
+            .with_code(&commit.code_tree, commit.worktree_dirty)
+            .with_review_id(review_id);
         review.outcome = args.outcome;
         review.reviewer_provider = args.reviewer_provider.clone();
         review.reviewer_model = args.reviewer_model.clone();
@@ -287,14 +312,15 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     reviews.extend(found.into_iter().filter_map(|(_, scenario)| scenario.copied()).map(|scenario| {
         let pins = current_pins(&gate_context, scenario);
         let mut review = Review::new(
-            Envelope::new(1, RecordKind::Review, at, actor.clone()),
+            Envelope::current(RecordKind::Review, at, actor.clone()),
             args.project_id.clone(),
             scenario.scenario_id.clone(),
             &args.reviewer,
             commit.sha.as_str(),
             provenance_ref.clone(),
         )
-        .with_code(&commit.code_tree, commit.worktree_dirty);
+        .with_code(&commit.code_tree, commit.worktree_dirty)
+        .with_review_id(review_id);
         review.outcome = args.outcome;
         review.reviewer_provider = args.reviewer_provider.clone();
         review.reviewer_model = args.reviewer_model.clone();
@@ -327,15 +353,20 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
             }, None)
         })
         .collect();
-    let unchanged: Vec<(String, crate::retry::Existing)> =
-        reviews.iter().zip(&repeats).filter_map(|((review, _), repeat)| repeat.clone().map(|existing| (review.target().to_string(), existing))).collect();
-    for (scenario, existing) in &unchanged {
-        crate::say!(args.json, "{cmd}: unchanged — an identical review of {scenario} is already {}; nothing written", existing.describe());
+    // The id a skipped review keeps is the stored review's (module doc).
+    let unchanged: Vec<(String, Option<String>, crate::retry::Existing)> = reviews
+        .iter()
+        .zip(&repeats)
+        .filter_map(|((review, _), repeat)| repeat.clone().map(|existing| (review.target().to_string(), stored_review_id(ledger_root, &existing), existing)))
+        .collect();
+    for (scenario, stored_id, existing) in &unchanged {
+        let id = stored_id.as_deref().map_or_else(String::new, |id| format!(" (review id {id})"));
+        crate::say!(args.json, "{cmd}: unchanged — an identical review of {scenario} is already {}{id}; nothing written", existing.describe());
     }
     let reviews: Vec<(Review, String)> = reviews.into_iter().zip(&repeats).filter(|(_, repeat)| repeat.is_none()).map(|(review, _)| review).collect();
     if reviews.is_empty() {
         if args.json {
-            let wrote: Vec<ReviewEntry> = unchanged.iter().map(|(scenario, existing)| ReviewEntry { location: existing.committed.clone(), deduped: None, scenario_id: Some(scenario.clone()), unchanged: Some(true) }).collect();
+            let wrote: Vec<ReviewEntry> = unchanged.iter().map(|(scenario, stored_id, existing)| ReviewEntry { location: existing.committed.clone(), deduped: None, scenario_id: Some(scenario.clone()), review_id: stored_id.clone(), unchanged: Some(true) }).collect();
             crate::json_out::data_with_meta(args.command(), &ReviewReport { outcome: args.outcome.as_str(), reviews: wrote, blobs_stored: 0 }, serde_json::json!({ "unchanged": true }));
         }
         return 0;
@@ -349,7 +380,7 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     let (stored, written) = match write_reviews(&repo, &gate_context.ctx.ledger_root, &files, &only_reviews, &mut |tier, review| tier.write(review)) {
         Ok(landed) => landed,
         Err(error) => {
-            let mut error = CliError::refused("WRITE_FAILED", error.to_string()).hint("check that the path is writable and the disk has room, then run the command again");
+            let mut error = CliError::refused("WRITE_FAILED", error.clone()).hint("check that the path is writable and the disk has room, then run the command again");
             if reviews.len() > 1 {
                 error = error.hint("no review is written: every review and blob this run wrote or stored was removed");
             }
@@ -365,17 +396,28 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> i32 {
     if !args.outcome.is_signed() {
         crate::say!(args.json, "{cmd}: outcome `{}` is recorded as a review gap, never as an approval", args.outcome.as_str());
     }
-    for (location, deduped) in &written {
-        crate::say!(args.json, "{cmd}: wrote {location} ({}) — {}", if *deduped { "deduped" } else { "new" }, crate::write_mode::DIRECT);
+    for ((location, deduped), (review, _)) in written.iter().zip(&reviews) {
+        crate::say!(args.json, "{cmd}: wrote {location} ({}) — {}; review id {review_id} of {}", if *deduped { "deduped" } else { "new" }, crate::write_mode::DIRECT, review.target());
     }
-    let mut wrote: Vec<ReviewEntry> = written.iter().map(|(location, deduped)| ReviewEntry { location: Some(location.clone()), deduped: Some(*deduped), scenario_id: None, unchanged: None }).collect();
-    wrote.extend(unchanged.iter().map(|(scenario, existing)| ReviewEntry { location: existing.committed.clone(), deduped: None, scenario_id: Some(scenario.clone()), unchanged: Some(true) }));
+    let mut wrote: Vec<ReviewEntry> = written
+        .iter()
+        .zip(&reviews)
+        .map(|((location, deduped), (review, _))| ReviewEntry { location: Some(location.clone()), deduped: Some(*deduped), scenario_id: Some(review.target().to_string()), review_id: Some(review_id.to_string()), unchanged: None })
+        .collect();
+    wrote.extend(unchanged.iter().map(|(scenario, stored_id, existing)| ReviewEntry { location: existing.committed.clone(), deduped: None, scenario_id: Some(scenario.clone()), review_id: stored_id.clone(), unchanged: Some(true) }));
     let scope = match &args.change {
         Some(change) => crate::next::Scope::Change(change.as_str().to_string()),
         None => crate::next::Scope::Scenarios(scenario_ids.iter().map(|id| id.as_str().to_string()).collect()),
     };
     crate::next::finish(&repo, args.command(), &scope, false, args.json, &ReviewReport { outcome: args.outcome.as_str(), reviews: wrote, blobs_stored: stored });
     0
+}
+
+/// The `review_id` of the stored review `existing` names, when it has one.
+fn stored_review_id(ledger_root: &Path, existing: &crate::retry::Existing) -> Option<String> {
+    let bytes = std::fs::read(ledger_root.join(existing.committed.as_deref()?)).ok()?;
+    let body: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    body.get("review_id").and_then(serde_json::Value::as_str).map(str::to_string)
 }
 
 /// The digest a change-level review of `change` pins: its chore brief as
@@ -445,6 +487,14 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn the_value_parsers_refuse_in_their_old_words() {
+        assert_eq!(parse_runtime_label(" x").unwrap_err().to_string(), "` x` is not a runtime label: it must be non-empty, without surrounding whitespace or control characters");
+        assert_eq!(parse_project_id("Bad Id").unwrap_err().to_string(), format!("invalid ProjectId: \"Bad Id\" does not match grammar `{}`", ProjectId::GRAMMAR));
+        assert_eq!(parse_scenario_id("nope").unwrap_err().to_string(), format!("invalid ScenarioId: \"nope\" does not match grammar `{}`", ScenarioId::GRAMMAR));
+        assert_eq!(parse_session_id("").unwrap_err().to_string(), format!("invalid SessionId: \"\" does not match grammar `{}`", SessionId::GRAMMAR));
+    }
+
     /// A repo whose `canon.yaml` configures the spec root `app-a`, the
     /// project id these tests write under (`--project-id` must name one).
     fn repo_dir() -> TempDir {
@@ -506,7 +556,7 @@ mod tests {
         assert_eq!(reviews.len(), 1);
         let review = &reviews[0];
         assert_eq!(review.envelope.actor.agent_id, "agent-x");
-        assert_eq!(review.envelope.actor.role.as_ref().map(|r| r.as_str()), Some("reviewer"));
+        assert_eq!(review.envelope.actor.role.as_ref().map(canon_model::RoleId::as_str), Some("reviewer"));
         assert_eq!(review.envelope.actor.session_id.as_ref(), Some(&session));
         assert_eq!(review.provenance_ref, ProvenanceRef::UpstreamRef("routes/world.firstbuy-hotdeal.26#onReview".to_string()));
         assert_eq!(review.outcome, ReviewOutcome::Signed);
@@ -526,7 +576,7 @@ mod tests {
         assert!(pins.evidence.is_empty(), "a new review never pins evidence record ids");
 
         let a = args();
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("impl", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("impl", RoleId::parse("implementer").unwrap()));
         let record = EvidenceRecord::new(envelope, None, Some(a.scenario_ids[0].clone()), None, EvidenceVerdict::Faithful).with_project_id(a.project_id.clone());
         ledger(&dir).write(&record).unwrap();
         assert_eq!(run_add(dir.path(), &ReviewAddArgs { reviewer: "reviewer-2".into(), ..args() }), 0);
@@ -593,7 +643,7 @@ mod tests {
         let files: Vec<crate::evidence_attach::BoundFile> =
             crate::evidence_attach::bind_artifacts(dir.path(), &[dir.path().join("shot.png")], 1024).unwrap().into_iter().map(|(_, file)| file).collect();
         let store = canon_gate::artifact_store::store_dir(dir.path());
-        let blobs = || std::fs::read_dir(&store).map(|d| d.count()).unwrap_or(0);
+        let blobs = || std::fs::read_dir(&store).map_or(0, std::iter::Iterator::count);
         let review = |scenario: &str| {
             let a = args();
             Review::new(
@@ -628,12 +678,12 @@ mod tests {
         assert_eq!((reviews(&dir).len(), blobs()), (0, 0));
 
         let review_dir = ledger_root.join("kind=review");
-        let mut readonly = std::fs::metadata(&review_dir).unwrap().permissions();
+        let original = std::fs::metadata(&review_dir).unwrap().permissions();
+        let mut readonly = original.clone();
         readonly.set_readonly(true);
-        std::fs::set_permissions(&review_dir, readonly.clone()).unwrap();
-        let refused = write_reviews(dir.path(), &ledger_root, &files, &batch, &mut |tier, review| tier.write(review));
-        readonly.set_readonly(false);
         std::fs::set_permissions(&review_dir, readonly).unwrap();
+        let refused = write_reviews(dir.path(), &ledger_root, &files, &batch, &mut |tier, review| tier.write(review));
+        std::fs::set_permissions(&review_dir, original).unwrap();
         assert!(refused.unwrap_err().contains("is read-only"));
         assert_eq!(blobs(), 0);
 

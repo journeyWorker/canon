@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "018-n4-impl"
+  },
+  "at": "2026-10-12T13:56:55.173174Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test finding finding_list_refuses && cargo test -p canon-cli --test conformance (finding-list-open-json)"
+  },
+  "evidence_note": {
+    "summary": "malformed change id refused exit 2"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 2,
+  "scenario_id": "finding.list.04",
+  "schema": 1,
+  "staging_id": "56f38c0c77dc",
+  "verdict": "faithful"
+}

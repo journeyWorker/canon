@@ -3,7 +3,7 @@
   "cli": {
     "about": "Specs, evidence gates, and agent memory for your repo",
     "name": "canon",
-    "version": "0.29.0"
+    "version": "0.30.0"
   },
   "commands": [
     {
@@ -370,6 +370,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "UNKNOWN_ROLE",
         "USAGE"
@@ -961,6 +962,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "SUBJECT_NOT_FOUND",
         "UNKNOWN_ROLE",
@@ -2021,6 +2023,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "PLAN_CORPUS_UNREADABLE",
         "PLAN_SOURCES_MISSING",
         "SERIALIZE_FAILED",
@@ -2347,6 +2350,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "PLAN_CORPUS_UNREADABLE",
         "PLAN_SOURCES_MISSING",
         "SERIALIZE_FAILED",
@@ -2515,6 +2519,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
@@ -2726,6 +2731,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
@@ -3026,6 +3032,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
@@ -3393,6 +3400,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
         "USAGE",
@@ -3635,6 +3643,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "REPO_UNREADABLE",
@@ -4251,6 +4260,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "REPO_UNREADABLE",
@@ -4885,6 +4895,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "LAYOUT_MIGRATION_REQUIRED",
+        "OLD_LAYOUT",
         "SPEC_ROOT_UNRESOLVED",
         "UNKNOWN_ROLE",
         "USAGE",
@@ -5069,8 +5080,10 @@
       "errorCodes": [
         "CONFIG_MISSING",
         "CONFIG_UNREADABLE",
+        "FINDING_INTRODUCED_REQUIRED",
         "FINDING_INVALID_ARGUMENT",
         "FINDING_RESOLUTION_REV_UNEXPECTED",
+        "FINDING_REVIEW_NOT_FOUND",
         "FINDING_SEQ_OCCUPIED",
         "FINDING_UNKNOWN_SCENARIO",
         "INPUT_CONFLICT",
@@ -5083,6 +5096,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "REPO_UNREADABLE",
         "UNKNOWN_ROLE",
@@ -5090,7 +5104,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --actor-id alice --summary \"Token is logged\""
+        "canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor-id alice --summary \"Token is logged\""
       ],
       "exits": [
         {
@@ -5122,6 +5136,7 @@
             {
               "actorId": "reviewer-1",
               "changeId": "add-login",
+              "introducedUnknown": true,
               "round": 1,
               "seq": 2,
               "severity": "blocker",
@@ -5131,6 +5146,7 @@
           "example": {
             "actorId": "alice",
             "changeId": "add-login",
+            "introducedUnknown": true,
             "round": 1,
             "seq": 2,
             "severity": "should-fix",
@@ -5268,6 +5284,27 @@
           "repeatable": false,
           "required": false,
           "valueName": "REV"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Say the introducing commit is not known, instead of --introduced-rev. A new blocker or should-fix needs one of the two; a note needs neither. Stored in its own field, never in the commit slot",
+          "kind": "flag",
+          "name": "introduced-unknown",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The review this finding came out of: the review id `canon review scenario` or `canon review change` printed. Refused when no review in the ledger or the archive carries it; a close copies it",
+          "kind": "value",
+          "name": "review-id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "REVIEW_ID"
         },
         {
           "aliases": [],
@@ -5422,6 +5459,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "REPO_UNREADABLE",
         "UNKNOWN_ROLE",
@@ -6188,6 +6226,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
         "UNKNOWN_ROLE",
@@ -6343,6 +6382,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
@@ -6491,6 +6531,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
@@ -6646,6 +6687,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
@@ -7065,6 +7107,7 @@
         "INPUT_UNREADABLE",
         "INVENTORY_ABORTED",
         "INVENTORY_FAILED",
+        "OLD_LAYOUT",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
@@ -7213,6 +7256,7 @@
         "INPUT_UNREADABLE",
         "LEDGER_ARCHIVE_UNAVAILABLE",
         "LEDGER_COMPACT_FAILED",
+        "OLD_LAYOUT",
         "PLAN_CHANGED",
         "UNKNOWN_ROLE",
         "USAGE"
@@ -7427,6 +7471,30 @@
         {
           "aliases": [],
           "default": [],
+          "help": "Undo the last committed migrate (restores what it backed up, undoes its moves and its Postgres and R2 re-keying); previews first, `--commit --plan-digest` acts",
+          "kind": "flag",
+          "name": "revert",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "With --revert, the backup directory to restore (default: the newest under .canon/migrate-backup/)",
+          "kind": "value",
+          "name": "backup",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "requires": [
+            "--revert"
+          ],
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
           "help": "Output JSON instead of the human-readable form",
           "kind": "flag",
           "name": "json",
@@ -7492,6 +7560,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "PLUGIN_SYNC_ERRORS",
         "PLUGIN_SYNC_FAILED",
         "UNKNOWN_ROLE",
@@ -8116,6 +8185,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "PLAN_CHANGED",
         "RETENTION_PURGE_FAILED",
         "UNKNOWN_ROLE",
@@ -9101,6 +9171,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "REVIEW_ARTIFACT_REFUSED",
         "REVIEW_INVALID_ARGUMENT",
         "REVIEW_SCENARIO_NOT_INDEXED",
@@ -9402,6 +9473,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_LAYOUT",
         "REVIEW_ARTIFACT_REFUSED",
         "REVIEW_INVALID_ARGUMENT",
         "REVIEW_SCENARIO_NOT_INDEXED",
@@ -9715,6 +9787,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "LAYOUT_MIGRATION_REQUIRED",
+        "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "SCAFFOLD_INVALID_ARGUMENT",
         "SCENARIO_TAG_EXISTS",
@@ -10860,6 +10933,7 @@
         "LEARN_PROMOTION_BLOCKED",
         "LEARN_PROMOTION_FAILED",
         "LEARN_SIGNATURE_UNREADABLE",
+        "OLD_LAYOUT",
         "UNKNOWN_ROLE",
         "USAGE"
       ],
@@ -11043,6 +11117,7 @@
         "LEARN_ROLLBACK_FAILED",
         "LEARN_SIGNATURE_UNREADABLE",
         "LEARN_TRAJECTORY_NOT_FOUND",
+        "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "UNKNOWN_ROLE",
         "USAGE"
@@ -11246,6 +11321,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
         "UNKNOWN_ROLE",
@@ -11398,6 +11474,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "POLICY_APPROVAL_UNREADABLE",
         "POLICY_CHANGED_SINCE_APPROVAL",
         "REPO_UNREADABLE",
@@ -11598,6 +11675,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "SUBJECT_EXISTS",
         "SUBJECT_GATE_VIOLATION",
@@ -11907,6 +11985,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
         "SUBJECT_UNADOPT_REFUSED",
@@ -12223,6 +12302,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_LAYOUT",
         "PLAN_CHANGED",
         "TIER_FAILED",
         "UNKNOWN_ROLE",
@@ -13246,6 +13326,13 @@
       "retryable": false
     },
     {
+      "code": "FINDING_INTRODUCED_REQUIRED",
+      "exit": 2,
+      "fix": "Pass --introduced-rev <rev> when the introducing commit was established, or --introduced-unknown when it was not; a note needs neither.",
+      "meaning": "a new blocker or should-fix finding names no introducing commit and does not say it is unknown",
+      "retryable": false
+    },
+    {
       "code": "FINDING_INVALID_ARGUMENT",
       "exit": 2,
       "fix": "Correct the `canon finding` argument that is empty, malformed or out of range.",
@@ -13271,6 +13358,13 @@
       "exit": 2,
       "fix": "Drop --resolution-rev, or close the finding as fixed.",
       "meaning": "--resolution-rev was given with a disposition other than fixed",
+      "retryable": false
+    },
+    {
+      "code": "FINDING_REVIEW_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass the review id that `canon review scenario` or `canon review change` printed; `canon query --kind review` shows the ids.",
+      "meaning": "--review-id names no review in the ledger or the archive",
       "retryable": false
     },
     {
@@ -13621,6 +13715,13 @@
       "exit": 2,
       "fix": "Run the command inside a git work tree that has at least one commit.",
       "meaning": "a command needed a commit and the directory is not a git work tree or has no commits",
+      "retryable": false
+    },
+    {
+      "code": "OLD_LAYOUT",
+      "exit": 2,
+      "fix": "Run `canon migrate --json` to preview the move, then `canon migrate --commit --plan-digest <digest>`.",
+      "meaning": "a command that writes records was refused in a repo whose ledger is laid out by canon 0.29; nothing was written",
       "retryable": false
     },
     {
@@ -14070,87 +14171,87 @@
     "kinds": [
       {
         "kind": "change",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=change/{change_id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/change.schema.json",
         "schemaVersion": 2
       },
       {
         "kind": "task",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=task/{task_id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/task.schema.json",
         "schemaVersion": 2
       },
       {
         "kind": "scenario",
-        "partition": "kind={kind}/area={area}/{id}.json",
+        "partition": "kind=scenario/{project_id}_{scenario_id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/scenario.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "session",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=session/{session_id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/session.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "run",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=run/{run_id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/run.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "event",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=event/{run_id}_{seq}_{digest8}.json",
         "schema": "crates/canon-model/schemas/event.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "handoff",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=handoff/{id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/handoff.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "review",
-        "partition": "kind={kind}/area={area}/{id}.json",
+        "partition": "kind=review/{project_id}_(scenario_{scenario_id}|change_{change_id})_{digest8}.json",
         "schema": "crates/canon-model/schemas/review.schema.json",
-        "schemaVersion": 1
+        "schemaVersion": 2
       },
       {
         "kind": "divergence",
-        "partition": "kind={kind}/area={area}/{id}.json",
+        "partition": "kind=divergence/{project_id}_{scenario_id}_{run_seq}_{round}_{digest8}.json",
         "schema": "crates/canon-model/schemas/divergence.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "trajectory",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=trajectory/{run_id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/trajectory.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "strategy_item",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=strategy_item/{regime_key}_{digest8}.json",
         "schema": "crates/canon-model/schemas/strategy_item.schema.json",
         "schemaVersion": 1
       },
       {
-        "kind": "evidence_record",
-        "partition": "kind={kind}/{id}.json",
-        "schema": "crates/canon-model/schemas/evidence_record.schema.json",
+        "kind": "evidence",
+        "partition": "kind=evidence/{project_id|-}_(task_{task_id}|scenario_{scenario_id}|run_{run_id})_{digest8}.json",
+        "schema": "crates/canon-model/schemas/evidence.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "subject",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=subject/{subject_id}_{digest8}.json",
         "schema": "crates/canon-model/schemas/subject.schema.json",
         "schemaVersion": 1
       },
       {
         "kind": "finding",
-        "partition": "kind={kind}/{id}.json",
+        "partition": "kind=finding/{change_id}_{round}_{seq}_{digest8}.json",
         "schema": "crates/canon-model/schemas/finding.schema.json",
-        "schemaVersion": 1
+        "schemaVersion": 2
       }
     ]
   },
@@ -16039,6 +16140,13 @@
             "changeId": {
               "type": "string"
             },
+            "hotStore": {
+              "description": "Where the change record went (0.30): the hot store's location; absent when the change is not routed to a hot store.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "subjectId": {
               "type": "string"
             }
@@ -17013,6 +17121,13 @@
         "DispatchBeginReport": {
           "description": "`canon dispatch begin`: the run opened. Binding keys are absent when unset;\n`lineage` only when the manifest records it; `tierDegraded` only when the\ntier write degraded.",
           "properties": {
+            "hotStore": {
+              "description": "Where the run record goes (0.30): the hot store's location; absent with no hot rung.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "injectedGuidance": {
               "description": "The strategies injected into the run (ledger records, their own schema).",
               "items": {
@@ -17314,6 +17429,13 @@
           "properties": {
             "endedAt": {
               "format": "date-time",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hotStore": {
+              "description": "Where the run record goes (0.30): the hot store's location; absent with no hot rung.",
               "type": [
                 "string",
                 "null"
@@ -19423,6 +19545,17 @@
             "disposition": {
               "type": "string"
             },
+            "introducedUnknown": {
+              "description": "`--introduced-unknown` was given: the finding says the introducing commit is not known (0.30).",
+              "type": "boolean"
+            },
+            "reviewId": {
+              "description": "The review the finding points at (0.30).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "round": {
               "format": "uint32",
               "minimum": 0,
@@ -20472,6 +20605,13 @@
               "minimum": 0,
               "type": "integer"
             },
+            "hotStore": {
+              "description": "Where the hot records go (0.30): the hot store's location; absent on a `--dry-run` or with no hot rung.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "nonCleanSources": {
               "description": "Every source this pass flagged non-clean (s18 spec) — the CLI\nlayer (`main.rs::run_ingest_plans`) prints an unconditional\nstderr WARN per entry and exits non-zero whenever this is\nnon-empty. Empty for an ordinary clean/partial-success pass.",
               "items": {
@@ -20530,7 +20670,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -20705,6 +20845,13 @@
             "dryRun": {
               "description": "A `--dry-run` preview: nothing was written; the counts are what a\nreal pass would do (convergence of superseded copies is not previewed).",
               "type": "boolean"
+            },
+            "hotStore": {
+              "description": "Where the hot records go (0.30): the hot store's location; absent on a `--dry-run` or with no hot rung.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "strategyItemsRebuilt": {
               "description": "Sum of every regime's freshly-distilled `StrategyItem` count\n([`NamespaceConvergence::items`]) — the count that actually lands\nin `stg_strategy_items`, i.e. what makes S9's `mart_role_memory`\nnon-empty.",
@@ -21140,6 +21287,13 @@
               "minimum": 0,
               "type": "integer"
             },
+            "hotStore": {
+              "description": "Where the hot records go (0.30): the hot store's location; absent on a `--dry-run`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "malformedRecords": {
               "format": "uint",
               "minimum": 0,
@@ -21183,6 +21337,7 @@
             "rowsSkipped",
             "runsWritten",
             "eventsWritten",
+            "hotStore",
             "degradeReason",
             "unwritten"
           ],
@@ -23114,8 +23269,15 @@
                 "null"
               ]
             },
+            "reviewId": {
+              "description": "The review id the record carries (0.30): this run's for a review it wrote, the stored\nreview's for one it skipped; absent only for a stored review written before 0.30.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "scenarioId": {
-              "description": "The scenario an unchanged repeat is about.",
+              "description": "The scenario (or, for `review change`, the change) the review is of.",
               "type": [
                 "string",
                 "null"
@@ -23325,8 +23487,15 @@
                 "null"
               ]
             },
+            "reviewId": {
+              "description": "The review id the record carries (0.30): this run's for a review it wrote, the stored\nreview's for one it skipped; absent only for a stored review written before 0.30.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "scenarioId": {
-              "description": "The scenario an unchanged repeat is about.",
+              "description": "The scenario (or, for `review change`, the change) the review is of.",
               "type": [
                 "string",
                 "null"
@@ -24416,7 +24585,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -24839,7 +25008,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -25262,7 +25431,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -25685,7 +25854,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -26501,6 +26670,13 @@
         },
         "changeId": {
           "type": "string"
+        },
+        "hotStore": {
+          "description": "Where the change record went (0.30): the hot store's location; absent when the change is not routed to a hot store.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "subjectId": {
           "type": "string"
@@ -27493,20 +27669,15 @@
           "description": "A record field's literal value (plugin §7 lineage, from the donor manifest\nlayer's types): the runtime shape [`type_accepts`] judges an authored\nYAML value against a declared [`Type`]. `Map` carries `evidence`'s\n`{kind, ref}` structure (and any other future record-shaped attr)."
         },
         "PartitionLayout": {
-          "description": "The Hive-style partition layout one record kind's git-tier files follow —\ndesign D3's `partition: LayoutDescriptor`, built from\n[`RecordKind::partition_template`]/[`RecordKind::is_area_scoped`] (S1's\nown registry — never a second, hand-written layout table).",
+          "description": "The name layout one record kind's files follow in every store —\ndesign D3's `partition: LayoutDescriptor`, built from\n[`RecordKind::partition_template`] (canon-model's component table — never\na second, hand-written layout table).",
           "properties": {
-            "areaScoped": {
-              "description": "Whether `template` requires the `area={area}/` segment.",
-              "type": "boolean"
-            },
             "template": {
-              "description": "The path template, e.g. `kind={kind}/{id}.json` or\n`kind={kind}/area={area}/{id}.json`.",
+              "description": "The path template, e.g. `kind=change/{change_id}_{digest8}.json`.",
               "type": "string"
             }
           },
           "required": [
-            "template",
-            "areaScoped"
+            "template"
           ],
           "type": "object"
         },
@@ -28081,7 +28252,7 @@
           "additionalProperties": {
             "$ref": "#/$defs/KindSurface"
           },
-          "description": "By the name `--kind` takes ([`crate::query::kind_cli_name`]): every\n`RecordKind::ALL` member. The wire string (`evidence_record`) stays\nstorage.",
+          "description": "By the one name every surface uses ([`RecordKind::as_str`]): every\n`RecordKind::ALL` member.",
           "type": "object"
         },
         "policy": {
@@ -28778,6 +28949,13 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "description": "`canon dispatch begin`: the run opened. Binding keys are absent when unset;\n`lineage` only when the manifest records it; `tierDegraded` only when the\ntier write degraded.",
       "properties": {
+        "hotStore": {
+          "description": "Where the run record goes (0.30): the hot store's location; absent with no hot rung.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "injectedGuidance": {
           "description": "The strategies injected into the run (ledger records, their own schema).",
           "items": {
@@ -28961,6 +29139,13 @@
       "properties": {
         "endedAt": {
           "format": "date-time",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hotStore": {
+          "description": "Where the run record goes (0.30): the hot store's location; absent with no hot rung.",
           "type": [
             "string",
             "null"
@@ -30752,6 +30937,10 @@
             "number"
           ]
         },
+        "introducedUnknown": {
+          "description": "Say the introducing commit is not known, instead of --introduced-rev. A new blocker or should-fix needs one of the two; a note needs neither. Stored in its own field, never in the commit slot",
+          "type": "boolean"
+        },
         "noPromote": {
           "description": "Keep this write staged even under canon.yaml `write: { promote: auto }`",
           "type": "boolean"
@@ -30770,6 +30959,13 @@
         "rev": {
           "default": "HEAD",
           "description": "The commit this record is about: any git revision (`HEAD~1`, a branch, a tag, a short sha); the full sha is recorded with the code tree it saw. The default HEAD records the working tree as it stands (uncommitted code included), and a commit made from it has the same code tree. Outside git, or with no commit, the command refuses (NO_COMMIT)",
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "reviewId": {
+          "description": "The review this finding came out of: the review id `canon review scenario` or `canon review change` printed. Refused when no review in the ledger or the archive carries it; a close copies it",
           "type": [
             "string",
             "number"
@@ -30857,6 +31053,17 @@
         },
         "disposition": {
           "type": "string"
+        },
+        "introducedUnknown": {
+          "description": "`--introduced-unknown` was given: the finding says the introducing commit is not known (0.30).",
+          "type": "boolean"
+        },
+        "reviewId": {
+          "description": "The review the finding points at (0.30).",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "round": {
           "format": "uint32",
@@ -31711,7 +31918,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -31823,6 +32030,13 @@
           "format": "uint",
           "minimum": 0,
           "type": "integer"
+        },
+        "hotStore": {
+          "description": "Where the hot records go (0.30): the hot store's location; absent on a `--dry-run` or with no hot rung.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "nonCleanSources": {
           "description": "Every source this pass flagged non-clean (s18 spec) — the CLI\nlayer (`main.rs::run_ingest_plans`) prints an unconditional\nstderr WARN per entry and exits non-zero whenever this is\nnon-empty. Empty for an ordinary clean/partial-success pass.",
@@ -32020,6 +32234,13 @@
         "dryRun": {
           "description": "A `--dry-run` preview: nothing was written; the counts are what a\nreal pass would do (convergence of superseded copies is not previewed).",
           "type": "boolean"
+        },
+        "hotStore": {
+          "description": "Where the hot records go (0.30): the hot store's location; absent on a `--dry-run` or with no hot rung.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "strategyItemsRebuilt": {
           "description": "Sum of every regime's freshly-distilled `StrategyItem` count\n([`NamespaceConvergence::items`]) — the count that actually lands\nin `stg_strategy_items`, i.e. what makes S9's `mart_role_memory`\nnon-empty.",
@@ -32481,6 +32702,13 @@
           "minimum": 0,
           "type": "integer"
         },
+        "hotStore": {
+          "description": "Where the hot records go (0.30): the hot store's location; absent on a `--dry-run`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "malformedRecords": {
           "format": "uint",
           "minimum": 0,
@@ -32524,6 +32752,7 @@
         "rowsSkipped",
         "runsWritten",
         "eventsWritten",
+        "hotStore",
         "degradeReason",
         "unwritten"
       ],
@@ -32965,7 +33194,19 @@
       "$id": "urn:canon:input:MigrateInput",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
-      "properties": {},
+      "properties": {
+        "backup": {
+          "description": "With --revert, the backup directory to restore (default: the newest under .canon/migrate-backup/)",
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "revert": {
+          "description": "Undo the last committed migrate (restores what it backed up, undoes its moves and its Postgres and R2 re-keying); previews first, `--commit --plan-digest` acts",
+          "type": "boolean"
+        }
+      },
       "title": "`canon migrate` --input document",
       "type": "object"
     },
@@ -33869,8 +34110,72 @@
     },
     "QueryReport": {
       "$defs": {
+        "DanglingRecord": {
+          "description": "One record's unresolved reference.",
+          "properties": {
+            "field": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "record": {
+              "description": "The record's id, as the query's ID column shows it.",
+              "type": "string"
+            },
+            "target": {
+              "description": "The kind of thing the field names: `change`, `review`, `task` or `scenario`.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record",
+            "field",
+            "target",
+            "id"
+          ],
+          "type": "object"
+        },
         "LedgerRecord": {
           "description": "A ledger record, verbatim: it keeps its own schema (`crates/canon-model/schemas/<kind>.schema.json`), minus anything redacted or left out by `--fields`",
+          "type": "object"
+        },
+        "QueryDangling": {
+          "description": "The unresolved references of a query (0.30 `record-links`): the count and the count per kind of reference\ncover every record the query found, `references` the records of this page.",
+          "properties": {
+            "byReference": {
+              "additionalProperties": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "description": "`<record kind>.<field>` to its count.",
+              "type": "object"
+            },
+            "count": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "references": {
+              "items": {
+                "$ref": "#/$defs/DanglingRecord"
+              },
+              "type": "array"
+            },
+            "unchecked": {
+              "description": "Why nothing was checked, when the sources could not be read.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "count",
+            "byReference",
+            "references"
+          ],
           "type": "object"
         },
         "QueryRollup": {
@@ -33901,6 +34206,17 @@
           "format": "uint",
           "minimum": 0,
           "type": "integer"
+        },
+        "dangling": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QueryDangling"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`--kind finding|evidence|subject` (0.30): the references to a source nothing committed holds."
         },
         "kind": {
           "type": "string"
@@ -34276,8 +34592,15 @@
                 "null"
               ]
             },
+            "reviewId": {
+              "description": "The review id the record carries (0.30): this run's for a review it wrote, the stored\nreview's for one it skipped; absent only for a stored review written before 0.30.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "scenarioId": {
-              "description": "The scenario an unchanged repeat is about.",
+              "description": "The scenario (or, for `review change`, the change) the review is of.",
               "type": [
                 "string",
                 "null"
@@ -34482,8 +34805,15 @@
                 "null"
               ]
             },
+            "reviewId": {
+              "description": "The review id the record carries (0.30): this run's for a review it wrote, the stored\nreview's for one it skipped; absent only for a stored review written before 0.30.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "scenarioId": {
-              "description": "The scenario an unchanged repeat is about.",
+              "description": "The scenario (or, for `review change`, the change) the review is of.",
               "type": [
                 "string",
                 "null"
@@ -35841,6 +36171,29 @@
           ],
           "type": "object"
         },
+        "DanglingSummary": {
+          "description": "How many references are unresolved, in all and per kind of reference\n(`<record kind>.<field>`, e.g. `finding.change_id`).",
+          "properties": {
+            "byReference": {
+              "additionalProperties": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "count": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "count",
+            "byReference"
+          ],
+          "type": "object"
+        },
         "FlowScenarioState": {
           "description": "One scenario covering a flow step, with the evidence and review state\nthe gate reads for it.",
           "properties": {
@@ -36239,6 +36592,17 @@
         "canonVersion": {
           "type": "string"
         },
+        "danglingReferences": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DanglingSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "References of findings, evidence and subjects to a source nothing committed holds\n(0.30 `record-links`), in all and per kind of reference. Absent when they were not\nchecked: a run that stopped early, or sources that could not be read (a warning says)."
+        },
         "policy": {
           "$ref": "#/$defs/PolicyStatus"
         },
@@ -36605,7 +36969,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -36968,7 +37332,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -37322,7 +37686,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -37602,7 +37966,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],
@@ -37918,7 +38282,7 @@
             "divergence",
             "trajectory",
             "strategy_item",
-            "evidence_record",
+            "evidence",
             "subject",
             "finding"
           ],

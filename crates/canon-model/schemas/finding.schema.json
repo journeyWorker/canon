@@ -44,6 +44,10 @@
         }
       ]
     },
+    "introduced_unknown": {
+      "description": "The reviewer SAYS the introducing commit is not known (0.30\n`record-links`): a defect finding (`blocker`, `should_fix`) that\n`canon finding add` writes names its introducing commit in\n`introduced_by` or sets this mark, never both and never neither. It\nis its own field so \"not known\" is never mixed into the commit slot\nand a derived count still reads an unsourced finding as UNKNOWN.\nAbsent unless `true`; a finding written before 0.30 has neither.",
+      "type": "boolean"
+    },
     "kind": {
       "$ref": "#/$defs/RecordKind"
     },
@@ -77,6 +81,17 @@
       "type": [
         "boolean",
         "null"
+      ]
+    },
+    "review_id": {
+      "description": "The `canon review` run this finding came out of (0.30\n`record-links`): the `review_id` its reviews carry. Absent when the\nfinding was not raised in a recorded review, and on every finding\nwritten before 0.30.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReviewId"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
     "reviewed_sha": {
@@ -224,10 +239,15 @@
         "divergence",
         "trajectory",
         "strategy_item",
-        "evidence_record",
+        "evidence",
         "subject",
         "finding"
       ]
+    },
+    "ReviewId": {
+      "description": "ULID (Crockford base32, 26 chars) — joins: finding ↔ review",
+      "type": "string",
+      "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
     },
     "RoleId": {
       "description": "kebab-case role slug (`[a-z0-9]+(-[a-z0-9]+)*`), e.g. `implementer`, `reviewer` — joins: not a join-spine key; used by `Actor.role` and `regime_key`'s `<role>` segment",

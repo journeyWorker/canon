@@ -13,8 +13,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::process::Command;
 
-use canon_model::{approval_payload_bytes, EvidenceApproval, EvidenceRecord, EvidenceVerdict};
-use canon_store::partition::content_digest12;
+use canon_model::{approval_payload_bytes, ApprovalPayload, EvidenceApproval, EvidenceRecord, EvidenceVerdict};
+use canon_store::partition::content_digest;
 
 use crate::approval::verify_risk_approval;
 use crate::context::{GateCheck, GateContext};
@@ -24,6 +24,7 @@ use crate::policy::{allowed_signers_path, PolicyDiagnostic, RiskTierRule};
 
 /// Verifies minimum distinct human approvals for the highest matching risk
 /// tier in each existing evidence subject group.
+#[derive(Debug)]
 pub struct RiskApprovalCheck;
 
 impl GateCheck for RiskApprovalCheck {
@@ -61,7 +62,7 @@ impl GateCheck for RiskApprovalCheck {
                 groups.entry((subject, record.project_id.as_ref().map(ToString::to_string))).or_default().push(record);
             }
         }
-        let mut changed_paths: BTreeMap<String, Result<Vec<String>, String>> = BTreeMap::new();
+        let mut changed_paths: BTreeMap<String, Option<Vec<String>>> = BTreeMap::new();
 
         groups
             .into_iter()
@@ -80,12 +81,12 @@ impl GateCheck for RiskApprovalCheck {
                     None => Vec::new(),
                 };
                 let analysis = match current.evidence_sha.as_ref() {
-                    None => Err("missing artifact Git SHA".to_string()),
+                    None => None,
                     // Groups of one generation share a commit: two git
                     // processes per commit, not per group.
-                    Some(sha) => changed_paths.entry(sha.to_string()).or_insert_with(|| artifact_changed_paths(&ctx.ctx.repo, sha)).clone(),
+                    Some(sha) => changed_paths.entry(sha.to_string()).or_insert_with(|| artifact_changed_paths(&ctx.ctx.repo, sha).ok()).clone(),
                 };
-                let analysis_known = analysis.is_ok();
+                let analysis_known = analysis.is_some();
                 let mut derived_surfaces = analysis.unwrap_or_default();
                 // Effects are supplemental; self-declared paths cannot hide
                 // security-sensitive changes present in the verified commit.
@@ -138,25 +139,41 @@ impl GateCheck for RiskApprovalCheck {
             .collect()
     }
 }
-pub fn artifact_changed_paths(repo: &Path, sha: &canon_model::Sha) -> Result<Vec<String>, String> {
+
+/// Why the paths a commit changed could not be derived.
+#[derive(Debug, thiserror::Error)]
+pub enum ArtifactPathsError {
+    #[error("resolve artifact SHA: {0}")]
+    Resolve(#[source] std::io::Error),
+    #[error("artifact SHA is not a commit: {0}")]
+    NotACommit(String),
+    #[error("derive artifact paths: {0}")]
+    Derive(#[source] std::io::Error),
+    #[error("cannot derive changed paths for artifact SHA: {0}")]
+    Underivable(String),
+    #[error("artifact path output is not UTF-8: {0}")]
+    NotUtf8(#[from] std::string::FromUtf8Error),
+}
+
+pub fn artifact_changed_paths(repo: &Path, sha: &canon_model::Sha) -> Result<Vec<String>, ArtifactPathsError> {
     let sha = sha.to_string();
     let resolved = Command::new("git")
         .arg("-C").arg(repo)
         .args(["rev-parse", "--verify", &format!("{sha}^{{commit}}")])
         .output()
-        .map_err(|error| format!("resolve artifact SHA: {error}"))?;
+        .map_err(ArtifactPathsError::Resolve)?;
     if !resolved.status.success() {
-        return Err(format!("artifact SHA is not a commit: {sha}"));
+        return Err(ArtifactPathsError::NotACommit(sha));
     }
     let output = Command::new("git")
         .arg("-C").arg(repo)
         .args(["diff-tree", "--root", "--no-commit-id", "-r", "-m", "--no-renames", "--name-only", &sha])
         .output()
-        .map_err(|error| format!("derive artifact paths: {error}"))?;
+        .map_err(ArtifactPathsError::Derive)?;
     if !output.status.success() {
-        return Err(format!("cannot derive changed paths for artifact SHA: {sha}"));
+        return Err(ArtifactPathsError::Underivable(sha));
     }
-    let text = String::from_utf8(output.stdout).map_err(|error| format!("artifact path output is not UTF-8: {error}"))?;
+    let text = String::from_utf8(output.stdout)?;
     let mut paths: Vec<String> = text.lines().map(str::trim).filter(|path| !path.is_empty()).map(str::to_string).collect();
     paths.sort_unstable();
     paths.dedup();
@@ -186,17 +203,17 @@ fn approval_is_authenticated(
     let artifact_sha = current_sha.to_string();
     let project = current.project_id.as_ref().map(ToString::to_string);
     let run_id = current.run_id.as_ref().map(ToString::to_string);
-    let payload = approval_payload_bytes(
-        canon_model::APPROVAL_NAMESPACE,
-        subject.as_str(),
-        project.as_deref(),
-        &artifact_sha,
-        run_id.as_deref(),
-        &approval.surface,
-        &approval.effects,
-        &approval.approver,
-        &approval.at,
-    );
+    let payload = approval_payload_bytes(&ApprovalPayload {
+        namespace: canon_model::APPROVAL_NAMESPACE,
+        subject: subject.as_str(),
+        project: project.as_deref(),
+        artifact_sha: &artifact_sha,
+        run_id: run_id.as_deref(),
+        surface: &approval.surface,
+        effects: &approval.effects,
+        actor: &approval.approver,
+        timestamp: &approval.at,
+    });
     verify_risk_approval(&payload, approval.signature.as_deref().unwrap_or_default().as_bytes(), &approval.approver, allowed_signers).is_ok()
 }
 
@@ -220,8 +237,8 @@ fn effects_for(surface: &[String]) -> Vec<String> {
 /// cannot bind an artifact, the required-risk path fails closed.
 fn latest_record<'a>(records: &[&'a EvidenceRecord]) -> Option<&'a EvidenceRecord> {
     records.iter().copied().max_by(|left, right| {
-        let left_digest = content_digest12(&serde_json::to_value(left).unwrap_or_default());
-        let right_digest = content_digest12(&serde_json::to_value(right).unwrap_or_default());
+        let left_digest = content_digest(&serde_json::to_value(left).unwrap_or_default());
+        let right_digest = content_digest(&serde_json::to_value(right).unwrap_or_default());
         (left.envelope.at, left.envelope.schema, left_digest).cmp(&(right.envelope.at, right.envelope.schema, right_digest))
     })
 }
@@ -267,13 +284,24 @@ fn wildcard_matches(pattern: &str, value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
 
-    use canon_model::{Actor, Envelope, EvidenceApproval, EvidenceRecord, EvidenceVerdict, RecordKind, RoleId, ScenarioId, Sha, TaskId};
+    use canon_model::{Actor, Envelope, RecordKind, RoleId, ScenarioId, Sha, TaskId};
     use chrono::{DateTime, Utc};
     use crate::context::GateCtx;
     use crate::policy::{PolicyField, PolicyResolution, StalenessPolicy};
     use super::*;
+
+    #[test]
+    fn artifact_changed_paths_errors_keep_their_messages() {
+        let sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let dir = tempfile::TempDir::new().unwrap();
+        let err = artifact_changed_paths(dir.path(), &Sha::parse(sha).unwrap()).unwrap_err();
+        assert_eq!(err.to_string(), format!("artifact SHA is not a commit: {sha}"));
+        assert_eq!(ArtifactPathsError::Underivable(sha.to_string()).to_string(), format!("cannot derive changed paths for artifact SHA: {sha}"));
+        let io = std::io::Error::other("boom");
+        assert_eq!(ArtifactPathsError::Resolve(io).to_string(), "resolve artifact SHA: boom");
+        assert_eq!(ArtifactPathsError::Derive(std::io::Error::other("boom")).to_string(), "derive artifact paths: boom");
+    }
 
     fn now() -> DateTime<Utc> {
         "2026-10-01T00:00:00Z".parse().unwrap()
@@ -281,7 +309,7 @@ mod tests {
 
     fn record(surface: &str, approver: Option<(&str, &str)>) -> EvidenceRecord {
         let mut record = EvidenceRecord::new(
-            Envelope::new(1, RecordKind::EvidenceRecord, now(), Actor::new("agent", RoleId::parse("implementer").unwrap())),
+            Envelope::new(1, RecordKind::Evidence, now(), Actor::new("agent", RoleId::parse("implementer").unwrap())),
             Some(TaskId::parse("change#1.1").unwrap()), None, None, EvidenceVerdict::Faithful,
         ).with_surface_ref(vec![surface.to_string()])
          .with_evidence_sha(Sha::parse("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").unwrap());

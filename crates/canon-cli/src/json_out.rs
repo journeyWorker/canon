@@ -280,7 +280,7 @@ pub fn relative_to_cwd(path: &Path) -> String {
 }
 
 fn context() -> Context {
-    let repo = crate::context::resolve_repo_root(REPO.get().map(PathBuf::as_path).unwrap_or(Path::new(".")));
+    let repo = crate::context::resolve_repo_root(REPO.get().map_or(Path::new("."), PathBuf::as_path));
     Context {
         role: crate::role::Role::current(None).map(|role| role.as_str().to_string()),
         actor: std::env::var("CANON_ACTOR").ok().map(|actor| actor.trim().to_string()).filter(|actor| !actor.is_empty()),
@@ -438,7 +438,8 @@ fn validate<R: Report>(text: &str) {
         let compile = |key: &str| jsonschema::validator_for(&schemas[key]).unwrap_or_else(|e| panic!("the {key} envelope schema does not compile: {e}"));
         (compile("success"), compile("failure"))
     });
-    static REPORTS: LazyLock<Mutex<HashMap<&'static str, Option<std::sync::Arc<Validator>>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+    type ReportValidators = Mutex<HashMap<&'static str, Option<std::sync::Arc<Validator>>>>;
+    static REPORTS: LazyLock<ReportValidators> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
     let document: Value = serde_json::from_str(text).expect("a document is JSON");
     witness::<R>(&document);
@@ -479,6 +480,7 @@ fn witness<R: Report>(document: &Value) {
 
 /// A command's narration: each line is said (stdout in human mode) and kept,
 /// so the JSON result can carry the same account.
+#[derive(Debug)]
 pub struct Log {
     json: bool,
     lines: Vec<String>,

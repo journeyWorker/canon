@@ -36,7 +36,7 @@ struct ScratchDir(PathBuf);
 impl ScratchDir {
     fn new() -> Result<Self, String> {
         static COUNTER: AtomicU64 = AtomicU64::new(0);
-        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
         let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
         let path = std::env::temp_dir().join(format!("canon-vocab-selftest-{}-{nanos}-{unique}", std::process::id()));
         std::fs::create_dir_all(&path).map_err(|e| format!("create scratch dir {}: {e}", path.display()))?;
@@ -55,7 +55,7 @@ impl Drop for ScratchDir {
 }
 
 fn repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap().to_path_buf()
+    Path::new(env!("CARGO_MANIFEST_DIR")).parent().and_then(Path::parent).expect("crate sits two levels below the repo root").to_path_buf()
 }
 
 fn fixture(name: &str) -> Result<String, String> {

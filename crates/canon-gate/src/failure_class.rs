@@ -1,5 +1,5 @@
 //! Stable failure-class strings (design decision 9, D9): the SAME
-//! ten strings every wave-2 check (coverage/D3a, verdict-ledger/D3b,
+//! eleven strings every wave-2 check (coverage/D3a, verdict-ledger/D3b,
 //! staleness, trust-ladder promotion, the flag ratchet,
 //! `gated-task-completion`'s checkbox-flip guard,
 //! `spec_coverage.require_review`'s open-blocker rule, and the audit
@@ -96,14 +96,19 @@ pub enum FailureClass {
     /// audit is a recorded fact, whether or not
     /// `spec_coverage.require_audit` sampled the scenario.
     FalseSuccess,
+    /// A record file named by the 0.29 rule (an `area=` level, a 12-hex
+    /// digest, `kind=evidence_record/`) sits in the ledger. Canon 0.30
+    /// never uses it for a verdict; `canon migrate` renames it (0.30
+    /// `ledger-naming`). Always on, whatever the policy.
+    OldLayout,
 }
 
 impl FailureClass {
-    /// All ten classes, in [`FAILURE_CLASSES`]'s own order — the one
+    /// All eleven classes, in [`FAILURE_CLASSES`]'s own order — the one
     /// iteration point [`FAILURE_CLASSES`] and
     /// [`FailureClass::from_str_exact`] both walk, so "ten classes"
     /// is asserted structurally, not by a comment that can drift.
-    pub const ALL: [FailureClass; 10] = [
+    pub const ALL: [FailureClass; 11] = [
         FailureClass::UncoveredCell,
         FailureClass::UnreviewedPromotion,
         FailureClass::TrustBelowRequired,
@@ -114,6 +119,7 @@ impl FailureClass {
         FailureClass::FabricatedEvidence,
         FailureClass::OpenBlocker,
         FailureClass::FalseSuccess,
+        FailureClass::OldLayout,
     ];
 
     /// The stable, grep-able wire string. Matches
@@ -132,6 +138,7 @@ impl FailureClass {
             FailureClass::FabricatedEvidence => "fabricated-evidence",
             FailureClass::OpenBlocker => "open-blocker",
             FailureClass::FalseSuccess => "false-success",
+            FailureClass::OldLayout => "old-layout",
         }
     }
 
@@ -149,7 +156,7 @@ impl FailureClass {
 /// enum, is what a shell hook or a fixture's `expected_failures.txt`
 /// greps against (static-gate.md §3.1's rationale for a plain string
 /// list over an `Enum`).
-pub const FAILURE_CLASSES: [&str; 10] = [
+pub const FAILURE_CLASSES: [&str; 11] = [
     "uncovered-cell",
     "unreviewed-promotion",
     "trust-below-required",
@@ -160,6 +167,7 @@ pub const FAILURE_CLASSES: [&str; 10] = [
     "fabricated-evidence",
     "open-blocker",
     "false-success",
+    "old-layout",
 ];
 
 /// One gate violation — mirrors `tools/parity.py::Violation(cls,
@@ -199,7 +207,7 @@ mod tests {
     use super::*;
 
     /// `FAILURE_CLASSES` stability test (acceptance criterion): the
-    /// ten wire strings are exactly [`FailureClass::ALL`]'s
+    /// eleven wire strings are exactly [`FailureClass::ALL`]'s
     /// `as_str()` output, in the same order, and every string
     /// round-trips through [`FailureClass::from_str_exact`] — the two
     /// representations (grep-stable const, typed enum) can never
@@ -208,7 +216,7 @@ mod tests {
     fn failure_classes_const_matches_enum_exactly() {
         let from_enum: Vec<&str> = FailureClass::ALL.iter().map(|c| c.as_str()).collect();
         assert_eq!(from_enum, FAILURE_CLASSES.to_vec());
-        for &s in FAILURE_CLASSES.iter() {
+        for &s in &FAILURE_CLASSES {
             assert_eq!(FailureClass::from_str_exact(s).map(FailureClass::as_str), Some(s));
         }
         assert_eq!(FailureClass::from_str_exact("not-a-real-class"), None);
@@ -233,11 +241,11 @@ mod tests {
     }
 
     #[test]
-    fn all_has_exactly_ten_classes_no_duplicates() {
+    fn all_has_exactly_eleven_classes_no_duplicates() {
         let mut seen = std::collections::HashSet::new();
         for class in FailureClass::ALL {
             assert!(seen.insert(class.as_str()), "duplicate failure class: {}", class.as_str());
         }
-        assert_eq!(seen.len(), 10);
+        assert_eq!(seen.len(), 11);
     }
 }

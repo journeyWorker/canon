@@ -3,13 +3,13 @@
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum PluginCommand {
     /// Validate and write a plugin's overlay records
     Sync(PluginSyncArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct PluginSyncArgs {
     /// A .canon/plugins/<id>/plugin.yaml manifest id (e.g. porting)
     #[arg(value_name = "PLUGIN_ID")]

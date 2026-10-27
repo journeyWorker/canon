@@ -115,14 +115,14 @@ fn promote_flag_commits_in_the_same_run_and_a_later_gate_promote_is_a_no_op() {
     let out = ok(repo, &with(evidence("game.run.01"), &["--promote"]));
     let text = stdout(&out);
     assert_eq!(without_next(&text).lines().count(), 1, "one success line:\n{text}");
-    assert!(text.starts_with("canon evidence add: wrote kind=evidence_record/game.run.01__") && text.contains(PROMOTED), "the success line names the committed record and the promotion:\n{text}");
+    assert!(text.starts_with("canon evidence add: wrote kind=evidence/root_scenario_game.run.01_") && text.contains(PROMOTED), "the success line names the committed record and the promotion:\n{text}");
     assert!(!text.contains("canon gate promote:"), "a promote on write reports its own record, not a batch tally:\n{text}");
     assert_eq!(staged(repo), 0);
-    assert_eq!(committed(repo, "evidence_record"), 1);
+    assert_eq!(committed(repo, "evidence"), 1);
 
     let again = ok(repo, &["gate", "promote"]);
     assert!(stdout(&again).contains("nothing staged"), "{}", stdout(&again));
-    assert_eq!(committed(repo, "evidence_record"), 1, "a second promote commits nothing");
+    assert_eq!(committed(repo, "evidence"), 1, "a second promote commits nothing");
 }
 
 /// evidence.add.61: an absent `write:` key keeps today's behavior — the
@@ -135,9 +135,9 @@ fn without_a_write_key_a_staged_write_stays_staged() {
 
     let out = ok(repo, &evidence("game.run.01"));
     assert!(stdout(&out).lines().any(|l| l.contains(STAGED)), "{}", stdout(&out));
-    assert_eq!((staged(repo), committed(repo, "evidence_record")), (1, 0));
+    assert_eq!((staged(repo), committed(repo, "evidence")), (1, 0));
     ok(repo, &["gate", "promote"]);
-    assert_eq!((staged(repo), committed(repo, "evidence_record")), (0, 1));
+    assert_eq!((staged(repo), committed(repo, "evidence")), (0, 1));
 }
 
 /// evidence.add.62: under `write: { promote: auto }` (what `canon init`
@@ -156,14 +156,14 @@ fn auto_promotes_every_staged_write_and_no_promote_keeps_one_staged() {
     ok(repo, &["finding", "close", "c-run", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design"]);
     ok(repo, &["divergence", "add", "game.run.01", "--project-id", "root", "--actor-id", "r", "--role", "reviewer"]);
     assert_eq!(staged(repo), 0, "nothing waits for a promote");
-    assert_eq!((committed(repo, "evidence_record"), committed(repo, "finding"), committed(repo, "divergence")), (1, 2, 1));
+    assert_eq!((committed(repo, "evidence"), committed(repo, "finding"), committed(repo, "divergence")), (1, 2, 1));
 
     // A second, different attestation (an identical one is a repeat and writes nothing).
     let out = ok(repo, &with(evidence("game.run.01"), &["--summary", "attested again", "--no-promote"]));
     assert!(stdout(&out).lines().any(|l| l.contains(STAGED)), "{}", stdout(&out));
     assert_eq!(staged(repo), 1);
     ok(repo, &["gate", "promote"]);
-    assert_eq!((staged(repo), committed(repo, "evidence_record")), (0, 2));
+    assert_eq!((staged(repo), committed(repo, "evidence")), (0, 2));
 }
 
 /// evidence.add.63 (@case:failure): a malformed `write:` section is a
@@ -212,8 +212,8 @@ fn a_promote_on_write_commits_only_its_own_record() {
     let out = ok(repo, &evidence("game.run.01"));
     let text = stdout(&out);
     assert_eq!(without_next(&text).lines().count(), 1, "one success line, for this run's own record:\n{text}");
-    assert!(text.starts_with("canon evidence add: wrote kind=evidence_record/") && text.contains(PROMOTED), "{text}");
-    assert_eq!((staged(repo), committed(repo, "evidence_record")), (1, 1), "the other author's record is still staged");
+    assert!(text.starts_with("canon evidence add: wrote kind=evidence/") && text.contains(PROMOTED), "{text}");
+    assert_eq!((staged(repo), committed(repo, "evidence")), (1, 1), "the other author's record is still staged");
 
     let stage = |actor: &str, extra: &[&str]| {
         let mut args = vec!["divergence", "add", "game.run.01", "--project-id", "root", "--role", "reviewer", "--actor-id", actor];
@@ -229,7 +229,7 @@ fn a_promote_on_write_commits_only_its_own_record() {
     let all = ok(repo, &["gate", "promote"]);
     assert!(stdout(&all).contains("canon gate promote: promoted evidence=1"), "{}", stdout(&all));
     ok(repo, &["gate", "promote", "--kind", "divergence"]);
-    assert_eq!((staged(repo), committed(repo, "evidence_record"), committed(repo, "divergence")), (0, 2, 2));
+    assert_eq!((staged(repo), committed(repo, "evidence"), committed(repo, "divergence")), (0, 2, 2));
 }
 
 /// evidence.add.67: under `write: { promote: auto }` every staged write

@@ -1,7 +1,7 @@
 //! The metadata row of every command, by exhaustive `match`: adding a command
 //! (or a group's leaf) without saying which row it is fails to compile.
 
-use super::*;
+use super::{Command, PolicyCommand, DemoCommand, ContextPackCommand, AdapterCommand, PromptCommand, FeatureCommand, ScenarioCommand, SubjectCommand, ChangeCommand, BriefCommand, InventoryCommand, GateCommand, TaskCommand, EvidenceCommand, ArtifactsCommand, FindingCommand, ReviewCommand, DivergenceCliCommand, IngestCommand, StrategyCommand, DispatchCommand, RegimeCommand, ReportCommand, PluginCommand, SkillsCommand, TierCommand, LedgerCommand};
 use crate::schema::{meta_for, CommandMeta};
 
 /// The canonical command path of `cmd`, e.g. `evidence add`. No wildcard arm:
@@ -66,7 +66,7 @@ pub fn path(cmd: &Command) -> &'static str {
         Command::Task { action } => match action {
             TaskCommand::Done(_) => "task done",
         },
-        Command::Evidence { action } => match action {
+        Command::Evidence { action } => match &**action {
             EvidenceCommand::ApprovalPayload(_) => "evidence approval-payload",
             EvidenceCommand::Add(_) => "evidence add",
             EvidenceCommand::Audit(_) => "evidence audit",

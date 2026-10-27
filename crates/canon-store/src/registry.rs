@@ -46,6 +46,7 @@ pub struct PurgeOutcome {
 
 /// Retention facade kept separate from ordinary query/age call sites so
 /// destructive lifecycle operations have one explicit entry point.
+#[derive(Debug)]
 pub struct RetentionService<'a> {
     registry: &'a TierRegistry,
 }
@@ -63,13 +64,26 @@ impl<'a> RetentionService<'a> {
         self.registry.purge_plan_keys(kind, before)
     }
 }
-pub struct TierRegistry {
 
+pub struct TierRegistry {
     policy: TierPolicy,
     local: Option<Arc<dyn Tier>>,
     hot: Option<Arc<dyn Tier>>,
     cold: Option<Arc<dyn Tier>>,
     git: Option<Arc<GitTier>>,
+}
+
+impl std::fmt::Debug for TierRegistry {
+    // `dyn Tier` handles are not `Debug`; show the policy and which rungs are attached.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TierRegistry")
+            .field("policy", &self.policy)
+            .field("local", &self.local.is_some())
+            .field("hot", &self.hot.is_some())
+            .field("cold", &self.cold.is_some())
+            .field("git", &self.git.is_some())
+            .finish()
+    }
 }
 
 impl TierRegistry {
@@ -206,7 +220,8 @@ impl TierRegistry {
             merged.records.append(&mut result.records);
             merged.violations.append(&mut result.violations);
         }
-        merged.records.sort_by_key(crate::tier::raw_record_at);
+        let kind = query.kind;
+        merged.records.sort_by_cached_key(|raw| crate::partition::record_order(kind, raw));
         Ok(merged)
     }
     /// This registry owns only canon-store's routed/aging rungs. The

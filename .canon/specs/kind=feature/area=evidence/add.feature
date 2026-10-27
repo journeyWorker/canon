@@ -754,3 +754,90 @@ Feature: evidence add
     Then no record is left staged or committed and no new blob is left, the error naming the second record
     And a read-only destination is refused before anything is written
     And the same batch with nothing failing lands whole, both records committed and the blob stored
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:31Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:evidence-attestation
+  @case:happy
+  @flow:canon-0-30-spec-backfill.F2
+  @evidence.add.116
+  Scenario: Artifacts verify reports every bound file as stored
+    Given a repo whose scenario is attested with one bound artifact file, held in the local artifact store
+    When canon artifacts verify is run, with and without --json
+    Then it exits 0, reporting one bound file, one stored and an empty problems list
+    And the human form says one bound file was checked with problems 0
+    And nothing in the tree changed
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:31Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:evidence-attestation
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F2
+  @evidence.add.117
+  Scenario: Artifacts verify names a bound file the store lost and exits 1
+    Given a repo whose scenario is attested with one bound artifact file
+    And the stored blob and the working-tree file are both gone
+    When canon artifacts verify is run with --json
+    Then it exits 1 with ARTIFACTS_VERIFY_FAILED
+    And data.problems holds one entry naming the bound path and its digest with blob missing
+    And nothing in the tree changed
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:31Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:evidence-attestation
+  @case:happy
+  @flow:canon-0-30-spec-backfill.F2
+  @evidence.add.118
+  Scenario: Artifacts move previews its plan, then moves the blobs to an object-store tier when the plan digest is given
+    Given a repo with an object-store tier cold in canon.yaml and a scenario attested with one bound artifact held in the local store
+    When canon artifacts move --tier cold is run bare, then again with --commit and the planDigest it printed
+    Then the bare run exits 0 with committed false, prints a planDigest, uploads nothing and changes no file
+    And the committed run exits 0 with committed true, one blob uploaded and one local copy removed
+    And the store holds the blob under its digest, the local copy is gone and canon.yaml names the tier as the artifact store
+    And canon artifacts verify --full then exits 0
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:32Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:evidence-attestation
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F2
+  @evidence.add.119
+  Scenario: Artifacts move refuses a tier that is no object store or a missing tier and changes nothing
+    Given a repo with an object-store tier cold and a scenario attested with one bound artifact in the local store
+    When canon artifacts move names tier hot, which is no object store, with --json
+    Then it exits 2 with ARTIFACTS_MOVE_REFUSED saying the tier is not an object store
+    And canon artifacts move with no --tier exits 2 naming --tier, and --commit without --plan-digest exits 2 naming --plan-digest
+    And after each refusal the tree is unchanged, the local blob is still there and the store holds nothing
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:32Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:evidence-attestation
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F2
+  @evidence.add.120
+  Scenario: Artifacts move refuses a plan that changed since its preview and moves nothing
+    Given a preview of canon artifacts move --tier cold that printed a plan digest
+    And another artifact was bound by new evidence after that preview
+    When canon artifacts move is run with --commit and the old digest
+    Then it exits 2 with PLAN_CHANGED
+    And nothing was uploaded and the tree is unchanged
+    And previewing again prints a new digest that commits
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:32Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:evidence-attestation
+  @case:happy
+  @flow:canon-0-30-spec-backfill.F2
+  @evidence.add.121
+  Scenario: An approval payload prints the exact bytes to sign and writes nothing
+    Given a repo with one indexed scenario
+    When canon evidence approval-payload is run with --scenario-id, --project-id, --approver alice and --approval-at, with and without --json
+    Then it exits 0 and prints one JSON document with no trailing newline, naming namespace canon-approval-v1, the scenario as subject, the project, the actor alice and the approval time
+    And --json carries the same bytes as payload and their lower-case hex as payloadHex
+    And nothing in the tree changed
+
+  # canon: {"schema":1,"at":"2026-10-26T11:43:32Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:evidence-attestation
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F2
+  @evidence.add.122
+  Scenario: An approval payload is refused without a task or scenario, or with an unreadable time, and prints no bytes
+    Given a repo with one indexed scenario
+    When canon evidence approval-payload is run with neither --task-id nor --scenario-id, with --approval-at yesterday, or with no --approver
+    Then each exits 2, the first with EVIDENCE_REFUSED and the others as usage errors naming invalid timestamp and --approver
+    And no payload bytes reach stdout
+    And the tree is unchanged

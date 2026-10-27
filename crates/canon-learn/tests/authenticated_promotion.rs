@@ -4,10 +4,10 @@ use std::process::Command;
 
 use canon_ingest::verdict::{Becomes, Polarity, VerdictRow};
 use canon_learn::{
-    promote_strategy_approved, rebuild_namespace, retrieve, rollback_strategy_authenticated, ParquetStrategyStore, ParquetTrajectoryStore,
-    PromotionApproval, PromotionEvaluation, StrategyLifecycle, StrategyStore, Trajectory, TrajectoryId, TrajectoryStore,
+    promote_strategy_approved, rebuild_namespace, retrieve, rollback_strategy_authenticated, AuthenticatedRollback, ParquetStrategyStore, ParquetTrajectoryStore,
+    PromotionApproval, PromotionEvaluation, PromotionEvaluationFields, StrategyLifecycle, StrategyStore, Trajectory, TrajectoryId, TrajectoryStore,
 };
-use canon_model::approval::approval_payload_bytes;
+use canon_model::approval::{approval_payload_bytes, ApprovalPayload};
 use canon_model::ids::{regime_key, RegimeKey, RoleId};
 use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
@@ -98,40 +98,26 @@ fn approved_bundle(
     signing: &SigningFixture,
 ) -> TestResult<(PromotionEvaluation, PromotionApproval)> {
     let (baseline_results, candidate_results) = paired_result_digests();
-    let evaluation = PromotionEvaluation::new(
-        candidate,
-        "candidate-v2",
-        baseline_results,
-        candidate_results,
-        "corpus-v1",
-        "paired-eval-v1",
-        "context-digest-v1",
-        "policy-digest-v1",
-        "model-digest-v1",
-        "tool-digest-v1",
-        [
+    let evaluation = PromotionEvaluation::new(candidate, PromotionEvaluationFields { candidate_version: "candidate-v2".into(), baseline_result_digests: baseline_results, candidate_result_digests: candidate_results, corpus_version: "corpus-v1".into(), eval_version: "paired-eval-v1".into(), context_digest: "context-digest-v1".into(), policy_digest: "policy-digest-v1".into(), model_digest: "model-digest-v1".into(), tool_digest: "tool-digest-v1".into(), paired_metrics: [
             ("pairs".to_string(), 2.0),
             ("uplift".to_string(), 0.75),
             ("regressions".to_string(), 0.0),
         ]
         .into_iter()
-        .collect(),
-        true,
-        "promote",
-    );
+        .collect(), passed: true, decision: "promote".into() });
     let approved_at = Utc::now();
     let mut approval = PromotionApproval::new(candidate.id, evaluation.digest(), signing.principal, "human", true, approved_at);
-    let payload = approval_payload_bytes(
-        "canon-learning-approval-v1",
-        &format!("strategy:{}", candidate.id),
-        None,
-        &evaluation.digest(),
-        None,
-        &[],
-        &[],
-        signing.principal,
-        &approved_at,
-    );
+    let payload = approval_payload_bytes(&ApprovalPayload {
+        namespace: "canon-learning-approval-v1",
+        subject: &format!("strategy:{}", candidate.id),
+        project: None,
+        artifact_sha: &evaluation.digest(),
+        run_id: None,
+        surface: &[],
+        effects: &[],
+        actor: signing.principal,
+        timestamp: &approved_at,
+    });
     approval.signature = Some(signing.sign("canon-learning-approval-v1", &payload)?);
     approval.signer_key = Some(signing.principal.to_string());
     approval.integrity_digest = approval.recomputed_integrity_digest();
@@ -140,17 +126,17 @@ fn approved_bundle(
 
 fn rollback_signature(signing: &SigningFixture, strategy_id: canon_learn::StrategyId, reason: &str, at: &DateTime<Utc>) -> TestResult<String> {
     let reason_digest = format!("{:x}", Sha256::digest(reason.as_bytes()));
-    let payload = approval_payload_bytes(
-        "canon-learning-approval-v1",
-        &format!("strategy:{strategy_id}:rollback:{reason_digest}"),
-        None,
-        &reason_digest,
-        None,
-        &[],
-        &[],
-        signing.principal,
-        at,
-    );
+    let payload = approval_payload_bytes(&ApprovalPayload {
+        namespace: "canon-learning-approval-v1",
+        subject: &format!("strategy:{strategy_id}:rollback:{reason_digest}"),
+        project: None,
+        artifact_sha: &reason_digest,
+        run_id: None,
+        surface: &[],
+        effects: &[],
+        actor: signing.principal,
+        timestamp: at,
+    });
     signing.sign("canon-learning-approval-v1", &payload)
 }
 
@@ -190,30 +176,12 @@ fn authenticated_activation_retrieval_rebuild_and_rollback_are_end_to_end() -> T
     let rollback_reason = "paired fixture contradiction";
     let rollback_at = Utc::now();
     let rollback_sig = rollback_signature(&signing, candidate.id, rollback_reason, &rollback_at)?;
-    rollback_strategy_authenticated(
-        &strategies,
-        candidate.id,
-        rollback_reason,
-        signing.principal,
-        Some(source.id),
-        &git_tier,
-        &rollback_sig,
-        rollback_at,
-    )?;
+    rollback_strategy_authenticated(AuthenticatedRollback { strategy_store: &strategies, strategy_id: candidate.id, reason: rollback_reason, actor: signing.principal, contradicting_trajectory_id: Some(source.id), git_tier_root: &git_tier, signature: &rollback_sig, approved_at: rollback_at })?;
     assert!(retrieve(&strategies, &regime(), None)?.is_empty(), "rolled-back candidates must be excluded");
     let rolled_back_bytes = fs::read(&promotion.path)?;
     assert!(String::from_utf8_lossy(&rolled_back_bytes).contains("status: rolled_back"));
 
-    rollback_strategy_authenticated(
-        &strategies,
-        candidate.id,
-        rollback_reason,
-        signing.principal,
-        Some(source.id),
-        &git_tier,
-        &rollback_sig,
-        rollback_at,
-    )?;
+    rollback_strategy_authenticated(AuthenticatedRollback { strategy_store: &strategies, strategy_id: candidate.id, reason: rollback_reason, actor: signing.principal, contradicting_trajectory_id: Some(source.id), git_tier_root: &git_tier, signature: &rollback_sig, approved_at: rollback_at })?;
     assert_eq!(fs::read(&promotion.path)?, rolled_back_bytes, "repeated rollback is idempotent");
     assert_eq!(strategies.find_by_id(&candidate.id)?.unwrap().lifecycle, Some(StrategyLifecycle::RolledBack));
     Ok(())
@@ -235,20 +203,20 @@ fn tampered_candidate_evaluation_and_signature_leave_zero_active_writes() -> Tes
     let mut tampered_candidate = candidate.clone();
     tampered_candidate.content.push_str(" tampered");
     strategies.append(&tampered_candidate)?;
-    assert!(promote_strategy_approved(&strategies, &candidate.id, &git_tier, &evaluation, &approval).is_err());
+    promote_strategy_approved(&strategies, &candidate.id, &git_tier, &evaluation, &approval).unwrap_err();
     assert_eq!(strategies.find_by_id(&candidate.id)?.unwrap().lifecycle, Some(StrategyLifecycle::Quarantined));
     assert!(!target.exists());
 
     strategies.append(&candidate)?;
     let mut tampered_evaluation = evaluation.clone();
     tampered_evaluation.candidate_digest = "tampered-candidate-digest".to_string();
-    assert!(promote_strategy_approved(&strategies, &candidate.id, &git_tier, &tampered_evaluation, &approval).is_err());
+    promote_strategy_approved(&strategies, &candidate.id, &git_tier, &tampered_evaluation, &approval).unwrap_err();
     assert_eq!(strategies.find_by_id(&candidate.id)?.unwrap().lifecycle, Some(StrategyLifecycle::Quarantined));
     assert!(!target.exists());
 
     let mut tampered_approval = approval.clone();
     tampered_approval.signature = Some("-----BEGIN SSH SIGNATURE-----\ntampered\n-----END SSH SIGNATURE-----\n".to_string());
-    assert!(promote_strategy_approved(&strategies, &candidate.id, &git_tier, &evaluation, &tampered_approval).is_err());
+    promote_strategy_approved(&strategies, &candidate.id, &git_tier, &evaluation, &tampered_approval).unwrap_err();
     assert_eq!(strategies.find_by_id(&candidate.id)?.unwrap().lifecycle, Some(StrategyLifecycle::Quarantined));
     assert!(!target.exists());
     Ok(())

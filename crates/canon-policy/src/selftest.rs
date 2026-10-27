@@ -219,7 +219,7 @@ fn check_rejection() -> Result<(), String> {
 // repeatedly and assert byte-identical results) ----
 
 fn determinism_fixed_now() -> DateTime<Utc> {
-    DateTime::parse_from_rfc3339("2026-06-01T00:00:00Z").unwrap().with_timezone(&Utc)
+    DateTime::parse_from_rfc3339("2026-06-01T00:00:00Z").expect("literal is valid RFC3339").with_timezone(&Utc)
 }
 
 fn determinism_fixture_records() -> Vec<Value> {

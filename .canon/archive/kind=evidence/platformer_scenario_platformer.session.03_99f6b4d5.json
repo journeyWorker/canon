@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "018-n5-impl",
+    "role": "implementer",
+    "session_id": "018-n5-impl"
+  },
+  "at": "2026-10-12T14:58:04.113425Z",
+  "attachments": [
+    {
+      "case": "platformer.session.03: R restarts to a clean initial state",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "981cb37d2b968c12d5308bb69acef389f7bfa365740b969ba6075e1de0edef61"
+    }
+  ],
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cd examples/platformer && bun run test:junit"
+  },
+  "kind": "evidence",
+  "project_id": "platformer",
+  "run_seq": 4,
+  "scenario_id": "platformer.session.03",
+  "schema": 1,
+  "staging_id": "98273db64c49",
+  "verdict": "faithful"
+}

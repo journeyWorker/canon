@@ -69,7 +69,7 @@ fn main() -> ExitCode {
         match check_report(&inputs, &args.out) {
             Ok(outcome) => {
                 eprintln!("{}", outcome.message(&args.out));
-                ExitCode::from(outcome.exit_code() as u8)
+                ExitCode::from(u8::try_from(outcome.exit_code()).expect("check exit code is 0 or 1"))
             }
             Err(e) => {
                 eprintln!("canon-report --check: {e}");

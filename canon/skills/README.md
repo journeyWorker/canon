@@ -58,7 +58,7 @@ wrote it, so `canon skills check` reports a stub another canon wrote and
 A repo upgraded from 0.27 holds a full `SKILL.md` and a `reference/**` tree:
 `canon migrate` (preview), then `canon migrate --commit --plan-digest <digest>`
 with the digest it printed, replaces them with the stub (backing the old files
-up under `.canon/migrate-backup/`), and `canon skills install` refreshes the
+up under `.canon/migrate-backup/`, local and git-ignored; `--revert` needs it), and `canon skills install` refreshes the
 rest.
 
 OMP/Pi projections are project-local passive bundles. The

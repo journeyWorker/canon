@@ -84,12 +84,11 @@ fn bless_mode() -> bool {
 /// half-added case must not vanish from the run.
 fn discover_cases() -> Result<Vec<Case>, String> {
     let root = cases_dir();
-    let entries = match std::fs::read_dir(&root) {
-        Ok(entries) => entries,
-        Err(_) => return Ok(Vec::new()),
+    let Ok(entries) = std::fs::read_dir(&root) else {
+        return Ok(Vec::new());
     };
     let mut dirs: Vec<PathBuf> = entries
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
         .map(|e| e.path())
         .filter(|p| p.is_dir())
         .collect();
@@ -155,8 +154,8 @@ fn base_env(home: &Path) -> BTreeMap<String, String> {
 // 3. RFC3339 timestamps -> `<ts>`.
 // 4. ULIDs -> `<ulid>`.
 // 5. 12-hex record digests in ledger record paths
-//    (`kind=<kind>/[area=<area>/]<natural_key>__<12 hex>.json`) ->
-//    `__<digest12>.json`.
+//    (`kind=<kind>/<components>_<8 hex>.json`) ->
+//    `_<digest8>.json`.
 
 fn normalize(text: &str, repo_paths: &[String]) -> String {
     let mut out = text.to_string();
@@ -255,10 +254,10 @@ fn replace_rfc3339(text: &str) -> String {
 
 /// Crockford base32 as ULIDs print it: uppercase, no I/L/O/U.
 fn is_crockford(b: u8) -> bool {
-    b.is_ascii_digit() || (b.is_ascii_uppercase() && !matches!(b, b'I' | b'L' | b'O' | b'U'))
+    b.is_ascii_digit() || ((b.is_ascii_uppercase() || b.is_ascii_lowercase()) && !matches!(b.to_ascii_uppercase(), b'I' | b'L' | b'O' | b'U'))
 }
 
-/// A ULID is exactly 26 Crockford characters whose first is `0`–`7` (the
+/// A ULID (a run id is written lowercase in a ledger name, 0.30) is exactly 26 Crockford characters whose first is `0`–`7` (the
 /// 128-bit bound), standing alone between non-alphanumeric bytes.
 fn replace_ulids(text: &str) -> String {
     const LEN: usize = 26;
@@ -288,37 +287,36 @@ fn replace_ulids(text: &str) -> String {
 
 /// The writer's ledger record path (`canon_store::partition::hive_object_key`,
 /// `GitTier::write_namespaced`) is
-/// `kind=<kind>/[area=<area>/]<natural_key>__<12 lowercase hex>.json`; the
-/// digest is over a time-stamped record, so only that 12-hex segment is
+/// `kind=<kind>/<components>_<8 lowercase hex>.json` (0.30); the
+/// digest is over a time-stamped record, so only that 8-hex segment is
 /// replaced, and only where the whole path shape is present:
 ///
 /// - `kind=` begins a path segment: text start, or right after `/`,
 ///   whitespace or a quote (`"`, `'`, `` ` ``), so both a bare
 ///   ledger-relative location and `.canon/ledger/kind=...` qualify;
 /// - `<kind>` is `[a-z0-9_.-]+` (core snake_case or namespaced `ns.kind`);
-/// - `<area>` and `<natural_key>` are non-empty path components, and
-///   `<natural_key>` does not start with `.`;
+/// - `<components>` is a non-empty path component that does not start with `.`;
 /// - `.json` ends the filename token: text end or a byte that cannot
 ///   continue a filename (not ASCII alphanumeric, `_`, `-`, `.`, `/`, `\`).
 ///
-/// A bare `name__<12 hex>.json` outside a `kind=` directory — a cache file
+/// A bare `name_<8 hex>.json` outside a `kind=` directory — a cache file
 /// name in a JSON field, a message — is consumer-visible and kept verbatim.
 fn replace_ledger_digests(text: &str) -> String {
-    const HEX: usize = 12;
-    const SUFFIX: usize = 2 + HEX + 5;
+    const HEX: usize = 8;
+    const SUFFIX: usize = 1 + HEX + 5;
     let bytes = text.as_bytes();
     let mut out = String::with_capacity(text.len());
     let mut i = 0;
     let mut copied = 0;
     while i + SUFFIX <= bytes.len() {
-        if bytes[i..].starts_with(b"__")
-            && bytes[i + 2..i + 2 + HEX].iter().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f'))
-            && &bytes[i + 2 + HEX..i + SUFFIX] == b".json"
+        if bytes[i..].starts_with(b"_")
+            && bytes[i + 1..i + 1 + HEX].iter().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f'))
+            && &bytes[i + 1 + HEX..i + SUFFIX] == b".json"
             && bytes.get(i + SUFFIX).is_none_or(|&c| !continues_filename(c))
             && in_ledger_record_path(bytes, i)
         {
             out.push_str(&text[copied..i]);
-            out.push_str("__<digest12>.json");
+            out.push_str("_<digest8>.json");
             i += SUFFIX;
             copied = i;
             continue;
@@ -343,23 +341,16 @@ fn component_start(bytes: &[u8], end: usize) -> usize {
     bytes[..end].iter().rposition(|&b| !is_component_byte(b)).map_or(0, |p| p + 1)
 }
 
-/// Whether the `__<12 hex>.json` suffix at `suffix` ends a
-/// `kind=<kind>/[area=<area>/]<natural_key>` path (see
+/// Whether the `_<8 hex>.json` suffix at `suffix` ends a
+/// `kind=<kind>/<components>` path (see
 /// [`replace_ledger_digests`]).
 fn in_ledger_record_path(bytes: &[u8], suffix: usize) -> bool {
     let stem = component_start(bytes, suffix);
     if stem == suffix || stem == 0 || bytes[stem - 1] != b'/' || bytes[stem] == b'.' {
         return false;
     }
-    let mut dir_end = stem - 1;
-    let mut dir = component_start(bytes, dir_end);
-    if let Some(area) = bytes[dir..dir_end].strip_prefix(b"area=") {
-        if area.is_empty() || dir == 0 || bytes[dir - 1] != b'/' {
-            return false;
-        }
-        dir_end = dir - 1;
-        dir = component_start(bytes, dir_end);
-    }
+    let dir_end = stem - 1;
+    let dir = component_start(bytes, dir_end);
     let Some(kind) = bytes[dir..dir_end].strip_prefix(b"kind=") else {
         return false;
     };
@@ -511,8 +502,10 @@ fn run_case(case: &Case, bless: bool) -> Result<(), String> {
             .envs(&env)
             .output()
             .map_err(|e| format!("step {n}: spawn canon: {e}"))?;
+        #[expect(clippy::map_err_ignore, reason = "the case failure names the step and the stream; the UTF-8 error only adds a byte offset")]
         let stdout = String::from_utf8(output.stdout)
             .map_err(|_| format!("step {n}: stdout is not UTF-8"))?;
+        #[expect(clippy::map_err_ignore, reason = "the case failure names the step and the stream; the UTF-8 error only adds a byte offset")]
         let stderr = String::from_utf8(output.stderr)
             .map_err(|_| format!("step {n}: stderr is not UTF-8"))?;
         let stdout = normalize(&stdout, &repo_paths);
@@ -559,12 +552,11 @@ fn run_case(case: &Case, bless: bool) -> Result<(), String> {
 }
 
 fn expectation_files(expected_dir: &Path) -> Result<Vec<PathBuf>, String> {
-    let entries = match std::fs::read_dir(expected_dir) {
-        Ok(entries) => entries,
-        Err(_) => return Ok(Vec::new()),
+    let Ok(entries) = std::fs::read_dir(expected_dir) else {
+        return Ok(Vec::new());
     };
     Ok(entries
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
         .map(|e| e.path())
         .filter(|p| {
             p.extension()
@@ -666,32 +658,32 @@ fn normalization_rules_rewrite_only_the_documented_values() {
     let short = "/var/folders/x/T/.tmpAbC/repo".to_string();
     let text = "at /private/var/folders/x/T/.tmpAbC/repo/a and /var/folders/x/T/.tmpAbC/repo/b\n\
                 id 01J9Z3Q4W5E6R7T8Y9V0P1A2SX stamped 2026-10-09T12:34:56.123456789Z / 2026-10-09T12:34:56+09:00\n\
-                file kind=evidence_record/01J9Z3Q4W5E6R7T8Y9V0P1A2SD__0123456789ab.json\n\
+                file kind=evidence/01J9Z3Q4W5E6R7T8Y9V0P1A2SD_01234567.json\n\
                 kept: not-a-ulid 01J9Z3Q4W5E6R7T8Y9U0P1A2SX sha 0123456789abcdef0123 task seed-change#1 2026-10-09\n";
     let got = normalize(text, &[repo, short]);
     assert_eq!(
         got,
         "at <repo>/a and <repo>/b\n\
          id <ulid> stamped <ts> / <ts>\n\
-         file kind=evidence_record/<ulid>__<digest12>.json\n\
+         file kind=evidence/<ulid>_<digest8>.json\n\
          kept: not-a-ulid 01J9Z3Q4W5E6R7T8Y9U0P1A2SX sha 0123456789abcdef0123 task seed-change#1 2026-10-09\n"
     );
 }
 
 #[test]
 fn ledger_digest_rule_rewrites_only_ledger_record_paths() {
-    let text = "wrote .canon/ledger/kind=task/seed-change#1__0123456789ab.json\n\
-                {\"location\":\"kind=review/area=world/root__world.hotdeal.01__abc__fedcba987654.json\"}\n\
-                {\"cache\":\"cache__0123456789ab.json\"}\n\
-                plain cache__0123456789ab.json and tmp/cache__0123456789ab.json\n\
-                not a filename end: kind=task/x__0123456789ab.json.bak kind=Task/x__0123456789ab.json\n";
+    let text = "wrote .canon/ledger/kind=task/seed-change+231_01234567.json\n\
+                {\"location\":\"kind=review/root_scenario_world.hotdeal.01_fedcba98.json\"}\n\
+                {\"cache\":\"cache_01234567.json\"}\n\
+                plain cache_01234567.json and tmp/cache_01234567.json\n\
+                not a filename end: kind=task/x_01234567.json.bak kind=Task/x__0123456789ab.json\n";
     assert_eq!(
         replace_ledger_digests(text),
-        "wrote .canon/ledger/kind=task/seed-change#1__<digest12>.json\n\
-         {\"location\":\"kind=review/area=world/root__world.hotdeal.01__abc__<digest12>.json\"}\n\
-         {\"cache\":\"cache__0123456789ab.json\"}\n\
-         plain cache__0123456789ab.json and tmp/cache__0123456789ab.json\n\
-         not a filename end: kind=task/x__0123456789ab.json.bak kind=Task/x__0123456789ab.json\n"
+        "wrote .canon/ledger/kind=task/seed-change+231_<digest8>.json\n\
+         {\"location\":\"kind=review/root_scenario_world.hotdeal.01_<digest8>.json\"}\n\
+         {\"cache\":\"cache_01234567.json\"}\n\
+         plain cache_01234567.json and tmp/cache_01234567.json\n\
+         not a filename end: kind=task/x_01234567.json.bak kind=Task/x__0123456789ab.json\n"
     );
 }
 

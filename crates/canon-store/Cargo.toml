@@ -41,3 +41,6 @@ uuid = { version = "1.23.4", features = ["v4"] }
 [features]
 live-pg = []
 live-r2 = []
+
+[lints]
+workspace = true

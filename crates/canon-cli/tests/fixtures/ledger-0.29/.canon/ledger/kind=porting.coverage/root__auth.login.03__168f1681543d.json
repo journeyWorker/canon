@@ -1,0 +1,12 @@
+{
+  "actor": {
+    "agent_id": "canon-plugin-porting-sync"
+  },
+  "at": "2026-07-10T00:00:00Z",
+  "covered": false,
+  "kind": "porting.coverage",
+  "project_id": "root",
+  "scenario_id": "auth.login.03",
+  "schema": 1,
+  "surface_ref": []
+}

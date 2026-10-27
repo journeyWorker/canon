@@ -255,15 +255,24 @@ pub fn finish<R: Report>(repo: &Path, command: &str, scope: &Scope, staged: bool
 
 /// [`finish`] with extra `meta` keys beside `next` (a page's cursor).
 pub fn finish_with_meta<R: Report>(repo: &Path, command: &str, scope: &Scope, staged: bool, json: bool, data: &R, extra_meta: Value) {
-    finish_with_steps(repo, command, scope, staged, json, data, extra_meta, Vec::new());
+    finish_with_steps(repo, command, scope, staged, json, data, Extras { meta: extra_meta, steps: Vec::new() });
 }
 
-/// [`finish_with_meta`] with `extra` steps ([`after_with`]).
-#[allow(clippy::too_many_arguments)]
-pub fn finish_with_steps<R: Report>(repo: &Path, command: &str, scope: &Scope, staged: bool, json: bool, data: &R, extra_meta: Value, extra: Vec<NextStep>) {
-    let after = after_with(repo, scope, staged, extra);
+/// What [`finish_with_steps`] adds beside the scope's own `next:`.
+#[derive(Debug)]
+pub struct Extras {
+    /// Extra `meta` keys (a page's cursor, warnings).
+    pub meta: Value,
+    /// Extra steps ([`after_with`]).
+    pub steps: Vec<NextStep>,
+}
+
+/// [`finish_with_meta`] with extra steps ([`after_with`]).
+pub fn finish_with_steps<R: Report>(repo: &Path, command: &str, scope: &Scope, staged: bool, json: bool, data: &R, extras: Extras) {
+    let Extras { meta, steps } = extras;
+    let after = after_with(repo, scope, staged, steps);
     if json {
-        crate::json_out::data_with_next_and_meta(command, data, &after, extra_meta);
+        crate::json_out::data_with_next_and_meta(command, data, &after, meta);
     } else {
         for line in after.lines() {
             println!("{line}");

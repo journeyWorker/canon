@@ -1,0 +1,5 @@
+# canon gate selftest fixture — old-layout (0.30 ledger-naming F2).
+# A file under the 0.29 kind=evidence_record/ directory: canon 0.30 never reads
+# it for a verdict, so the ledger check names it with its own code (hint:
+# `canon migrate`), subject = the git-tier-relative path of the file.
+old-layout kind=evidence_record/world.firstbuy-hotdeal.14__0123456789ab.json

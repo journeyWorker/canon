@@ -149,6 +149,7 @@ fn fold_one(winner: &Divergence, live: Option<&BindingSnapshot>, as_of: DateTime
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::records::DivergenceFields;
     use crate::envelope::{Actor, Envelope, RecordKind};
     use crate::ids::{RoleId, TotalOrder};
 
@@ -169,7 +170,7 @@ mod tests {
     }
 
     fn divergence(run_seq: u64, round: u32, status: DivergenceStatus, at: DateTime<Utc>) -> Divergence {
-        Divergence::new(envelope_at(at), project_id(), scenario_id(), sha('a'), status, TotalOrder::new(run_seq), round, "reviewer-1", "detail")
+        Divergence::new(DivergenceFields { envelope: envelope_at(at), project_id: project_id(), scenario_id: scenario_id(), sha: sha('a'), status, run_seq: TotalOrder::new(run_seq), round, reviewer: "reviewer-1".into(), detail: "detail".into() })
     }
 
     #[test]

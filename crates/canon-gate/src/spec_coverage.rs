@@ -19,7 +19,7 @@
 //!    which is a worse trade than one more entry in
 //!    [`crate::dispatch::check_set`].
 //! 3. **Requiredness is unanswerable here.** `risk_routing` is a CEL
-//!    predicate bound to `RecordKind::EvidenceRecord`
+//!    predicate bound to `RecordKind::Evidence`
 //!    (`crate::coverage`'s own note on `PolicyResolution`'s binding
 //!    contract) and, by that module's stated rule, is "evaluate[d] ...
 //!    against the artifact's OWN already-submitted evidence (never a
@@ -79,8 +79,20 @@ use crate::derived::{latest_of, stamps_of};
 use crate::ledger::{latest_verdicts, verdicts_of};
 use crate::policy::SpecCoverage;
 
+/// Whether `canon gate check` judges the spec corpus under this context's policy: a `spec_coverage` section
+/// that asks for something. When it does not, the gate names no corpus-kind layout violation.
+pub fn judges_corpus(ctx: &GateContext) -> bool {
+    match &ctx.policy.spec_coverage {
+        Some(SpecCoverage::Active { require_evidence, require_cases, require_review, require_audit, .. }) => {
+            *require_evidence || !require_cases.is_empty() || require_review.is_some() || require_audit.is_some()
+        }
+        _ => false,
+    }
+}
+
 /// The spec-corpus coverage check. Silent unless `policy.yaml` declares
 /// a `spec_coverage:` section (module doc).
+#[derive(Debug)]
 pub struct SpecCoverageCheck;
 
 impl GateCheck for SpecCoverageCheck {
@@ -135,7 +147,19 @@ impl GateCheck for SpecCoverageCheck {
         let verdicts = latest_verdicts(ctx);
         let subject_status: BTreeMap<&str, SubjectStatus> = latest_subjects(ctx).into_iter().map(|s| (s.subject_id.as_str(), s.status)).collect();
 
-        let mut violations = Vec::new();
+        // A corpus file whose name is not the one its body computes is skipped by every read, so the corpus being
+        // judged here is missing it: name it (R9/F1). Without the section the gate stays as it was (`canon query`
+        // and `canon status` report it). A finding is left to `review_gate::malformed_findings` when
+        // `block_on_findings` is on, which names every unreadable finding already.
+        let findings_named_elsewhere = require_review.as_ref().is_some_and(|review| review.block_on_findings);
+        let mut violations: Vec<Violation> = ctx
+            .corpus_violations
+            .iter()
+            .filter(|(kind, violation)| canon_store::partition::is_layout_violation(violation) && !(findings_named_elsewhere && *kind == canon_model::RecordKind::Finding))
+            .map(|(_, violation)| {
+                Violation::new(FailureClass::MalformedEvidence, violation.subject.clone(), format!("{} ({})", violation.detail, violation.class.as_str()))
+            })
+            .collect();
         let mut in_scope = Vec::new();
         for scenario in latest_scenarios(ctx) {
             match scope_decision(scope, scenario.subject_id.as_ref(), &subject_status) {
@@ -282,7 +306,7 @@ pub fn case_gaps<'a>(scenarios: impl IntoIterator<Item = &'a Scenario>, required
 /// `Divergence` is deliberately NOT folded this way: its supersession is
 /// `(run_seq, round)`, not `(at, schema, digest)`, and
 /// [`fold_to_current_state`] owns that rule and needs every row.
-pub fn latest_by_key<'a, T: serde::Serialize, K: Ord>(records: &'a [T], key: impl Fn(&T) -> K) -> Vec<&'a T> {
+pub fn latest_by_key<T: serde::Serialize, K: Ord>(records: &[T], key: impl Fn(&T) -> K) -> Vec<&T> {
     latest_of(&stamps_of(records), 0..records.len(), |i| key(&records[i])).into_iter().map(|i| &records[i]).collect()
 }
 
@@ -404,7 +428,7 @@ fn evidenced_scenarios(ctx: &GateContext) -> BTreeSet<(ProjectId, ScenarioId)> {
 /// ([`canon_store::fold::live_bindings_of`]) so the two surfaces cannot
 /// disagree about which scenarios are open.
 fn live_bindings(ctx: &GateContext) -> BTreeMap<(ProjectId, ScenarioId), canon_model::fold::BindingSnapshot> {
-    canon_store::fold::live_bindings_of(ctx.evidence.clone())
+    canon_store::fold::live_bindings_of(&ctx.evidence)
 }
 
 /// Whether a folded divergence state counts as mismatched work, and how
@@ -413,16 +437,16 @@ fn live_bindings(ctx: &GateContext) -> BTreeMap<(ProjectId, ScenarioId), canon_m
 /// `StillDivergent` upstream, so it needs no arm here.
 fn mismatch_detail(state: &FoldedState) -> Option<String> {
     match state {
-        FoldedState::Open { .. } => Some("spec has an open divergence — implementation does not match the spec".to_string()),
-        FoldedState::StillDivergent { .. } => Some("spec divergence was re-checked and is still divergent".to_string()),
+        FoldedState::Open => Some("spec has an open divergence — implementation does not match the spec".to_string()),
+        FoldedState::StillDivergent => Some("spec divergence was re-checked and is still divergent".to_string()),
         // The staleest resolution state: the record claims Resolved, but
         // the app sha it resolved against has moved. Included
         // deliberately — a resolution that no longer binds is a mismatch
         // nobody has looked at since.
-        FoldedState::ResolvedInvalid { .. } => {
+        FoldedState::ResolvedInvalid => {
             Some("spec divergence is marked resolved against an app sha that has since moved — the resolution no longer binds".to_string())
         }
-        FoldedState::Resolved { .. } | FoldedState::Deferred { .. } | FoldedState::Accepted { .. } => None,
+        FoldedState::Resolved | FoldedState::Deferred { .. } | FoldedState::Accepted { .. } => None,
     }
 }
 
@@ -464,9 +488,10 @@ pub(crate) fn scope_decision<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use canon_model::DivergenceFields;
     use crate::policy::{PolicyField, StalenessPolicy};
     use canon_model::{
-        Actor, DivergenceStatus, Divergence, Envelope, EvidenceRecord, RecordKind, RoleId, Scenario, SpecDigest, Subject, TotalOrder,
+        Actor, DivergenceStatus, Divergence, Envelope, RecordKind, RoleId, SpecDigest, TotalOrder,
     };
     use chrono::Utc;
 
@@ -486,23 +511,13 @@ mod tests {
     /// A SCENARIO-keyed record carrying the composite key — the shape
     /// `canon evidence add --scenario-id --project-id` now produces.
     fn evidence(scenario_id: &str, verdict: EvidenceVerdict) -> EvidenceRecord {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent-a", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("agent-a", RoleId::parse("implementer").unwrap()));
         EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(scenario_id).unwrap()), None, verdict).with_project_id(project())
     }
 
     fn divergence(scenario_id: &str, status: DivergenceStatus) -> Divergence {
         let envelope = Envelope::new(1, RecordKind::Divergence, Utc::now(), Actor::new("reviewer-1", RoleId::parse("reviewer").unwrap()));
-        Divergence::new(
-            envelope,
-            project(),
-            ScenarioId::parse(scenario_id).unwrap(),
-            canon_model::Sha::parse("a".repeat(40)).unwrap(),
-            status,
-            TotalOrder::from(1u64),
-            1,
-            "reviewer-1",
-            "d",
-        )
+        Divergence::new(DivergenceFields { envelope, project_id: project(), scenario_id: ScenarioId::parse(scenario_id).unwrap(), sha: canon_model::Sha::parse("a".repeat(40)).unwrap(), status, run_seq: TotalOrder::from(1u64), round: 1, reviewer: "reviewer-1".into(), detail: "d".into() })
     }
 
     fn subject(id: &str, status: SubjectStatus) -> Subject {
@@ -584,8 +599,8 @@ mod tests {
         Some(SpecCoverage::Active {
             require_evidence: false,
             scope: Vec::new(),
-            exclude_lanes: exclude_lanes.iter().map(|s| s.to_string()).collect(),
-            require_cases: cases.iter().map(|s| s.to_string()).collect(),
+            exclude_lanes: exclude_lanes.iter().map(std::string::ToString::to_string).collect(),
+            require_cases: cases.iter().map(std::string::ToString::to_string).collect(),
             require_review: None,
             require_audit: None,
         })
@@ -749,7 +764,7 @@ mod tests {
     /// in another.
     #[test]
     fn evidence_without_a_project_id_does_not_cover_a_scenario() {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("a", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("a", RoleId::parse("implementer").unwrap()));
         let half_keyed = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse("p.a.01").unwrap()), None, EvidenceVerdict::Faithful);
 
         let mut corpus = Corpus::new();
@@ -917,7 +932,7 @@ mod tests {
     // ── require_review (issue #2) ──
 
     use crate::policy::RequireReview;
-    use canon_model::{ChangeId, Finding, FindingDisposition, FindingSeverity, ProvenanceRef, Review, StatusOverride, WaivedViolation};
+    use canon_model::{Finding, FindingDisposition, FindingSeverity, ProvenanceRef, Review, StatusOverride, WaivedViolation};
 
     fn reviewing(scope: Vec<SubjectStatus>, distinct_actor: bool) -> Option<SpecCoverage> {
         Some(SpecCoverage::Active {

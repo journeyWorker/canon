@@ -32,11 +32,14 @@ fn main() -> ExitCode {
     if let Err(error) = canon_cli::role::init(cli.declared_role) {
         let role_free = matches!(&cli.command, canon_cli::cli::Command::Schema(_) | canon_cli::cli::Command::Context(_) | canon_cli::cli::Command::Skills { action: canon_cli::cli::SkillsCommand::Show(_) });
         if !role_free {
-            return ExitCode::from(error.emit("canon", argv_wants_json()) as u8);
+            return ExitCode::from(error.emit("canon", argv_wants_json()));
         }
         canon_cli::json_out::warn(error.message);
     }
     if let Some(code) = refuse_without_config(&parsed) {
+        return code;
+    }
+    if let Some(code) = canon_cli::old_layout::refuse_write(&parsed) {
         return code;
     }
     canon_cli::run::run(cli)

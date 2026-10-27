@@ -84,7 +84,7 @@ pub fn env_var_names() -> impl Iterator<Item = &'static str> {
     ENV_VARS.iter().map(|v| v.name)
 }
 
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum NodeKind {
     Leaf,
@@ -92,7 +92,7 @@ pub enum NodeKind {
 }
 
 /// One operand of a leaf.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Operand {
     /// The clap id.
@@ -110,7 +110,7 @@ pub struct Operand {
 }
 
 /// How many values an operand takes; `max` is absent when unbounded.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct Arity {
     pub min: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -118,7 +118,7 @@ pub struct Arity {
 }
 
 /// One option of a leaf (or a global one).
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OptionSpec {
     /// The long name, without `--`.
@@ -146,7 +146,7 @@ pub struct OptionSpec {
 }
 
 /// One output of a leaf: what it prints and the schema of that.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Output {
     pub kind: OutputKind,
@@ -164,7 +164,7 @@ pub struct Output {
 
 /// One exit code of a leaf with its meaning: the leaf's own rows ([`crate::schema::META`]),
 /// then one row per exit a listed error code carries that the leaf did not declare.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ExitRow {
     pub code: u8,
     pub meaning: String,
@@ -179,7 +179,7 @@ fn exits_of(declared: &[ExitMeta], codes: &[&'static str]) -> Vec<ExitRow> {
         if rows.iter().any(|r| r.code == exit) {
             continue;
         }
-        let named: Vec<&str> = codes.iter().copied().filter(|c| crate::cli_error::code_info(c).is_some_and(|i| i.exit == i32::from(exit))).collect();
+        let named: Vec<&str> = codes.iter().copied().filter(|c| crate::cli_error::code_info(c).is_some_and(|i| i.exit == exit)).collect();
         if !named.is_empty() {
             rows.push(ExitRow { code: exit, meaning: format!("{what}: {}", named.join(", ")) });
         }
@@ -189,7 +189,7 @@ fn exits_of(declared: &[ExitMeta], codes: &[&'static str]) -> Vec<ExitRow> {
 }
 
 /// The part of a node only a leaf has.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Leaf {
     pub effect: Effect,
@@ -215,7 +215,7 @@ pub struct Leaf {
 }
 
 /// One node of the command tree: a leaf, or a group that only holds children.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Node {
     /// The canonical space-separated path, e.g. `evidence add`.
@@ -246,11 +246,11 @@ fn is_builtin(arg: &Arg) -> bool {
 }
 
 fn display_name(arg: &Arg) -> String {
-    arg.get_long().map(|l| format!("--{l}")).unwrap_or_else(|| arg.get_id().to_string())
+    arg.get_long().map_or_else(|| arg.get_id().to_string(), |l| format!("--{l}"))
 }
 
 fn value_name(arg: &Arg) -> String {
-    arg.get_value_names().and_then(|v| v.first()).map(|v| v.to_string()).unwrap_or_else(|| arg.get_id().as_str().to_uppercase())
+    arg.get_value_names().and_then(|v| v.first()).map_or_else(|| arg.get_id().as_str().to_uppercase(), std::string::ToString::to_string)
 }
 
 fn is_repeatable(arg: &Arg) -> bool {
@@ -323,17 +323,17 @@ fn option_spec(cmd: &Command, arg: &Arg, conflicts: &[(String, String)]) -> Opti
     requires.sort();
     requires.dedup();
     OptionSpec {
-        name: arg.get_long().map(str::to_string).unwrap_or_else(|| arg.get_id().to_string()),
+        name: arg.get_long().map_or_else(|| arg.get_id().to_string(), str::to_string),
         kind,
         short: arg.get_short(),
-        aliases: arg.get_all_aliases().map(|a| a.iter().map(|s| s.to_string()).collect()).unwrap_or_default(),
+        aliases: arg.get_all_aliases().map(|a| a.iter().map(std::string::ToString::to_string).collect()).unwrap_or_default(),
         value_name: (kind == "value").then(|| value_name(arg)),
         required: arg.is_required_set(),
         repeatable: is_repeatable(arg),
         possible_values: arg.get_possible_values().iter().filter(|v| !v.is_hide_set()).map(|v| v.get_name().to_string()).collect(),
         // A flag is off unless given; clap's `false` is not a default worth listing.
         default: if kind == "value" { default_values(arg) } else { Vec::new() },
-        help: arg.get_help().map(|h| h.to_string()),
+        help: arg.get_help().map(std::string::ToString::to_string),
         env: arg.get_env().map(|e| e.to_string_lossy().into_owned()),
         conflicts_with,
         requires,
@@ -352,7 +352,7 @@ fn operand_spec(arg: &Arg, note: Option<&str>) -> Operand {
         repeatable: is_repeatable(arg),
         possible_values: arg.get_possible_values().iter().filter(|v| !v.is_hide_set()).map(|v| v.get_name().to_string()).collect(),
         default: default_values(arg),
-        description: note.map(str::to_string).or_else(|| arg.get_help().map(|h| h.to_string())),
+        description: note.map(str::to_string).or_else(|| arg.get_help().map(std::string::ToString::to_string)),
     }
 }
 
@@ -462,7 +462,7 @@ pub fn nodes(root: &Command) -> Vec<Node> {
                 name: sub.get_name().to_string(),
                 node_kind: if is_group { NodeKind::Group } else { NodeKind::Leaf },
                 aliases: sub.get_all_aliases().map(str::to_string).collect(),
-                about: sub.get_about().map(|a| a.to_string()),
+                about: sub.get_about().map(std::string::ToString::to_string),
                 children: subcommands(sub).map(|c| format!("{command} {}", c.get_name())).collect(),
                 leaf: (!is_group).then(|| leaf_of(&command, sub, reports)),
                 command,
@@ -487,7 +487,7 @@ fn global_options(root: &Command) -> Vec<OptionSpec> {
 }
 
 /// One error code of the registry.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ErrorRow {
     pub code: &'static str,
     pub meaning: &'static str,
@@ -501,7 +501,7 @@ pub struct ErrorRow {
 
 /// Every registered error code, sorted by code.
 pub fn error_rows() -> Vec<ErrorRow> {
-    crate::cli_error::all_codes().iter().map(|info| ErrorRow { code: info.code, meaning: info.meaning, exit: info.exit, retryable: info.retryable, fix: info.fix }).collect()
+    crate::cli_error::all_codes().iter().map(|info| ErrorRow { code: info.code, meaning: info.meaning, exit: i32::from(info.exit), retryable: info.retryable, fix: info.fix }).collect()
 }
 
 /// Every removed spelling with its replacement (the README's Upgrading list
@@ -570,7 +570,7 @@ pub fn generate() -> Value {
         "cli": {
             "name": root.get_name(),
             "version": env!("CARGO_PKG_VERSION"),
-            "about": root.get_about().map(|a| a.to_string()),
+            "about": root.get_about().map(std::string::ToString::to_string),
         },
         "globalOptions": global_options(&root),
         "envVars": ENV_VARS.iter().map(|v| json!({ "name": v.name, "about": v.about })).collect::<Vec<_>>(),

@@ -10,7 +10,7 @@
 //! fixtures and any hook that greps them (mirrors `canon_vocab::checker`'s
 //! own `E-*` code stability discipline, `crates/canon-vocab/src/
 //! checker.rs:21-23`). [`DIAGNOSTIC_CODES`] is asserted complete by a unit
-//! test so a new code added to [`crate::manifest::loader::LoadError`] or
+//! test so a new code added to [`crate::manifest::loader::PluginLoadError`] or
 //! [`crate::manifest::resolve`]'s resolution checks can never silently
 //! diverge from this list.
 

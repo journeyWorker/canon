@@ -216,7 +216,7 @@ The forms you reach for most (the story's ids; swap in yours):
 canon evidence add --all-scenarios --report junit:a.xml --report junit:b.xml --role implementer
 canon evidence add --scenario-id auth.login.01 --report junit:red.xml
 canon evidence add --scenario-id auth.login.01 --verdict divergent --class test-run --ref "upstream limit, tracked in issue 118" --artifact limit.log
-canon finding add --change-id add-login --round 1 --seq 1 --severity should-fix --actor-id unit-1 --summary "Token is logged"
+canon finding add --change-id add-login --round 1 --seq 1 --severity should-fix --introduced-unknown --actor-id unit-1 --summary "Token is logged"
 ```
 
 Batches are one `--input` document (the keys are option names in camelCase,

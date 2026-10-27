@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "017-p2-impl",
+    "role": "implementer",
+    "session_id": "017-p2-impl"
+  },
+  "at": "2026-10-12T10:41:17.808056Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject subject_lifecycle_24_shipping_is_refused_while_the_brief_has_no_approved_line"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 27,
+  "scenario_id": "subject.lifecycle.24",
+  "schema": 1,
+  "staging_id": "9866f5b46b20",
+  "verdict": "faithful"
+}

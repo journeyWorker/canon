@@ -1,5 +1,17 @@
-canon gate check: clean (0 violations)
+canon gate check: 10 violation(s)
+
+uncovered-cell (1):
+  uncovered-cell cart.add.01 — spec scenario has no evidence record — specified, never attested to
+
+old-layout (9):
+  old-layout kind=evidence_record/cart.add.01__ca470d326b9c.json — named by the 0.29 rule (an `area=` level, a 12-hex digest or `kind=evidence_record/`); canon 0.30 does not read it. Hint: run `canon migrate` (a bare run only previews)
+  old-layout kind=scenario/area=cart/root__cart.add.01__d48e93161fd8.json — named by the 0.29 rule (an `area=` level, a 12-hex digest or `kind=evidence_record/`); canon 0.30 does not read it. Hint: run `canon migrate` (a bare run only previews)
+  old-layout kind=subject/cart__55a8e6fb3271.json — named by the 0.29 rule (an `area=` level, a 12-hex digest or `kind=evidence_record/`); canon 0.30 does not read it. Hint: run `canon migrate` (a bare run only previews)
+  old-layout kind=subject/cart__87fa47acfc4f.json — named by the 0.29 rule (an `area=` level, a 12-hex digest or `kind=evidence_record/`); canon 0.30 does not read it. Hint: run `canon migrate` (a bare run only previews)
+  old-layout kind=subject/cart__9582c1349e37.json — named by the 0.29 rule (an `area=` level, a 12-hex digest or `kind=evidence_record/`); canon 0.30 does not read it. Hint: run `canon migrate` (a bare run only previews)
+  old-layout kind=subject/cart__fb0e62593c20.json — named by the 0.29 rule (an `area=` level, a 12-hex digest or `kind=evidence_record/`); canon 0.30 does not read it. Hint: run `canon migrate` (a bare run only previews)
+  old-layout kind=change/c-cart__0a04f4f3ea29.json — named by the 0.29 rule (an `area=` level, a 12-hex digest or `kind=evidence_record/`); canon 0.30 does not read it. Hint: run `canon migrate` (a bare run only previews)
+  old-layout kind=change/c-cart__de904648ce98.json — named by the 0.29 rule (an `area=` level, a 12-hex digest or `kind=evidence_record/`); canon 0.30 does not read it. Hint: run `canon migrate` (a bare run only previews)
+  old-layout kind=review/area=cart/root__cart.add.01__0123456789abcdef0123456789abcdef01234567__cb947839cde3.json — named by the 0.29 rule (an `area=` level, a 12-hex digest or `kind=evidence_record/`); canon 0.30 does not read it. Hint: run `canon migrate` (a bare run only previews)
 
 advisory: policy not approved: .canon/policy.yaml has no approval record (.canon/policy.approval.json); a human reviews it and runs `canon policy approve --approver <who>`
-
-advisory: 1 scenario(s) have a review that predates 0.23 review pinning (cart.add.01); such a review does not count until `canon migrate` rewrites it to what the evidence says

@@ -26,7 +26,7 @@ routing:
   subject: local
   change: local
   scenario: local
-  evidence_record: local
+  evidence: local
   finding: local
 ";
 
@@ -97,7 +97,7 @@ fn seed_change(repo: &Path, id: &str) {
 }
 
 fn seed_evidence(repo: &Path, scenario: &str, at: DateTime<Utc>) {
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, at, actor("impl-agent", "implementer"));
+    let envelope = Envelope::new(1, RecordKind::Evidence, at, actor("impl-agent", "implementer"));
     let record = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(scenario).unwrap()), None, EvidenceVerdict::Faithful).with_project_id(ProjectId::parse("demo").unwrap());
     ledger(repo).write(&record).unwrap();
 }
@@ -353,7 +353,7 @@ fn a_chore_review_goes_stale_when_the_brief_changes_and_a_feature_change_is_refu
 
     let refused = change_review(r, "c-demo");
     assert_eq!(refused.status.code(), Some(2), "{}", stderr(&refused));
-    let reviews = |r: &Path| std::fs::read_dir(r.join(".canon/ledger/kind=review")).map(|d| d.count()).unwrap_or(0);
+    let reviews = |r: &Path| std::fs::read_dir(r.join(".canon/ledger/kind=review")).map_or(0, std::iter::Iterator::count);
     let json = run(r, &["review", "change", "c-demo", "--project-id", "demo", "--original-spec-ref", ".canon/changes/brief.md", "--actor-id", "reviewer-3", "--role", "reviewer", "--json"]);
     assert_eq!(json.status.code(), Some(2));
     assert!(stdout(&json).contains("REVIEW_INVALID_ARGUMENT"), "{}", stdout(&json));
@@ -529,7 +529,7 @@ fn finding_close_81_inherits_the_scenarios_the_finding_names() {
     let add = run(
         r,
         &[
-            "finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--actor-id", "reviewer-2", "--summary", "double click", "--scenario-id", "world.demo.01",
+            "finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--introduced-unknown", "--actor-id", "reviewer-2", "--summary", "double click", "--scenario-id", "world.demo.01",
             "--scenario-id", "world.demo.01", "--promote",
         ],
     );
@@ -561,7 +561,7 @@ fn finding_add_33_refuses_a_scenario_id_the_index_does_not_know() {
     two_scenarios(r);
     let out = run(
         r,
-        &["finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--actor-id", "r", "--summary", "s", "--scenario-id", "world.demo.99", "--json"],
+        &["finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "blocker", "--introduced-unknown", "--actor-id", "r", "--summary", "s", "--scenario-id", "world.demo.99", "--json"],
     );
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     let body: Value = serde_json::from_str(&stdout(&out)).unwrap();
@@ -579,7 +579,7 @@ fn finding_add_32_records_the_scenarios_it_names_once_each() {
     let dir = repo();
     let r = dir.path();
     two_scenarios(r);
-    let base = ["finding", "add", "--change-id", "c-demo", "--round", "1", "--actor-id", "r", "--summary", "s", "--severity", "should-fix", "--promote"];
+    let base = ["finding", "add", "--change-id", "c-demo", "--round", "1", "--actor-id", "r", "--summary", "s", "--severity", "should-fix", "--introduced-unknown", "--promote"];
     let named = [&base[..], &["--seq", "1", "--scenario-id", "world.demo.02", "--scenario-id", "world.demo.01", "--scenario-id", "world.demo.02"]].concat();
     let plain = [&base[..], &["--seq", "2"]].concat();
     for args in [named, plain] {
@@ -604,7 +604,7 @@ fn gate_check_99_a_scoped_refusal_names_a_command_for_each_spec_root() {
     seed_scenario_in(r, "other", "world.other.01");
     seed_scenario_in(r, "other", "world.other.02");
     let seed_other = |scenario: &str, at: DateTime<Utc>| {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, at, actor("impl-agent", "implementer"));
+        let envelope = Envelope::new(1, RecordKind::Evidence, at, actor("impl-agent", "implementer"));
         let record = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(scenario).unwrap()), None, EvidenceVerdict::Faithful).with_project_id(ProjectId::parse("other").unwrap());
         ledger(r).write(&record).unwrap();
     };

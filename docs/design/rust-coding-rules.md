@@ -15,8 +15,10 @@ status: Accepted
 - **Scope:** the Rust code under `crates/` (11 crates, 315 source files,
   125k lines). canon's own `canon fmt` / doc lint check spec corpora and are
   not covered here.
-- **Schedule:** see
-  `docs/superpowers/notes/2026-10-24-canon-0.29-0.30-release-order.md`.
+- **Schedule:** see the 0.29/0.30 release-order note
+  (`docs/superpowers/notes/2026-10-24-canon-0.29-0.30-release-order.md`,
+  removed in 0.30; `git show 0977bce1:<path>`) and the 0.30 changes in
+  `.canon/changes/canon-0-30-*`.
   0.29 restructures how `canon gate check`, `canon status` and evidence
   batches derive data from the corpus (§7). Once this note is `Accepted`, new
   0.29 code follows it, but existing code is not swept. 0.30 applies the
@@ -24,8 +26,10 @@ status: Accepted
   and the gate/status half of `canon-cli` are what 0.29 rewrites, so a sweep
   first would polish code about to be replaced.
 - **Measured at:** HEAD `0642815c` (canon 0.28.0), toolchain 1.99.1,
-  `cargo clippy --workspace --all-targets`. The plain clippy run is already
-  close to clean: 7 default-level warnings.
+  `cargo clippy --workspace --all-targets`. Re-measured at 0.29.0 for the
+  sweep: the plain clippy run then had 114 default-level sites (105 src,
+  9 tests), one of them a `never_loop` error; the earlier "7 warnings" figure
+  was wrong.
 
 ## 0. Decisions
 
@@ -185,7 +189,7 @@ Total: 1,113 sites in `src` plus 96 in `tests`, plus the 14 production
 | `doc_markdown` | 272 | Prose-heavy docs quote spec terms and ids that are not code. |
 | `assert_is_empty` | 179 | Test-only style. |
 | `format_push_string` | 146 | `write!` into a `String` returns a `Result` §5 would then need an `expect` for. Hot spots are found by profiling. |
-| `result_large_err` | 43 | Error values on cold paths; boxing them is a measured decision, not a sweep. |
+| `result_large_err` | 43 | Not in the block, but on by default. 0.30 fixed it at the root rather than allowing it: `CliError` keeps its hot fields inline and boxes the optional detail, and the few other large `Err`s are boxed. |
 | `cast_precision_loss` | 17 | Integer-to-float feeds metrics and report ratios; the narrowing directions are covered. |
 | `clippy::cargo` | — | Crates are not published to crates.io; the npm package ships the binary. |
 | `mod_module_files` | — | The opposite of §2. |
@@ -338,21 +342,26 @@ Rules:
 ## 9. 0.30 sweep
 
 Behaviour-preserving, on top of 0.29, with no other branch open. Each step is
-its own commit and on its own passes `cargo test --workspace`, the `clippy`
-job, `canon gate check` over canon's own corpus and the conformance cases.
-Formatting-only commits go into `.git-blame-ignore-revs`.
+its own commit and on its own passes `cargo test --workspace`, the byte-identity
+comparison against 0.29.0 outputs, and the conformance cases. The sweep is the
+canon change `canon-0-30-rust-sweep`; the pinned `clippy` CI job and the
+`scripts/` visibility check are the separate change `canon-0-30-clippy-ci`,
+attached to the sweep's last commit, because the job can only pass once the
+sweep is done.
 
-1. Add the lint configuration (§1), `[lints] workspace = true` in every
-   crate, `clippy.toml`, the pinned `clippy` job with the production
-   `unwrap_used` command. Apply `cargo clippy --fix` for the autofix lints.
-2. Fix the remaining sites by hand: casts, `Debug` impls, `allow` →
-   `expect`, `Arc::clone`, `wildcard_imports`, `for_each`, `unsafe`
-   `expect`s, the production `unwrap()` calls and poisoned-lock recovery.
-3. Rewrite the 20 `pub(super)` sites to `pub(crate)` and add the `scripts/`
-   check (§3).
-4. Typed errors for the 65 `pub fn … Result<_, String>`; `Display` and
-   `Error` for the 8 types that lack them; drop `anyhow` from the workspace
-   (§4).
+1. Lint configuration (§1), `[lints] workspace = true` in every crate,
+   `clippy.toml`, `cargo clippy --fix` for the autofix lints, and the
+   `#[expect(unsafe_code, reason)]` + `SAFETY:` on the `unsafe` sites (so
+   `unsafe_code = "deny"` builds from the first commit).
+2. Root causes in `canon-cli`: `CliError` detail boxed (`result_large_err`),
+   exit codes as `u8` (the ~120 `as u8` casts).
+3. The remaining sites by hand: casts, `Debug` impls, `allow` → `expect`,
+   `Arc::clone`, `wildcard_imports`, `for_each`, the production `unwrap()`
+   calls and poisoned-lock recovery; the 19 `pub(super)` sites to
+   `pub(crate)` (§3).
+4. Typed errors for the `pub fn … Result<_, String>` (52 at 0.29.0);
+   `Display` and `Error` for the 8 types that lack them; crate-unique error
+   names; drop `anyhow` from the workspace (§4).
 
 Done means the `clippy` job, including the production `unwrap_used` command,
 passes with the configuration above, and the counts in §1, §3, §4 and §5 are

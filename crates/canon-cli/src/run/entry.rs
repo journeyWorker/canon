@@ -12,6 +12,7 @@ use crate::cli_error::CliError;
 /// as other command-line tools do (0.20). `dashboard` serves sockets and
 /// keeps it ignored, so a client that disconnects never kills the server.
 #[cfg(unix)]
+#[expect(unsafe_code, reason = "libc::signal is an unsafe FFI call with no safe std equivalent for restoring SIGPIPE")]
 pub fn set_sigpipe(default: bool) {
     let action = if default { libc::SIG_DFL } else { libc::SIG_IGN };
     // SAFETY: called on the main thread before any other thread exists or
@@ -35,7 +36,7 @@ pub fn usage_error(error: &clap::Error) -> ExitCode {
         let args: Vec<String> = std::env::args().skip(1).collect();
         if let Some(removed) = crate::removed::find(&crate::cli::command(), &args) {
             let command = format!("canon {}", removed.command);
-            return ExitCode::from(CliError::refused("USAGE", removed.message()).hint(removed.hint()).field(removed.field.clone()).expected([removed.replacement.clone()]).emit(command.trim(), json) as u8);
+            return ExitCode::from(CliError::refused("USAGE", removed.message()).hint(removed.hint()).field(removed.field.clone()).expected([removed.replacement.clone()]).emit(command.trim(), json));
         }
     }
     if !json || !error.use_stderr() {
@@ -43,7 +44,7 @@ pub fn usage_error(error: &clap::Error) -> ExitCode {
     }
     let root = crate::cli::command();
     let (path, usage) = usage_parts(error, &root);
-    ExitCode::from(usage.emit(&format!("canon {path}"), true) as u8)
+    ExitCode::from(usage.emit(&format!("canon {path}"), true))
 }
 
 /// The command path and the `USAGE` error a clap parse failure becomes: the
@@ -92,7 +93,7 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
             }
             let valid: Vec<String> = match error.get(ContextKind::ValidValue) {
                 Some(ContextValue::Strings(values)) => values.clone(),
-                _ => usage.field.as_deref().map(|field| possible_values(node, field)).unwrap_or_default(),
+                _ => usage.field_name().map(|field| possible_values(node, field)).unwrap_or_default(),
             };
             if !valid.is_empty() {
                 usage = usage.expected(valid);
@@ -216,5 +217,5 @@ pub fn refuse_without_config(parsed: &clap::ArgMatches) -> Option<ExitCode> {
     }
     let json = leaf.try_get_one::<bool>("json").ok().flatten().copied().unwrap_or(false);
     let error = crate::context::require_config(repo.map(PathBuf::as_path)).err()?;
-    Some(ExitCode::from(error.emit(&format!("canon {command}"), json) as u8))
+    Some(ExitCode::from(error.emit(&format!("canon {command}"), json)))
 }

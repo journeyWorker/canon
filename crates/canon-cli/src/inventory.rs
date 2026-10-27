@@ -15,7 +15,10 @@
 //!    scenario_id)` via the normal append-only `GitTier::write`.
 //!    Idempotence is LOGICAL (design D5): fold latest-per-key first
 //!    (`canon_store::fold_latest_by_key`), no-op when the candidate's
-//!    digests/title/tags already match the latest folded record.
+//!    digests/title/tags/steps already match the latest folded record.
+//!    The steps (0.30 `record-links`) are read with the `gherkin` crate
+//!    ([`canon_fmt::steps`]); a file it refuses is indexed without them and
+//!    the sync says so.
 //!
 //! # General index — never `upstream`/`InventoryEntry.covered_by`
 //! The index derives ONLY from the `.feature` corpus — this module
@@ -36,7 +39,7 @@ use std::path::{Path, PathBuf};
 use canon_fmt::Violation;
 use canon_gate::{GateContext, GateCtx};
 use canon_model::ids::SpecDigest;
-use canon_model::{paths, Actor, Envelope, ProjectId, RecordKind, Scenario, ScenarioId, SubjectId};
+use canon_model::{paths, Actor, Envelope, ProjectId, RecordKind, Scenario, ScenarioId, ScenarioStep, SubjectId};
 use canon_store::file_lock::{FileLock, FileLockError};
 use canon_store::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
@@ -226,7 +229,7 @@ pub fn check_spec_root(roots: &[SpecRoot], project_id: &ProjectId) -> Result<(),
 /// the one given, else the only root `canon.yaml` configures. With several
 /// roots and none given the leaf refuses with `code`, naming the roots. The
 /// id given is not checked here ([`require_spec_root`] does that).
-pub fn resolve_project_id(repo: &Path, given: Option<&ProjectId>, code: &'static str, command: &str, json: bool) -> Result<ProjectId, i32> {
+pub fn resolve_project_id(repo: &Path, given: Option<&ProjectId>, code: &'static str, command: &str, json: bool) -> Result<ProjectId, u8> {
     use crate::cli_error::CliError;
     if let Some(id) = given {
         return Ok(id.clone());
@@ -475,14 +478,14 @@ fn corpus_ids(roots: &[SpecRoot], scans: &[Vec<ScannedScenario>]) -> BTreeMap<Pr
 /// Each record's OWN content digest and format generation ride along
 /// into the fold (s21 D3: the tie-break needs a real digest, never just
 /// `at`; `s38-evidence-bearing-memory`: an equal-`at` tie is decided by
-/// `envelope.schema` FIRST) — `content_digest12` over the record's raw
+/// `envelope.schema` FIRST) — `content_digest` over the record's raw
 /// JSON, the same digest `GitTier`/`PgTier` writes already compute.
 fn latest_index(tier: &GitTier) -> Result<BTreeMap<(ProjectId, ScenarioId), Scenario>, InventoryError> {
     let existing = tier.read(&TierQuery::kind(RecordKind::Scenario))?;
     let indexed: Vec<(Scenario, String)> = existing
         .records
         .iter()
-        .filter_map(|raw| serde_json::from_value::<Scenario>(raw.0.clone()).ok().map(|scenario| (scenario, canon_store::partition::content_digest12(&raw.0))))
+        .filter_map(|raw| serde_json::from_value::<Scenario>(raw.0.clone()).ok().map(|scenario| (scenario, canon_store::partition::content_digest(&raw.0))))
         .collect();
     Ok(fold_latest_by_key(
         indexed,
@@ -567,6 +570,12 @@ pub struct ScannedScenario {
     pub lane_tags: Vec<String>,
     pub case_tags: Vec<String>,
     pub unknown_namespace_tags: Vec<String>,
+    /// The scenario's steps in source order (0.30); empty when the file has
+    /// none for it or the Gherkin parser refused the file ([`Self::steps_error`]).
+    pub steps: Vec<ScenarioStep>,
+    /// Why the Gherkin parser refused the file, when it did: the sync says
+    /// the steps are not indexed.
+    pub steps_error: Option<String>,
 }
 
 /// The full walk both [`scan_feature_corpus`] and [`sync_one_root`]
@@ -588,6 +597,8 @@ pub fn scan_feature_corpus_detailed(root: &Path) -> Vec<ScannedScenario> {
                     lane_tags: candidate.lane_tags.clone(),
                     case_tags: candidate.case_tags.clone(),
                     unknown_namespace_tags: candidate.unknown_namespace_tags.clone(),
+                    steps: file.steps.as_ref().ok().and_then(|steps| steps.get(&candidate.scenario_id)).cloned().unwrap_or_default(),
+                    steps_error: file.steps.as_ref().err().map(ToString::to_string),
                 });
             }
         }
@@ -596,10 +607,13 @@ pub fn scan_feature_corpus_detailed(root: &Path) -> Vec<ScannedScenario> {
 }
 
 /// One `.feature` file as the Gherkin scan reads it.
+#[derive(Debug)]
 pub struct FeatureFileScan {
     pub scan: canon_fmt::gherkin::FeatureScan,
     pub source_digest: SpecDigest,
     pub scenario_digests: BTreeMap<String, SpecDigest>,
+    /// The steps by scenario id, or why the Gherkin parser refused the file.
+    pub steps: Result<BTreeMap<String, Vec<ScenarioStep>>, canon_fmt::steps::StepsError>,
 }
 
 /// What each `.feature` file scanned to, by path, while its size and
@@ -607,17 +621,19 @@ pub struct FeatureFileScan {
 /// One command scans the corpus for the staleness check, the refresh,
 /// the status, the gate and the brief's flow coverage; an unchanged file
 /// is read and lexed once, and an edited or new one is read again.
-static FEATURE_MEMO: std::sync::LazyLock<std::sync::Mutex<BTreeMap<PathBuf, (canon_store::git_tier::FileStamp, std::sync::Arc<FeatureFileScan>)>>> =
+static FEATURE_MEMO: std::sync::LazyLock<std::sync::Mutex<BTreeMap<PathBuf, MemoEntry>>> =
     std::sync::LazyLock::new(Default::default);
+
+type MemoEntry = (canon_store::git_tier::FileStamp, std::sync::Arc<FeatureFileScan>);
 
 /// The scan of the `.feature` file at `path`; `None` when it cannot be
 /// read or is not UTF-8 (the file holds no scenario).
 pub fn feature_file_scan(path: &Path) -> Option<std::sync::Arc<FeatureFileScan>> {
     let stamp = std::fs::metadata(path).ok().and_then(|metadata| canon_store::git_tier::FileStamp::of(&metadata));
     if let Some(stamp) = stamp {
-        let memo = FEATURE_MEMO.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let memo = FEATURE_MEMO.lock().expect("feature-file memo lock poisoned");
         if let Some((_, file)) = memo.get(path).filter(|(seen, _)| *seen == stamp) {
-            return Some(file.clone());
+            return Some(std::sync::Arc::clone(file));
         }
     }
     let bytes = std::fs::read(path).ok()?;
@@ -626,9 +642,10 @@ pub fn feature_file_scan(path: &Path) -> Option<std::sync::Arc<FeatureFileScan>>
         scan: canon_fmt::gherkin::scan(text),
         source_digest: canon_fmt::gherkin::source_digest(&bytes),
         scenario_digests: canon_fmt::gherkin::scenario_digests(text),
+        steps: canon_fmt::steps::scenario_steps(text),
     });
     if let Some(stamp) = stamp {
-        FEATURE_MEMO.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).insert(path.to_path_buf(), (stamp, file.clone()));
+        FEATURE_MEMO.lock().expect("feature-file memo lock poisoned").insert(path.to_path_buf(), (stamp, std::sync::Arc::clone(&file)));
     }
     Some(file)
 }
@@ -810,7 +827,6 @@ struct RootPlan {
 /// Decide what syncing `spec_root` writes against the index as it stands
 /// (`folded`, read only when the root is not refused), without writing.
 /// [`sync_one_root`] writes it; [`overlay_stale_index`] only reads it.
-#[allow(clippy::too_many_arguments)]
 fn plan_one_root<'f>(
     folded: impl FnOnce() -> Result<std::borrow::Cow<'f, BTreeMap<(ProjectId, ScenarioId), Scenario>>, InventoryError>,
     repo: &Path,
@@ -861,6 +877,13 @@ fn plan_one_root<'f>(
                 namespace
             ));
         }
+        if let Some(error) = &candidate.steps_error {
+            let shown = candidate.path.strip_prefix(repo).unwrap_or(&candidate.path).display().to_string();
+            let diagnostic = format!("`{shown}` was refused by the Gherkin parser ({error}); its scenarios are indexed without steps");
+            if !tag_diagnostics.contains(&diagnostic) {
+                tag_diagnostics.push(diagnostic);
+            }
+        }
         let key = (spec_root.id.clone(), candidate.scenario_id.clone());
         // The subject join joins the idempotence key: a record written
         // before this field existed (or before the tag was added) gets
@@ -873,6 +896,7 @@ fn plan_one_root<'f>(
                 && latest.subject_id == subject_id
                 && latest.lane.as_deref() == lane.as_deref()
                 && latest.case.as_deref() == case.as_deref()
+                && latest.steps == candidate.steps
         });
         if unchanged {
             continue;
@@ -889,6 +913,7 @@ fn plan_one_root<'f>(
         record.lane = lane;
         record.case = case;
         record.subject_id = subject_id;
+        record.steps = candidate.steps.clone();
         records.push(record);
     }
 
@@ -914,7 +939,6 @@ fn plan_one_root<'f>(
     Ok(RootPlan { outcome, records })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn sync_one_root(
     tier: &GitTier,
     repo: &Path,
@@ -1004,7 +1028,7 @@ pub fn format_human(outcome: &SyncOutcome) -> String {
 }
 
 /// One spec root of `canon inventory sync`'s report.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InventoryRootReport<'a> {
     pub id: &'a str,
@@ -1020,7 +1044,7 @@ pub struct InventoryRootReport<'a> {
 }
 
 /// `canon inventory sync`'s report (`InventorySyncReport`).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InventorySyncReport<'a> {
     /// True when `--dry-run` previewed the run without writing.
@@ -1046,8 +1070,8 @@ pub fn format_json(outcome: &SyncOutcome) -> InventorySyncReport<'_> {
             written: root.written,
             removed: root.removed,
             violations: root.violations.iter().map(crate::fmt::ViolationEntry::of).collect(),
-            sync_errors: root.sync_errors.iter().map(|e| e.to_string()).collect(),
-            tag_diagnostics: root.tag_diagnostics.iter().map(|d| d.to_string()).collect(),
+            sync_errors: root.sync_errors.clone(),
+            tag_diagnostics: root.tag_diagnostics.clone(),
         })
         .collect();
     InventorySyncReport { dry_run: outcome.dry_run, clean: outcome.is_clean(), total_written: outcome.total_written(), roots }
@@ -1078,9 +1102,11 @@ struct StaleRoot {
 /// lacks or holds at another `source_digest` or `scenario_digest`, and
 /// an indexed scenario the corpus no longer declares — the indexed id
 /// set and the corpus id set of a project must be equal.
-fn stale_roots(tier: &GitTier, roots: &[SpecRoot]) -> Result<(Vec<StaleRoot>, BTreeMap<ProjectId, BTreeSet<ScenarioId>>), InventoryError> {
+fn stale_roots(tier: &GitTier, roots: &[SpecRoot]) -> Result<StaleScan, InventoryError> {
     Ok(stale_roots_against(&latest_index(tier)?, roots))
 }
+
+type StaleScan = (Vec<StaleRoot>, BTreeMap<ProjectId, BTreeSet<ScenarioId>>);
 
 /// [`stale_roots`] against an index already folded ([`latest_index`]).
 fn stale_roots_against(latest: &BTreeMap<(ProjectId, ScenarioId), Scenario>, roots: &[SpecRoot]) -> (Vec<StaleRoot>, BTreeMap<ProjectId, BTreeSet<ScenarioId>>) {
@@ -1094,11 +1120,11 @@ fn stale_roots_against(latest: &BTreeMap<(ProjectId, ScenarioId), Scenario>, roo
             .filter(|candidate| {
                 !latest
                     .get(&(root.id.clone(), candidate.scenario_id.clone()))
-                    .is_some_and(|record| !record.removed && record.source_digest == candidate.source_digest && record.scenario_digest == candidate.scenario_digest)
+                    .is_some_and(|record| !record.removed && record.source_digest == candidate.source_digest && record.scenario_digest == candidate.scenario_digest && record.steps == candidate.steps)
             })
             .map(|candidate| candidate.path.clone())
             .collect();
-        let removed: Vec<ScenarioId> = removed_from_corpus(&latest, &root.id, &corpus[&root.id]).into_iter().map(|scenario| scenario.scenario_id.clone()).collect();
+        let removed: Vec<ScenarioId> = removed_from_corpus(latest, &root.id, &corpus[&root.id]).into_iter().map(|scenario| scenario.scenario_id.clone()).collect();
         if !files.is_empty() || !removed.is_empty() {
             stale.push(StaleRoot { root: root.clone(), scanned, files, removed });
         }

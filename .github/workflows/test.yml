@@ -9,7 +9,9 @@ name: Test
 # 2026-07-10): it spins the repo-root `docker-compose.yml` stack
 # (`postgres` backs `PgTier`, `minio` backs `R2Tier`) and runs
 # `crates/canon-store`'s `live-pg`/`live-r2`-gated integration tests
-# against REAL local services, never real cloud credentials. Both tests'
+# against REAL local services, never real cloud credentials, then `crates/
+# canon-cli/tests/ledger_pg_live.rs` (`canon migrate` over a Postgres hot tier).
+# Both tests'
 # own skip-if-down probes (`tests/pg_tier_live.rs`/`tests/r2_tier_live.rs`)
 # are told to fail hard instead of skipping via `CANON_REQUIRE_LIVE=1` —
 # without it, a docker-compose regression that left the stack unreachable
@@ -34,6 +36,8 @@ on:
       - "bun.lock"
       - "examples/platformer/**"
       - "scripts/bench/**"
+      - "clippy.toml"
+      - "scripts/check_visibility.sh"
       - ".github/workflows/test.yml"
   pull_request:
     paths:
@@ -47,6 +51,8 @@ on:
       - "bun.lock"
       - "examples/platformer/**"
       - "scripts/bench/**"
+      - "clippy.toml"
+      - "scripts/check_visibility.sh"
       - ".github/workflows/test.yml"
   workflow_dispatch:
 
@@ -143,6 +149,49 @@ jobs:
           cargo build --locked --offline -p canon-cli
           ./target/debug/canon inventory sync
           ./target/debug/canon gate check
+
+  # 0.30: the lint gate for rust-coding-rules.md. The other jobs run the
+  # current stable toolchain; this one alone is pinned to 1.99.1, because a
+  # new stable adds lints and would turn a clean tree red with no code change.
+  # Bumping the pin re-checks the lint list (the `-D` flags below and
+  # `clippy.toml`) in the same change. Four steps, each fails on its own:
+  # everything incl. tests, no `unwrap` in production code, the live-tier test
+  # files (compiled only with `live-pg,live-r2`), and the visibility ban.
+  clippy:
+    name: clippy 1.99.1 and visibility rule
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: canon-test-clippy-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: cargo fetch --locked
+        run: cargo fetch --locked
+
+      - name: clippy, whole workspace with tests
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: clippy, libraries and binaries without unwrap
+        run: cargo clippy --workspace --lib --bins --locked -- -D warnings -D clippy::unwrap_used
+
+      - name: clippy, canon-store live-tier tests
+        run: cargo clippy -p canon-store --all-targets --features live-pg,live-r2 --locked -- -D warnings
+
+      - name: no pub(super) or pub(in ..) in crate sources
+        run: scripts/check_visibility.sh
 
   # T15: the grammar tests catch seeded violations (scripts/check-mutations.sh). Its own job:
   # it builds a copy of the workspace, which would double the time of the job above.
@@ -299,6 +348,16 @@ jobs:
           CANON_S3_ACCESS_KEY: "canon"
           CANON_S3_SECRET_KEY: "canoncanon"
         run: cargo test -p canon-store --features live-pg,live-r2 --locked
+
+      - name: cargo test -p canon-cli --test ledger_pg_live
+        env:
+          CANON_REQUIRE_LIVE: "1"
+          CANON_PG_DSN: "postgres://canon:canon@127.0.0.1:55432/canon_v1"
+          CANON_S3_ENDPOINT: "http://127.0.0.1:59000"
+          CANON_S3_BUCKET: "canon"
+          CANON_S3_ACCESS_KEY: "canon"
+          CANON_S3_SECRET_KEY: "canoncanon"
+        run: cargo test -p canon-cli --test ledger_pg_live --locked
 
       - name: docker compose down
         if: always()

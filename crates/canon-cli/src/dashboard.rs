@@ -89,6 +89,7 @@ const READ_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// One file of the app embedded in the binary: its path under the app's
 /// root and its gzip-compressed bytes.
+#[derive(Debug)]
 pub struct EmbeddedFile {
     pub path: &'static str,
     pub gz: &'static [u8],
@@ -131,7 +132,7 @@ impl DashboardError {
 /// `--snapshot` verbatim when given, else the conventional
 /// [`DEFAULT_SNAPSHOT_DIR`] under the resolved repo root (module doc).
 pub fn resolve_snapshot_dir(repo: &Path, snapshot: Option<&Path>) -> PathBuf {
-    snapshot.map(Path::to_path_buf).unwrap_or_else(|| repo.join(DEFAULT_SNAPSHOT_DIR))
+    snapshot.map_or_else(|| repo.join(DEFAULT_SNAPSHOT_DIR), Path::to_path_buf)
 }
 
 /// Whether the served snapshot can back the panels page.
@@ -152,7 +153,7 @@ impl SnapshotState {
 }
 
 /// `canon dashboard --json`: where the dashboard serves (`DashboardReport`).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardReport {
     pub url: String,
@@ -166,7 +167,7 @@ pub struct DashboardReport {
 impl crate::json_out::Report for DashboardReport {}
 
 /// Whether the snapshot backs the panels page, and how to fix it when not.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SnapshotStatus<'a> {
     pub available: bool,
@@ -174,7 +175,7 @@ pub struct SnapshotStatus<'a> {
     pub fix: Option<&'a str>,
 }
 
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AppStatus {
     /// `embedded` or `directory`.
@@ -182,7 +183,7 @@ pub struct AppStatus {
 }
 
 /// `GET /api/status` (`DashboardStatusReport`).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardStatusReport<'a> {
     pub snapshot: SnapshotStatus<'a>,
@@ -213,7 +214,7 @@ fn ensure_snapshot(inputs: &canon_report::ReportInputs, dir: &Path, explicit: bo
 }
 
 /// Where the served app's files come from (module doc).
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum AppSource {
     /// A built `dist/` directory: the development override.
     Dir(PathBuf),
@@ -222,6 +223,7 @@ pub enum AppSource {
 }
 
 /// One file of the app, ready to send.
+#[derive(Debug)]
 pub struct AppFile {
     pub content_type: &'static str,
     /// Gzip-compressed when `gzipped`, else the file's bytes.
@@ -293,6 +295,7 @@ struct Server {
 /// logging) plus the live [`TcpListener`], already bound — so a caller (or
 /// a test) can read the actually-assigned port ([`BoundDashboard::port`])
 /// before handing off to [`BoundDashboard::serve_forever`].
+#[derive(Debug)]
 pub struct BoundDashboard {
     pub listener: TcpListener,
     pub repo: PathBuf,
@@ -325,7 +328,7 @@ impl BoundDashboard {
     /// The actually-bound port — meaningful even when `--port 0` asked
     /// the OS to pick any free port.
     pub fn port(&self) -> u16 {
-        self.listener.local_addr().map(|addr| addr.port()).unwrap_or(0)
+        self.listener.local_addr().map_or(0, |addr| addr.port())
     }
 
     /// The URL to open: the app root with `?snapshot=` already pointed
@@ -492,7 +495,7 @@ fn read_and_approve(reader: &mut impl Read, length: usize, server: &Server) -> R
     if reader.read_exact(&mut body).is_err() {
         return bad_request("the body is shorter than its Content-Length");
     }
-    let _approving = server.approvals.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _approving = server.approvals.lock().expect("dashboard approvals lock poisoned");
     crate::dashboard_briefs::approve(&server.repo, &body)
 }
 
@@ -514,7 +517,7 @@ fn serve_file(stream: &mut TcpStream, head: &Head, path: &str, server: &Server) 
         return write_response(stream, 200, file.content_type, &file.body, &[("Content-Encoding", "gzip"), ("Vary", "Accept-Encoding")]);
     }
     let mut plain = Vec::new();
-    match flate2::read::GzDecoder::new(&file.body[..]).read_to_end(&mut plain) {
+    match flate2::read::GzDecoder::new(&*file.body).read_to_end(&mut plain) {
         Ok(_) => write_response(stream, 200, file.content_type, &plain, &[("Vary", "Accept-Encoding")]),
         Err(_) => write_status(stream, 500, "the embedded app file is unreadable"),
     }
@@ -607,7 +610,6 @@ fn write_response(stream: &mut TcpStream, code: u16, content_type: &str, body: &
 /// on the client's side. So the write half is shut first and what the
 /// client still sends is drained, bounded in bytes and time.
 fn linger_close(stream: &mut TcpStream) {
-    use std::io::Read;
     let _ = stream.flush();
     let _ = stream.shutdown(std::net::Shutdown::Write);
     let _ = stream.set_read_timeout(Some(std::time::Duration::from_millis(200)));

@@ -1,0 +1,30 @@
+{
+  "actor": {
+    "agent_id": "rev-030-sb",
+    "role": "reviewer",
+    "session_id": "rev-030-sb-2026-10-26"
+  },
+  "at": "2026-10-26T13:10:17.635039582Z",
+  "code_tree": "3d45c26a51c33ee4ffa26007ec25ba5978dbd691",
+  "kind": "review",
+  "pin": "7f9f15df9b2287e3743828cd184d6cdc3e83d05c",
+  "pins": {
+    "checks": [
+      {
+        "checks": [],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "994c96bd890d0ac95804ebd6ad2ebb56db8a1e0fdac31f2d26024880f1416516",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": ".canon/changes/canon-0-30-spec-backfill/brief.md"
+  },
+  "reviewer": "rev-030-sb",
+  "scenario_id": "learn.promotion.13",
+  "schema": 1,
+  "worktree_dirty": true
+}

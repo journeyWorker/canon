@@ -10,5 +10,20 @@
   "scenario_id": "world.firstbuy-hotdeal.26",
   "schema": 1,
   "source_digest": "35c8108febef5114231270499c009815415cc2257cf048184cd3704de212e428",
+  "steps": [
+    {
+      "inherited": "background",
+      "keyword": "Given",
+      "text": "a precondition"
+    },
+    {
+      "keyword": "When",
+      "text": "the overlay opens"
+    },
+    {
+      "keyword": "Then",
+      "text": "it shows the deal"
+    }
+  ],
   "title": "hotdeal"
 }

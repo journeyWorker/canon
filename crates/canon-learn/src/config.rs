@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn a_malformed_role_slug_fails_loud() {
         let yaml = "learn:\n  roles:\n    - \"Not Valid!\"\n";
-        assert!(LearnConfig::from_manifest(yaml).is_err());
+        LearnConfig::from_manifest(yaml).unwrap_err();
     }
 
     #[test]
@@ -299,7 +299,7 @@ mod tests {
     #[test]
     fn a_malformed_promotion_role_slug_fails_loud() {
         let yaml = "learn:\n  promotion:\n    \"Not Valid!\":\n      mode: occurrence\n";
-        assert!(LearnConfig::from_manifest(yaml).is_err());
+        LearnConfig::from_manifest(yaml).unwrap_err();
     }
 
     #[test]

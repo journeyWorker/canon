@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "017-p4-impl",
+    "role": "implementer",
+    "session_id": "017-p4-impl"
+  },
+  "at": "2026-10-12T11:49:50.280587Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test legacy_pins an_index_generation_from_before_0_15_cannot_leave_a_legacy_review_undecidable"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 42,
+  "scenario_id": "gate.check.95",
+  "schema": 1,
+  "staging_id": "9206783f6379",
+  "verdict": "faithful"
+}

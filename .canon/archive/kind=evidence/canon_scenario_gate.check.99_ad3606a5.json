@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-0241",
+    "role": "implementer",
+    "session_id": "canon-impl-0241-1"
+  },
+  "at": "2026-10-20T20:10:01.407089Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test reverify gate_check_99"
+  },
+  "evidence_note": {
+    "summary": "reverify gate_check_99: 1 passed, 13 filtered out, 0 failed"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 56,
+  "scenario_id": "gate.check.99",
+  "schema": 1,
+  "staging_id": "3a443350e411",
+  "verdict": "faithful"
+}

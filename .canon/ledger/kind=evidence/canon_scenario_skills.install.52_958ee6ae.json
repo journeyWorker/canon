@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:36:27.196746706Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test skills_install skills_install_52 && cargo test -p canon-cli --test conformance (skills-doctor-stray-projection steps 1-2)"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 139,
+  "scenario_id": "skills.install.52",
+  "schema": 1,
+  "staging_id": "8c0f6293",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

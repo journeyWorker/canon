@@ -14,7 +14,7 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 
-use canon_learn::{ParquetStrategyStore, StrategyId, StrategyItem, StrategyStore, TrajectoryId};
+use canon_learn::{ParquetStrategyStore, StrategyId, StrategyItem, StrategyItemFields, StrategyStore, TrajectoryId};
 use canon_model::ids::{RegimeKey, RoleId, regime_key};
 use chrono::Utc;
 
@@ -47,7 +47,7 @@ fn shell_quote(s: &str) -> String {
 
 fn seed_strategy(repo: &Path, regime_key: &RegimeKey, role: &RoleId, title: &str, content: &str) {
     let store = ParquetStrategyStore::open(repo.join(".canon").join("learn").join("strategies"));
-    let item = StrategyItem::new(StrategyId::new(), regime_key.clone(), role.clone(), title, "description", content, vec![TrajectoryId::new()], Utc::now());
+    let item = StrategyItem::new(StrategyItemFields { id: StrategyId::new(), regime_key: regime_key.clone(), role: role.clone(), title: title.into(), description: "description".into(), content: content.into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() });
     store.append(&item).expect("seed strategy");
 }
 
@@ -68,7 +68,7 @@ fn run_hook(repo: &Path, stdin_json: &str) -> Output {
     {
         use std::io::Write;
         child.stdin.take().unwrap().write_all(stdin_json.as_bytes()).expect("write stdin");
-    }
+    };
     child.wait_with_output().expect("wait for pre-dispatch.sh")
 }
 

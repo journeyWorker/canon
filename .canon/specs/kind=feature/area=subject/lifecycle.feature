@@ -396,3 +396,26 @@ Feature: subject lifecycle
     Then both are refused naming b's brief, and the output names every change set aside, here c
     And without c the refusal is the same, and only an unapproved change nothing is tagged for is ever set aside
     And canon status does not advise the refused reopen: it says reopening waits for the brief's approval
+
+  # canon: {"schema":1,"at":"2026-10-26T11:42:43Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}
+  @subject:subject-lifecycle
+  @case:happy
+  @flow:canon-0-30-spec-backfill.F4
+  @subject.lifecycle.40
+  Scenario: Show prints one subject's record, status and owner and writes nothing
+    Given a repo holding a proposed subject demo with domain dev, title Demo and owner role implementer
+    When canon subject show demo runs, once with --json and once without
+    Then both exit 0, and the --json data carries subject_id, title, domain, status proposed and owner_role
+    And the human output names the subject with its domain and status, its title and its owner
+    And no file in the repo changed
+
+  # canon: {"schema":1,"at":"2026-10-26T11:42:43Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F4
+  @subject.lifecycle.41
+  Scenario: Show of an unknown or missing subject id is refused with exit 2 and writes nothing
+    Given a repo holding a subject demo and no subject nope
+    When canon subject show runs with the id nope, and again with no id
+    Then the first exits 2 with SUBJECT_NOT_FOUND naming nope, and the second exits 2 with USAGE
+    And no file in the repo changed

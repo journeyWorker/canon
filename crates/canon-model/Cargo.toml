@@ -26,3 +26,6 @@ serde_yaml = "0.9.34"
 ulid = { version = "1.2.1", features = ["serde"] }
 uuid = { version = "1.23.4", features = ["v4", "serde"] }
 sha2 = { workspace = true }
+
+[lints]
+workspace = true

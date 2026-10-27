@@ -617,6 +617,9 @@ pub struct ArtifactIngestOutcome {
     /// S7 webhook receiver's no-rollback timer to resolve it. Counted,
     /// never an error.
     pub trajectories_left_pending: usize,
+    /// Where the hot records go (0.30): the hot store's location; absent on a `--dry-run` or with no hot rung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hot_store: Option<String>,
 }
 
 impl Report for ArtifactIngestOutcome {}
@@ -750,7 +753,7 @@ fn read_kind_records(
     missing_config_reason: Option<&str>,
 ) -> Result<Vec<RawRecord>, String> {
     let Some(store) = store else {
-        return Err(missing_config_reason.map(str::to_string).unwrap_or_else(|| "canon.yaml is missing or unreadable — no live tiers configured".to_string()));
+        return Err(missing_config_reason.map_or_else(|| "canon.yaml is missing or unreadable — no live tiers configured".to_string(), str::to_string));
     };
     let policy = policy.expect("policy is always Some whenever store is Some -- built together in run()");
     if let Ok(rung) = policy.tier_for(kind) {
@@ -787,7 +790,7 @@ fn fold_handoff_records(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRec
         let key = canon_store::partition::resolve_partition(kind, &record.0).map(|p| p.natural_key).unwrap_or_default();
         let at = canon_store::tier::raw_record_at(&record);
         let schema = canon_store::tier::raw_record_schema(&record);
-        let digest = canon_store::partition::content_digest12(&record.0);
+        let digest = canon_store::partition::content_digest(&record.0);
         Candidate { key, at, schema, digest, record }
     });
     fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str()).into_values().map(|c| c.record).collect()
@@ -888,7 +891,7 @@ impl<'a> ScenarioGeneration<'a> {
             project_id,
             at: raw_record_at_or_min(record),
             schema: canon_store::tier::raw_record_schema(record),
-            digest: canon_store::partition::content_digest12(&record.0),
+            digest: canon_store::partition::content_digest(&record.0),
             title,
         })
     }
@@ -993,8 +996,7 @@ fn raw_record_at_or_min(record: &RawRecord) -> DateTime<Utc> {
         .get("at")
         .and_then(|value| value.as_str())
         .and_then(|at| DateTime::parse_from_rfc3339(at).ok())
-        .map(|at| at.with_timezone(&Utc))
-        .unwrap_or(DateTime::<Utc>::MIN_UTC)
+        .map_or(DateTime::<Utc>::MIN_UTC, |at| at.with_timezone(&Utc))
 }
 
 /// Collapses whitespace runs to single spaces, trims, and caps at
@@ -1364,7 +1366,7 @@ impl RegimeEvidence {
     /// Folds one [`DerivedVerdict`] in, keeping the running max
     /// timestamp and both first-seen-ordered dedup lists.
     fn absorb(&mut self, derived: DerivedVerdict) {
-        let DerivedVerdict { regime_key: _, row, at, join_key, scenario_title, kind_label, evidence_line, antecedents } = derived;
+        let DerivedVerdict { row, at, join_key, scenario_title, kind_label, evidence_line, antecedents, .. } = derived;
         if self.rows.is_empty() {
             self.join_key = Some(join_key);
         } else {
@@ -1854,7 +1856,7 @@ impl RowProvenance {
     fn of(row: &Trajectory) -> Self {
         // Exhaustive on purpose (see this type's doc) — never a
         // two-field pick that a new `Trajectory` field slips past.
-        let Trajectory { id: _, regime_key: _, task: _, context: _, verdicts: _, recorded_at: _, tags: _, verdict_record, run_id } = row;
+        let Trajectory { verdict_record, run_id, .. } = row;
         Self { verdict_record: *verdict_record, run_id: *run_id }
     }
 
@@ -2184,7 +2186,7 @@ fn plan_trajectory(
     let canonical = canonical_driver_row(existing, &derivation);
     let already_persisted = match canonical {
         Some(id) => existing.iter().any(|stored| stored.id == id && carries_identity(stored)),
-        None => existing.iter().any(|stored| carries_identity(stored)),
+        None => existing.iter().any(carries_identity),
     };
     if already_persisted {
         // Two arms, because the namespace can still hold this driver's own
@@ -2205,7 +2207,7 @@ fn plan_trajectory(
     }
 
     let trajectory = Trajectory::new(
-        canonical.unwrap_or_else(TrajectoryId::new),
+        canonical.unwrap_or_default(),
         regime_key.clone(),
         task,
         context,
@@ -2634,6 +2636,7 @@ fn run_pass(repo: &Path, run_id: Option<&RunId>, dry_run: bool) -> Result<Artifa
         strategy_items_rebuilt,
         trajectories_marked,
         trajectories_left_pending,
+        hot_store: None,
     })
 }
 

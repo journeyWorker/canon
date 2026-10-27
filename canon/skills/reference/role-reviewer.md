@@ -79,10 +79,10 @@ canon divergence resolve auth.login.01 --actor-id alice --role reviewer
 ```
 ```text
 # Record one code-review finding
-canon finding add --change-id <CHANGE_ID> --round <N> --seq <N> --severity <blocker|should-fix|note> --actor-id <ACTOR_ID> --summary <TEXT> [--disposition <open|fixed|rejected|deferred>] [--rev <REV>] [--resolution-rev <REV>] [--introduced-rev <REV>] [--file-ref <TEXT>] [--scenario-id <SCENARIO_ID>]* [--role <ROLE>] [--session-id <SESSION_ID>] [--promote | --no-promote] [--input]
+canon finding add --change-id <CHANGE_ID> --round <N> --seq <N> --severity <blocker|should-fix|note> --actor-id <ACTOR_ID> --summary <TEXT> [--disposition <open|fixed|rejected|deferred>] [--rev <REV>] [--resolution-rev <REV>] [--introduced-rev <REV>] [--introduced-unknown] [--review-id <REVIEW_ID>] [--file-ref <TEXT>] [--scenario-id <SCENARIO_ID>]* [--role <ROLE>] [--session-id <SESSION_ID>] [--promote | --no-promote] [--input]
 ```
 ```bash
-canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --actor-id alice --summary "Token is logged"
+canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor-id alice --summary "Token is logged"
 ```
 ```text
 # Move an already-committed finding's disposition
@@ -187,7 +187,7 @@ Several findings at once are one `--input` array (the keys are option names
 in camelCase):
 
 ```text
-canon finding add --input '[{"changeId":"add-login","round":1,"seq":3,"severity":"note","actorId":"reviewer-1","summary":"Token is logged"},{"changeId":"add-login","round":1,"seq":4,"severity":"should-fix","actorId":"reviewer-1","summary":"Error text leaks the user name"}]'
+canon finding add --input '[{"changeId":"add-login","round":1,"seq":3,"severity":"note","actorId":"reviewer-1","summary":"Token is logged"},{"changeId":"add-login","round":1,"seq":4,"severity":"should-fix","introducedUnknown":true,"actorId":"reviewer-1","summary":"Error text leaks the user name"}]'
 ```
 
 A review pins what you saw: the scenario's digest plus the verdict

@@ -113,6 +113,7 @@ pub const EXTRA_SESSIONS_DIR_ENV: &str = "CANON_INGEST_CLAUDE_SESSIONS_DIR";
 /// (`claudecode.rs:1309-1406`) is out of scope (module doc above).
 const DEFAULT_PROVIDER_ID: &str = "anthropic";
 
+#[derive(Debug)]
 pub struct ClaudeCodeAdapter;
 
 /// Claude Code JSONL entry (one line). Ported from `claudecode.rs:22-43`
@@ -232,9 +233,8 @@ fn parse_claude_file(path: &Path) -> ParseOutcome {
 
     let fallback_timestamp = file_modified_timestamp_ms(path);
 
-    let file = match std::fs::File::open(path) {
-        Ok(f) => f,
-        Err(_) => return ParseOutcome::default(),
+    let Ok(file) = std::fs::File::open(path) else {
+        return ParseOutcome::default();
     };
 
     let reader = BufReader::new(file);
@@ -264,9 +264,8 @@ fn parse_claude_file(path: &Path) -> ParseOutcome {
     let mut parent_agent_id: Option<String> = None;
 
     for line in reader.lines() {
-        let line = match line {
-            Ok(l) => l,
-            Err(_) => continue,
+        let Ok(line) = line else {
+            continue;
         };
 
         let trimmed = line.trim();
@@ -338,7 +337,18 @@ fn parse_claude_file(path: &Path) -> ParseOutcome {
                 });
             }
             if let Some(row) =
-                extract_claude_tool_result_row(trimmed, &entry, &session_id, fallback_timestamp, workspace_key.clone(), workspace_label.clone(), agent_id.clone(), parent_agent_id.clone())
+                extract_claude_tool_result_row(
+                    trimmed,
+                    &entry,
+                    &session_id,
+                    fallback_timestamp,
+                    ToolResultLineage {
+                        workspace_key: workspace_key.clone(),
+                        workspace_label: workspace_label.clone(),
+                        agent_id: agent_id.clone(),
+                        parent_agent_id: parent_agent_id.clone(),
+                    },
+                )
             {
                 match row.dedup_key.clone() {
                     Some(dedup_key) => match processed_hashes.get(&dedup_key) {
@@ -458,6 +468,15 @@ fn flatten_claude_content(content: Option<&Value>) -> Option<String> {
     if text.is_empty() { None } else { Some(text) }
 }
 
+/// Caller-resolved workspace and agent lineage threaded into a
+/// `tool_result` row.
+struct ToolResultLineage {
+    workspace_key: Option<String>,
+    workspace_label: Option<String>,
+    agent_id: Option<String>,
+    parent_agent_id: Option<String>,
+}
+
 /// One `user`/`tool_result` line's extracted billable-token usage.
 /// Ported from `claudecode.rs:839-842` (`ClaudeToolResultUsage`).
 struct ClaudeToolResultUsage {
@@ -475,17 +494,8 @@ struct ClaudeToolResultUsage {
 /// `parent_agent_id` lineage pair (s37-execution-graph-topology) IS
 /// threaded through, since a subagent's `tool_result` tokens belong to
 /// the subagent's run.
-#[allow(clippy::too_many_arguments)]
-fn extract_claude_tool_result_row(
-    trimmed: &str,
-    entry: &ClaudeEntry,
-    session_id: &str,
-    fallback_timestamp: i64,
-    workspace_key: Option<String>,
-    workspace_label: Option<String>,
-    agent_id: Option<String>,
-    parent_agent_id: Option<String>,
-) -> Option<UnifiedRow> {
+fn extract_claude_tool_result_row(trimmed: &str, entry: &ClaudeEntry, session_id: &str, fallback_timestamp: i64, lineage: ToolResultLineage) -> Option<UnifiedRow> {
+    let ToolResultLineage { workspace_key, workspace_label, agent_id, parent_agent_id } = lineage;
     let value: Value = serde_json::from_str(trimmed).ok()?;
     let usage = extract_claude_tool_result_usage(&value)?;
 
@@ -623,7 +633,7 @@ fn tool_result_output_char_count(tool_result: &Value) -> usize {
 
     match tool_result.get("content") {
         Some(content) if content.is_string() => {
-            chars += content.as_str().map(str::chars).map(Iterator::count).unwrap_or(0);
+            chars += content.as_str().map(str::chars).map_or(0, Iterator::count);
         }
         Some(content) => {
             chars += tool_result_content_output_chars(content);
@@ -638,7 +648,7 @@ fn tool_result_output_char_count(tool_result: &Value) -> usize {
 fn tool_result_content_output_chars(content: &Value) -> usize {
     content
         .as_array()
-        .map(|blocks| {
+        .map_or(0, |blocks| {
             blocks
                 .iter()
                 .map(|block| {
@@ -648,12 +658,10 @@ fn tool_result_content_output_chars(content: &Value) -> usize {
                         .and_then(|output| output.as_str())
                         .or_else(|| block.get("text").and_then(|text| text.as_str()))
                         .map(str::chars)
-                        .map(Iterator::count)
-                        .unwrap_or(0)
+                        .map_or(0, Iterator::count)
                 })
                 .sum()
         })
-        .unwrap_or(0)
 }
 
 /// One token per four characters, rounded up — matches the donor's
@@ -661,7 +669,7 @@ fn tool_result_content_output_chars(content: &Value) -> usize {
 /// metadata. Ported from `claudecode.rs:1085-1089`
 /// (`estimate_tokens_from_chars`).
 fn estimate_tokens_from_chars(chars: usize) -> i64 {
-    chars.div_ceil(4) as i64
+    i64::try_from(chars.div_ceil(4)).expect("token estimate fits in i64")
 }
 
 /// Ported from the donor session-parser project's `extract_i64` — a
@@ -670,12 +678,12 @@ fn estimate_tokens_from_chars(chars: usize) -> i64 {
 /// `inferred_provider_from_model` local-copy precedent (no shared
 /// crate-wide `utils` module exists yet).
 fn extract_i64(value: Option<&Value>) -> Option<i64> {
-    value.and_then(|val| val.as_i64().or_else(|| val.as_u64().map(|v| v as i64)).or_else(|| val.as_str().and_then(|s| s.parse::<i64>().ok())))
+    value.and_then(|val| val.as_i64().or_else(|| val.as_u64().map(u64::cast_signed)).or_else(|| val.as_str().and_then(|s| s.parse::<i64>().ok())))
 }
 
 /// Ported from the donor session-parser project's `extract_string`.
 fn extract_string(value: Option<&Value>) -> Option<String> {
-    value.and_then(|val| val.as_str().map(|s| s.to_string()))
+    value.and_then(|val| val.as_str().map(std::string::ToString::to_string))
 }
 
 /// Per-`tool_result`-line duplicate merge (mirrors unit 4's
@@ -757,9 +765,7 @@ fn file_modified_timestamp_ms(path: &Path) -> i64 {
     std::fs::metadata(path)
         .and_then(|meta| meta.modified())
         .ok()
-        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
-        .map(|duration| duration.as_millis() as i64)
-        .unwrap_or_else(|| chrono::Utc::now().timestamp_millis())
+        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok()).map_or_else(|| chrono::Utc::now().timestamp_millis(), |duration| i64::try_from(duration.as_millis()).expect("epoch millis fit in i64"))
 }
 
 /// Ported from `claudecode.rs:778-782` (`parse_claude_entry_timestamp`).
@@ -1023,12 +1029,17 @@ not valid json at all"#;
     }
 
     #[test]
+    #[expect(unsafe_code, reason = "std::env::set_var/remove_var are unsafe fns; the SAFETY comments below say why this test cannot race")]
     fn scan_roots_ignores_env_override_when_use_env_roots_is_false() {
-        // SAFETY: test-only, single-threaded within this process's
-        // test harness invocation for this var name.
+        // SAFETY: `EXTRA_SESSIONS_DIR_ENV` is read only inside `scan_roots` when
+        // `use_env_roots` is true, and no test in this crate passes `true` for the
+        // claude adapter, so no other thread reads this variable while it is set.
+        // Rust's `std::env` serializes its own accessors and nothing here calls libc
+        // `getenv` directly.
         unsafe { std::env::set_var(EXTRA_SESSIONS_DIR_ENV, "/should/not/appear") };
         let adapter = ClaudeCodeAdapter;
         let roots = adapter.scan_roots(Path::new("/home/example"), false);
+        // SAFETY: same as the `set_var` above; this test is the variable's only user.
         unsafe { std::env::remove_var(EXTRA_SESSIONS_DIR_ENV) };
         assert!(!roots.iter().any(|r| r == Path::new("/should/not/appear")));
     }

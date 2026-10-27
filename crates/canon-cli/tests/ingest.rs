@@ -40,7 +40,7 @@ fn write_omp_fixture_home(home: &std::path::Path) {
 fn run_canon_ingest(fixture: &support::Fixture, extra_args: &[&str]) -> Output {
     let bin = Path::new(env!("CARGO_BIN_EXE_canon"));
     let mut args: Vec<String> = vec!["ingest".to_string(), "sessions".to_string()];
-    args.extend(extra_args.iter().map(|s| s.to_string()));
+    args.extend(extra_args.iter().map(std::string::ToString::to_string));
     args.push("--repo".to_string());
     args.push(fixture.canon_yaml_path().parent().unwrap().display().to_string());
     Command::new(bin)

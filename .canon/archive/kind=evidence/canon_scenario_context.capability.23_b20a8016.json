@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-024",
+    "role": "implementer",
+    "session_id": "canon-impl-024-1"
+  },
+  "at": "2026-10-19T08:33:12.244974Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test finding context_capability_23"
+  },
+  "evidence_note": {
+    "summary": "finding context_capability_23: 1 passed, 0 failed"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 26,
+  "scenario_id": "context.capability.23",
+  "schema": 1,
+  "staging_id": "2a265bb4be4d",
+  "verdict": "faithful"
+}

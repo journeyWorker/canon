@@ -1,0 +1,80 @@
+# Per CLI leaf: at least one success-path and one failure-path scenario id.
+# Columns (tab-separated): leaf id as in docs/cli/canon.cli.json, happy ids, failure ids.
+# happy ids: scenarios whose @case is not failure; failure ids: @case:failure scenarios.
+# Ids are comma-separated, written without the leading @.
+adapter authorize	dispatch.manifest.08	dispatch.manifest.09,dispatch.manifest.10
+adapter validate	dispatch.manifest.11	dispatch.manifest.12,dispatch.manifest.13
+artifacts move	evidence.add.118	evidence.add.119,evidence.add.120
+artifacts store	evidence.add.17,inventory.sync.40	inventory.sync.42
+artifacts verify	evidence.add.116	evidence.add.117
+brief approve	skills.install.20,report.dashboard.06	skills.install.68
+brief check	authoring.brief-check.01,authoring.brief-check.05	authoring.brief-check.06,authoring.brief-check.16
+brief show	authoring.brief-check.01	context.capability.45
+change new	authoring.change.01	authoring.change.02,authoring.change.03
+completion	context.capability.41	context.capability.42
+context	context.capability.38,context.capability.39	context.capability.40
+context-pack add	dispatch.manifest.14	dispatch.manifest.15
+context-pack show	dispatch.manifest.16	dispatch.manifest.17
+context-pack verify	dispatch.manifest.18	dispatch.manifest.19
+dashboard	report.dashboard.01	report.dashboard.02,report.dashboard.03
+demo init	authoring.demo.01	authoring.demo.02
+demo review	authoring.demo.03	authoring.demo.04
+dispatch begin	dispatch.manifest.01,dispatch.manifest.03	dispatch.manifest.05,dispatch.manifest.07
+dispatch diff	query.read.82	dispatch.manifest.28
+dispatch end	dispatch.manifest.25	dispatch.manifest.26,dispatch.manifest.27
+divergence accept	divergence.lifecycle.12	divergence.lifecycle.10,divergence.lifecycle.11
+divergence add	evidence.add.62,evidence.add.67	divergence.lifecycle.10
+divergence defer	divergence.lifecycle.03	divergence.lifecycle.10
+divergence list	divergence.lifecycle.04	divergence.lifecycle.13
+divergence resolve	divergence.lifecycle.03	divergence.lifecycle.10
+evidence add	evidence.add.01,evidence.add.03	evidence.add.04,evidence.add.06
+evidence approval-payload	evidence.add.121	evidence.add.105,evidence.add.122
+evidence audit	evidence.add.45	evidence.add.44
+export	tier.storage.14	tier.storage.15
+feature new	authoring.scaffold.04,authoring.scaffold.05	authoring.scaffold.02,authoring.scaffold.13
+finding add	finding.add.03,finding.add.09	finding.add.01,finding.add.02
+finding close	finding.close.01	finding.close.07,finding.close.82
+finding list	finding.list.01,finding.list.02	finding.list.04
+format	format.corpus.02,format.corpus.08	format.corpus.01,format.corpus.10
+gate check	gate.check.61,gate.check.97	gate.check.02,gate.check.100
+gate install-hooks	gate.check.105,gate.check.106	gate.check.107
+gate promote	gate.promote.01,gate.promote.05	gate.promote.03,gate.promote.04
+ingest plans	ingest.plans.02,ingest.plans.11	ingest.plans.04,ingest.plans.05
+ingest records	ingest.artifacts.02	ingest.artifacts.08
+ingest sessions	ingest.sessions.05,ingest.sessions.06	ingest.sessions.12
+init	authoring.init.01,authoring.init.31	authoring.init.33,authoring.init.94
+inventory sync	inventory.sync.01,inventory.sync.51	inventory.sync.02,inventory.sync.48
+ledger compact	tier.storage.12	tier.storage.13
+migrate	authoring.migrate.01,authoring.migrate.15	authoring.migrate.03,authoring.migrate.16
+plugin sync	plugin.overlay.09,plugin.overlay.04	plugin.overlay.10
+policy approve	policy.expressions.30	policy.expressions.31
+policy show	policy.expressions.33	policy.expressions.34
+prompt add	dispatch.manifest.20	dispatch.manifest.21,dispatch.manifest.22
+prompt show	dispatch.manifest.23	dispatch.manifest.24
+purge	tier.storage.16	tier.storage.17
+query	query.read.06,query.read.81	context.capability.17,query.read.80
+regime show	context.capability.24	retrieve.guidance.07
+report build	report.generation.01,report.generation.10	report.generation.11
+report check	report.generation.03,report.generation.13	report.generation.02,report.generation.04
+report snapshot	report.generation.07	report.generation.14
+retrieve	retrieve.guidance.01	retrieve.guidance.04
+review change	gate.check.103	review.add.99
+review scenario	review.add.80,review.add.20	review.add.02,review.add.21
+scenario new	authoring.scaffold.01,authoring.scaffold.12	authoring.scaffold.03,authoring.scaffold.11
+schema	context.capability.27,context.capability.29	context.capability.46
+selftest	gate.check.109	gate.check.108
+skills check	skills.install.53,skills.install.57	skills.install.54,skills.install.58
+skills doctor	skills.install.43,skills.install.56	skills.install.58,skills.install.64
+skills install	skills.install.01,skills.install.52	skills.install.07,skills.install.51
+skills show	skills.install.65	skills.install.66
+status	context.status.01,context.status.02	context.capability.44
+strategy approval-payload	learn.promotion.10	learn.promotion.11
+strategy promote	learn.promotion.01,learn.promotion.03	learn.promotion.04
+strategy rollback	learn.promotion.12	learn.promotion.13
+subject adopt	subject.lifecycle.02,subject.lifecycle.33	subject.lifecycle.23
+subject move	subject.lifecycle.03,subject.lifecycle.08	subject.lifecycle.04,subject.lifecycle.06
+subject new	subject.lifecycle.01	subject.lifecycle.09
+subject show	subject.lifecycle.40	subject.lifecycle.41
+subject unadopt	subject.lifecycle.36	subject.lifecycle.37
+task done	gate.task.02,gate.task.07	gate.task.01,gate.task.06
+tier age	tier.storage.03,tier.storage.04	tier.storage.10,tier.storage.11

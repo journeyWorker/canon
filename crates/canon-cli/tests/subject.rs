@@ -33,7 +33,7 @@ routing:
   subject: local
   change: local
   scenario: local
-  evidence_record: local
+  evidence: local
 ";
 
 /// Makes `repo` a git work tree with one commit, which every revision-bound
@@ -105,7 +105,7 @@ fn seed_subject_with_changes(repo: &Path, id: &str, status: SubjectStatus, scena
 }
 
 fn seed_scenario_verdict(repo: &Path, scenario: &str, verdict: EvidenceVerdict) {
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("reviewer-1", RoleId::parse("reviewer").unwrap()));
+    let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("reviewer-1", RoleId::parse("reviewer").unwrap()));
     let record = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(scenario).unwrap()), None, verdict);
     ledger(repo).write(&record).unwrap();
 }
@@ -186,7 +186,7 @@ fn adopt_links_the_change_and_the_subject_on_both_sides() {
     // Change side: some version carries the stamped `subject_ids`.
     let cq = run(dir.path(), &["query", "--kind", "change", "--json"]);
     assert!(cq.status.success(), "stderr: {}", stderr(&cq));
-    let change_payload: Value = data_of(&cq);
+    let change_payload = data_of(&cq);
     let changes = change_payload["records"].as_array().unwrap();
     assert!(
         changes.iter().any(|c| c["subject_ids"] == serde_json::json!(["demo-subject"]) && c["schema"] == 2),
@@ -205,7 +205,7 @@ fn adopt_refuses_an_unknown_change() {
 
 fn ledger_file_count(repo: &Path) -> usize {
     fn walk(dir: &Path) -> usize {
-        std::fs::read_dir(dir).map(|entries| entries.filter_map(Result::ok).map(|e| if e.path().is_dir() { walk(&e.path()) } else { 1 }).sum()).unwrap_or(0)
+        std::fs::read_dir(dir).map_or(0, |entries| entries.filter_map(Result::ok).map(|e| if e.path().is_dir() { walk(&e.path()) } else { 1 }).sum())
     }
     walk(&repo.join(".canon/ledger"))
 }
@@ -260,7 +260,7 @@ fn adopt_failing_between_its_two_writes_prints_a_repair_that_completes_the_link(
 
     let repair = run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "s36-demo"]);
     assert_eq!(repair.status.code(), Some(0), "{}", stderr(&repair));
-    let changes: Value = data_of(&run(dir.path(), &["query", "--kind", "change", "--json"]));
+    let changes = data_of(&run(dir.path(), &["query", "--kind", "change", "--json"]));
     assert!(changes["records"].as_array().unwrap().iter().any(|c| c["subject_ids"] == serde_json::json!(["demo-subject"])), "{changes}");
     let again = run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "s36-demo"]);
     assert!(stdout(&again).contains("nothing written"), "{}", stdout(&again));
@@ -528,7 +528,7 @@ fn seed_attested_subject_with(repo: &Path, session: Option<&str>, status: Subjec
     if let Some(session) = session {
         actor = actor.with_session(SessionId::parse(session).unwrap());
     }
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), actor);
+    let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), actor);
     let record = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse("world.demo.01").unwrap()), None, EvidenceVerdict::Faithful)
         .with_project_id(ProjectId::parse("demo").unwrap());
     ledger(repo).write(&record).unwrap();
@@ -598,7 +598,7 @@ fn seed_blocker(repo: &Path, fixed_after: Option<i64>) {
 /// review of it, both after the blocker was raised and closed.
 fn seed_reverification(repo: &Path, scenario: &str) {
     let later = |seconds: i64| Utc::now() + chrono::Duration::seconds(seconds);
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, later(10), Actor::new("impl-agent", RoleId::parse("implementer").unwrap()));
+    let envelope = Envelope::new(1, RecordKind::Evidence, later(10), Actor::new("impl-agent", RoleId::parse("implementer").unwrap()));
     let evidence = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(scenario).unwrap()), None, EvidenceVerdict::Faithful).with_project_id(ProjectId::parse("demo").unwrap());
     ledger(repo).write(&evidence).unwrap();
     let envelope = Envelope::new(1, RecordKind::Review, later(11), Actor::new("reviewer-2", RoleId::parse("reviewer").unwrap()));
@@ -731,6 +731,7 @@ fn a_blocker_the_author_found_in_its_own_work_is_accepted_and_still_blocks() {
             "1",
             "--severity",
             "blocker",
+            "--introduced-unknown",
             "--actor-id",
             "impl-agent",
             "--summary",
@@ -1072,7 +1073,7 @@ fn review_add_61_the_guard_and_status_judge_a_review_that_predates_pinning_as_th
     assert!(err.contains(&format!("canon subject move: advisory: {UNMIGRATED_ADVISORY}\n")), "{err}");
     assert_eq!(current_subject(dir.path())["status"], "building");
 
-    let report: Value = data_of(&run(dir.path(), &["status", "--json"]));
+    let report = data_of(&run(dir.path(), &["status", "--json"]));
     let subject = report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "demo-subject").unwrap().clone();
     assert_eq!((subject["reviewed"].as_u64(), subject["staleReviews"].as_u64()), (Some(0), Some(1)), "counted as a stale review: {subject}");
     let text = stdout(&run(dir.path(), &["status"]));
@@ -1104,7 +1105,7 @@ fn seed_technically_ship_ready(repo: &Path, brief: &str) {
 fn status_brief(repo: &Path) -> Value {
     let out = run(repo, &["status", "--json"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
-    let report: Value = data_of(&out);
+    let report = data_of(&out);
     report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "demo-subject").unwrap()["brief"].clone()
 }
 
@@ -1228,7 +1229,7 @@ fn evidence_files(repo: &Path) -> Vec<std::path::PathBuf> {
             let path = entry.path();
             if path.is_dir() {
                 walk(&path, out);
-            } else if path.to_string_lossy().contains("evidence_record") {
+            } else if path.to_string_lossy().contains("evidence") {
                 out.push(path);
             }
         }
@@ -1653,7 +1654,7 @@ fn subject_lifecycle_32_shipping_a_reopened_subject_runs_every_guard_again() {
 
     seed_blocker(dir.path(), Some(5));
     seed_reverification(dir.path(), "world.demo.01");
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now() + chrono::Duration::seconds(10), Actor::new("impl-agent", RoleId::parse("implementer").unwrap()));
+    let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now() + chrono::Duration::seconds(10), Actor::new("impl-agent", RoleId::parse("implementer").unwrap()));
     let evidence = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse("world.demo.02").unwrap()), None, EvidenceVerdict::Faithful)
         .with_project_id(ProjectId::parse("demo").unwrap());
     ledger(dir.path()).write(&evidence).unwrap();
@@ -1676,7 +1677,7 @@ fn subject_lifecycle_32_shipping_a_reopened_subject_runs_every_guard_again() {
 
 /// The latest stored version of change `id`, as `canon query` shows it.
 fn latest_change(repo: &Path, id: &str) -> Value {
-    let changes: Value = data_of(&run(repo, &["query", "--kind", "change", "--json"]));
+    let changes = data_of(&run(repo, &["query", "--kind", "change", "--json"]));
     changes["records"]
         .as_array()
         .unwrap()
@@ -1720,7 +1721,7 @@ fn subject_lifecycle_34_a_pre_0_18_change_reads_as_a_one_element_list_and_a_seco
     let change = latest_change(dir.path(), "refactor-core");
     assert_eq!(change["subject_ids"], serde_json::json!(["perception", "editing"]), "appended, not re-pointed: {change}");
     assert_eq!(change["schema"], 2, "written at the current generation: {change}");
-    let changes: Value = data_of(&run(dir.path(), &["query", "--kind", "change", "--json"]));
+    let changes = data_of(&run(dir.path(), &["query", "--kind", "change", "--json"]));
     assert_eq!(changes["count"], 1, "the old and the new version fold to one row: {changes}");
     assert_eq!(changes["records"][0]["subject_ids"], serde_json::json!(["perception", "editing"]), "{changes}");
 }

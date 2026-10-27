@@ -4,7 +4,7 @@ use clap::{Args, Subcommand};
 
 use canon_model::ChangeId;
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum BriefCommand {
     /// Show where the change stands and the next one to three steps; never edits
     #[command(after_help = "Examples:\n  canon brief show\n  canon brief show add-login --json\n\nThe operand names the change; without it the repo's only live change is read.")]
@@ -17,7 +17,7 @@ pub enum BriefCommand {
 }
 
 /// The flags of `brief show`.
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct BriefShowArgs {
     /// The change to read (default: the repo's only live change)
     #[arg(value_parser = crate::subject::parse_change_id)]
@@ -30,7 +30,7 @@ pub struct BriefShowArgs {
 }
 
 /// The flags of `brief check`.
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct BriefCheckArgs {
     /// The change to read (default: the repo's only live change)
     #[arg(value_name = "CHANGE_ID", value_parser = crate::subject::parse_change_id)]
@@ -43,7 +43,7 @@ pub struct BriefCheckArgs {
 }
 
 /// The flags of `brief approve`.
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct BriefApproveArgs {
     /// Who approved (the human, not the agent)
     #[arg(long, value_name = "NAME")]

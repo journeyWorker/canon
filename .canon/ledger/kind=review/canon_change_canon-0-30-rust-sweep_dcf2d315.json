@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-030-chore",
+    "role": "reviewer",
+    "session_id": "rev-030-chore-2026-10-26"
+  },
+  "at": "2026-10-26T21:10:11.795402934Z",
+  "change_id": "canon-0-30-rust-sweep",
+  "code_tree": "2ef08199d2a75e59681658106d5d6e0f2759b463",
+  "kind": "review",
+  "pin": "63e53828b3b7368d61b529c7283e2ee1954e1e32",
+  "pins": {
+    "checks": [],
+    "scenario_digest": "03b5528c36d1a7749a1c9be3d3191be12db6c1b21c9786bb569d32faa3d11d72",
+    "scenario_digest_scope": "brief"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "original_spec_ref": ".canon/changes/canon-0-30-rust-sweep/brief.md"
+  },
+  "review_id": "01M5X0S9JKDZ3E3DGWK6GAR2B6",
+  "reviewer": "rev-030-chore",
+  "schema": 2,
+  "worktree_dirty": false
+}

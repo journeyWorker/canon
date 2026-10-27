@@ -54,7 +54,7 @@ fn every_leaf_declares_its_outputs_with_a_schema_and_a_version() {
                 problems.push(format!("`{path}`: {name} names no schema of the spec"));
             }
             // The report is named for its leaf: `<PascalCaseId>Report`, or a variant of it (`Batch…`, a second shape).
-            let pascal: String = path.split(|c: char| c == ' ' || c == '-').map(|w| w[..1].to_uppercase() + &w[1..]).collect();
+            let pascal: String = path.split([' ', '-']).map(|w| w[..1].to_uppercase() + &w[1..]).collect();
             if !name.ends_with("Report") || !(name.contains(&pascal) || name.starts_with("Batch")) {
                 problems.push(format!("`{path}`: {name} is not named for its leaf (`{pascal}Report`)"));
             }
@@ -79,7 +79,7 @@ fn no_schema_of_the_spec_is_orphaned() {
             _ => {}
         }
     }
-    for (name, reason) in UNLISTED_SCHEMAS.iter() {
+    for (name, reason) in UNLISTED_SCHEMAS {
         assert!(!reason.is_empty());
         if spec()["schemas"].get(name).is_none() {
             problems.push(format!("UNLISTED_SCHEMAS names {name}, which is no schema: drop it from the list"));

@@ -1,0 +1,30 @@
+{
+  "actor": {
+    "agent_id": "rev-030-ln",
+    "role": "reviewer",
+    "session_id": "rev-030-ln-2026-10-26"
+  },
+  "at": "2026-10-26T18:26:30.174635449Z",
+  "code_tree": "a63296920ba393b2da8dc7715fead8017ec5435e",
+  "kind": "review",
+  "pin": "63a5e3c4e25e58d42ca9db7cc692b02490f43ee5",
+  "pins": {
+    "checks": [
+      {
+        "checks": [],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "dd44617ff5b18f77fe7f04b5711b1cafe6274afd6b7b87ff1ef82e155e2fa72c",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": ".canon/changes/canon-0-30-ledger-naming/brief.md"
+  },
+  "reviewer": "rev-030-ln",
+  "scenario_id": "ledger.naming.06",
+  "schema": 1,
+  "worktree_dirty": false
+}

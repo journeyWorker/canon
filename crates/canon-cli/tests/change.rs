@@ -186,7 +186,7 @@ fn assert_nothing_left(repo: &Path) {
     assert!(staging_leftovers(repo).is_empty(), "staging dirs left: {:?}", staging_leftovers(repo));
     assert!(query(repo, "change").is_empty(), "no change record may be written");
     let subjects = query(repo, "subject");
-    assert!(subjects.iter().all(|s| s["change_ids"].as_array().is_none_or(|ids| ids.is_empty())), "{subjects:?}");
+    assert!(subjects.iter().all(|s| s["change_ids"].as_array().is_none_or(std::vec::Vec::is_empty)), "{subjects:?}");
 }
 
 #[test]
@@ -235,7 +235,7 @@ fn make_writable(dir: &Path) {
 /// Every record file in the git ledger, for "nothing was written" checks.
 fn ledger_file_count(repo: &Path) -> usize {
     fn walk(dir: &Path) -> usize {
-        std::fs::read_dir(dir).map(|entries| entries.filter_map(Result::ok).map(|e| if e.path().is_dir() { walk(&e.path()) } else { 1 }).sum()).unwrap_or(0)
+        std::fs::read_dir(dir).map_or(0, |entries| entries.filter_map(Result::ok).map(|e| if e.path().is_dir() { walk(&e.path()) } else { 1 }).sum())
     }
     walk(&repo.join(".canon/ledger"))
 }

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "m5-impl"
+  },
+  "at": "2026-10-11T16:35:36.105609Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test legacy_pins the_subject_status_guard_and_status_apply_the_same_legacy_decision"
+  },
+  "evidence_note": {
+    "summary": "subject status refuses with the gate's stale detail and prints the split; status counts the stale review; re-review lets the move through"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 28,
+  "scenario_id": "review.add.61",
+  "schema": 1,
+  "staging_id": "42826a750e57",
+  "verdict": "faithful"
+}

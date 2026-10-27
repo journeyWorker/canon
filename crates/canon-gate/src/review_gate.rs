@@ -226,7 +226,7 @@ pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclud
                 .and_then(|all| all.into_iter().next());
             match waived {
                 Some((subject, waiver)) => {
-                    outcome.advisories.push(ReviewAdvisory { violation, subject_id: subject.subject_id.clone(), waiver: waiver.clone() })
+                    outcome.advisories.push(ReviewAdvisory { violation, subject_id: subject.subject_id.clone(), waiver: waiver.clone() });
                 }
                 None => outcome.violations.push(violation),
             }
@@ -249,7 +249,7 @@ pub(crate) fn evaluate(ctx: &GateContext, require_review: &RequireReview, exclud
                 .and_then(|all| all.into_iter().next());
             match waived {
                 Some((subject, waiver)) => {
-                    outcome.advisories.push(ReviewAdvisory { violation, subject_id: subject.subject_id.clone(), waiver: waiver.clone() })
+                    outcome.advisories.push(ReviewAdvisory { violation, subject_id: subject.subject_id.clone(), waiver: waiver.clone() });
                 }
                 None => outcome.violations.push(violation),
             }
@@ -468,7 +468,7 @@ pub fn review_gap(ctx: &GateContext, scenario: &Scenario, distinct_actor: bool) 
         }
         let evidence = scenario_evidence(ctx, scenario);
         let evidence_actors: BTreeSet<&str> = evidence.iter().map(|e| e.envelope.actor.agent_id.as_str()).collect();
-        let evidence_sessions: BTreeSet<&str> = evidence.iter().filter_map(|e| e.envelope.actor.session_id.as_ref()).map(|s| s.as_str()).collect();
+        let evidence_sessions: BTreeSet<&str> = evidence.iter().filter_map(|e| e.envelope.actor.session_id.as_ref()).map(canon_model::SessionId::as_str).collect();
         let distinct_actors = |r: &Review| !evidence_actors.contains(r.reviewer.as_str()) && !evidence_actors.contains(r.envelope.actor.agent_id.as_str());
         let distinct_session = |r: &Review| r.envelope.actor.session_id.as_ref().is_none_or(|s| !evidence_sessions.contains(s.as_str()));
         if fresh.iter().any(|&r| distinct_actors(r) && distinct_session(r)) {
@@ -479,7 +479,7 @@ pub fn review_gap(ctx: &GateContext, scenario: &Scenario, distinct_actor: bool) 
         // rule alone; name it, or the operator is told the actors collide
         // when they do not.
         let shared_sessions: BTreeSet<&str> =
-            fresh.iter().filter(|&&r| distinct_actors(r)).filter_map(|r| r.envelope.actor.session_id.as_ref()).map(|s| s.as_str()).collect();
+            fresh.iter().filter(|&&r| distinct_actors(r)).filter_map(|r| r.envelope.actor.session_id.as_ref()).map(canon_model::SessionId::as_str).collect();
         let detail = if shared_sessions.is_empty() {
             format!(
                 "every review of this scenario is by an actor that also attested its evidence ({actors}); spec_coverage.require_review.distinct_actor wants a reviewer other than the evidence actor"
@@ -778,7 +778,7 @@ pub fn change_review_gap(ctx: &GateContext, subject: &Subject, change: &ChangeId
     }
     let evidence: Vec<&canon_model::EvidenceRecord> = crate::spec_coverage::subject_scenarios(ctx, &subject.subject_id).into_iter().flat_map(|s| scenario_evidence(ctx, s)).collect();
     let actors: BTreeSet<&str> = evidence.iter().map(|e| e.envelope.actor.agent_id.as_str()).collect();
-    let sessions: BTreeSet<&str> = evidence.iter().filter_map(|e| e.envelope.actor.session_id.as_ref()).map(|s| s.as_str()).collect();
+    let sessions: BTreeSet<&str> = evidence.iter().filter_map(|e| e.envelope.actor.session_id.as_ref()).map(canon_model::SessionId::as_str).collect();
     let independent = |r: &Review| {
         !actors.contains(r.reviewer.as_str()) && !actors.contains(r.envelope.actor.agent_id.as_str()) && r.envelope.actor.session_id.as_ref().is_none_or(|s| !sessions.contains(s.as_str()))
     };

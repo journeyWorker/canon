@@ -315,7 +315,7 @@ impl DispatchError {
             Self::SkillDigestWithoutId => "pass --skill-id <id> with --skill-digest, or drop the digest".to_string(),
             Self::Io(_) => "check that the repository's .canon directory is writable, then run the command again".to_string(),
             Self::Serialize(_) => "this is a canon bug: report it together with the command line that produced it".to_string(),
-            Self::ContextPack(inner) => inner.to_cli_error().hint.unwrap_or_default(),
+            Self::ContextPack(inner) => inner.to_cli_error().hint_text().unwrap_or_default().to_string(),
             Self::TaskNotFound { .. } => "task ids look like <change_id>#<n>; open the change's plan document to find the right number".to_string(),
             Self::NoPlanSources { .. } => "write the change's plan document, then run `canon ingest plans` so --task-id can resolve against it".to_string(),
             Self::PlanCorpus { .. } => "fix the plan document the message names, then run the command again".to_string(),
@@ -516,11 +516,25 @@ pub struct DispatchMetadata {
     pub prompt_bundle: Option<PromptBundleSelection>,
 }
 
+/// A `canon dispatch` value that no parser accepts.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum DispatchArgError {
+    /// `--prompt-bundle` without an `@`.
+    #[error("prompt bundle must be NAME@VERSION")]
+    PromptBundleShape,
+    /// `--prompt-bundle` with an empty name or version, or a second `@`.
+    #[error("prompt bundle must be NAME@VERSION with non-empty name and version")]
+    PromptBundleParts,
+    /// `--status` other than `succeeded` or `failed`.
+    #[error("`{0}` is not a terminal run status — expected one of: succeeded, failed")]
+    UnknownRunStatus(String),
+}
+
 /// Parse the CLI's `name@version` prompt bundle selector.
-pub fn parse_prompt_bundle(value: &str) -> Result<PromptBundleSelection, String> {
-    let (name, version) = value.split_once('@').ok_or_else(|| "prompt bundle must be NAME@VERSION".to_string())?;
+pub fn parse_prompt_bundle(value: &str) -> Result<PromptBundleSelection, DispatchArgError> {
+    let (name, version) = value.split_once('@').ok_or(DispatchArgError::PromptBundleShape)?;
     if name.is_empty() || version.is_empty() || version.contains('@') {
-        return Err("prompt bundle must be NAME@VERSION with non-empty name and version".to_string());
+        return Err(DispatchArgError::PromptBundleParts);
     }
     Ok(PromptBundleSelection { name: name.to_string(), version: version.to_string() })
 }
@@ -560,7 +574,7 @@ fn capture_lineage(
     spec.task_ref = task_ref;
     spec.injected_guidance = guidance.to_vec();
     let (pack, _) = create_dispatch_pack(repo, &spec, &context_bytes, surface.capability_version)?;
-    let policy_digest = pack.policy.as_ref().map(|file| file.content.digest.clone()).unwrap_or_else(|| "sha256:absent".to_string());
+    let policy_digest = pack.policy.as_ref().map_or_else(|| "sha256:absent".to_string(), |file| file.content.digest.clone());
     Ok(RunLineage {
         provider: metadata.provider.clone().or(pack.provider.clone()),
         model: metadata.model.clone().or(pack.model.clone()),
@@ -799,6 +813,9 @@ pub struct DispatchBeginReport<'a> {
     pub parent_run_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tier_degraded: Option<&'a str>,
+    /// Where the run record goes (0.30): the hot store's location; absent with no hot rung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hot_store: Option<String>,
 }
 
 impl crate::reports::Report for DispatchBeginReport<'_> {}
@@ -815,6 +832,9 @@ pub struct DispatchEndReport<'a> {
     pub ended_at: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tier_degraded: Option<&'a str>,
+    /// Where the run record goes (0.30): the hot store's location; absent with no hot rung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hot_store: Option<String>,
 }
 
 impl crate::reports::Report for DispatchEndReport<'_> {}
@@ -876,6 +896,7 @@ pub fn run_begin(
 ) -> ExitCode {
     match begin(repo, role, regime_key, agent_id, binding, metadata) {
         Ok(begun) => {
+            let hot = crate::hot_store::HotStore::of(&repo.join("canon.yaml"));
             if !json {
                 println!(
                     "dispatch {} begun for {} — recorded {} guidance item(s) -> {}",
@@ -890,6 +911,9 @@ pub fn run_begin(
                 if let Some(parent) = begun.run.parent_run_id {
                     println!("  dispatched by run {parent}");
                 }
+                if let Some(hot) = &hot {
+                    println!("{}", hot.line());
+                }
             }
             let report = DispatchBeginReport {
                 run_id: begun.run_id.to_string(),
@@ -899,6 +923,7 @@ pub fn run_begin(
                 task_id: begun.run.task_id.as_ref().map(TaskId::as_str),
                 parent_run_id: begun.run.parent_run_id.map(|parent| parent.to_string()),
                 tier_degraded: begun.tier.degrade_reason(),
+                hot_store: hot.as_ref().map(crate::hot_store::HotStore::location),
             };
             crate::next::finish(repo, "dispatch begin", &crate::next::Scope::Repo, false, json, &report);
             // stderr in BOTH render modes, so stdout stays a clean
@@ -914,7 +939,7 @@ pub fn run_begin(
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(err.to_cli_error().emit("canon dispatch begin", json) as u8)
+            ExitCode::from(err.to_cli_error().emit("canon dispatch begin", json))
         }
     }
 }
@@ -926,16 +951,16 @@ pub fn run_begin(
 /// GRAMMAR check only — `<change_id>#<n>`. Whether such a task EXISTS
 /// is [`validate_task_binding`]'s job at dispatch time, against the
 /// live plan corpus, because clap has not resolved `--repo` yet.
-pub fn parse_task_id(s: &str) -> Result<TaskId, String> {
-    TaskId::parse(s).map_err(|e| e.to_string())
+pub fn parse_task_id(s: &str) -> Result<TaskId, canon_model::ids::JoinKeyError> {
+    TaskId::parse(s)
 }
 
 /// `--parent-run-id`'s and `--run-id`'s clap `value_parser`: the `RunId`
 /// grammar (a ULID). For `--parent-run-id` this is the ONLY check there
 /// is — see [`DispatchBinding::parent_run_id`] for why the parent's
 /// existence is deliberately not verified.
-pub fn parse_run_id(s: &str) -> Result<RunId, String> {
-    RunId::parse(s).map_err(|e| e.to_string())
+pub fn parse_run_id(s: &str) -> Result<RunId, canon_model::ids::JoinKeyError> {
+    RunId::parse(s)
 }
 
 /// `canon dispatch end --status`'s clap `value_parser`. The domain is
@@ -948,11 +973,11 @@ pub fn run_status_parser() -> impl clap::builder::TypedValueParser<Value = RunSt
 }
 
 /// A terminal run status, as `--status` spells it.
-pub fn parse_run_status(s: &str) -> Result<RunStatus, String> {
+pub fn parse_run_status(s: &str) -> Result<RunStatus, DispatchArgError> {
     match s {
         "succeeded" => Ok(RunStatus::Succeeded),
         "failed" => Ok(RunStatus::Failed),
-        other => Err(format!("`{other}` is not a terminal run status — expected one of: succeeded, failed")),
+        other => Err(DispatchArgError::UnknownRunStatus(other.to_string())),
     }
 }
 
@@ -1352,8 +1377,12 @@ pub fn end(repo: &Path, run_id: RunId, status: RunStatus) -> Result<Ended, Dispa
 pub fn run_end(repo: &Path, run_id: RunId, status: RunStatus, json: bool) -> ExitCode {
     match end(repo, run_id, status) {
         Ok(ended) => {
+            let hot = crate::hot_store::HotStore::of(&repo.join("canon.yaml"));
             if !json {
                 println!("dispatch {} ended `{}` -> {}", ended.run_id, status_slug(ended.run.status), ended.manifest_path.display());
+                if let Some(hot) = &hot {
+                    println!("{}", hot.line());
+                }
             }
             let report = DispatchEndReport {
                 run_id: ended.run_id.to_string(),
@@ -1361,6 +1390,7 @@ pub fn run_end(repo: &Path, run_id: RunId, status: RunStatus, json: bool) -> Exi
                 status: status_slug(ended.run.status),
                 ended_at: ended.run.ended_at,
                 tier_degraded: ended.tier.degrade_reason(),
+                hot_store: hot.as_ref().map(crate::hot_store::HotStore::location),
             };
             crate::next::finish(repo, "dispatch end", &crate::next::Scope::Repo, false, json, &report);
             if let Some(reason) = ended.tier.degrade_reason() {
@@ -1373,7 +1403,7 @@ pub fn run_end(repo: &Path, run_id: RunId, status: RunStatus, json: bool) -> Exi
             ExitCode::SUCCESS
         }
         Err(err) => {
-            ExitCode::from(err.to_cli_error().emit("canon dispatch end", json) as u8)
+            ExitCode::from(err.to_cli_error().emit("canon dispatch end", json))
         }
     }
 }
@@ -1812,7 +1842,7 @@ fn reconcile_runs(tier: Vec<Value>, manifests: Vec<Value>, notes: &mut Vec<Strin
             // `record` is over before either branch below MOVES it —
             // a `let ... else` on the borrow directly would keep the
             // initializer's temporaries alive across the `else`.
-            let keyed = str_field(&record, "run_id").map(|run_id| run_id.to_string());
+            let keyed = str_field(&record, "run_id").map(std::string::ToString::to_string);
             let Some(run_id) = keyed else {
                 unkeyed.push(record);
                 continue;
@@ -1862,7 +1892,7 @@ fn describe_divergence(left: &Value, right: &Value) -> String {
         return "the whole record".to_string();
     };
     let differing: BTreeSet<&str> =
-        left.keys().chain(right.keys()).map(|field| field.as_str()).filter(|field| left.get(*field) != right.get(*field)).collect();
+        left.keys().chain(right.keys()).map(std::string::String::as_str).filter(|field| left.get(*field) != right.get(*field)).collect();
     if differing.is_empty() {
         // Two objects that compare unequal must differ on some key,
         // so this is unreachable — but a note reading "differs on: "
@@ -1990,6 +2020,15 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+
+    #[test]
+    fn the_value_parsers_refuse_in_their_old_words() {
+        assert_eq!(parse_prompt_bundle("plain").unwrap_err().to_string(), "prompt bundle must be NAME@VERSION");
+        assert_eq!(parse_prompt_bundle("a@").unwrap_err().to_string(), "prompt bundle must be NAME@VERSION with non-empty name and version");
+        assert_eq!(parse_run_status("running").unwrap_err().to_string(), "`running` is not a terminal run status — expected one of: succeeded, failed");
+        assert_eq!(parse_task_id("nope").unwrap_err().to_string(), format!("invalid TaskId: \"nope\" does not match grammar `{}`", TaskId::GRAMMAR));
+        assert!(parse_run_id("nope").unwrap_err().to_string().starts_with("invalid RunId: \"nope\" does not match grammar"));
+    }
 
     /// A plan `Task` record's diff-relevant shape: its own id plus the
     /// ids it declares as antecedents.
@@ -2341,15 +2380,15 @@ mod begin_tests {
     use super::*;
     use tempfile::TempDir;
 
-    /// `pub(super)`, like [`regime`] and [`write_openspec_change`]
+    /// `pub(crate)`, like [`regime`] and [`write_openspec_change`]
     /// below, so s42's `tier_tests` composes the SAME dispatch inputs
     /// this module already uses instead of a second, silently
     /// drifting copy of them.
-    pub(super) fn role() -> RoleId {
+    pub(crate) fn role() -> RoleId {
         RoleId::parse("implementer").expect("a literal role slug")
     }
 
-    pub(super) fn regime() -> RegimeKey {
+    pub(crate) fn regime() -> RegimeKey {
         RegimeKey::parse("implementer/canon/dispatch/abc123").expect("a literal regime key")
     }
 
@@ -2357,7 +2396,7 @@ mod begin_tests {
     /// openspec dialect's own admission bar — a change dir without one
     /// is not a change the importer recognizes at all) plus the given
     /// `tasks.md` rows.
-    pub(super) fn write_openspec_change(root: &Path, change_id: &str, rows: &str) {
+    pub(crate) fn write_openspec_change(root: &Path, change_id: &str, rows: &str) {
         let change_dir = root.join(change_id);
         std::fs::create_dir_all(&change_dir).expect("creating the change dir");
         std::fs::write(change_dir.join("proposal.md"), format!("# {change_id}\n\n## Why\n\nTo exercise --task-id resolution.\n"))
@@ -2975,11 +3014,11 @@ mod begin_tests {
 
     #[test]
     fn the_binding_value_parsers_check_grammar_only() {
-        assert!(parse_task_id("demo-change#1.1").is_ok());
+        parse_task_id("demo-change#1.1").unwrap();
         assert!(parse_task_id("no-such-change#9.9").is_ok(), "grammar, not existence — existence is checked at dispatch time");
-        assert!(parse_task_id("missing-the-separator").is_err());
-        assert!(parse_run_id("01ARZ3NDEKTSV4RRFFQ69G5FAV").is_ok());
-        assert!(parse_run_id("not-a-ulid").is_err());
+        parse_task_id("missing-the-separator").unwrap_err();
+        parse_run_id("01ARZ3NDEKTSV4RRFFQ69G5FAV").unwrap();
+        parse_run_id("not-a-ulid").unwrap_err();
     }
 }
 

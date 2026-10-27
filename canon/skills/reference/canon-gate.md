@@ -205,9 +205,15 @@ Two refusals rather than a silent pass, both surfacing as
   `divergence`, or `subject` sent anywhere but `local`) refuses, because
   the gate reads one tier and would otherwise pass by seeing nothing.
 
-Malformed rows in those three kinds do NOT surface as
+Unparseable rows in those three kinds do NOT surface as
 `malformed-evidence`; they are kept off the evidence violation set on
-purpose, so enabling nothing changes no existing verdict.
+purpose, so enabling nothing changes no existing verdict. A row whose file
+name is not the one its body computes (a layout violation) is the
+exception once `spec_coverage` judges the corpus: the gate names it as
+`malformed-evidence`, because every read skips it and the corpus being
+judged would otherwise be missing it silently. Without the section the
+gate stays as it was; `canon query --kind <kind>` and `canon status`
+report such files.
 
 ### Accepted divergence and re-verification
 

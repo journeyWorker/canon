@@ -31,18 +31,26 @@ use crate::context::resolve_repo_root;
 use crate::policy_approval::ApprovalState;
 use canon_ingest::markdown::{field, without_field};
 
-const EXIT_REFUSED: i32 = 2;
-const EXIT_ERROR: i32 = 1;
+const EXIT_REFUSED: u8 = 2;
+const EXIT_ERROR: u8 = 1;
+
+/// A brief that cannot carry an `Approved:` line.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum ApprovedTextError {
+    /// The brief ends inside an open code fence or HTML comment.
+    #[error("the brief ends inside an open code fence or HTML comment, so an `Approved:` line appended there would not be read; close it first")]
+    UnreadableLine,
+}
 
 /// `text` approved: its `Approved:` lines replaced by one that binds the
 /// result's remaining text. `Err` when the line would not be read back
 /// (the brief ends inside an open code fence or HTML comment).
-pub fn approved_text(text: &str, by: &str, when: &str, note: &str) -> Result<String, String> {
+pub fn approved_text(text: &str, by: &str, when: &str, note: &str) -> Result<String, ApprovedTextError> {
     let body = format!("{}\n\n", without_field(text, "Approved:").trim_end());
     let value = format!("{by} {when} — \"{note}\" (brief {})", brief_digest(&body));
     let approved = format!("{body}Approved: {value}\n");
     if field(&approved, "Approved:") != Some(value.as_str()) || brief_digest(&approved) != brief_digest(&body) {
-        return Err("the brief ends inside an open code fence or HTML comment, so an `Approved:` line appended there would not be read; close it first".to_string());
+        return Err(ApprovedTextError::UnreadableLine);
     }
     Ok(approved)
 }
@@ -72,7 +80,7 @@ fn hint_for(code: &str) -> &'static str {
     }
 }
 
-fn refuse(code: &'static str, message: &str, exit: i32) -> CliError {
+fn refuse(code: &'static str, message: &str, exit: u8) -> CliError {
     CliError::failed(code, message).hint(hint_for(code)).with_exit(exit)
 }
 
@@ -132,11 +140,11 @@ fn approve_checked(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str,
         return Ok((Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&text), approved_by: by.to_string(), policy_approved }, true));
     }
     let when = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    let approved = approved_text(&text, by, &when, note).map_err(|e| refuse("BRIEF_UNAPPROVABLE", &e, EXIT_REFUSED))?;
+    let approved = approved_text(&text, by, &when, note).map_err(|e| refuse("BRIEF_UNAPPROVABLE", &e.to_string(), EXIT_REFUSED))?;
     // Policy first: a failed policy write leaves the brief untouched, and a
     // failed brief write leaves a policy approval that is true on its own.
     if policy_approved {
-        crate::policy_approval::record(repo, by, Some(note)).map_err(|e| refuse("POLICY_APPROVAL_FAILED", &e, EXIT_ERROR))?;
+        crate::policy_approval::record(repo, by, Some(note)).map_err(|e| refuse("POLICY_APPROVAL_FAILED", &e.to_string(), EXIT_ERROR))?;
     }
     std::fs::write(&path, &approved).map_err(|e| refuse("BRIEF_WRITE_FAILED", &format!("cannot write `{}`: {e}", checked.brief), EXIT_ERROR))?;
     Ok((Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&approved), approved_by: by.to_string(), policy_approved }, false))
@@ -156,7 +164,7 @@ fn verify_bytes(brief: &str, bytes: Option<&[u8]>, expected: &str) -> Result<(),
 }
 
 /// `canon brief approve`. Returns the process exit code.
-pub fn run_approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, json: bool) -> i32 {
+pub fn run_approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let (approved, unchanged) = match approve_checked(&repo, change, by, note, None) {
         Ok(done) => done,
@@ -185,4 +193,15 @@ fn already_approved_so(text: &str, by: &str, note: &str) -> bool {
         .and_then(|value| value.strip_prefix(' '))
         .and_then(|value| value.strip_suffix(tail.as_str()))
         .is_some_and(|when| !when.is_empty() && !when.contains(char::is_whitespace))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_brief_ending_inside_a_fence_is_refused_in_its_old_words() {
+        let error = approved_text("# Brief\n\n```\nunclosed\n", "me", "2026-01-01T00:00:00Z", "ok").unwrap_err();
+        assert_eq!(error.to_string(), "the brief ends inside an open code fence or HTML comment, so an `Approved:` line appended there would not be read; close it first");
+    }
 }

@@ -48,7 +48,7 @@ pub struct Manifest {
     /// tables. On the git tier it covers the eight core kinds
     /// `crate::digest`'s `digest_side` assigns to a digest —
     /// `change`/`task`/`scenario`/`subject` (corpus) and
-    /// `review`/`divergence`/`evidence_record`/`finding` (ledger head)
+    /// `review`/`divergence`/`evidence`/`finding` (ledger head)
     /// — PLUS every namespaced overlay kind that tier holds, whatever
     /// it is named, discovered from the tier's own `kind=`
     /// directories rather than from any list
@@ -132,7 +132,7 @@ pub struct Manifest {
     /// `(N violation(s) reported, excluded)` and still exits zero, and
     /// `canon gate check` never sees it at all, because
     /// `canon_gate::context::GateContext::load` reads only
-    /// `RecordKind::EvidenceRecord`, so `LedgerCheck`'s
+    /// `RecordKind::Evidence`, so `LedgerCheck`'s
     /// `malformed-evidence` surfacing covers the ledger kind alone.
     /// Widening that load to every core kind is the closure, and it is
     /// canon-gate's change rather than this crate's: a report can only

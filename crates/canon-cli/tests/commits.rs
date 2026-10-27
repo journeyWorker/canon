@@ -163,7 +163,7 @@ fn every_rev_default_resolves_head_and_records_the_code_it_saw() {
         assert_eq!(record["code_tree"], tree.tree);
         assert_eq!(record["worktree_dirty"], false);
     }
-    let evidence = records(r, "evidence_record");
+    let evidence = records(r, "evidence");
     assert_eq!(evidence.len(), 2, "declared and audit evidence");
     for record in &evidence {
         assert_eq!(sha_of(record, "evidence_sha").as_deref(), Some(head.as_str()));
@@ -218,7 +218,7 @@ fn a_dirty_working_tree_is_recorded_with_the_code_tree_of_the_commit_made_from_i
     let review = records(r, "review").remove(0);
     assert_eq!(review["worktree_dirty"], true);
     assert_eq!(review["pin"], head(r), "the revision is still HEAD");
-    for kind in ["divergence", "evidence_record"] {
+    for kind in ["divergence", "evidence"] {
         assert_eq!(records(r, kind)[0]["worktree_dirty"], true, "{kind}");
     }
     let reviewed_tree = review["code_tree"].as_str().unwrap().to_string();

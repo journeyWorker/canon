@@ -36,7 +36,7 @@ fn merges_records_split_across_the_routed_tier_and_its_aging_destination() {
     let output = fixture.run_canon(&["query", "--kind", "trajectory", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
 
-    let payload: Value = data_of(&support::stdout(&output));
+    let payload = data_of(&support::stdout(&output));
     assert_eq!(payload["kind"], "trajectory");
     assert_eq!(payload["count"], 2);
     let records = payload["records"].as_array().expect("records array");
@@ -59,31 +59,32 @@ fn since_filters_to_records_at_or_after_the_given_timestamp() {
     let output = fixture.run_canon(&["query", "--kind", "trajectory", "--since", &cutoff.to_rfc3339(), "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
 
-    let payload: Value = data_of(&support::stdout(&output));
+    let payload = data_of(&support::stdout(&output));
     let records = payload["records"].as_array().expect("records array");
     let rewards: Vec<f64> = records.iter().map(|record| record["reward"].as_f64().unwrap()).collect();
     assert_eq!(rewards, vec![0.15, 0.2], "the at-cutoff and newer records must be returned, the older one filtered out");
 }
 
 /// query.read.04: two otherwise-identical attestations of one scenario at
-/// two pinned commits are stored under two distinct natural keys and
+/// two pinned commits are stored as two records under one key (they differ by digest) and
 /// `canon query --kind review` returns BOTH — reviews are never folded
 /// by key, so neither attestation is dropped as a stale version.
 #[test]
-fn two_reviews_of_one_scenario_at_two_pins_are_two_keys_and_both_read_back() {
+fn two_reviews_of_one_scenario_at_two_pins_are_two_records_and_both_read_back() {
     let fixture = support::Fixture::new("  review: local\n", "");
     let at = Utc::now() - Duration::hours(1);
     let first = fixture.plant_review_in_git("app-a", "world.place-lock.01", "abc123", at);
     let second = fixture.plant_review_in_git("app-a", "world.place-lock.01", "def456", at);
-    assert!(first.location.contains("app-a__world.place-lock.01__abc123__"), "{}", first.location);
-    assert!(second.location.contains("app-a__world.place-lock.01__def456__"), "{}", second.location);
+    // The pin is not in the name (0.30 R2): both land under one key prefix, told apart by digest.
+    assert!(first.location.starts_with("kind=review/app-a_scenario_world.place-lock.01_"), "{}", first.location);
+    assert!(second.location.starts_with("kind=review/app-a_scenario_world.place-lock.01_"), "{}", second.location);
     assert_ne!(first.location, second.location);
 
     let output = fixture.run_canon(&["query", "--kind", "review", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = data_of(&support::stdout(&output));
+    let payload = data_of(&support::stdout(&output));
     assert_eq!(payload["count"], 1, "the ledger holds the one in-effect review of this reviewer: {payload}");
-    let history: Value = data_of(&support::stdout(&fixture.run_canon(&["query", "--kind", "review", "--json", "--history"])));
+    let history = data_of(&support::stdout(&fixture.run_canon(&["query", "--kind", "review", "--json", "--history"])));
     assert_eq!(history["count"], 2, "--history returns both attestations: {history}");
     let payload = history;
     let records = payload["records"].as_array().expect("records array");
@@ -92,7 +93,10 @@ fn two_reviews_of_one_scenario_at_two_pins_are_two_keys_and_both_read_back() {
         .map(|record| canon_store::partition::resolve_partition(canon_model::envelope::RecordKind::Review, record).unwrap().natural_key)
         .collect();
     keys.sort();
-    assert_eq!(keys, vec!["app-a__world.place-lock.01__abc123".to_string(), "app-a__world.place-lock.01__def456".to_string()]);
+    assert_eq!(keys, vec!["app-a_scenario_world.place-lock.01".to_string(); 2], "two records under one key");
+    let mut pins: Vec<&str> = records.iter().map(|r| r["pin"].as_str().unwrap()).collect();
+    pins.sort_unstable();
+    assert_eq!(pins, ["abc123", "def456"], "the pin stays in the body");
     for record in records {
         assert_eq!(record["project_id"], "app-a");
         assert_eq!(record["scenario_id"], "world.place-lock.01");
@@ -293,7 +297,7 @@ fn change_id_scopes_a_task_query_to_one_changes_rows() {
 
     let output = fixture.run_canon(&["query", "--kind", "task", "--change-id", "add-audio-reactive", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = data_of(&support::stdout(&output));
+    let payload = data_of(&support::stdout(&output));
     let ids: Vec<String> = payload["records"].as_array().unwrap().iter().map(|r| r["task_id"].as_str().unwrap().to_string()).collect();
     assert_eq!(ids, vec!["add-audio-reactive#1.1", "add-audio-reactive#2.2"], "add-widget#1.1 must be excluded: {ids:?}");
 }
@@ -308,7 +312,7 @@ fn change_id_scopes_a_change_query_to_at_most_one_record() {
 
     let output = fixture.run_canon(&["query", "--kind", "change", "--change-id", "add-widget", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = data_of(&support::stdout(&output));
+    let payload = data_of(&support::stdout(&output));
     let records = payload["records"].as_array().unwrap();
     assert_eq!(records.len(), 1, "the two add-widget versions fold to the current one (0.18 D4), add-other excluded: {records:?}");
     assert_eq!(records[0]["title"], "Add widget, refined", "the newer version wins: {records:?}");
@@ -323,7 +327,7 @@ fn status_filters_task_records_by_open_done() {
 
     let output = fixture.run_canon(&["query", "--kind", "task", "--status", "open", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = data_of(&support::stdout(&output));
+    let payload = data_of(&support::stdout(&output));
     let records = payload["records"].as_array().unwrap();
     assert_eq!(records.len(), 1);
     assert_eq!(records[0]["task_id"], "add-widget#1.1");
@@ -338,7 +342,7 @@ fn status_filters_change_records_by_their_four_value_domain() {
 
     let output = fixture.run_canon(&["query", "--kind", "change", "--status", "in_progress", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = data_of(&support::stdout(&output));
+    let payload = data_of(&support::stdout(&output));
     let records = payload["records"].as_array().unwrap();
     assert_eq!(records.len(), 1);
     assert_eq!(records[0]["change_id"], "add-widget");
@@ -366,7 +370,7 @@ fn rollup_reflects_the_filtered_result_set_not_the_whole_ledger() {
 
     let output = fixture.run_canon(&["query", "--kind", "task", "--change-id", "add-audio-reactive", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = data_of(&support::stdout(&output));
+    let payload = data_of(&support::stdout(&output));
     assert_eq!(payload["rollup"], serde_json::json!({"done": 2, "total": 6}));
 }
 
@@ -381,7 +385,7 @@ fn an_unfiltered_task_query_rolls_up_the_whole_result_set() {
 
     let output = fixture.run_canon(&["query", "--kind", "task", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = data_of(&support::stdout(&output));
+    let payload = data_of(&support::stdout(&output));
     assert_eq!(payload["rollup"], serde_json::json!({"done": 4, "total": 10}));
 }
 
@@ -399,7 +403,7 @@ fn task_output_sorts_by_change_id_then_task_number_not_merge_order() {
 
     let output = fixture.run_canon(&["query", "--kind", "task", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = data_of(&support::stdout(&output));
+    let payload = data_of(&support::stdout(&output));
     let ids: Vec<String> = payload["records"].as_array().unwrap().iter().map(|r| r["task_id"].as_str().unwrap().to_string()).collect();
     assert_eq!(ids, vec!["add-audio-reactive#1.1", "add-audio-reactive#1.2", "add-widget#1.1", "add-widget#2.1"]);
 }
@@ -426,7 +430,7 @@ fn fold_is_a_noop_for_an_unsuperseded_task_corpus() {
 
     let output = fixture.run_canon(&["query", "--kind", "task", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = data_of(&support::stdout(&output));
+    let payload = data_of(&support::stdout(&output));
     let ids: Vec<String> = payload["records"].as_array().unwrap().iter().map(|r| r["task_id"].as_str().unwrap().to_string()).collect();
     assert_eq!(ids.len(), 3, "one write per key must fold to exactly 3 rows, not fewer: {ids:?}");
     assert_eq!(ids, vec!["add-other#1.1", "add-widget#1.1", "add-widget#1.2"]);
@@ -442,7 +446,7 @@ fn fold_is_a_noop_for_an_unsuperseded_handoff_corpus() {
 
     let output = fixture.run_canon(&["query", "--kind", "handoff", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = data_of(&support::stdout(&output));
+    let payload = data_of(&support::stdout(&output));
     let ids: Vec<String> = payload["records"].as_array().unwrap().iter().map(|r| r["id"].as_str().unwrap().to_string()).collect();
     assert_eq!(ids.len(), 2, "one write per key must fold to exactly 2 rows, not fewer: {ids:?}");
 }
@@ -464,7 +468,7 @@ fn fold_resolves_to_the_newer_version_for_a_superseded_task() {
 
     let output = fixture.run_canon(&["query", "--kind", "task", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = data_of(&support::stdout(&output));
+    let payload = data_of(&support::stdout(&output));
     let records = payload["records"].as_array().unwrap();
     assert_eq!(records.len(), 1, "two versions of the same task_id must fold to exactly one row: {records:?}");
     assert_eq!(records[0]["status"], "done", "the chronologically newer (done) version must win, not the physically-last-arrived (open) one");
@@ -482,7 +486,7 @@ fn fold_resolves_to_the_newer_version_for_a_superseded_handoff() {
 
     let output = fixture.run_canon(&["query", "--kind", "handoff", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
-    let payload: Value = data_of(&support::stdout(&output));
+    let payload = data_of(&support::stdout(&output));
     let records = payload["records"].as_array().unwrap();
     assert_eq!(records.len(), 1, "two versions of the same handoff id must fold to exactly one row: {records:?}");
     assert_eq!(records[0]["body"]["fields"]["tag"], "v2", "the chronologically newer version must win, not the physically-last-arrived one");
@@ -508,7 +512,7 @@ fn fold_list_matches_pg_routing() {
     let pg_routed: BTreeSet<&str> = RecordKind::ALL
         .iter()
         .filter(|k| {
-            policy.tier_for(**k).ok().and_then(|rung| policy.tiers.get(&rung)).map(|cfg| cfg.backend()) == Some(Backend::Postgres)
+            policy.tier_for(**k).ok().and_then(|rung| policy.tiers.get(&rung)).map(canon_store::policy::BackendConfig::backend) == Some(Backend::Postgres)
         })
         .map(|k| k.as_str())
         .collect();

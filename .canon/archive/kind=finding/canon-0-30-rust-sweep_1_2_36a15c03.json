@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-030-chore",
+    "role": "reviewer",
+    "session_id": "rev-030-chore-2026-10-26"
+  },
+  "at": "2026-10-26T21:00:32.556091934Z",
+  "change_id": "canon-0-30-rust-sweep",
+  "code_tree": "b121948f5c80ce540c71b72d1870da2d387702b1",
+  "disposition": "open",
+  "file_ref": "docs/design/rust-coding-rules.md:141",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "f422bbbcf878916f2a88762880cf6d84bc80e53a",
+  "reviewer": "rev-030-chore",
+  "round": 1,
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Checks item 'leave a before/after table' is not met: lint counts are 0 at HEAD (scripts/lint-counts.sh: 'total 0 warnings' over the all/live/prod passes, 1.99.1), but no after column or table is committed. rust-coding-rules.md §1 'Measured cost' still lists only the 0.29.0 counts (1,113 src + 96 tests + 14 unwrap), and step 1's figure of 894 remaining appears only in a commit message. Fix: add the after (0) column or a short before/after table to §1 or §9.",
+  "worktree_dirty": false
+}

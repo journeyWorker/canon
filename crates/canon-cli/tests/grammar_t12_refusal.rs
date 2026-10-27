@@ -75,11 +75,6 @@ impl Row {
         self.setup = setup;
         self
     }
-
-    const fn exit(mut self, exit: i32) -> Self {
-        self.exit = exit;
-        self
-    }
 }
 
 /// A `canon.yaml` that does not parse: every leaf that reads the config refuses it.
@@ -295,7 +290,7 @@ fn settle(check: &str, found: Vec<(String, String)>) {
 fn every_write_leaf_has_one_refusal_recipe_naming_a_code_it_lists() {
     let spec_leaves: BTreeSet<String> = write_leaves().iter().map(|n| path_of(n)).collect();
     let rows: Vec<&str> = REFUSALS.iter().map(|r| r.leaf).collect();
-    let table: BTreeSet<String> = rows.iter().map(|l| l.to_string()).collect();
+    let table: BTreeSet<String> = rows.iter().map(std::string::ToString::to_string).collect();
     assert_eq!(rows.len(), table.len(), "a leaf has two recipes: {rows:?}");
     assert_eq!(table, spec_leaves, "REFUSALS and the spec's write and destructive leaves differ (a new write leaf needs a row)");
 
@@ -307,7 +302,7 @@ fn every_write_leaf_has_one_refusal_recipe_naming_a_code_it_lists() {
             problems.push(format!("{}: the spec does not list `{}` among {:?}", row.leaf, row.code, error_codes(node)));
         }
         match registry.iter().find(|info| info.code == row.code) {
-            Some(info) if info.exit == row.exit => {}
+            Some(info) if i32::from(info.exit) == row.exit => {}
             Some(info) => problems.push(format!("{}: `{}` exits {} in the registry, the row says {}", row.leaf, row.code, info.exit, row.exit)),
             None => problems.push(format!("{}: `{}` is not a registered code", row.leaf, row.code)),
         }

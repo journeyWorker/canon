@@ -563,7 +563,7 @@ mod tests {
     /// lines against that partition kind by kind: each digested kind
     /// names itself on its own row and on no other, and each excluded
     /// kind appears on neither. A subset, a superset, or a stale
-    /// spelling (`evidence` for `evidence_record`) all fail here.
+    /// spelling (`evidence_record` for `evidence`) all fail here.
     #[test]
     fn the_inputs_labels_state_exactly_what_the_digest_hashes() {
         let report = rendered();

@@ -2,13 +2,13 @@
 
 use clap::{Args, Subcommand};
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum RegimeCommand {
     /// Build a canonical regime key for hook scripts
     Show(RegimeShowArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct RegimeShowArgs {
     /// The <role> segment (canonicalized)
     #[arg(long = "role-segment", value_name = "NAME")]

@@ -38,7 +38,7 @@ routing:
   divergence: local
   trajectory: local
   strategy_item: local
-  evidence_record: local
+  evidence: local
   subject: local
   finding: local
 specs:

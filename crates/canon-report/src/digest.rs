@@ -14,7 +14,7 @@
 //! introducing a THIRD, canon-specific notion of "corpus": **corpus**
 //! = `change`/`task`/`scenario`/`subject` records (the declarative
 //! "what exists to be verified" side); **ledger head** =
-//! `evidence_record`/`review`/`divergence`/`finding` records (the
+//! `evidence`/`review`/`divergence`/`finding` records (the
 //! dynamic verdict/attestation side). Which side each kind lands on
 //! is [`digest_side`]'s exhaustive `match`, never a hand-kept list —
 //! see its doc for the two kinds that went missing when the lists were
@@ -122,11 +122,11 @@ const fn digest_side(kind: RecordKind) -> DigestSide {
         // Verdict/attestation over that corpus. `Finding` is review
         // evidence committed alongside the code it judges (canon.yaml
         // routes it `local`, beside `review`/`divergence`/
-        // `evidence_record`), and it is the SOURCE a release
+        // `evidence`), and it is the SOURCE a release
         // narrative's issue counts are derived from — a snapshot whose
         // digest ignored it would claim to describe a corpus it could
         // not distinguish.
-        RecordKind::EvidenceRecord | RecordKind::Review | RecordKind::Divergence | RecordKind::Finding => DigestSide::Ledger,
+        RecordKind::Evidence | RecordKind::Review | RecordKind::Divergence | RecordKind::Finding => DigestSide::Ledger,
         // Ingested execution telemetry: machine-derived from agent
         // transcripts, re-derivable by re-running `canon ingest
         // sessions`, and routed off the git tier this module reads.
@@ -420,7 +420,7 @@ mod tests {
         assert_eq!(corpus.len() + ledger.len() + neither.len(), RecordKind::ALL.len(), "the three sides must partition RecordKind::ALL");
 
         assert_eq!(corpus, vec![RecordKind::Change, RecordKind::Task, RecordKind::Scenario, RecordKind::Subject]);
-        assert_eq!(ledger, vec![RecordKind::Review, RecordKind::Divergence, RecordKind::EvidenceRecord, RecordKind::Finding]);
+        assert_eq!(ledger, vec![RecordKind::Review, RecordKind::Divergence, RecordKind::Evidence, RecordKind::Finding]);
         assert_eq!(
             neither,
             vec![
@@ -537,7 +537,7 @@ mod tests {
         let digest = || DigestHeader::compute(dir.path(), &git_root).unwrap().combined_digest();
 
         let baseline = digest();
-        tier.write_namespaced("porting.coverage", "root__s9.fixture.03", overlay_body("porting.coverage", "root", "s9.fixture.03", true))
+        tier.write_namespaced("porting.coverage", &["root".to_string(), "s9.fixture.03".to_string()], overlay_body("porting.coverage", "root", "s9.fixture.03", true))
             .unwrap();
         let with_overlay = digest();
         assert_ne!(baseline, with_overlay, "an overlay-only change must move `source_digest`");
@@ -545,7 +545,7 @@ mod tests {
         // And the row's own CONTENT counts, not merely its existence:
         // flipping `covered` is exactly what moves a
         // `mart_scope_status` cell.
-        tier.write_namespaced("porting.coverage", "root__s9.fixture.03", overlay_body("porting.coverage", "root", "s9.fixture.03", false))
+        tier.write_namespaced("porting.coverage", &["root".to_string(), "s9.fixture.03".to_string()], overlay_body("porting.coverage", "root", "s9.fixture.03", false))
             .unwrap();
         assert_ne!(with_overlay, digest(), "flipping an overlay row's `covered` must move `source_digest`");
     }
@@ -564,7 +564,7 @@ mod tests {
         let digest = || DigestHeader::compute(dir.path(), &git_root).unwrap().combined_digest();
 
         let baseline = digest();
-        tier.write_namespaced("future.widget", "root__w1", overlay_body("future.widget", "root", "w1", true)).unwrap();
+        tier.write_namespaced("future.widget", &["root".to_string(), "w1".to_string()], overlay_body("future.widget", "root", "w1", true)).unwrap();
         assert_ne!(baseline, digest(), "an unknown overlay kind must still move `source_digest`");
     }
 

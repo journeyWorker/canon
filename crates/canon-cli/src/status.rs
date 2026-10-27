@@ -159,6 +159,11 @@ pub struct StatusReport {
     /// `require_audit` is off and no latest audit is refuted.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audits: Option<AuditSummary>,
+    /// References of findings, evidence and subjects to a source nothing committed holds
+    /// (0.30 `record-links`), in all and per kind of reference. Absent when they were not
+    /// checked: a run that stopped early, or sources that could not be read (a warning says).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dangling_references: Option<crate::references::DanglingSummary>,
     /// The next steps, role-filtered: carried in `meta.next` (with `nextOmitted` and `waitingOn`), not in `data`.
     #[serde(skip)]
     #[schemars(skip)]
@@ -390,7 +395,7 @@ pub fn policy_warning(policy: &PolicyResolution) -> Option<String> {
 }
 
 /// `canon status`: resolve, report, exit `0`.
-pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> i32 {
+pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> u8 {
     if let Some(requested) = fields {
         if let Err(e) = crate::paging::check_known("canon status", requested, &REPORT_FIELDS) {
             return e.emit("canon status", json);
@@ -398,7 +403,7 @@ pub fn run(repo: &Path, json: bool, fields: Option<&[String]>) -> i32 {
     }
     let repo = resolve_repo_root(repo);
     crate::legacy::announce(&repo);
-    let mut report = resolve_with_pending_index(&repo);
+    let mut report = resolve_for_status(&repo);
     report.apply_role(Role::current(None));
     // A ledger that could not be read gave the report nothing to count (D3): `unverifiable`, never a silent pass.
     let coverage = status_coverage(&repo, &report);
@@ -492,13 +497,13 @@ pub fn split_by_role(steps: Vec<NextStep>, role: Role) -> (Vec<NextStep>, BTreeM
 
 /// The top-level fields of the `--json` report, which `--fields` may name.
 /// `audits` is omitted from a report that has none.
-const REPORT_FIELDS: [&str; 7] = ["statusVersion", "canonVersion", "policy", "warnings", "subjects", "unowned", "audits"];
+const REPORT_FIELDS: [&str; 8] = ["statusVersion", "canonVersion", "policy", "warnings", "subjects", "unowned", "audits", "danglingReferences"];
 
 /// Build the report for an already-resolved repo root. The caller has
 /// refreshed a stale scenario index (a writer that reports does, first);
 /// `canon status` itself reads it with [`resolve_with_pending_index`].
 pub fn resolve(repo: &Path) -> StatusReport {
-    resolve_with(repo, false)
+    resolve_with(repo, false, false)
 }
 
 /// [`resolve`] for a command that wrote `.feature` files and must not
@@ -506,10 +511,17 @@ pub fn resolve(repo: &Path) -> StatusReport {
 /// memory ([`crate::inventory::overlay_stale_index`]), so the report is
 /// the one `canon status` gives after its own refresh.
 pub fn resolve_with_pending_index(repo: &Path) -> StatusReport {
-    resolve_with(repo, true)
+    resolve_with(repo, true, false)
 }
 
-fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
+/// [`resolve_with_pending_index`] for `canon status` itself: it also checks the references of
+/// findings, evidence and subjects against the committed sources ([`crate::references`]), which
+/// the commands that only need the next steps do not pay for.
+fn resolve_for_status(repo: &Path) -> StatusReport {
+    resolve_with(repo, true, true)
+}
+
+fn resolve_with(repo: &Path, pending_index: bool, references: bool) -> StatusReport {
     let registry = SchemaRegistry::load();
     let mut warnings = Vec::new();
     let mut next = Vec::new();
@@ -549,9 +561,28 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     for kind in &routed_away {
         warnings.push(format!("`{kind}` routes away from the `local` rung status reads, so its records are not counted"));
     }
-    let unreadable = ctx.violations.len() + ctx.corpus_violations.len();
-    if unreadable > 0 {
-        warnings.push(format!("{unreadable} ledger record(s) could not be read and are not counted; `canon gate check` names them"));
+    let old_layout = ctx.violations.iter().chain(ctx.corpus_violations.iter().map(|(_, v)| v)).filter(|v| v.class == canon_model::FailureClass::OldLayout).count();
+    if old_layout > 0 {
+        warnings.push(format!("{old_layout} ledger record file(s) are named by the 0.29 rule and are not counted; run `canon migrate --json` to preview the rename, then `canon migrate --commit --plan-digest <digest>`"));
+    }
+    // The always-on ledger check names what is in `violations`; a corpus-kind file is named by the gate only
+    // as a layout violation under a `spec_coverage` section that judges the corpus. `canon query` reports all.
+    let named = ctx.violations.len() - ctx.violations.iter().filter(|v| v.class == canon_model::FailureClass::OldLayout).count();
+    if named > 0 {
+        warnings.push(format!("{named} ledger record(s) could not be read and are not counted; `canon gate check` names them"));
+    }
+    let corpus: Vec<_> = ctx.corpus_violations.iter().filter(|(_, v)| v.class != canon_model::FailureClass::OldLayout).collect();
+    if !corpus.is_empty() {
+        let mut kinds: Vec<&str> = corpus.iter().map(|(kind, _)| kind.as_str()).collect();
+        kinds.sort_unstable();
+        kinds.dedup();
+        let queries = kinds.iter().map(|k| format!("`canon query --kind {k}`")).collect::<Vec<_>>().join(", ");
+        let who = if canon_gate::spec_coverage::judges_corpus(&ctx) {
+            format!("`canon gate check` names the misnamed ones, and {queries} reports each")
+        } else {
+            format!("`canon gate check` does not judge them without a `spec_coverage` section; {queries} reports each")
+        };
+        warnings.push(format!("{} ledger record(s) of kind {} could not be read and are not counted; {who}", corpus.len(), kinds.join(", ")));
     }
     if let Some(note) = canon_gate::review_gate::unmigrated_review_note(&ctx) {
         warnings.push(note);
@@ -579,7 +610,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     let known: BTreeSet<&str> = subjects.iter().map(|s| s.subject_id.as_str()).collect();
     let mut dangling: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for scenario in &scenarios {
-        if let Some(id) = scenario.subject_id.as_ref().map(|id| id.as_str()).filter(|id| !known.contains(*id)) {
+        if let Some(id) = scenario.subject_id.as_ref().map(canon_model::SubjectId::as_str).filter(|id| !known.contains(*id)) {
             dangling.entry(id).or_default().push(scenario.scenario_id.as_str());
         }
     }
@@ -684,7 +715,7 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     // index: the next step is writing features and scenarios, so each
     // subject gets its `scenario new … --subject-id` step below.
     let corpus_has_scenarios = || spec_roots.iter().any(|root| !scan_feature_corpus(&root.root).is_empty());
-    let promote_manual = crate::write_mode::configured_promote_mode(&repo.join("canon.yaml")) != Ok(crate::write_mode::PromoteMode::Auto);
+    let promote_manual = !matches!(crate::write_mode::configured_promote_mode(&repo.join("canon.yaml")), Ok(crate::write_mode::PromoteMode::Auto));
     let mut owners: Vec<(std::ops::Range<usize>, String)> = Vec::new();
     if scenarios.is_empty() && !subjects.is_empty() && corpus_has_scenarios() {
         warnings.push("the ledger holds no scenario records, so every subject reads as owning none".into());
@@ -707,9 +738,10 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
         }
         let mut by_priority: Vec<&(&Subject, SubjectSummary)> = summaries.iter().filter(|(s, _)| NEXT_ORDER.contains(&s.status)).collect();
         by_priority.sort_by_key(|(s, _)| (rank(&NEXT_ORDER, s.status), s.subject_id.as_str().to_string()));
+        let inputs = StepInputs { ctx: &ctx, joins: &joins, all: &scenarios, roots: &roots };
         for (subject, summary) in by_priority {
             let start = next.len();
-            subject_steps(&ctx, &joins, &scenarios, &roots, !policy_blocks, promote_manual, subject, summary, &mut next);
+            subject_steps(&inputs, !policy_blocks, promote_manual, subject, summary, &mut next);
             owners.push((start..next.len(), subject.subject_id.as_str().to_string()));
         }
     }
@@ -739,7 +771,9 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     };
     let summaries = summaries.into_iter().map(|(_, summary)| summary).collect();
     let unowned = unowned.iter().map(|s| s.scenario_id.as_str().to_string()).collect();
+    let dangling_references = if references { dangling_references(repo, &ctx, &mut warnings) } else { None };
     let mut report = finish(repo, &ctx.policy, warnings, summaries, unowned, audits, next);
+    report.dangling_references = dangling_references;
     for (range, id) in owners {
         for slot in &mut report.step_subjects[range] {
             *slot = Some(id.clone());
@@ -750,7 +784,6 @@ fn resolve_with(repo: &Path, pending_index: bool) -> StatusReport {
     report
 }
 
-#[allow(clippy::too_many_arguments)]
 fn finish(
     repo: &Path,
     policy: &PolicyResolution,
@@ -775,6 +808,7 @@ fn finish(
         subjects,
         unowned,
         audits,
+        dangling_references: None,
         next,
         next_omitted,
         waiting_on: None,
@@ -784,6 +818,23 @@ fn finish(
         change_subjects: BTreeMap::new(),
         examined: true,
     }
+}
+
+/// The references of the ledger's findings, evidence and subjects that no committed source holds
+/// ([`crate::references`]). `None`, with a warning, when the sources cannot be read.
+fn dangling_references(repo: &Path, ctx: &GateContext, warnings: &mut Vec<String>) -> Option<crate::references::DanglingSummary> {
+    let sources = match crate::references::Sources::load(repo) {
+        Ok(sources) => sources,
+        Err(error) => {
+            warnings.push(format!("references to missing sources were not checked: {error}"));
+            return None;
+        }
+    };
+    let mut summary = crate::references::DanglingSummary::default();
+    crate::references::summarize(&sources, RecordKind::Finding, &ctx.findings, &mut summary);
+    crate::references::summarize(&sources, RecordKind::Evidence, ctx.evidence.iter().chain(&ctx.audits), &mut summary);
+    crate::references::summarize(&sources, RecordKind::Subject, latest_subjects(ctx), &mut summary);
+    Some(summary)
 }
 
 /// The `require_audit` sample's state and every refuted latest audit,
@@ -1128,23 +1179,29 @@ fn awaits_brief(summary: &SubjectSummary) -> bool {
     !on_pending_draft(summary) && summary.brief.as_ref().is_some_and(|brief| brief.enforced)
 }
 
+/// What every subject's `next:` rules ([`subject_steps`]) read alike.
+#[derive(Clone, Copy)]
+struct StepInputs<'a> {
+    ctx: &'a GateContext,
+    joins: &'a Joins<'a>,
+    all: &'a [&'a Scenario],
+    roots: &'a [ProjectId],
+}
+
 /// The per-subject `next:` rules (module doc), each producing at most one
 /// step. An enforced unapproved brief is the subject's only step; else
 /// the gap rules; the status advance only when none fired and
 /// `may_advance` (no blocking policy gap). `promote_manual` is whether
 /// `canon.yaml` keeps writes staged for `canon gate promote`.
-#[allow(clippy::too_many_arguments)]
 fn subject_steps(
-    ctx: &GateContext,
-    joins: &Joins,
-    all: &[&Scenario],
-    roots: &[ProjectId],
+    inputs: &StepInputs<'_>,
     may_advance: bool,
     promote_manual: bool,
     subject: &Subject,
     summary: &SubjectSummary,
     next: &mut Vec<NextStep>,
 ) {
+    let StepInputs { ctx, joins, all, roots } = *inputs;
     let id = subject.subject_id.as_str();
     let status = subject.status;
 
@@ -1462,6 +1519,10 @@ pub fn render(report: &StatusReport) -> String {
     }
 
     let _ = writeln!(out);
+    if let Some(kinds) = report.dangling_references.as_ref().and_then(crate::references::DanglingSummary::describe) {
+        let count = report.dangling_references.as_ref().map_or(0, |summary| summary.count);
+        let _ = writeln!(out, "dangling references: {count} point at a source nothing committed holds ({kinds})");
+    }
     let _ = writeln!(out, "subjects ({}):", report.subjects.len());
     for status in DISPLAY_ORDER {
         let name = subject_status_name(status);

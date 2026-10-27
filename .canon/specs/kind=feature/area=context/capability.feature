@@ -152,8 +152,8 @@ Feature: context capability
   Scenario: A --kind value never carries the _record suffix
     Given the --kind options of query, export and purge
     When their accepted values are listed by `canon schema <command> --json`
-    Then every value is a record kind without the _record suffix, so evidence_record is evidence
-    And the record's own kind field, the ledger directories and the canon.yaml routing keys keep their stored names
+    Then every value is a record kind without the _record suffix, so the evidence kind is evidence
+    And the record's own kind field, the ledger directories and the canon.yaml routing keys spell it the same way, evidence
 
   # canon: {"schema":1,"at":"2026-10-18T15:07:37Z","actor":{"agent_id":"canon"}}
   @subject:context-capability
@@ -400,7 +400,7 @@ Feature: context capability
   Scenario: Context names the kinds users see, evidence included, and every artifact family
     Given the record kinds and artifact families the model registers
     When canon context is run
-    Then its kinds are every record kind under the name users type, evidence rather than evidence_record, and its cel section names the same kinds
+    Then its kinds are every record kind under the one name every surface uses, evidence included, and its cel section names the same kinds
     And its families are every artifact family in order, and the capability version is 6
     And every closed --kind value of query, export and purge is one of those kinds
 
@@ -455,3 +455,25 @@ Feature: context capability
     Then status exits 2 with UNKNOWN_ROLE, naming the value, and with stderr empty under --json
     And schema and context still exit 0, never filtered or failed by the variable, and context names the value in meta.warnings
     And the flag wins over the variable, and an unknown --as value is a usage error
+
+  # canon: {"schema":1,"at":"2026-10-26T11:42:44Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}
+  @subject:context-capability
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F4
+  @context.capability.45
+  Scenario: Brief show of a change with no brief, or in a repo with no briefs, is refused with exit 2
+    Given a repo with a subject and no change, and then two changes that each have a brief
+    When canon brief show runs with no change in the first repo state, with the change nope, and with no change once two changes exist
+    Then the first exits 2 with NO_BRIEF, the second exits 2 with BRIEF_NOT_FOUND naming .canon/changes/nope/brief.md, and the third exits 2 with CHANGE_AMBIGUOUS
+    And no file in the repo changed
+
+  # canon: {"schema":1,"at":"2026-10-26T11:42:45Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}
+  @subject:context-capability
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F4
+  @context.capability.46
+  Scenario: Schema of an unknown command or a leaf with a sub-path is refused with UNKNOWN_COMMAND and exit 2
+    Given a canon repo
+    When canon schema runs with the command nope, and with a leaf command followed by extra path words
+    Then each exits 2 with UNKNOWN_COMMAND, the first naming nope and the second saying the leaf takes no sub-path
+    And no file in the repo changed

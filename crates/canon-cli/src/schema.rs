@@ -76,6 +76,7 @@ pub const STANDARD_EXITS: &[ExitMeta] = &[
 ];
 
 /// Metadata clap cannot supply, for one leaf command.
+#[derive(Debug)]
 pub struct CommandMeta {
     /// Canonical space-separated path, e.g. `evidence add`.
     pub path: &'static str,
@@ -246,7 +247,7 @@ pub fn check_metadata(root: &Command, meta: &[CommandMeta]) -> Vec<String> {
 }
 
 /// One command in `canon schema`'s listing.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ListEntry {
     command: String,
     effect: Effect,
@@ -255,7 +256,7 @@ pub struct ListEntry {
 }
 
 /// `canon schema` with no command: the commands, filtered to a role.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ListSchema {
     /// The role the listing was filtered to; absent when it lists every command.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -264,14 +265,14 @@ pub struct ListSchema {
 }
 
 /// `canon schema --errors`: every error code.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ErrorList {
     errors: Vec<spec::ErrorRow>,
 }
 
 /// `canon schema`'s report (`SchemaReport`): the command listing, one command's
 /// node of the generated spec, or the error registry.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
 pub enum SchemaReport<'a> {
     Commands(ListSchema),
@@ -281,7 +282,7 @@ pub enum SchemaReport<'a> {
 }
 
 /// `canon schema --error <CODE>`: the one registry row.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct ErrorEntry {
     pub error: spec::ErrorRow,
 }
@@ -349,9 +350,7 @@ fn resolve(root: &Command, tokens: &[String]) -> Result<Resolved, Refusal> {
             }
         }
     }
-    if cmd.get_subcommands().any(|c| c.get_name() != "help") {
-        Ok(Resolved::Group(canonical))
-    } else if canonical.is_empty() {
+    if cmd.get_subcommands().any(|c| c.get_name() != "help") || canonical.is_empty() {
         Ok(Resolved::Group(canonical))
     } else {
         Ok(Resolved::Leaf(canonical))
@@ -436,7 +435,7 @@ pub fn run(root: &Command, tokens: &[String], json: bool, errors: bool, error: O
     let tokens: Vec<String> = tokens.iter().flat_map(|t| t.split_whitespace()).map(str::to_string).collect();
     let resolved = match resolve(root, &tokens) {
         Ok(r) => r,
-        Err(Refusal(msg)) => return crate::cli_error::CliError::refused("UNKNOWN_COMMAND", msg).hint("`canon schema` lists every command").emit("canon schema", json) as u8,
+        Err(Refusal(msg)) => return crate::cli_error::CliError::refused("UNKNOWN_COMMAND", msg).hint("`canon schema` lists every command").emit("canon schema", json),
     };
     let nodes = spec::nodes(root);
     match resolved {
@@ -485,9 +484,9 @@ fn print_error(code: &str, json: bool) -> u8 {
         let nearest: Vec<&str> = crate::cli_error::all_codes().iter().map(|info| info.code).filter(|known| known.contains(code) || code.contains(known)).take(5).collect();
         let mut error = crate::cli_error::CliError::refused("UNKNOWN_ERROR_CODE", format!("`{code}` is not an error code canon has")).field("--error").received(code).hint("`canon schema --errors` lists every code");
         if !nearest.is_empty() {
-            error = error.suggestions(nearest.iter().map(|c| c.to_string()).collect::<Vec<_>>());
+            error = error.suggestions(nearest.iter().map(std::string::ToString::to_string).collect::<Vec<_>>());
         }
-        return error.emit("canon schema", json) as u8;
+        return error.emit("canon schema", json);
     };
     if json {
         crate::json_out::data("schema", &SchemaReport::Error(ErrorEntry { error: row }));
@@ -577,7 +576,7 @@ fn print_human(node: &Node) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clap::{Arg, ArgAction, Command};
+    use clap::{Arg, ArgAction};
 
     fn tree() -> Command {
         Command::new("canon")

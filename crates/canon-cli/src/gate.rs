@@ -144,7 +144,7 @@ impl crate::reports::Report for GateCheckReport<'_> {}
 /// `--release` is given — `canon_gate::dispatch`'s own module doc: the
 /// dispatcher never drops `TrustLadderCheck` when a release profile is
 /// engaged) and runs it over the resolved repo's `GateContext`.
-pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
+pub fn run_check(repo: &Path, release: bool, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     crate::legacy::announce(&repo);
     let ctx = match GateCtx::from_repo(&repo) {
@@ -215,7 +215,7 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
     if let Some(review) = canon_gate::review_advisories(&gate_context) {
         crate::say_raw!(json, "{}", format_review_advisories(&review));
         if !review.is_empty() {
-            advisories.push(advisory("review_waivers", format!("{} waived review gap(s) — not failing the gate", review.len()), review.iter().map(|a| a.line()).collect()));
+            advisories.push(advisory("review_waivers", format!("{} waived review gap(s) — not failing the gate", review.len()), review.iter().map(canon_gate::ReviewAdvisory::line).collect()));
         }
     }
     let accepted = canon_gate::acceptance::accepted_divergences(&gate_context);
@@ -239,7 +239,7 @@ pub fn run_check(repo: &Path, release: bool, json: bool) -> i32 {
         advisories.push(advisory(
             "unstored_attachments",
             format!("{} bound file(s) not in the artifact store; run `canon artifacts store` to store them", unstored.len()),
-            unstored.iter().map(|a| a.line()).collect(),
+            unstored.iter().map(canon_gate::UnstoredAttachment::line).collect(),
         ));
     }
     let violations: Vec<GateViolation> = report
@@ -393,7 +393,7 @@ fn format_gate_report(report: &GateReport) -> String {
     let mut out = format!("canon gate check: {} violation(s)\n", report.violations.len());
     for class_str in FAILURE_CLASSES {
         let class = FailureClass::from_str_exact(class_str).expect("FAILURE_CLASSES round-trips to FailureClass");
-        let lines: Vec<String> = report.by_class(class).map(|v| v.line()).collect();
+        let lines: Vec<String> = report.by_class(class).map(canon_gate::Violation::line).collect();
         if lines.is_empty() {
             continue;
         }
@@ -496,7 +496,7 @@ impl crate::reports::Report for TaskDoneReport<'_> {}
 /// the evidence decision — so an already-done row is a success no-op and
 /// a missing row is a gate-red "no matching row" regardless of what the
 /// evidence says (the pre-s35 precedence, preserved).
-pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
+pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let task_id = match TaskId::parse(task_id_str) {
         Ok(t) => t,
@@ -513,7 +513,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
     let LocatedTask { write_back, document_path, source_root } = match locate_task(&repo, &task_id) {
         Ok(located) => located,
         Err(e) => {
-            return CliError::refused("TASK_NOT_FOUND", e.to_string()).hint("task ids look like <change_id>#<n>; open the change's plan document to find the right number").emit("canon task done", json);
+            return CliError::refused("TASK_NOT_FOUND", e.clone()).hint("task ids look like <change_id>#<n>; open the change's plan document to find the right number").emit("canon task done", json);
         }
     };
 
@@ -545,7 +545,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
     // The row counts every record bound to the task and scans every note
     // it carries, so this is a history read: the ledger's records and the
     // archive's (`canon_gate::history`).
-    let raw_records = match GitTier::new(gate_context.ctx.ledger_root.clone()).read_history(RecordKind::EvidenceRecord) {
+    let raw_records = match GitTier::new(gate_context.ctx.ledger_root.clone()).read_history(RecordKind::Evidence) {
         Ok(read) => read.records,
         Err(e) => {
             return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon task done", json);
@@ -565,7 +565,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
         Ok(Some(atom)) => match typed_path_evidence(&repo, &atom, &raw_records, &task_id) {
             Ok(pair) => pair,
             Err(e) => {
-                return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
+                return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.clone()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
             }
         },
         Ok(None) => {
@@ -573,13 +573,13 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
             let notes = match notes_of(same_task_id, &task_id) {
                 Ok(n) => n,
                 Err(e) => {
-                    return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.to_string()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
+                    return CliError::failed("GATE_TASK_EVIDENCE_INVALID", e.clone()).hint("fix the evidence row under the task in its plan document (the message names it), or re-record it with `canon evidence add`").emit("canon task done", json);
                 }
             };
             (canon_gate::history::evidence_history(&gate_context).to_vec(), notes)
         }
         Err(e) => {
-            return CliError::refused("TYPED_ATOMS_INVALID", e.to_string()).hint("fix the typed evidence atom in the plan task (the message names it), then run the command again").emit("canon task done", json);
+            return CliError::refused("TYPED_ATOMS_INVALID", e.clone()).hint("fix the typed evidence atom in the plan task (the message names it), then run the command again").emit("canon task done", json);
         }
     };
 
@@ -643,7 +643,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> i32 {
             0
         }
         TaskFlipDecision::Blocked { violations } => {
-            CliError::failed("GATE_TASK_BLOCKED", violations.iter().map(|v| v.line()).collect::<Vec<_>>().join("\n")).hint("record the missing evidence with `canon evidence add --task-id <id> ...`, then run `canon task done` again").emit("canon task done", json)
+            CliError::failed("GATE_TASK_BLOCKED", violations.iter().map(canon_gate::Violation::line).collect::<Vec<_>>().join("\n")).hint("record the missing evidence with `canon evidence add --task-id <id> ...`, then run `canon task done` again").emit("canon task done", json)
         }
     }
 }
@@ -910,7 +910,7 @@ fn raw_evidence_kind_ref(raw: &serde_json::Value) -> Option<(String, String)> {
 /// The staging [`GitTier`] root `canon evidence add` writes to and
 /// [`run_promote`] drains: `<ledger_root>/_staging`, a SIBLING of the
 /// committed `kind=<k>/` tree — a committed read walks
-/// `<ledger_root>/kind=evidence_record/`, so a staged record is
+/// `<ledger_root>/kind=evidence/`, so a staged record is
 /// invisible to `canon task done`/`canon gate check` until promotion
 /// (the same sibling-directory arrangement `canon_gate::
 /// divergence_staging_dir`'s `_staging_divergence` already uses).
@@ -963,7 +963,7 @@ impl crate::reports::Report for GatePromoteReport {}
 /// idempotent per staged candidate (its own recovery section), so a
 /// re-run drains a candidate whose record already landed instead of
 /// committing it twice, and still exits `0`.
-pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: bool) -> i32 {
+pub fn run_promote(repo: &Path, kind: Option<RecordKind>, dry_run: bool, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let ctx = match GateCtx::from_repo(&repo) {
         Ok(ctx) => ctx,
@@ -1063,7 +1063,7 @@ impl StagedOutcome {
     }
 
     /// The exit code: a refused promotion is refused-by-policy.
-    pub(crate) fn exit_code(&self) -> i32 {
+    pub(crate) fn exit_code(&self) -> u8 {
         match self {
             Self::Refused => 1,
             Self::Staged | Self::Promoted { .. } => 0,
@@ -1108,30 +1108,30 @@ pub(crate) struct PromoteRefusal {
 
 /// [`promote_after_stage`]'s promotion, without its reporting: the committed
 /// path (relative to the ledger root), or why not.
-pub(crate) fn try_promote(ledger_root: &Path, location: &str) -> Result<String, PromoteRefusal> {
+pub(crate) fn try_promote(ledger_root: &Path, location: &str) -> Result<String, Box<PromoteRefusal>> {
     promotion_outcome(promote_staged(&GitTier::new(evidence_staging_dir(ledger_root)), &GitTier::new(ledger_root), Path::new(location)))
 }
 
 /// [`try_promote`] for one record of a batch, promoted through the batch's
 /// own `EvidencePromoter` (one committed-history read for the batch).
-pub(crate) fn try_promote_in(promoter: &mut canon_gate::promote::EvidencePromoter<'_>, location: &str) -> Result<String, PromoteRefusal> {
+pub(crate) fn try_promote_in(promoter: &mut canon_gate::promote::EvidencePromoter<'_>, location: &str) -> Result<String, Box<PromoteRefusal>> {
     promotion_outcome(promoter.promote(Path::new(location)))
 }
 
-fn promotion_outcome(promoted: Result<PromoteReport, canon_store::tier::StoreError>) -> Result<String, PromoteRefusal> {
+fn promotion_outcome(promoted: Result<PromoteReport, canon_store::tier::StoreError>) -> Result<String, Box<PromoteRefusal>> {
     match promoted {
         // The report carries exactly this one candidate: committed or
         // recovered, or refused.
         Ok(report) => match report.promoted.iter().chain(&report.recovered).next().filter(|_| report.is_clean()) {
             Some(landed) => Ok(landed.target.display().to_string()),
-            None => Err(PromoteRefusal {
+            None => Err(Box::new(PromoteRefusal {
                 lines: format_candidate_lines(&report, false),
                 error: CliError::failed("PROMOTE_REFUSED", "staged, but promotion refused the record; it stays staged")
                     .hint("the refusal is named in data.refused; fix it and run `canon gate promote`"),
                 data: Some(promote_report(&report, false)),
-            }),
+            })),
         },
-        Err(e) => Err(PromoteRefusal { lines: String::new(), error: CliError::failed("PROMOTE_FAILED", format!("staged, but promoting it failed: {e}")).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`"), data: None }),
+        Err(e) => Err(Box::new(PromoteRefusal { lines: String::new(), error: CliError::failed("PROMOTE_FAILED", format!("staged, but promoting it failed: {e}")).hint("the records stay staged; fix the cause the message names, then run `canon gate promote`"), data: None })),
     }
 }
 
@@ -1142,7 +1142,7 @@ fn promotion_outcome(promoted: Result<PromoteReport, canon_store::tier::StoreErr
 /// kinds in one call, and a batch that silently drained none of the
 /// kind you cared about is the failure mode this command has: a bare
 /// "promoted 7" cannot be checked against a ledger, where "promoted
-/// evidence_record=1, finding=6" can. Every registered kind appears
+/// evidence=1, finding=6" can. Every registered kind appears
 /// with its count INCLUDING zero, so the output also answers "which
 /// kinds can be promoted at all" — the question an author whose
 /// records went nowhere is actually asking.
@@ -1201,13 +1201,13 @@ fn format_candidate_lines(report: &PromoteReport, dry_run: bool) -> String {
 fn kind_tally(landed: &[Promoted]) -> String {
     STAGED_KINDS
         .iter()
-        .map(|staged| format!("{}={}", crate::query::kind_cli_name(staged.kind), landed.iter().filter(|p| p.kind == staged.kind).count()))
+        .map(|staged| format!("{}={}", staged.kind.as_str(), landed.iter().filter(|p| p.kind == staged.kind).count()))
         .collect::<Vec<_>>()
         .join(", ")
 }
 
 fn promotable_kinds() -> String {
-    STAGED_KINDS.iter().map(|staged| crate::query::kind_cli_name(staged.kind)).collect::<Vec<_>>().join(", ")
+    STAGED_KINDS.iter().map(|staged| staged.kind.as_str()).collect::<Vec<_>>().join(", ")
 }
 
 /// `canon gate install-hooks`: whether the hooks changed.
@@ -1233,8 +1233,7 @@ impl crate::reports::Report for GateInstallHooksReport {}
 /// `canon-gate-pre-commit.sh` (`PRE_COMMIT_SCRIPT`, task 4.2) into
 /// `<repo>/.canon/scripts/`, matching spec.md's "a non-donor repo gets a generic
 /// pre-commit script" scenario.
-#[allow(clippy::too_many_arguments)]
-pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, command: &str, timeout: u32, dry_run: bool, json: bool) -> i32 {
+pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, command: &str, timeout: u32, dry_run: bool, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let entry = HookEntry::new(event, matcher.map(str::to_string), command, timeout);
 
@@ -1335,7 +1334,7 @@ fn write_pre_commit_script(path: &Path) -> std::io::Result<()> {
         let mut perms = std::fs::metadata(path)?.permissions();
         perms.set_mode(0o755);
         std::fs::set_permissions(path, perms)?;
-    }
+    };
     Ok(())
 }
 
@@ -1350,7 +1349,7 @@ mod tests {
     /// staging-relative location.
     fn stage(ledger_root: &Path, actor: Actor) -> String {
         let record = EvidenceRecord::new(
-            Envelope::current(RecordKind::EvidenceRecord, Utc::now(), actor),
+            Envelope::current(RecordKind::Evidence, Utc::now(), actor),
             Some(TaskId::parse("demo-change#1.1").unwrap()),
             None,
             None,
@@ -1392,7 +1391,7 @@ mod tests {
         assert_eq!(outcome, StagedOutcome::Refused);
         assert!(evidence_staging_dir(&ledger_root).join(&refused).exists(), "a refused record stays staged");
         assert!(evidence_staging_dir(&ledger_root).join(&bystander).exists(), "a refusal promotes nothing else either");
-        let committed = GitTier::new(&ledger_root).read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap();
+        let committed = GitTier::new(&ledger_root).read(&TierQuery::kind(RecordKind::Evidence)).unwrap();
         assert_eq!(committed.records.len(), 1, "only the command's own promoted record is committed");
     }
 }

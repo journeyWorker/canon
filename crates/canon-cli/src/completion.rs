@@ -9,7 +9,7 @@ use crate::cli::CompletionShell;
 use crate::reports::Report;
 
 /// `--json` of `canon completion`: the script in an envelope.
-#[derive(Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CompletionReport {
     /// `bash`, `zsh` or `fish`.

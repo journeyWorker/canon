@@ -89,30 +89,47 @@ use sha2::{Digest, Sha256};
 const MAX_REPORT_BYTES: u64 = 64 * 1024 * 1024;
 
 /// Why binding refused, graded to the `canon evidence add` exit code.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum BindError {
     /// The invocation is wrong (missing file, bad format, no case): 2.
     /// Every refusal says how to get unstuck (`hint`) and, when one flag
-    /// caused it, which (`field`).
-    Usage { message: String, hint: String, field: Option<&'static str> },
+    /// caused it, which (`field`). `source` is the underlying failure, when
+    /// there is one; the message already says what it said.
+    #[error("{message}")]
+    Usage {
+        message: String,
+        hint: String,
+        field: Option<&'static str>,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
     /// The report contradicts the verdict: 1.
+    #[error("{0}")]
     Contradiction(String),
 }
 
 impl BindError {
     fn usage(message: impl Into<String>, hint: impl Into<String>) -> Self {
-        BindError::Usage { message: message.into(), hint: hint.into(), field: None }
+        BindError::Usage { message: message.into(), hint: hint.into(), field: None, source: None }
+    }
+
+    /// Records the failure behind a usage refusal.
+    fn caused_by(self, cause: impl std::error::Error + Send + Sync + 'static) -> Self {
+        match self {
+            BindError::Usage { message, hint, field, .. } => BindError::Usage { message, hint, field, source: Some(Box::new(cause)) },
+            other => other,
+        }
     }
 
     /// Names the flag the refused file was given with.
     fn on(self, flag: &'static str) -> Self {
         match self {
-            BindError::Usage { message, hint, .. } => BindError::Usage { message, hint, field: Some(flag) },
-            other => other,
+            BindError::Usage { message, hint, source, .. } => BindError::Usage { message, hint, field: Some(flag), source },
+            other @ BindError::Contradiction(_) => other,
         }
     }
 
-    pub fn exit_code(&self) -> i32 {
+    pub fn exit_code(&self) -> u8 {
         match self {
             BindError::Usage { .. } => 2,
             BindError::Contradiction(_) => 1,
@@ -177,28 +194,39 @@ pub fn parse_artifact(value: &Path) -> (Option<String>, PathBuf) {
     (None, value.to_path_buf())
 }
 
+/// `--report` was not `<format>:<path>`.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum ReportSpecError {
+    /// No `:` between the format and the path.
+    #[error("`{0}` is not <junit|cucumber|swift-testing>:<path>")]
+    NotFormatAndPath(String),
+    /// A format canon has no parser for.
+    #[error("`{0}` is not a supported report format (expected junit, cucumber or swift-testing)")]
+    UnsupportedFormat(String),
+    /// An empty path after the `:`.
+    #[error("`{0}` names no file")]
+    NoFile(String),
+}
+
 /// Parse `--report`'s `<format>:<path>`.
-pub fn parse_report_spec(value: &str) -> Result<(ReportFormat, PathBuf), String> {
+pub fn parse_report_spec(value: &str) -> Result<(ReportFormat, PathBuf), ReportSpecError> {
     let (format, path) = value
         .split_once(':')
-        .ok_or_else(|| format!("`{value}` is not <junit|cucumber|swift-testing>:<path>"))?;
+        .ok_or_else(|| ReportSpecError::NotFormatAndPath(value.to_string()))?;
     let format = match format {
         "junit" => ReportFormat::Junit,
         "cucumber" => ReportFormat::Cucumber,
         "swift-testing" => ReportFormat::SwiftTesting,
-        other => {
-            return Err(format!(
-                "`{other}` is not a supported report format (expected junit, cucumber or swift-testing)"
-            ))
-        }
+        other => return Err(ReportSpecError::UnsupportedFormat(other.to_string())),
     };
     if path.is_empty() {
-        return Err(format!("`{value}` names no file"));
+        return Err(ReportSpecError::NoFile(value.to_string()));
     }
     Ok((format, PathBuf::from(path)))
 }
 
 /// Inputs for [`bind`].
+#[derive(Debug)]
 pub struct BindRequest<'a> {
     pub repo: &'a Path,
     pub artifacts: &'a [PathBuf],
@@ -239,7 +267,7 @@ impl BoundFile {
     /// The bytes behind the digest.
     fn reader(&self) -> std::io::Result<Box<dyn Read>> {
         match &self.embedded {
-            Some(bytes) => Ok(Box::new(std::io::Cursor::new(bytes.clone()))),
+            Some(bytes) => Ok(Box::new(std::io::Cursor::new(Arc::clone(bytes)))),
             None => Ok(Box::new(std::fs::File::open(&self.resolved)?)),
         }
     }
@@ -309,7 +337,7 @@ fn hash_artifact(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, Bo
 /// was hashed is refused rather than stored under a digest its bytes no
 /// longer have, and then nothing is published. The error names that
 /// file.
-pub fn store_files<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<usize, (&'f BoundFile, canon_gate::artifact_store::StoreError)> {
+pub fn store_files<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<usize, (&'f BoundFile, canon_gate::artifact_store::ArtifactStoreError)> {
     store_files_held(repo, files).map(|held| held.stored())
 }
 
@@ -317,8 +345,8 @@ pub fn store_files<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<usize, (&'
 /// several records naming these blobs (0.18): if one of those writes
 /// fails, [`HeldStore::rollback`] removes exactly the blobs this call
 /// published, while no other writer could have published them meanwhile.
-pub fn store_files_held<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<HeldStore, (&'f BoundFile, canon_gate::artifact_store::StoreError)> {
-    use canon_gate::artifact_store::{ArtifactStore, StoreError, StoreLock};
+pub fn store_files_held<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<HeldStore, (&'f BoundFile, canon_gate::artifact_store::ArtifactStoreError)> {
+    use canon_gate::artifact_store::{ArtifactStore, ArtifactStoreError, StoreLock};
 
     let Some(first) = files.first() else {
         return Ok(HeldStore { lock: None, published: Vec::new(), uploaded: 0 });
@@ -343,14 +371,14 @@ pub fn store_files_held<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<HeldS
             let actual = file
                 .reader()
                 .and_then(canon_gate::artifact_store::sha256_reader)
-                .map_err(|e| (file, StoreError::from(e)))?;
+                .map_err(|e| (file, ArtifactStoreError::from(e)))?;
             if actual != file.sha256 {
-                return Err((file, StoreError::Changed { expected: file.sha256.clone(), actual }));
+                return Err((file, ArtifactStoreError::Changed { expected: file.sha256.clone(), actual }));
             }
         }
         let mut uploaded = 0;
         for file in files {
-            let stored = file.reader().map_err(StoreError::from).and_then(|reader| object.upload(&file.sha256, reader)).map_err(|e| (file, e))?;
+            let stored = file.reader().map_err(ArtifactStoreError::from).and_then(|reader| object.upload(&file.sha256, reader)).map_err(|e| (file, e))?;
             if stored == canon_gate::artifact_store::StoreOutcome::Stored {
                 uploaded += 1;
             }
@@ -362,7 +390,7 @@ pub fn store_files_held<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<HeldS
     for file in files {
         let blob = file
             .reader()
-            .map_err(StoreError::from)
+            .map_err(ArtifactStoreError::from)
             .and_then(|reader| lock.stage(&file.sha256, reader))
             .map_err(|e| (file, e))?;
         if let Some(blob) = blob {
@@ -377,6 +405,7 @@ pub fn store_files_held<'f>(repo: &Path, files: &'f [BoundFile]) -> Result<HeldS
 /// The blobs one [`store_files_held`] call stored, with the local store
 /// lock still held (none for an object store). Dropping it keeps them
 /// and releases the lock.
+#[derive(Debug)]
 pub struct HeldStore {
     lock: Option<canon_gate::artifact_store::StoreLock>,
     published: Vec<PathBuf>,
@@ -464,7 +493,7 @@ impl ParsedReport {
                         return Err(refusal(&name, format!("it is {} bytes, over the artifact store's limit of {max_bytes} bytes", bytes.len())));
                     }
                     let sha256 = format!("{:x}", Sha256::digest(bytes));
-                    (name.clone(), BoundFile { resolved: PathBuf::from(&name), sha256, embedded: Some(bytes.clone()) })
+                    (name.clone(), BoundFile { resolved: PathBuf::from(&name), sha256, embedded: Some(Arc::clone(bytes)) })
                 }
             };
             out.push((EvidenceAttachment { path, sha256: bound.sha256.clone(), format: None, case: None, outcome: None }, bound));
@@ -540,18 +569,20 @@ fn read_report_file(repo: &Path, format: ReportFormat, path: &Path, max_bytes: u
             "bind the file as an opaque --artifact, or split the report per suite",
         ));
     }
-    let text = std::str::from_utf8(&bytes)
-        .map_err(|_| BindError::usage(format!("{} is not UTF-8", path.display()), "write the report as UTF-8 (a test runner's XML/JSON output is), or bind the file as an opaque --artifact"))?;
+    let text = std::str::from_utf8(&bytes).map_err(|cause| {
+        BindError::usage(format!("{} is not UTF-8", path.display()), "write the report as UTF-8 (a test runner's XML/JSON output is), or bind the file as an opaque --artifact").caused_by(cause)
+    })?;
     let cases = match format {
         ReportFormat::Junit => parse_junit(text),
         ReportFormat::Cucumber => parse_cucumber(text),
         ReportFormat::SwiftTesting => parse_swift_testing(text),
     }
-    .map_err(|e| {
+    .map_err(|cause| {
         BindError::usage(
-            format!("{} is not a readable {} report: {e}", path.display(), format_name(format)),
+            format!("{} is not a readable {} report: {cause}", path.display(), format_name(format)),
             "pass --report <format>:<path> with the format the file really is (junit, cucumber or swift-testing), regenerate the report if the run was cut short, or bind the file as an opaque --artifact",
         )
+        .caused_by(cause)
     })?;
     let sha256 = format!("{:x}", Sha256::digest(&bytes));
     Ok(ParsedReport { format, given: path.to_path_buf(), relative, resolved, sha256, cases })
@@ -607,6 +638,7 @@ pub fn bind(request: &BindRequest<'_>) -> Result<Bound, BindError> {
 }
 
 /// Inputs for [`bind_all_scenarios`].
+#[derive(Debug)]
 pub struct BatchRequest<'a> {
     pub repo: &'a Path,
     /// `--artifact <scenario-id>=<path>`: each bound to that scenario's
@@ -812,11 +844,12 @@ fn open_in_repo(repo: &Path, path: &Path, max_bytes: u64) -> Result<(String, Pat
             "name a file, not a directory; archive a directory first (zip or tar) and bind the archive",
         ));
     }
-    let relative = resolved.strip_prefix(repo).map_err(|_| {
+    let relative = resolved.strip_prefix(repo).map_err(|cause| {
         BindError::usage(
             format!("{} is outside the repository; bound files are recorded by repository-relative path", path.display()),
             "copy the file anywhere under the repository and bind that path; canon stores the bytes under .canon/artifacts/sha256 either way",
         )
+        .caused_by(cause)
     })?;
     let relative = relative
         .components()
@@ -847,6 +880,17 @@ fn names_case(case: &ReportCase, name: &str) -> bool {
     case.name == name || case.name.ends_with(&format!("::{name}"))
 }
 
+/// No report case could be bound.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum CaseMatchError {
+    /// Nothing to match by: no `--scenario-id` and no `--report-case`.
+    #[error("no --scenario-id to match the report by; name the case with --report-case")]
+    NothingToMatchBy,
+    /// Nothing in the report matched. `wanted` reads `for scenario `x` or named `y``.
+    #[error("no case {wanted} among its {total} case(s); start the test name with the scenario id or tag it, or name the case with --report-case")]
+    NoMatch { wanted: String, total: usize },
+}
+
 /// Every case this evidence binds (module doc): the ones whose own
 /// scenario id is this one, plus the ones `explicit` names, each once,
 /// in report order. Empty is an error.
@@ -854,12 +898,9 @@ pub fn match_cases<'c>(
     cases: &'c [ReportCase],
     explicit: &[String],
     scenario_id: Option<&str>,
-) -> Result<Vec<&'c ReportCase>, String> {
+) -> Result<Vec<&'c ReportCase>, CaseMatchError> {
     if explicit.is_empty() && scenario_id.is_none() {
-        return Err(
-            "no --scenario-id to match the report by; name the case with --report-case"
-                .to_string(),
-        );
+        return Err(CaseMatchError::NothingToMatchBy);
     }
     let matched: Vec<&ReportCase> = cases
         .iter()
@@ -871,11 +912,7 @@ pub fn match_cases<'c>(
             wanted.push(format!("for scenario `{id}`"));
         }
         wanted.extend(explicit.iter().map(|n| format!("named `{n}`")));
-        return Err(format!(
-            "no case {} among its {} case(s); start the test name with the scenario id or tag it, or name the case with --report-case",
-            wanted.join(" or "),
-            cases.len()
-        ));
+        return Err(CaseMatchError::NoMatch { wanted: wanted.join(" or "), total: cases.len() });
     }
     Ok(matched)
 }
@@ -939,9 +976,70 @@ fn ends_with_two_segments(before: &[u8], separator: u8) -> bool {
     surface > 0 && rest.last() == Some(&separator) && rest[..rest.len() - 1].last().is_some_and(|b| segment(*b))
 }
 
+/// Why a test report could not be read into cases.
+#[derive(Debug, thiserror::Error)]
+pub enum ReportParseError {
+    /// JUnit: the XML itself is malformed.
+    #[error(transparent)]
+    Xml(#[from] quick_xml::Error),
+    /// JUnit: text that is not valid in its declared encoding.
+    #[error(transparent)]
+    XmlEncoding(#[from] quick_xml::encoding::EncodingError),
+    /// JUnit: a malformed attribute.
+    #[error(transparent)]
+    XmlAttribute(#[from] quick_xml::events::attributes::AttrError),
+    /// JUnit: `<testcase>` never closed.
+    #[error("unterminated <testcase>")]
+    UnterminatedTestcase,
+    /// JUnit: no `<testcase>` at all.
+    #[error("no <testcase> element")]
+    NoTestcase,
+    /// JUnit: a `<testcase>` without `name`.
+    #[error("a <testcase> has no name")]
+    UnnamedTestcase,
+    /// Cucumber: not JSON.
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    /// Cucumber: JSON that is not a list of features.
+    #[error("the top level is not an array of features")]
+    NotFeatureArray,
+    /// Cucumber: no scenario element at all.
+    #[error("no scenario element")]
+    NoScenario,
+    /// Cucumber: an embedding whose data is not base64.
+    #[error("an embedding of a {key} item is not valid base64: {source}")]
+    Base64 {
+        key: &'static str,
+        #[source]
+        source: base64::DecodeError,
+    },
+    /// Swift Testing: a line that is not JSON.
+    #[error("line {line}: {source}")]
+    JsonLine {
+        line: usize,
+        #[source]
+        source: serde_json::Error,
+    },
+    /// Swift Testing: a record without `payload`.
+    #[error("line {line}: a record without a payload")]
+    NoPayload { line: usize },
+    /// Swift Testing: a `test` record without `id`.
+    #[error("line {line}: a test without an id")]
+    NoTestId { line: usize },
+    /// Swift Testing: a test with neither `displayName` nor `name`.
+    #[error("line {line}: test `{id}` has no name")]
+    NoTestName { line: usize, id: String },
+    /// Swift Testing: no `function` test record.
+    #[error("no test record of kind `function`")]
+    NoFunction,
+    /// Swift Testing: no declared test ran.
+    #[error("no test ran (no testStarted or testSkipped event names a declared test)")]
+    NothingRan,
+}
+
 /// Parse JUnit XML: every `<testcase>`, failed when it holds `<failure>`
 /// or `<error>`, skipped when it holds `<skipped>`, passed otherwise.
-pub fn parse_junit(text: &str) -> Result<Vec<ReportCase>, String> {
+pub fn parse_junit(text: &str) -> Result<Vec<ReportCase>, ReportParseError> {
     let mut reader = quick_xml::Reader::from_str(text);
     let mut cases = Vec::new();
     let mut open: Option<ReportCase> = None;
@@ -949,26 +1047,26 @@ pub fn parse_junit(text: &str) -> Result<Vec<ReportCase>, String> {
     // reporter writes one `[[ATTACHMENT|<path>]]` line per attachment.
     let mut system_out: Option<String> = None;
     loop {
-        match reader.read_event().map_err(|e| e.to_string())? {
+        match reader.read_event()? {
             Event::Start(e) if e.local_name().as_ref() == b"testcase" => open = Some(testcase(&e)?),
             Event::Empty(e) if e.local_name().as_ref() == b"testcase" => cases.push(testcase(&e)?),
             Event::Start(e) if e.local_name().as_ref() == b"system-out" && open.is_some() => system_out = Some(String::new()),
             Event::Text(t) => {
                 if let Some(buffer) = system_out.as_mut() {
-                    buffer.push_str(&t.decode().map_err(|e| e.to_string())?);
+                    buffer.push_str(&t.decode()?);
                 }
             }
             Event::CData(c) => {
                 if let Some(buffer) = system_out.as_mut() {
-                    buffer.push_str(&c.decode().map_err(|e| e.to_string())?);
+                    buffer.push_str(&c.decode()?);
                 }
             }
             Event::GeneralRef(r) => {
                 if let Some(buffer) = system_out.as_mut() {
-                    if let Some(c) = r.resolve_char_ref().map_err(|e| e.to_string())? {
+                    if let Some(c) = r.resolve_char_ref()? {
                         buffer.push(c);
                     } else {
-                        match r.decode().map_err(|e| e.to_string())?.as_ref() {
+                        match r.decode()?.as_ref() {
                             "amp" => buffer.push('&'),
                             "lt" => buffer.push('<'),
                             "gt" => buffer.push('>'),
@@ -989,7 +1087,7 @@ pub fn parse_junit(text: &str) -> Result<Vec<ReportCase>, String> {
                     match e.local_name().as_ref() {
                         b"failure" | b"error" => case.outcome = ReportOutcome::Failed,
                         b"skipped" if case.outcome != ReportOutcome::Failed => {
-                            case.outcome = ReportOutcome::Skipped
+                            case.outcome = ReportOutcome::Skipped;
                         }
                         _ => {}
                     }
@@ -1005,10 +1103,10 @@ pub fn parse_junit(text: &str) -> Result<Vec<ReportCase>, String> {
         }
     }
     if open.is_some() {
-        return Err("unterminated <testcase>".to_string());
+        return Err(ReportParseError::UnterminatedTestcase);
     }
     if cases.is_empty() {
-        return Err("no <testcase> element".to_string());
+        return Err(ReportParseError::NoTestcase);
     }
     Ok(cases)
 }
@@ -1022,19 +1120,16 @@ fn attachment_lines(text: &str) -> Vec<CaseFile> {
         .collect()
 }
 
-fn testcase(e: &BytesStart<'_>) -> Result<ReportCase, String> {
-    let attr = |name: &str| -> Result<String, String> {
-        match e.try_get_attribute(name).map_err(|err| err.to_string())? {
-            Some(a) => a
-                .normalized_value(quick_xml::XmlVersion::Implicit1_0)
-                .map(|v| v.into_owned())
-                .map_err(|err| err.to_string()),
+fn testcase(e: &BytesStart<'_>) -> Result<ReportCase, ReportParseError> {
+    let attr = |name: &str| -> Result<String, ReportParseError> {
+        match e.try_get_attribute(name)? {
+            Some(a) => Ok(a.normalized_value(quick_xml::XmlVersion::Implicit1_0).map(std::borrow::Cow::into_owned)?),
             None => Ok(String::new()),
         }
     };
     let name = attr("name")?;
     if name.is_empty() {
-        return Err("a <testcase> has no name".to_string());
+        return Err(ReportParseError::UnnamedTestcase);
     }
     Ok(ReportCase {
         name,
@@ -1048,11 +1143,11 @@ fn testcase(e: &BytesStart<'_>) -> Result<ReportCase, String> {
 /// Parse Cucumber JSON: every scenario element; failed when any step or
 /// hook (including its feature's preceding Background) failed, skipped
 /// when any is skipped/pending/undefined/ambiguous or nothing ran.
-pub fn parse_cucumber(text: &str) -> Result<Vec<ReportCase>, String> {
-    let features: serde_json::Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
+pub fn parse_cucumber(text: &str) -> Result<Vec<ReportCase>, ReportParseError> {
+    let features: serde_json::Value = serde_json::from_str(text)?;
     let features = features
         .as_array()
-        .ok_or("the top level is not an array of features")?;
+        .ok_or(ReportParseError::NotFeatureArray)?;
     let mut cases = Vec::new();
     for feature in features {
         let group = feature
@@ -1103,7 +1198,7 @@ pub fn parse_cucumber(text: &str) -> Result<Vec<ReportCase>, String> {
         }
     }
     if cases.is_empty() {
-        return Err("no scenario element".to_string());
+        return Err(ReportParseError::NoScenario);
     }
     Ok(cases)
 }
@@ -1112,7 +1207,7 @@ pub fn parse_cucumber(text: &str) -> Result<Vec<ReportCase>, String> {
 /// or the newer `attachments`): base64 `data` with a `mime_type`
 /// (`mimeType`, `media_type`, `media.type`); a `body` whose
 /// `contentEncoding` is `IDENTITY` is the bytes as written.
-fn element_embeddings(element: &serde_json::Value) -> Result<Vec<CaseFile>, String> {
+fn element_embeddings(element: &serde_json::Value) -> Result<Vec<CaseFile>, ReportParseError> {
     use base64::Engine;
 
     let mut files = Vec::new();
@@ -1135,7 +1230,7 @@ fn element_embeddings(element: &serde_json::Value) -> Result<Vec<CaseFile>, Stri
                         text.as_bytes().to_vec()
                     } else {
                         let compact: String = text.split_whitespace().collect();
-                        base64::engine::general_purpose::STANDARD.decode(compact).map_err(|e| format!("an embedding of a {key} item is not valid base64: {e}"))?
+                        base64::engine::general_purpose::STANDARD.decode(compact).map_err(|source| ReportParseError::Base64 { key, source })?
                     };
                     files.push(CaseFile::Embedded { mime, bytes: bytes.into() });
                 }
@@ -1198,7 +1293,7 @@ fn worse(a: ReportOutcome, b: ReportOutcome) -> ReportOutcome {
 /// test or suite inside it recorded (setup or teardown failed) fails
 /// every test inside it too; when a test inside did fail, the suite's
 /// end only reports that, and its other tests keep their own outcome.
-pub fn parse_swift_testing(text: &str) -> Result<Vec<ReportCase>, String> {
+pub fn parse_swift_testing(text: &str) -> Result<Vec<ReportCase>, ReportParseError> {
     use std::collections::HashMap;
 
     #[derive(Default)]
@@ -1221,11 +1316,11 @@ pub fn parse_swift_testing(text: &str) -> Result<Vec<ReportCase>, String> {
             continue;
         }
         let at = index + 1;
-        let record: serde_json::Value = serde_json::from_str(line).map_err(|e| format!("line {at}: {e}"))?;
-        let payload = record.get("payload").ok_or_else(|| format!("line {at}: a record without a payload"))?;
+        let record: serde_json::Value = serde_json::from_str(line).map_err(|source| ReportParseError::JsonLine { line: at, source })?;
+        let payload = record.get("payload").ok_or(ReportParseError::NoPayload { line: at })?;
         match record.get("kind").and_then(|v| v.as_str()) {
             Some("test") => {
-                let id = field(payload, "id").ok_or_else(|| format!("line {at}: a test without an id"))?;
+                let id = field(payload, "id").ok_or(ReportParseError::NoTestId { line: at })?;
                 if field(payload, "kind").as_deref() == Some("suite") {
                     suites.push(id);
                     continue;
@@ -1233,7 +1328,7 @@ pub fn parse_swift_testing(text: &str) -> Result<Vec<ReportCase>, String> {
                 let name = field(payload, "displayName")
                     .or_else(|| field(payload, "name"))
                     .filter(|n| !n.is_empty())
-                    .ok_or_else(|| format!("line {at}: test `{id}` has no name"))?;
+                    .ok_or_else(|| ReportParseError::NoTestName { line: at, id: id.clone() })?;
                 functions.push((id, name));
             }
             Some("event") => {
@@ -1256,7 +1351,7 @@ pub fn parse_swift_testing(text: &str) -> Result<Vec<ReportCase>, String> {
         }
     }
     if functions.is_empty() {
-        return Err("no test record of kind `function`".to_string());
+        return Err(ReportParseError::NoFunction);
     }
     let inside = |id: &str, suite: &str| id.strip_prefix(suite).is_some_and(|rest| rest.starts_with('/'));
     let own_failure = |id: &str, function: bool| seen.get(id).is_some_and(|s| s.failed || (function && s.ended_failed));
@@ -1288,7 +1383,7 @@ pub fn parse_swift_testing(text: &str) -> Result<Vec<ReportCase>, String> {
         })
         .collect();
     if cases.is_empty() {
-        return Err("no test ran (no testStarted or testSkipped event names a declared test)".to_string());
+        return Err(ReportParseError::NothingRan);
     }
     Ok(cases)
 }
@@ -1297,10 +1392,10 @@ pub fn parse_swift_testing(text: &str) -> Result<Vec<ReportCase>, String> {
 /// the stream carries it, else an issue that is neither a known issue nor
 /// a warning.
 fn issue_is_failure(issue: &serde_json::Value) -> bool {
-    if let Some(failure) = issue.get("isFailure").and_then(|v| v.as_bool()) {
+    if let Some(failure) = issue.get("isFailure").and_then(serde_json::Value::as_bool) {
         return failure;
     }
-    let known = issue.get("isKnown").and_then(|v| v.as_bool()).unwrap_or(false);
+    let known = issue.get("isKnown").and_then(serde_json::Value::as_bool).unwrap_or(false);
     let warning = issue.get("severity").and_then(|v| v.as_str()) == Some("warning");
     !known && !warning
 }
@@ -1309,6 +1404,44 @@ fn issue_is_failure(issue: &serde_json::Value) -> bool {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[test]
+    fn binding_refusals_read_as_before() {
+        assert_eq!(parse_report_spec("junit").unwrap_err().to_string(), "`junit` is not <junit|cucumber|swift-testing>:<path>");
+        assert_eq!(parse_report_spec("tap:a.tap").unwrap_err().to_string(), "`tap` is not a supported report format (expected junit, cucumber or swift-testing)");
+        assert_eq!(parse_report_spec("junit:").unwrap_err().to_string(), "`junit:` names no file");
+        assert_eq!(match_cases(&[], &[], None).unwrap_err().to_string(), "no --scenario-id to match the report by; name the case with --report-case");
+        assert_eq!(
+            match_cases(&[], &["x".to_string()], Some("a.b.01")).unwrap_err().to_string(),
+            "no case for scenario `a.b.01` or named `x` among its 0 case(s); start the test name with the scenario id or tag it, or name the case with --report-case"
+        );
+        let usage = BindError::usage("the message", "the hint").caused_by(std::io::Error::other("boom"));
+        assert_eq!(usage.to_string(), "the message");
+        assert!(std::error::Error::source(&usage).is_some());
+        assert_eq!(BindError::usage("the message", "the hint").on("--report").field(), Some("--report"));
+        assert_eq!(BindError::Contradiction("it contradicts".to_string()).to_string(), "it contradicts");
+    }
+
+    #[test]
+    fn report_parse_failures_read_as_before() {
+        let junit = |text: &str| parse_junit(text).unwrap_err().to_string();
+        assert_eq!(junit("<testsuites/>"), "no <testcase> element");
+        assert_eq!(junit("<testsuite><testcase name=\"a\">"), "unterminated <testcase>");
+        assert_eq!(junit("<testsuite><testcase/></testsuite>"), "a <testcase> has no name");
+        let cucumber = |text: &str| parse_cucumber(text).unwrap_err().to_string();
+        assert_eq!(cucumber("{}"), "the top level is not an array of features");
+        assert_eq!(cucumber("[]"), "no scenario element");
+        assert_eq!(cucumber("nope"), serde_json::from_str::<serde_json::Value>("nope").unwrap_err().to_string(), "a JSON failure reads as serde_json says it");
+        let bad_base64 = r#"[{"elements":[{"steps":[{"embeddings":[{"data":"!!!","mime_type":"text/plain"}]}]}]}]"#;
+        assert!(cucumber(bad_base64).starts_with("an embedding of a steps item is not valid base64: "), "{}", cucumber(bad_base64));
+        let swift = |text: &str| parse_swift_testing(text).unwrap_err().to_string();
+        assert!(swift("{").starts_with("line 1: "), "{}", swift("{"));
+        assert_eq!(swift(r#"{"kind":"test"}"#), "line 1: a record without a payload");
+        assert_eq!(swift(r#"{"kind":"test","payload":{}}"#), "line 1: a test without an id");
+        assert_eq!(swift(r#"{"kind":"test","payload":{"id":"t"}}"#), "line 1: test `t` has no name");
+        assert_eq!(swift(""), "no test record of kind `function`");
+        assert_eq!(swift(r#"{"kind":"test","payload":{"id":"t","displayName":"n"}}"#), "no test ran (no testStarted or testSkipped event names a declared test)");
+    }
 
     const JUNIT: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
@@ -1343,7 +1476,7 @@ mod tests {
             parse_junit("<testsuites/>").is_err(),
             "a report with no case binds nothing"
         );
-        assert!(parse_junit("<testsuite><testcase name=\"x\">").is_err());
+        parse_junit("<testsuite><testcase name=\"x\">").unwrap_err();
     }
 
     fn names(matched: &[&ReportCase]) -> Vec<(String, ReportOutcome)> {
@@ -1365,13 +1498,14 @@ mod tests {
         );
         assert!(match_cases(&cases, &[], Some("cart.add.09"))
             .unwrap_err()
+            .to_string()
             .contains("5 case(s)"));
         assert_eq!(
             names(&match_cases(&cases, &["cart_add_04_refuses_out_of_stock".to_string()], None).unwrap())[0].0,
             "spec_coverage::tests::cart_add_04_refuses_out_of_stock",
             "--report-case names a Rust test by its function"
         );
-        assert!(match_cases(&cases, &[], None).is_err());
+        match_cases(&cases, &[], None).unwrap_err();
     }
 
     /// 0.14 acceptance rerun G7: a case binds only to its OWN leading
@@ -1396,7 +1530,7 @@ mod tests {
         assert_eq!(bound("game.session.05"), ["tests::game_session_05_restart_mirrors_game_session_01"], "underscored leading id");
         assert_eq!(bound("game.session.06"), ["freezes the clock, unlike game.session.01"], "the describe path's id leads the name's mention");
         assert!(
-            match_cases(&cases, &[], Some("game.session.07")).unwrap_err().contains("start the test name with the scenario id"),
+            match_cases(&cases, &[], Some("game.session.07")).unwrap_err().to_string().contains("start the test name with the scenario id"),
             "an earlier id-shaped token (v1.2.10) leads, so the case is not .07's own"
         );
         assert_eq!(
@@ -1457,7 +1591,7 @@ mod tests {
             names(&match_cases(&cases, &[], Some("cart.add.04")).unwrap()),
             vec![("Outline".to_string(), ReportOutcome::Passed), ("Outline".to_string(), ReportOutcome::Failed)]
         );
-        assert!(parse_cucumber("{}").is_err());
+        parse_cucumber("{}").unwrap_err();
     }
 
     fn request<'a>(
@@ -1521,7 +1655,7 @@ mod tests {
         std::fs::write(outside.path().join("x.log"), b"x").unwrap();
         let elsewhere = vec![outside.path().join("x.log")];
         let err = bind(&request(repo.path(), &elsewhere, &[], EvidenceVerdict::Faithful)).unwrap_err();
-        assert!(matches!(&err, BindError::Usage { message: m, hint: h, field: Some("--artifact") } if m.contains("outside the repository") && h.contains("copy the file")), "{err:?}");
+        assert!(matches!(&err, BindError::Usage { message: m, hint: h, field: Some("--artifact"), .. } if m.contains("outside the repository") && h.contains("copy the file")), "{err:?}");
 
         let oversized = BindRequest { max_bytes: 4, ..request(repo.path(), &artifacts, &[], EvidenceVerdict::Faithful) };
         assert!(
@@ -1544,7 +1678,7 @@ mod tests {
 
         let (failed, error) = store_files(repo.path(), &files).unwrap_err();
         assert_eq!(failed.sha256, files[1].sha256, "the error names the file that changed");
-        assert!(matches!(error, canon_gate::artifact_store::StoreError::Changed { .. }), "{error}");
+        assert!(matches!(error, canon_gate::artifact_store::ArtifactStoreError::Changed { .. }), "{error}");
         let store = canon_gate::artifact_store::store_dir(repo.path());
         assert_eq!(std::fs::read_dir(&store).unwrap().count(), 0, "nothing published and no temp file left");
 
@@ -1560,9 +1694,9 @@ mod tests {
             parse_report_spec("junit:target/nextest/junit.xml").unwrap(),
             (ReportFormat::Junit, PathBuf::from("target/nextest/junit.xml"))
         );
-        assert!(parse_report_spec("tap:out.tap").is_err());
-        assert!(parse_report_spec("junit:").is_err());
-        assert!(parse_report_spec("junit.xml").is_err());
+        parse_report_spec("tap:out.tap").unwrap_err();
+        parse_report_spec("junit:").unwrap_err();
+        parse_report_spec("junit.xml").unwrap_err();
         assert_eq!(
             parse_report_spec("swift-testing:.build/events.jsonl").unwrap(),
             (ReportFormat::SwiftTesting, PathBuf::from(".build/events.jsonl"))
@@ -1646,9 +1780,9 @@ mod tests {
         let ended_failed = [test("a_b_01"), event("a_b_01", "testStarted", ""), event("a_b_01", "testEnded", r#","messages":[{"symbol":"fail","text":"failed"}]"#)].join("\n");
         assert_eq!(parse_swift_testing(&ended_failed).unwrap()[0].outcome, ReportOutcome::Failed, "a test whose own end reports a failure failed");
 
-        assert!(parse_swift_testing("<testsuite/>").unwrap_err().starts_with("line 1:"), "not JSON lines");
-        assert!(parse_swift_testing(&test("a_b_01")).unwrap_err().contains("no test ran"));
-        assert!(parse_swift_testing("").unwrap_err().contains("no test record"));
+        assert!(parse_swift_testing("<testsuite/>").unwrap_err().to_string().starts_with("line 1:"), "not JSON lines");
+        assert!(parse_swift_testing(&test("a_b_01")).unwrap_err().to_string().contains("no test ran"));
+        assert!(parse_swift_testing("").unwrap_err().to_string().contains("no test record"));
     }
 
     /// evidence.add.80: each indexed scenario's record carries its own

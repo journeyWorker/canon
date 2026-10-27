@@ -63,9 +63,9 @@ use canon_model::envelope::RecordKind;
 use chrono::{DateTime, Utc};
 use sqlx::Row;
 
-use crate::partition::{content_digest12, resolve_partition};
+use crate::partition::resolve_name;
 use crate::policy::{Backend, Rung};
-use crate::tier::{AgeReport, AgingRule, PurgeCount, RawWrite, StoreError, StoredRecord, Tier, TierQuery, TierReadResult, WriteReceipt};
+use crate::tier::{AgeReport, AgingRule, PurgeCount, RawWrite, RowRekey, StoreError, StoredRecord, StoredRow, Tier, TierQuery, TierReadResult, WriteReceipt};
 
 fn create_table_sql() -> &'static str {
     "CREATE TABLE IF NOT EXISTS records_history (\
@@ -82,17 +82,6 @@ fn create_index_sql() -> &'static str {
     "CREATE INDEX IF NOT EXISTS records_history_kind_id_idx ON records_history (kind, id)"
 }
 
-/// [`crate::pg_tier::insert_sql`]'s sqlite twin: the SAME append-only
-/// `ON CONFLICT (kind, id, digest) DO NOTHING` dedup, `?` placeholders
-/// instead of `$1..$5`. `RETURNING kind` is the "did this row actually
-/// land" signal [`SqliteTier::write_row`] reads off row PRESENCE, not
-/// a computed column — identical rationale to the pg twin.
-fn insert_sql() -> &'static str {
-    "INSERT INTO records_history (kind, id, at, digest, body) VALUES (?, ?, ?, ?, ?) \
-     ON CONFLICT (kind, id, digest) DO NOTHING \
-     RETURNING kind"
-}
-
 /// [`crate::pg_tier::WRITE_BATCH_CHUNK_SIZE`]'s sqlite twin (s31
 /// design D2 pattern, s32 tasks.md 1.2): the identical 500-row chunk
 /// size — sqlite's own bind-parameter ceiling
@@ -100,7 +89,7 @@ fn insert_sql() -> &'static str {
 /// clear of `500 * 5 = 2500` params per chunk.
 const WRITE_BATCH_CHUNK_SIZE: usize = 500;
 
-/// Multi-row form of [`insert_sql`] (mirrors
+/// The multi-row `INSERT` (mirrors
 /// [`crate::pg_tier::insert_batch_sql`]) — `n` unnumbered `(?, ?, ?,
 /// ?, ?)` tuples in ONE `INSERT … ON CONFLICT (kind, id, digest) DO
 /// NOTHING`, the SAME per-row dedup semantics as the single-row form.
@@ -117,6 +106,12 @@ fn insert_batch_sql(n: usize) -> String {
          ON CONFLICT (kind, id, digest) DO NOTHING \
          RETURNING kind, id, digest"
     )
+}
+
+/// The stored body of one `(kind, id, digest)` row: what a write that
+/// found its key taken compares itself against (R7).
+fn select_body_sql() -> &'static str {
+    "SELECT body FROM records_history WHERE kind = ? AND id = ? AND digest = ?"
 }
 
 fn select_sql(since: bool) -> &'static str {
@@ -156,10 +151,26 @@ fn delete_sql() -> &'static str {
 /// hanging forever.
 const BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
+#[derive(Debug)]
 pub struct SqliteTier {
     path: PathBuf,
     pool: sqlx::SqlitePool,
     rt: tokio::runtime::Runtime,
+    /// Sidecar files (`-wal`, `-shm`) that a read-only open created; removed
+    /// on drop so a preview leaves the tree as it found it.
+    created_sidecars: Vec<PathBuf>,
+}
+
+impl Drop for SqliteTier {
+    fn drop(&mut self) {
+        if self.created_sidecars.is_empty() {
+            return;
+        }
+        self.rt.block_on(self.pool.close());
+        for sidecar in &self.created_sidecars {
+            let _ = std::fs::remove_file(sidecar);
+        }
+    }
 }
 
 impl SqliteTier {
@@ -203,6 +214,29 @@ impl SqliteTier {
         Self::open(path, !absent)
     }
 
+    /// Open an EXISTING db file strictly read-only (`SQLITE_OPEN_READ_ONLY`):
+    /// no create, no journal-mode change, no `CREATE TABLE`, no write of any
+    /// kind. A WAL-mode db still needs its `-wal`/`-shm` to read the latest
+    /// rows; sidecars this open creates are removed when the tier drops, so
+    /// the tree is byte-identical afterwards. An absent file reads as empty,
+    /// like [`SqliteTier::connect_for_read`].
+    pub fn connect_read_only(path: &Path) -> Result<Self, StoreError> {
+        if matches!(std::fs::symlink_metadata(path), Err(e) if e.kind() == std::io::ErrorKind::NotFound) {
+            return Self::open(path, false);
+        }
+        let rt = tokio::runtime::Runtime::new().map_err(StoreError::Io)?;
+        let unavailable = |e: String| StoreError::tier_unavailable(Rung::Hot, Some(Backend::Sqlite), format!("{}: {e}", path.display()));
+        let sidecar = |suffix: &str| {
+            let mut name = path.as_os_str().to_os_string();
+            name.push(suffix);
+            PathBuf::from(name)
+        };
+        let created_sidecars: Vec<PathBuf> = ["-wal", "-shm"].into_iter().map(sidecar).filter(|p| !p.exists()).collect();
+        let opts = sqlx::sqlite::SqliteConnectOptions::new().filename(path).read_only(true).create_if_missing(false).busy_timeout(BUSY_TIMEOUT);
+        let pool = rt.block_on(sqlx::sqlite::SqlitePoolOptions::new().max_connections(1).connect_with(opts)).map_err(|e| unavailable(e.to_string()))?;
+        Ok(Self { path: path.to_path_buf(), pool, rt, created_sidecars })
+    }
+
     fn open(path: &Path, on_disk: bool) -> Result<Self, StoreError> {
         let rt = tokio::runtime::Runtime::new().map_err(StoreError::Io)?;
         let path_owned = path.to_path_buf();
@@ -229,7 +263,7 @@ impl SqliteTier {
             sqlx::query(create_index_sql()).execute(&pool).await.map_err(|e| StoreError::Sql(e.to_string()))?;
             Ok::<_, StoreError>(pool)
         })?;
-        Ok(Self { path: path_owned, pool, rt })
+        Ok(Self { path: path_owned, pool, rt, created_sidecars: Vec::new() })
     }
 
     /// The resolved db-file path this tier was opened against —
@@ -239,56 +273,28 @@ impl SqliteTier {
         &self.path
     }
 
-    /// Append-only (mirrors [`crate::pg_tier::PgTier::write_row`]):
-    /// every write is a plain `INSERT … ON CONFLICT (kind, id, digest)
-    /// DO NOTHING` — a byte-identical resubmission at the same key is
-    /// a no-op (`deduped: true`, row count unchanged); ANY new digest
-    /// at the same `(kind, id)` lands as a brand-new row, never an
-    /// overwrite of a prior version.
+    /// Append-only (mirrors [`crate::pg_tier::PgTier::write_row`]): a
+    /// single-record batch, so one write and a batch of one share the one
+    /// code path (and the one refusal of a same-key, different-content write).
     fn write_row(&self, record: &dyn StoredRecord) -> Result<WriteReceipt, StoreError> {
-        let kind = record.kind();
-        let raw = record.to_raw();
-        let key = resolve_partition(kind, &raw.0)?;
-        let digest = content_digest12(&raw.0);
-        let at = record.at();
-
-        let inserted = self.rt.block_on(async {
-            let row = sqlx::query(insert_sql())
-                .bind(kind.as_str())
-                .bind(&key.natural_key)
-                .bind(at)
-                .bind(&digest)
-                .bind(sqlx::types::Json(&raw.0))
-                .fetch_optional(&self.pool)
-                .await
-                .map_err(|e| StoreError::Sql(e.to_string()))?;
-            Ok::<bool, StoreError>(row.is_some())
-        })?;
-
-        Ok(WriteReceipt {
-            kind,
-            location: format!("sqlite.records_history[{}={}]__{}", kind.as_str(), key.natural_key, digest),
-            digest,
-            deduped: !inserted,
-        })
+        Ok(self.write_rows(std::slice::from_ref(&record))?.remove(0))
     }
 
-    /// One ≤[`WRITE_BATCH_CHUNK_SIZE`]-row chunk of
-    /// [`Tier::write_batch`] (s31 design D2 pattern, mirrors
-    /// [`crate::pg_tier::PgTier::write_chunk`]): a SINGLE multi-row
-    /// `INSERT … ON CONFLICT DO NOTHING` inside its own transaction —
-    /// one transaction per chunk, never one per row and never one
-    /// spanning multiple chunks. Per-row semantics mirror
-    /// [`Self::write_row`] exactly.
-    fn write_chunk(&self, records: &[&dyn StoredRecord]) -> Result<Vec<WriteReceipt>, StoreError> {
+    /// The whole of one [`Tier::write_batch`] in ONE transaction (R7): every
+    /// row is a plain `INSERT … ON CONFLICT (kind, id, digest) DO NOTHING`.
+    /// A key that already holds the SAME canonical JSON is a no-op
+    /// (`deduped: true`); a key that holds DIFFERENT canonical JSON is a
+    /// [`StoreError::KeyConflict`] and the transaction rolls back, so none of
+    /// the batch's rows is kept. A new digest at the same `(kind, id)` is a
+    /// genuine append.
+    fn write_rows(&self, records: &[&dyn StoredRecord]) -> Result<Vec<WriteReceipt>, StoreError> {
         if records.is_empty() {
             return Ok(Vec::new());
         }
 
         // Resolve every row's persisted shape BEFORE opening the
-        // transaction: a malformed record (`resolve_partition` error)
-        // is an ordinary per-record `Err`, never something that should
-        // abort a half-open transaction.
+        // transaction: a malformed record is an ordinary per-record `Err`,
+        // never something that should abort a half-open transaction.
         let mut kinds = Vec::with_capacity(records.len());
         let mut keys = Vec::with_capacity(records.len());
         let mut ats = Vec::with_capacity(records.len());
@@ -297,25 +303,52 @@ impl SqliteTier {
         for record in records {
             let kind = record.kind();
             let raw = record.to_raw();
-            let key = resolve_partition(kind, &raw.0)?;
-            digests.push(content_digest12(&raw.0));
+            let name = resolve_name(kind, &raw.0)?;
+            digests.push(name.digest);
             kinds.push(kind);
             ats.push(record.at());
-            keys.push(key.natural_key);
+            keys.push(name.key);
             bodies.push(raw.0);
         }
 
         let landed: HashSet<(String, String, String)> = self.rt.block_on(async {
             let mut tx = self.pool.begin().await.map_err(|e| StoreError::Sql(e.to_string()))?;
-            let mut q = sqlx::query(sqlx::AssertSqlSafe(insert_batch_sql(records.len())));
-            for i in 0..records.len() {
-                q = q.bind(kinds[i].as_str()).bind(&keys[i]).bind(ats[i]).bind(&digests[i]).bind(sqlx::types::Json(&bodies[i]));
+            let mut landed = HashSet::new();
+            let mut seen: std::collections::HashMap<(String, String, String), usize> = std::collections::HashMap::new();
+            for start in (0..records.len()).step_by(WRITE_BATCH_CHUNK_SIZE) {
+                let end = (start + WRITE_BATCH_CHUNK_SIZE).min(records.len());
+                let mut q = sqlx::query(sqlx::AssertSqlSafe(insert_batch_sql(end - start)));
+                for i in start..end {
+                    q = q.bind(kinds[i].as_str()).bind(&keys[i]).bind(ats[i]).bind(&digests[i]).bind(sqlx::types::Json(&bodies[i]));
+                }
+                for r in q.fetch_all(&mut *tx).await.map_err(|e| StoreError::Sql(e.to_string()))? {
+                    landed.insert((r.get::<String, _>("kind"), r.get::<String, _>("id"), r.get::<String, _>("digest")));
+                }
             }
-            let rows = q.fetch_all(&mut *tx).await.map_err(|e| StoreError::Sql(e.to_string()))?;
-            let landed = rows
-                .into_iter()
-                .map(|r| (r.get::<String, _>("kind"), r.get::<String, _>("id"), r.get::<String, _>("digest")))
-                .collect();
+            for i in 0..records.len() {
+                let key = (kinds[i].as_str().to_string(), keys[i].clone(), digests[i].clone());
+                if let Some(&first) = seen.get(&key) {
+                    if bodies[first] != bodies[i] {
+                        return Err(StoreError::KeyConflict { location: self.location(kinds[i], &keys[i], &digests[i]) });
+                    }
+                    continue;
+                }
+                seen.insert(key.clone(), i);
+                if !landed.contains(&key) {
+                    let stored = sqlx::query(select_body_sql())
+                        .bind(kinds[i].as_str())
+                        .bind(&keys[i])
+                        .bind(&digests[i])
+                        .fetch_one(&mut *tx)
+                        .await
+                        .map_err(|e| StoreError::Sql(e.to_string()))?
+                        .get::<sqlx::types::Json<serde_json::Value>, _>("body")
+                        .0;
+                    if stored != bodies[i] {
+                        return Err(StoreError::KeyConflict { location: self.location(kinds[i], &keys[i], &digests[i]) });
+                    }
+                }
+            }
             tx.commit().await.map_err(|e| StoreError::Sql(e.to_string()))?;
             Ok::<_, StoreError>(landed)
         })?;
@@ -323,14 +356,85 @@ impl SqliteTier {
         Ok((0..records.len())
             .map(|i| {
                 let inserted = landed.contains(&(kinds[i].as_str().to_string(), keys[i].clone(), digests[i].clone()));
-                WriteReceipt {
-                    kind: kinds[i],
-                    location: format!("sqlite.records_history[{}={}]__{}", kinds[i].as_str(), keys[i], digests[i]),
-                    digest: digests[i].clone(),
-                    deduped: !inserted,
-                }
+                WriteReceipt { kind: kinds[i], location: self.location(kinds[i], &keys[i], &digests[i]), digest: digests[i].clone(), deduped: !inserted }
             })
             .collect())
+    }
+
+    fn location(&self, kind: RecordKind, key: &str, digest: &str) -> String {
+        format!("sqlite.records_history[{}={key}]_{digest}", kind.as_str())
+    }
+
+    /// Every row of `records_history`, in key order: what `canon migrate`
+    /// reads to compute the rows' new keys.
+    pub fn all_rows(&self) -> Result<Vec<StoredRow>, StoreError> {
+        self.rt.block_on(async {
+            let rows = sqlx::query("SELECT kind, id, at, digest, body FROM records_history ORDER BY kind, id, digest")
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| StoreError::Sql(e.to_string()))?;
+            Ok(rows
+                .into_iter()
+                .map(|r| StoredRow {
+                    kind: r.get("kind"),
+                    id: r.get("id"),
+                    at: r.get("at"),
+                    digest: r.get("digest"),
+                    body: r.get::<sqlx::types::Json<serde_json::Value>, _>("body").0,
+                })
+                .collect())
+        })
+    }
+
+    /// Re-key rows in ONE transaction (0.30 `canon migrate`): each row gets
+    /// its new `(kind, id, digest)` and body. A new key already held by the
+    /// same JSON is a no-op (the old row goes); held by other JSON it is a
+    /// [`StoreError::KeyConflict`] and nothing of the call is kept.
+    pub fn rekey(&self, changes: &[RowRekey]) -> Result<(), StoreError> {
+        self.rt.block_on(async {
+            let mut tx = self.pool.begin().await.map_err(|e| StoreError::Sql(e.to_string()))?;
+            for change in changes {
+                let held = sqlx::query(select_body_sql())
+                    .bind(&change.to.0)
+                    .bind(&change.to.1)
+                    .bind(&change.to.2)
+                    .fetch_optional(&mut *tx)
+                    .await
+                    .map_err(|e| StoreError::Sql(e.to_string()))?
+                    .map(|r| r.get::<sqlx::types::Json<serde_json::Value>, _>("body").0);
+                let moves_onto_itself = change.from == change.to;
+                if let (Some(held), false) = (&held, moves_onto_itself) {
+                    if *held != change.body {
+                        return Err(StoreError::KeyConflict { location: self.location_of(&change.to) });
+                    }
+                    sqlx::query(delete_sql()).bind(&change.from.0).bind(&change.from.1).bind(&change.from.2).execute(&mut *tx).await.map_err(|e| StoreError::Sql(e.to_string()))?;
+                    continue;
+                }
+                sqlx::query("UPDATE records_history SET kind = ?, id = ?, digest = ?, body = ? WHERE kind = ? AND id = ? AND digest = ?")
+                    .bind(&change.to.0)
+                    .bind(&change.to.1)
+                    .bind(&change.to.2)
+                    .bind(sqlx::types::Json(&change.body))
+                    .bind(&change.from.0)
+                    .bind(&change.from.1)
+                    .bind(&change.from.2)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|e| StoreError::Sql(e.to_string()))?;
+            }
+            tx.commit().await.map_err(|e| StoreError::Sql(e.to_string()))?;
+            Ok(())
+        })
+    }
+
+    fn location_of(&self, key: &(String, String, String)) -> String {
+        format!("sqlite.records_history[{}={}]_{}", key.0, key.1, key.2)
+    }
+
+    /// Fold the write-ahead log into the db file, so copying the file alone
+    /// (the `canon migrate` backup) copies every row.
+    pub fn checkpoint(&self) -> Result<(), StoreError> {
+        self.rt.block_on(async { sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)").execute(&self.pool).await.map(drop).map_err(|e| StoreError::Sql(e.to_string())) })
     }
 
     fn read_rows(&self, query: &TierQuery, older_than: Option<DateTime<Utc>>) -> Result<Vec<RawRecord>, StoreError> {
@@ -365,11 +469,7 @@ impl Tier for SqliteTier {
     /// byte-for-byte the same shape [`Self::write_row`]'s single-row
     /// path produces for each record.
     fn write_batch(&self, records: &[&dyn StoredRecord]) -> Result<Vec<WriteReceipt>, StoreError> {
-        let mut receipts = Vec::with_capacity(records.len());
-        for chunk in records.chunks(WRITE_BATCH_CHUNK_SIZE) {
-            receipts.extend(self.write_chunk(chunk)?);
-        }
-        Ok(receipts)
+        self.write_rows(records)
     }
 
     /// Never pre-folds (s21 D5) — returns every retained historical
@@ -381,34 +481,38 @@ impl Tier for SqliteTier {
     }
     fn purge_keys(&self, kind: RecordKind, before: DateTime<Utc>) -> Result<Vec<String>, StoreError> {
         self.rt.block_on(async {
-            let rows = sqlx::query("SELECT id, digest FROM records_history WHERE kind = ? AND at < ? ORDER BY id, digest")
+            let rows = sqlx::query("SELECT id, body FROM records_history WHERE kind = ? AND at < ? ORDER BY id, digest")
                 .bind(kind.as_str())
                 .bind(before)
                 .fetch_all(&self.pool)
                 .await
                 .map_err(|e| StoreError::Sql(e.to_string()))?;
-            Ok(rows.iter().map(|r| format!("{}#{}", r.get::<String, _>("id"), r.get::<String, _>("digest"))).collect())
+            Ok(rows.iter()
+                .map(|r| crate::partition::purge_id(kind, &RawRecord(r.get::<sqlx::types::Json<serde_json::Value>, _>("body").0), &r.get::<String, _>("id")))
+                .collect())
         })
     }
     fn purge_before(&self, kind: RecordKind, before: DateTime<Utc>, dry_run: bool) -> Result<PurgeCount, StoreError> {
         self.rt.block_on(async {
-            let matched = sqlx::query(purge_count_sql())
+            let matched = usize::try_from(sqlx::query(purge_count_sql())
                 .bind(kind.as_str())
                 .bind(before)
                 .fetch_one(&self.pool)
                 .await
                 .map_err(|e| StoreError::Sql(e.to_string()))?
-                .get::<i64, _>("count") as usize;
+                .get::<i64, _>("count"))
+                .expect("a SQL COUNT is non-negative and fits usize");
             let deleted = if dry_run {
                 0
             } else {
-                sqlx::query(purge_delete_sql())
+                usize::try_from(sqlx::query(purge_delete_sql())
                     .bind(kind.as_str())
                     .bind(before)
                     .execute(&self.pool)
                     .await
                     .map_err(|e| StoreError::Sql(e.to_string()))?
-                    .rows_affected() as usize
+                    .rows_affected())
+                    .expect("deleted row count fits usize")
             };
             Ok(PurgeCount { matched, deleted })
         })
@@ -422,8 +526,7 @@ impl Tier for SqliteTier {
         let mut moved = 0;
         let mut already_aged = 0;
         for raw in candidates {
-            let key = resolve_partition(rule.kind, &raw.0)?;
-            let digest = content_digest12(&raw.0);
+            let name = resolve_name(rule.kind, &raw.0)?;
             let receipt = rule.destination.write(&RawWrite(raw))?;
             if receipt.deduped {
                 already_aged += 1;
@@ -433,8 +536,8 @@ impl Tier for SqliteTier {
             self.rt.block_on(async {
                 sqlx::query(delete_sql())
                     .bind(rule.kind.as_str())
-                    .bind(&key.natural_key)
-                    .bind(&digest)
+                    .bind(&name.key)
+                    .bind(&name.digest)
                     .execute(&self.pool)
                     .await
                     .map_err(|e| StoreError::Sql(e.to_string()))
@@ -446,10 +549,9 @@ impl Tier for SqliteTier {
 
 #[cfg(test)]
 mod tests {
-    use canon_model::envelope::{Actor, Envelope, RecordKind};
+    use canon_model::envelope::{Actor, Envelope};
     use canon_model::ids::{ChangeId, RoleId, RunId};
     use canon_model::records::{Change, ChangeStatus, Trajectory};
-    use chrono::Utc;
 
     use super::*;
 
@@ -473,15 +575,6 @@ mod tests {
         assert!(sql.contains("CREATE TABLE IF NOT EXISTS records_history"), "no schema qualification, unlike pg: {sql}");
         assert!(sql.contains("PRIMARY KEY (kind, id, digest)"), "s21 D2: the idempotence key includes digest, never a bare (kind, id)");
         assert!(!sql.contains('.'), "sqlite has no schema namespace to qualify the table with: {sql}");
-    }
-
-    #[test]
-    fn insert_sql_conflicts_on_kind_id_digest_and_does_nothing_never_updates() {
-        let sql = insert_sql();
-        assert!(sql.contains("ON CONFLICT (kind, id, digest) DO NOTHING"), "s21 D1: append-only, never an UPDATE on conflict");
-        assert!(sql.contains("INSERT INTO records_history"));
-        assert!(!sql.to_uppercase().contains("DO UPDATE"), "must never fall back to an upsert-in-place");
-        assert!(sql.contains("VALUES (?, ?, ?, ?, ?)"), "sqlite uses positional `?`, not numbered `$1..$5`: {sql}");
     }
 
     #[test]
@@ -568,7 +661,7 @@ mod tests {
             (mode.0, timeout.0)
         });
         assert_eq!(journal_mode.to_lowercase(), "wal");
-        assert_eq!(busy_timeout, BUSY_TIMEOUT.as_millis() as i64);
+        assert_eq!(busy_timeout, i64::try_from(BUSY_TIMEOUT.as_millis()).unwrap());
     }
 
     /// s32 tasks.md 1.3: "dedup no-op on byte-identical resubmission".
@@ -588,6 +681,79 @@ mod tests {
 
         let result = tier.read(&TierQuery::kind(RecordKind::Change)).unwrap();
         assert_eq!(result.records.len(), 1, "row count must be unchanged after the resubmission");
+    }
+
+    /// R7: a key held by DIFFERENT canonical JSON is a loud conflict, not a
+    /// silent `DO NOTHING`.
+    #[test]
+    fn a_key_held_by_other_json_is_a_key_conflict() {
+        let dir = tempfile::tempdir().unwrap();
+        let tier = SqliteTier::connect(&dir.path().join("hot.db")).unwrap();
+        let record = change(Utc::now(), "r7-conflict");
+        tier.write(&record).unwrap();
+        tier.rt
+            .block_on(async { sqlx::query("UPDATE records_history SET body = ?").bind(sqlx::types::Json(serde_json::json!({"tampered": true}))).execute(&tier.pool).await })
+            .unwrap();
+
+        let err = tier.write(&record).unwrap_err();
+        assert!(matches!(err, StoreError::KeyConflict { .. }), "got {err:?}");
+    }
+
+    /// `canon migrate`'s rekey: a free target moves the row, a target held by
+    /// other JSON conflicts and keeps the old row.
+    #[test]
+    fn rekey_moves_a_row_and_refuses_a_target_held_by_other_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let tier = SqliteTier::connect(&dir.path().join("hot.db")).unwrap();
+        let a = change(Utc::now(), "rekey-a");
+        let b = change(Utc::now(), "rekey-b");
+        let ra = tier.write(&a).unwrap();
+        let rb = tier.write(&b).unwrap();
+        let key_of = |id: &str, digest: &str| ("change".to_string(), id.to_string(), digest.to_string());
+        let from = key_of("rekey-a", &ra.digest);
+
+        let conflict = RowRekey { from: from.clone(), to: key_of("rekey-b", &rb.digest), body: a.to_raw().0 };
+        let err = tier.rekey(&[conflict]).unwrap_err();
+        assert!(matches!(err, StoreError::KeyConflict { .. }), "got {err:?}");
+        assert_eq!(tier.read(&TierQuery::kind(RecordKind::Change)).unwrap().records.len(), 2, "a refused rekey changes nothing");
+
+        let moved = RowRekey { from, to: key_of("rekey-a2", "deadbeef"), body: a.to_raw().0 };
+        tier.rekey(&[moved]).unwrap();
+        let ids: Vec<String> = tier
+            .rt
+            .block_on(async { sqlx::query("SELECT id FROM records_history ORDER BY id").fetch_all(&tier.pool).await })
+            .unwrap()
+            .into_iter()
+            .map(|r| r.get::<String, _>("id"))
+            .collect();
+        assert_eq!(ids, vec!["rekey-a2".to_string(), "rekey-b".to_string()]);
+    }
+
+    /// A read-only open reads the rows and leaves the tree as it found it:
+    /// no sidecar files, db bytes unchanged.
+    #[test]
+    fn connect_read_only_reads_rows_and_leaves_no_sidecars() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("hot.db");
+        let writer = SqliteTier::connect(&db).unwrap();
+        writer.write(&change(Utc::now(), "ro-read")).unwrap();
+        writer.checkpoint().unwrap();
+        drop(writer);
+        // A clean close of the last connection removes the sidecars.
+        let _ = std::fs::remove_file(dir.path().join("hot.db-wal"));
+        let _ = std::fs::remove_file(dir.path().join("hot.db-shm"));
+        let before = std::fs::read(&db).unwrap();
+
+        let tier = SqliteTier::connect_read_only(&db).unwrap();
+        assert_eq!(tier.read(&TierQuery::kind(RecordKind::Change)).unwrap().records.len(), 1);
+        drop(tier);
+
+        let mut names: Vec<String> = std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        names.sort();
+        assert_eq!(names, vec!["hot.db".to_string()], "no -wal/-shm left behind");
+        assert_eq!(std::fs::read(&db).unwrap(), before, "the db file is byte-identical");
+        assert!(SqliteTier::connect_read_only(&dir.path().join("absent.db")).unwrap().read(&TierQuery::kind(RecordKind::Change)).unwrap().records.is_empty());
+        assert!(!dir.path().join("absent.db").exists());
     }
 
     /// s32 tasks.md 1.3: "write_batch == write loop" — a
@@ -657,8 +823,8 @@ mod tests {
         let path = dir.path().join("hot.db");
         {
             let tier = SqliteTier::connect(&path).unwrap();
-            tier.write(&change(Utc::now(), "s32-reconnect-test")).unwrap();
-        }
+            tier.write(&change(Utc::now(), "s32-reconnect-test")).unwrap()
+        };
         let reopened = SqliteTier::connect(&path).unwrap();
         let result = reopened.read(&TierQuery::kind(RecordKind::Change)).unwrap();
         assert_eq!(result.records.len(), 1);
@@ -678,9 +844,8 @@ mod tests {
         std::fs::write(&blocking_file, b"i am a file, not a directory").unwrap();
         let db_path = blocking_file.join("hot.db");
 
-        let err = match SqliteTier::connect(&db_path) {
-            Ok(_) => panic!("a parent path component that is a plain file must fail to open"),
-            Err(e) => e,
+        let Err(err) = SqliteTier::connect(&db_path) else {
+            panic!("a parent path component that is a plain file must fail to open")
         };
         assert!(
             matches!(err, StoreError::TierUnavailable { backend: Some(Backend::Sqlite), .. }),
@@ -703,7 +868,7 @@ mod tests {
         let old = trajectory(Utc::now() - chrono::Duration::days(30), 0.3);
         source.write(&old).unwrap();
 
-        let report = source.age(&AgingRule { kind: RecordKind::Trajectory, after: chrono::Duration::days(1), destination: dest.clone() }).unwrap();
+        let report = source.age(&AgingRule { kind: RecordKind::Trajectory, after: chrono::Duration::days(1), destination: std::sync::Arc::<SqliteTier>::clone(&dest) }).unwrap();
         assert_eq!(report.moved, 1);
         assert_eq!(report.already_aged, 0);
         assert_eq!(source.read(&TierQuery::kind(RecordKind::Trajectory)).unwrap().records.len(), 0, "the source row must be gone after aging");

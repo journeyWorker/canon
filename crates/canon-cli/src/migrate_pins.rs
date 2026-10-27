@@ -35,14 +35,16 @@ use canon_gate::freshness::{current_checks, current_pins, scenario_evidence};
 use canon_gate::review_gate::in_effect_reviews;
 use canon_gate::spec_coverage::{latest_by_key, latest_scenarios};
 use canon_gate::{GateContext, GateCtx};
-use canon_model::{Divergence, DivergenceStatus, EvidencePin, EvidenceRecord, PinnedSpec, ProjectId, RecordKind, Review, Scenario, ScenarioId};
+use canon_model::{Divergence, DivergenceStatus, EvidencePin, PinnedSpec, ProjectId, RecordKind, Review, Scenario, ScenarioId};
+use canon_model::EvidenceViolation;
 use canon_policy::SchemaRegistry;
 use canon_store::git_tier::GitTier;
-use canon_store::partition::{content_digest12, expected_relative_path, resolve_partition};
-use canon_store::tier::{Tier, TierQuery};
+use canon_store::partition::expected_relative_path;
+use canon_store::tier::{StoreError, Tier, TierQuery};
 use chrono::Utc;
 
 use crate::migrate_legacy_pins::{self, LegacyPins, PinnedScenario};
+use crate::migrate_names::{v029, OldWorld};
 
 /// How one old review or acceptance stands under the rule it was written
 /// under.
@@ -126,19 +128,74 @@ impl Report {
     }
 }
 
+/// Why a pin migration stopped.
+#[derive(Debug, thiserror::Error)]
+pub enum MigratePinsError {
+    /// `canon.yaml` cannot be read into a gate context.
+    #[error(transparent)]
+    Config(#[from] canon_gate::CanonYamlError),
+    /// The ledger cannot be read into a gate context.
+    #[error(transparent)]
+    Context(#[from] canon_gate::GateContextError),
+    /// A record kind's ledger cannot be read.
+    #[error("cannot read the {kind} ledger: {source}")]
+    ReadLedger {
+        kind: &'static str,
+        #[source]
+        source: StoreError,
+    },
+    /// A migrated record cannot be serialized.
+    #[error("cannot write the migrated {kind}: {source}")]
+    Serialize {
+        kind: &'static str,
+        #[source]
+        source: serde_json::Error,
+    },
+    /// A migrated record has no ledger file name.
+    #[error("cannot place the migrated {kind}: {source}")]
+    Place {
+        kind: &'static str,
+        #[source]
+        source: EvidenceViolation,
+    },
+    /// A migrated record cannot be written.
+    #[error("cannot write the migrated {kind}: {source}")]
+    Write {
+        kind: &'static str,
+        #[source]
+        source: StoreError,
+    },
+    /// The file the old record was read from cannot be removed.
+    #[error("cannot replace {path}: {source}")]
+    Remove {
+        path: String,
+        #[source]
+        source: std::io::Error,
+    },
+}
+
 /// Convert every old-pinned review and acceptance of `repo` (module doc).
 /// `apply: false` reports what would change and writes nothing.
-pub fn run(repo: &Path, apply: bool) -> Result<Report, String> {
-    let ctx = GateCtx::from_repo(repo).map_err(|e| e.to_string())?;
-    let mut ctx = GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())?;
+pub fn run(repo: &Path, apply: bool) -> Result<Report, MigratePinsError> {
+    run_in(repo, None, &OldWorld::default(), apply)
+}
+
+/// [`run`] over `ledger_root` instead of the repo's own (a preview of a ledger the renaming has not moved yet),
+/// judging the file digests legacy pins hold against `old`, the 0.29 record of the evidence files.
+pub fn run_in(repo: &Path, ledger_root: Option<&Path>, old: &OldWorld, apply: bool) -> Result<Report, MigratePinsError> {
+    let mut ctx = GateCtx::from_repo(repo)?;
+    if let Some(root) = ledger_root {
+        ctx.ledger_root = root.to_path_buf();
+    }
+    let mut ctx = GateContext::load(ctx, &SchemaRegistry::load(), Utc::now())?;
     if !apply {
         // A preview judges the reviews against the scenario index the migration rebuilds first, in memory, so it names the records the commit rewrites.
         crate::inventory::overlay_stale_index(&mut ctx);
     }
-    let prefix = ctx.ctx.ledger_root.strip_prefix(repo).unwrap_or(&ctx.ctx.ledger_root).to_path_buf();
+    let prefix = GateCtx::from_repo(repo)?.ledger_root.strip_prefix(repo).unwrap_or(&ctx.ctx.ledger_root).to_path_buf();
     let live: BTreeMap<(&ProjectId, &ScenarioId), &Scenario> = latest_scenarios(&ctx).into_iter().map(|s| ((&s.project_id, &s.scenario_id), s)).collect();
     let tier = GitTier::new(&ctx.ctx.ledger_root);
-    let file_digests = evidence_file_digests(&tier)?;
+    let file_digests = evidence_file_digests(old);
     let legacy = migrate_legacy_pins::resolve(&ctx, || crate::inventory::spec_sources(repo));
     let mut report = Report::default();
 
@@ -221,16 +278,20 @@ fn review_currency(ctx: &GateContext, review: &Review, scenario: &Scenario, lega
 }
 
 /// What a 0.15–0.22 review or acceptance of `scenario` pinned right now:
-/// the latest evidence record per role, each named by its ledger file, the
-/// natural key and digest of `kind=evidence_record/<key>__<digest>.json`.
+/// the latest evidence record per role, each named by its 0.29 ledger file, the
+/// natural key and digest of `kind=evidence_record/<key>__<digest>.json`. Judged
+/// with the frozen 0.29 functions ([`v029`]): the live records are named by the
+/// 0.30 rule and carry `kind: "evidence"`, so the 0.29 key, and the 12-hex digest
+/// of the record with its 0.29 kind value, are computed the 0.29 way, and the
+/// file digest comes from the record of the old world.
 fn legacy_evidence_pins(ctx: &GateContext, scenario: &Scenario, file_digests: &BTreeMap<String, String>) -> Vec<EvidencePin> {
     let evidence = scenario_evidence(ctx, scenario);
     let mut pins: Vec<EvidencePin> = latest_by_key(&evidence, |e| e.envelope.actor.role.as_ref().map(|r| r.as_str().to_string()))
         .into_iter()
         .map(|record| {
             let body = serde_json::to_value(record).unwrap_or_default();
-            let key = resolve_partition(RecordKind::EvidenceRecord, &body).expect("an evidence record's natural key always resolves (`unscoped` at worst)").natural_key;
-            let typed = content_digest12(&body);
+            let key = v029::evidence_key(&body);
+            let typed = v029::typed_digest12(record);
             let digest = file_digests.get(&typed).cloned().unwrap_or(typed);
             EvidencePin { key, digest }
         })
@@ -239,27 +300,19 @@ fn legacy_evidence_pins(ctx: &GateContext, scenario: &Scenario, file_digests: &B
     pins
 }
 
-/// The ledger file digest of each evidence record (the 12 hex characters
-/// of `<natural_key>__<digest>.json`), keyed by the content digest of the
-/// record as deserialized: the typed record leaves out raw-only keys
-/// (`evidence.ref`, `staging_id`, …), so its own digest is not its file's.
-fn evidence_file_digests(tier: &GitTier) -> Result<BTreeMap<String, String>, String> {
-    let read = tier.read(&TierQuery::kind(RecordKind::EvidenceRecord)).map_err(|e| format!("cannot read the evidence ledger: {e}"))?;
-    Ok(read
-        .records
-        .iter()
-        .filter_map(|raw| {
-            let typed: EvidenceRecord = serde_json::from_value(raw.0.clone()).ok()?;
-            let typed = serde_json::to_value(&typed).ok()?;
-            Some((content_digest12(&typed), content_digest12(&raw.0)))
-        })
-        .collect())
+/// The 0.29 file digest of each evidence record (the 12 hex characters of
+/// `<natural_key>__<digest>.json`), by the 12-hex digest of the typed record
+/// ([`v029::typed_digest12`]): the typed record leaves out raw-only keys
+/// (`evidence.ref`, `staging_id`, …), so its own digest is not its file's. The
+/// plan recorded both before it renamed anything.
+fn evidence_file_digests(old: &OldWorld) -> BTreeMap<String, String> {
+    old.file_digests()
 }
 
 /// Every record of `kind` in the ledger that reads as `T`, with the path it
 /// is filed at (relative to the ledger root).
-fn records_of<T: serde::de::DeserializeOwned>(tier: &GitTier, kind: RecordKind) -> Result<Vec<(T, String)>, String> {
-    let read = tier.read(&TierQuery::kind(kind)).map_err(|e| format!("cannot read the {} ledger: {e}", kind.as_str()))?;
+fn records_of<T: serde::de::DeserializeOwned>(tier: &GitTier, kind: RecordKind) -> Result<Vec<(T, String)>, MigratePinsError> {
+    let read = tier.read(&TierQuery::kind(kind)).map_err(|source| MigratePinsError::ReadLedger { kind: kind.as_str(), source })?;
     Ok(read
         .records
         .iter()
@@ -268,9 +321,9 @@ fn records_of<T: serde::de::DeserializeOwned>(tier: &GitTier, kind: RecordKind) 
 }
 
 /// The files `old` is read from and `new` is written to, as the effect names them.
-fn rewrite<T: canon_model::CanonRecord + PartialEq + serde::Serialize>(prefix: &Path, on_disk: &[(T, String)], old: &T, new: &T, kind: RecordKind) -> Result<Rewrite, String> {
-    let body = serde_json::to_value(new).map_err(|e| format!("cannot write the migrated {}: {e}", kind.as_str()))?;
-    let to = expected_relative_path(kind, &body).map_err(|e| format!("cannot place the migrated {}: {e}", kind.as_str()))?;
+fn rewrite<T: canon_model::CanonRecord + PartialEq + serde::Serialize>(prefix: &Path, on_disk: &[(T, String)], old: &T, new: &T, kind: RecordKind) -> Result<Rewrite, MigratePinsError> {
+    let body = serde_json::to_value(new).map_err(|source| MigratePinsError::Serialize { kind: kind.as_str(), source })?;
+    let to = expected_relative_path(kind, &body).map_err(|source| MigratePinsError::Place { kind: kind.as_str(), source })?;
     let from = on_disk.iter().find(|(record, _)| record == old).map(|(_, path)| prefix.join(path).display().to_string());
     Ok(Rewrite { kind, from, to: prefix.join(to).display().to_string() })
 }
@@ -278,11 +331,29 @@ fn rewrite<T: canon_model::CanonRecord + PartialEq + serde::Serialize>(prefix: &
 /// Write `new` and remove the file `old` was read from. Unarchived: the
 /// migrated record keeps `old`'s time, so the archive's latest-version
 /// rule could pick either copy; this replacement removes `old` itself.
-fn replace<T: canon_model::CanonRecord + PartialEq + serde::Serialize>(tier: &GitTier, ledger_root: &Path, on_disk: &[(T, String)], old: &T, new: &T, kind: RecordKind) -> Result<(), String> {
+fn replace<T: canon_model::CanonRecord + PartialEq + serde::Serialize>(tier: &GitTier, ledger_root: &Path, on_disk: &[(T, String)], old: &T, new: &T, kind: RecordKind) -> Result<(), MigratePinsError> {
     let old_path = on_disk.iter().find(|(record, _)| record == old).map(|(_, path)| path.clone());
-    tier.write_unarchived(new).map_err(|e| format!("cannot write the migrated {}: {e}", kind.as_str()))?;
+    tier.write_unarchived(new).map_err(|source| MigratePinsError::Write { kind: kind.as_str(), source })?;
     if let Some(path) = old_path {
-        std::fs::remove_file(ledger_root.join(&path)).map_err(|e| format!("cannot replace {path}: {e}"))?;
+        std::fs::remove_file(ledger_root.join(&path)).map_err(|source| MigratePinsError::Remove { path, source })?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn migration_failures_read_as_before_and_keep_their_cause() {
+        let store = || StoreError::PurgeKindUnsupported { kind: "x".to_string() };
+        let cause = "purge kind `x` is not allowed; allowed kinds: session, run, event, trajectory";
+        assert_eq!(MigratePinsError::ReadLedger { kind: "review", source: store() }.to_string(), format!("cannot read the review ledger: {cause}"));
+        assert_eq!(MigratePinsError::Write { kind: "review", source: store() }.to_string(), format!("cannot write the migrated review: {cause}"));
+        let json = serde_json::from_str::<u8>("x").unwrap_err();
+        assert_eq!(MigratePinsError::Serialize { kind: "review", source: json }.to_string(), "cannot write the migrated review: expected value at line 1 column 1");
+        let remove = MigratePinsError::Remove { path: "p".to_string(), source: std::io::Error::other("boom") };
+        assert_eq!(remove.to_string(), "cannot replace p: boom");
+        assert!(std::error::Error::source(&remove).is_some());
+    }
 }

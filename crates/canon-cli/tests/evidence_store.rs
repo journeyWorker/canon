@@ -83,7 +83,7 @@ fn attest(repo: &Path, extra: &[&str]) -> Output {
 }
 
 fn committed_records(repo: &Path) -> Vec<serde_json::Value> {
-    let dir = repo.join(".canon/ledger/kind=evidence_record");
+    let dir = repo.join(".canon/ledger/kind=evidence");
     let mut paths: Vec<_> = std::fs::read_dir(dir).map(|d| d.filter_map(Result::ok).map(|e| e.path()).collect()).unwrap_or_default();
     paths.sort();
     paths.iter().map(|p| serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap()).collect()
@@ -123,6 +123,33 @@ fn a_stored_blob_keeps_a_rewritten_report_provable_and_a_lost_one_is_stale_evide
     let out = text(&stale);
     assert!(out.contains("stale-evidence game.run.01") && out.contains("`reports/smoke.json`"), "{out}");
     assert!(out.contains(&sha(v1)) && out.contains(&sha(v3)) && out.contains(": missing"), "names the path and both digests: {out}");
+}
+
+/// gate.check.24: a stored blob whose bytes were changed while the
+/// working-tree report still matches is `stale-evidence` naming the blob's
+/// actual digest, saying it was altered, never that the bytes are gone.
+#[test]
+fn gate_check_24_an_altered_stored_blob_is_stale_evidence_that_says_altered_not_gone() {
+    let dir = setup(false);
+    let repo = dir.path();
+    scenario(repo, "game.run.01", None);
+    std::fs::create_dir_all(repo.join("reports")).unwrap();
+    let v1 = br#"{"at":"2026-10-10T14:00:00Z","checks":16}"#;
+    std::fs::write(repo.join("reports/smoke.json"), v1).unwrap();
+    let added = attest(repo, &["--artifact", "reports/smoke.json"]);
+    assert!(added.status.success(), "{}", text(&added));
+    commit_all(repo);
+    assert!(canon(repo, &["gate", "check"]).status.success());
+
+    let tampered = b"someone else's bytes";
+    std::fs::write(blob(repo, v1), tampered).unwrap();
+    let gate = canon(repo, &["gate", "check"]);
+    assert_eq!(gate.status.code(), Some(1), "{}", text(&gate));
+    let out = text(&gate);
+    let line = out.lines().find(|l| l.contains("stale-evidence game.run.01")).unwrap_or_else(|| panic!("no stale-evidence line:\n{out}"));
+    assert!(line.contains(&sha(tampered)), "names the blob's actual digest: {line}");
+    assert!(line.contains("does not match its name") && line.contains("altered"), "says the stored blob was altered: {line}");
+    assert!(!line.contains("gone"), "never says gone: {line}");
 }
 
 /// A record written before the store existed (0.11–0.13) is proven
@@ -232,8 +259,8 @@ fn a_fabrication_marker_refusal_reads_refused_and_exits_1() {
     assert!(lines[0].starts_with("canon evidence add: EVIDENCE_FABRICATED — fabricated-evidence game.run.01 — ") && lines[1].starts_with("fabricated-evidence game.run.01 — ") && lines[2].starts_with("hint: "), "{stderr}");
     assert!(lines[0].contains("summary field contains fabrication marker \"tbd\"") && lines[1].contains("command_result field contains fabrication marker \"n/a\""), "{stderr}");
     assert!(committed_records(repo).is_empty(), "a refused add writes nothing");
-    let staged = repo.join(".canon/ledger/_staging/kind=evidence_record");
-    assert!(std::fs::read_dir(&staged).map(|mut entries| entries.next().is_none()).unwrap_or(true), "a refused add stages nothing");
+    let staged = repo.join(".canon/ledger/_staging/kind=evidence");
+    assert!(std::fs::read_dir(&staged).map_or(true, |mut entries| entries.next().is_none()), "a refused add stages nothing");
 }
 
 /// Dogfood F15: one `--report-case` hid the other cases for the same

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-026",
+    "role": "implementer",
+    "session_id": "canon-impl-026-1"
+  },
+  "at": "2026-10-21T17:02:23.835672900Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cd packages/dashboard && bun test test/briefs-render.test.ts -t \"report.dashboard.12\""
+  },
+  "evidence_note": {
+    "summary": "briefs-render.test.ts: 1 pass, 17 filtered out, 0 fail @ 5df188d"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 18,
+  "scenario_id": "report.dashboard.12",
+  "schema": 1,
+  "staging_id": "77aec6f2f072",
+  "verdict": "faithful"
+}

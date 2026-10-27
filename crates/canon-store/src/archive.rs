@@ -52,7 +52,7 @@ use canon_model::{EvidenceRecord, RawRecord, ScenarioId, TrustLifecycle};
 use serde_json::Value;
 
 use crate::git_tier::GitTier;
-use crate::partition::{content_digest12, resolve_partition};
+use crate::partition::{content_digest, resolve_partition};
 use crate::tier::{raw_record_at, raw_record_schema, StoreError};
 
 /// The directory beside the ledger holding the archive.
@@ -71,7 +71,7 @@ pub const ARCHIVED_KINDS: [RecordKind; 7] = [
     RecordKind::Subject,
     RecordKind::Scenario,
     RecordKind::Finding,
-    RecordKind::EvidenceRecord,
+    RecordKind::Evidence,
     RecordKind::Review,
     RecordKind::Divergence,
 ];
@@ -119,7 +119,7 @@ fn nanos(raw: &RawRecord) -> i128 {
 }
 
 fn latest_rank(raw: &RawRecord) -> Rank {
-    (nanos(raw), i128::from(raw_record_schema(raw)), 0, content_digest12(&raw.0))
+    (nanos(raw), i128::from(raw_record_schema(raw)), 0, content_digest(&raw.0))
 }
 
 fn text<'a>(json: &'a Value, field: &str) -> Option<&'a str> {
@@ -147,7 +147,7 @@ fn classify(kind: RecordKind, raw: &RawRecord) -> Judged {
             Judged { groups: vec![(format!("review|{project}|{target}|{reviewer}"), latest_rank(raw))], pinned: false, approval: None }
         }
         RecordKind::Divergence => classify_divergence(raw),
-        RecordKind::EvidenceRecord => classify_evidence(raw),
+        RecordKind::Evidence => classify_evidence(raw),
         _ => unjudged(),
     }
 }
@@ -188,7 +188,7 @@ fn classify_evidence(raw: &RawRecord) -> Judged {
     let project = record.project_id.as_ref().map_or("-".to_string(), ToString::to_string);
     let audit = if record.is_audit() { "audit" } else { "declared" };
     // The gate folds by the typed record's digest, not the file's.
-    let typed_digest = content_digest12(&serde_json::to_value(&record).unwrap_or_default());
+    let typed_digest = content_digest(&serde_json::to_value(&record).unwrap_or_default());
     let rank: Rank = (i128::from(record.envelope.at.timestamp_nanos_opt().unwrap_or(0)), i128::from(record.envelope.schema), 0, typed_digest);
 
     let subjects: Vec<String> = task.iter().map(|t| format!("task:{t}")).chain(scenario.iter().map(|s| format!("scenario:{s}"))).collect();
@@ -401,20 +401,25 @@ impl GitTier {
 
 /// The directory and file-name test bounding which files can share a
 /// group with a freshly written `raw`. `None`: the whole kind.
-fn scope_of(kind: RecordKind, raw: &RawRecord) -> Option<(PathBuf, Box<dyn Fn(&str) -> bool>)> {
-    let relative = crate::partition::expected_relative_path(kind, &raw.0).ok()?;
-    let dir = relative.parent()?.to_path_buf();
+type Scope = (PathBuf, Box<dyn Fn(&str) -> bool>);
+
+fn scope_of(kind: RecordKind, raw: &RawRecord) -> Option<Scope> {
+    let name = crate::partition::resolve_name(kind, &raw.0).ok()?;
+    let dir = PathBuf::from(format!("kind={}", kind.as_str()));
     match kind {
-        RecordKind::Change | RecordKind::Subject | RecordKind::Scenario | RecordKind::Finding => {
-            let key = resolve_partition(kind, &raw.0).ok()?.natural_key;
-            Some((dir, Box::new(move |name| stem_key(name) == Some(key.as_str()))))
+        RecordKind::Change | RecordKind::Subject | RecordKind::Scenario | RecordKind::Finding | RecordKind::Review => {
+            // One group per key: the files whose stem key is this record's.
+            let key = name.key;
+            Some((dir, Box::new(move |file| stem_key(file) == Some(key.as_str()))))
         }
-        RecordKind::Review | RecordKind::Divergence => {
-            let target = text(&raw.0, "scenario_id").map(str::to_string).or_else(|| text(&raw.0, "change_id").map(|c| format!("change-{c}")))?;
-            let prefix = format!("{}__{}__", text(&raw.0, "project_id")?, target);
-            Some((dir, Box::new(move |name| name.starts_with(&prefix))))
+        RecordKind::Divergence => {
+            // Every round of one scenario competes: the project and scenario
+            // components lead the key.
+            let components = canon_model::layout::components(kind, &raw.0).ok()?;
+            let prefix: String = components.iter().take(2).map(|c| format!("{}_", canon_model::layout::escape(&c.value()))).collect();
+            Some((dir, Box::new(move |file| file.starts_with(&prefix))))
         }
-        // `EvidenceRecord` has no narrower scope, on purpose: the ledger
+        // `Evidence` has no narrower scope, on purpose: the ledger
         // is one flat directory keyed by scenario or task, but its fold
         // groups span keys (the `run_seq` partition covers every scenario
         // of one surface, the project and subject groups several), so a
@@ -426,9 +431,11 @@ fn scope_of(kind: RecordKind, raw: &RawRecord) -> Option<(PathBuf, Box<dyn Fn(&s
     }
 }
 
-/// The natural-key part of a record file name `<key>__<digest12>.json`.
+/// The key part of a record file name `<key>_<digest8>.json`: the
+/// components of its typed name, never the digest (R10: a record's own
+/// digest comes from its body).
 fn stem_key(name: &str) -> Option<&str> {
-    name.strip_suffix(".json")?.rsplit_once("__").map(|(key, _)| key)
+    canon_model::layout::split_stem(name.strip_suffix(".json")?).map(|(key, _)| key)
 }
 
 /// Move `<from>/<relative>` to `<to>/<relative>`. `Ok(false)` when
@@ -496,8 +503,8 @@ impl GitTier {
 #[cfg(test)]
 mod tests {
     use canon_model::envelope::{Actor, Envelope};
-    use canon_model::ids::{ChangeId, ProjectId, RoleId, ScenarioId, Sha, TotalOrder};
-    use canon_model::records::{Change, ChangeStatus, Divergence, DivergenceStatus};
+    use canon_model::ids::{ChangeId, ProjectId, RoleId, Sha, TotalOrder};
+    use canon_model::records::{Change, ChangeStatus, Divergence, DivergenceFields, DivergenceStatus};
     use canon_model::{EvidenceVerdict, FlaggedOverlay, Review, ProvenanceRef};
     use chrono::{Duration, TimeZone, Utc};
 
@@ -522,7 +529,7 @@ mod tests {
     }
 
     fn evidence(role: &str, scenario: &str, at_offset: i64, verdict: EvidenceVerdict) -> EvidenceRecord {
-        EvidenceRecord::new(Envelope::new(1, RecordKind::EvidenceRecord, base() + Duration::seconds(at_offset), actor(role)), None, Some(ScenarioId::parse(scenario).unwrap()), None, verdict)
+        EvidenceRecord::new(Envelope::new(1, RecordKind::Evidence, base() + Duration::seconds(at_offset), actor(role)), None, Some(ScenarioId::parse(scenario).unwrap()), None, verdict)
             .with_project_id(ProjectId::parse("root").unwrap())
     }
 
@@ -572,16 +579,16 @@ mod tests {
         let scenario = "world.firstbuy-hotdeal.26";
         tier.write(&evidence("implementer", scenario, 0, EvidenceVerdict::Faithful)).unwrap();
         tier.write(&evidence("reviewer", scenario, 5, EvidenceVerdict::Faithful)).unwrap();
-        assert_eq!(names(&tier, RecordKind::EvidenceRecord).len(), 2, "each role's latest is a different cell: both stay");
+        assert_eq!(names(&tier, RecordKind::Evidence).len(), 2, "each role's latest is a different cell: both stay");
 
         tier.write(&evidence("implementer", scenario, 10, EvidenceVerdict::Divergent)).unwrap();
-        let held = tier.read(&TierQuery::kind(RecordKind::EvidenceRecord)).unwrap().records;
+        let held = tier.read(&TierQuery::kind(RecordKind::Evidence)).unwrap().records;
         assert_eq!(held.len(), 2, "the implementer's newer record replaced only the implementer's older one");
-        assert_eq!(archived(&tier, RecordKind::EvidenceRecord), 1);
+        assert_eq!(archived(&tier, RecordKind::Evidence), 1);
 
         let other_project = evidence("implementer", scenario, 12, EvidenceVerdict::Faithful).with_project_id(ProjectId::parse("other").unwrap());
         tier.write(&other_project).unwrap();
-        assert_eq!(names(&tier, RecordKind::EvidenceRecord).len(), 3, "a record of another project does not supersede this project's");
+        assert_eq!(names(&tier, RecordKind::Evidence).len(), 3, "a record of another project does not supersede this project's");
     }
 
     #[test]
@@ -592,8 +599,8 @@ mod tests {
         let flagged = evidence("implementer", scenario, 0, EvidenceVerdict::Faithful).with_flagged(FlaggedOverlay::set(actor("human"), base()));
         tier.write(&flagged).unwrap();
         tier.write(&evidence("implementer", scenario, 10, EvidenceVerdict::Faithful)).unwrap();
-        assert_eq!(names(&tier, RecordKind::EvidenceRecord).len(), 2, "a flagged record is never green and is read unfolded: it stays");
-        assert_eq!(archived(&tier, RecordKind::EvidenceRecord), 0);
+        assert_eq!(names(&tier, RecordKind::Evidence).len(), 2, "a flagged record is never green and is read unfolded: it stays");
+        assert_eq!(archived(&tier, RecordKind::Evidence), 0);
     }
 
     #[test]
@@ -688,17 +695,7 @@ mod tests {
     }
 
     fn divergence(run_seq: u64, status: DivergenceStatus, at_offset: i64) -> Divergence {
-        Divergence::new(
-            Envelope::new(1, RecordKind::Divergence, base() + Duration::seconds(at_offset), actor("reviewer")),
-            ProjectId::parse("root").unwrap(),
-            ScenarioId::parse("world.firstbuy-hotdeal.26").unwrap(),
-            Sha::parse("a".repeat(40)).unwrap(),
-            status,
-            TotalOrder::new(run_seq),
-            1,
-            "alice",
-            "detail",
-        )
+        Divergence::new(DivergenceFields { envelope: Envelope::new(1, RecordKind::Divergence, base() + Duration::seconds(at_offset), actor("reviewer")), project_id: ProjectId::parse("root").unwrap(), scenario_id: ScenarioId::parse("world.firstbuy-hotdeal.26").unwrap(), sha: Sha::parse("a".repeat(40)).unwrap(), status, run_seq: TotalOrder::new(run_seq), round: 1, reviewer: "alice".into(), detail: "detail".into() })
     }
 
     #[test]

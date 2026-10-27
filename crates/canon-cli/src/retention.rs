@@ -73,7 +73,6 @@ fn audit_path(repo: &Path) -> Option<PathBuf> {
 /// record bodies. New audit files are created mode 0600. Silently writes
 /// nothing when there is no `canon.yaml` to scope the event to
 /// ([`audit_path`]).
-#[allow(clippy::too_many_arguments)]
 pub fn append_access_audit(
     repo: &Path,
     operation: &str,
@@ -221,7 +220,7 @@ impl Report for PartialPurgeReport {}
 
 fn purge_report(outcome: &PurgeOutcome, learn_counts: Option<(usize, usize)>, plan: Plan) -> PurgeReport {
     PurgeReport {
-        kind: crate::query::kind_cli_name(outcome.kind).to_string(),
+        kind: outcome.kind.as_str().to_string(),
         before: outcome.before.to_rfc3339(),
         source_scope: "routed_and_aging_destinations",
         rungs: outcome.rungs.iter().map(|r| PurgeRung { rung: r.rung.as_str().to_string(), backend: r.backend.as_str().to_string(), matched: r.matched, deleted: r.deleted }).collect(),
@@ -232,7 +231,7 @@ fn purge_report(outcome: &PurgeOutcome, learn_counts: Option<(usize, usize)>, pl
 }
 
 fn partial_purge_report(kind: RecordKind, before: DateTime<Utc>, matched: usize, deleted: usize, error: &str) -> PartialPurgeReport {
-    PartialPurgeReport { kind: crate::query::kind_cli_name(kind).to_string(), before: before.to_rfc3339(), status: "partial", matched, deleted, error: error.to_string(), atomic: false }
+    PartialPurgeReport { kind: kind.as_str().to_string(), before: before.to_rfc3339(), status: "partial", matched, deleted, error: error.to_string(), atomic: false }
 }
 
 /// The plan of a purge: one `delete` per record the removal set holds, in
@@ -248,7 +247,7 @@ fn purge_effects(outcome: &PurgeOutcome, keys: &[String], learn_keys: Option<&[S
 /// `canon purge --kind K --before T [--commit --plan-digest D]`. A bare run
 /// previews and writes nothing, not even the access-audit line; `--commit`
 /// deletes only when the plan recomputed now has the digest given. `base` is
-/// the command line without the safety flags ([`crate::safety::command`]).
+/// the command line without the `--commit`/`--plan-digest` flags.
 pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mode, base: &str, json_output: bool) -> u8 {
     let result = (|| -> Result<(), RetentionError> {
         let (yaml, registry) = loaded_registry(repo, kind, true)?;
@@ -288,7 +287,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
         let report = purge_report(&outcome, learn_counts, if commit { plan.committed() } else { plan });
         if commit {
             if !json_output {
-                println!("canon purge --kind {}: {matched} matched, {deleted} deleted", crate::query::kind_cli_name(kind));
+                println!("canon purge --kind {}: {matched} matched, {deleted} deleted", kind.as_str());
             }
             crate::next::finish(repo, "purge", &crate::next::Scope::Repo, false, json_output, &report);
         } else {
@@ -298,7 +297,7 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
     })();
     match result {
         Ok(()) => 0,
-        Err(RetentionError::Refusal(error)) => error.emit("canon purge", json_output) as u8,
+        Err(RetentionError::Refusal(error)) => error.emit("canon purge", json_output),
         Err(err) => {
             let (matched, deleted) = match &err {
                 RetentionError::Store(canon_store::tier::StoreError::PurgePartial { matched, deleted, .. }) => (*matched, *deleted),
@@ -320,16 +319,16 @@ pub fn run_purge(repo: &Path, kind: RecordKind, before: DateTime<Utc>, mode: &Mo
                 // One document: the partial-purge manifest is `data` beside the shared `error`.
                 Some(manifest) if json_output => {
                     crate::human_err!("{}", error.human("canon purge"));
-                    error.emit_with_data("canon purge", true, &manifest) as u8
+                    error.emit_with_data("canon purge", true, &manifest)
                 }
-                _ => error.emit("canon purge", json_output) as u8,
+                _ => error.emit("canon purge", json_output),
             }
         }
     }
 }
 
 /// One exported record: identity and digest, never the content.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportRecord {
     pub kind: &'static str,
@@ -340,7 +339,7 @@ pub struct ExportRecord {
 
 impl ExportRecord {
     fn of(kind: RecordKind, raw: &canon_model::evidence::RawRecord) -> Self {
-        let digest = canon_store::partition::content_digest12(&raw.0);
+        let digest = canon_store::partition::content_digest(&raw.0);
         let at = raw_record_at(raw).to_rfc3339();
         let id = canon_store::partition::resolve_partition(kind, &raw.0).ok().map(|p| p.natural_key);
         Self { kind: kind.as_str(), at, id, digest }
@@ -354,7 +353,7 @@ impl ExportRecord {
 }
 
 /// An exported record cut to the `--fields` asked for.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectedExportRecord {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -367,7 +366,7 @@ pub struct ProjectedExportRecord {
     pub digest: Option<String>,
 }
 
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
 pub enum ExportRecordView {
     Full(ExportRecord),
@@ -377,7 +376,7 @@ pub enum ExportRecordView {
 /// The `canon.retention.export` manifest: what `export` writes to stdout or
 /// `--output`, and what `--json` envelopes (without `meta`, which then travels
 /// in the envelope's `meta`).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportManifest {
     pub schema: &'static str,
@@ -399,7 +398,7 @@ pub struct ExportManifest {
 }
 
 /// What `--json --output` returns: the file holds the manifest, this names it.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportWritten {
     pub output: String,
@@ -408,7 +407,7 @@ pub struct ExportWritten {
 }
 
 /// What `--json --dry-run` returns: what the run would write, nothing written.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportPreview {
     /// Always true.
@@ -421,7 +420,7 @@ pub struct ExportPreview {
 
 /// `canon export --json` (`ExportReport`): the manifest, or with `--output` the
 /// file it was written to; with `--dry-run` the preview.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
 pub enum ExportReport {
     Manifest(ExportManifest),
@@ -434,18 +433,13 @@ impl crate::json_out::Report for ExportReport {}
 /// The fields of one exported record, which `--fields` may name.
 const RECORD_FIELDS: [&str; 4] = ["kind", "at", "id", "digest"];
 
-pub fn run_export(
-    repo: &Path,
-    kind: RecordKind,
-    before: Option<DateTime<Utc>>,
-    after: Option<DateTime<Utc>>,
-    out: Option<&Path>,
-    json_output: bool,
-    include_sensitive: bool,
-    page: &crate::paging::Page,
-    fields: Option<&[String]>,
-    dry_run: bool,
-) -> u8 {
+pub fn run_export(args: crate::cli::top::ExportArgs) -> u8 {
+    let crate::cli::top::ExportArgs { kind, before, after, output, repo, json: json_output, include_sensitive, page, fields, dry_run, .. } = args;
+    let repo = repo.as_path();
+    let out = output.as_deref();
+    let page = &page.page();
+    let fields = fields.as_deref();
+    let dry_run = dry_run.dry_run;
     let mut next_cursor_line = None;
     let result = (|| -> Result<(), ExportFailure> {
         if let Some(requested) = fields {
@@ -544,10 +538,10 @@ pub fn run_export(
         }
         // A refused export read and wrote nothing: no audit line (O7).
         Err(ExportFailure::Cursor(err)) => {
-            err.emit("canon export", json_output) as u8
+            err.emit("canon export", json_output)
         }
         Err(ExportFailure::Retention(err)) => {
-            CliError::refused("RETENTION_EXPORT_FAILED", err.to_string()).hint("check that the destination is writable and the ledger is readable, then run `canon export` again").emit("canon export", json_output) as u8
+            CliError::refused("RETENTION_EXPORT_FAILED", err.to_string()).hint("check that the destination is writable and the ledger is readable, then run `canon export` again").emit("canon export", json_output)
         }
     }
 }
@@ -563,6 +557,13 @@ impl<E: Into<RetentionError>> From<E> for ExportFailure {
     fn from(err: E) -> Self {
         ExportFailure::Retention(err.into())
     }
+}
+
+/// The access event for one `canon query`, scoped like every other
+/// event ([`audit_path`]). Written only for a query that reached the store: a
+/// refused one leaves no line (O7).
+pub fn audit_query(repo: &Path, kind: RecordKind, since: Option<DateTime<Utc>>, sensitive: bool, matched: usize) -> Result<(), RetentionError> {
+    append_access_audit(repo, "query", Some(kind), if since.is_some() { "since" } else { "all" }, sensitive, matched, 0)
 }
 
 #[cfg(test)]
@@ -640,11 +641,4 @@ mod tests {
         append_access_audit(dir.path(), "query", Some(RecordKind::Event), "all", false, 0, 0).unwrap();
         assert!(fs::read_dir(dir.path()).unwrap().next().is_none(), "a directory without canon.yaml must be left untouched");
     }
-}
-
-/// The access event for one `canon query`, scoped like every other
-/// event ([`audit_path`]). Written only for a query that reached the store: a
-/// refused one leaves no line (O7).
-pub fn audit_query(repo: &Path, kind: RecordKind, since: Option<DateTime<Utc>>, sensitive: bool, matched: usize) -> Result<(), RetentionError> {
-    append_access_audit(repo, "query", Some(kind), if since.is_some() { "since" } else { "all" }, sensitive, matched, 0)
 }

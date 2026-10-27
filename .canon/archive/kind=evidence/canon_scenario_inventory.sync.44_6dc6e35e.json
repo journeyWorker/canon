@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "m2-impl"
+  },
+  "at": "2026-10-11T15:45:38.827106Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test write_path a_root_that_cannot_sync_marks_no_scenario_removed"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 17,
+  "scenario_id": "inventory.sync.44",
+  "schema": 1,
+  "staging_id": "8e4f6aa302aa",
+  "verdict": "faithful"
+}

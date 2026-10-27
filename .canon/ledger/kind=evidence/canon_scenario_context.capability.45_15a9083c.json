@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:24:43.263413420Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_reads context_capability_45_brief_show_of_a_change_with_no_brief_or_in_a_repo_with_no_briefs_is_refused_with_exit_2"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 195,
+  "scenario_id": "context.capability.45",
+  "schema": 1,
+  "staging_id": "75374d53",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

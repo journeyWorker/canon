@@ -3,13 +3,13 @@
 use canon_model::{ChangeId, SubjectId};
 use clap::{Args, Subcommand};
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum ChangeCommand {
     /// Write .canon/changes/<slug>/brief.md, import it, and adopt it into a subject
     New(ChangeNewArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct ChangeNewArgs {
     /// The change's slug (its change_id)
     #[arg(value_name = "CHANGE_ID", value_parser = crate::subject::parse_change_id)]

@@ -5,7 +5,7 @@ description: Use for every build, implement, add-a-feature, change-a-feature or 
 
 # Canon
 
-This repo is managed with canon (canon 0.29.0). Canon records the work as evidence and a gate grades it. This file is a stub: the full guide is built into the `canon` binary, so it always matches the version you run.
+This repo is managed with canon (canon 0.30.0). Canon records the work as evidence and a gate grades it. This file is a stub: the full guide is built into the `canon` binary, so it always matches the version you run.
 
 ## The loop
 

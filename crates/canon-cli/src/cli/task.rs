@@ -2,13 +2,13 @@
 
 use clap::{Args, Subcommand};
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum TaskCommand {
     /// Flip one task checkbox, gated on real evidence (fails closed)
     Done(TaskDoneArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct TaskDoneArgs {
     /// The task id (<change_id>#<n>)
     #[arg(value_name = "TASK_ID")]

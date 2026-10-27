@@ -36,28 +36,40 @@ use serde_json::Value;
 use crate::json_out::Report;
 
 /// A finding, a failed check or an operational failure.
-pub const EXIT_FAILED: i32 = 1;
+pub const EXIT_FAILED: u8 = 1;
 /// A refusal or a usage error.
-pub const EXIT_REFUSED: i32 = 2;
+pub const EXIT_REFUSED: u8 = 2;
 
 /// One refusal or operational failure.
+///
+/// The members every error has stay inline; the optional ones that most errors
+/// leave empty live in one boxed [`CliErrorDetail`], so the `Err` side of a
+/// `Result<_, CliError>` stays small.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CliError {
     pub code: &'static str,
     pub message: String,
-    pub hint: Option<String>,
     /// Whether running the same command again, unchanged, can succeed
     /// (the code's registry row).
     pub retryable: bool,
-    pub exit: i32,
+    /// The process exit code, `0..=255` (the code's registry row unless a site overrides it).
+    pub exit: u8,
+    detail: Option<Box<CliErrorDetail>>,
+}
+
+/// The optional members of a [`CliError`], read through its accessors and set
+/// through its builder methods.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct CliErrorDetail {
+    hint: Option<String>,
     /// The argument or record field that was refused (`--to`, `--kind`).
-    pub field: Option<String>,
+    field: Option<String>,
     /// The values `field` accepts, when the refusal is about a closed set.
-    pub expected: Option<Vec<String>>,
+    expected: Option<Vec<String>>,
     /// The refused value as given; redacted when it is rendered ([`redact`]).
-    pub received: Option<String>,
+    received: Option<String>,
     /// The nearest valid words, closest first ([`crate::suggest`]).
-    pub suggestions: Vec<String>,
+    suggestions: Vec<String>,
 }
 
 /// The `error` member of a failure envelope. Field order is the document
@@ -88,7 +100,7 @@ pub struct ErrorBody {
 impl CliError {
     fn new(code: &'static str, message: impl Into<String>) -> Self {
         let (exit, retryable) = code_info(code).map_or((EXIT_REFUSED, false), |info| (info.exit, info.retryable));
-        Self { code, message: message.into(), hint: None, retryable, exit, field: None, expected: None, received: None, suggestions: Vec::new() }
+        Self { code, message: message.into(), retryable, exit, detail: None }
     }
 
     /// The command was understood and declined. The exit comes from the
@@ -104,15 +116,29 @@ impl CliError {
         Self::new(code, message)
     }
 
+    fn detail_mut(&mut self) -> &mut CliErrorDetail {
+        self.detail.get_or_insert_with(Box::default)
+    }
+
+    /// The hint, if the error has one.
+    pub fn hint_text(&self) -> Option<&str> {
+        self.detail.as_deref()?.hint.as_deref()
+    }
+
+    /// The refused argument or field, if the error names one.
+    pub fn field_name(&self) -> Option<&str> {
+        self.detail.as_deref()?.field.as_deref()
+    }
+
     /// The next step the caller can take.
     pub fn hint(mut self, hint: impl Into<String>) -> Self {
-        self.hint = Some(hint.into());
+        self.detail_mut().hint = Some(hint.into());
         self
     }
 
     /// Names the refused argument or field (`--to`, `--kind`).
     pub fn field(mut self, field: impl Into<String>) -> Self {
-        self.field = Some(field.into());
+        self.detail_mut().field = Some(field.into());
         self
     }
 
@@ -122,13 +148,13 @@ impl CliError {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        self.expected = Some(expected.into_iter().map(Into::into).collect());
+        self.detail_mut().expected = Some(expected.into_iter().map(Into::into).collect());
         self
     }
 
     /// The value that was refused. It is redacted when rendered.
     pub fn received(mut self, received: impl Into<String>) -> Self {
-        self.received = Some(received.into());
+        self.detail_mut().received = Some(received.into());
         self
     }
 
@@ -138,14 +164,14 @@ impl CliError {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        self.suggestions = suggestions.into_iter().map(Into::into).collect();
+        self.detail_mut().suggestions = suggestions.into_iter().map(Into::into).collect();
         self
     }
 
     /// Overrides the registry's exit for one documented site: a batch whose
     /// validation refuses (`2`) and whose write fails later (`1`) is one code
     /// with two exits (`EVIDENCE_BATCH_REFUSED`).
-    pub fn with_exit(mut self, exit: i32) -> Self {
+    pub fn with_exit(mut self, exit: u8) -> Self {
         self.exit = exit;
         self
     }
@@ -154,7 +180,7 @@ impl CliError {
     /// optional `hint:` line. `command` is the full prefix, e.g.
     /// `canon evidence add`.
     pub fn human(&self, command: &str) -> String {
-        match &self.hint {
+        match self.hint_text() {
             Some(hint) => format!("{command}: {} — {}\nhint: {hint}", self.code, self.message),
             None => format!("{command}: {} — {}", self.code, self.message),
         }
@@ -162,18 +188,21 @@ impl CliError {
 
     /// The `error` member of the failure envelope.
     pub fn body(&self) -> ErrorBody {
-        let suggestions = match (&self.expected, &self.received) {
-            (Some(expected), Some(received)) if self.suggestions.is_empty() => crate::suggest::nearest(received, expected.iter().map(String::as_str)),
-            _ => self.suggestions.clone(),
+        let detail = self.detail.as_deref();
+        let field = detail.and_then(|d| d.field.as_deref());
+        let suggestions = match detail {
+            Some(CliErrorDetail { expected: Some(expected), received: Some(received), suggestions, .. }) if suggestions.is_empty() => crate::suggest::nearest(received, expected.iter().map(String::as_str)),
+            Some(d) => d.suggestions.clone(),
+            None => Vec::new(),
         };
         ErrorBody {
             code: self.code.to_string(),
             message: self.message.clone(),
-            field: self.field.as_deref().map(|field| crate::input::field_for_body(field).into_owned()),
-            expected: self.expected.clone(),
-            received: self.received.as_deref().map(|received| redact(self.field.as_deref(), received)),
+            field: field.map(|field| crate::input::field_for_body(field).into_owned()),
+            expected: detail.and_then(|d| d.expected.clone()),
+            received: detail.and_then(|d| d.received.as_deref()).map(|received| redact(field, received)),
             suggestions,
-            hint: self.hint.clone(),
+            hint: detail.and_then(|d| d.hint.clone()),
             retryable: self.retryable,
         }
     }
@@ -185,7 +214,7 @@ impl CliError {
     }
 
     /// Renders the error (see the module docs) and returns the exit code.
-    pub fn emit(&self, command: &str, json: bool) -> i32 {
+    pub fn emit(&self, command: &str, json: bool) -> u8 {
         debug_assert!(is_registered(self.code), "error code {} is not in cli_error::all_codes()", self.code);
         if json {
             crate::json_out::print_failure::<crate::json_out::NoData>(command, self, None);
@@ -200,13 +229,13 @@ impl CliError {
     /// printed that report in its human form, so human mode adds nothing: the
     /// exit code is the whole signal there. In JSON mode the one document
     /// carries `error` (the branch point), `data` (the report) and `meta`.
-    pub fn emit_with_data<R: Report>(&self, command: &str, json: bool, data: &R) -> i32 {
+    pub fn emit_with_data<R: Report>(&self, command: &str, json: bool, data: &R) -> u8 {
         self.emit_with_data_and_meta(command, json, data, serde_json::Value::Null)
     }
 
     /// [`CliError::emit_with_data`] with extra `meta` keys beside `command`
     /// (`coverage`, …).
-    pub fn emit_with_data_and_meta<R: Report>(&self, command: &str, json: bool, data: &R, extra_meta: serde_json::Value) -> i32 {
+    pub fn emit_with_data_and_meta<R: Report>(&self, command: &str, json: bool, data: &R, extra_meta: serde_json::Value) -> u8 {
         debug_assert!(is_registered(self.code), "error code {} is not in cli_error::all_codes()", self.code);
         if json {
             crate::json_out::print_failure_with_meta(command, self, Some(data), extra_meta);
@@ -214,6 +243,18 @@ impl CliError {
         self.exit
     }
 }
+
+/// `<CODE>: <message>`: the form for logs and `?` chains, without the command
+/// prefix or the hint. Every user-visible rendering goes through
+/// [`CliError::human`] or the envelope ([`CliError::body`]) instead, never
+/// through this.
+impl std::fmt::Display for CliError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.code, self.message)
+    }
+}
+
+impl std::error::Error for CliError {}
 
 /// What a `received` value may keep: argument names that carry secrets lose the
 /// whole value, `NAME=value` environment assignments keep only the name, and a
@@ -253,7 +294,11 @@ pub fn redact(field: Option<&str>, received: &str) -> String {
 /// words. clap then knows the set: a bad value is refused with
 /// `possible values`, `canon schema` lists them as `possibleValues`, and the
 /// `--json` usage error carries them as `expected`.
-pub fn closed_set<T: Clone + Send + Sync + 'static>(values: impl Into<clap::builder::PossibleValuesParser>, parse: fn(&str) -> Result<T, String>) -> impl clap::builder::TypedValueParser<Value = T> {
+pub fn closed_set<T, E>(values: impl Into<clap::builder::PossibleValuesParser>, parse: fn(&str) -> Result<T, E>) -> impl clap::builder::TypedValueParser<Value = T>
+where
+    T: Clone + Send + Sync + 'static,
+    E: Into<Box<dyn std::error::Error + Send + Sync + 'static>> + 'static,
+{
     use clap::builder::TypedValueParser;
     clap::builder::PossibleValuesParser::new(values).try_map(move |word: String| parse(&word))
 }
@@ -268,7 +313,7 @@ pub struct CodeInfo {
     pub code: &'static str,
     pub meaning: &'static str,
     /// The process exit code the code carries (`1` or `2`).
-    pub exit: i32,
+    pub exit: u8,
     /// True only where running the same command again can succeed.
     pub retryable: bool,
     /// One imperative sentence telling the caller what to do about the code.
@@ -348,10 +393,12 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "EVIDENCE_STORE_FAILED", meaning: "a bound file could not be stored in the artifact store", exit: 2, retryable: true, fix: "Check the artifact store is reachable and writable, then run the command again." },
     CodeInfo { code: "FEATURE_EXISTS", meaning: "the feature file already exists", exit: 2, retryable: false, fix: "Choose a different feature path or edit the existing file." },
     CodeInfo { code: "FEATURE_OUTSIDE_SPEC_ROOTS", meaning: "the feature path is under no configured specs.roots entry", exit: 2, retryable: false, fix: "Place the feature under a specs.roots entry in canon.yaml, or add a root that covers it." },
+    CodeInfo { code: "FINDING_INTRODUCED_REQUIRED", meaning: "a new blocker or should-fix finding names no introducing commit and does not say it is unknown", exit: 2, retryable: false, fix: "Pass --introduced-rev <rev> when the introducing commit was established, or --introduced-unknown when it was not; a note needs neither." },
     CodeInfo { code: "FINDING_INVALID_ARGUMENT", meaning: "a `finding` argument is empty, malformed or out of range", exit: 2, retryable: false, fix: "Correct the `canon finding` argument that is empty, malformed or out of range." },
     CodeInfo { code: "FINDING_NOT_FOUND", meaning: "no committed finding at that change, round and seq", exit: 2, retryable: false, fix: "Pass the change, round and seq of a committed finding; `canon finding list` shows them." },
     CodeInfo { code: "FINDING_REASON_REQUIRED", meaning: "closing a finding as rejected or deferred needs a one-line --reason", exit: 2, retryable: false, fix: "Pass a one-line --reason when closing a finding as rejected or deferred." },
     CodeInfo { code: "FINDING_RESOLUTION_REV_UNEXPECTED", meaning: "--resolution-rev was given with a disposition other than fixed", exit: 2, retryable: false, fix: "Drop --resolution-rev, or close the finding as fixed." },
+    CodeInfo { code: "FINDING_REVIEW_NOT_FOUND", meaning: "--review-id names no review in the ledger or the archive", exit: 2, retryable: false, fix: "Pass the review id that `canon review scenario` or `canon review change` printed; `canon query --kind review` shows the ids." },
     CodeInfo { code: "FINDING_SEQ_OCCUPIED", meaning: "a finding already holds that change, round and seq", exit: 2, retryable: false, fix: "Choose an unused seq for that change and round." },
     CodeInfo { code: "FINDING_STAGED", meaning: "the finding is still staged and cannot be closed until committed", exit: 2, retryable: false, fix: "Commit the staged finding, then close it." },
     CodeInfo { code: "FINDING_UNKNOWN_SCENARIO", meaning: "--scenario-id names a scenario the index does not know", exit: 2, retryable: false, fix: "Pass a --scenario-id that the scenario index knows; run `canon inventory sync` if the scenario is new." },
@@ -402,6 +449,7 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "MIGRATE_UNCOMMITTED", meaning: "`migrate` refused because paths it moves have uncommitted changes", exit: 2, retryable: false, fix: "Commit or stash the uncommitted changes under the paths migrate moves, then run `canon migrate` again." },
     CodeInfo { code: "NO_BRIEF", meaning: "no live change has a brief", exit: 2, retryable: false, fix: "Run `canon change new` to create a change with a brief." },
     CodeInfo { code: "NO_COMMIT", meaning: "a command needed a commit and the directory is not a git work tree or has no commits", exit: 2, retryable: false, fix: "Run the command inside a git work tree that has at least one commit." },
+    CodeInfo { code: "OLD_LAYOUT", meaning: "a command that writes records was refused in a repo whose ledger is laid out by canon 0.29; nothing was written", exit: 2, retryable: false, fix: "Run `canon migrate --json` to preview the move, then `canon migrate --commit --plan-digest <digest>`." },
     CodeInfo { code: "PLAN_CHANGED", meaning: "the plan recomputed under `--commit` no longer has the `--plan-digest` the preview printed; nothing was written", exit: 2, retryable: false, fix: "Run the command again without --commit to preview the new plan, then act with `--commit --plan-digest <DIGEST>`." },
     CodeInfo { code: "PLAN_CORPUS_UNREADABLE", meaning: "the plan corpus could not be read to resolve a task", exit: 2, retryable: false, fix: "Fix the plan sources configured in canon.yaml so every document can be read." },
     CodeInfo { code: "PLAN_SOURCES_MISSING", meaning: "the repository configures no plan sources", exit: 2, retryable: false, fix: "Configure plan sources in canon.yaml, then run the command again." },
@@ -467,5 +515,19 @@ mod fix_tests {
             assert_eq!(info.fix, info.fix.trim_end(), "{} fix ends in whitespace", info.code);
             assert!(!info.fix.contains("...") && !info.fix.contains('\u{2026}'), "{} fix has an ellipsis", info.code);
         }
+    }
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::CliError;
+
+    #[test]
+    fn display_is_code_and_message_only_and_leaves_the_human_form_alone() {
+        let error = CliError::refused("USAGE", "bad flag").hint("pass --x");
+        assert_eq!(error.to_string(), "USAGE: bad flag");
+        assert_eq!(error.human("canon x"), "canon x: USAGE — bad flag\nhint: pass --x");
+        let as_error: &dyn std::error::Error = &error;
+        assert!(as_error.source().is_none());
     }
 }

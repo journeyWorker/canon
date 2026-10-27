@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "rev-030-sb",
+    "role": "reviewer",
+    "session_id": "rev-030-sb-2026-10-26"
+  },
+  "at": "2026-10-26T13:08:15.695792927Z",
+  "change_id": "canon-0-30-spec-backfill",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "7f9f15df9b2287e3743828cd184d6cdc3e83d05c",
+  "reviewer": "rev-030-sb",
+  "round": 1,
+  "schema": 1,
+  "seq": 9,
+  "severity": "note",
+  "summary": "[acceptance F1-F5 checks, recorded per brief] Ran cargo test for spec030_dispatch_demo (25), spec030_reads (11), spec030_storage_gate (21), leaf_coverage (1) and the platformer vitest suite (19): all green, matching the faithful evidence. leaf_coverage bites: with the tsv bind-mounted (no file edited) without the subject show failure id it reports 'no failure-path scenario id', without the row 'no row'. Output mutation: a canon wrapper turning context-pack verify's verified:true into false makes dispatch_manifest_18 fail. No scenario names a ledger file; the tier.storage.12/13 tests do read .canon/ledger/kind=evidence_record paths, so the ledger rename must update them.",
+  "worktree_dirty": false
+}

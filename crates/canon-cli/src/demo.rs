@@ -54,7 +54,7 @@ fn ledger_root(repo: &Path) -> PathBuf {
 fn write_evidence(repo: &Path, agent: &str, role: &str) -> Result<(), String> {
     let scenario = ScenarioId::parse(DEMO_SCENARIO).map_err(|e| e.to_string())?;
     let role_id = RoleId::parse(role).map_err(|e| e.to_string())?;
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, chrono::Utc::now(), Actor::new(agent, role_id));
+    let envelope = Envelope::new(1, RecordKind::Evidence, chrono::Utc::now(), Actor::new(agent, role_id));
     let record = EvidenceRecord::new(envelope, None, Some(scenario), None, EvidenceVerdict::Faithful);
     GitTier::new(ledger_root(repo)).write(&record).map_err(|e| e.to_string())?;
     Ok(())
@@ -65,7 +65,7 @@ fn write_evidence(repo: &Path, agent: &str, role: &str) -> Result<(), String> {
 /// existing one — exit `2`), then writes the reviewer-requiring
 /// `policy.yaml` and seeds the dev evidence. Exit `0` on success, `2` on
 /// any refusal/IO failure.
-pub fn run_demo_init(repo: &Path, json: bool) -> i32 {
+pub fn run_demo_init(repo: &Path, json: bool) -> u8 {
     // Real `canon init`: creates the dir, writes `canon.yaml`, scaffolds
     // `.gitignore`. Refuses (non-zero) if a `canon.yaml` already exists:
     // with no AGENTS.md block to refresh, a rerun has nothing to do. The
@@ -134,7 +134,7 @@ impl crate::reports::Report for DemoReviewReport {}
 /// evidence left. Resolves the repo root the same nearest-ancestor way
 /// every other subcommand does. Exit `0` on success, `2` when no demo
 /// scaffold is present.
-pub fn run_demo_review(repo: &Path, json: bool) -> i32 {
+pub fn run_demo_review(repo: &Path, json: bool) -> u8 {
     let root = resolve_repo_root(repo);
     if !root.join("canon.yaml").exists() {
         return CliError::refused("DEMO_NOT_INITIALIZED", format!("no `canon.yaml` found under `{}` — run `canon demo init` first", root.display())).hint("run `canon demo init` first, or pass --repo <the demo directory>").emit("canon demo review", json);

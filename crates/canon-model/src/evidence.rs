@@ -43,6 +43,10 @@ pub enum FailureClass {
     /// A registered domain's template rejected `Handoff.body.fields`
     /// (missing/invalid field).
     InvalidHandoffBody,
+    /// A record file named by the 0.29 rule (an `area=` level, a 12-hex
+    /// digest, `kind=evidence_record/`): canon 0.30 never uses it for a
+    /// judgement, and its hint is `canon migrate` (0.30 `ledger-naming`).
+    OldLayout,
 }
 
 impl FailureClass {
@@ -57,6 +61,7 @@ impl FailureClass {
             FailureClass::InvalidStateTransition => "invalid-state-transition",
             FailureClass::UnregisteredHandoffDomain => "unregistered-handoff-domain",
             FailureClass::InvalidHandoffBody => "invalid-handoff-body",
+            FailureClass::OldLayout => "old-layout",
         }
     }
 
@@ -70,6 +75,7 @@ impl FailureClass {
             FailureClass::InvalidStateTransition,
             FailureClass::UnregisteredHandoffDomain,
             FailureClass::InvalidHandoffBody,
+            FailureClass::OldLayout,
         ]
         .into_iter()
         .find(|c| c.as_str() == s)
@@ -129,15 +135,14 @@ pub fn validate_envelope_shape(candidate: &RawRecord) -> Result<(), EvidenceViol
         Err(EvidenceViolation::new(FailureClass::Malformed, subject, detail))
     };
 
-    let obj = match candidate.0.as_object() {
-        Some(obj) => obj,
-        None => return malformed("<candidate>", "not a JSON object"),
+    let Some(obj) = candidate.0.as_object() else {
+        return malformed("<candidate>", "not a JSON object");
     };
 
     if !obj.get("schema").is_some_and(|v| v.is_u64() || v.is_i64()) {
         return malformed("schema", "missing or non-integer `schema` field");
     }
-    if !obj.get("kind").is_some_and(|v| v.is_string()) {
+    if !obj.get("kind").is_some_and(serde_json::Value::is_string) {
         return malformed("kind", "missing or non-string `kind` field");
     }
     match obj.get("at") {
@@ -146,11 +151,10 @@ pub fn validate_envelope_shape(candidate: &RawRecord) -> Result<(), EvidenceViol
         _ => return malformed("at", "missing or non-string `at` field"),
     }
 
-    let actor = match obj.get("actor").and_then(|v| v.as_object()) {
-        Some(actor) => actor,
-        None => return malformed("actor", "missing or non-object `actor` field"),
+    let Some(actor) = obj.get("actor").and_then(|v| v.as_object()) else {
+        return malformed("actor", "missing or non-object `actor` field");
     };
-    if !actor.get("agent_id").is_some_and(|v| v.is_string()) {
+    if !actor.get("agent_id").is_some_and(serde_json::Value::is_string) {
         return malformed("actor.agent_id", "missing or non-string `actor.agent_id` field");
     }
     if actor.get("role").is_some_and(|v| !v.is_string()) {
@@ -185,12 +189,22 @@ fn check_optional_scenario_id(candidate: &RawRecord, field: &str) -> Result<(), 
 /// join key as `InvalidJoinKey`, anything else caught by the full
 /// deserialize attempt as `Malformed`).
 pub fn validate_evidence(candidate: &RawRecord) -> Result<(), EvidenceViolation> {
+    parse_evidence(candidate).map(|_| ())
+}
+
+/// The validation of [`validate_evidence`], keeping the one deserialized
+/// record so the batch form does not deserialize a second time.
+fn parse_evidence(candidate: &RawRecord) -> Result<EvidenceRecord, EvidenceViolation> {
     validate_envelope_shape(candidate)?;
     check_optional_scenario_id(candidate, "scenario_id")?;
 
-    serde_json::from_value::<EvidenceRecord>(candidate.0.clone())
-        .map(|_| ())
-        .map_err(|e| EvidenceViolation::new(FailureClass::Malformed, "<candidate>", e.to_string()))
+    let record = EvidenceRecord::deserialize(&candidate.0).map_err(|e| EvidenceViolation::new(FailureClass::Malformed, "<candidate>", e.to_string()))?;
+    // F5: a record that names no task, scenario or run has no name in any
+    // store, so the model refuses it for every writer.
+    if record.task_id.is_none() && record.scenario_id.is_none() && record.run_id.is_none() {
+        return Err(crate::layout::keyless_evidence());
+    }
+    Ok(record)
 }
 
 /// Batch form mirroring `tools/parity.py::_load_ledger`'s skip-not-crash
@@ -202,16 +216,8 @@ pub fn validate_evidence_batch(candidates: &[RawRecord]) -> (Vec<EvidenceRecord>
     let mut accepted = Vec::new();
     let mut violations = Vec::new();
     for candidate in candidates {
-        match validate_evidence(candidate) {
-            Ok(()) => {
-                // `validate_evidence` already proved this deserializes;
-                // re-deserializing here (rather than threading the value
-                // through) keeps the two functions independently
-                // correct and independently testable.
-                if let Ok(record) = serde_json::from_value::<EvidenceRecord>(candidate.0.clone()) {
-                    accepted.push(record);
-                }
-            }
+        match parse_evidence(candidate) {
+            Ok(record) => accepted.push(record),
             Err(violation) => violations.push(violation),
         }
     }
@@ -229,22 +235,37 @@ mod tests {
         let record = EvidenceRecord::new(
             Envelope::new(
                 1,
-                RecordKind::EvidenceRecord,
+                RecordKind::Evidence,
                 Utc::now(),
                 Actor::new("codex-cli", RoleId::parse("implementer").unwrap()),
             ),
             None,
-            None,
+            Some(crate::ids::ScenarioId::parse("vocab.typed.01").unwrap()),
             None,
             crate::records::EvidenceVerdict::Faithful,
         );
         serde_json::to_value(&record).unwrap()
     }
 
+    /// F5: ledger-naming.keyless-evidence.01 -- evidence that names no
+    /// task, scenario or run is refused by the model, both as a typed
+    /// record and as a raw body.
+    #[test]
+    fn ledger_naming_keyless_evidence_01_the_model_refuses_a_record_with_no_key() {
+        let mut json = well_formed_evidence_json();
+        json.as_object_mut().unwrap().remove("scenario_id");
+        let violation = validate_evidence(&RawRecord(json.clone())).unwrap_err();
+        assert_eq!(violation.subject, "evidence");
+        assert!(!crate::layout::evidence_has_a_key(&json));
+        let (accepted, violations) = validate_evidence_batch(&[RawRecord(json)]);
+        assert!(accepted.is_empty());
+        assert_eq!(violations.len(), 1);
+    }
+
     #[test]
     fn well_formed_record_validates_with_no_violation() {
         let candidate = RawRecord(well_formed_evidence_json());
-        assert!(validate_evidence(&candidate).is_ok());
+        validate_evidence(&candidate).unwrap();
     }
 
     #[test]
@@ -290,6 +311,7 @@ mod tests {
             FailureClass::InvalidStateTransition,
             FailureClass::UnregisteredHandoffDomain,
             FailureClass::InvalidHandoffBody,
+            FailureClass::OldLayout,
         ] {
             let json = serde_json::to_string(&class).unwrap();
             assert_eq!(json, format!("\"{}\"", class.as_str()));

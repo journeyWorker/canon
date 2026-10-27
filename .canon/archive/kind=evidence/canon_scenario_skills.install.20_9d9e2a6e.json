@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "017-p2-impl",
+    "role": "implementer",
+    "session_id": "017-p2-impl"
+  },
+  "at": "2026-10-12T10:41:19.456013Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test skills_install skills_install_20_skill_and_block_carry_one_approval_per_scope"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 22,
+  "scenario_id": "skills.install.20",
+  "schema": 1,
+  "staging_id": "4a03c3c9504e",
+  "verdict": "faithful"
+}

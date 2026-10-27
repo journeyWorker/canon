@@ -201,3 +201,71 @@ Feature: finding add
     When it is invoked
     Then the record names the full sha HEAD resolves to as the commit it reviewed
     And it carries the code tree it saw and a worktree-dirty flag, and no introduced or resolution commit
+
+  # canon: {"schema":1,"at":"2026-10-26T18:12:50Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:finding-lifecycle
+  @case:happy
+  @flow:canon-0-30-record-links.F1
+  @finding.add.38
+  Scenario: A finding added with a review id points at that review and a query shows the id
+    Given a review written by canon review scenario and the review id it printed
+    When canon finding add is run with that id as --review-id and the finding is promoted
+    Then the committed finding carries `review_id` with that value
+    And canon query --kind finding --json shows the review id on the record
+    And a finding added without --review-id has no `review_id` field
+
+  # canon: {"schema":1,"at":"2026-10-26T18:12:54Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:finding-lifecycle
+  @case:failure
+  @flow:canon-0-30-record-links.F1
+  @finding.add.39
+  Scenario: A review id that no review has is refused and the ledger is unchanged
+    Given a ledger and an archive in which no review carries the id given
+    When canon finding add is run with that id as --review-id
+    Then it is refused with FINDING_REVIEW_NOT_FOUND, exit 2, naming the id
+    And nothing is staged and the ledger, the staging area and the archive are as they were
+    And a value that is not a ULID is refused as an invalid argument before the ledger is read
+
+  # canon: {"schema":1,"at":"2026-10-26T18:12:57Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:finding-lifecycle
+  @case:edge
+  @flow:canon-0-30-record-links.F1
+  @finding.add.40
+  Scenario: The id of a review that moved to the archive is still accepted
+    Given a review that a later review of the same scenario by the same reviewer moved to the archive
+    When canon finding add is run with the earlier review's id
+    Then the finding is recorded and carries that review id
+
+  # canon: {"schema":1,"at":"2026-10-26T18:13:02Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:finding-lifecycle
+  @case:failure
+  @flow:canon-0-30-record-links.F2
+  @finding.add.41
+  Scenario: A new blocker or should-fix with no introducing commit and no unknown mark is refused
+    Given a change under review
+    When canon finding add records a blocker and then a should-fix with neither --introduced-rev nor --introduced-unknown
+    Then each is refused with FINDING_INTRODUCED_REQUIRED, exit 2, and the message names both options
+    And nothing is staged
+
+  # canon: {"schema":1,"at":"2026-10-26T18:13:04Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:finding-lifecycle
+  @case:happy
+  @flow:canon-0-30-record-links.F2
+  @finding.add.42
+  Scenario: A new defect finding is recorded with an introducing commit or with the unknown mark, and a note needs neither
+    Given a change under review
+    When canon finding add records a blocker with --introduced-rev, a should-fix with --introduced-unknown and a note with neither
+    Then the blocker carries `introduced_by` and no `introduced_unknown`
+    And the should-fix carries `introduced_unknown: true` and no `introduced_by`
+    And the note carries neither and is recorded
+
+  # canon: {"schema":1,"at":"2026-10-26T18:13:06Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:finding-lifecycle
+  @case:failure
+  @flow:canon-0-30-record-links.F2
+  @finding.add.43
+  Scenario: An introducing commit together with the unknown mark is refused
+    Given a change under review
+    When canon finding add is given --introduced-rev together with --introduced-unknown
+    Then it is refused with FINDING_INVALID_ARGUMENT, exit 2, naming the two options as exclusive
+    And nothing is staged

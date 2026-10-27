@@ -43,7 +43,7 @@ fn every_well_formed_fixture_round_trips_through_git_tier() {
 }
 
 #[test]
-fn area_scoped_kinds_land_under_area_and_flat_kinds_do_not() {
+fn every_kind_lands_one_directory_level_below_the_root_with_no_area() {
     let dir = tempfile::tempdir().unwrap();
     let tier = GitTier::new(dir.path());
 
@@ -51,14 +51,9 @@ fn area_scoped_kinds_land_under_area_and_flat_kinds_do_not() {
         let path = fixtures_dir().join(format!("{}.json", kind.as_str()));
         let json: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
         let receipt = tier.write(&RawWrite(RawRecord(json))).unwrap();
-        let has_area_segment = receipt.location.contains("/area=");
-        assert_eq!(
-            has_area_segment,
-            kind.is_area_scoped(),
-            "{}: location {:?} area-segment presence must match RecordKind::is_area_scoped()",
-            kind.as_str(),
-            receipt.location
-        );
+        assert!(!receipt.location.contains("area="), "{}: location {:?} must have no area level (R1)", kind.as_str(), receipt.location);
+        assert_eq!(std::path::Path::new(&receipt.location).components().count(), 2, "{}: `kind=<kind>/<name>.json`, {:?}", kind.as_str(), receipt.location);
+        assert!(receipt.location.starts_with(&format!("kind={}/", kind.as_str())));
     }
 }
 
@@ -90,7 +85,7 @@ fn a_finding_whose_round_reviewed_a_worktree_round_trips_through_git_tier() {
     let receipt = tier.write(&RawWrite(RawRecord(json.clone()))).expect("a finding with no reviewed_sha must be storable");
     assert_eq!(receipt.kind, RecordKind::Finding);
     assert!(
-        receipt.location.contains("s42-close-the-open-loops__0008__0010__"),
+        receipt.location.contains("s42-close-the-open-loops_8_10_"),
         "the natural key is change-keyed, never sha-keyed: {}",
         receipt.location
     );
@@ -104,8 +99,8 @@ fn a_finding_whose_round_reviewed_a_worktree_round_trips_through_git_tier() {
 
 /// review.add.04: the pin is part of a review's identity. Two reviews of
 /// one scenario in one project, identical except for the pinned commit,
-/// resolve two distinct natural keys, land as two committed files, and
-/// read back as two records — never as two versions of one.
+/// resolve one natural key (the pin left the name, R2) and two digests,
+/// land as two committed files, and read back as two records.
 #[test]
 fn reviews_of_one_scenario_at_two_pins_are_two_stored_records() {
     let dir = tempfile::tempdir().unwrap();
@@ -128,14 +123,14 @@ fn reviews_of_one_scenario_at_two_pins_are_two_stored_records() {
 
     let first_key = canon_store::partition::resolve_partition(RecordKind::Review, &first).unwrap();
     let second_key = canon_store::partition::resolve_partition(RecordKind::Review, &second).unwrap();
-    assert_eq!(first_key.natural_key, "root__world.place-lock.01__9c93d024b1a2", "project, scenario and pin joined");
-    assert_eq!(second_key.natural_key, "root__world.place-lock.01__0d1e2f3a4b5c");
-    assert_ne!(first_key.natural_key, second_key.natural_key, "a different pin must resolve a different key");
+    assert_eq!(first_key.natural_key, "root_scenario_world.place-lock.01", "project, tag and scenario joined; the pin is not part of the name (R2)");
+    assert_eq!(first_key.natural_key, second_key.natural_key, "the pin left the name: two pins are two records under ONE key prefix");
 
     let first_receipt = tier.write(&RawWrite(RawRecord(first.clone()))).unwrap();
     let second_receipt = tier.write(&RawWrite(RawRecord(second.clone()))).unwrap();
-    assert!(first_receipt.location.contains(&format!("{}__", first_key.natural_key)), "{}", first_receipt.location);
-    assert!(second_receipt.location.contains(&format!("{}__", second_key.natural_key)), "{}", second_receipt.location);
+    assert!(first_receipt.location.contains(&format!("{}_", first_key.natural_key)), "{}", first_receipt.location);
+    assert!(second_receipt.location.contains(&format!("{}_", second_key.natural_key)), "{}", second_receipt.location);
+    assert_ne!(first_receipt.digest, second_receipt.digest, "the body digest is what tells the two pins apart");
     assert_ne!(first_receipt.location, second_receipt.location, "two attestations are two files");
     assert!(dir.path().join(&first_receipt.location).is_file() && dir.path().join(&second_receipt.location).is_file());
 

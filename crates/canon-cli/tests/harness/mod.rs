@@ -4,7 +4,7 @@
 //! repository the leaves run in.
 //!
 //! Each test binary uses a subset, so dead-code warnings are expected here.
-#![allow(dead_code)]
+#![expect(dead_code, reason = "each test binary that includes this module uses a subset")]
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -233,7 +233,7 @@ pub fn canon_in(dir: &Path, home: &Path, args: &[String], envs: &[(&str, &str)])
 }
 
 pub fn strs(args: &[&str]) -> Vec<String> {
-    args.iter().map(|a| a.to_string()).collect()
+    args.iter().map(std::string::ToString::to_string).collect()
 }
 
 /// `canon <args>` that must exit 0.
@@ -366,7 +366,7 @@ pub fn validate_document(document: &Value) -> Vec<String> {
 
     static VALIDATORS: LazyLock<Mutex<HashMap<String, std::sync::Arc<jsonschema::Validator>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
     let validator = |key: &str, schema: &Value| -> std::sync::Arc<jsonschema::Validator> {
-        VALIDATORS.lock().unwrap().entry(key.to_string()).or_insert_with(|| std::sync::Arc::new(compile(schema))).clone()
+        std::sync::Arc::clone(VALIDATORS.lock().unwrap().entry(key.to_string()).or_insert_with(|| std::sync::Arc::new(compile(schema))))
     };
 
     let mut problems = Vec::new();
@@ -461,14 +461,14 @@ pub fn clean_brief() -> String {
 /// A strategy in the warm tier and the trajectories that corroborate it: what `strategy promote` re-renders.
 pub fn seed_strategy(repo: &Path) -> String {
     use canon_ingest::verdict::{Becomes, Polarity, VerdictRow};
-    use canon_learn::{ParquetStrategyStore, ParquetTrajectoryStore, StrategyId, StrategyItem, StrategyLifecycle, StrategyStore, Trajectory, TrajectoryId, TrajectoryStore, TrajectoryVerdict, VerdictOutcome};
+    use canon_learn::{ParquetStrategyStore, ParquetTrajectoryStore, StrategyId, StrategyItem, StrategyItemFields, StrategyLifecycle, StrategyStore, Trajectory, TrajectoryId, TrajectoryStore, TrajectoryVerdict, VerdictOutcome};
     use canon_model::ids::{regime_key, RegimeKey, RoleId};
     use chrono::{Duration, Utc};
 
     let regime = RegimeKey::parse(regime_key("dev", "canon", "join-spine", "9c93d024b1a2")).unwrap();
     let role = RoleId::parse("dev").unwrap();
     let id = StrategyId::new();
-    let item = StrategyItem::new(id, regime.clone(), role.clone(), "review guidance", "one-liner", "prefer the boring, correct option", vec![TrajectoryId::new()], Utc::now()).with_lifecycle(StrategyLifecycle::Active);
+    let item = StrategyItem::new(StrategyItemFields { id, regime_key: regime.clone(), role: role.clone(), title: "review guidance".into(), description: "one-liner".into(), content: "prefer the boring, correct option".into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() }).with_lifecycle(StrategyLifecycle::Active);
     ParquetStrategyStore::open(repo.join(".canon").join("learn").join("strategies")).append(&item).expect("seed strategy");
     let store = ParquetTrajectoryStore::open(repo.join(".canon").join("learn").join("trajectories"));
     let now = Utc::now();

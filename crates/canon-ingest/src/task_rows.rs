@@ -505,7 +505,7 @@ pub(crate) fn word_at(bytes: &[u8], i: usize, words: &[&str]) -> Option<usize> {
 
 /// Advance past ASCII whitespace from `i`.
 pub(crate) fn skip_ws(bytes: &[u8], mut i: usize) -> usize {
-    while bytes.get(i).is_some_and(|b| b.is_ascii_whitespace()) {
+    while bytes.get(i).is_some_and(u8::is_ascii_whitespace) {
         i += 1;
     }
     i
@@ -830,7 +830,7 @@ mod tests {
     // ── resolve_declared_deps (s37 execution-graph-topology) ──
 
     fn known_rows(rows: &[&str]) -> BTreeSet<String> {
-        rows.iter().map(|r| r.to_string()).collect()
+        rows.iter().map(std::string::ToString::to_string).collect()
     }
 
     #[test]
@@ -840,7 +840,7 @@ mod tests {
         let known = known_rows(&["6.1", "6.2", "6.3"]);
 
         let (resolved, unresolvable) = resolve_declared_deps(&change_id, &self_id, &["6.2".to_string(), "6.1".to_string()], &known);
-        assert_eq!(resolved.iter().map(|t| t.as_str()).collect::<Vec<_>>(), vec!["add-widget#6.2", "add-widget#6.1"], "first-seen order, never re-sorted");
+        assert_eq!(resolved.iter().map(canon_model::TaskId::as_str).collect::<Vec<_>>(), vec!["add-widget#6.2", "add-widget#6.1"], "first-seen order, never re-sorted");
         assert!(unresolvable.is_empty());
     }
 
@@ -851,7 +851,7 @@ mod tests {
         let known = known_rows(&["1.1", "1.2"]);
 
         let (resolved, unresolvable) = resolve_declared_deps(&change_id, &self_id, &["1.2".to_string(), "9.9".to_string()], &known);
-        assert_eq!(resolved.iter().map(|t| t.as_str()).collect::<Vec<_>>(), vec!["add-widget#1.2"], "the well-formed sibling still resolves");
+        assert_eq!(resolved.iter().map(canon_model::TaskId::as_str).collect::<Vec<_>>(), vec!["add-widget#1.2"], "the well-formed sibling still resolves");
         assert_eq!(unresolvable, vec!["9.9".to_string()], "the unresolvable token is handed back for a named diagnostic, never silently swallowed");
     }
 
@@ -862,7 +862,7 @@ mod tests {
         let known = known_rows(&["2.1", "2.4"]);
 
         let (resolved, unresolvable) = resolve_declared_deps(&change_id, &self_id, &["2.1".to_string(), "2.4".to_string(), "2.4".to_string()], &known);
-        assert_eq!(resolved.iter().map(|t| t.as_str()).collect::<Vec<_>>(), vec!["add-widget#2.4"], "a repeated reference is carried once");
+        assert_eq!(resolved.iter().map(canon_model::TaskId::as_str).collect::<Vec<_>>(), vec!["add-widget#2.4"], "a repeated reference is carried once");
         assert!(unresolvable.is_empty(), "a row citing its own number is not an operator mistake, so never a diagnostic");
     }
 

@@ -91,7 +91,7 @@ fn session_ids_land_on_evidence_and_review_actors() {
     ];
     ok(repo, &evidence);
     ok(repo, &["gate", "promote"]);
-    let records = committed(repo, "evidence_record");
+    let records = committed(repo, "evidence");
     assert_eq!(records.len(), 1);
     assert_eq!(records[0]["actor"], serde_json::json!({"agent_id": "impl-unit-1", "role": "implementer", "session_id": "sess-impl"}));
 
@@ -132,7 +132,7 @@ fn a_session_id_outside_the_grammar_is_refused_and_nothing_is_written() {
         }
     }
     assert!(records_under(repo, "_staging").is_empty(), "a refused add stages nothing");
-    assert!(committed(repo, "evidence_record").is_empty() && committed(repo, "review").is_empty());
+    assert!(committed(repo, "evidence").is_empty() && committed(repo, "review").is_empty());
 }
 
 /// D6 (F16): every write command leaves its record where its write mode says,
@@ -173,10 +173,10 @@ fn every_write_command_stages_or_writes_directly_as_its_mode_says() {
 
     staged(
         &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke", "--role", "implementer", "--no-promote"],
-        "evidence_record",
+        "evidence",
         STAGED,
     );
-    staged(&["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke 2", "--role", "implementer"], "evidence_record", PROMOTED);
+    staged(&["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke 2", "--role", "implementer"], "evidence", PROMOTED);
     staged(&["finding", "add", "--change-id", "cats", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "r", "--summary", "s", "--no-promote"], "finding", STAGED);
     ok(repo, &["gate", "promote"]);
     // A close supersedes the committed finding, so the committed count holds: the disposition is what moves.

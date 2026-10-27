@@ -1,11 +1,12 @@
 //! `canon dispatch` — the handlers of the group.
 
-use crate::cli::dispatch::*;
+use crate::cli::dispatch::{DispatchCommand, DispatchBeginArgs, DispatchEndArgs, DispatchDiffArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: DispatchCommand) -> ExitCode {
     match cmd {
-        DispatchCommand::Begin(DispatchBeginArgs { role, regime, actor_id, session, provider, model, skill_id, skill_digest, manifest, prompt_bundle, task_id, parent_run_id, repo, json, .. }) => {
+        DispatchCommand::Begin(args) => {
+            let DispatchBeginArgs { role, regime, actor_id, session, provider, model, skill_id, skill_digest, manifest, prompt_bundle, task_id, parent_run_id, repo, json, .. } = *args;
             let role = match super::record_role(role, &repo, "canon dispatch begin", json) {
                 Ok(role) => role,
                 Err(code) => return code,

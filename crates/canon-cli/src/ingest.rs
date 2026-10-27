@@ -66,7 +66,7 @@ use canon_ingest::{enumerate, registry, scanner};
 use canon_model::envelope::RecordKind;
 use canon_model::paths;
 use canon_store::cursor::{CursorStore, SourceCursor, file_digest};
-use canon_store::partition::content_digest12;
+use canon_store::partition::content_digest;
 use canon_store::policy::BackendConfig;
 use canon_store::registry::TierRegistry;
 use canon_store::tier::StoreError;
@@ -201,6 +201,7 @@ struct RawIngestSessions {
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
+#[derive(Default)]
 struct RawDirectivePrivacy {
     #[serde(default)]
     capture_user_directives: bool,
@@ -208,11 +209,6 @@ struct RawDirectivePrivacy {
     max_directive_chars: Option<usize>,
 }
 
-impl Default for RawDirectivePrivacy {
-    fn default() -> Self {
-        Self { capture_user_directives: false, max_directive_chars: None }
-    }
-}
 
 #[derive(Debug, Default, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -266,7 +262,7 @@ impl IngestSourceConfig {
                  wrong corpus): {e}"
             ))
         })?;
-        let known: BTreeSet<&str> = registry().iter().map(|e| e.client_id()).collect();
+        let known: BTreeSet<&str> = registry().iter().map(canon_ingest::AdapterEntry::client_id).collect();
         if let Some(id) = ingest.sources.keys().find(|id| !known.contains(id.as_str())) {
             let mut names: Vec<&str> = known.into_iter().collect();
             names.sort_unstable();
@@ -486,7 +482,7 @@ fn absolutize(path: &Path) -> PathBuf {
     if path.is_absolute() {
         return path.to_path_buf();
     }
-    std::env::current_dir().map(|cwd| cwd.join(path)).unwrap_or_else(|_| path.to_path_buf())
+    std::env::current_dir().map_or_else(|_| path.to_path_buf(), |cwd| cwd.join(path))
 }
 
 /// `git worktree list --porcelain` -> every worktree root, main
@@ -830,7 +826,7 @@ pub fn run(canon_yaml: &Path, home: &Path, use_env_roots: bool, full_rescan: boo
 fn file_stat(path: &Path) -> (i64, u64) {
     match std::fs::metadata(path) {
         Ok(meta) => {
-            let mtime_ms = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0);
+            let mtime_ms = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX));
             (mtime_ms, meta.len())
         }
         Err(_) => (0, 0),
@@ -990,7 +986,7 @@ fn safe_tier_degrade_reason(rung: canon_store::policy::Rung, backend: Option<can
         let name = name.strip_prefix('`').and_then(|name| name.strip_suffix('`')).unwrap_or(name);
         (!name.is_empty() && name.bytes().all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_')).then_some(name)
     });
-    let reason = safe_reason.map(|name| format!("{name} is unset")).unwrap_or_else(|| backend.map(|value| value.default_unattached_reason().to_string()).unwrap_or_else(|| "unavailable".to_string()));
+    let reason = safe_reason.map_or_else(|| backend.map_or_else(|| "unavailable".to_string(), |value| value.default_unattached_reason().to_string()), |name| format!("{name} is unset"));
     StoreError::tier_unavailable(rung, backend, reason).to_string()
 }
 
@@ -1036,7 +1032,7 @@ pub fn format_json(outcome: &IngestOutcome) -> Option<String> {
 }
 
 /// One adapter's scan counts in `ingest sessions`' report.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AdapterCounts<'a> {
     pub client: &'a str,
@@ -1050,7 +1046,7 @@ pub struct AdapterCounts<'a> {
 /// `canon ingest sessions`' report (`IngestSessionsReport`): the counts the
 /// human summary prints, plus `unwritten` (the metadata of what could not be
 /// persisted) when the store's tiers were unreachable.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct IngestSessionsReport<'a> {
     /// True when `--dry-run` previewed the pass without writing.
@@ -1062,6 +1058,8 @@ pub struct IngestSessionsReport<'a> {
     pub rows_skipped: usize,
     pub runs_written: usize,
     pub events_written: usize,
+    /// Where the hot records go (0.30): the hot store's location; absent on a `--dry-run`.
+    pub hot_store: Option<String>,
     pub degrade_reason: Option<&'a str>,
     pub unwritten: Option<Unwritten<'a>>,
 }
@@ -1069,7 +1067,7 @@ pub struct IngestSessionsReport<'a> {
 impl crate::json_out::Report for IngestSessionsReport<'_> {}
 
 /// One adapter's scan counts in the unwritten metadata.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UnwrittenAdapter<'a> {
     pub client_id: &'a str,
@@ -1081,7 +1079,7 @@ pub struct UnwrittenAdapter<'a> {
 }
 
 /// The counts of the unwritten metadata.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UnwrittenCounts {
     pub sessions: usize,
@@ -1095,7 +1093,7 @@ pub struct UnwrittenCounts {
 }
 
 /// One session that was not persisted: identity and digest, no content.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UnwrittenSession<'a> {
     pub session_id: &'a canon_model::SessionId,
@@ -1107,7 +1105,7 @@ pub struct UnwrittenSession<'a> {
 }
 
 /// One run that was not persisted.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UnwrittenRun<'a> {
     pub run_id: &'a canon_model::RunId,
@@ -1117,7 +1115,7 @@ pub struct UnwrittenRun<'a> {
 }
 
 /// One event that was not persisted: its place and digest, never its detail.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UnwrittenEvent<'a> {
     pub run_id: &'a canon_model::RunId,
@@ -1128,7 +1126,7 @@ pub struct UnwrittenEvent<'a> {
 }
 
 /// Why the pass did not reach a durable tier.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UnwrittenFailure<'a> {
     pub class: &'a str,
@@ -1136,7 +1134,7 @@ pub struct UnwrittenFailure<'a> {
 }
 
 /// The metadata-only account of what an ingest pass could not persist.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Unwritten<'a> {
     /// True when `--dry-run` previewed the pass without writing.
@@ -1151,8 +1149,9 @@ pub struct Unwritten<'a> {
 }
 
 /// The `--json` data for one ingest pass.
-pub fn summary_json(outcome: &IngestOutcome) -> IngestSessionsReport<'_> {
+pub fn summary_json(outcome: &IngestOutcome, hot_store: Option<String>) -> IngestSessionsReport<'_> {
     IngestSessionsReport {
+        hot_store: hot_store.filter(|_| !outcome.dry_run),
         dry_run: outcome.dry_run,
         scope: &outcome.scope_summary,
         adapters: outcome
@@ -1182,7 +1181,7 @@ fn degraded_metadata<'a>(outcome: &'a IngestOutcome, sessions: &'a [NormalizedSe
                 workspace_key: session.workspace_key.as_deref(),
                 workspace_label: session.workspace_label.as_deref(),
                 project_key: session.project_key.as_deref(),
-                digest: content_digest12(&body),
+                digest: content_digest(&body),
             }
         })
         .collect();
@@ -1191,7 +1190,7 @@ fn degraded_metadata<'a>(outcome: &'a IngestOutcome, sessions: &'a [NormalizedSe
         .flat_map(|normalized| {
             normalized.runs().map(|run| {
                 let body = serde_json::to_value(run).expect("Run always serializes");
-                UnwrittenRun { run_id: &run.run_id, session_id: run.session_id.as_ref(), parent_run_id: run.parent_run_id.as_ref(), digest: content_digest12(&body) }
+                UnwrittenRun { run_id: &run.run_id, session_id: run.session_id.as_ref(), parent_run_id: run.parent_run_id.as_ref(), digest: content_digest(&body) }
             })
         })
         .collect();
@@ -1200,7 +1199,7 @@ fn degraded_metadata<'a>(outcome: &'a IngestOutcome, sessions: &'a [NormalizedSe
         .flat_map(|normalized| {
             normalized.events.iter().map(|event| {
                 let body = serde_json::to_value(event).expect("Event always serializes");
-                UnwrittenEvent { run_id: &event.run_id, seq: event.seq, at: event.envelope.at, label: &event.label, digest: content_digest12(&body) }
+                UnwrittenEvent { run_id: &event.run_id, seq: event.seq, at: event.envelope.at, label: &event.label, digest: content_digest(&body) }
             })
         })
         .collect();

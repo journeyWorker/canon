@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "l2-impl"
+  },
+  "at": "2026-10-10T19:38:06.604132Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_audit a_refuted_audit_is_false_success_until_a_newer_audit_confirms"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 28,
+  "scenario_id": "gate.check.60",
+  "schema": 1,
+  "staging_id": "f2ce1a06a532",
+  "verdict": "faithful"
+}

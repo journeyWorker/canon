@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-ln",
+    "role": "implementer",
+    "session_id": "ln-2026-10-26"
+  },
+  "at": "2026-10-26T18:09:41.902993220Z",
+  "code_tree": "a63296920ba393b2da8dc7715fead8017ec5435e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test ledger_naming ledger_naming_15_an_overlay_record_is_named_by_its_join_key_values"
+  },
+  "evidence_sha": "b42cf3d7aa61f1636780eb859e9a20a1c6420194",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 15,
+  "scenario_id": "ledger.naming.15",
+  "schema": 1,
+  "staging_id": "c32960ae",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

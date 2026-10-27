@@ -100,7 +100,7 @@ fn a_leaf_lists_only_registered_codes_and_the_exits_of_the_table() {
         assert!(exits.contains(&0), "`{path}` has no success exit");
         // A leaf that lists a code of exit 2 declares exit 2; one that lists a code of exit 1 declares exit 1.
         for code in strings(&node["errorCodes"]) {
-            let exit = all_codes().iter().find(|i| i.code == code).unwrap().exit as u64;
+            let exit = u64::from(all_codes().iter().find(|i| i.code == code).unwrap().exit);
             assert!(exits.contains(&exit), "`{path}` lists {code} (exit {exit}) but declares only {exits:?}");
         }
     }

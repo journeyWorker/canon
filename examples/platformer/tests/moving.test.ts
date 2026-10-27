@@ -95,3 +95,31 @@ test('platformer.moving.02: Stepping off a platform edge drops cleanly', () => {
     expect(f.platformDx).not.toBe(0);
   }
 });
+
+test('platformer.moving.03: A player standing on the ground under a moving platform is not carried by it', () => {
+  // Given the player stands on the ground, with a platform oscillating
+  // overhead (its underside well above the player's head).
+  const rows = Array.from({ length: 9 }, () => '.'.repeat(24).split(''));
+  rows[7][10] = 'S';
+  rows[8] = '#'.repeat(24).split('');
+  const platform: PlatformSpawn = { x: 456, y: 192, w: 144, h: 48, axis: 'x', min: 396, max: 516, speed: PLATFORM_SPEED };
+  const sim = simOf(level(rows.map((r) => r.join('')), { platforms: [platform] }));
+  settle(sim);
+  const { player: p, platforms: [pl] } = sim.getRenderSnapshot();
+  expect(pl.y + pl.h).toBeLessThan(p.y);
+  const start = { x: p.x, y: p.y };
+
+  // When the platform moves through a full cycle, both turnarounds included.
+  const seen = new Set<number>();
+  for (let i = 0; i < 600; i++) {
+    step(sim);
+    seen.add(pl.x);
+    // Then the player is not carried: it neither moves nor leaves the ground.
+    expect(p.x).toBe(start.x);
+    expect(p.y).toBe(start.y);
+    expect(p.onGround).toBe(true);
+  }
+
+  // And the platform keeps moving.
+  expect(Math.max(...seen) - Math.min(...seen)).toBe(PLATFORM_AMPLITUDE);
+});

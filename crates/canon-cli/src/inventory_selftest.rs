@@ -56,7 +56,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use canon_model::ids::TotalOrder;
-use canon_model::{paths, Actor, BindingSnapshot, Divergence, DivergenceStatus, Envelope, FoldedState, ProjectId, RecordKind, RoleId, ScenarioId, Sha, fold_to_current_state};
+use canon_model::{paths, Actor, BindingSnapshot, Divergence, DivergenceFields, DivergenceStatus, Envelope, FoldedState, ProjectId, RecordKind, RoleId, ScenarioId, Sha, fold_to_current_state};
 use chrono::{DateTime, Utc};
 
 use crate::inventory::{RootSyncOutcome, SyncCtx, run_sync_with_ctx};
@@ -212,33 +212,13 @@ fn rfc3339(s: &str) -> DateTime<Utc> {
 /// round-3 fresh campaign (higher `run_seq`, must win).
 fn frozen_incident_divergences() -> Vec<Divergence> {
     vec![
-        Divergence::new(
-            Envelope::new(1, RecordKind::Divergence, rfc3339("2026-07-07T12:00:00Z"), Actor::new("backfill-w1-retro", RoleId::parse("reviewer").expect("valid RoleId"))),
-            frozen_project_id(),
-            frozen_scenario_id(),
-            Sha::parse("87c1fc578467437918410502e9be5ea71cae315e").expect("valid Sha"),
-            DivergenceStatus::Open,
-            TotalOrder::new(1),
-            8,
-            "backfill-w1-retro",
-            "round-8 backfill of an earlier campaign (frozen incident, divergence-log.md §3.3)",
-        ),
-        Divergence::new(
-            Envelope::new(
+        Divergence::new(DivergenceFields { envelope: Envelope::new(1, RecordKind::Divergence, rfc3339("2026-07-07T12:00:00Z"), Actor::new("backfill-w1-retro", RoleId::parse("reviewer").expect("valid RoleId"))), project_id: frozen_project_id(), scenario_id: frozen_scenario_id(), sha: Sha::parse("87c1fc578467437918410502e9be5ea71cae315e").expect("valid Sha"), status: DivergenceStatus::Open, run_seq: TotalOrder::new(1), round: 8, reviewer: "backfill-w1-retro".into(), detail: "round-8 backfill of an earlier campaign (frozen incident, divergence-log.md §3.3)".into() }),
+        Divergence::new(DivergenceFields { envelope: Envelope::new(
                 1,
                 RecordKind::Divergence,
                 rfc3339("2026-07-08T20:05:49Z"),
                 Actor::new("code-reviewer-world-firstbuy-hotdeal", RoleId::parse("reviewer").expect("valid RoleId")),
-            ),
-            frozen_project_id(),
-            frozen_scenario_id(),
-            Sha::parse("8c81f9e13e9bda0a6a5ee29ba1b6b5137e7bf552").expect("valid Sha"),
-            DivergenceStatus::Resolved,
-            TotalOrder::new(3),
-            3,
-            "code-reviewer-world-firstbuy-hotdeal",
-            "round-3 fresh review campaign, run_seq 3 (frozen incident, divergence-log.md §3.3)",
-        ),
+            ), project_id: frozen_project_id(), scenario_id: frozen_scenario_id(), sha: Sha::parse("8c81f9e13e9bda0a6a5ee29ba1b6b5137e7bf552").expect("valid Sha"), status: DivergenceStatus::Resolved, run_seq: TotalOrder::new(3), round: 3, reviewer: "code-reviewer-world-firstbuy-hotdeal".into(), detail: "round-3 fresh review campaign, run_seq 3 (frozen incident, divergence-log.md §3.3)".into() }),
     ]
 }
 
@@ -316,6 +296,7 @@ fn parse_expected(text: &str) -> Result<BTreeSet<(String, String)>, String> {
 /// One fixture's diff outcome — both halves of the two-sided exact-set
 /// oracle (spec Req 1): `missing` (under-detection, expected but not
 /// produced) and `extra` (over-triggering, produced but not expected).
+#[derive(Debug)]
 pub struct FixtureOutcome {
     pub name: &'static str,
     pub missing: BTreeSet<(String, String)>,
@@ -348,6 +329,7 @@ impl FixtureOutcome {
 }
 
 /// Every fixture's outcome from one run.
+#[derive(Debug)]
 pub struct SelftestReport {
     pub outcomes: Vec<FixtureOutcome>,
 }

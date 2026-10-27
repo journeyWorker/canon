@@ -63,6 +63,17 @@
     "provenance_ref": {
       "$ref": "#/$defs/ProvenanceRef"
     },
+    "review_id": {
+      "description": "The id of the `canon review` run that wrote this review (0.30\n`record-links`): one ULID per run, shared by every review the run\nwrote, kept in the body so a rename, a rewrite or the move to the\narchive never changes it. A finding's `review_id` points at it. Absent\non a review written before 0.30; such a review stays valid.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReviewId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "reviewer": {
       "type": "string"
     },
@@ -284,7 +295,7 @@
         "divergence",
         "trajectory",
         "strategy_item",
-        "evidence_record",
+        "evidence",
         "subject",
         "finding"
       ]
@@ -306,6 +317,11 @@
         "path",
         "sha256"
       ]
+    },
+    "ReviewId": {
+      "description": "ULID (Crockford base32, 26 chars) — joins: finding ↔ review",
+      "type": "string",
+      "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
     },
     "ReviewOutcome": {
       "description": "How a reviewer's run ended (0.15 D4). Only `Signed` is an approval.\n`Indeterminate` (the reviewer ran but could not reach a verdict) and\n`Unavailable` (the reviewer could not run) are recorded so a failed\nreview is visible, never mistaken for a sign-off or a rejection.",

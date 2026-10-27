@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-030-rl",
+    "role": "reviewer",
+    "session_id": "rev-030-rl-r2-2026-10-26"
+  },
+  "at": "2026-10-26T20:46:33.067499749Z",
+  "change_id": "canon-0-30-record-links",
+  "code_tree": "86779563bdaf9bb2a2dfff7f4bc7cd6f8f2b60a7",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/record_links.rs:292-310",
+  "kind": "finding",
+  "reason": "round 2: inventory_sync_53 now asserts a 0.29 record re-synced keeps its scenario_digest",
+  "resolution_code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "resolution_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "resolution_worktree_dirty": false,
+  "review_id": "01M5WVXD2Z94A6RC55YKS9WS0Q",
+  "reviewed_sha": "bdf0ac42680d33c7a44b528115190303445447ab",
+  "reviewer": "rev-030-rl",
+  "round": 1,
+  "scenario_ids": [
+    "inventory.sync.53"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "inventory.sync.53's last Then (scenario_digest is the value it had before steps were indexed) is not asserted; holds by construction (scenario_digests untouched) and in a probe, but the test should compare the digest with and without steps",
+  "worktree_dirty": false
+}

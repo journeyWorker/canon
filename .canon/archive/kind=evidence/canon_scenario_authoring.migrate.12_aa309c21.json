@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "017-fix-impl",
+    "role": "implementer",
+    "session_id": "017-fix-impl"
+  },
+  "at": "2026-10-12T12:49:39.817201Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test migrate authoring_migrate_12_unread_openspec_material_keeps_the_source"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 14,
+  "scenario_id": "authoring.migrate.12",
+  "schema": 1,
+  "staging_id": "5a686e6792f3",
+  "verdict": "faithful"
+}

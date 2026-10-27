@@ -1,0 +1,556 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EvidenceRecord",
+  "description": "The evidence-integrity spec's own record kind: the candidate shape\n[`crate::evidence::validate_evidence`] validates. Carries whichever\njoin keys are relevant to what it attests (join-spine `task_id`\nrow: task ↔ evidence ↔ trajectory). `project_id` is OPTIONAL\n(design D6: real records may exist via `canon gate promote` before\nevery producer is project-aware). The native trust/evidence fields are\nthe home for what were `canon-gate`-owned raw-JSON companions (design\nD9), and `approval` is the explicit accountable attestation for this\nphase. Each companion reads THREE-way: a legitimately ABSENT key\ndeserializes to `None`/empty (the documented safe default —\n`canon-gate` still owns what that default MEANS per field, e.g.\nabsent `lifecycle` = draft), a PRESENT well-formed value deserializes\ntyped, and a PRESENT malformed value fails this whole record's\n`Deserialize` — never silently collapsed to absent.",
+  "type": "object",
+  "properties": {
+    "actor": {
+      "$ref": "#/$defs/Actor"
+    },
+    "approval": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EvidenceApproval"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "attachments": {
+      "description": "Files this evidence is bound to (experimental evidence binding;\nadditive and skipped when empty, so unbound records are unchanged\non the wire).",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/EvidenceAttachment"
+      }
+    },
+    "audit": {
+      "description": "Present only on an audit record (`--kind audit`, 0.15 D3): the\nexternal evaluator and its result. Additive.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EvidenceAudit"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "brief_override": {
+      "description": "Present only on a record attested under `--override-reason` while\na subject it attests for had an enforced, unapproved brief (0.16\nM7). Additive.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BriefOverride"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "code_tree": {
+      "description": "The git tree id of the code the writing command saw (0.28 D7b):\nthe working tree for the default `HEAD`, the commit's own code for\nan explicit rev; `.canon/`, spec roots and `code.exclude` are not\npart of it. Absent on a record written before 0.28.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "evidence_sha": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Sha"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "flagged": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FlaggedOverlay"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "kind": {
+      "$ref": "#/$defs/RecordKind"
+    },
+    "lifecycle": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TrustLifecycle"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "project_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProjectId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RunId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "run_seq": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TotalOrder"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "scenario_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ScenarioId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "schema": {
+      "description": "Per-kind FORMAT GENERATION — the value\n[`RecordKind::schema_version`] defines and every writer stamps\nvia [`Envelope::current`] (design D2; `canon fmt`/`canon\nmigrate`, S11, key off it; `canon_store::fold::fold_latest_by_key`\norders an equal-`at` supersession tie by it,\n`s38-evidence-bearing-memory`). See\n[`RecordKind::schema_version`] for the bump rule — it is \"bump\nwhen two generations of one record can tie on `at`\", not \"bump on\nevery field addition\".",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "surface_ref": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "task_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TaskId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "verdict": {
+      "$ref": "#/$defs/EvidenceVerdict"
+    },
+    "worktree_dirty": {
+      "description": "Whether the working tree's code differed from `HEAD`'s when this was\nwritten (0.28 D7b). Absent on a record written before 0.28.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "schema",
+    "kind",
+    "at",
+    "actor",
+    "verdict"
+  ],
+  "$defs": {
+    "Actor": {
+      "description": "Who/what produced a record — structured, never a bare `by: String`\n(design D2, the donor audit's biggest cross-family gap).\n\n`role` is `Option` (S11 design D5, \"actor backfill is best-effort\nfrom adjacent fields; absent stays absent\"): a migrated legacy\nrecord whose only source field is a bare `by: \"legacy-ci-machine\"`\nstring carries no role information at all — `canon migrate` maps\nthat string to `agent_id` and leaves `role: null` rather than\nguessing, so the field must be able to express \"unknown\", not just\n\"known\". Every record canon itself originates still supplies a role\nvia [`Actor::new`]; only backfilled/migrated records use\n[`Actor::new_unattributed`].",
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoleId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "agent_id"
+      ]
+    },
+    "AuditResult": {
+      "description": "What an external evaluator concluded when it re-audited a scenario's\ndeclared success (0.15 D3). `Indeterminate` is a real outcome — the\nevaluator ran and could not decide — never an approval.",
+      "oneOf": [
+        {
+          "description": "The evaluator re-checked the requirement and the declared success holds.",
+          "type": "string",
+          "const": "confirmed"
+        },
+        {
+          "description": "The evaluator found the declared success false (a counterexample).",
+          "type": "string",
+          "const": "refuted"
+        },
+        {
+          "description": "The evaluator ran but could not decide either way.",
+          "type": "string",
+          "const": "indeterminate"
+        }
+      ]
+    },
+    "BriefOverride": {
+      "description": "The accountable waiver an attestation was let through under, when\n`canon evidence add` refused it because a subject it attests for has\nan enforced, unapproved brief (0.16 M7) and the operator passed\n`--override-reason`. [`StatusOverride`]'s shape without `to`: an\nattestation moves no status. `waived` lists the refusals it let\nthrough as `(unreviewed-promotion, <subject id>)`, the pair the ship\nguard's brief check prints.",
+      "type": "object",
+      "properties": {
+        "actor": {
+          "description": "Who waived it.",
+          "$ref": "#/$defs/Actor"
+        },
+        "reason": {
+          "description": "The operator's reason, verbatim (one line).",
+          "type": "string"
+        },
+        "waived": {
+          "description": "Exactly the brief refusals this waiver let through, sorted.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/WaivedViolation"
+          }
+        }
+      },
+      "required": [
+        "reason",
+        "waived",
+        "actor"
+      ]
+    },
+    "EvidenceApproval": {
+      "description": "An approval attestation attached to an [`EvidenceRecord`].\n\n`verified` is retained only as a non-authoritative display field for wire\ncompatibility. Gate decisions MUST reverify `signature` over the canonical\nartifact-bound payload and MUST ignore this bit and process environment.",
+      "type": "object",
+      "properties": {
+        "approver": {
+          "type": "string"
+        },
+        "artifact_sha": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sha"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "project_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProjectId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "role": {
+          "$ref": "#/$defs/RoleId"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "signature": {
+          "description": "Detached SSH signature in armored form. Missing signatures never count.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "subject": {
+          "description": "Subject and artifact binding covered by the signature.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "surface": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "verified": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "approver",
+        "role",
+        "at"
+      ]
+    },
+    "EvidenceAttachment": {
+      "description": "A file an [`EvidenceRecord`] is bound to (experimental evidence\nbinding). Canon reads the file when the evidence is added — it never\nexecutes anything — and records what it found: the bytes' sha256, and\nfor a parsed report the case it matched and that case's outcome. The\ndigest lets a reviewer later confirm exactly which file backed the\nclaim; an attachment with no `format` is an opaque artifact (a trace,\nscreenshots, an agent QA log) bound by digest alone.",
+      "type": "object",
+      "properties": {
+        "case": {
+          "description": "The report case this evidence was matched to (parsed reports only).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "format": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReportFormat"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReportOutcome"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "description": "Repository-relative path, `/`-separated, as read at attestation.",
+          "type": "string"
+        },
+        "sha256": {
+          "description": "64 lowercase hex characters: sha256 over the file's bytes.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ]
+    },
+    "EvidenceAudit": {
+      "description": "An external evaluator's re-audit of a scenario (0.15 D3), carried on\nan [`EvidenceRecord`] written by `canon evidence audit`.\nCanon never generates or runs the audit; it records which evaluator\nran (id, version, and the sha256 of the evaluator itself) and what it\nconcluded. A record carrying this is an AUDITED outcome and is folded\napart from declared evidence: it never becomes a scenario's latest\ndeclared verdict.",
+      "type": "object",
+      "properties": {
+        "evaluator_digest": {
+          "description": "64 lowercase hex characters: sha256 of the evaluator (its binary,\nimage, or prompt bundle), as the evaluator's operator reports it.",
+          "type": "string"
+        },
+        "evaluator_id": {
+          "type": "string"
+        },
+        "evaluator_version": {
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/AuditResult"
+        }
+      },
+      "required": [
+        "evaluator_id",
+        "evaluator_version",
+        "evaluator_digest",
+        "result"
+      ]
+    },
+    "EvidenceVerdict": {
+      "description": "The three-way verdict an evidence record carries. `Divergent` is an\nexplicit third value rather than \"no record exists\" — the donor\nparity harness represents non-faithful as *absence* of a\ndesign-review/code-review record, which works for a directory-scanned\nledger but not for a single, standalone canon record whose own\n`Deserialize` must always succeed or fail on its own — so canon makes\nthe state explicit instead of leaning on record-absence.",
+      "type": "string",
+      "enum": [
+        "faithful",
+        "not_applicable",
+        "divergent"
+      ]
+    },
+    "FlaggedOverlay": {
+      "description": "The orthogonal `flagged` overlay, paired with whatever\n`EvidenceRecord` it marks. `flagged_by`/`flagged_at` carry who/when;\nthe flag-CLEAR ratchet's enforcement (only a human-attributed actor\nmay set or clear this, one-way) lives in `canon-gate::trust`\n(`attempt_clear`), not here — this type carries the shape only.",
+      "type": "object",
+      "properties": {
+        "flagged": {
+          "type": "boolean"
+        },
+        "flagged_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "flagged_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Actor"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "flagged"
+      ]
+    },
+    "ProjectId": {
+      "description": "`[a-z0-9][a-z0-9-]*` — lowercase alnum + hyphen, first character alphanumeric, no underscore (keeps the `__` natural-key separator unambiguous) — joins: not a join-spine key; composite identity prefix on Scenario/Review/Divergence natural keys (`<project_id>__<scenario_id>…`), optional on EvidenceRecord",
+      "type": "string"
+    },
+    "RecordKind": {
+      "description": "The fourteen closed record kinds `canon-model` recognizes (design D1;\n`Subject` is the reviewed 13th kind, added by s36, and `Finding` the\nreviewed 14th, added by s43 — the \"a new kind is a reviewed, breaking\n`canon-model` change\" process design D1 mandates, exercised twice for\nreal). A fifteenth kind is again a reviewed, breaking\nchange — never a `kind: String` escape hatch (design D1's explicitly\nrejected alternative: an untyped `payload: serde_json::Value` would\nsilently recreate the \"no documented join key\" problem inside canon\nitself).",
+      "type": "string",
+      "enum": [
+        "change",
+        "task",
+        "scenario",
+        "session",
+        "run",
+        "event",
+        "handoff",
+        "review",
+        "divergence",
+        "trajectory",
+        "strategy_item",
+        "evidence",
+        "subject",
+        "finding"
+      ]
+    },
+    "ReportFormat": {
+      "description": "The machine-readable test-report formats `canon evidence add\n--report` parses (experimental evidence binding). Canon never runs a\ntest; it reads the report the team's own runner already wrote.",
+      "oneOf": [
+        {
+          "description": "JUnit XML — emitted or convertible from nearly every ecosystem.",
+          "type": "string",
+          "const": "junit"
+        },
+        {
+          "description": "Cucumber JSON — Gherkin runners; scenario tags travel in it.",
+          "type": "string",
+          "const": "cucumber"
+        },
+        {
+          "description": "Swift Testing's JSON-lines event stream (`swift test\n--experimental-event-stream-output <path>`): the scenario id is\nread from a test's display name, else its function name.",
+          "type": "string",
+          "const": "swift-testing"
+        }
+      ]
+    },
+    "ReportOutcome": {
+      "description": "The outcome a parsed report records for the case an attachment names.",
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
+        "skipped"
+      ]
+    },
+    "RoleId": {
+      "description": "kebab-case role slug (`[a-z0-9]+(-[a-z0-9]+)*`), e.g. `implementer`, `reviewer` — joins: not a join-spine key; used by `Actor.role` and `regime_key`'s `<role>` segment",
+      "type": "string"
+    },
+    "RunId": {
+      "description": "ULID (Crockford base32, 26 chars) — joins: run ↔ events ↔ manifest",
+      "type": "string",
+      "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$"
+    },
+    "ScenarioId": {
+      "description": "`<area>.<surface>.<nn>` — `[a-z0-9-]+\\.[a-z0-9-]+\\.\\d{2,}`; never renumbered once assigned — joins: spec ↔ test ↔ ledger ↔ divergence",
+      "type": "string"
+    },
+    "SessionId": {
+      "description": "opaque, non-empty agent-CLI session token; derivation source varies by adapter (Claude Code/Codex: transcript filename stem; omp/pi: in-file header `id` field) — this type validates shape only, never a single fixed format — joins: session ↔ cost ↔ run ↔ trajectory",
+      "type": "string"
+    },
+    "Sha": {
+      "description": "git commit SHA-1: exactly 40 lowercase hex characters — joins: reward signals ↔ trajectory",
+      "type": "string"
+    },
+    "TaskId": {
+      "description": "`<change_id>#<n>`, where `<n>` is one or more dot-separated integers (`1`, `1.1`, `6.2`) matching `tasks.md`'s own numbering — joins: task ↔ evidence ↔ trajectory",
+      "type": "string"
+    },
+    "TotalOrder": {
+      "description": "monotonic fold-ordering rank (e.g. Divergence.run_seq) — the SOLE primary sort key within a fold group; never compared against a round tiebreak",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "TrustLifecycle": {
+      "description": "The three-rung evidence lifecycle — exactly one per artifact, never\na fourth \"flagged\" rung ([`FlaggedOverlay`] is an orthogonal\noverlay, not a lifecycle state). Unlike the donor's freeform\n`@draft`/`@reviewed`/`@ratified` tags (which can co-occur), a typed\nRust enum makes \"two lifecycle tags at once\" structurally\nimpossible.",
+      "type": "string",
+      "enum": [
+        "draft",
+        "reviewed",
+        "ratified"
+      ]
+    },
+    "WaivedViolation": {
+      "description": "One violation a [`StatusOverride`] let through: the gate failure\nclass (`unreviewed-promotion`, `open-blocker`) and the violation's\nsubject (a scenario id, or `<change_id>#<round>.<seq>` for a\nblocker), as `canon gate check` prints them.",
+      "type": "object",
+      "properties": {
+        "class": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "class",
+        "subject"
+      ]
+    }
+  }
+}

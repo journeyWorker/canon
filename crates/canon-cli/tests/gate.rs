@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use canon_model::{
-    approval_payload_bytes, Actor, Envelope, EvidenceApproval, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord, RecordKind, RoleId, RunId,
+    approval_payload_bytes, ApprovalPayload, Actor, Envelope, EvidenceApproval, EvidenceRecord, EvidenceVerdict, ProjectId, RawRecord, RecordKind, RoleId, RunId,
     Sha, TaskId, APPROVAL_NAMESPACE,
 };
 use canon_store::git_tier::GitTier;
@@ -31,7 +31,7 @@ fn stderr(output: &Output) -> String {
 }
 
 fn write_evidence(ledger_root: &Path, task_id: &str, role: &str, verdict: EvidenceVerdict) {
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("it-agent", RoleId::parse(role).unwrap()));
+    let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("it-agent", RoleId::parse(role).unwrap()));
     let record = EvidenceRecord::new(envelope, Some(TaskId::parse(task_id).unwrap()), None, None, verdict);
     GitTier::new(ledger_root).write(&record).expect("write evidence record");
 }
@@ -96,11 +96,11 @@ fn gate_check_names_the_file_of_a_schema_invalid_evidence_record() {
     let dir = tempfile::tempdir().unwrap();
     write_canon_yaml(dir.path());
     let ledger_root = dir.path().join(".canon/ledger");
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("it-agent", RoleId::parse("implementer").unwrap()));
+    let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("it-agent", RoleId::parse("implementer").unwrap()));
     let record = EvidenceRecord::new(envelope, Some(TaskId::parse("seed-change#1").unwrap()), None, None, EvidenceVerdict::Faithful);
     let mut body = serde_json::to_value(&record).unwrap();
     body["verdict"] = serde_json::json!("maybe");
-    let relative = canon_store::partition::expected_relative_path(RecordKind::EvidenceRecord, &body).unwrap();
+    let relative = canon_store::partition::expected_relative_path(RecordKind::Evidence, &body).unwrap();
     std::fs::create_dir_all(ledger_root.join(&relative).parent().unwrap()).unwrap();
     std::fs::write(ledger_root.join(&relative), serde_json::to_vec_pretty(&body).unwrap()).unwrap();
 
@@ -166,7 +166,7 @@ fn gate_check_release_flag_engages_release_trust_check_but_ordinary_run_stays_si
     // P3b); `class` stays a raw companion key (never migrated).
     let ledger_root = dir.path().join(".canon/ledger");
     std::fs::create_dir_all(&ledger_root).unwrap();
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("it-agent", RoleId::parse("implementer").unwrap()));
+    let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("it-agent", RoleId::parse("implementer").unwrap()));
     let record = EvidenceRecord::new(envelope, Some(TaskId::parse("seed-change#1").unwrap()), None, None, EvidenceVerdict::Faithful).with_lifecycle(canon_model::TrustLifecycle::Reviewed);
     let mut body = serde_json::to_value(&record).unwrap();
     body.as_object_mut().unwrap().insert("class".to_string(), serde_json::json!("p1"));
@@ -215,6 +215,14 @@ fn gate_check_from_a_subdirectory_resolves_the_ancestor_repo_root() {
     assert!(stdout(&output).contains("uncovered-cell"), "{}", stdout(&output));
 }
 // ── risk approval integration ──
+
+/// Which task, artifact, run and moment a record or approval is written for.
+struct Stamp<'a> {
+    task: &'a str,
+    artifact: &'a str,
+    run_id: RunId,
+    at: chrono::DateTime<Utc>,
+}
 
 struct RiskRepo {
     root: tempfile::TempDir,
@@ -303,20 +311,12 @@ impl RiskRepo {
         run_canon(&["gate", "check", "--repo", "."], self.root.path())
     }
 
-    fn write_record(
-        &self,
-        task: &str,
-        artifact: &str,
-        run_id: RunId,
-        at: chrono::DateTime<Utc>,
-        verdict: EvidenceVerdict,
-        surface: Vec<String>,
-        approvals: Vec<EvidenceApproval>,
-    ) {
+    fn write_record(&self, stamp: Stamp<'_>, verdict: EvidenceVerdict, surface: Vec<String>, approvals: Vec<EvidenceApproval>) {
+        let Stamp { task, artifact, run_id, at } = stamp;
         let approvals = if approvals.is_empty() { vec![None] } else { approvals.into_iter().map(Some).collect() };
         for approval in approvals {
             let mut record = EvidenceRecord::new(
-                Envelope::new(1, RecordKind::EvidenceRecord, at, Actor::new("risk-test", RoleId::parse("implementer").unwrap())),
+                Envelope::new(1, RecordKind::Evidence, at, Actor::new("risk-test", RoleId::parse("implementer").unwrap())),
                 Some(TaskId::parse(task).unwrap()),
                 None,
                 Some(run_id),
@@ -332,29 +332,21 @@ impl RiskRepo {
         }
     }
 
-    fn approval(
-        &self,
-        signer: &str,
-        key: &Path,
-        subject: &str,
-        artifact: &str,
-        run_id: RunId,
-        at: chrono::DateTime<Utc>,
-        surface: &[String],
-    ) -> EvidenceApproval {
+    fn approval(&self, signer: &str, key: &Path, stamp: Stamp<'_>, surface: &[String]) -> EvidenceApproval {
+        let Stamp { task: subject, artifact, run_id, at } = stamp;
         let project = "risk-project";
         let effects: Vec<String> = Vec::new();
-        let payload = approval_payload_bytes(
-            APPROVAL_NAMESPACE,
+        let payload = approval_payload_bytes(&ApprovalPayload {
+            namespace: APPROVAL_NAMESPACE,
             subject,
-            Some(project),
-            artifact,
-            Some(&run_id.to_string()),
+            project: Some(project),
+            artifact_sha: artifact,
+            run_id: Some(&run_id.to_string()),
             surface,
-            &effects,
-            signer,
-            &at,
-        );
+            effects: &effects,
+            actor: signer,
+            timestamp: &at,
+        });
         let payload_file = tempfile::NamedTempFile::new_in(self.root.path()).unwrap();
         std::fs::write(payload_file.path(), payload).unwrap();
         let output = Command::new("ssh-keygen")
@@ -431,7 +423,7 @@ fn risk_gate_rejects_zero_and_one_signer_then_accepts_two_distinct_ssh_signers()
     let signed_paths = normalized_for_signature(&paths);
 
     repo.reset_ledger();
-    repo.write_record(task, &repo.auth_sha, run, Utc::now(), EvidenceVerdict::Faithful, paths.clone(), Vec::new());
+    repo.write_record(Stamp { task, artifact: &repo.auth_sha, run_id: run, at: Utc::now() }, EvidenceVerdict::Faithful, paths.clone(), Vec::new());
     let zero = repo.gate();
     assert_eq!(zero.status.code(), Some(1), "zero approvals must gate-red: {}", stdout(&zero));
     assert!(stdout(&zero).contains("risk tier `high`"), "{}", stdout(&zero));
@@ -440,17 +432,17 @@ fn risk_gate_rejects_zero_and_one_signer_then_accepts_two_distinct_ssh_signers()
 
     repo.reset_ledger();
     let one_at = Utc::now();
-    let alice = repo.approval("alice", &repo.alice, task, &repo.auth_sha, run, one_at, &signed_paths);
-    repo.write_record(task, &repo.auth_sha, run, one_at, EvidenceVerdict::Faithful, paths.clone(), vec![alice]);
+    let alice = repo.approval("alice", &repo.alice, Stamp { task, artifact: &repo.auth_sha, run_id: run, at: one_at }, &signed_paths);
+    repo.write_record(Stamp { task, artifact: &repo.auth_sha, run_id: run, at: one_at }, EvidenceVerdict::Faithful, paths.clone(), vec![alice]);
     let one = repo.gate();
     assert_eq!(one.status.code(), Some(1), "one approval must gate-red: {}", stdout(&one));
     assert!(stdout(&one).contains("observed 1"), "{}", stdout(&one));
 
     repo.reset_ledger();
     let agent_at = Utc::now();
-    let mut agent = repo.approval("alice", &repo.alice, task, &repo.auth_sha, run, agent_at, &signed_paths);
+    let mut agent = repo.approval("alice", &repo.alice, Stamp { task, artifact: &repo.auth_sha, run_id: run, at: agent_at }, &signed_paths);
     agent.role = RoleId::parse("agent").unwrap();
-    repo.write_record(task, &repo.auth_sha, run, agent_at, EvidenceVerdict::Faithful, paths.clone(), vec![agent]);
+    repo.write_record(Stamp { task, artifact: &repo.auth_sha, run_id: run, at: agent_at }, EvidenceVerdict::Faithful, paths.clone(), vec![agent]);
     let agent_only = repo.gate();
     assert_eq!(agent_only.status.code(), Some(1), "agent approval must not satisfy the human tier: {}", stdout(&agent_only));
     assert!(stdout(&agent_only).contains("observed 0"), "{}", stdout(&agent_only));
@@ -460,19 +452,19 @@ fn risk_gate_rejects_zero_and_one_signer_then_accepts_two_distinct_ssh_signers()
     // otherwise both records are byte-identical and collapse into one.
     repo.reset_ledger();
     let duplicate_at = Utc::now();
-    let alice_one = repo.approval("alice", &repo.alice, task, &repo.auth_sha, run, duplicate_at, &signed_paths);
+    let alice_one = repo.approval("alice", &repo.alice, Stamp { task, artifact: &repo.auth_sha, run_id: run, at: duplicate_at }, &signed_paths);
     let alice_two =
-        repo.approval("alice", &repo.alice, task, &repo.auth_sha, run, duplicate_at + chrono::Duration::seconds(1), &signed_paths);
-    repo.write_record(task, &repo.auth_sha, run, duplicate_at, EvidenceVerdict::Faithful, paths.clone(), vec![alice_one, alice_two]);
+        repo.approval("alice", &repo.alice, Stamp { task, artifact: &repo.auth_sha, run_id: run, at: duplicate_at + chrono::Duration::seconds(1) }, &signed_paths);
+    repo.write_record(Stamp { task, artifact: &repo.auth_sha, run_id: run, at: duplicate_at }, EvidenceVerdict::Faithful, paths.clone(), vec![alice_one, alice_two]);
     let duplicate = repo.gate();
     assert_eq!(duplicate.status.code(), Some(1), "the same signer twice must not satisfy distinct approvals: {}", stdout(&duplicate));
     assert!(stdout(&duplicate).contains("observed 1"), "{}", stdout(&duplicate));
 
     repo.reset_ledger();
     let two_at = Utc::now();
-    let alice = repo.approval("alice", &repo.alice, task, &repo.auth_sha, run, two_at, &signed_paths);
-    let bob = repo.approval("bob", &repo.bob, task, &repo.auth_sha, run, two_at, &signed_paths);
-    repo.write_record(task, &repo.auth_sha, run, two_at, EvidenceVerdict::Faithful, paths, vec![alice, bob]);
+    let alice = repo.approval("alice", &repo.alice, Stamp { task, artifact: &repo.auth_sha, run_id: run, at: two_at }, &signed_paths);
+    let bob = repo.approval("bob", &repo.bob, Stamp { task, artifact: &repo.auth_sha, run_id: run, at: two_at }, &signed_paths);
+    repo.write_record(Stamp { task, artifact: &repo.auth_sha, run_id: run, at: two_at }, EvidenceVerdict::Faithful, paths, vec![alice, bob]);
     let two = repo.gate();
     assert!(two.status.success(), "two distinct authenticated signers must pass: stdout={} stderr={}", stdout(&two), stderr(&two));
     assert!(stdout(&two).contains("clean"), "{}", stdout(&two));
@@ -487,13 +479,13 @@ fn risk_gate_rejects_tampered_signature_old_artifact_and_divergent_generation() 
     let paths = changed_paths(repo.root.path(), &repo.auth_sha);
     let signed_paths = normalized_for_signature(&paths);
     let at = Utc::now();
-    let mut alice = repo.approval("alice", &repo.alice, task, &repo.auth_sha, run, at, &signed_paths);
+    let mut alice = repo.approval("alice", &repo.alice, Stamp { task, artifact: &repo.auth_sha, run_id: run, at }, &signed_paths);
     let signature = alice.signature.as_mut().unwrap();
     let body_start = signature.find('\n').unwrap() + 1;
     let replacement = if signature.as_bytes()[body_start] == b'A' { "B" } else { "A" };
     signature.replace_range(body_start..body_start + 1, replacement);
-    let bob = repo.approval("bob", &repo.bob, task, &repo.auth_sha, run, at, &signed_paths);
-    repo.write_record(task, &repo.auth_sha, run, at, EvidenceVerdict::Faithful, paths, vec![alice, bob]);
+    let bob = repo.approval("bob", &repo.bob, Stamp { task, artifact: &repo.auth_sha, run_id: run, at }, &signed_paths);
+    repo.write_record(Stamp { task, artifact: &repo.auth_sha, run_id: run, at }, EvidenceVerdict::Faithful, paths, vec![alice, bob]);
     let tampered = repo.gate();
     assert_eq!(tampered.status.code(), Some(1), "tampered signature must gate-red: {}", stdout(&tampered));
     assert!(stdout(&tampered).contains("observed 1"), "{}", stdout(&tampered));
@@ -503,9 +495,9 @@ fn risk_gate_rejects_tampered_signature_old_artifact_and_divergent_generation() 
     let old_paths = changed_paths(repo.root.path(), &repo.initial_sha);
     let old_signed_paths = normalized_for_signature(&old_paths);
     let old_at = Utc::now();
-    let alice = repo.approval("alice", &repo.alice, task, &repo.initial_sha, run, old_at, &old_signed_paths);
-    let bob = repo.approval("bob", &repo.bob, task, &repo.initial_sha, run, old_at, &old_signed_paths);
-    repo.write_record(task, &repo.initial_sha, run, old_at, EvidenceVerdict::Faithful, old_paths, vec![alice, bob]);
+    let alice = repo.approval("alice", &repo.alice, Stamp { task, artifact: &repo.initial_sha, run_id: run, at: old_at }, &old_signed_paths);
+    let bob = repo.approval("bob", &repo.bob, Stamp { task, artifact: &repo.initial_sha, run_id: run, at: old_at }, &old_signed_paths);
+    repo.write_record(Stamp { task, artifact: &repo.initial_sha, run_id: run, at: old_at }, EvidenceVerdict::Faithful, old_paths, vec![alice, bob]);
     let old = repo.gate();
     assert_eq!(old.status.code(), Some(1), "old artifact must gate-red: {}", stdout(&old));
     assert!(stdout(&old).contains("stale-evidence"), "{}", stdout(&old));
@@ -516,10 +508,10 @@ fn risk_gate_rejects_tampered_signature_old_artifact_and_divergent_generation() 
     let signed_paths = normalized_for_signature(&paths);
     let divergent_at = Utc::now();
     let faithful_at = divergent_at - Duration::seconds(1);
-    let alice = repo.approval("alice", &repo.alice, task, &repo.auth_sha, run, faithful_at, &signed_paths);
-    let bob = repo.approval("bob", &repo.bob, task, &repo.auth_sha, run, faithful_at, &signed_paths);
-    repo.write_record(task, &repo.auth_sha, run, faithful_at, EvidenceVerdict::Faithful, paths.clone(), vec![alice, bob]);
-    repo.write_record(task, &repo.auth_sha, run, divergent_at, EvidenceVerdict::Divergent, paths, Vec::new());
+    let alice = repo.approval("alice", &repo.alice, Stamp { task, artifact: &repo.auth_sha, run_id: run, at: faithful_at }, &signed_paths);
+    let bob = repo.approval("bob", &repo.bob, Stamp { task, artifact: &repo.auth_sha, run_id: run, at: faithful_at }, &signed_paths);
+    repo.write_record(Stamp { task, artifact: &repo.auth_sha, run_id: run, at: faithful_at }, EvidenceVerdict::Faithful, paths.clone(), vec![alice, bob]);
+    repo.write_record(Stamp { task, artifact: &repo.auth_sha, run_id: run, at: divergent_at }, EvidenceVerdict::Divergent, paths, Vec::new());
     let divergent = repo.gate();
     assert_eq!(divergent.status.code(), Some(1), "divergent generation must gate-red: {}", stdout(&divergent));
     assert!(stdout(&divergent).contains("current faithful verdict"), "{}", stdout(&divergent));
@@ -531,7 +523,7 @@ fn risk_gate_accepts_a_known_unaffected_docs_artifact_without_approvals() {
     let task = "risk-docs#1";
     let run = RunId::parse("01ARZ3NDEKTSV4RRFFQ69G5FAX").unwrap();
     let paths = changed_paths(repo.root.path(), &repo.docs_sha);
-    repo.write_record(task, &repo.docs_sha, run, Utc::now(), EvidenceVerdict::Faithful, paths, Vec::new());
+    repo.write_record(Stamp { task, artifact: &repo.docs_sha, run_id: run, at: Utc::now() }, EvidenceVerdict::Faithful, paths, Vec::new());
     let output = repo.gate();
     assert!(output.status.success(), "known unaffected docs must be accepted without risk approvals: stdout={} stderr={}", stdout(&output), stderr(&output));
     assert!(stdout(&output).contains("clean"), "{}", stdout(&output));
@@ -737,7 +729,7 @@ fn seed_vocab_core(repo: &Path) {
 /// own doc: silently dropped by `EvidenceRecord`'s strict `Deserialize`,
 /// same established companion pattern as `trust_ladder`/`evidence_sha`).
 fn write_typed_evidence(ledger_root: &Path, task_id: &str, role: &str, verdict: EvidenceVerdict, kind: &str, evidence_ref: &str) {
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("it-agent", RoleId::parse(role).unwrap()));
+    let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("it-agent", RoleId::parse(role).unwrap()));
     let record = EvidenceRecord::new(envelope, Some(TaskId::parse(task_id).unwrap()), None, None, verdict);
     let mut body = serde_json::to_value(&record).unwrap();
     body.as_object_mut().unwrap().insert("evidence".to_string(), serde_json::json!({"kind": kind, "ref": evidence_ref}));
@@ -749,7 +741,7 @@ fn write_typed_evidence(ledger_root: &Path, task_id: &str, role: &str, verdict: 
 /// `canon_gate::evidence_note_of` reads, independent of the `evidence:
 /// {kind, ref}` typed-path companion `write_typed_evidence` itself adds.
 fn write_typed_evidence_with_note(ledger_root: &Path, task_id: &str, role: &str, verdict: EvidenceVerdict, kind: &str, evidence_ref: &str, note_summary: &str) {
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("it-agent", RoleId::parse(role).unwrap()));
+    let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("it-agent", RoleId::parse(role).unwrap()));
     let record = EvidenceRecord::new(envelope, Some(TaskId::parse(task_id).unwrap()), None, None, verdict);
     let mut body = serde_json::to_value(&record).unwrap();
     let obj = body.as_object_mut().unwrap();
@@ -902,10 +894,10 @@ fn gate_promote_assigns_a_run_seq_and_lands_the_record_in_the_committed_tier() {
     let text = stdout(&output);
     assert!(text.contains("run_seq=1"), "{text}");
 
-    let committed = GitTier::new(&ledger_root).read(&canon_store::tier::TierQuery::kind(RecordKind::EvidenceRecord)).expect("read committed tier");
+    let committed = GitTier::new(&ledger_root).read(&canon_store::tier::TierQuery::kind(RecordKind::Evidence)).expect("read committed tier");
     assert_eq!(committed.records.len(), 1, "the promoted record must land in the committed tier");
 
-    let staged_remaining = GitTier::new(ledger_root.join("_staging")).read(&canon_store::tier::TierQuery::kind(RecordKind::EvidenceRecord)).expect("read staging tier");
+    let staged_remaining = GitTier::new(ledger_root.join("_staging")).read(&canon_store::tier::TierQuery::kind(RecordKind::Evidence)).expect("read staging tier");
     assert!(staged_remaining.records.is_empty(), "a promoted staging file must be deleted");
 }
 
@@ -919,9 +911,9 @@ fn gate_promote_dry_run_writes_nothing() {
     assert!(output.status.success());
     assert!(stdout(&output).contains("would promote"), "{}", stdout(&output));
 
-    let committed = GitTier::new(&ledger_root).read(&canon_store::tier::TierQuery::kind(RecordKind::EvidenceRecord)).expect("read committed tier");
+    let committed = GitTier::new(&ledger_root).read(&canon_store::tier::TierQuery::kind(RecordKind::Evidence)).expect("read committed tier");
     assert!(committed.records.is_empty(), "--dry-run must never write to the committed tier");
-    let staged = GitTier::new(ledger_root.join("_staging")).read(&canon_store::tier::TierQuery::kind(RecordKind::EvidenceRecord)).expect("read staging tier");
+    let staged = GitTier::new(ledger_root.join("_staging")).read(&canon_store::tier::TierQuery::kind(RecordKind::Evidence)).expect("read staging tier");
     assert_eq!(staged.records.len(), 1, "--dry-run must never delete the staging file");
 }
 
@@ -996,7 +988,7 @@ fn repo_with_spec_corpus() -> tempfile::TempDir {
     git_seed(dir.path());
     std::fs::write(
         dir.path().join("canon.yaml"),
-        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  scenario: local\n  subject: local\n  divergence: local\n  evidence_record: local\nspecs:\n  roots:\n    - id: core\n      root: specs\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  scenario: local\n  subject: local\n  divergence: local\n  evidence: local\nspecs:\n  roots:\n    - id: core\n      root: specs\n",
     )
     .unwrap();
     let features = dir.path().join("specs/kind=feature/area=core");
@@ -1150,7 +1142,7 @@ fn evidence_files(ledger_root: &Path) -> Vec<PathBuf> {
             let path = entry.path();
             if path.is_dir() {
                 walk(&path, out);
-            } else if path.components().any(|c| c.as_os_str() == "kind=evidence_record") {
+            } else if path.components().any(|c| c.as_os_str() == "kind=evidence") {
                 out.push(path);
             }
         }
@@ -1259,7 +1251,7 @@ fn evidence_add_still_accepts_a_task_keyed_record() {
     // task`'s own resolution.
     std::fs::write(
         dir.path().join("canon.yaml"),
-        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  evidence_record: local\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec/changes\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  evidence: local\nplans:\n  sources:\n    - dialect: openspec\n      root: openspec/changes\n",
     )
     .unwrap();
     let change = dir.path().join("openspec/changes/it-task-keyed");

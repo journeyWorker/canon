@@ -51,6 +51,7 @@ use crate::artifact_adapter::{
     ArtifactAdapter, ArtifactEvent, ArtifactEventKind, ArtifactJoinKey, ArtifactParseOutcome, ArtifactSourceConfig, ArtifactSourceHandle,
 };
 
+#[derive(Debug)]
 pub struct ReviewFlywheelAdapter;
 
 impl ReviewFlywheelAdapter {
@@ -179,7 +180,7 @@ mod tests {
         assert_eq!(event.kind, ArtifactEventKind::NonVerdict);
         assert_eq!(event.join_key, ArtifactJoinKey::Scenario(ScenarioId::parse("world.firstbuy-hotdeal.26").unwrap()));
         assert_eq!(event.area.as_deref(), Some("world"));
-        assert_eq!(event.authoring_role.as_ref().map(|r| r.as_str()), Some("dev"));
+        assert_eq!(event.authoring_role.as_ref().map(canon_model::RoleId::as_str), Some("dev"));
         assert_eq!(event.detail["native_kind"], "review");
     }
 

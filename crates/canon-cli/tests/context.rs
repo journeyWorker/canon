@@ -61,8 +61,8 @@ fn context_exits_zero_with_a_full_surface_even_when_the_corpus_fails_fmt_check()
     assert!(json_output.status.success(), "canon context --json must also exit 0 against a violating corpus");
     let json: serde_json::Value = serde_json::from_slice(&json_output.stdout).expect("--json output must parse as JSON");
     let json = json["data"].clone();
-    assert_eq!(json["kinds"].as_object().map(|o| o.len()), Some(14), "JSON surface must list all fourteen kinds");
-    assert_eq!(json["cel"].as_object().map(|o| o.len()), Some(14), "JSON surface must carry a per-kind cel section for all fourteen kinds");
+    assert_eq!(json["kinds"].as_object().map(serde_json::Map::len), Some(14), "JSON surface must list all fourteen kinds");
+    assert_eq!(json["cel"].as_object().map(serde_json::Map::len), Some(14), "JSON surface must carry a per-kind cel section for all fourteen kinds");
     let task_cel = &json["cel"]["task"];
     assert!(task_cel["fields"].as_object().is_some_and(|f| !f.is_empty()), "cel.task.fields must be non-empty: {json}");
     assert!(task_cel["functions"].as_array().is_some_and(|f| !f.is_empty()), "cel.task.functions must be non-empty: {json}");

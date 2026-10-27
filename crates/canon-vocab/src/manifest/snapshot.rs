@@ -109,7 +109,6 @@ impl CapabilitySnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manifest::schema::DirectiveDecl;
     use crate::manifest::types::{AttrDecl, Type};
 
     fn snapshot_with_task_directive() -> CapabilitySnapshot {

@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-26T09:52:56.267831337Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "verifying",
+  "subject_id": "inventory-sync",
+  "summary": "",
+  "title": "Inventory: validated spec corpus into the scenario ledger"
+}

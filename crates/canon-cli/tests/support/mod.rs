@@ -10,13 +10,13 @@
 //! a subset of these helpers, so per-binary dead-code warnings are
 //! expected and suppressed here rather than by padding every test file
 //! with calls it doesn't otherwise need.
-#![allow(dead_code)]
+#![expect(dead_code, reason = "each test binary that includes this module uses a subset")]
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use canon_model::envelope::{Actor, Envelope, RecordKind};
-use canon_model::handoff::{DomainId, Handoff, HandoffBody};
+use canon_model::handoff::{DomainId, Handoff, HandoffBody, HandoffFields};
 use canon_model::ids::{ChangeId, HandoffId, ProjectId, RoleId, RunId, ScenarioId, SpecDigest, TaskId};
 use canon_model::records::{Change, ChangeStatus, ProvenanceRef, Review, Scenario, Task, TaskStatus, Trajectory};
 use canon_store::git_tier::GitTier;
@@ -133,7 +133,7 @@ impl Fixture {
         let git = GitTier::new(self.git_root());
         let body = HandoffBody { domain: DomainId::parse("기획").unwrap(), template_version: 1, fields: serde_json::json!({"tag": content_tag}) };
         let record =
-            Handoff::new(Envelope::new(1, RecordKind::Handoff, at, actor()), HandoffId::parse(id).unwrap(), uuid::Uuid::new_v4(), None, 1, content_tag, None, body);
+            Handoff::new(HandoffFields { envelope: Envelope::new(1, RecordKind::Handoff, at, actor()), id: HandoffId::parse(id).unwrap(), chain_id: uuid::Uuid::new_v4(), parent_handoff_id: None, seq: 1, title: content_tag.to_string(), openspec_change_slug: None, body });
         git.write(&record).unwrap()
     }
 
@@ -175,7 +175,7 @@ impl Fixture {
     /// appended after the subcommand path, never before it.
     pub fn run_canon(&self, subcommand_args: &[&str]) -> Output {
         let bin = Path::new(env!("CARGO_BIN_EXE_canon"));
-        let mut args: Vec<String> = subcommand_args.iter().map(|s| s.to_string()).collect();
+        let mut args: Vec<String> = subcommand_args.iter().map(std::string::ToString::to_string).collect();
         args.push("--repo".to_string());
         args.push(self.root.path().display().to_string());
         Command::new(bin).args(&args).env("CANON_R2_LOCAL_ROOT", self.r2_root()).output().expect("spawning the built `canon` binary")

@@ -83,7 +83,7 @@ fn check_reports_drift_when_new_evidence_lands_after_the_committed_write() {
     use canon_store::tier::Tier;
     let tier = GitTier::new(in_.roots.git_root.clone());
     tier.write(&EvidenceRecord::new(
-        Envelope::new(1, RecordKind::EvidenceRecord, chrono::Utc::now(), Actor::new("late-agent", RoleId::parse("dev").unwrap())),
+        Envelope::new(1, RecordKind::Evidence, chrono::Utc::now(), Actor::new("late-agent", RoleId::parse("dev").unwrap())),
         Some(TaskId::parse("s9-fixture#3").unwrap()),
         None,
         None,

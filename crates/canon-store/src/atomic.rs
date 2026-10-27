@@ -30,7 +30,7 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, format!("write_atomic: path has no parent directory: {}", path.display())))?;
     std::fs::create_dir_all(dir)?;
 
-    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
     let tmp_name = format!(
         "{}.tmp.{}.{:x}",
         path.file_name().and_then(|f| f.to_str()).unwrap_or("canon-store-record"),

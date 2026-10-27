@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26"
+  },
+  "at": "2026-10-26T19:41:01.484891119Z",
+  "attachments": [
+    {
+      "case": "gate_check_105_gate_install_hooks_writes_the_hook_commands_and_the_pre_commit_script_and_a_second_run_writes_nothing",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/030-junit-canon.xml",
+      "sha256": "3311b701b05709376c4e9249c8ab4219c5603d65062d022a77fe5f84d07e8e47"
+    }
+  ],
+  "code_tree": "86779563bdaf9bb2a2dfff7f4bc7cd6f8f2b60a7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/030-junit-canon.xml"
+  },
+  "evidence_sha": "bdf0ac42680d33c7a44b528115190303445447ab",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 103,
+  "scenario_id": "gate.check.105",
+  "schema": 1,
+  "staging_id": "198221f5",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

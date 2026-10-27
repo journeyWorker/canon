@@ -712,7 +712,7 @@ fn deterministic_run_id(session_id: &SessionId, agent_id: Option<&str>, started_
     }
     let digest = hasher.finalize();
     let random = u128::from_be_bytes(digest[0..16].try_into().expect("sha256 digest is >= 16 bytes"));
-    let ulid = ulid::Ulid::from_parts(started_at_ms.max(0) as u64, random);
+    let ulid = ulid::Ulid::from_parts(started_at_ms.max(0).cast_unsigned(), random);
     RunId::parse(ulid.to_string()).expect("Ulid::to_string always yields a valid RunId grammar")
 }
 
@@ -753,7 +753,7 @@ pub fn normalize_workspace_key(raw: &str) -> Option<String> {
 /// The last non-empty path segment of an already-normalized workspace
 /// key — ported verbatim from the donor's `workspace_label_from_key`.
 pub fn workspace_label_from_key(key: &str) -> Option<String> {
-    key.rsplit('/').find(|segment| !segment.is_empty()).map(|segment| segment.to_string())
+    key.rsplit('/').find(|segment| !segment.is_empty()).map(std::string::ToString::to_string)
 }
 
 /// A stable sha256-derived content digest over a normalized record's
@@ -764,7 +764,7 @@ pub fn workspace_label_from_key(key: &str) -> Option<String> {
 /// the storage layer). `serde_json::to_value` on any of this crate's
 /// output types serializes `serde_json::Map` as a `BTreeMap` (no
 /// `preserve_order` feature anywhere in this workspace — same
-/// invariant `canon-store::partition::content_digest12` relies on), so
+/// invariant `canon-store::partition::content_digest` relies on), so
 /// key order never perturbs the digest.
 pub fn content_digest(value: &serde_json::Value) -> String {
     let canonical = serde_json::to_vec(value).expect("serde_json::Value always serializes");
@@ -1103,7 +1103,7 @@ mod tests {
         assert_eq!(detail["captured_chars"], 3);
         assert_eq!(detail["redaction_counts"]["secret"], 0);
         assert_eq!(detail["redaction_counts"]["pii"], 0);
-        assert_eq!(detail["text"].as_str().unwrap().chars().count(), detail["captured_chars"].as_u64().unwrap() as usize);
+        assert_eq!(detail["text"].as_str().unwrap().chars().count(), usize::try_from(detail["captured_chars"].as_u64().unwrap()).unwrap());
     }
 
     #[test]

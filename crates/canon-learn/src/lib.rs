@@ -130,13 +130,13 @@ pub mod write;
 
 pub use config::{DemotionConfig, LearnConfig, PromotionMode, PromotionRoleConfig};
 pub use distill::{distill_namespace, distill_trajectory};
-pub use error::LearnError;
+pub use error::{LearnError, PromotionEvidenceError};
 pub use guidance::{DEFAULT_K, manifest_guidance_for_replay, retrieve_first_nonempty, retrieve_guidance};
 pub use ids::{StrategyId, StrategyIdentity, TrajectoryId};
 pub use mark_verdict::mark_trajectory_verdict;
 pub use promotion::{
-    CrnPromotionGate, DemotionPolicy, DemotionRecord, OccurrencePromotionGate, Promotion, PromotionApproval, PromotionDecision,
-    PromotionEvaluation, PromotionGate, RollbackRecord, demote_strategy, evaluate_now, plan_promotion, promote_strategy,
+    AuthenticatedRollback, CrnPromotionGate, DemotionPolicy, DemotionRecord, OccurrencePromotionGate, Promotion, PromotionApproval, PromotionDecision,
+    PromotionEvaluation, PromotionEvaluationFields, PromotionGate, RollbackRecord, demote_strategy, evaluate_now, plan_promotion, promote_strategy,
     promote_strategy_approved, rollback_strategy, rollback_strategy_authenticated,
 };
 pub use rebuild::rebuild_namespace;
@@ -144,7 +144,7 @@ pub use retrieve::retrieve;
 pub use reward::{RewardFn, RewardRegistry};
 pub use role::RoleRegistry;
 pub use store::{ParquetStrategyStore, ParquetTrajectoryStore, StrategyStore, TrajectoryStore};
-pub use strategy::{DemotionEvidence, StrategyItem, StrategyLifecycle};
+pub use strategy::{DemotionEvidence, StrategyItem, StrategyItemFields, StrategyLifecycle};
 pub use trajectory::Trajectory;
 pub use verdict_outcome::{TrajectoryVerdict, VerdictOutcome};
 pub use webhook::{

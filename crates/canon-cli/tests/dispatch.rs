@@ -16,7 +16,7 @@ use std::path::Path;
 use std::process::Command;
 
 use canon_learn::{
-    demote_strategy, manifest_guidance_for_replay, retrieve_guidance, DemotionPolicy, ParquetStrategyStore, StrategyId, StrategyItem,
+    demote_strategy, manifest_guidance_for_replay, retrieve_guidance, DemotionPolicy, ParquetStrategyStore, StrategyId, StrategyItem, StrategyItemFields,
     StrategyStore, TrajectoryId,
 };
 use canon_model::ids::{RegimeKey, RoleId};
@@ -33,7 +33,7 @@ fn seed(repo: &Path, content: &str) -> StrategyId {
     let store = strategy_store(repo);
     let id = StrategyId::new();
     let rk = RegimeKey::parse(REGIME).unwrap();
-    let item = StrategyItem::new(id, rk, RoleId::parse("dev").unwrap(), "guidance", "one-liner", content, vec![TrajectoryId::new()], Utc::now());
+    let item = StrategyItem::new(StrategyItemFields { id, regime_key: rk, role: RoleId::parse("dev").unwrap(), title: "guidance".into(), description: "one-liner".into(), content: content.into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() });
     store.append(&item).unwrap();
     id
 }

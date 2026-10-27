@@ -49,6 +49,7 @@ use std::process::ExitCode;
 /// One registered suite's outcome: `passed` counts the independent
 /// fixture checks that cleared; `failures` carries one human-readable
 /// line per failing check (empty ⇒ the suite is clean).
+#[derive(Debug)]
 pub struct SuiteResult {
     pub name: &'static str,
     pub passed: usize,
@@ -62,6 +63,7 @@ impl SuiteResult {
 }
 
 /// Every registered suite's outcome from one `canon selftest` run.
+#[derive(Debug)]
 pub struct SelftestReport {
     pub suites: Vec<SuiteResult>,
 }
@@ -187,7 +189,7 @@ pub fn run_suite(only: Option<&str>) -> SelftestReport {
 }
 
 /// `canon selftest --json`: one entry per suite.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SelftestSummary {
     /// Every suite is clean.
@@ -196,7 +198,7 @@ pub struct SelftestSummary {
 }
 
 /// One suite's outcome in [`SelftestSummary`].
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SuiteSummary {
     pub name: String,
@@ -221,7 +223,7 @@ pub fn run_selftest(suite: Option<&str>, json: bool) -> ExitCode {
         if !report.is_clean() {
             // The failure keeps the summary in `data`.
             let error = crate::cli_error::CliError::failed("SELFTEST_FAILED", "a selftest suite did not pass against its fixtures").hint("the failing fixtures are listed in `data.suites[].failures`; this is a canon defect, so report it with the output");
-            return ExitCode::from(error.emit_with_data("canon selftest", true, &summary) as u8);
+            return ExitCode::from(error.emit_with_data("canon selftest", true, &summary));
         }
         crate::json_out::data("selftest", &summary);
     } else {

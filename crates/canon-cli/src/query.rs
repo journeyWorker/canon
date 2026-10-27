@@ -24,7 +24,7 @@ use canon_model::evidence::RawRecord;
 use canon_model::ids::{ChangeId, ProjectId, ScenarioId, TaskId};
 use canon_model::records::Scenario;
 use canon_plugin::manifest::snapshot::OverlayDecl;
-use canon_plugin::{Diagnostic as PluginDiagnostic, project_overlay, resolve_plugin_snapshot};
+use canon_plugin::{project_overlay, resolve_plugin_snapshot, Diagnostic as PluginDiagnostic};
 use canon_store::fold_latest_by_key;
 use canon_store::git_tier::GitTier;
 use canon_store::registry::TierRegistry;
@@ -47,6 +47,7 @@ pub enum QueryError {
     Store(#[from] StoreError),
 }
 
+#[derive(Debug)]
 pub struct QueryOutcome {
     pub kind: RecordKind,
     pub since: Option<DateTime<Utc>>,
@@ -62,42 +63,58 @@ pub struct QueryOutcome {
     pub page: Option<PageMeta>,
     /// `--fields`: the top-level record fields JSON output keeps.
     pub fields: Option<Vec<String>>,
+    /// 0.30 `record-links`: the references of the records this query returned that no committed source
+    /// holds ([`crate::references`]); `None` for a kind whose references are not checked.
+    pub references: Option<ReferenceCheck>,
 }
 
-/// `--kind`'s `clap` value parser — `<k>` is a [`RecordKind`] spelled by
-/// [`kind_cli_name`] (e.g. `handoff`, `strategy_item`, `evidence`): the
-/// snake_case wire string of `canon.yaml`'s own `routing`/`aging` keys
-/// (`canon-store`'s `policy` module doc) without the `_record` suffix.
-pub fn parse_kind(s: &str) -> Result<RecordKind, String> {
-    RecordKind::ALL.into_iter().find(|k| kind_cli_name(*k) == s).ok_or_else(|| {
-        let known = RecordKind::ALL.iter().map(|k| kind_cli_name(*k)).collect::<Vec<_>>().join(", ");
-        format!("unknown record kind `{s}` (expected one of: {known})")
+/// What checking the references of a query's records found.
+#[derive(Debug)]
+pub enum ReferenceCheck {
+    /// Every record was checked.
+    Scanned(crate::references::QueryScan),
+    /// The sources could not be read, so nothing was checked; why.
+    Unchecked(String),
+}
+
+/// Check the references of `records` (of `kind`), when `kind` has any worth checking.
+fn check_references(repo: &Path, kind: RecordKind, records: &[RawRecord]) -> Option<ReferenceCheck> {
+    if !crate::references::is_checked(kind) {
+        return None;
+    }
+    let repo = crate::context::resolve_repo_root(repo);
+    Some(match crate::references::Sources::load(&repo) {
+        Ok(sources) => ReferenceCheck::Scanned(crate::references::QueryScan::of(&sources, kind, records, |raw| record_key(kind, raw))),
+        Err(error) => ReferenceCheck::Unchecked(error.to_string()),
     })
 }
 
-/// A record kind as `--kind` spells it: the wire string without the
-/// `_record` suffix (`evidence_record` is `evidence`). The wire string
-/// itself (the record's `kind` field, ledger paths, `canon.yaml` routing
-/// keys) is storage and stays [`RecordKind::as_str`]; anything canon prints
-/// for an agent to type back after `--kind` uses this.
-pub fn kind_cli_name(kind: RecordKind) -> &'static str {
-    match kind {
-        RecordKind::EvidenceRecord => "evidence",
-        other => other.as_str(),
-    }
+/// `--kind`'s `clap` value parser — `<k>` is a [`RecordKind`] spelled by
+/// [`RecordKind::as_str`] (e.g. `handoff`, `strategy_item`, `evidence`): the
+/// one name every surface uses, the record's own `kind` field, the ledger
+/// directory and `canon.yaml`'s `routing`/`aging` keys (0.30).
+pub fn parse_kind(s: &str) -> Result<RecordKind, RecordKindError> {
+    RecordKind::ALL.into_iter().find(|k| k.as_str() == s).ok_or_else(|| RecordKindError::Unknown(s.to_string()))
+}
+
+/// `--kind` named no record kind.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum RecordKindError {
+    #[error("unknown record kind `{0}` (expected one of: {known})", known = RecordKind::ALL.iter().map(|k| k.as_str()).collect::<Vec<_>>().join(", "))]
+    Unknown(String),
 }
 
 /// `--kind`'s clap parser: one of the record kinds, known to clap. The
 /// removed `<kind>_record` spellings do not parse ([`crate::removed`]).
 pub fn kind_parser() -> impl clap::builder::TypedValueParser<Value = RecordKind> {
-    let visible = RecordKind::ALL.iter().map(|k| clap::builder::PossibleValue::new(kind_cli_name(*k)));
+    let visible = RecordKind::ALL.iter().map(|k| clap::builder::PossibleValue::new(k.as_str()));
     crate::cli_error::closed_set(visible.collect::<Vec<_>>(), parse_kind)
 }
 
 /// `purge --kind`'s clap parser: the record kinds purge accepts
 /// ([`canon_store::tier::PURGEABLE_KINDS`]), a closed subset of [`kind_parser`]'s.
 pub fn purgeable_kind_parser() -> impl clap::builder::TypedValueParser<Value = RecordKind> {
-    let visible = canon_store::tier::PURGEABLE_KINDS.iter().map(|k| clap::builder::PossibleValue::new(kind_cli_name(*k)));
+    let visible = canon_store::tier::PURGEABLE_KINDS.iter().map(|k| clap::builder::PossibleValue::new(k.as_str()));
     crate::cli_error::closed_set(visible.collect::<Vec<_>>(), parse_kind)
 }
 
@@ -106,8 +123,8 @@ pub fn purgeable_kind_parser() -> impl clap::builder::TypedValueParser<Value = R
 /// `--kind`) happens in [`validate_scope`], not here, so a malformed
 /// grammar and an inapplicable kind produce two distinctly-worded
 /// errors (design D5).
-pub fn parse_change_id(s: &str) -> Result<ChangeId, String> {
-    ChangeId::parse(s).map_err(|e| e.to_string())
+pub fn parse_change_id(s: &str) -> Result<ChangeId, canon_model::ids::JoinKeyError> {
+    ChangeId::parse(s)
 }
 
 const TASK_STATUSES: [&str; 2] = ["open", "done"];
@@ -132,9 +149,9 @@ fn status_domain(kind: RecordKind) -> &'static [&'static str] {
 /// `--status` value outside the QUERIED kind's own status domain.
 #[derive(Debug, thiserror::Error)]
 pub enum ScopeError {
-    #[error("`{flag}` applies only to {supported} (got `--kind {}`)", kind_cli_name(*.kind))]
+    #[error("`{flag}` applies only to {supported} (got `--kind {}`)", .kind.as_str())]
     UnsupportedKind { flag: &'static str, supported: &'static str, kind: RecordKind },
-    #[error("`--status {value}` is not valid for `--kind {}` (expected one of: {})", kind_cli_name(*.kind), .valid.join(", "))]
+    #[error("`--status {value}` is not valid for `--kind {}` (expected one of: {})", .kind.as_str(), .valid.join(", "))]
     InvalidStatus { kind: RecordKind, value: String, valid: Vec<String> },
 }
 
@@ -168,7 +185,7 @@ pub fn validate_scope(kind: RecordKind, change_id: Option<&ChangeId>, status: Op
     if let Some(value) = status {
         let allowed = status_domain(kind);
         if !allowed.contains(&value) {
-            return Err(ScopeError::InvalidStatus { kind, value: value.to_string(), valid: allowed.iter().map(|s| s.to_string()).collect() });
+            return Err(ScopeError::InvalidStatus { kind, value: value.to_string(), valid: allowed.iter().map(std::string::ToString::to_string).collect() });
         }
     }
     Ok(())
@@ -248,7 +265,7 @@ fn scope_sort_key(kind: RecordKind, raw: &RawRecord) -> (String, Vec<u64>) {
 /// `canon-report::divergence`), keyed by the SAME natural key
 /// [`scope_sort_key`]/[`format_human`] already derive
 /// (`canon_store::partition::resolve_partition`), winner = greatest
-/// `(at, envelope.schema, content_digest12)`. A no-op for every kind routed to a
+/// `(at, envelope.schema, content_digest)`. A no-op for every kind routed to a
 /// local/cold (GitTier/R2Tier-backed) rung (returned untouched)
 /// and for a corpus with no supersession (row-count parity, design.md
 /// R3's own mitigation).
@@ -308,12 +325,11 @@ fn fold_pg_routed_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
 /// same trade-off: a kind that gains a re-writing verb must be added
 /// here or its `canon query` result regresses to N-independent-versions.
 ///
-/// `review` is deliberately ABSENT and is not an oversight: its natural
-/// key carries the pinned sha
-/// (`{project_id}__{scenario_id}__{pin}`), so two attestations of one
-/// scenario at two commits are two DISTINCT keys, not two versions of
-/// one. Folding by key would collapse nothing today and would silently
-/// start dropping attestations the day two reviews share a pin.
+/// `review` is deliberately ABSENT and is not an oversight: the pin is not
+/// in its name (0.30 R2), so two attestations of one scenario at two
+/// commits are two records under one key prefix, told apart by digest —
+/// both are history to read, not versions of one. Folding by key would
+/// silently drop every attestation but the newest.
 fn fold_rewritten_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
     if !matches!(kind, RecordKind::Subject | RecordKind::Finding | RecordKind::Scenario | RecordKind::Change) {
         return records;
@@ -328,7 +344,7 @@ fn fold_rewritten_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
 /// The shared fold-to-latest-per-natural-key body (design D11/s21 D3,
 /// `s38-evidence-bearing-memory`): winner per natural key
 /// ([`canon_store::partition::resolve_partition`]) is the greatest
-/// `(at, envelope.schema, content_digest12)` triple, via the SAME
+/// `(at, envelope.schema, content_digest)` triple, via the SAME
 /// [`fold_latest_by_key`] `canon-gate::ledger` and `canon-report`
 /// already use. Called by both [`fold_pg_routed_kind`] (hot-routed
 /// multi-version kinds) and [`fold_rewritten_kind`] (git-routed but
@@ -354,10 +370,70 @@ fn fold_latest_by_natural_key(kind: RecordKind, records: Vec<RawRecord>) -> Vec<
         let key = canon_store::partition::resolve_partition(kind, &record.0).map(|p| p.natural_key).unwrap_or_default();
         let at = canon_store::tier::raw_record_at(&record);
         let schema = canon_store::tier::raw_record_schema(&record);
-        let digest = canon_store::partition::content_digest12(&record.0);
+        let digest = canon_store::partition::content_digest(&record.0);
         Candidate { key, at, schema, digest, record }
     });
-    fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str()).into_values().map(|c| c.record).collect()
+    fold_latest_by_key(
+        candidates,
+        |c| c.key.clone(),
+        |c| c.at,
+        |c| c.schema,
+        |c| c.digest.as_str(),
+    )
+    .into_values()
+    .map(|c| c.record)
+    .collect()
+}
+
+/// Whether 0.29 returned `kind`'s latest-only records in natural-key order (the kinds it folded, whose
+/// fold is a key-ordered map) rather than in `at` order.
+fn is_key_ordered(kind: RecordKind) -> bool {
+    matches!(
+        kind,
+        RecordKind::Task
+            | RecordKind::Handoff
+            | RecordKind::Session
+            | RecordKind::Run
+            | RecordKind::Event
+            | RecordKind::Subject
+            | RecordKind::Finding
+            | RecordKind::Scenario
+            | RecordKind::Change
+    )
+}
+
+/// 0.29's joined-key string for a record: components as written, integers zero-padded to ten digits,
+/// joined by `_` (for ordering only; never a name).
+fn legacy_sort_key(components: &[canon_model::layout::Component]) -> String {
+    use canon_model::layout::Component;
+    components
+        .iter()
+        .map(|c| match c {
+            Component::Int(n) => format!("{n:010}"),
+            other => other.value(),
+        })
+        .collect::<Vec<_>>()
+        .join("_")
+}
+
+/// The order `canon query` shows latest-only records in, as 0.29 did: the kinds it folded by their joined
+/// key, every other kind by `at`; ties fall to `at`, the typed components and the body digest.
+fn latest_order(
+    kind: RecordKind,
+    raw: &RawRecord,
+) -> (
+    String,
+    DateTime<Utc>,
+    Vec<canon_model::layout::Component>,
+    String,
+) {
+    let (at, components, digest) = canon_store::partition::record_order(kind, raw);
+    let key = if is_key_ordered(kind) {
+        legacy_sort_key(&components)
+    } else {
+        String::new()
+    };
+    (key, at, components, digest)
 }
 
 /// Post-tier-merge scope application (design D5/D6, tasks 3.4/3.6;
@@ -395,7 +471,6 @@ fn rollup_for(kind: RecordKind, records: &[RawRecord]) -> Option<(usize, usize)>
 /// ([`canon_store::git_tier::GitTier::read_history`]), unfolded, oldest
 /// first. Without it, the current records only: the ledger holds one
 /// version per key, so this is the working set the gate reads.
-#[allow(clippy::too_many_arguments)]
 pub fn run(
     repo: &Path,
     kind: RecordKind,
@@ -420,13 +495,20 @@ pub fn run(
         let archived = canon_store::tier::Tier::read(&archive, &query)?;
         result.records.extend(archived.records);
         result.violations.extend(archived.violations);
-        result.records.sort_by_key(canon_store::tier::raw_record_at);
+        result.records.sort_by_cached_key(|raw| canon_store::partition::record_order(kind, raw));
     }
     let violation_count = result.violations.len();
-    let records = if history { result.records } else { fold_rewritten_kind(kind, fold_pg_routed_kind(kind, result.records)) };
+    let records = if history {
+        result.records
+    } else {
+        let mut latest = fold_rewritten_kind(kind, fold_pg_routed_kind(kind, result.records));
+        latest.sort_by_cached_key(|raw| latest_order(kind, raw));
+        latest
+    };
     let records = apply_scope(kind, records, change_id, status, domain);
     let rollup = rollup_for(kind, &records);
-    Ok(QueryOutcome { kind, since, records, violation_count, rollup, page: None, fields: None })
+    let references = check_references(repo, kind, &records);
+    Ok(QueryOutcome { kind, since, records, violation_count, rollup, page: None, fields: None, references })
 }
 
 /// The top-level record fields `--fields` may name for `kind`: what the
@@ -452,7 +534,13 @@ pub fn known_fields(kind: RecordKind, plugin: bool) -> BTreeSet<String> {
 /// same three the human table shows.
 fn record_key(kind: RecordKind, raw: &RawRecord) -> String {
     let id = canon_store::partition::resolve_partition(kind, &raw.0).map(|p| p.natural_key).unwrap_or_default();
-    format!("{}|{id}|{}", canon_store::tier::raw_record_at(raw).to_rfc3339(), canon_store::partition::content_digest12(&raw.0))
+    format!("{}|{id}|{}", canon_store::tier::raw_record_at(raw).to_rfc3339(), canon_store::partition::content_digest(&raw.0))
+}
+
+/// Whether a cursor's record key (`<at>|<id>|<digest>#<n>`) ends in a 0.29 12-hex digest; 0.30 digests are 8 hex.
+fn names_a_029_record(key: &str) -> bool {
+    let digest = key.rsplit('|').next().and_then(|tail| tail.split('#').next()).unwrap_or("");
+    digest.len() == 12 && digest.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 /// Applies `--limit`/`--cursor`/`--all` and `--fields` to a finished query:
@@ -464,6 +552,9 @@ pub fn page_outcome(mut outcome: QueryOutcome, page: &Page, fields: Option<Vec<S
         paging::check_fields("canon query", requested, &known_fields(outcome.kind, plugin))?;
     }
     let kind = outcome.kind;
+    if page.cursor.as_deref().and_then(paging::cursor_key).is_some_and(|key| names_a_029_record(&key)) {
+        return Err(CliError::refused("INVALID_CURSOR", "the cursor names records by 0.29 names (an id with `__` parts and a 12-hex digest), which canon 0.30 no longer uses").hint("drop --cursor and start from the first page"));
+    }
     let (records, meta) = paging::paginate(&format!("query:{}", kind.as_str()), std::mem::take(&mut outcome.records), |raw| record_key(kind, raw), page)?;
     outcome.records = records;
     outcome.page = Some(meta);
@@ -483,12 +574,21 @@ pub fn format_human(outcome: &QueryOutcome) -> String {
 /// event bodies even when sensitive output was authorized for another
 /// formatter.
 pub fn format_human_with_sensitive(outcome: &QueryOutcome, _include_sensitive: bool) -> String {
-    let since_desc = outcome.since.map(|s| s.to_rfc3339()).unwrap_or_else(|| "none".to_string());
-    let mut out = format!("canon query --kind {} --since {}: {} record(s)", kind_cli_name(outcome.kind), since_desc, outcome.records.len());
+    let since_desc = outcome.since.map_or_else(|| "none".to_string(), |s| s.to_rfc3339());
+    let mut out = format!("canon query --kind {} --since {}: {} record(s)", outcome.kind.as_str(), since_desc, outcome.records.len());
     if outcome.violation_count > 0 {
         out.push_str(&format!("  ({} violation(s) reported, excluded)", outcome.violation_count));
     }
     out.push('\n');
+    match &outcome.references {
+        Some(ReferenceCheck::Scanned(scan)) => {
+            if let Some(kinds) = scan.summary.describe() {
+                out.push_str(&format!("{} reference(s) to a source nothing committed holds ({kinds})\n", scan.summary.count));
+            }
+        }
+        Some(ReferenceCheck::Unchecked(reason)) => out.push_str(&format!("references not checked: {reason}\n")),
+        None => {}
+    }
     if let Some((done, total)) = outcome.rollup {
         out.push_str(&format!("{done}/{total} done\n"));
     }
@@ -500,14 +600,15 @@ pub fn format_human_with_sensitive(outcome: &QueryOutcome, _include_sensitive: b
     out.push_str("\nAT                             ID                              DIGEST\n");
     for raw in &outcome.records {
         let at = canon_store::tier::raw_record_at(raw);
-        let id = canon_store::partition::resolve_partition(outcome.kind, &raw.0)
-            .map(|p| match p.area {
-                Some(area) => format!("area={area}/{}", p.natural_key),
-                None => p.natural_key,
-            })
-            .unwrap_or_else(|_| "-".to_string());
-        let digest = canon_store::partition::content_digest12(&raw.0);
-        out.push_str(&format!("{:<30} {:<30} {}\n", at.to_rfc3339(), id, digest));
+        let id = canon_store::partition::resolve_partition(outcome.kind, &raw.0).map_or_else(|_| "-".to_string(), |p| p.natural_key);
+        let digest = canon_store::partition::content_digest(&raw.0);
+        out.push_str(&format!("{:<30} {:<30} {}", at.to_rfc3339(), id, digest));
+        if let Some(ReferenceCheck::Scanned(scan)) = &outcome.references {
+            for reference in scan.by_record.get(&record_key(outcome.kind, raw)).into_iter().flatten() {
+                out.push_str(&format!("  <- {} `{}` ({}) has no committed source", reference.target, reference.id, reference.field));
+            }
+        }
+        out.push('\n');
     }
     finish_human(out, outcome)
 }
@@ -552,7 +653,7 @@ fn redact_event_detail(value: &mut Value) {
 }
 
 fn sensitive_detail_key(key: &str) -> bool {
-    let compact = key.chars().filter(|character| character.is_ascii_alphanumeric()).map(|character| character.to_ascii_lowercase()).collect::<String>();
+    let compact = key.chars().filter(char::is_ascii_alphanumeric).map(|character| character.to_ascii_lowercase()).collect::<String>();
     matches!(
         compact.as_str(),
         "credential"
@@ -617,9 +718,57 @@ pub struct QueryReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub overlays: Option<Vec<String>>,
     pub records: Vec<LedgerRecord>,
+    /// `--kind finding|evidence|subject` (0.30): the references to a source nothing committed holds.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dangling: Option<QueryDangling>,
     /// `--kind task`: tasks done of tasks listed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rollup: Option<QueryRollup>,
+}
+
+/// The unresolved references of a query (0.30 `record-links`): the count and the count per kind of reference
+/// cover every record the query found, `references` the records of this page.
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryDangling {
+    pub count: usize,
+    /// `<record kind>.<field>` to its count.
+    pub by_reference: BTreeMap<String, usize>,
+    pub references: Vec<DanglingRecord>,
+    /// Why nothing was checked, when the sources could not be read.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unchecked: Option<String>,
+}
+
+/// One record's unresolved reference.
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DanglingRecord {
+    /// The record's id, as the query's ID column shows it.
+    pub record: String,
+    pub field: &'static str,
+    /// The kind of thing the field names: `change`, `review`, `task` or `scenario`.
+    pub target: &'static str,
+    pub id: String,
+}
+
+fn dangling_of(outcome: &QueryOutcome, check: &ReferenceCheck) -> QueryDangling {
+    match check {
+        ReferenceCheck::Scanned(scan) => {
+            let references = outcome
+                .records
+                .iter()
+                .filter_map(|raw| {
+                    let unresolved = scan.by_record.get(&record_key(outcome.kind, raw))?;
+                    let record = canon_store::partition::resolve_partition(outcome.kind, &raw.0).map(|p| p.natural_key).unwrap_or_default();
+                    Some(unresolved.iter().map(move |reference| DanglingRecord { record: record.clone(), field: reference.field, target: reference.target, id: reference.id.clone() }))
+                })
+                .flatten()
+                .collect();
+            QueryDangling { count: scan.summary.count, by_reference: scan.summary.by_reference.clone(), references, unchecked: None }
+        }
+        ReferenceCheck::Unchecked(reason) => QueryDangling { count: 0, by_reference: BTreeMap::new(), references: Vec::new(), unchecked: Some(reason.clone()) },
+    }
 }
 
 impl Report for QueryReport {}
@@ -647,6 +796,7 @@ fn base_report(outcome: &QueryOutcome, records: Vec<LedgerRecord>) -> QueryRepor
         plugin: None,
         overlays: None,
         records,
+        dangling: outcome.references.as_ref().map(|check| dangling_of(outcome, check)),
         rollup: outcome.rollup.map(|(done, total)| QueryRollup { done, total }),
     }
 }
@@ -672,6 +822,7 @@ fn finish_human(mut out: String, outcome: &QueryOutcome) -> String {
 /// One resolved overlay's projected view (task 3.3): the `<namespace>.
 /// <kind>` identity it came from, plus [`project_overlay`]'s own
 /// folded output.
+#[derive(Debug)]
 pub struct OverlayProjection {
     pub identity: String,
     pub projected: BTreeMap<(ProjectId, ScenarioId), serde_json::Map<String, Value>>,
@@ -691,7 +842,7 @@ pub struct OverlayProjection {
 /// non-empty whenever `projections` is empty, and possibly non-empty
 /// even when `projections` isn't (a malformed sibling overlay record
 /// is still worth reporting).
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct PluginQueryOutcome {
     pub projections: Vec<OverlayProjection>,
     pub diagnostics: Vec<String>,
@@ -833,7 +984,8 @@ pub fn run_with_plugin(
     let records = fold_rewritten_kind(kind, records);
     let records = apply_scope(kind, records, change_id, status, domain);
     let rollup = rollup_for(kind, &records);
-    let outcome = QueryOutcome { kind, since, records, violation_count, rollup, page: None, fields: None };
+    let references = check_references(repo, kind, &records);
+    let outcome = QueryOutcome { kind, since, records, violation_count, rollup, page: None, fields: None, references };
 
     let git = git_root.map(GitTier::new);
     let plugin_outcome = resolve_and_project(&project_dir, git.as_ref(), kind, plugin_id, &outcome.records);
@@ -893,9 +1045,9 @@ pub fn format_human_with_overlay(outcome: &QueryOutcome, plugin_id: &str, projec
 }
 
 pub fn format_human_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id: &str, projections: &[OverlayProjection], _include_sensitive: bool) -> String {
-    let since_desc = outcome.since.map(|s| s.to_rfc3339()).unwrap_or_else(|| "none".to_string());
+    let since_desc = outcome.since.map_or_else(|| "none".to_string(), |s| s.to_rfc3339());
     let mut out =
-        format!("canon query --kind {} --since {} --plugin {}: {} record(s)", kind_cli_name(outcome.kind), since_desc, plugin_id, outcome.records.len());
+        format!("canon query --kind {} --since {} --plugin {}: {} record(s)", outcome.kind.as_str(), since_desc, plugin_id, outcome.records.len());
     if outcome.violation_count > 0 {
         out.push_str(&format!("  ({} violation(s) reported, excluded)", outcome.violation_count));
     }
@@ -911,15 +1063,9 @@ pub fn format_human_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id
     out.push_str("\nAT                             ID                              DIGEST           OVERLAY\n");
     for raw in &outcome.records {
         let at = canon_store::tier::raw_record_at(raw);
-        let id = canon_store::partition::resolve_partition(outcome.kind, &raw.0)
-            .map(|p| match p.area {
-                Some(area) => format!("area={area}/{}", p.natural_key),
-                None => p.natural_key,
-            })
-            .unwrap_or_else(|_| "-".to_string());
-        let digest = canon_store::partition::content_digest12(&raw.0);
-        let overlay_desc = scenario_key(raw)
-            .map(|key| {
+        let id = canon_store::partition::resolve_partition(outcome.kind, &raw.0).map_or_else(|_| "-".to_string(), |p| p.natural_key);
+        let digest = canon_store::partition::content_digest(&raw.0);
+        let overlay_desc = scenario_key(raw).map_or_else(|| "-".to_string(), |key| {
                 let mut obj = serde_json::Map::new();
                 for projection in projections {
                     if let Some(fields) = projection.projected.get(&key) {
@@ -927,8 +1073,7 @@ pub fn format_human_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id
                     }
                 }
                 if obj.is_empty() { "-".to_string() } else { Value::Object(obj).to_string() }
-            })
-            .unwrap_or_else(|| "-".to_string());
+            });
         out.push_str(&format!("{:<30} {:<30} {:<16} {}\n", at.to_rfc3339(), id, digest, overlay_desc));
     }
     finish_human(out, outcome)
@@ -937,6 +1082,13 @@ pub fn format_human_with_overlay_and_sensitive(outcome: &QueryOutcome, plugin_id
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_value_parsers_refuse_in_their_old_words() {
+        let known = RecordKind::ALL.iter().map(|k| k.as_str()).collect::<Vec<_>>().join(", ");
+        assert_eq!(parse_kind("bogus").unwrap_err().to_string(), format!("unknown record kind `bogus` (expected one of: {known})"));
+        assert_eq!(parse_change_id("Bad Id").unwrap_err().to_string(), format!("invalid ChangeId: \"Bad Id\" does not match grammar `{}`", ChangeId::GRAMMAR));
+    }
 
     fn event_outcome() -> QueryOutcome {
         QueryOutcome {
@@ -960,6 +1112,7 @@ mod tests {
             rollup: None,
             page: None,
             fields: None,
+            references: None,
         }
     }
 

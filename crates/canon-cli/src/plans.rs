@@ -139,7 +139,7 @@ use canon_model::envelope::{CanonRecord, RecordKind};
 use canon_model::ids::{ChangeId, SubjectId};
 use canon_model::records::{Change, Task};
 use canon_store::cursor::{file_digest, CursorStore, SourceCursor};
-use canon_store::policy::{PolicyError, TierPolicy};
+use canon_store::policy::{TierPolicy, TierPolicyError};
 use canon_store::registry::TierRegistry;
 use canon_store::tier::StoreError;
 use schemars::JsonSchema;
@@ -159,7 +159,7 @@ pub enum PlansError {
     #[error("{0}")]
     Config(String),
     #[error(transparent)]
-    Policy(#[from] PolicyError),
+    Policy(#[from] TierPolicyError),
     #[error(transparent)]
     Store(#[from] StoreError),
 }
@@ -302,6 +302,9 @@ pub struct PlansOutcome {
     /// stderr WARN per entry and exits non-zero whenever this is
     /// non-empty. Empty for an ordinary clean/partial-success pass.
     pub non_clean_sources: Vec<NonCleanSource>,
+    /// Where the hot records go (0.30): the hot store's location; absent on a `--dry-run` or with no hot rung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hot_store: Option<String>,
 }
 
 impl Report for PlansOutcome {}
@@ -515,7 +518,7 @@ pub fn run(repo: &Path, dialect: Option<&str>, source: Option<&Path>, dry_run: b
 fn open_store(repo: &Path, canon_yaml_path: &Path) -> Result<(TierRegistry, Option<PathBuf>), PlansError> {
     let canon_yaml_text = std::fs::read_to_string(canon_yaml_path).unwrap_or_default();
     let policy = if canon_yaml_text.trim().is_empty() {
-        TierPolicy { tiers: HashMap::new(), routing: HashMap::new(), aging: HashMap::new() }
+        TierPolicy { tiers: HashMap::new(), routing: HashMap::new(), aging: HashMap::new(), legacy_kind_keys: Vec::new() }
     } else {
         TierPolicy::from_yaml_at(&canon_yaml_text, repo)?
     };
@@ -583,7 +586,7 @@ impl Adoptions {
         if self.0.is_none() {
             let latest = match crate::subject::latest_records(store, RecordKind::Change) {
                 Ok(records) => records,
-                Err(StoreError::TierUnavailable { .. }) | Err(StoreError::UnroutedKind { .. }) => Vec::new(),
+                Err(StoreError::TierUnavailable { .. } | StoreError::UnroutedKind { .. }) => Vec::new(),
                 Err(err) => return Err(PlansError::Store(err)),
             };
             let adopted = latest
@@ -735,7 +738,7 @@ fn ensure_dialect_registered(dialect: &str) -> Result<(), PlansError> {
 }
 
 fn registered_dialect_ids() -> Vec<&'static str> {
-    let mut ids: Vec<&str> = plan_registry::registry().iter().map(|e| e.dialect_id()).collect();
+    let mut ids: Vec<&str> = plan_registry::registry().iter().map(canon_ingest::PlanAdapterEntry::dialect_id).collect();
     ids.sort_unstable();
     ids
 }
@@ -746,6 +749,24 @@ fn registered_dialect_ids() -> Vec<&'static str> {
 pub(crate) fn load_plan_sources_from_config(canon_yaml_path: &Path, repo: &Path) -> Result<Vec<PlanSource>, PlansError> {
     let configured = configured_plan_sources(canon_yaml_path, repo)?;
     Ok(PlanSource::native(repo).into_iter().chain(configured).collect())
+}
+
+/// The change ids and the task ids the plan sources declare right now
+/// (canon's own `.canon/changes/`, then `canon.yaml`'s `plans.sources`), read
+/// from the plan documents themselves and not from any stored record: what
+/// `canon query` and `canon status` hold a finding's or an evidence record's
+/// `change_id` and `task_id` against (0.30 `record-links`).
+pub(crate) fn declared_ids(repo: &Path) -> Result<(BTreeSet<String>, BTreeSet<String>), PlansError> {
+    let mut changes = BTreeSet::new();
+    let mut tasks = BTreeSet::new();
+    for source in load_plan_sources_from_config(&repo.join("canon.yaml"), repo)? {
+        let Some(entry) = source.entry() else { continue };
+        let Some(handle) = entry.adapter.resolve_source(&PlanSourceConfig { root: Some(source.root.clone()) }) else { continue };
+        let PlanParseOutcome { changes: parsed_changes, tasks: parsed_tasks, .. } = entry.adapter.parse(&handle);
+        changes.extend(parsed_changes.iter().map(|change| change.change_id.to_string()));
+        tasks.extend(parsed_tasks.iter().map(|task| task.task_id.to_string()));
+    }
+    Ok((changes, tasks))
 }
 
 /// Parse `canon.yaml`'s `plans:` section (task 3.2; see module doc for
@@ -886,7 +907,7 @@ fn plan_source_cursor_id(dialect: &str, parse_version: u32, root: &Path) -> Stri
 fn file_stat(path: &Path) -> (i64, u64) {
     match std::fs::metadata(path) {
         Ok(meta) => {
-            let mtime_ms = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64).unwrap_or(0);
+            let mtime_ms = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX));
             (mtime_ms, meta.len())
         }
         Err(_) => (0, 0),
@@ -919,7 +940,7 @@ fn persist_or_unwritten<T: CanonRecord>(store: &TierRegistry, record: T, dry_run
     match written {
         Ok(()) => Ok(None),
         Err(StoreError::DuplicatePath { .. }) => Ok(None),
-        Err(StoreError::TierUnavailable { .. }) | Err(StoreError::UnroutedKind { .. }) => Ok(Some(record)),
+        Err(StoreError::TierUnavailable { .. } | StoreError::UnroutedKind { .. }) => Ok(Some(record)),
         Err(err) => Err(PlansError::Store(err)),
     }
 }

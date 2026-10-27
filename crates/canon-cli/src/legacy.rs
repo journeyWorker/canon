@@ -97,7 +97,11 @@ fn commands(value: &Value, out: &mut Vec<String>) {
                 }
             }
         }
-        Value::Array(items) => items.iter().for_each(|item| commands(item, out)),
+        Value::Array(items) => {
+            for item in items {
+                commands(item, out);
+            }
+        }
         _ => {}
     }
 }
@@ -313,7 +317,7 @@ impl Plan {
     }
 
     /// Writes the plan.
-    pub fn apply(&self, repo: &Path) -> Result<(), String> {
+    pub fn apply(&self, repo: &Path) -> Result<(), LegacyError> {
         for file in &self.hooks {
             write_file(&repo.join(file.path), file.text.as_bytes())?;
         }
@@ -323,14 +327,14 @@ impl Plan {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).map_err(|e| format!("could not make {} executable: {e}", script.path))?;
+                fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).map_err(|source| LegacyError::MakeExecutable { path: script.path.clone(), source })?;
             }
         }
         if let Some(agents) = &self.agents {
             write_file(&repo.join("AGENTS.md"), agents.text.as_bytes())?;
         }
         if self.skill.is_some() {
-            skills::install_canonical(skills::resolve_source(None).as_deref(), repo, None, false).map_err(|e| format!("could not install the skill stub: {e}"))?;
+            skills::install_canonical(skills::resolve_source(None).as_deref(), repo, None, false).map_err(LegacyError::InstallStub)?;
         }
         Ok(())
     }
@@ -339,9 +343,55 @@ impl Plan {
 /// The skill install lock, repo-relative.
 const SKILLS_LOCK: &str = ".canon/skills/.install-lock.json";
 
-fn write_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
+/// Why a `canon migrate` of the 0.27-era files could not plan, back up or write.
+#[derive(Debug, thiserror::Error)]
+pub enum LegacyError {
+    /// A projected file could not be written.
+    #[error("could not write {}: {source}", path.display())]
+    Write {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    /// A rewritten script could not be made executable.
+    #[error("could not make {path} executable: {source}")]
+    MakeExecutable {
+        path: String,
+        #[source]
+        source: std::io::Error,
+    },
+    /// The skill stub could not be installed.
+    #[error("could not install the skill stub: {0}")]
+    InstallStub(#[source] skills::SkillsError),
+    /// The skill stub install could not be previewed.
+    #[error("could not plan the skill stub: {0}")]
+    PlanStub(#[source] skills::SkillsError),
+    /// A file to back up could not be read.
+    #[error("could not read {path} for its backup: {source}")]
+    BackupRead {
+        path: String,
+        #[source]
+        source: std::io::Error,
+    },
+    /// The backup directory could not be created.
+    #[error("could not create {}: {source}", path.display())]
+    BackupDir {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    /// A backup copy could not be written.
+    #[error("could not write the backup {}: {source}", path.display())]
+    BackupWrite {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+}
+
+fn write_file(path: &Path, bytes: &[u8]) -> Result<(), LegacyError> {
     let temp = path.with_extension("canon-migrate.tmp");
-    fs::write(&temp, bytes).and_then(|()| fs::rename(&temp, path)).map_err(|e| format!("could not write {}: {e}", path.display()))
+    fs::write(&temp, bytes).and_then(|()| fs::rename(&temp, path)).map_err(|source| LegacyError::Write { path: path.to_path_buf(), source })
 }
 
 /// The repo-relative `/`-separated form of `path` under `repo`.
@@ -350,9 +400,9 @@ fn relative(repo: &Path, path: &Path) -> String {
 }
 
 /// The plan for `repo`: empty when nothing is 0.27-era.
-pub fn plan(repo: &Path) -> Result<Plan, String> {
+pub fn plan(repo: &Path) -> Result<Plan, LegacyError> {
     let skill = if skills::has_full_projection(repo) {
-        let preview = skills::install_canonical(skills::resolve_source(None).as_deref(), repo, None, true).map_err(|e| format!("could not plan the skill stub: {e}"))?;
+        let preview = skills::install_canonical(skills::resolve_source(None).as_deref(), repo, None, true).map_err(LegacyError::PlanStub)?;
         let mut rewritten: Vec<(String, bool)> = preview.rewritten.iter().map(|path| (relative(repo, path), path.exists())).collect();
         rewritten.sort();
         let mut pruned: Vec<String> = preview.pruned.iter().map(|orphan| relative(repo, &orphan.path)).collect();
@@ -374,7 +424,7 @@ pub fn plan(repo: &Path) -> Result<Plan, String> {
 /// Copies each of `paths` (repo-relative, regular files that exist) to
 /// `<repo>/.canon/migrate-backup/<stamp>/<path>`, bytes unchanged. Returns the directory, or `None`
 /// when there was nothing to copy.
-pub fn backup(repo: &Path, paths: &[String]) -> Result<Option<PathBuf>, String> {
+pub fn backup(repo: &Path, paths: &[String]) -> Result<Option<PathBuf>, LegacyError> {
     let existing: Vec<&String> = paths.iter().filter(|path| fs::symlink_metadata(repo.join(path)).is_ok_and(|meta| meta.is_file())).collect();
     if existing.is_empty() {
         return Ok(None);
@@ -388,18 +438,31 @@ pub fn backup(repo: &Path, paths: &[String]) -> Result<Option<PathBuf>, String> 
         dir = base.join(format!("{stamp}-{n}"));
         n += 1;
     }
+    ensure_backup_ignored(&base).map_err(|source| LegacyError::BackupDir { path: base.clone(), source })?;
     for path in existing {
         let to = dir.join(path);
-        let bytes = fs::read(repo.join(path)).map_err(|e| format!("could not read {path} for its backup: {e}"))?;
+        let bytes = fs::read(repo.join(path)).map_err(|source| LegacyError::BackupRead { path: path.clone(), source })?;
         if let Some(parent) = to.parent() {
-            fs::create_dir_all(parent).map_err(|e| format!("could not create {}: {e}", parent.display()))?;
+            fs::create_dir_all(parent).map_err(|source| LegacyError::BackupDir { path: parent.to_path_buf(), source })?;
         }
-        fs::write(&to, bytes).map_err(|e| format!("could not write the backup {}: {e}", to.display()))?;
+        fs::write(&to, bytes).map_err(|source| LegacyError::BackupWrite { path: to.clone(), source })?;
     }
     Ok(Some(dir))
 }
 
+/// Makes git ignore everything under the backup directory `base`, whatever the repo's `.gitignore` says
+/// (a revert restores that file, which would otherwise show the backup as untracked).
+pub fn ensure_backup_ignored(base: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(base)?;
+    let guard = base.join(".gitignore");
+    if !guard.exists() {
+        fs::write(guard, "*\n")?;
+    }
+    Ok(())
+}
+
 /// What a cheap scan found, for the warning.
+#[derive(Debug)]
 pub struct Detected {
     pub hooks: bool,
     pub scripts: bool,
@@ -451,7 +514,10 @@ fn migrate_step(found: &Detected) -> NextStep {
 /// For `status`, `gate check` and `context`: when `repo` holds 0.27-era state, says so as a warning and
 /// puts `canon migrate --json` first in `meta.next` ([`crate::json_out::prepend_next`]).
 pub fn announce(repo: &Path) {
-    if let Some(found) = detect(repo) {
+    let legacy = detect(repo);
+    // A 0.29 ledger layout (0.30 `ledger-naming`): the same `canon migrate` step; one step when both hold.
+    crate::old_layout::announce(repo, legacy.is_none());
+    if let Some(found) = legacy {
         let stale = if found.skill { format!("; {STALE_GUIDE}") } else { "; run `canon migrate --json` to preview the upgrade".to_string() };
         crate::json_out::warn(format!("this repo holds 0.27-era canon state ({}){stale}", found.what()));
         crate::json_out::prepend_next(migrate_step(&found));
@@ -468,6 +534,23 @@ pub fn warn_stale_guide(repo: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn migrate_failures_read_as_before_and_keep_their_cause() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("missing").join("hook.json");
+        let write = write_file(&file, b"x").unwrap_err();
+        assert!(write.to_string().starts_with(&format!("could not write {}: ", file.display())), "{write}");
+        assert!(std::error::Error::source(&write).is_some());
+        let io = || std::io::Error::other("boom");
+        assert_eq!(LegacyError::MakeExecutable { path: "s.sh".to_string(), source: io() }.to_string(), "could not make s.sh executable: boom");
+        assert_eq!(LegacyError::BackupRead { path: "a".to_string(), source: io() }.to_string(), "could not read a for its backup: boom");
+        assert_eq!(LegacyError::BackupDir { path: "d".into(), source: io() }.to_string(), "could not create d: boom");
+        assert_eq!(LegacyError::BackupWrite { path: "b".into(), source: io() }.to_string(), "could not write the backup b: boom");
+        let stub = || skills::SkillsError::SourceNotFound("x".into());
+        assert_eq!(LegacyError::InstallStub(stub()).to_string(), "could not install the skill stub: source directory not found: x");
+        assert_eq!(LegacyError::PlanStub(stub()).to_string(), "could not plan the skill stub: source directory not found: x");
+    }
 
     #[test]
     fn a_removed_command_prefix_is_rewritten_and_its_arguments_kept() {

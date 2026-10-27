@@ -88,7 +88,7 @@
 //! # Staged, never committed
 //! [`run_add`] writes to [`crate::gate::evidence_staging_dir`] —
 //! `<ledger_root>/_staging`, a `GitTier` sibling of the committed
-//! `kind=evidence_record/` tree — exactly the mechanism `canon gate
+//! `kind=evidence/` tree — exactly the mechanism `canon gate
 //! promote` already drains (`canon_gate::promote`), never a parallel
 //! one. So the three-command loop is:
 //!
@@ -217,7 +217,7 @@ use canon_gate::review_gate::{in_effect_reviews, review_gap, ReviewGapKind};
 use canon_gate::{scan_note_text, verify_risk_approval, FailureClass, GateContext, GateCtx, Violation};
 use canon_ingest::task_rows::first_row_line_break;
 use canon_model::{
-    approval_payload_bytes, Actor, AuditResult, BriefOverride, Envelope, EvidenceApproval, EvidenceAudit, EvidenceRecord, EvidenceVerdict, ProjectId,
+    approval_payload_bytes, ApprovalPayload, Actor, AuditResult, BriefOverride, Envelope, EvidenceApproval, EvidenceAudit, EvidenceRecord, EvidenceVerdict, ProjectId,
     ProvenanceRef, RawRecord, RecordKind, ReportFormat, Review, RoleId, RunId, Scenario, ScenarioId, SessionId, Sha, TaskId, WaivedViolation, APPROVAL_NAMESPACE,
 };
 use canon_policy::SchemaRegistry;
@@ -248,7 +248,7 @@ fn fabricated(violations: &[Violation]) -> CliError {
 fn bind_refusal(error: &crate::evidence_attach::BindError) -> CliError {
     use crate::evidence_attach::BindError;
     match error {
-        BindError::Usage { message, hint, field } => {
+        BindError::Usage { message, hint, field, .. } => {
             let refusal = CliError::refused("EVIDENCE_BIND_REFUSED", message.as_str()).hint(hint.as_str());
             match field {
                 Some(flag) => refusal.field(*flag),
@@ -322,13 +322,30 @@ pub fn verdict_parser() -> impl clap::builder::TypedValueParser<Value = Evidence
     crate::cli_error::closed_set(["faithful", "not-applicable", "divergent"], parse_verdict)
 }
 
+/// A `canon evidence add` value that no parser accepts.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum EvidenceArgError {
+    /// `--verdict` outside the three verdicts.
+    #[error("`{0}` is not an evidence verdict — expected one of: faithful, not-applicable, divergent")]
+    UnknownVerdict(String),
+    /// A `--surface-ref` that is empty, padded or multi-line.
+    #[error("surface refs must be non-empty, trimmed, and contain no line separators or NUL")]
+    SurfaceRefMalformed,
+    /// An `effect:` ref whose slug is not kebab-case.
+    #[error("effect surface refs must use `effect:<kebab-slug>`")]
+    EffectRefMalformed,
+    /// A path ref that is absolute or leaves the repository.
+    #[error("path surface refs must be repository-relative and stay inside the repository")]
+    PathRefOutside,
+}
+
 /// `--verdict`'s clap `value_parser`.
-pub fn parse_verdict(s: &str) -> Result<EvidenceVerdict, String> {
+pub fn parse_verdict(s: &str) -> Result<EvidenceVerdict, EvidenceArgError> {
     match s {
         "faithful" => Ok(EvidenceVerdict::Faithful),
         "not-applicable" => Ok(EvidenceVerdict::NotApplicable),
         "divergent" => Ok(EvidenceVerdict::Divergent),
-        other => Err(format!("`{other}` is not an evidence verdict — expected one of: faithful, not-applicable, divergent")),
+        other => Err(EvidenceArgError::UnknownVerdict(other.to_string())),
     }
 }
 
@@ -336,19 +353,19 @@ pub fn parse_verdict(s: &str) -> Result<EvidenceVerdict, String> {
 /// `effect:<kebab-slug>` form; all other refs are repository-relative paths.
 /// This validates shape only — the CLI still records an attestation, not
 /// proof that the caller's ref equals the changed paths.
-pub fn parse_surface_ref(s: &str) -> Result<String, String> {
+pub fn parse_surface_ref(s: &str) -> Result<String, EvidenceArgError> {
     if s.is_empty() || s.trim() != s || s.contains('\n') || s.contains('\r') || s.contains('\0') {
-        return Err("surface refs must be non-empty, trimmed, and contain no line separators or NUL".to_string());
+        return Err(EvidenceArgError::SurfaceRefMalformed);
     }
     if let Some(effect) = s.strip_prefix("effect:") {
         if effect.is_empty() || !effect.split('-').all(|part| !part.is_empty() && part.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit())) {
-            return Err("effect surface refs must use `effect:<kebab-slug>`".to_string());
+            return Err(EvidenceArgError::EffectRefMalformed);
         }
         return Ok(s.to_string());
     }
     let path = std::path::Path::new(s);
     if path.is_absolute() || path.components().any(|component| matches!(component, std::path::Component::ParentDir | std::path::Component::RootDir | std::path::Component::Prefix(_))) {
-        return Err("path surface refs must be repository-relative and stay inside the repository".to_string());
+        return Err(EvidenceArgError::PathRefOutside);
     }
     Ok(s.to_string())
 }
@@ -367,6 +384,7 @@ fn normalized_strings(values: &[String]) -> Vec<String> {
 /// `actor_id`/`surface_ref`/`approval_by` are plain strings — every adjacent
 /// pair of them would silently compile if transposed, and approval fields
 /// end up in the permanent ledger body.
+#[derive(Debug)]
 pub struct EvidenceArgs {
     /// The plan task this evidence attests to, validated against the
     /// live plan corpus by [`crate::dispatch::validate_task_binding`]
@@ -590,6 +608,7 @@ fn audit_of(args: &EvidenceArgs) -> Result<Option<EvidenceAudit>, String> {
 
 
 /// Inputs shared by payload export and authenticated evidence staging.
+#[derive(Debug)]
 pub struct ApprovalPayloadArgs {
     pub task_id: Option<TaskId>,
     pub scenario_id: Option<ScenarioId>,
@@ -602,7 +621,9 @@ pub struct ApprovalPayloadArgs {
     pub json: bool,
 }
 
-fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<(Vec<u8>, Vec<String>, Vec<String>), String> {
+type ApprovalBinding = (Vec<u8>, Vec<String>, Vec<String>);
+
+fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<ApprovalBinding, String> {
     let subject = args.task_id.as_ref().map(ToString::to_string)
         .or_else(|| args.scenario_id.as_ref().map(ToString::to_string))
         .ok_or("give --task-id or --scenario-id")?;
@@ -613,27 +634,32 @@ fn approval_binding(repo: &Path, args: &ApprovalPayloadArgs) -> Result<(Vec<u8>,
         || first_row_line_break(&args.approval_by).is_some() {
         return Err("--approver must be a non-empty trimmed single-line identity".into());
     }
+    #[expect(clippy::map_err_ignore, reason = "the error is a fixed message string with no source slot; the chrono parse detail is not part of the pinned wording")]
     let at = args.approval_at.parse::<DateTime<Utc>>()
         .map_err(|_| "--approval-at must be an RFC3339 timestamp")?;
     if let Some(task) = &args.task_id {
         crate::dispatch::validate_task_binding(repo, task).map_err(|error| error.to_string())?;
     }
-    let mut surface = canon_gate::risk::artifact_changed_paths(repo, &args.artifact_sha)?;
+    let mut surface = canon_gate::risk::artifact_changed_paths(repo, &args.artifact_sha).map_err(|error| error.to_string())?;
     for value in &args.surface_ref {
-        parse_surface_ref(value)?;
+        parse_surface_ref(value).map_err(|error| error.to_string())?;
         if value.starts_with("effect:") {
             surface.push(value.clone());
         }
     }
     let surface = normalized_strings(&surface);
     let effects = normalized_strings(&surface.iter().filter_map(|value| value.strip_prefix("effect:").map(str::to_string)).collect::<Vec<_>>());
-    let payload = approval_payload_bytes(
-        APPROVAL_NAMESPACE, &subject,
-        args.project_id.as_ref().map(ToString::to_string).as_deref(),
-        &args.artifact_sha.to_string(),
-        args.run_id.as_ref().map(ToString::to_string).as_deref(),
-        &surface, &effects, &args.approval_by, &at,
-    );
+    let payload = approval_payload_bytes(&ApprovalPayload {
+        namespace: APPROVAL_NAMESPACE,
+        subject: &subject,
+        project: args.project_id.as_ref().map(ToString::to_string).as_deref(),
+        artifact_sha: &args.artifact_sha.to_string(),
+        run_id: args.run_id.as_ref().map(ToString::to_string).as_deref(),
+        surface: &surface,
+        effects: &effects,
+        actor: &args.approval_by,
+        timestamp: &at,
+    });
     Ok((payload, surface, effects))
 }
 
@@ -706,7 +732,7 @@ pub struct EvidenceAddReport {
 impl crate::reports::Report for EvidenceAddReport {}
 
 /// Emit only the exact signable bytes to stdout; never stage or sign.
-pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> i32 {
+pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> u8 {
     use std::io::Write;
     let repo = resolve_repo_root(repo);
     if let Some(project_id) = &args.project_id {
@@ -729,7 +755,7 @@ pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> i32 {
             }
         },
         Err(error) => {
-            CliError::refused("EVIDENCE_REFUSED", error.to_string()).hint("fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)").emit("canon evidence approval-payload", args.json)
+            CliError::refused("EVIDENCE_REFUSED", error.clone()).hint("fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)").emit("canon evidence approval-payload", args.json)
         }
     }
 }
@@ -749,7 +775,7 @@ pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> i32 {
 /// `canon_gate::stage_divergence`, and it is the honest shape — two
 /// attestations made at two times are two pieces of evidence, not one
 /// re-stated.
-pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
+pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
     // `validate_task_binding` resolves `<repo>/canon.yaml` directly, no
     // ancestor walk of its own — so the walk happens HERE, once, exactly
     // as `crate::gate`'s every subcommand does it.
@@ -765,7 +791,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         return CliError::refused("EVIDENCE_INVALID_ARGUMENT", "--kind and --ref must both be non-empty; an empty companion narrows the gate's typed evidence slice to nothing").hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
     if let Err(error) = check_all_scenarios_flags(args) {
-        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", error.to_string()).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
+        return CliError::refused("EVIDENCE_INVALID_ARGUMENT", error.clone()).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
     }
     if let Err(error) = check_artifact_scopes(args) {
         return error.emit(&args.full(), args.json);
@@ -780,7 +806,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     let audit = match audit_of(args) {
         Ok(audit) => audit,
         Err(error) => {
-            return CliError::refused("EVIDENCE_INVALID_ARGUMENT", error.to_string()).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
+            return CliError::refused("EVIDENCE_INVALID_ARGUMENT", error.clone()).hint("`canon schema evidence add` lists the accepted arguments and their forms").emit(&args.full(), args.json);
         }
     };
     // An audit's result is a claim; so is `--verdict`. With neither, a bound
@@ -815,13 +841,13 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         if approver.trim().is_empty() || approver.trim() != approver || approver.chars().any(|ch| matches!(ch, '\n' | '\r')) {
             return CliError::refused("EVIDENCE_APPROVAL_INVALID", "approval identity must be a non-empty trimmed single-line value").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
-        if args.approval_role.as_ref().map_or(true, |role| role.as_str() != "human") {
+        if args.approval_role.as_ref().is_none_or(|role| role.as_str() != "human") {
             return CliError::refused("EVIDENCE_APPROVAL_INVALID", "only the human approval role can satisfy risk approval").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
         if args.approval_at.as_deref().and_then(|value| value.parse::<DateTime<Utc>>().ok()).is_none() {
             return CliError::refused("EVIDENCE_APPROVAL_INVALID", "--approval-at must be an RFC3339 timestamp").hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
-        let signature_path = args.approval_signature_file.as_ref().unwrap();
+        let signature_path = args.approval_signature_file.as_ref().expect("approval_requested implies --signature-file");
         if !signature_path.is_file() {
             return CliError::refused("EVIDENCE_APPROVAL_INVALID", format!("detached signature file does not exist: {}", signature_path.display())).hint("pass --approver, --approval-role human, --signature-file and --approval-at together (--rev names the commit it binds); `canon evidence approval-payload` prints the bytes to sign").emit(&args.full(), args.json);
         }
@@ -918,7 +944,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
     let mut gate_context = match load_gate_context(&repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit(&args.full(), args.json);
+            return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit(&args.full(), args.json);
         }
     };
     let refusals = brief_refusals(&repo, &gate_context, &crate::brief_check::FlowChangesIndex::lazy(), args.task_id.as_ref(), args.project_id.as_ref().zip(args.scenario_id.as_ref()));
@@ -958,10 +984,10 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         actor = actor.with_session(session_id.clone());
     }
     let mut record = EvidenceRecord::new(
-        Envelope::current(RecordKind::EvidenceRecord, at, actor),
+        Envelope::current(RecordKind::Evidence, at, actor),
         args.task_id.clone(),
         args.scenario_id.clone(),
-        args.run_id.clone(),
+        args.run_id,
         verdict,
     )
     .with_attachments(bound.attachments.clone())
@@ -981,29 +1007,29 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         record = record.with_project_id(project_id.clone());
     }
     if approval_requested {
-        let approver = args.approval_by.as_ref().unwrap();
-        let role = args.approval_role.as_ref().unwrap();
-        let approval_at = args.approval_at.as_ref().unwrap().parse::<DateTime<Utc>>().unwrap();
+        let approver = args.approval_by.as_ref().expect("approval_requested implies --approver");
+        let role = args.approval_role.as_ref().expect("approval_requested implies --approval-role");
+        let approval_at = args.approval_at.as_ref().expect("approval_requested implies --approval-at").parse::<DateTime<Utc>>().expect("--approval-at was validated as RFC3339 above");
         let artifact_sha = &args.commit.sha;
-        let subject = args.task_id.as_ref().map(ToString::to_string).or_else(|| args.scenario_id.as_ref().map(ToString::to_string)).unwrap();
+        let subject = args.task_id.as_ref().map(ToString::to_string).or_else(|| args.scenario_id.as_ref().map(ToString::to_string)).expect("a task or scenario id was required above");
         let (payload, surface, effects) = match approval_binding(&repo, &ApprovalPayloadArgs {
             task_id: args.task_id.clone(),
             scenario_id: args.scenario_id.clone(),
             project_id: args.project_id.clone(),
-            run_id: args.run_id.clone(),
+            run_id: args.run_id,
             artifact_sha: artifact_sha.clone(),
             surface_ref: args.surface_ref.clone(),
             approval_by: approver.clone(),
-            approval_at: args.approval_at.clone().unwrap(),
+            approval_at: args.approval_at.clone().expect("approval_requested implies --approval-at"),
             json: args.json,
         }) {
             Ok(binding) => binding,
             Err(error) => {
-                return CliError::refused("EVIDENCE_REFUSED", error.to_string()).hint("fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)").emit(&args.full(), args.json);
+                return CliError::refused("EVIDENCE_REFUSED", error.clone()).hint("fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)").emit(&args.full(), args.json);
             }
         };
         record = record.with_surface_ref(surface.clone());
-        let signature_path = args.approval_signature_file.as_ref().unwrap();
+        let signature_path = args.approval_signature_file.as_ref().expect("approval_requested implies --signature-file");
         let signature = match std::fs::read(signature_path) {
             Ok(signature) => signature,
             Err(error) => {
@@ -1022,11 +1048,8 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
         if let Err(error) = verify_risk_approval(&payload, &signature, approver, &allowed_signers) {
             return CliError::failed("EVIDENCE_APPROVAL_INVALID", error.to_string()).hint("sign the exact bytes `canon evidence approval-payload` prints with a key listed in the policy's allowed_signers, then record the approval again").emit(&args.full(), args.json);
         }
-        let signature = match String::from_utf8(signature) {
-            Ok(signature) => signature,
-            Err(_) => {
-                return CliError::refused("EVIDENCE_APPROVAL_INVALID", "detached signature must be UTF-8 armored SSH signature text").hint("sign the bytes `canon evidence approval-payload` prints with `ssh-keygen -Y sign` and pass the armored output as --signature-file").emit(&args.full(), args.json);
-            }
+        let Ok(signature) = String::from_utf8(signature) else {
+            return CliError::refused("EVIDENCE_APPROVAL_INVALID", "detached signature must be UTF-8 armored SSH signature text").hint("sign the bytes `canon evidence approval-payload` prints with `ssh-keygen -Y sign` and pass the armored output as --signature-file").emit(&args.full(), args.json);
         };
         record = record.with_approval(EvidenceApproval {
             approver: approver.clone(),
@@ -1037,7 +1060,7 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> i32 {
             subject: Some(subject),
             project_id: args.project_id.clone(),
             artifact_sha: Some(artifact_sha.clone()),
-            run_id: args.run_id.clone(),
+            run_id: args.run_id,
             surface,
             effects,
         });
@@ -1116,7 +1139,7 @@ fn repeat_of_latest(ledger_root: &Path, body: &serde_json::Value) -> Option<crat
 /// it writes any of them: the ledger, the staging area and the reviews are
 /// read once for all of them, not once per body.
 fn repeats_of_latest(ledger_root: &Path, bodies: &[serde_json::Value]) -> Vec<Option<crate::retry::Existing>> {
-    let corpus = crate::retry::RepeatCorpus::read(ledger_root, Some(&evidence_staging_dir(ledger_root)), RecordKind::EvidenceRecord.as_str(), Some(RecordKind::Review.as_str()));
+    let corpus = crate::retry::RepeatCorpus::read(ledger_root, Some(&evidence_staging_dir(ledger_root)), RecordKind::Evidence.as_str(), Some(RecordKind::Review.as_str()));
     bodies
         .iter()
         .map(|body| {
@@ -1277,12 +1300,12 @@ fn check_artifact_scopes(args: &EvidenceArgs) -> Result<(), CliError> {
 /// share the stored report blob and `--artifact` files. Prints one line
 /// per record, then each unindexed scenario id it skipped, then any
 /// review the batch makes stale.
-fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
+fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
     let project_id = args.project_id.as_ref().expect("--all-scenarios requires --project-id, checked by check_all_scenarios_flags");
     let mut gate_context = match load_gate_context(repo) {
         Ok(ctx) => ctx,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon evidence add", args.json);
+            return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon evidence add", args.json);
         }
     };
     let mut indexed: Vec<&ScenarioId> =
@@ -1322,7 +1345,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
     let flow_changes = crate::brief_check::FlowChangesIndex::lazy();
     let refusals: Vec<Vec<BriefRefusal>> = scenario_ids.iter().map(|id| brief_refusals(repo, &gate_context, &flow_changes, None, Some((project_id, id)))).collect();
     if let Err(error) = report_brief_refusals(args, &refusals.concat()) {
-        let hint = format!("no record of the batch is written; {}", error.hint.as_deref().unwrap_or_default());
+        let hint = format!("no record of the batch is written; {}", error.hint_text().unwrap_or_default());
         return error.hint(hint).emit("canon evidence add", args.json);
     }
 
@@ -1339,7 +1362,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
         .zip(&scenario_ids)
         .zip(&refusals)
         .map(|((binding, id), refusals)| {
-            let mut record = EvidenceRecord::new(Envelope::current(RecordKind::EvidenceRecord, at, actor.clone()), None, Some(id.clone()), args.run_id.clone(), binding.verdict)
+            let mut record = EvidenceRecord::new(Envelope::current(RecordKind::Evidence, at, actor.clone()), None, Some(id.clone()), args.run_id, binding.verdict)
                 .with_attachments(binding.attachments.clone())
                 .with_project_id(project_id.clone())
                 .with_evidence_sha(args.commit.sha.clone())
@@ -1381,7 +1404,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
     let landed = match land_batch(repo, &ledger_root, &batch.files, bodies, promote, &mut |tier, write| tier.write(write)) {
         Ok(landed) => landed,
         Err((error, code)) => {
-            return CliError::failed("EVIDENCE_BATCH_REFUSED", error.to_string())
+            return CliError::failed("EVIDENCE_BATCH_REFUSED", error.clone())
                 .hint("no record of the batch is written: every record and blob this run staged, promoted or stored was removed")
                 .with_exit(code)
                 .emit("canon evidence add", args.json);
@@ -1409,7 +1432,7 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> i32 {
     let mut skipped = Vec::new();
     for (id, case) in &batch.unindexed {
         crate::say!(json, "canon evidence add: skipped {id} — not an indexed scenario of spec root `{}` (case `{case}`); index it (`canon inventory sync`) or fix the test name", project_id.as_str());
-        skipped.push(SkippedCase { scenario_id: id.to_string(), case: case.to_string(), reason: "not an indexed scenario" });
+        skipped.push(SkippedCase { scenario_id: id.clone(), case: case.clone(), reason: "not an indexed scenario" });
     }
     if batch.without_id > 0 {
         crate::say!(json, "canon evidence add: skipped {} case(s) that carry no scenario id", batch.without_id);
@@ -1460,9 +1483,9 @@ fn land_batch(
     bodies: Vec<serde_json::Value>,
     promote: bool,
     write: &mut dyn FnMut(&GitTier, &RawWrite) -> Result<canon_store::tier::WriteReceipt, canon_store::tier::StoreError>,
-) -> Result<LandedBatch, (String, i32)> {
+) -> Result<LandedBatch, (String, u8)> {
     let staging_root = evidence_staging_dir(ledger_root);
-    let kind_dir = format!("kind={}", RecordKind::EvidenceRecord.as_str());
+    let kind_dir = format!("kind={}", RecordKind::Evidence.as_str());
     let mut destinations = vec![staging_root.join(&kind_dir)];
     if promote {
         destinations.push(ledger_root.join(&kind_dir));
@@ -1488,7 +1511,7 @@ fn land_batch(
             }
         }
         if locations.iter().any(|location| location.promoted.is_some()) {
-            crate::ledger::restore_after_rollback(ledger_root, RecordKind::EvidenceRecord);
+            crate::ledger::restore_after_rollback(ledger_root, RecordKind::Evidence);
         }
         held.rollback();
     };
@@ -1590,7 +1613,7 @@ fn print_stale_reviews(stale: &[Review], promoted: bool, json: bool) -> Vec<Stal
                 review.reviewer,
                 review.target()
             );
-            StaleReview { reviewer: review.reviewer.to_string(), scenario_id: review.target().to_string(), repin }
+            StaleReview { reviewer: review.reviewer.clone(), scenario_id: review.target().to_string(), repin }
         })
         .collect()
 }
@@ -1644,8 +1667,8 @@ fn repin_command(review: &Review) -> String {
 /// whatever it could store: whether an unstored file matters is the
 /// gate's question, and a superseded record's lost file never does. `2`
 /// when the ledger cannot be read or a write fails.
-pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) -> i32 {
-    use canon_gate::artifact_store::{working_tree_path, ArtifactStore, Observed, StoreError, StoreLock, StoreOutcome, MIB};
+pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) -> u8 {
+    use canon_gate::artifact_store::{working_tree_path, ArtifactStore, ArtifactStoreError, Observed, StoreLock, StoreOutcome, MIB};
 
     let repo = resolve_repo_root(repo);
     // The gate's own context, so the reviews vaulted are exactly the ones
@@ -1654,7 +1677,7 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
     let gate_context = match GateCtx::from_repo(&repo).map_err(|e| e.to_string()).and_then(|ctx| GateContext::load(ctx, &SchemaRegistry::load(), Utc::now()).map_err(|e| e.to_string())) {
         Ok(gate_context) => gate_context,
         Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon artifacts store", json);
+            return CliError::refused("CONFIG_UNREADABLE", e.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon artifacts store", json);
         }
     };
     let files: std::collections::BTreeSet<(String, String)> = gate_context
@@ -1700,14 +1723,11 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
             missing.push(format!("{path} (recorded sha256 {sha256}): the recorded path leaves the repository"));
             continue;
         };
-        let file = match std::fs::File::open(&source) {
-            Ok(file) => file,
-            Err(_) => {
-                missing.push(format!("{path} (recorded sha256 {sha256}): working tree: missing"));
-                continue;
-            }
+        let Ok(file) = std::fs::File::open(&source) else {
+            missing.push(format!("{path} (recorded sha256 {sha256}): working tree: missing"));
+            continue;
         };
-        let size = file.metadata().map(|m| m.len()).unwrap_or(0);
+        let size = file.metadata().map_or(0, |m| m.len());
         if size > max_bytes {
             missing.push(format!(
                 "{path} (recorded sha256 {sha256}): {size} bytes, over the limit of {max_bytes} bytes; raise it with {} <MiB>",
@@ -1726,7 +1746,7 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
         match outcome {
             Ok(StoreOutcome::Stored) => stored.push(format!("{} <- {path}", store.display(sha256))),
             Ok(StoreOutcome::AlreadyStored) => already += 1,
-            Err(StoreError::Changed { actual, .. }) => missing.push(format!("{path} (recorded sha256 {sha256}): working tree: {actual}")),
+            Err(ArtifactStoreError::Changed { actual, .. }) => missing.push(format!("{path} (recorded sha256 {sha256}): working tree: {actual}")),
             Err(e) => {
                 return CliError::refused("ARTIFACTS_STORE_FAILED", format!("could not write {}: {e}", store.display(sha256))).hint(e.hint()).emit("canon artifacts store", json);
             }
@@ -1763,7 +1783,7 @@ pub fn run_store(repo: &Path, max_artifact_mib: u64, dry_run: bool, json: bool) 
 }
 
 /// `canon artifacts store`: what the pass stored, or with `--dry-run` would store.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ArtifactsStoreReport<'a> {
     /// True when `--dry-run` previewed the pass without writing.
@@ -1795,12 +1815,18 @@ fn verdict_slug(verdict: EvidenceVerdict) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use canon_store::tier::TierQuery;
     use tempfile::TempDir;
 
     use super::*;
+
+    #[test]
+    fn the_value_parsers_refuse_in_their_old_words() {
+        assert_eq!(parse_verdict("maybe").unwrap_err().to_string(), "`maybe` is not an evidence verdict — expected one of: faithful, not-applicable, divergent");
+        assert_eq!(parse_surface_ref(" x").unwrap_err().to_string(), "surface refs must be non-empty, trimmed, and contain no line separators or NUL");
+        assert_eq!(parse_surface_ref("effect:Bad").unwrap_err().to_string(), "effect surface refs must use `effect:<kebab-slug>`");
+        assert_eq!(parse_surface_ref("../x").unwrap_err().to_string(), "path surface refs must be repository-relative and stay inside the repository");
+    }
 
     /// The smallest repo `canon evidence add` → `canon gate promote` →
     /// `canon task done` can actually run against: one configured
@@ -1859,11 +1885,11 @@ mod tests {
 
     fn staged_count(repo: &Path) -> usize {
         let root = evidence_staging_dir(&GateCtx::from_repo(repo).unwrap().ledger_root);
-        GitTier::new(root).read(&TierQuery::kind(RecordKind::EvidenceRecord)).map(|read| read.records.len()).unwrap_or(0)
+        GitTier::new(root).read(&TierQuery::kind(RecordKind::Evidence)).map_or(0, |read| read.records.len())
     }
 
     fn committed(repo: &Path) -> Vec<RawRecord> {
-        GitTier::new(GateCtx::from_repo(repo).unwrap().ledger_root).read(&TierQuery::kind(RecordKind::EvidenceRecord)).expect("reading the committed ledger").records
+        GitTier::new(GateCtx::from_repo(repo).unwrap().ledger_root).read(&TierQuery::kind(RecordKind::Evidence)).expect("reading the committed ledger").records
     }
 
     /// s42 task 4.3, the whole point of the change: a checkbox flips on
@@ -1872,7 +1898,7 @@ mod tests {
     #[test]
     fn the_full_add_promote_task_path_flips_a_real_checkbox() {
         let tmp = repo_with_plan_corpus();
-        let repo: PathBuf = tmp.path().to_path_buf();
+        let repo = tmp.path().to_path_buf();
 
         assert_eq!(run_add(&repo, &args(Some("the add -> promote -> task loop exercised this row"))), 0, "staging must succeed");
         assert_eq!(staged_count(&repo), 1, "the record must be in _staging, not committed");
@@ -2012,7 +2038,7 @@ mod tests {
             let verdict = parse_verdict(slug).expect("an accepted spelling");
             assert_eq!(verdict_slug(verdict), slug);
         }
-        let err = parse_verdict("passing").expect_err("an unknown verdict is refused");
+        let err = parse_verdict("passing").expect_err("an unknown verdict is refused").to_string();
         assert!(err.contains("faithful"), "the refusal must name the domain: {err}");
     }
 
@@ -2020,9 +2046,9 @@ mod tests {
     fn surface_ref_validation_preserves_effect_and_rejects_unsafe_paths() {
         assert_eq!(parse_surface_ref("effect:secret-access").unwrap(), "effect:secret-access");
         assert_eq!(parse_surface_ref("src/auth/login.rs").unwrap(), "src/auth/login.rs");
-        assert!(parse_surface_ref("../outside").is_err());
-        assert!(parse_surface_ref("/absolute/path").is_err());
-        assert!(parse_surface_ref("effect:Secret-Access").is_err());
+        parse_surface_ref("../outside").unwrap_err();
+        parse_surface_ref("/absolute/path").unwrap_err();
+        parse_surface_ref("effect:Secret-Access").unwrap_err();
     }
 
     /// LAYER ONE of the newline-injection fix (module doc): the exact
@@ -2080,7 +2106,7 @@ mod tests {
     /// refusal existed would.
     fn stage_note_verbatim(repo: &Path, summary: &str) {
         let record = EvidenceRecord::new(
-            Envelope::current(RecordKind::EvidenceRecord, Utc::now(), Actor::new("canon", RoleId::parse("implementer").expect("a literal role"))),
+            Envelope::current(RecordKind::Evidence, Utc::now(), Actor::new("canon", RoleId::parse("implementer").expect("a literal role"))),
             Some(TaskId::parse("demo-change#1.1").expect("a literal task id")),
             None,
             None,
@@ -2118,7 +2144,7 @@ mod tests {
 
     /// A scenario-keyed evidence body by `actor`, as a batch stages it.
     fn batch_body(scenario: &str, actor: Actor) -> serde_json::Value {
-        let record = EvidenceRecord::new(Envelope::current(RecordKind::EvidenceRecord, Utc::now(), actor), None, Some(ScenarioId::parse(scenario).unwrap()), None, EvidenceVerdict::Faithful)
+        let record = EvidenceRecord::new(Envelope::current(RecordKind::Evidence, Utc::now(), actor), None, Some(ScenarioId::parse(scenario).unwrap()), None, EvidenceVerdict::Faithful)
             .with_project_id(ProjectId::parse("root").unwrap());
         serde_json::to_value(&record).unwrap()
     }
@@ -2135,7 +2161,7 @@ mod tests {
         let files: Vec<crate::evidence_attach::BoundFile> =
             crate::evidence_attach::bind_artifacts(repo, &[repo.join("junit.xml")], 1024).unwrap().into_iter().map(|(_, file)| file).collect();
         let store = canon_gate::artifact_store::store_dir(repo);
-        let blobs = || std::fs::read_dir(&store).map(|d| d.count()).unwrap_or(0);
+        let blobs = || std::fs::read_dir(&store).map_or(0, std::iter::Iterator::count);
         let implementer = || Actor::new("impl", RoleId::parse("implementer").unwrap());
         let bodies = || vec![batch_body("cart.add.01", implementer()), batch_body("cart.add.02", implementer())];
 
@@ -2162,13 +2188,13 @@ mod tests {
         assert_eq!((staged_count(repo), committed(repo).len(), blobs()), (0, 0, 0), "the first committed record is removed too");
 
         // A read-only destination is refused before anything is written.
-        let staging_kind = evidence_staging_dir(&ledger_root).join("kind=evidence_record");
-        let mut readonly = std::fs::metadata(&staging_kind).unwrap().permissions();
+        let staging_kind = evidence_staging_dir(&ledger_root).join("kind=evidence");
+        let original = std::fs::metadata(&staging_kind).unwrap().permissions();
+        let mut readonly = original.clone();
         readonly.set_readonly(true);
-        std::fs::set_permissions(&staging_kind, readonly.clone()).unwrap();
-        let outcome = land_batch(repo, &ledger_root, &files, bodies(), true, &mut |tier, write| tier.write(write));
-        readonly.set_readonly(false);
         std::fs::set_permissions(&staging_kind, readonly).unwrap();
+        let outcome = land_batch(repo, &ledger_root, &files, bodies(), true, &mut |tier, write| tier.write(write));
+        std::fs::set_permissions(&staging_kind, original).unwrap();
         assert!(matches!(&outcome, Err((e, 2)) if e.contains("is read-only")), "{:?}", outcome.as_ref().err());
         assert_eq!(blobs(), 0);
 

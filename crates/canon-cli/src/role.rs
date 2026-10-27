@@ -108,14 +108,22 @@ fn policy_roles(repo: &std::path::Path) -> Vec<String> {
                     walk(child, out);
                 }
             }
-            Value::Sequence(items) => items.iter().for_each(|item| walk(item, out)),
+            Value::Sequence(items) => {
+                for item in items {
+                    walk(item, out);
+                }
+            }
             _ => {}
         }
     }
     fn collect_strings(value: &serde_yaml::Value, out: &mut Vec<String>) {
         match value {
             serde_yaml::Value::String(text) => out.push(text.clone()),
-            serde_yaml::Value::Sequence(items) => items.iter().for_each(|item| collect_strings(item, out)),
+            serde_yaml::Value::Sequence(items) => {
+                for item in items {
+                    collect_strings(item, out);
+                }
+            }
             _ => {}
         }
     }

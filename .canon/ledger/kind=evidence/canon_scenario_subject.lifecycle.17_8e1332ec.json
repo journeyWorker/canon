@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:37:15.266829399Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject an_override_never_waives_the_ship_gate_and_a_blank_reason_is_refused"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 93,
+  "scenario_id": "subject.lifecycle.17",
+  "schema": 1,
+  "staging_id": "d34dc25f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

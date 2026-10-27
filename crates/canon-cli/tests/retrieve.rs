@@ -13,7 +13,7 @@ use std::path::Path;
 use std::process::{Command, Output};
 
 use canon_cli::retrieve::derive_candidates;
-use canon_learn::{ParquetStrategyStore, StrategyId, StrategyItem, StrategyStore, TrajectoryId};
+use canon_learn::{ParquetStrategyStore, StrategyId, StrategyItem, StrategyItemFields, StrategyStore, TrajectoryId};
 use canon_model::ids::{RegimeKey, RoleId, SubjectId, regime_key};
 use chrono::Utc;
 
@@ -36,7 +36,7 @@ fn stderr(output: &Output) -> String {
 fn seed_strategy(repo: &Path, regime_key: &RegimeKey, role: &RoleId, title: &str) {
     let store = ParquetStrategyStore::open(repo.join(".canon").join("learn").join("strategies"));
     let item =
-        StrategyItem::new(StrategyId::new(), regime_key.clone(), role.clone(), title, "description", "content", vec![TrajectoryId::new()], Utc::now());
+        StrategyItem::new(StrategyItemFields { id: StrategyId::new(), regime_key: regime_key.clone(), role: role.clone(), title: title.into(), description: "description".into(), content: "content".into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() });
     store.append(&item).expect("seed strategy");
 }
 

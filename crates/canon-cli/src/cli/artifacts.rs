@@ -2,7 +2,7 @@
 
 use clap::{Args, Subcommand};
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum ArtifactsCommand {
     /// Check that the artifact store holds every file the latest evidence and current reviews bind (--full re-hashes the stored bytes)
     #[command(after_help = "Asks the store canon.yaml's `artifacts:` block selects (default: local, .canon/artifacts/sha256) about each bound file, the way `canon gate check` does. For an object store that is one HEAD per distinct digest plus the size and sha256 metadata written at upload; --full downloads each blob and re-hashes it.\n\nExit 0 when every file is stored, 1 when one is missing or altered (data.problems names each), 2 when the store cannot be used or reached: an unreachable store is a refusal, never a pass.")]
@@ -15,7 +15,7 @@ pub enum ArtifactsCommand {
     Move(ArtifactsMoveArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct ArtifactsVerifyArgs {
     /// Download every blob and re-hash it, instead of trusting the store's size and digest metadata
     #[arg(long)]
@@ -27,7 +27,7 @@ pub struct ArtifactsVerifyArgs {
     pub json: bool,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct ArtifactsStoreArgs {
     /// Per-file size limit for the artifact store, in MiB
     #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
@@ -43,7 +43,7 @@ pub struct ArtifactsStoreArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct ArtifactsMoveArgs {
     /// The tier to move to: the name of an `s3` tier in canon.yaml (for example `cold`)
     #[arg(long, value_name = "TIER")]

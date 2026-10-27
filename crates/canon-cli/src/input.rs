@@ -51,7 +51,7 @@ const FLAGS_ONLY: &[&str] = &["repo", "as", "json", "input", "commit", "plan-dig
 const BATCH_EXAMPLES: &[(&str, &str)] = &[
     ("scenario new", r#"[{"operands":["auth.login.01"],"title":"Logs in","case":"happy"},{"operands":["auth.login.02"],"title":"Signs out","case":"happy"}]"#),
     ("evidence add", r#"[{"scenarioId":"auth.login.01","class":"test-run","ref":"npm test","role":"implementer"},{"scenarioId":"auth.login.02","class":"test-run","ref":"npm test","role":"implementer"}]"#),
-    ("finding add", r#"[{"changeId":"add-login","round":1,"seq":1,"severity":"note","actorId":"reviewer-1","summary":"Token is logged"},{"changeId":"add-login","round":1,"seq":2,"severity":"blocker","actorId":"reviewer-1","summary":"No rate limit"}]"#),
+    ("finding add", r#"[{"changeId":"add-login","round":1,"seq":1,"severity":"note","actorId":"reviewer-1","summary":"Token is logged"},{"changeId":"add-login","round":1,"seq":2,"severity":"blocker","introducedUnknown":true,"actorId":"reviewer-1","summary":"No rate limit"}]"#),
     ("divergence add", r#"[{"operands":["auth.login.01"],"actorId":"reviewer-1","role":"reviewer"},{"operands":["auth.login.02"],"actorId":"reviewer-1","role":"reviewer"}]"#),
     ("subject new", r#"[{"operands":["payments"],"domain":"dev","title":"Payments"},{"operands":["billing"],"domain":"dev","title":"Billing"}]"#),
 ];
@@ -200,7 +200,7 @@ impl Leaf {
                     possible: a.get_possible_values().iter().filter(|v| !v.is_hide_set()).map(|v| v.get_name().to_string()).collect(),
                     negatable: args.iter().any(|o| o.get_long().is_some_and(|l| l.strip_prefix("no-") == Some(long))),
                     required: a.is_required_set(),
-                    help: a.get_help().map(|h| h.to_string()),
+                    help: a.get_help().map(std::string::ToString::to_string),
                     default: if kind == Kind::Value { a.get_default_values().iter().map(|v| v.to_string_lossy().into_owned()).collect() } else { Vec::new() },
                 })
             })
@@ -237,8 +237,8 @@ impl Leaf {
             has_dry_run: keys.iter().any(|k| k.long == "dry-run"),
             keys,
             operands,
-            operand_help: positionals.first().and_then(|a| a.get_help()).map(|h| h.to_string()),
-            operand_names: positionals.iter().flat_map(|a| [a.get_id().to_string(), a.get_value_names().and_then(|v| v.first()).map(|v| v.to_string()).unwrap_or_default()]).collect(),
+            operand_help: positionals.first().and_then(|a| a.get_help()).map(std::string::ToString::to_string),
+            operand_names: positionals.iter().flat_map(|a| [a.get_id().to_string(), a.get_value_names().and_then(|v| v.first()).map(std::string::ToString::to_string).unwrap_or_default()]).collect(),
             one_of,
         }
     }
@@ -324,7 +324,7 @@ struct Lexed {
 }
 
 fn find_long<'a>(cmd: &'a Command, name: &str) -> Option<&'a Arg> {
-    cmd.get_arguments().find(|a| a.get_long() == Some(name) || a.get_all_aliases().is_some_and(|aliases| aliases.iter().any(|alias| *alias == name)))
+    cmd.get_arguments().find(|a| a.get_long() == Some(name) || a.get_all_aliases().is_some_and(|aliases| aliases.contains(&name)))
 }
 
 fn find_short(cmd: &Command, short: char) -> Option<&Arg> {
@@ -433,6 +433,7 @@ fn too_large(what: &str) -> CliError {
 }
 
 /// Reads at most [`MAX_BYTES`] from `reader`; one byte more is `INPUT_TOO_LARGE`.
+#[expect(clippy::map_err_ignore, reason = "`refused` takes a message and a hint, no source; the message already says the input is not UTF-8")]
 fn read_capped(reader: impl Read, what: &str) -> Result<String, CliError> {
     let mut bytes = Vec::new();
     reader.take(MAX_BYTES + 1).read_to_end(&mut bytes).map_err(|e| refused("INPUT_UNREADABLE", format!("{what} could not be read: {e}"), "check that the file is readable, or pass the document inline"))?;
@@ -687,6 +688,7 @@ fn assemble(base: &Base<'_>, settings: &[Setting], prefix: &str) -> Result<Vec<S
 // ---------------------------------------------------------------- expand
 
 /// What `main` does with the command line after [`expand`].
+#[derive(Debug)]
 pub enum Expanded {
     /// Parse and run this command line.
     Argv(Vec<OsString>),
@@ -725,7 +727,7 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
     }
     let leaf = Leaf::of(cmd, &path);
     let command_name = leaf.command();
-    let fail = |error: CliError| Expanded::Exit(ExitCode::from(error.emit(&command_name, json) as u8));
+    let fail = |error: CliError| Expanded::Exit(ExitCode::from(error.emit(&command_name, json)));
     let [input] = inputs.as_slice() else {
         return fail(refused("INPUT_INVALID", "`--input` was given more than once", "give one `--input`; a batch is one array or NDJSON file").field("--input"));
     };
@@ -782,13 +784,13 @@ pub fn expand(root: &Command, args: Vec<OsString>) -> Expanded {
 // ---------------------------------------------------------------- batch
 
 /// A failure of the validation pass: the error with its field already a pointer into the batch.
-fn pointed(mut error: CliError, map: &DocMap, prefix: &str) -> CliError {
-    error.field = match error.field.as_deref() {
-        Some(field) => map.pointer(prefix, field).or(error.field),
+fn pointed(error: CliError, map: &DocMap, prefix: &str) -> CliError {
+    let field = match error.field_name() {
+        Some(field) => map.pointer(prefix, field).unwrap_or_else(|| field.to_string()),
         // a refusal about the element as a whole still says which element
-        None => Some(prefix.to_string()),
+        None => prefix.to_string(),
     };
-    error
+    error.field(field)
 }
 
 /// The error of a child's failure envelope, `field` pointed into the batch.
@@ -796,10 +798,18 @@ fn error_of(envelope: &Value, map: &DocMap, prefix: &str) -> CliError {
     let body = &envelope["error"];
     let code = body["code"].as_str().and_then(crate::cli_error::code_info).map_or("INPUT_ELEMENT_FAILED", |info| info.code);
     let mut error = CliError::failed(code, body["message"].as_str().unwrap_or("the element failed without a message")).hint(body["hint"].as_str().unwrap_or("run the element on its own to see its output"));
-    error.field = body["field"].as_str().map(str::to_string);
-    error.received = body["received"].as_str().map(str::to_string);
-    error.expected = body["expected"].as_array().map(|values| values.iter().filter_map(|v| v.as_str().map(str::to_string)).collect());
-    error.suggestions = body["suggestions"].as_array().map(|values| values.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default();
+    if let Some(field) = body["field"].as_str() {
+        error = error.field(field);
+    }
+    if let Some(received) = body["received"].as_str() {
+        error = error.received(received);
+    }
+    if let Some(values) = body["expected"].as_array() {
+        error = error.expected(values.iter().filter_map(Value::as_str));
+    }
+    if let Some(values) = body["suggestions"].as_array() {
+        error = error.suggestions(values.iter().filter_map(Value::as_str));
+    }
     pointed(error, map, prefix)
 }
 
@@ -828,7 +838,7 @@ fn crashed(child: &Child) -> CliError {
 
 fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: &Lexed, items: Vec<Value>, json: bool) -> Expanded {
     let command_name = leaf.command();
-    let exit_refused = |error: CliError| Expanded::Exit(ExitCode::from(error.emit(&command_name, json) as u8));
+    let exit_refused = |error: CliError| Expanded::Exit(ExitCode::from(error.emit(&command_name, json)));
     let exe = match std::env::current_exe() {
         Ok(exe) => exe,
         Err(e) => return exit_refused(CliError::failed("INPUT_ELEMENT_FAILED", format!("canon cannot find its own executable to run the batch: {e}")).hint("run the elements one by one instead")),
@@ -896,7 +906,7 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
     if json {
         let data = BatchReport { items: report };
         return Expanded::Exit(ExitCode::from(match &failure {
-            Some(error) => error.emit_with_data(&command_name, true, &data) as u8,
+            Some(error) => error.emit_with_data(&command_name, true, &data),
             None => {
                 if all_unchanged {
                     crate::json_out::mark_unchanged();
@@ -913,7 +923,7 @@ fn run_batch(root: &Command, leaf: &Leaf, base: &Base<'_>, map: &DocMap, lexed: 
     match failure {
         Some(error) => {
             eprintln!("{}", error.human(&command_name));
-            Expanded::Exit(ExitCode::from(error.exit as u8))
+            Expanded::Exit(ExitCode::from(error.exit))
         }
         None => Expanded::Exit(ExitCode::SUCCESS),
     }
@@ -1056,7 +1066,7 @@ pub fn example_document(cmd: &Command, leaf: &Leaf) -> Option<Value> {
 }
 
 /// One input of a leaf in the spec (`inputs[]`).
-#[derive(Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InputDoc {
     /// The option that carries it.

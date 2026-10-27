@@ -2,13 +2,13 @@
 
 use clap::{Args, Subcommand};
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum LedgerCommand {
     /// Move superseded versions of every record out of the ledger into the archive
     Compact(LedgerCompactArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct LedgerCompactArgs {
     #[command(flatten)]
     pub safety: crate::cli::SafetyArgs,

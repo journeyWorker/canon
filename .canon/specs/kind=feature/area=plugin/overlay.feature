@@ -93,3 +93,15 @@ Feature: plugin overlay
     When the overlay is synced a second time with nothing changed
     Then it reports zero written and two deduped
     And the overlay record count on disk is exactly what it was
+
+  # canon: {"schema":1,"at":"2026-10-26T11:50:36Z","actor":{"agent_id":"impl-030-sb-f2","role":"implementer","session_id":"sb-f2-2026-10-26"}}
+  @subject:plugin-overlay
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F2
+  @plugin.overlay.10
+  Scenario: Plugin sync refuses a plugin id with no installed manifest and writes nothing
+    Given a repo with a canon.yaml and no plugin manifest under .canon/plugins
+    When canon plugin sync is run with a plugin id that has no installed manifest, with and without --json
+    Then it exits 2 with PLUGIN_SYNC_FAILED saying the plugin has no installed manifest
+    And running it with no plugin id exits 2 as a usage error
+    And the tree is unchanged after each refusal

@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:35:28.899114732Z",
+  "attachments": [
+    {
+      "case": "review_add_102_running_the_same_review_again_writes_nothing_and_shows_the_earlier_review_ids",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/030-junit-canon.xml",
+      "sha256": "325366efa06b97a55594e69cb9ae92e432994ce07687e3a2ed997da4ad010bdc"
+    }
+  ],
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/030-junit-canon.xml"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 99,
+  "scenario_id": "review.add.102",
+  "schema": 1,
+  "staging_id": "35df454e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

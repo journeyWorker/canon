@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:27:22.929320781Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_store an_unstored_binding_is_an_advisory_until_canon_evidence_vault_stores_it"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 245,
+  "scenario_id": "evidence.add.17",
+  "schema": 1,
+  "staging_id": "759b2a30",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

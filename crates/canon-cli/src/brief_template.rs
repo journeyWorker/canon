@@ -46,6 +46,7 @@ impl Role {
 }
 
 /// One PRD section: its marker key and role, in brief order.
+#[derive(Debug)]
 pub struct PrdSection {
     pub key: &'static str,
     pub role: Role,
@@ -67,9 +68,16 @@ pub fn kind_parser() -> impl clap::builder::TypedValueParser<Value = ChangeKind>
     crate::cli_error::closed_set(["feature", "chore"], parse_kind)
 }
 
+/// `--kind` named neither `feature` nor `chore`.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum ChangeKindError {
+    #[error("unknown change kind `{0}`; expected `feature` or `chore`")]
+    Unknown(String),
+}
+
 /// `--kind` for clap: `feature` (the default) or `chore`.
-pub fn parse_kind(raw: &str) -> Result<ChangeKind, String> {
-    ChangeKind::parse(raw).ok_or_else(|| format!("unknown change kind `{raw}`; expected `feature` or `chore`"))
+pub fn parse_kind(raw: &str) -> Result<ChangeKind, ChangeKindError> {
+    ChangeKind::parse(raw).ok_or_else(|| ChangeKindError::Unknown(raw.to_string()))
 }
 
 /// What a change is (0.19 D5). A `chore` changes how the subject is
@@ -185,4 +193,15 @@ pub fn brief(kind: ChangeKind, title: &str, language: &Language) -> String {
 /// `language`.
 pub fn heading_of(language: &Language, key: &str) -> &'static str {
     heading_and_hint(language.template(), key).0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_unknown_change_kind_is_refused_in_its_old_words() {
+        assert_eq!(parse_kind("epic").unwrap_err().to_string(), "unknown change kind `epic`; expected `feature` or `chore`");
+        assert_eq!(parse_kind("chore").unwrap(), ChangeKind::Chore);
+    }
 }

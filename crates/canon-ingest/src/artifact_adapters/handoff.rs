@@ -62,6 +62,7 @@ use crate::artifact_adapter::{
     ArtifactAdapter, ArtifactEvent, ArtifactEventKind, ArtifactJoinKey, ArtifactParseOutcome, ArtifactSourceConfig, ArtifactSourceHandle,
 };
 
+#[derive(Debug)]
 pub struct HandoffAdapter;
 
 impl HandoffAdapter {
@@ -201,7 +202,7 @@ impl ArtifactAdapter for HandoffAdapter {
 
 #[cfg(test)]
 mod tests {
-    use canon_model::envelope::{Actor, Envelope, RecordKind};
+    use canon_model::envelope::{Actor, Envelope};
     use canon_model::evidence::RawRecord;
     use canon_model::handoff::{DomainId, HandoffBody};
     use canon_model::ids::HandoffId;

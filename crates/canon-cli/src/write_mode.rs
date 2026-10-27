@@ -86,35 +86,62 @@ struct RawWriteSection {
     promote: Option<PromoteMode>,
 }
 
+/// Why `canon.yaml`'s `write:` section cannot be read.
+#[derive(Debug, thiserror::Error)]
+pub enum WriteModeError {
+    /// `canon.yaml` is not YAML.
+    #[error("canon.yaml is not valid YAML: {0}")]
+    Yaml(#[source] serde_yaml::Error),
+    /// `write:` is not `{ promote: auto | manual }`.
+    #[error("canon.yaml `write:` section is malformed (expected `write: {{ promote: auto | manual }}`): {0}")]
+    Section(#[source] serde_yaml::Error),
+}
+
 /// `write.promote` from `canon.yaml` at `canon_yaml`. A missing file,
 /// an absent `write:` key, or an absent `promote:` is `manual`, so a
 /// repo that never opted in sees no change. A present but malformed
 /// section fails loud: a typo meant to turn promotion on must not
 /// silently leave every record staged.
-pub fn configured_promote_mode(canon_yaml: &Path) -> Result<PromoteMode, String> {
+pub fn configured_promote_mode(canon_yaml: &Path) -> Result<PromoteMode, WriteModeError> {
     let Ok(text) = std::fs::read_to_string(canon_yaml) else {
         return Ok(PromoteMode::Manual);
     };
-    let doc: serde_yaml::Value =
-        serde_yaml::from_str(&text).map_err(|e| format!("canon.yaml is not valid YAML: {e}"))?;
+    let doc: serde_yaml::Value = serde_yaml::from_str(&text).map_err(WriteModeError::Yaml)?;
     let Some(section) = doc.get("write") else {
         return Ok(PromoteMode::Manual);
     };
-    let section: RawWriteSection = serde_yaml::from_value(section.clone())
-        .map_err(|e| format!("canon.yaml `write:` section is malformed (expected `write: {{ promote: auto | manual }}`): {e}"))?;
+    let section: RawWriteSection = serde_yaml::from_value(section.clone()).map_err(WriteModeError::Section)?;
     Ok(section.promote.unwrap_or(PromoteMode::Manual))
 }
 
 /// Whether a staged write in `repo` (already resolved to its root)
 /// promotes in the same run. An explicit flag wins without reading the
 /// config.
-pub fn should_promote(repo: &Path, flag: PromoteFlag) -> Result<bool, String> {
+pub fn should_promote(repo: &Path, flag: PromoteFlag) -> Result<bool, WriteModeError> {
     match flag {
         PromoteFlag::Promote => Ok(true),
         PromoteFlag::NoPromote => Ok(false),
         PromoteFlag::Config => {
             Ok(configured_promote_mode(&repo.join("canon.yaml"))? == PromoteMode::Auto)
         }
+    }
+}
+
+/// Whether a real run could create the file `path`: `path` is not a
+/// directory and its parent is one (`create_parents`: its nearest existing
+/// ancestor is). What a `--dry-run` asks instead of writing, so it refuses
+/// where the real write would.
+pub fn check_creatable(path: &Path, create_parents: bool) -> std::io::Result<()> {
+    if path.is_dir() {
+        return Err(std::io::Error::new(std::io::ErrorKind::IsADirectory, format!("`{}` is a directory", path.display())));
+    }
+    let parent = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let nearest = if create_parents { parent.ancestors().find(|ancestor| ancestor.exists()) } else { Some(parent) };
+    match nearest {
+        Some(dir) if dir.is_dir() => Ok(()),
+        Some(dir) if dir.exists() => Err(std::io::Error::new(std::io::ErrorKind::NotADirectory, format!("`{}` is not a directory", dir.display()))),
+        Some(dir) => Err(std::io::Error::new(std::io::ErrorKind::NotFound, format!("`{}` does not exist", dir.display()))),
+        None => Ok(()),
     }
 }
 
@@ -128,7 +155,7 @@ mod tests {
         if let Some(yaml) = yaml {
             std::fs::write(&path, yaml).unwrap();
         }
-        configured_promote_mode(&path)
+        configured_promote_mode(&path).map_err(|error| error.to_string())
     }
 
     #[test]
@@ -155,38 +182,29 @@ mod tests {
 
     #[test]
     fn a_present_but_malformed_section_fails_loud() {
-        assert!(mode(Some("write: { promote: always }\n")).is_err());
-        assert!(mode(Some("write: { promot: auto }\n")).is_err());
-        assert!(mode(Some("write: auto\n")).is_err());
+        mode(Some("write: { promote: always }\n")).unwrap_err();
+        mode(Some("write: { promot: auto }\n")).unwrap_err();
+        mode(Some("write: auto\n")).unwrap_err();
     }
 
     #[test]
     fn an_explicit_flag_wins_without_reading_the_config() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("canon.yaml"), "write: { promote: bogus }\n").unwrap();
-        assert_eq!(should_promote(dir.path(), PromoteFlag::Promote), Ok(true));
-        assert_eq!(
-            should_promote(dir.path(), PromoteFlag::NoPromote),
-            Ok(false)
-        );
-        assert!(should_promote(dir.path(), PromoteFlag::Config).is_err());
+        assert!(matches!(should_promote(dir.path(), PromoteFlag::Promote), Ok(true)));
+        assert!(matches!(should_promote(dir.path(), PromoteFlag::NoPromote), Ok(false)));
+        should_promote(dir.path(), PromoteFlag::Config).unwrap_err();
     }
-}
 
-/// Whether a real run could create the file `path`: `path` is not a
-/// directory and its parent is one (`create_parents`: its nearest existing
-/// ancestor is). What a `--dry-run` asks instead of writing, so it refuses
-/// where the real write would.
-pub fn check_creatable(path: &Path, create_parents: bool) -> std::io::Result<()> {
-    if path.is_dir() {
-        return Err(std::io::Error::new(std::io::ErrorKind::IsADirectory, format!("`{}` is a directory", path.display())));
-    }
-    let parent = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
-    let nearest = if create_parents { parent.ancestors().find(|ancestor| ancestor.exists()) } else { Some(parent) };
-    match nearest {
-        Some(dir) if dir.is_dir() => Ok(()),
-        Some(dir) if dir.exists() => Err(std::io::Error::new(std::io::ErrorKind::NotADirectory, format!("`{}` is not a directory", dir.display()))),
-        Some(dir) => Err(std::io::Error::new(std::io::ErrorKind::NotFound, format!("`{}` does not exist", dir.display()))),
-        None => Ok(()),
+    #[test]
+    fn the_refusals_read_as_before_and_keep_their_cause() {
+        let message = mode(Some("write: auto\n")).unwrap_err();
+        assert!(message.starts_with("canon.yaml `write:` section is malformed (expected `write: { promote: auto | manual }`): "), "{message}");
+        let message = mode(Some("write: [\n")).unwrap_err();
+        assert!(message.starts_with("canon.yaml is not valid YAML: "), "{message}");
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("canon.yaml"), "write: auto\n").unwrap();
+        let error = should_promote(dir.path(), PromoteFlag::Config).unwrap_err();
+        assert!(std::error::Error::source(&error).is_some());
     }
 }

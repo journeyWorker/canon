@@ -64,8 +64,8 @@ use canon_store::fold::live_bindings_of;
 /// own contract) — pass `Utc::now()` for "right now".
 pub fn current_states(ledger_root: &Path, as_of: DateTime<Utc>) -> BTreeMap<(ProjectId, ScenarioId), FoldedState> {
     let divergences: Vec<Divergence> = read_kind_fail_soft(ledger_root, RecordKind::Divergence);
-    let evidence: Vec<EvidenceRecord> = read_kind_fail_soft(ledger_root, RecordKind::EvidenceRecord);
-    let live_bindings = live_bindings_of(evidence);
+    let evidence: Vec<EvidenceRecord> = read_kind_fail_soft(ledger_root, RecordKind::Evidence);
+    let live_bindings = live_bindings_of(&evidence);
     fold_to_current_state(&divergences, &live_bindings, as_of)
 }
 
@@ -109,10 +109,10 @@ mod tests {
     use canon_model::envelope::{Actor, Envelope};
     use canon_model::ids::{RoleId, Sha, TotalOrder};
     use canon_model::records::{DivergenceStatus, EvidenceVerdict};
-    use canon_store::tier::Tier;
     use tempfile::TempDir;
 
     use super::*;
+    use canon_model::DivergenceFields;
 
     fn actor(role: &str) -> Actor {
         Actor::new("selftest-agent", RoleId::parse(role).unwrap())
@@ -121,24 +121,14 @@ mod tests {
     // A `#[cfg(test)]` fixture builder mirroring `Divergence`'s own
     // field set — the arg count is inherent to the record it
     // constructs, not a design smell worth a params struct here.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "test helper whose argument count is the record's field set; a params struct adds nothing")]
     fn write_divergence(tier: &GitTier, project_id: &str, scenario_id: &str, sha: &str, status: DivergenceStatus, run_seq: u64, round: u32, at: DateTime<Utc>) {
-        let divergence = Divergence::new(
-            Envelope::new(1, RecordKind::Divergence, at, actor("reviewer")),
-            ProjectId::parse(project_id).unwrap(),
-            ScenarioId::parse(scenario_id).unwrap(),
-            Sha::parse(sha).unwrap(),
-            status,
-            TotalOrder::new(run_seq),
-            round,
-            "reviewer-1",
-            "",
-        );
+        let divergence = Divergence::new(DivergenceFields { envelope: Envelope::new(1, RecordKind::Divergence, at, actor("reviewer")), project_id: ProjectId::parse(project_id).unwrap(), scenario_id: ScenarioId::parse(scenario_id).unwrap(), sha: Sha::parse(sha).unwrap(), status, run_seq: TotalOrder::new(run_seq), round, reviewer: "reviewer-1".into(), detail: "".into() });
         tier.write(&divergence).expect("write fixture divergence");
     }
 
     fn write_evidence(tier: &GitTier, project_id: &str, scenario_id: &str, sha: &str, at: DateTime<Utc>) {
-        let record = EvidenceRecord::new(Envelope::new(1, RecordKind::EvidenceRecord, at, actor("implementer")), None, Some(ScenarioId::parse(scenario_id).unwrap()), None, EvidenceVerdict::Faithful)
+        let record = EvidenceRecord::new(Envelope::new(1, RecordKind::Evidence, at, actor("implementer")), None, Some(ScenarioId::parse(scenario_id).unwrap()), None, EvidenceVerdict::Faithful)
             .with_project_id(ProjectId::parse(project_id).unwrap())
             .with_evidence_sha(Sha::parse(sha).unwrap());
         tier.write(&record).expect("write fixture evidence");
@@ -207,17 +197,7 @@ mod tests {
         let tier = GitTier::new(&ledger_root);
 
         let expiry = Utc::now() + chrono::Duration::days(1);
-        let divergence = Divergence::new(
-            Envelope::new(1, RecordKind::Divergence, Utc::now(), actor("reviewer")),
-            ProjectId::parse("app-a").unwrap(),
-            ScenarioId::parse("world.firstbuy-hotdeal.33").unwrap(),
-            Sha::parse("a".repeat(40)).unwrap(),
-            DivergenceStatus::Deferred { reason: "waiting on upstream".to_string(), expiry },
-            TotalOrder::new(1),
-            1,
-            "reviewer-1",
-            "",
-        );
+        let divergence = Divergence::new(DivergenceFields { envelope: Envelope::new(1, RecordKind::Divergence, Utc::now(), actor("reviewer")), project_id: ProjectId::parse("app-a").unwrap(), scenario_id: ScenarioId::parse("world.firstbuy-hotdeal.33").unwrap(), sha: Sha::parse("a".repeat(40)).unwrap(), status: DivergenceStatus::Deferred { reason: "waiting on upstream".to_string(), expiry }, run_seq: TotalOrder::new(1), round: 1, reviewer: "reviewer-1".into(), detail: "".into() });
         tier.write(&divergence).unwrap();
 
         let key = (ProjectId::parse("app-a").unwrap(), ScenarioId::parse("world.firstbuy-hotdeal.33").unwrap());

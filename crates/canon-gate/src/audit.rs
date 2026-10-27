@@ -47,6 +47,7 @@ pub fn latest_audits(ctx: &GateContext) -> BTreeMap<(ProjectId, ScenarioId), &Ev
 
 /// The always-on audit check: `false-success` for every scenario whose
 /// latest audit is `refuted` (module doc).
+#[derive(Debug)]
 pub struct AuditCheck;
 
 impl GateCheck for AuditCheck {
@@ -216,7 +217,6 @@ pub fn subject_audit_gaps(ctx: &GateContext, subject_id: &SubjectId, target: Sub
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
 
     use canon_model::{Actor, Envelope, EvidenceAudit, EvidenceVerdict, RecordKind, RoleId, SpecDigest};
     use chrono::Utc;
@@ -231,7 +231,7 @@ mod tests {
     }
 
     fn record(scenario: &str, verdict: EvidenceVerdict, audit: Option<AuditResult>, offset: i64) -> EvidenceRecord {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now() + chrono::Duration::seconds(offset), Actor::new("agent", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now() + chrono::Duration::seconds(offset), Actor::new("agent", RoleId::parse("implementer").unwrap()));
         let record = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(scenario).unwrap()), None, verdict).with_project_id(ProjectId::parse("root").unwrap());
         match audit {
             Some(result) => record.with_audit(EvidenceAudit { evaluator_id: "ev".into(), evaluator_version: "1".into(), evaluator_digest: "b".repeat(64), result }),

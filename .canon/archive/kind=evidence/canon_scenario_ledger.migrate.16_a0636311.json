@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-030-rl",
+    "role": "implementer",
+    "session_id": "rl-2026-10-26"
+  },
+  "at": "2026-10-26T19:08:04.723504751Z",
+  "code_tree": "463d6ce08fdbcd6c85c53060ee7326430658f413",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test record_links"
+  },
+  "evidence_note": {
+    "summary": "record_links integration test of this scenario passes"
+  },
+  "evidence_sha": "fc849088f19c6c65cd95dddd2eed392b899582b2",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 16,
+  "scenario_id": "ledger.migrate.16",
+  "schema": 1,
+  "staging_id": "055ad611",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

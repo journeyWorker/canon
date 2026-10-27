@@ -188,7 +188,7 @@ impl ProviderSelection {
             ProviderOrigin::Config => "from canon.yaml skills.providers".into(),
             ProviderOrigin::Lock => "from the install lock; canon.yaml has no skills: key".into(),
             ProviderOrigin::Detected if self.providers.is_empty() => {
-                format!("no {} directory found", MARKER_LIST)
+                format!("no {MARKER_LIST} directory found")
             }
             ProviderOrigin::Detected => format!(
                 "detected: {}",
@@ -344,12 +344,19 @@ pub enum SkillsError {
     CanonicalSourceMissing(PathBuf),
     #[error("invalid provider `{0}`; expected one of: claude, codex, omp, pi, or none")]
     InvalidProvider(String),
-    #[error("{0}")]
-    Config(String),
+    #[error(transparent)]
+    Config(#[from] SkillsConfigError),
     #[error("canonical bundle has an unsupported or unsafe symlink at {0}")]
     UnsafeSymlink(PathBuf),
     #[error("refusing to overwrite a symlink at {0}")]
     RefuseSymlink(PathBuf),
+    /// A path that is not under the target directory is refused the same way: nothing can be shown to be no symlink.
+    #[error("refusing to overwrite a symlink at {path}")]
+    PathOutsideTarget {
+        path: PathBuf,
+        #[source]
+        source: std::path::StripPrefixError,
+    },
     #[error("malformed lock file at {path}: {source}")]
     LockParse {
         path: PathBuf,
@@ -396,7 +403,7 @@ fn reject_symlink_path(path: &Path) -> Result<(), SkillsError> {
 fn reject_symlink_path_under(target_dir: &Path, path: &Path) -> Result<(), SkillsError> {
     let relative = path
         .strip_prefix(target_dir)
-        .map_err(|_| SkillsError::RefuseSymlink(path.to_path_buf()))?;
+        .map_err(|source| SkillsError::PathOutsideTarget { path: path.to_path_buf(), source })?;
     let mut current = target_dir.to_path_buf();
     if let Ok(metadata) = fs::symlink_metadata(&current) {
         if metadata.file_type().is_symlink() {
@@ -469,7 +476,7 @@ pub fn discover_skills(source_dir: &Path) -> Result<Vec<DiscoveredSkill>, Skills
             path: source_dir.to_path_buf(),
             source,
         })?;
-        if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+        if !entry.file_type().is_ok_and(|t| t.is_dir()) {
             continue;
         }
         if entry.path().join("SKILL.md").is_file() {
@@ -686,20 +693,38 @@ struct RawSkillsSection {
 /// The shape a `skills:` section must have, for diagnostics.
 const SKILLS_SECTION_SHAPE: &str = "`skills: { providers: [claude, codex, omp, pi] }`, any subset, `[]` for none";
 
-fn configured_providers_in(text: &str) -> Result<Option<Vec<Provider>>, String> {
-    let doc: serde_yaml::Value =
-        serde_yaml::from_str(text).map_err(|e| format!("canon.yaml is not valid YAML: {e}"))?;
+/// Why `canon.yaml`'s `skills:` section cannot be read or rewritten.
+#[derive(Debug, thiserror::Error)]
+pub enum SkillsConfigError {
+    /// `canon.yaml` is not YAML.
+    #[error("canon.yaml is not valid YAML: {0}")]
+    Yaml(#[source] serde_yaml::Error),
+    /// `skills:` is not [`SKILLS_SECTION_SHAPE`].
+    #[error("canon.yaml `skills:` section is malformed (expected {shape}): {0}", shape = SKILLS_SECTION_SHAPE)]
+    Section(#[source] serde_yaml::Error),
+    /// `skills.providers` names a harness canon does not ship for.
+    #[error("canon.yaml `skills.providers` names `{0}`; expected any of claude, codex, omp, pi")]
+    UnknownProvider(String),
+    /// The rewritten section would not read back as the chosen providers.
+    #[error("could not rewrite the `skills:` section of canon.yaml safely; set it by hand to `skills: {{ providers: [{providers}] }}`")]
+    Unrewritable {
+        /// The chosen providers, comma-separated.
+        providers: String,
+    },
+}
+
+fn configured_providers_in(text: &str) -> Result<Option<Vec<Provider>>, SkillsConfigError> {
+    let doc: serde_yaml::Value = serde_yaml::from_str(text).map_err(SkillsConfigError::Yaml)?;
     let Some(section) = doc.get("skills") else {
         return Ok(None);
     };
-    let raw: RawSkillsSection = serde_yaml::from_value(section.clone())
-        .map_err(|e| format!("canon.yaml `skills:` section is malformed (expected {SKILLS_SECTION_SHAPE}): {e}"))?;
+    let raw: RawSkillsSection = serde_yaml::from_value(section.clone()).map_err(SkillsConfigError::Section)?;
     let mut providers = Vec::new();
     for name in &raw.providers {
         let provider = ALL_PROVIDERS
             .into_iter()
             .find(|provider| provider.as_str() == name)
-            .ok_or_else(|| format!("canon.yaml `skills.providers` names `{name}`; expected any of claude, codex, omp, pi"))?;
+            .ok_or_else(|| SkillsConfigError::UnknownProvider(name.clone()))?;
         providers.push(provider);
     }
     providers.sort();
@@ -710,7 +735,7 @@ fn configured_providers_in(text: &str) -> Result<Option<Vec<Provider>>, String> 
 /// `skills.providers` from the `canon.yaml` at `canon_yaml`: `None` when
 /// the file or its `skills:` key is absent. A present section that is not
 /// [`SKILLS_SECTION_SHAPE`], or names an unknown provider, fails loud.
-pub fn configured_providers(canon_yaml: &Path) -> Result<Option<Vec<Provider>>, String> {
+pub fn configured_providers(canon_yaml: &Path) -> Result<Option<Vec<Provider>>, SkillsConfigError> {
     let Ok(text) = fs::read_to_string(canon_yaml) else {
         return Ok(None);
     };
@@ -741,7 +766,7 @@ pub fn skills_config_block(providers: &[Provider]) -> String {
 /// line belongs to it only when an indented line follows. The result is
 /// refused unless it parses to exactly `providers` with every other key
 /// unchanged.
-pub(crate) fn rewrite_skills_section(text: &str, providers: &[Provider]) -> Result<String, String> {
+pub(crate) fn rewrite_skills_section(text: &str, providers: &[Provider]) -> Result<String, SkillsConfigError> {
     let newline = if text.contains("\r\n") { "\r\n" } else { "\n" };
     let block = skills_config_block(providers).replace('\n', newline);
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
@@ -774,12 +799,7 @@ pub(crate) fn rewrite_skills_section(text: &str, providers: &[Provider]) -> Resu
             out
         }
     };
-    let refuse = || {
-        format!(
-            "could not rewrite the `skills:` section of canon.yaml safely; set it by hand to `skills: {{ providers: [{}] }}`",
-            providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", ")
-        )
-    };
+    let refuse = || SkillsConfigError::Unrewritable { providers: providers.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(", ") };
     let without_skills = |text: &str| -> Option<serde_yaml::Value> {
         let mut doc: serde_yaml::Value = serde_yaml::from_str(text).ok()?;
         if let Some(map) = doc.as_mapping_mut() {
@@ -806,7 +826,7 @@ fn planned_config(target_dir: &Path, providers: &[Provider]) -> Result<Option<(P
     if configured_providers_in(&text).ok().flatten().as_deref() == Some(providers) {
         return Ok(None);
     }
-    let rewritten = rewrite_skills_section(&text, providers).map_err(SkillsError::Config)?;
+    let rewritten = rewrite_skills_section(&text, providers)?;
     Ok(Some((path, rewritten)))
 }
 
@@ -819,7 +839,7 @@ pub fn select_providers(target_dir: &Path, flag: Option<&str>) -> Result<Provide
     if let Some(value) = flag {
         return Ok(ProviderSelection { providers: parse_provider_list(value)?, origin: ProviderOrigin::Flag });
     }
-    if let Some(providers) = configured_providers(&target_dir.join("canon.yaml")).map_err(SkillsError::Config)? {
+    if let Some(providers) = configured_providers(&target_dir.join("canon.yaml"))? {
         return Ok(ProviderSelection { providers, origin: ProviderOrigin::Config });
     }
     // A lock canon cannot parse leaves the choice to detection; `check`
@@ -1338,14 +1358,14 @@ mod legacy_fs {
         Some(bytes)
     }
 
-    pub(super) fn read(target_dir: &Path, key: &str) -> Option<Vec<u8>> {
+    pub(crate) fn read(target_dir: &Path, key: &str) -> Option<Vec<u8>> {
         let (dir, name) = open_parent(target_dir, key)?;
         read_in(&dir, name)
     }
 
     /// Whether it unlinked the file: `false` when the file is gone, is not a
     /// regular file, or no longer holds the bytes `hash` names.
-    pub(super) fn remove_file_if_hash(target_dir: &Path, key: &str, hash: &str) -> Result<bool, SkillsError> {
+    pub(crate) fn remove_file_if_hash(target_dir: &Path, key: &str, hash: &str) -> Result<bool, SkillsError> {
         let Some((dir, name)) = open_parent(target_dir, key) else {
             return Ok(false);
         };
@@ -1361,7 +1381,7 @@ mod legacy_fs {
 
     /// `rmdir` relative to the parent's handle: it never follows a symlink
     /// and refuses a non-empty directory atomically.
-    pub(super) fn remove_dir_if_empty(target_dir: &Path, key: &str) -> Result<(), SkillsError> {
+    pub(crate) fn remove_dir_if_empty(target_dir: &Path, key: &str) -> Result<(), SkillsError> {
         let Some((dir, name)) = open_parent(target_dir, key) else {
             return Ok(());
         };
@@ -1389,14 +1409,14 @@ mod legacy_fs {
 
     use super::{content_hash, reject_symlink_path_under, SkillsError};
 
-    pub(super) fn read(target_dir: &Path, key: &str) -> Option<Vec<u8>> {
+    pub(crate) fn read(target_dir: &Path, key: &str) -> Option<Vec<u8>> {
         let path = target_dir.join(key);
         reject_symlink_path_under(target_dir, &path).ok()?;
         fs::symlink_metadata(&path).ok()?.is_file().then_some(())?;
         fs::read(&path).ok()
     }
 
-    pub(super) fn remove_file_if_hash(target_dir: &Path, key: &str, hash: &str) -> Result<bool, SkillsError> {
+    pub(crate) fn remove_file_if_hash(target_dir: &Path, key: &str, hash: &str) -> Result<bool, SkillsError> {
         if read(target_dir, key).is_none_or(|bytes| content_hash(&bytes) != hash) {
             return Ok(false);
         }
@@ -1404,7 +1424,7 @@ mod legacy_fs {
         fs::remove_file(&path).map(|()| true).map_err(|source| SkillsError::Io { path, source })
     }
 
-    pub(super) fn remove_dir_if_empty(target_dir: &Path, key: &str) -> Result<(), SkillsError> {
+    pub(crate) fn remove_dir_if_empty(target_dir: &Path, key: &str) -> Result<(), SkillsError> {
         let path = target_dir.join(key);
         if reject_symlink_path_under(target_dir, &path).is_err()
             || !fs::symlink_metadata(&path).is_ok_and(|metadata| metadata.is_dir())
@@ -1909,7 +1929,7 @@ pub fn resolve_source(explicit: Option<&Path>) -> Option<PathBuf> {
 }
 
 /// One skill the legacy (pre-bundle) install wrote.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InstalledSkillEntry<'a> {
     pub name: &'a str,
@@ -1918,7 +1938,7 @@ pub struct InstalledSkillEntry<'a> {
 }
 
 /// What the legacy install (a source without `SKILL.src.md`) reports.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LegacyInstall<'a> {
     /// True when `--dry-run` previewed the run without writing.
@@ -1927,7 +1947,7 @@ pub struct LegacyInstall<'a> {
 }
 
 /// An orphan the install pruned.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PrunedEntry {
     pub path: String,
@@ -1936,7 +1956,7 @@ pub struct PrunedEntry {
 }
 
 /// An orphan the install kept, with what to do by hand.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct KeptEntry {
     pub path: String,
@@ -1946,7 +1966,7 @@ pub struct KeptEntry {
 }
 
 /// What the bundle install reports.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BundleInstall {
     /// True when `--dry-run` previewed the run without writing.
@@ -1962,7 +1982,7 @@ pub struct BundleInstall {
 
 /// `canon skills install`'s report (`SkillsInstallReport`): the bundle install,
 /// or the legacy one for a source without `SKILL.src.md`.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(untagged)]
 pub enum SkillsInstallReport<'a> {
     Bundle(BundleInstall),
@@ -1972,7 +1992,7 @@ pub enum SkillsInstallReport<'a> {
 impl crate::json_out::Report for SkillsInstallReport<'_> {}
 
 /// The state of one installed skill file.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillFileStatus {
     pub path: String,
@@ -1981,7 +2001,7 @@ pub struct SkillFileStatus {
 }
 
 /// An orphan `skills check` found.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OrphanEntry {
     pub path: String,
@@ -1992,7 +2012,7 @@ pub struct OrphanEntry {
 }
 
 /// An install lock written by another canon version.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OutdatedEntry {
     pub path: String,
@@ -2001,7 +2021,7 @@ pub struct OutdatedEntry {
 }
 
 /// `canon skills check`'s report (`SkillsCheckReport`).
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillsCheckReport {
     pub clean: bool,
@@ -2017,7 +2037,7 @@ pub struct SkillsCheckReport {
 impl crate::json_out::Report for SkillsCheckReport {}
 
 /// `canon skills doctor`'s report (`SkillsDoctorReport`).
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillsDoctorReport<'a> {
     pub lines: &'a [String],
@@ -2026,7 +2046,7 @@ pub struct SkillsDoctorReport<'a> {
 impl crate::json_out::Report for SkillsDoctorReport<'_> {}
 
 /// `--json` of `canon skills show`: the guide `name` names, as this canon embeds it.
-#[derive(Serialize, schemars::JsonSchema)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillsShowReport {
     pub name: String,
@@ -2041,6 +2061,25 @@ impl crate::json_out::Report for SkillsShowReport {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_path_outside_the_target_is_refused_as_a_symlink_and_keeps_its_cause() {
+        let error = reject_symlink_path_under(Path::new("/target"), Path::new("/elsewhere/file")).unwrap_err();
+        assert_eq!(error.to_string(), "refusing to overwrite a symlink at /elsewhere/file");
+        assert!(std::error::Error::source(&error).is_some());
+    }
+
+    #[test]
+    fn the_skills_section_refusals_read_as_before() {
+        let message = |text: &str| configured_providers_in(text).unwrap_err().to_string();
+        assert_eq!(message("skills:\n  providers: [vim]\n"), "canon.yaml `skills.providers` names `vim`; expected any of claude, codex, omp, pi");
+        assert!(message("skills: 3\n").starts_with("canon.yaml `skills:` section is malformed (expected `skills: { providers: [claude, codex, omp, pi] }`, any subset, `[]` for none): "));
+        assert!(message("skills: [\n").starts_with("canon.yaml is not valid YAML: "));
+        let unrewritable = SkillsConfigError::Unrewritable { providers: "claude, omp".to_string() };
+        assert_eq!(unrewritable.to_string(), "could not rewrite the `skills:` section of canon.yaml safely; set it by hand to `skills: { providers: [claude, omp] }`");
+        assert_eq!(SkillsError::from(unrewritable).to_string(), "could not rewrite the `skills:` section of canon.yaml safely; set it by hand to `skills: { providers: [claude, omp] }`");
+        assert!(std::error::Error::source(&configured_providers_in("skills: 3\n").unwrap_err()).is_some());
+    }
 
     #[test]
     fn legacy_codex_keys_are_confined_to_the_legacy_projection() {

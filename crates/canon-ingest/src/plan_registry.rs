@@ -48,6 +48,15 @@ pub struct PlanAdapterEntry {
     pub write_back: Option<&'static dyn PlanWriteBack>,
 }
 
+impl std::fmt::Debug for PlanAdapterEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PlanAdapterEntry")
+            .field("dialect_id", &self.adapter.dialect_id())
+            .field("write_back", &self.write_back.is_some())
+            .finish_non_exhaustive()
+    }
+}
+
 impl PlanAdapterEntry {
     pub fn dialect_id(&self) -> &'static str {
         self.adapter.dialect_id()
@@ -137,8 +146,8 @@ mod tests {
         // "Never HashMap-iteration-order dependent" — two calls (or two
         // passes, per the connector spec's "Registry iteration order is
         // deterministic" scenario) enumerate identically.
-        let first: Vec<&str> = registry().iter().map(|e| e.dialect_id()).collect();
-        let second: Vec<&str> = registry().iter().map(|e| e.dialect_id()).collect();
+        let first: Vec<&str> = registry().iter().map(super::PlanAdapterEntry::dialect_id).collect();
+        let second: Vec<&str> = registry().iter().map(super::PlanAdapterEntry::dialect_id).collect();
         assert_eq!(first, second);
         assert_eq!(first, vec!["openspec", "superpowers"]);
     }

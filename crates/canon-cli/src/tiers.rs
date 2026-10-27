@@ -57,7 +57,7 @@ pub enum TierCliError {
     #[error("reading `{path}`: {source}")]
     ReadCanonYaml { path: String, source: std::io::Error },
     #[error("parsing `{path}`: {source}")]
-    Policy { path: String, source: canon_store::policy::PolicyError },
+    Policy { path: String, source: canon_store::policy::TierPolicyError },
     #[error(transparent)]
     Store(#[from] StoreError),
 }
@@ -70,6 +70,7 @@ pub enum TierCliError {
 /// zero network); `pg`/`r2`/`sqlite` only when their own rung's block
 /// exists (design §9 local-first: an unconfigured rung is never
 /// attempted).
+#[derive(Debug)]
 pub struct LoadedTiers {
     pub policy: TierPolicy,
     pub git: Option<GitTier>,
@@ -153,6 +154,7 @@ fn build_tiers_with(canon_yaml_path: &Path, read_only: bool) -> Result<LoadedTie
                 // is never masked by an unset-DSN error naming the
                 // wrong problem first.
                 validate_schema_ident(&cfg.schema)?;
+                #[expect(clippy::map_err_ignore, reason = "`VarError` only says unset or non-UTF-8; the refusal names the variable and reads the same for both")]
                 let dsn = std::env::var(&cfg.dsn_env).map_err(|_| {
                     StoreError::tier_unavailable(rung, Some(canon_store::policy::Backend::Postgres), format!("`{}` is unset", cfg.dsn_env))
                 })?;
@@ -207,7 +209,7 @@ fn build_tiers_with(canon_yaml_path: &Path, read_only: bool) -> Result<LoadedTie
 /// degrade-or-propagate decision for the postgres backend in this
 /// module (s22 design.md D4, renamed from `attach_pg` per s27 design D4
 /// to name the BACKEND it attaches).
-fn attach_postgres(cfg: &PgTierConfig) -> Result<(Option<PgTier>, Option<String>), TierCliError> {
+pub(crate) fn attach_postgres(cfg: &PgTierConfig) -> Result<(Option<PgTier>, Option<String>), TierCliError> {
     validate_schema_ident(&cfg.schema)?;
     match std::env::var(&cfg.dsn_env) {
         Err(_) => Ok((None, Some(format!("`{}` is unset", cfg.dsn_env)))),
@@ -227,7 +229,7 @@ fn attach_postgres(cfg: &PgTierConfig) -> Result<(Option<PgTier>, Option<String>
 /// Shared by [`build_lenient_tiers`]/[`build_lenient_tiers_for_kinds`]
 /// -- the ONE degrade-or-propagate decision for the s3 backend
 /// (renamed from `attach_r2` per s27 design D4).
-fn attach_s3(cfg: &R2TierConfig) -> Result<(Option<R2Tier>, Option<String>), TierCliError> {
+pub(crate) fn attach_s3(cfg: &R2TierConfig) -> Result<(Option<R2Tier>, Option<String>), TierCliError> {
     match R2Tier::attach(cfg) {
         Ok(tier) => Ok((Some(tier), None)),
         Err(StoreError::BackendUnattached { reason, .. }) => Ok((None, Some(reason))),
@@ -534,7 +536,7 @@ mod tests {
     #[cfg(debug_assertions)]
     #[test]
     fn debug_build_honors_local_r2_root_env_var_as_a_test_seam() {
-        let _seam = super::R2_SEAM_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _seam = super::R2_SEAM_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = tempfile::tempdir().unwrap();
         std::env::set_var(LOCAL_R2_ROOT_ENV, dir.path());
         let cfg = R2TierConfig { bucket_env: "CANON_R2_BUCKET_UNUSED_IN_THIS_TEST".to_string(), prefix: "canon/".to_string() };
@@ -591,7 +593,7 @@ mod lenient_tier_tests {
         for (kind, to) in aging {
             aging_map.insert(*kind, AgingRuleConfig { after: chrono::Duration::days(30), to: *to });
         }
-        TierPolicy { tiers: std::collections::HashMap::new(), routing: routing_map, aging: aging_map }
+        TierPolicy { tiers: std::collections::HashMap::new(), routing: routing_map, aging: aging_map, legacy_kind_keys: Vec::new() }
     }
 
     /// design.md D2/task 2.3: a local-routed, never-aged kind
@@ -684,7 +686,7 @@ mod lenient_tier_tests {
     /// still degrades to `None` even though `hot`'s DSN is unset too.
     #[test]
     fn kind_scoped_build_attempts_both_tiers_for_a_hot_routed_cold_aged_kind() {
-        let _seam = super::R2_SEAM_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _seam = super::R2_SEAM_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = tempfile::tempdir().unwrap();
         let canon_yaml = write_multi_tier_canon_yaml(dir.path());
         std::env::remove_var("CANON_PG_DSN_S22_UNIT_UNSET");
@@ -710,7 +712,7 @@ mod lenient_tier_tests {
     #[cfg(debug_assertions)]
     #[test]
     fn kind_scoped_build_actually_attaches_a_reachable_aged_r2_tier() {
-        let _seam = super::R2_SEAM_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _seam = super::R2_SEAM_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = tempfile::tempdir().unwrap();
         let canon_yaml = write_multi_tier_canon_yaml(dir.path());
         let r2_root = tempfile::tempdir().unwrap();
@@ -753,7 +755,7 @@ mod lenient_tier_tests {
     #[cfg(debug_assertions)]
     #[test]
     fn strict_build_names_the_cold_rung_and_s3_backend_for_an_unattached_bucket() {
-        let _seam = super::R2_SEAM_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _seam = super::R2_SEAM_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let dir = tempfile::tempdir().unwrap();
         let canon_yaml = write_local_cold_canon_yaml(dir.path());
         std::env::remove_var("CANON_R2_BUCKET_S27_STRICT_UNSET");

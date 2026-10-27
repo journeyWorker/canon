@@ -10,10 +10,10 @@ use std::process::{Command, Output};
 
 use canon_ingest::verdict::{Becomes, Polarity, VerdictRow};
 use canon_learn::{
-    promote_strategy_approved, rebuild_namespace, ParquetStrategyStore, ParquetTrajectoryStore, PromotionApproval, PromotionEvaluation, StrategyItem, Trajectory,
+    promote_strategy_approved, rebuild_namespace, ParquetStrategyStore, ParquetTrajectoryStore, PromotionApproval, PromotionEvaluation, PromotionEvaluationFields, StrategyItem, Trajectory,
     TrajectoryId, TrajectoryStore,
 };
-use canon_model::approval::approval_payload_bytes;
+use canon_model::approval::{approval_payload_bytes, ApprovalPayload};
 use canon_model::ids::{regime_key, RegimeKey, RoleId};
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::Value;
@@ -103,21 +103,7 @@ fn candidate_and_evaluation(repo: &Path) -> (StrategyItem, PromotionEvaluation) 
     trajectories.append(&trajectory).unwrap();
     let candidate = rebuild_namespace(&trajectories, &strategies, &regime()).unwrap().into_iter().next().expect("one candidate");
     let digest = |variant: &str, panel: usize, score: f64| format!("{:x}", Sha256::digest(format!("{variant}|panel={panel}|score={score:.3}").as_bytes()));
-    let evaluation = PromotionEvaluation::new(
-        &candidate,
-        "candidate-v2",
-        vec![digest("baseline", 0, 0.50), digest("baseline", 1, 0.54)],
-        vec![digest("candidate", 0, 0.91), digest("candidate", 1, 0.88)],
-        "corpus-v1",
-        "paired-eval-v1",
-        "context-digest-v1",
-        "policy-digest-v1",
-        "model-digest-v1",
-        "tool-digest-v1",
-        BTreeMap::from([("pairs".to_string(), 2.0), ("uplift".to_string(), 0.75), ("regressions".to_string(), 0.0)]).into_iter().collect(),
-        true,
-        "promote",
-    );
+    let evaluation = PromotionEvaluation::new(&candidate, PromotionEvaluationFields { candidate_version: "candidate-v2".into(), baseline_result_digests: vec![digest("baseline", 0, 0.50), digest("baseline", 1, 0.54)], candidate_result_digests: vec![digest("candidate", 0, 0.91), digest("candidate", 1, 0.88)], corpus_version: "corpus-v1".into(), eval_version: "paired-eval-v1".into(), context_digest: "context-digest-v1".into(), policy_digest: "policy-digest-v1".into(), model_digest: "model-digest-v1".into(), tool_digest: "tool-digest-v1".into(), paired_metrics: BTreeMap::from([("pairs".to_string(), 2.0), ("uplift".to_string(), 0.75), ("regressions".to_string(), 0.0)]).into_iter().collect(), passed: true, decision: "promote".into() });
     (candidate, evaluation)
 }
 
@@ -153,7 +139,7 @@ fn strategy_rollback_json_is_the_record_as_data_with_a_next_step() {
     let strategies = ParquetStrategyStore::open(repo.join(".canon/learn/strategies"));
     let approved_at = Utc::now();
     let mut approval = PromotionApproval::new(candidate.id, evaluation.digest(), "alice", "human", true, approved_at);
-    let payload = approval_payload_bytes("canon-learning-approval-v1", &format!("strategy:{}", candidate.id), None, &evaluation.digest(), None, &[], &[], "alice", &approved_at);
+    let payload = approval_payload_bytes(&ApprovalPayload { namespace: "canon-learning-approval-v1", subject: &format!("strategy:{}", candidate.id), project: None, artifact_sha: &evaluation.digest(), run_id: None, surface: &[], effects: &[], actor: "alice", timestamp: &approved_at });
     approval.signature = Some(signing.sign(&payload));
     approval.signer_key = Some("alice".to_string());
     approval.integrity_digest = approval.recomputed_integrity_digest();
@@ -162,7 +148,7 @@ fn strategy_rollback_json_is_the_record_as_data_with_a_next_step() {
     let reason = "paired fixture contradiction";
     let at: DateTime<Utc> = Utc::now();
     let reason_digest = format!("{:x}", Sha256::digest(reason.as_bytes()));
-    let rollback_payload = approval_payload_bytes("canon-learning-approval-v1", &format!("strategy:{}:rollback:{reason_digest}", candidate.id), None, &reason_digest, None, &[], &[], "alice", &at);
+    let rollback_payload = approval_payload_bytes(&ApprovalPayload { namespace: "canon-learning-approval-v1", subject: &format!("strategy:{}:rollback:{reason_digest}", candidate.id), project: None, artifact_sha: &reason_digest, run_id: None, surface: &[], effects: &[], actor: "alice", timestamp: &at });
     fs::write(repo.join("rollback.sig"), signing.sign(&rollback_payload)).unwrap();
 
     let out = canon(

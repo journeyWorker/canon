@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:25:17.508448114Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test status context_status_67_a_proposed_subject_with_no_brief_keeps_its_steps_and_its_brief_adds_no_transition_check"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 130,
+  "scenario_id": "context.status.67",
+  "schema": 1,
+  "staging_id": "18c86b0e",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

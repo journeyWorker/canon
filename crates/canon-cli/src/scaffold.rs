@@ -83,18 +83,28 @@ fn is_segment(s: &str) -> bool {
     !s.is_empty() && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
+/// A `canon feature new` / `canon scenario new` operand that no parser accepts.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum ScaffoldArgError {
+    /// `<area>.<surface>` without exactly one `.`.
+    #[error("invalid <area>.<surface> `{0}`: expected exactly one `.` separator (grammar `[a-z0-9-]+\\.[a-z0-9-]+`, matching `ScenarioId`'s own first two segments)")]
+    AreaSurfaceSeparator(String),
+    /// `<area>.<surface>` with a segment outside `[a-z0-9-]+`.
+    #[error("invalid <area>.<surface> `{0}`: both segments must match `[a-z0-9-]+` (matching `ScenarioId`'s own first two segments)")]
+    AreaSurfaceSegment(String),
+    /// `<lane>` that is not a kebab-case slug.
+    #[error("invalid lane `{0}`: expected a kebab-case slug (`[a-z0-9]+(-[a-z0-9]+)*`)")]
+    Lane(String),
+}
+
 impl AreaSurface {
-    pub fn parse(s: &str) -> Result<Self, String> {
+    pub fn parse(s: &str) -> Result<Self, ScaffoldArgError> {
         let parts: Vec<&str> = s.split('.').collect();
         let [area, surface] = parts.as_slice() else {
-            return Err(format!(
-                "invalid <area>.<surface> `{s}`: expected exactly one `.` separator (grammar `[a-z0-9-]+\\.[a-z0-9-]+`, matching `ScenarioId`'s own first two segments)"
-            ));
+            return Err(ScaffoldArgError::AreaSurfaceSeparator(s.to_string()));
         };
         if !is_segment(area) || !is_segment(surface) {
-            return Err(format!(
-                "invalid <area>.<surface> `{s}`: both segments must match `[a-z0-9-]+` (matching `ScenarioId`'s own first two segments)"
-            ));
+            return Err(ScaffoldArgError::AreaSurfaceSegment(s.to_string()));
         }
         Ok(Self { area: (*area).to_string(), surface: (*surface).to_string() })
     }
@@ -109,19 +119,19 @@ impl AreaSurface {
 /// itself is called with the (possibly-stripped) rest verbatim, so its
 /// grammar and every other call site (gate evidence matching, inventory
 /// sync, query scope filters) stays untouched and `@`-free.
-pub fn parse_scenario_tag(s: &str) -> Result<ScenarioId, String> {
-    ScenarioId::parse(s.strip_prefix('@').unwrap_or(s)).map_err(|e| e.to_string())
+pub fn parse_scenario_tag(s: &str) -> Result<ScenarioId, canon_model::ids::JoinKeyError> {
+    ScenarioId::parse(s.strip_prefix('@').unwrap_or(s))
 }
 
 
 /// `<surface>`'s `clap` value parser (`canon feature new`).
-pub fn parse_area_surface(s: &str) -> Result<AreaSurface, String> {
+pub fn parse_area_surface(s: &str) -> Result<AreaSurface, ScaffoldArgError> {
     AreaSurface::parse(s)
 }
 
 /// `<lane>`'s `clap` value parser (`canon scenario new`) — the same
 /// kebab-slug grammar used by model `domain` values.
-pub fn parse_lane_slug(s: &str) -> Result<String, String> {
+pub fn parse_lane_slug(s: &str) -> Result<String, ScaffoldArgError> {
     let valid = !s.is_empty()
         && !s.starts_with('-')
         && !s.ends_with('-')
@@ -130,7 +140,7 @@ pub fn parse_lane_slug(s: &str) -> Result<String, String> {
     if valid {
         Ok(s.to_string())
     } else {
-        Err(format!("invalid lane `{s}`: expected a kebab-case slug (`[a-z0-9]+(-[a-z0-9]+)*`)"))
+        Err(ScaffoldArgError::Lane(s.to_string()))
     }
 }
 
@@ -350,7 +360,7 @@ impl Planner {
             Some(flow) => {
                 let key = (spec.subject.as_ref().map(|s| s.as_str().to_string()), spec.change.as_ref().map(|c| c.as_str().to_string()), flow.clone());
                 let repo_root = &self.repo_root;
-                let found = self.flows.entry(key).or_insert_with(|| crate::brief_check::flow_tag_value(repo_root, spec.subject.as_ref(), spec.change.as_ref(), flow)).clone();
+                let found = self.flows.entry(key).or_insert_with(|| crate::brief_check::flow_tag_value(repo_root, spec.subject.as_ref(), spec.change.as_ref(), flow).map_err(|e| e.to_string())).clone();
                 Some(found.map_err(|e| CliError::refused("SCAFFOLD_INVALID_ARGUMENT", e).hint("`canon schema scenario new` lists the accepted arguments and their forms").field("--flow"))?)
             }
         };
@@ -500,7 +510,7 @@ impl Report for FeatureNewReport<'_> {}
 /// `spec.project` is `--project-id <id>`: which configured `specs.roots[]`
 /// entry the DERIVED path lands under, selected by the root's `id`
 /// exactly as [`run_feature_new`] selects it ([`resolve_spec_root`]).
-pub fn run_scenario_new(repo: &Path, spec: &ScenarioSpec, actor: &Actor, at: DateTime<Utc>, json: bool) -> i32 {
+pub fn run_scenario_new(repo: &Path, spec: &ScenarioSpec, actor: &Actor, at: DateTime<Utc>, json: bool) -> u8 {
     let repo_root = resolve_repo_root(repo);
     let planned = match Planner::new(&repo_root).and_then(|mut planner| planner.plan(spec)) {
         Ok(planned) => planned,
@@ -564,7 +574,7 @@ pub fn run_feature_new(
     actor: &Actor,
     at: DateTime<Utc>,
     json: bool,
-) -> i32 {
+) -> u8 {
     let repo_root = resolve_repo_root(repo);
     let roots = match SyncCtx::from_repo(&repo_root).and_then(|ctx| ctx.spec_roots(None)) {
         Ok(roots) => roots,
@@ -575,12 +585,12 @@ pub fn run_feature_new(
     let root = match resolve_spec_root("canon feature new", &roots, project) {
         Ok(root) => root,
         Err(msg) => {
-            return CliError::refused("SPEC_ROOT_UNRESOLVED", msg.to_string()).hint("pass --project-id <id> naming a configured spec root (`specs.roots[]` in canon.yaml)").emit("canon feature new", json);
+            return CliError::refused("SPEC_ROOT_UNRESOLVED", msg.clone()).hint("pass --project-id <id> naming a configured spec root (`specs.roots[]` in canon.yaml)").emit("canon feature new", json);
         }
     };
 
     if let Err(msg) = refuse_pre_0_17(&repo_root, root) {
-        return CliError::refused("LAYOUT_MIGRATION_REQUIRED", msg.to_string()).hint("run `canon migrate` to move the repository to the current layout").emit("canon feature new", json);
+        return CliError::refused("LAYOUT_MIGRATION_REQUIRED", msg.clone()).hint("run `canon migrate` to move the repository to the current layout").emit("canon feature new", json);
     }
 
     let feature_path = resolve_feature_path(root, &area_surface.area, &area_surface.surface);
@@ -633,6 +643,20 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_value_parsers_refuse_in_their_old_words() {
+        assert_eq!(
+            parse_area_surface("a.b.c").unwrap_err().to_string(),
+            "invalid <area>.<surface> `a.b.c`: expected exactly one `.` separator (grammar `[a-z0-9-]+\\.[a-z0-9-]+`, matching `ScenarioId`'s own first two segments)"
+        );
+        assert_eq!(
+            AreaSurface::parse("A.b").unwrap_err().to_string(),
+            "invalid <area>.<surface> `A.b`: both segments must match `[a-z0-9-]+` (matching `ScenarioId`'s own first two segments)"
+        );
+        assert_eq!(parse_lane_slug("Bad_Lane").unwrap_err().to_string(), "invalid lane `Bad_Lane`: expected a kebab-case slug (`[a-z0-9]+(-[a-z0-9]+)*`)");
+        assert_eq!(parse_scenario_tag("nope").unwrap_err().to_string(), format!("invalid ScenarioId: \"nope\" does not match grammar `{}`", ScenarioId::GRAMMAR));
+    }
+
+    #[test]
     fn area_surface_parses_a_well_formed_two_segment_tag() {
         let parsed = AreaSurface::parse("world.hotdeal").unwrap();
         assert_eq!(parsed, AreaSurface { area: "world".to_string(), surface: "hotdeal".to_string() });
@@ -640,13 +664,13 @@ mod tests {
 
     #[test]
     fn area_surface_rejects_a_three_segment_scenario_id_shaped_string() {
-        assert!(AreaSurface::parse("world.hotdeal.42").is_err());
+        AreaSurface::parse("world.hotdeal.42").unwrap_err();
     }
 
     #[test]
     fn area_surface_rejects_an_empty_segment() {
-        assert!(AreaSurface::parse("world.").is_err());
-        assert!(AreaSurface::parse(".hotdeal").is_err());
+        AreaSurface::parse("world.").unwrap_err();
+        AreaSurface::parse(".hotdeal").unwrap_err();
     }
 
     fn actor() -> Actor {
@@ -655,8 +679,8 @@ mod tests {
 
     #[test]
     fn area_surface_rejects_uppercase_or_underscore() {
-        assert!(AreaSurface::parse("World.hotdeal").is_err());
-        assert!(AreaSurface::parse("world.hot_deal").is_err());
+        AreaSurface::parse("World.hotdeal").unwrap_err();
+        AreaSurface::parse("world.hot_deal").unwrap_err();
     }
 
     #[test]
@@ -668,13 +692,13 @@ mod tests {
 
     #[test]
     fn parse_scenario_tag_rejects_a_malformed_tag_with_or_without_the_at_prefix() {
-        assert!(parse_scenario_tag("@Story.X.01").is_err());
-        assert!(parse_scenario_tag("Story.X.01").is_err());
+        parse_scenario_tag("@Story.X.01").unwrap_err();
+        parse_scenario_tag("Story.X.01").unwrap_err();
     }
 
     #[test]
     fn parse_scenario_tag_rejects_a_double_at_prefix() {
-        assert!(parse_scenario_tag("@@story.x.01").is_err());
+        parse_scenario_tag("@@story.x.01").unwrap_err();
     }
 
     #[test]

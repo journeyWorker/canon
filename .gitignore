@@ -48,7 +48,7 @@ packages/cli/man/
 # still matched by the `*` line, so a STAGED (unpromoted) record stays
 # local — only promoted records are tracked.
 .canon/ledger/*
-!.canon/ledger/kind=evidence_record/
+!.canon/ledger/kind=evidence/
 !.canon/ledger/kind=finding/
 !.canon/ledger/kind=review/
 !.canon/ledger/kind=subject/
@@ -100,3 +100,8 @@ vendors/
 examples/platformer/reports/
 # the snapshot `canon dashboard` and `canon report snapshot` regenerate -- derived, never committed.
 .canon/dashboard-snapshot/
+
+# Change records are derived from .canon/changes (see the ledger rule
+# above); their superseded versions are derived the same way.
+.canon/archive/kind=change/
+.canon/migrate-backup/

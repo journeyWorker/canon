@@ -90,6 +90,7 @@ pub(crate) const DIAG_NOT_A_PLAN_DOC: &str = "not-a-plan-doc";
 /// openspec dialect's own identically-named constant.
 pub(crate) const DIAG_UNRESOLVABLE_TASK_DEP: &str = "unresolvable-task-dep";
 
+#[derive(Debug)]
 pub struct SuperpowersPlanAdapter;
 
 impl PlanAdapter for SuperpowersPlanAdapter {
@@ -206,7 +207,7 @@ fn list_md_files(dir: &Path) -> Vec<PathBuf> {
         return Vec::new();
     };
     let mut files: Vec<PathBuf> = entries
-        .filter_map(|entry| entry.ok())
+        .filter_map(std::result::Result::ok)
         .map(|entry| entry.path())
         .filter(|p| p.is_file() && p.extension().and_then(|e| e.to_str()) == Some("md"))
         .collect();
@@ -633,9 +634,7 @@ fn file_modified_at(path: &Path) -> DateTime<Utc> {
     let ms = fs::metadata(path)
         .and_then(|meta| meta.modified())
         .ok()
-        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
-        .map(|duration| duration.as_millis() as i64)
-        .unwrap_or_else(|| Utc::now().timestamp_millis());
+        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok()).map_or_else(|| Utc::now().timestamp_millis(), |duration| i64::try_from(duration.as_millis()).expect("epoch millis fit in i64"));
     Utc.timestamp_millis_opt(ms).single().unwrap_or_else(Utc::now)
 }
 
@@ -882,7 +881,7 @@ mod tests {
     // ── `- Consumes:` -> Task.depends_on (s37 execution-graph-topology) ──
 
     fn dep_ids(task: &Task) -> Vec<&str> {
-        task.depends_on.iter().map(|t| t.as_str()).collect()
+        task.depends_on.iter().map(canon_model::TaskId::as_str).collect()
     }
 
     /// The corpus's own Consumes shapes, verbatim: `nothing (first

@@ -3,7 +3,7 @@
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum ReportCommand {
     /// Write the status report (.canon/REPORT.md)
     Build(ReportBuildArgs),
@@ -13,7 +13,7 @@ pub enum ReportCommand {
     Snapshot(ReportSnapshotArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct ReportBuildArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -24,7 +24,7 @@ pub struct ReportBuildArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct ReportCheckArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,
@@ -33,7 +33,7 @@ pub struct ReportCheckArgs {
     pub json: bool,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct ReportSnapshotArgs {
     /// The output directory (created if absent)
     #[arg(value_name = "DIR")]

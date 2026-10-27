@@ -120,13 +120,16 @@ pub struct ChangeNewReport<'a> {
     pub subject_id: &'a str,
     /// The staged `brief.md`, relative to the repo.
     pub brief: &'a str,
+    /// Where the change record went (0.30): the hot store's location; absent when the change is not routed to a hot store.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hot_store: Option<String>,
 }
 
 impl crate::reports::Report for ChangeNewReport<'_> {}
 
 /// `canon change new` (module doc). Exit `0` written + adopted, `2`
 /// refused or failed with nothing left behind.
-pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: ChangeKind, title: &str, json: bool) -> i32 {
+pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: ChangeKind, title: &str, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let language = match crate::language::configured(&repo) {
         Ok(language) => language,
@@ -144,7 +147,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         }
         Ok((Some(subject), None)) => subject,
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon change new", json);
+            return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon change new", json);
         }
     };
 
@@ -161,7 +164,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
     let change = match stage_change(&staging_path, slug, kind, title, &language) {
         Ok(change) => change,
         Err(e) => {
-            return CliError::refused("CHANGE_INVALID_ARGUMENT", e.to_string()).hint("`canon schema change new` lists the accepted arguments and their forms").emit("canon change new", json);
+            return CliError::refused("CHANGE_INVALID_ARGUMENT", e.clone()).hint("`canon schema change new` lists the accepted arguments and their forms").emit("canon change new", json);
         }
     };
 
@@ -202,6 +205,10 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         subject_id.as_str(),
         crate::write_mode::DIRECT
     );
+    let hot = crate::hot_store::HotStore::written_by(&crate::context::resolve_canon_yaml(&repo), &[canon_model::RecordKind::Change, canon_model::RecordKind::Subject]);
+    if let Some(hot) = &hot {
+        crate::say!(json, "{}", hot.line());
+    }
     for warning in &warnings {
         crate::human_err!("canon change new: warning: {warning}");
     }
@@ -230,8 +237,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
         &crate::next::Scope::Change(slug.as_str().to_string()),
         false,
         json,
-        &ChangeNewReport { change_id: slug.as_str(), subject_id: subject_id.as_str(), brief: &brief },
-        crate::json_out::warnings_meta(&warnings),
-        extra);
+        &ChangeNewReport { change_id: slug.as_str(), subject_id: subject_id.as_str(), brief: &brief, hot_store: hot.as_ref().map(crate::hot_store::HotStore::location) },
+        crate::next::Extras { meta: crate::json_out::warnings_meta(&warnings), steps: extra });
     0
 }

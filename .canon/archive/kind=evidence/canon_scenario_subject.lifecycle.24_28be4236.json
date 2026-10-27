@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "final-fix-016"
+  },
+  "at": "2026-10-11T17:33:14.552594Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject subject_lifecycle_24_shipping_is_refused_while_the_brief_has_no_approved_line"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 22,
+  "scenario_id": "subject.lifecycle.24",
+  "schema": 1,
+  "staging_id": "bb66db0beda8",
+  "verdict": "faithful"
+}

@@ -1,6 +1,6 @@
 //! `canon review` — the handlers of the group.
 
-use crate::cli::review::*;
+use crate::cli::review::{ReviewCommand, ReviewScenarioArgs, ReviewChangeArgs, ReviewOptions};
 use canon_model::{ChangeId, ScenarioId};
 use std::process::ExitCode;
 use super::record_role;
@@ -39,7 +39,7 @@ fn run_review(command: &str, scenario_ids: Vec<ScenarioId>, change: Option<Chang
     let root = crate::context::resolve_repo_root(&repo);
     let project_id = match crate::inventory::resolve_project_id(&root, project_id.as_ref(), "REVIEW_INVALID_ARGUMENT", command, json) {
         Ok(id) => id,
-        Err(code) => return ExitCode::from(code as u8),
+        Err(code) => return ExitCode::from(code),
     };
     crate::inventory::refresh_stale_index(&repo, command);
     ExitCode::from(crate::review::run_add(
@@ -63,5 +63,5 @@ fn run_review(command: &str, scenario_ids: Vec<ScenarioId>, change: Option<Chang
             max_artifact_mib,
             json,
         },
-    ) as u8)
+    ))
 }

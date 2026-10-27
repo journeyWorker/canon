@@ -11,6 +11,7 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+use canon_model::HandoffFields;
 use canon_model::{
     Actor, Change, ChangeId, ChangeStatus, DomainId, Envelope, Handoff, HandoffBody, HandoffId, HandoffState, RecordKind, RoleId, Subject, SubjectId, SubjectStatus,
 };
@@ -271,7 +272,7 @@ fn records_repo() -> tempfile::TempDir {
 
     let envelope = Envelope::new(1, RecordKind::Handoff, "2026-07-01T09:00:00Z".parse().unwrap(), Actor::new("fixture", RoleId::parse("implementer").unwrap()));
     let body = HandoffBody { domain: DomainId::parse("development").unwrap(), template_version: 1, fields: serde_json::json!({}) };
-    let mut handoff = Handoff::new(envelope, HandoffId::parse("20260701-0910-fixture-a1b2").unwrap(), uuid::Uuid::new_v4(), None, 1, "Fixture handoff", None, body);
+    let mut handoff = Handoff::new(HandoffFields { envelope, id: HandoffId::parse("20260701-0910-fixture-a1b2").unwrap(), chain_id: uuid::Uuid::new_v4(), parent_handoff_id: None, seq: 1, title: "Fixture handoff".into(), openspec_change_slug: None, body });
     handoff.transition_to(HandoffState::InProgress, "2026-07-01T09:11:00Z".parse().unwrap(), Some("agent")).unwrap();
     handoff.transition_to(HandoffState::Done, "2026-07-01T09:20:00Z".parse().unwrap(), None).unwrap();
     GitTier::new(dir.path().join(".canon/ledger")).write(&handoff).unwrap();
@@ -389,7 +390,7 @@ fn export_dry_run_refuses_like_the_real_run() {
 // ── subject adopt / unadopt ──
 
 fn subject_repo(listing: &[&str]) -> tempfile::TempDir {
-    let dir = repo_with(&format!("{LOCAL_TIER}routing:\n  subject: local\n  change: local\n  scenario: local\n  evidence_record: local\n"));
+    let dir = repo_with(&format!("{LOCAL_TIER}routing:\n  subject: local\n  change: local\n  scenario: local\n  evidence: local\n"));
     let ledger = GitTier::new(dir.path().join(".canon/ledger"));
     let change = Change::new(
         Envelope::new(1, RecordKind::Change, chrono::Utc::now(), Actor::new("importer", RoleId::parse("planner").unwrap())),

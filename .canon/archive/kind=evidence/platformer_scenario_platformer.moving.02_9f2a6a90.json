@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "impl-030-sb-f4",
+    "role": "implementer",
+    "session_id": "sb-f4-2026-10-26"
+  },
+  "at": "2026-10-26T13:01:16.815797077Z",
+  "attachments": [
+    {
+      "case": "platformer.moving.02: Stepping off a platform edge drops cleanly",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "examples/platformer/reports/junit.xml",
+      "sha256": "d42cd6e273148dfb96c2b1417f765a39a12b732f3d0e7067423ed3ed4face5d3"
+    }
+  ],
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "examples/platformer/reports/junit.xml"
+  },
+  "evidence_sha": "b5bb0837c492eabacbbdfeb303af3aa97bbbcc58",
+  "kind": "evidence",
+  "project_id": "platformer",
+  "run_seq": 7,
+  "scenario_id": "platformer.moving.02",
+  "schema": 1,
+  "staging_id": "c7d2d6e9357a",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

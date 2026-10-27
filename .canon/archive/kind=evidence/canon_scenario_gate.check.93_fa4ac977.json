@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-023",
+    "role": "implementer",
+    "session_id": "canon-impl-023-1"
+  },
+  "at": "2026-10-17T20:04:26.938558Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test migrate_pins migrate_pins_04_an_unreadable_pin_is_pinned_as_the_scenario_stands"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 50,
+  "scenario_id": "gate.check.93",
+  "schema": 1,
+  "staging_id": "d9d529d5a050",
+  "verdict": "faithful"
+}

@@ -42,7 +42,7 @@ fn fresh_repo() -> TempDir {
 
 /// The lines of the repo's access audit, none when it does not exist.
 fn audit_lines(repo: &Path) -> usize {
-    std::fs::read_to_string(repo.join(".canon/audit/access.jsonl")).map(|text| text.lines().count()).unwrap_or(0)
+    std::fs::read_to_string(repo.join(".canon/audit/access.jsonl")).map_or(0, |text| text.lines().count())
 }
 
 #[test]

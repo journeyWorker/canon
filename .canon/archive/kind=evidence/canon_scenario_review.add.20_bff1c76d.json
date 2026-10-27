@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-023",
+    "role": "implementer",
+    "session_id": "canon-impl-023-1"
+  },
+  "at": "2026-10-17T20:04:31.797698Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib review::tests::pins_the_scenario_digest_and_what_its_latest_evidence_says"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 33,
+  "scenario_id": "review.add.20",
+  "schema": 1,
+  "staging_id": "05885a58d285",
+  "verdict": "faithful"
+}

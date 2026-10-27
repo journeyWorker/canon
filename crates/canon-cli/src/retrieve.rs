@@ -70,29 +70,29 @@ use sha2::{Digest, Sha256};
 
 use canon_learn::guidance::{retrieve_first_nonempty, retrieve_guidance};
 use canon_learn::{LearnConfig, ParquetStrategyStore};
-use canon_model::ids::regime_key;
+use canon_model::ids::{regime_key, JoinKeyError};
 use canon_model::{RegimeKey, RoleId, StrategyRef, SubjectId};
 
 use crate::context::resolve_repo_root;
 
 /// `--role`'s clap value parser.
-pub fn parse_role(s: &str) -> Result<RoleId, String> {
-    RoleId::parse(s).map_err(|e| e.to_string())
+pub fn parse_role(s: &str) -> Result<RoleId, JoinKeyError> {
+    RoleId::parse(s)
 }
 
 /// `--regime`'s `clap` value parser — the full `regime_key` string
 /// (`<role>/<repo>/<area>/<hash>`), the SAME canonical serialization
 /// S6's write side produces (design decision 1: "no second key
 /// derivation").
-pub fn parse_regime(s: &str) -> Result<RegimeKey, String> {
-    RegimeKey::parse(s).map_err(|e| e.to_string())
+pub fn parse_regime(s: &str) -> Result<RegimeKey, JoinKeyError> {
+    RegimeKey::parse(s)
 }
 
 /// `--subject-id`'s `clap` value parser — a [`SubjectId`] kebab slug (s36
 /// `subject-domain-loop`). Validated here so a malformed subject id is
 /// a clean clap usage error, never a silently-coerced regime segment.
-pub fn parse_subject(s: &str) -> Result<SubjectId, String> {
-    SubjectId::parse(s).map_err(|e| e.to_string())
+pub fn parse_subject(s: &str) -> Result<SubjectId, JoinKeyError> {
+    SubjectId::parse(s)
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -351,14 +351,14 @@ pub fn format_human(role: &RoleId, regime_key: &RegimeKey, guidance: &[StrategyR
 /// omitted/null value, so a caller piping `(.data // .)` into a manifest
 /// write always gets a well-formed JSON array. The installed hook reads
 /// `(.data // .)`, so it works with the 0.27 bare array and this envelope.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(transparent)]
 pub struct RetrieveReport<'a>(pub &'a [StrategyRef]);
 
 impl crate::json_out::Report for RetrieveReport<'_> {}
 
 /// `canon regime-key`: the validated key (`RegimeShowReport`).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RegimeShowReport<'a> {
     pub regime_key: &'a str,
@@ -369,10 +369,16 @@ impl crate::json_out::Report for RegimeShowReport<'_> {}
 #[cfg(test)]
 mod tests {
     use canon_learn::StrategyStore;
-    use canon_model::ids::regime_key;
     use chrono::Utc;
 
     use super::*;
+
+    #[test]
+    fn the_value_parsers_refuse_in_their_old_words() {
+        assert_eq!(parse_role("Bad Role").unwrap_err().to_string(), format!("invalid RoleId: \"Bad Role\" does not match grammar `{}`", RoleId::GRAMMAR));
+        assert_eq!(parse_regime("nope").unwrap_err().to_string(), format!("invalid RegimeKey: \"nope\" does not match grammar `{}`", RegimeKey::GRAMMAR));
+        assert_eq!(parse_subject("Bad Subject").unwrap_err().to_string(), format!("invalid SubjectId: \"Bad Subject\" does not match grammar `{}`", SubjectId::GRAMMAR));
+    }
 
     fn role(s: &str) -> RoleId {
         RoleId::parse(s).unwrap()
@@ -385,16 +391,7 @@ mod tests {
     fn seed_strategy(repo_dir: &Path, regime_key: &RegimeKey, role: &RoleId, title: &str) {
         let learn_config = LearnConfig::default();
         let store = ParquetStrategyStore::open(repo_dir.join(learn_config.root).join("strategies"));
-        let item = canon_learn::StrategyItem::new(
-            canon_learn::StrategyId::new(),
-            regime_key.clone(),
-            role.clone(),
-            title,
-            "description",
-            "content",
-            vec![canon_learn::TrajectoryId::new()],
-            Utc::now(),
-        );
+        let item = canon_learn::StrategyItem::new(canon_learn::StrategyItemFields { id: canon_learn::StrategyId::new(), regime_key: regime_key.clone(), role: role.clone(), title: title.into(), description: "description".into(), content: "content".into(), source_trajectory_ids: vec![canon_learn::TrajectoryId::new()], recorded_at: Utc::now() });
         store.append(&item).unwrap();
     }
 

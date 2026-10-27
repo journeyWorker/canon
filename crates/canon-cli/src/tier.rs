@@ -31,6 +31,7 @@ pub enum TierAgeError {
 
 /// One `aging:` entry's outcome: what a preview found past the threshold
 /// (`candidates`) and, once committed, what the run did with it.
+#[derive(Debug)]
 pub struct AgeRuleReport {
     pub kind: RecordKind,
     pub source: Rung,
@@ -63,7 +64,7 @@ pub fn preview(loaded: &tiers::LoadedTiers) -> Result<(Vec<AgeRuleReport>, Vec<E
             .filter(|raw| canon_store::tier::raw_record_at(raw) < cutoff)
             .map(|raw| {
                 let id = canon_store::partition::resolve_partition(*kind, &raw.0).ok().map(|p| p.natural_key).unwrap_or_default();
-                format!("{}:{id}:{}", kind.as_str(), canon_store::partition::content_digest12(&raw.0))
+                format!("{}:{id}:{}", kind.as_str(), canon_store::partition::content_digest(&raw.0))
             })
             .collect();
         ids.sort();

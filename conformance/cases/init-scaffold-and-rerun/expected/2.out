@@ -1,1 +1,2 @@
 total: 0 change(s) persisted, 0 task(s) persisted, 0 duplicate-change-id skipped
+hot store: .canon/hot.db (sqlite file of this worktree; another worktree of the repository has its own)

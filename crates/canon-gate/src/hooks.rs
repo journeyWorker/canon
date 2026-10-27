@@ -287,7 +287,7 @@ mod tests {
         {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&script_path, fs::Permissions::from_mode(0o755)).unwrap();
-        }
+        };
 
         let mut cmd = Command::new("/bin/sh");
         cmd.arg(&script_path);

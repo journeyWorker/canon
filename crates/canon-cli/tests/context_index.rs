@@ -32,7 +32,7 @@ fn kinds_are_every_record_kind_under_its_user_facing_name() {
     let out = context(&[], &[]);
     assert!(out.status.success());
     let doc = data(&out);
-    let expected: BTreeSet<String> = RecordKind::ALL.iter().map(|k| canon_cli::query::kind_cli_name(*k).to_string()).collect();
+    let expected: BTreeSet<String> = RecordKind::ALL.iter().map(|k| k.as_str().to_string()).collect();
     assert_eq!(names(&doc["kinds"]), expected);
     assert_eq!(names(&doc["cel"]), expected);
     assert!(expected.contains("evidence") && !expected.contains("evidence_record"));

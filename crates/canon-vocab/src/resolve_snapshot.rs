@@ -47,14 +47,14 @@ pub fn resolve_snapshot(project_dir: &Path, profile: Option<&str>) -> (Capabilit
     let project = match load_project(project_dir) {
         Ok(p) => p,
         Err(e) => {
-            diags.push(resolve_diag("E-PROJECT-MALFORMED", e));
+            diags.push(resolve_diag("E-PROJECT-MALFORMED", e.to_string()));
             None
         }
     };
 
     let (vocab_dir, graph, selected_owned) = match &project {
-        Some(p) => (p.vocab_dir.clone(), p.graph.clone(), profile.map(str::to_string).unwrap_or_else(|| p.graph.default_profile.clone())),
-        None => (project_dir.join(canon_model::paths::VOCAB_DIR), ProfileGraph::empty(DEFAULT_PROFILE), profile.map(str::to_string).unwrap_or_else(|| DEFAULT_PROFILE.to_string())),
+        Some(p) => (p.vocab_dir.clone(), p.graph.clone(), profile.map_or_else(|| p.graph.default_profile.clone(), str::to_string)),
+        None => (project_dir.join(canon_model::paths::VOCAB_DIR), ProfileGraph::empty(DEFAULT_PROFILE), profile.map_or_else(|| DEFAULT_PROFILE.to_string(), str::to_string)),
     };
     let selected = selected_owned.as_str();
 

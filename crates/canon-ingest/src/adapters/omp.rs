@@ -44,13 +44,14 @@ use crate::normalize::{normalize_workspace_key, workspace_label_from_key};
 /// an ambient value from the calling shell.
 pub const EXTRA_SESSIONS_DIR_ENV: &str = "CANON_INGEST_OMP_SESSIONS_DIR";
 
+#[derive(Debug)]
 pub struct OmpAdapter;
 
 /// Pi session header (first line of JSONL).
 /// Ported from `pi.rs:16-26`.
 #[derive(Debug, Deserialize)]
 struct PiSessionHeader {
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "deserialized to validate the header shape; never read")]
     #[serde(rename = "type")]
     entry_type: String,
     id: String,
@@ -181,9 +182,8 @@ impl SessionAdapter for OmpAdapter {
 /// otherwise well-formed message) is NOT malformed content and is NOT
 /// counted.
 fn parse_pi_file(path: &Path) -> ParseOutcome {
-    let file = match std::fs::File::open(path) {
-        Ok(f) => f,
-        Err(_) => return ParseOutcome::default(),
+    let Ok(file) = std::fs::File::open(path) else {
+        return ParseOutcome::default();
     };
 
     let fallback_timestamp = file_modified_timestamp_ms(path);
@@ -199,9 +199,8 @@ fn parse_pi_file(path: &Path) -> ParseOutcome {
     let mut workspace_label: Option<String> = None;
 
     for line in reader.lines() {
-        let line = match line {
-            Ok(l) => l,
-            Err(_) => continue,
+        let Ok(line) = line else {
+            continue;
         };
 
         let trimmed = line.trim();
@@ -231,9 +230,8 @@ fn parse_pi_file(path: &Path) -> ParseOutcome {
 
             buffer.clear();
             buffer.extend_from_slice(trimmed.as_bytes());
-            let header = match simd_json::from_slice::<PiSessionHeader>(&mut buffer) {
-                Ok(h) => h,
-                Err(_) => return ParseOutcome::new(Vec::new(), skipped + 1),
+            let Ok(header) = simd_json::from_slice::<PiSessionHeader>(&mut buffer) else {
+                return ParseOutcome::new(Vec::new(), skipped + 1);
             };
 
             // Content-derived session_id, never the filename — the
@@ -251,12 +249,9 @@ fn parse_pi_file(path: &Path) -> ParseOutcome {
         // amendment) rather than vanishing silently.
         buffer.clear();
         buffer.extend_from_slice(trimmed.as_bytes());
-        let entry = match simd_json::from_slice::<PiSessionEntry>(&mut buffer) {
-            Ok(e) => e,
-            Err(_) => {
-                skipped += 1;
-                continue;
-            }
+        let Ok(entry) = simd_json::from_slice::<PiSessionEntry>(&mut buffer) else {
+            skipped += 1;
+            continue;
         };
 
         if entry.entry_type != "message" {
@@ -274,8 +269,7 @@ fn parse_pi_file(path: &Path) -> ParseOutcome {
             .timestamp
             .as_deref()
             .and_then(|ts| chrono::DateTime::parse_from_rfc3339(ts).ok())
-            .map(|dt| dt.timestamp_millis())
-            .unwrap_or(fallback_timestamp);
+            .map_or(fallback_timestamp, |dt| dt.timestamp_millis());
 
         // s31 D4: a `user`-role message carries no token usage — it
         // NEVER becomes a `UnifiedRow` — but its (possibly empty)
@@ -408,9 +402,7 @@ fn file_modified_timestamp_ms(path: &Path) -> i64 {
     std::fs::metadata(path)
         .and_then(|meta| meta.modified())
         .ok()
-        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
-        .map(|duration| duration.as_millis() as i64)
-        .unwrap_or_else(|| chrono::Utc::now().timestamp_millis())
+        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok()).map_or_else(|| chrono::Utc::now().timestamp_millis(), |duration| i64::try_from(duration.as_millis()).expect("epoch millis fit in i64"))
 }
 
 /// Ported from the donor session-parser project's provider-identity module
@@ -567,12 +559,17 @@ not valid json
     }
 
     #[test]
+    #[expect(unsafe_code, reason = "std::env::set_var/remove_var are unsafe fns; the SAFETY comments below say why this test cannot race")]
     fn scan_roots_ignores_env_override_when_use_env_roots_is_false() {
-        // SAFETY: test-only, single-threaded within this process's
-        // test harness invocation for this var name.
+        // SAFETY: `EXTRA_SESSIONS_DIR_ENV` is read only inside `scan_roots` when
+        // `use_env_roots` is true, and no test in this crate passes `true` for the
+        // omp adapter, so no other thread reads this variable while it is set.
+        // Rust's `std::env` serializes its own accessors and nothing here calls libc
+        // `getenv` directly.
         unsafe { std::env::set_var(EXTRA_SESSIONS_DIR_ENV, "/should/not/appear") };
         let adapter = OmpAdapter;
         let roots = adapter.scan_roots(Path::new("/home/example"), false);
+        // SAFETY: same as the `set_var` above; this test is the variable's only user.
         unsafe { std::env::remove_var(EXTRA_SESSIONS_DIR_ENV) };
         assert!(!roots.iter().any(|r| r == Path::new("/should/not/appear")));
     }

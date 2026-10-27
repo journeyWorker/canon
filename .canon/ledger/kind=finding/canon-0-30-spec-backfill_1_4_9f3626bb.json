@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-030-sb",
+    "role": "reviewer",
+    "session_id": "rev-030-sb-2026-10-26"
+  },
+  "at": "2026-10-26T13:08:12.105824221Z",
+  "change_id": "canon-0-30-spec-backfill",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "7f9f15df9b2287e3743828cd184d6cdc3e83d05c",
+  "reviewer": "rev-030-sb",
+  "round": 1,
+  "scenario_ids": [
+    "dispatch.manifest.10",
+    "dispatch.manifest.13"
+  ],
+  "schema": 1,
+  "seq": 4,
+  "severity": "note",
+  "summary": "[0.29 behaviour] dispatch.manifest.10/13 pin ADAPTER_REFUSED with exit 2 (missing --response file), while canon schema --error ADAPTER_REFUSED documents exit 1 and dispatch.manifest.12 gets exit 1 for the same code. The scenarios state the runtime truthfully; the code/catalog mismatch is a 0.29 inconsistency to fix in a separate change (the scenarios will then move with it). Related: the brief's F1 line 'wrong input -> exit 2' does not hold for 09, 12, 22 (catalog exit 1).",
+  "worktree_dirty": false
+}

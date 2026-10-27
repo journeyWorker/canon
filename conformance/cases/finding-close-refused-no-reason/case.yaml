@@ -1,6 +1,6 @@
 description: "0.25 D4 (#98): `canon finding close` refuses a rejected or deferred close with no --reason (FINDING_REASON_REQUIRED, exit 2, nothing staged); with --reason the close is written and `finding list` shows it"
 steps:
-  - args: [finding, add, --change-id, c-cart, --round, "1", --seq, "1", --severity, blocker, --actor-id, rev-a, --summary, teardown races HMR]
+  - args: [finding, add, --change-id, c-cart, --round, "1", --seq, "1", --severity, blocker, --introduced-unknown, --actor-id, rev-a, --summary, teardown races HMR]
     exit: 0
   - args: [gate, promote]
     exit: 0

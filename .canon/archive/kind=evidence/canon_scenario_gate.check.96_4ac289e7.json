@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-023",
+    "role": "implementer",
+    "session_id": "canon-impl-023-1"
+  },
+  "at": "2026-10-17T20:04:27.782016Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test migrate_pins migrate_pins_07_a_moved_root_is_searched_at_its_former_path_and_only_for_its_own_project"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 52,
+  "scenario_id": "gate.check.96",
+  "schema": 1,
+  "staging_id": "865c2e2f6596",
+  "verdict": "faithful"
+}

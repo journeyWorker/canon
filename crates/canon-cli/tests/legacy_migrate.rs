@@ -122,7 +122,7 @@ fn commit(repo: &Path) -> Output {
 
 fn backup_dirs(repo: &Path) -> Vec<PathBuf> {
     match std::fs::read_dir(repo.join(".canon/migrate-backup")) {
-        Ok(entries) => entries.flatten().map(|entry| entry.path()).collect(),
+        Ok(entries) => entries.flatten().map(|entry| entry.path()).filter(|path| path.is_dir()).collect(),
         Err(_) => Vec::new(),
     }
 }

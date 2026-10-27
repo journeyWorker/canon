@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-sb-f2",
+    "role": "implementer",
+    "session_id": "sb-f2-2026-10-26"
+  },
+  "at": "2026-10-26T13:01:25.333632173Z",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_storage_gate evidence_add_120_artifacts_move_refuses_a_plan_that_changed_since_its_preview_and_moves_nothing"
+  },
+  "evidence_sha": "b5bb0837c492eabacbbdfeb303af3aa97bbbcc58",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 162,
+  "scenario_id": "evidence.add.120",
+  "schema": 1,
+  "staging_id": "79f1cde39ba0",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

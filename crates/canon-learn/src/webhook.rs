@@ -207,7 +207,7 @@ pub struct NormalizedCiEvent {
 fn detect_revert_target(body: Option<&str>) -> Option<Sha> {
     let body = body?;
     let start = body.find(REVERT_MARKER)? + REVERT_MARKER.len();
-    let candidate: String = body[start..].chars().take_while(|c| c.is_ascii_hexdigit()).collect();
+    let candidate: String = body[start..].chars().take_while(char::is_ascii_hexdigit).collect();
     Sha::parse(candidate).ok()
 }
 
@@ -426,7 +426,7 @@ impl WebhookConfig {
     /// producing a timer that is always-already-elapsed or never-elapsing.
     pub fn from_manifest(canon_yaml: &str) -> Result<Self, WebhookError> {
         let manifest: WebhookManifest = serde_yaml::from_str(canon_yaml).map_err(|e| WebhookError::Config(e.to_string()))?;
-        let enabled = manifest.webhook.map(|section| section.enabled).unwrap_or(false);
+        let enabled = manifest.webhook.is_some_and(|section| section.enabled);
         let window_hours =
             manifest.no_rollback.and_then(|section| section.window_hours).unwrap_or(DEFAULT_NO_ROLLBACK_WINDOW_HOURS);
         if window_hours <= 0 {

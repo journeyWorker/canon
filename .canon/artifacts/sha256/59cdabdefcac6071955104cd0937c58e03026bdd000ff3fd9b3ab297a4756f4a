@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<testsuites><testsuite name="record_links" tests="3" failures="0">
+<testcase classname="record_links" name="ingest_sessions_15_a_command_that_writes_hot_records_prints_the_hot_store_location"/>
+<testcase classname="record_links" name="ingest_sessions_16_the_other_hot_writers_print_the_hot_store_location_too"/>
+<testcase classname="record_links" name="ledger_migrate_16_a_review_keeps_its_review_id_through_canon_migrate"/>
+</testsuite></testsuites>

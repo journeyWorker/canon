@@ -66,6 +66,7 @@ use crate::task_rows::{self, Annotation, TaskRow, parse_line};
 
 /// The `ArtifactAdapter` for `openspec/changes/*/tasks.md` checkbox
 /// state (S4 design D4).
+#[derive(Debug)]
 pub struct OpenspecTaskAdapter;
 
 impl ArtifactAdapter for OpenspecTaskAdapter {
@@ -162,9 +163,7 @@ fn file_modified_at(path: &Path) -> DateTime<Utc> {
     let ms = fs::metadata(path)
         .and_then(|meta| meta.modified())
         .ok()
-        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
-        .map(|duration| duration.as_millis() as i64)
-        .unwrap_or_else(|| Utc::now().timestamp_millis());
+        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok()).map_or_else(|| Utc::now().timestamp_millis(), |duration| i64::try_from(duration.as_millis()).expect("epoch millis fit in i64"));
     Utc.timestamp_millis_opt(ms).single().unwrap_or_else(Utc::now)
 }
 
@@ -272,7 +271,6 @@ fn contains_ci_reference(lower: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
 
     use super::*;
     use crate::verdict::{attach_regime_key, derive_verdict};

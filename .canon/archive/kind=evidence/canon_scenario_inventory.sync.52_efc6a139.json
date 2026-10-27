@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-028",
+    "role": "implementer",
+    "session_id": "canon-impl-028-1"
+  },
+  "at": "2026-10-23T12:32:52.322170054Z",
+  "code_tree": "d4c959e50ef49b38b33e9d5cbdb51c73edc4d663",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test dry_run inventory_sync_dry_run_refuses_like_the_real_run"
+  },
+  "evidence_note": {
+    "summary": "dry_run inventory_sync_dry_run_refuses_like_the_real_run: 1 passed, 0 failed, 24 filtered out @ 2c0fb497"
+  },
+  "evidence_sha": "2c0fb4972782486f9ee8a638db56be81405f3bda",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 35,
+  "scenario_id": "inventory.sync.52",
+  "schema": 1,
+  "staging_id": "2794729691b0",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

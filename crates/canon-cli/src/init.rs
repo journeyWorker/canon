@@ -85,7 +85,7 @@ const HOT_KINDS: [RecordKind; 5] = [RecordKind::Task, RecordKind::Handoff, Recor
 /// object-store stand-in), which would otherwise be untracked after the
 /// first run (#105, #107); and the archive of superseded scenario index
 /// versions, which every rewrite of the derived index fills.
-const GITIGNORE_LINES: [(&str, &str); 9] = [
+const GITIGNORE_LINES: [(&str, &str); 10] = [
     ("# canon's sqlite hot tier (s32 sqlite-hot-backend) -- db file + WAL/SHM sidecars.", paths::HOT_DB_GITIGNORE),
     ("# canon's read-access audit log (canon query/export/purge) -- local, never committed.", paths::AUDIT_GITIGNORE),
     ("# canon's scenario index -- derived from the .feature files, rebuilt by every reader.", paths::SCENARIO_INDEX_GITIGNORE),
@@ -95,6 +95,7 @@ const GITIGNORE_LINES: [(&str, &str); 9] = [
     ("# the snapshot `canon dashboard` and `canon report snapshot` regenerate -- derived, never committed.", paths::DASHBOARD_SNAPSHOT_GITIGNORE),
     ("# canon's learn scratch area -- rebuildable, never committed.", paths::LEARN_GITIGNORE),
     ("# canon's local object-store stand-in -- local state, never committed.", paths::R2_LOCAL_GITIGNORE),
+    ("# the copies `canon migrate` keeps so `--revert` can restore them -- local, never committed.", paths::MIGRATE_BACKUP_GITIGNORE),
 ];
 
 /// D8/D9's skeleton `canon.yaml` body: every one of `RecordKind::ALL`'s
@@ -292,7 +293,7 @@ Inside an approved scope, never stop for a human: fixes, follow-ups and review r
 /// blocks, with `end` before the line's newline. `Err` when the text
 /// ends inside an unclosed fence: a block appended there would land in
 /// the fence and never be found again.
-pub(crate) fn marker_lines(text: &str) -> Result<(Vec<(usize, usize)>, Vec<(usize, usize)>), String> {
+pub(crate) fn marker_lines(text: &str) -> Result<(MarkerSpans, MarkerSpans), String> {
     let (mut begins, mut ends) = (Vec::new(), Vec::new());
     let mut open_fence: Option<(char, usize)> = None;
     let mut offset = 0;
@@ -314,6 +315,8 @@ pub(crate) fn marker_lines(text: &str) -> Result<(Vec<(usize, usize)>, Vec<(usiz
     }
     Ok((begins, ends))
 }
+
+type MarkerSpans = Vec<(usize, usize)>;
 
 /// `AGENTS.md`'s content with the canon block merged in. `existing` is
 /// the current file (`None` when absent). Only standalone marker lines
@@ -389,7 +392,7 @@ impl InitLog {
         self.steps.push(InitStep { step: step.to_string(), detail: detail.into() });
     }
 
-    fn finish(self, repo: &Path) -> i32 {
+    fn finish(self, repo: &Path) -> u8 {
         if self.emit_data {
             if !self.wrote {
                 crate::json_out::mark_unchanged();
@@ -401,7 +404,7 @@ impl InitLog {
 }
 
 /// One step `canon init` took.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InitStep {
     pub step: String,
@@ -409,7 +412,7 @@ pub struct InitStep {
 }
 
 /// `canon init`'s report (`InitReport`): what it did, step by step.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InitReport {
     /// True when `--dry-run` previewed the run without writing.
@@ -420,7 +423,7 @@ pub struct InitReport {
 impl crate::json_out::Report for InitReport {}
 
 /// One `canon.yaml` section `init --check-config` examined.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InitCheckSection {
     pub section: String,
@@ -430,7 +433,7 @@ pub struct InitCheckSection {
 }
 
 /// `canon init --check-config`'s report (`InitCheckReport`).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InitCheckReport {
     pub ok: bool,
@@ -558,7 +561,7 @@ fn language_section(language: Option<&crate::language::Language>) -> String {
 /// Installs the canon skill for the chosen harnesses through
 /// [`skills::install_canonical`] (which follows the `skills.providers`
 /// just written), and prints what happened. `Err` carries the exit code.
-fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkills, dry_run: bool, log: &mut InitLog) -> Result<(), i32> {
+fn install_chosen_skills(repo: &Path, canon_yaml_path: &Path, chosen: &InitSkills, dry_run: bool, log: &mut InitLog) -> Result<(), u8> {
     if chosen.providers.is_empty() {
         if chosen.recorded {
             log.step("skills-none", "skills.providers is []", "canon init: skills.providers is [] — no canon skill installed; change it with `canon skills install --providers=<list>`".to_string());
@@ -676,13 +679,13 @@ fn scaffold_policy(repo: &Path, level: PolicyLevel, dry_run: bool, log: &mut Ini
 /// - A fresh repo also records and installs the harness choice
 ///   ([`SkillsChoice`], 0.17 D5); an install that fails after the writes
 ///   exits `2` naming the retry. A rerun never asks and never installs.
-pub fn run_init(repo: &Path, options: InitOptions, json: bool) -> i32 {
+pub fn run_init(repo: &Path, options: InitOptions, json: bool) -> u8 {
     run_init_in(repo, options, json, true)
 }
 
 /// [`run_init`], with `emit_data: false` leaving the JSON document to the
 /// calling command (`canon demo init`).
-pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_data: bool) -> i32 {
+pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_data: bool) -> u8 {
     let dry_run = options.dry_run;
     let mut log = InitLog::new(json, dry_run, emit_data);
     if let Err(e) = (!dry_run).then(|| fs::create_dir_all(repo)).transpose() {
@@ -706,7 +709,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
         match merge_agents_md(existing.as_deref()) {
             Ok(merged) => Some((existing, merged)),
             Err(e) => {
-                return CliError::refused("INIT_AGENTS_MD_CONFLICT", e.to_string()).hint("resolve the conflict in AGENTS.md by hand, or run `canon init --no-agents-md`").emit(log.command(), json);
+                return CliError::refused("INIT_AGENTS_MD_CONFLICT", e.clone()).hint("resolve the conflict in AGENTS.md by hand, or run `canon init --no-agents-md`").emit(log.command(), json);
             }
         }
     } else {
@@ -720,7 +723,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
         match choose_skills(repo, &options.skills) {
             Ok(skills) => skills,
             Err(e) => {
-                return CliError::refused("INIT_INVALID_ARGUMENT", e.to_string()).hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
+                return CliError::refused("INIT_INVALID_ARGUMENT", e.clone()).hint("`canon schema init` lists the accepted arguments and their forms").emit(log.command(), json);
             }
         }
     };
@@ -809,7 +812,7 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
 /// least one present section fails -- printing one PASS/FAIL/"not
 /// configured" line per section regardless (never stopping at the
 /// first failure, design D7).
-pub fn run_check_config(repo: &Path, json: bool) -> i32 {
+pub fn run_check_config(repo: &Path, json: bool) -> u8 {
     let canon_yaml_path = repo.join("canon.yaml");
     let Ok(text) = fs::read_to_string(&canon_yaml_path) else {
         return CliError::refused("CONFIG_MISSING", format!("`{}` does not exist; run `canon init` first", canon_yaml_path.display())).hint("run `canon init` in the repository root first").emit("canon init --check", json);
@@ -836,6 +839,16 @@ pub fn run_check_config(repo: &Path, json: bool) -> i32 {
                     all_ok = false;
                     report.push_str(&format!("[FAIL] tiers/routing/aging: {e}\n"));
                 }
+            }
+            match crate::hot_store::HotStore::from_policy(&policy, repo) {
+                Some(hot) => match hot.check(repo) {
+                    Ok(()) => report.push_str(&format!("[PASS] hot-store: {} ({})\n", hot.location(), hot.note())),
+                    Err(e) => {
+                        all_ok = false;
+                        report.push_str(&format!("[FAIL] hot-store: {e}\n"));
+                    }
+                },
+                None => report.push_str("[not configured] hot-store\n"),
             }
         }
         Err(e) => {
@@ -992,7 +1005,7 @@ mod tests {
         let chosen = InitSkills { providers: vec![Provider::Codex, Provider::Pi], recorded: true };
         std::fs::write(&canon_yaml, skeleton_yaml() + &skills_section(Some(&chosen))).unwrap();
         assert_eq!(skills::configured_providers(&canon_yaml).unwrap(), Some(vec![Provider::Codex, Provider::Pi]));
-        assert!(TierPolicy::from_yaml_at(&std::fs::read_to_string(&canon_yaml).unwrap(), dir.path()).is_ok());
+        TierPolicy::from_yaml_at(&std::fs::read_to_string(&canon_yaml).unwrap(), dir.path()).unwrap();
         std::fs::write(&canon_yaml, skeleton_yaml() + &skills_section(None)).unwrap();
         assert_eq!(skills::configured_providers(&canon_yaml).unwrap(), None);
     }
@@ -1032,10 +1045,10 @@ mod tests {
         std::fs::write(&canon_yaml_path, skeleton_yaml()).unwrap();
         let text = std::fs::read_to_string(&canon_yaml_path).unwrap();
 
-        assert!(TierPolicy::from_yaml_at(&text, dir.path()).is_ok());
-        assert!(crate::inventory::load_spec_roots(&canon_yaml_path).is_ok());
-        assert!(crate::plans::load_plan_sources_from_config(&canon_yaml_path, dir.path()).is_ok());
-        assert_eq!(crate::write_mode::configured_promote_mode(&canon_yaml_path), Ok(crate::write_mode::PromoteMode::Auto), "a new repo promotes on write");
+        TierPolicy::from_yaml_at(&text, dir.path()).unwrap();
+        crate::inventory::load_spec_roots(&canon_yaml_path).unwrap();
+        crate::plans::load_plan_sources_from_config(&canon_yaml_path, dir.path()).unwrap();
+        assert_eq!(crate::write_mode::configured_promote_mode(&canon_yaml_path).unwrap(), crate::write_mode::PromoteMode::Auto, "a new repo promotes on write");
     }
 
     fn has_every_gitignore_line(text: &str) -> bool {
@@ -1162,6 +1175,6 @@ spec_coverage:
 
     #[test]
     fn merge_agents_md_refuses_a_trailing_unclosed_fence() {
-        assert!(merge_agents_md(Some("# Docs\n\n```\nnever closed\n")).is_err());
+        merge_agents_md(Some("# Docs\n\n```\nnever closed\n")).unwrap_err();
     }
 }

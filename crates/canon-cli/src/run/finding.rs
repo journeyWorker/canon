@@ -1,6 +1,6 @@
 //! `canon finding` — the handlers of the group.
 
-use crate::cli::finding::*;
+use crate::cli::finding::{FindingCommand, FindingAddArgs, FindingCloseArgs, FindingListArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: FindingCommand) -> ExitCode {
@@ -15,6 +15,8 @@ pub fn run(cmd: FindingCommand) -> ExitCode {
             rev,
             resolution_rev,
             introduced_rev,
+            introduced_unknown,
+            review_id,
             file_ref,
             scenario_ids,
             actor_id,
@@ -39,6 +41,8 @@ pub fn run(cmd: FindingCommand) -> ExitCode {
                 summary,
                 resolution_rev,
                 introduced_rev,
+                introduced_unknown,
+                review_id,
                 file_ref,
                 scenario_ids,
                 actor_id,
@@ -47,17 +51,17 @@ pub fn run(cmd: FindingCommand) -> ExitCode {
                 promote: promote.flag(),
                 json,
             },
-        ) as u8)
+        ))
         }
         FindingCommand::Close(FindingCloseArgs { change_id, round, seq, disposition, resolution_rev, reason, actor_id, role, session_id, promote, repo, json, .. }) => {
             crate::role::warn_if_unknown(&role, &crate::context::resolve_repo_root(&repo));
             ExitCode::from(crate::finding::run_close(
                 &repo,
                 &crate::finding::FindingCloseArgs { change_id, round, seq, disposition, resolution_rev, reason, actor_id, role, session_id, promote: promote.flag(), json },
-            ) as u8)
+            ))
         }
         FindingCommand::List(FindingListArgs { change_id, open, json, repo, page, fields }) => {
-            ExitCode::from(crate::finding::run_list(&repo, &crate::finding::FindingListArgs { change_id, open, json, page: page.page(), fields }) as u8)
+            ExitCode::from(crate::finding::run_list(&repo, &crate::finding::FindingListArgs { change_id, open, json, page: page.page(), fields }))
         }
     }
 }

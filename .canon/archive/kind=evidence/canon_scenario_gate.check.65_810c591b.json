@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-023",
+    "role": "implementer",
+    "session_id": "canon-impl-023-1"
+  },
+  "at": "2026-10-17T20:04:23.988663Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_audit a_new_audit_replaces_a_refutation_and_binds_only_what_it_names"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 46,
+  "scenario_id": "gate.check.65",
+  "schema": 1,
+  "staging_id": "d98b3fc2b26b",
+  "verdict": "faithful"
+}

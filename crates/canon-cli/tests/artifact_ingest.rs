@@ -33,6 +33,7 @@ use std::process::{Command, Output};
 
 use canon_ingest::verdict::Polarity;
 use canon_learn::{ParquetTrajectoryStore, TrajectoryStore};
+use canon_model::{DivergenceFields, HandoffFields};
 use canon_model::{
     Actor, Divergence, DivergenceStatus, DomainId, Envelope, Handoff, HandoffBody, HandoffId, HandoffState, ProjectId, ProvenanceRef,
     RecordKind, RegimeKey, Review, RoleId, ScenarioId, Sha, TotalOrder,
@@ -106,7 +107,7 @@ fn plant_handoff_in_git(git_root: &Path) -> HandoffId {
         Actor::new("s14-fixture", RoleId::parse("implementer").unwrap()),
     );
     let body = HandoffBody { domain: DomainId::parse("development").unwrap(), template_version: 1, fields: serde_json::json!({}) };
-    let mut handoff = Handoff::new(envelope, id.clone(), Uuid::new_v4(), None, 1, "S14 fixture handoff", None, body);
+    let mut handoff = Handoff::new(HandoffFields { envelope, id: id.clone(), chain_id: Uuid::new_v4(), parent_handoff_id: None, seq: 1, title: "S14 fixture handoff".into(), openspec_change_slug: None, body });
     handoff.transition_to(HandoffState::InProgress, "2026-07-01T09:11:00Z".parse().unwrap(), Some("s14-agent")).unwrap();
     handoff.transition_to(HandoffState::Done, "2026-07-01T09:20:00Z".parse().unwrap(), None).unwrap();
     GitTier::new(git_root).write(&handoff).expect("write handoff fixture into the git tier");
@@ -153,17 +154,7 @@ fn plant_divergence_resolved_in_git(git_root: &Path) {
         "2026-07-01T09:40:00Z".parse().unwrap(),
         Actor::new("s15-fixture", RoleId::parse("test").unwrap()),
     );
-    let divergence = Divergence::new(
-        envelope,
-        ProjectId::parse("acme-repo").unwrap(),
-        ScenarioId::parse("world.firstbuy-hotdeal.27").unwrap(),
-        Sha::parse("b".repeat(40)).unwrap(),
-        DivergenceStatus::Resolved,
-        TotalOrder::new(1),
-        1,
-        "reviewer-1",
-        "",
-    );
+    let divergence = Divergence::new(DivergenceFields { envelope, project_id: ProjectId::parse("acme-repo").unwrap(), scenario_id: ScenarioId::parse("world.firstbuy-hotdeal.27").unwrap(), sha: Sha::parse("b".repeat(40)).unwrap(), status: DivergenceStatus::Resolved, run_seq: TotalOrder::new(1), round: 1, reviewer: "reviewer-1".into(), detail: "".into() });
     GitTier::new(git_root).write(&divergence).expect("write divergence fixture into the git tier");
 }
 
@@ -219,7 +210,7 @@ fn ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_re
     let output = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(output.status.success(), "canon ingest records must exit 0; stderr: {}", stderr(&output));
 
-    let payload: Value = data_of(&stdout(&output));
+    let payload = data_of(&stdout(&output));
 
     // ── (a) the handoff RECORDS-source adapter was actually DRIVEN. ──
     let adapters = payload["adapters"].as_array().expect("adapters array");
@@ -286,15 +277,15 @@ fn ingest_artifacts_drives_both_source_shapes_persists_trajectories_and_feeds_re
         .iter()
         .find(|r| r.get("role").and_then(|v| v.as_str()) == Some("dev") && r.get("regime_key").and_then(|v| v.as_str()) == Some(regime_key_str.as_str()))
         .unwrap_or_else(|| panic!("no mart_role_memory row for regime_key {regime_key_str}: {:?}", role_memory.rows));
-    assert_eq!(dev_row.get("strategy_count").and_then(|v| v.as_i64()), Some(1));
+    assert_eq!(dev_row.get("strategy_count").and_then(serde_json::Value::as_i64), Some(1));
 
     let flywheel = canon_report::marts::fetch_flywheel_funnel(&roots).expect("mart_flywheel_funnel query must succeed");
     assert!(!flywheel.rows.is_empty(), "mart_flywheel_funnel must render non-empty after this ingest");
     let dev_funnel = flywheel.rows.iter().find(|r| r.get("role").and_then(|v| v.as_str()) == Some("dev")).unwrap_or_else(|| {
         panic!("no mart_flywheel_funnel row for role `dev`: {:?}", flywheel.rows)
     });
-    assert_eq!(dev_funnel.get("verdicts").and_then(|v| v.as_i64()), Some(1));
-    assert_eq!(dev_funnel.get("distilled").and_then(|v| v.as_i64()), Some(1));
+    assert_eq!(dev_funnel.get("verdicts").and_then(serde_json::Value::as_i64), Some(1));
+    assert_eq!(dev_funnel.get("distilled").and_then(serde_json::Value::as_i64), Some(1));
 }
 
 /// s42 (`close-the-open-loops`) task 3.2, end to end through the actual
@@ -332,12 +323,12 @@ fn ingest_artifacts_stamps_the_dispatched_run_it_was_given_and_rejects_one_it_wa
     let regime = canon_model::regime_key("dev", "acme-repo", "world", "abc123");
     let begun = run_canon(&["dispatch", "begin", "--role", "dev", "--regime", &regime, "--repo", ".", "--json"], &repo);
     assert!(begun.status.success(), "canon dispatch begin must exit 0; stderr: {}", stderr(&begun));
-    let begun_payload: Value = data_of(&stdout(&begun));
+    let begun_payload = data_of(&stdout(&begun));
     let run_id = begun_payload["runId"].as_str().expect("run_id string").to_string();
 
     let ingested = run_canon(&["ingest", "records", "--repo", ".", "--run-id", &run_id, "--json"], &repo);
     assert!(ingested.status.success(), "canon ingest records --run-id must exit 0; stderr: {}", stderr(&ingested));
-    let payload: Value = data_of(&stdout(&ingested));
+    let payload = data_of(&stdout(&ingested));
     let persisted = payload["trajectoriesPersisted"].as_array().expect("trajectories_persisted array");
     assert_eq!(persisted.len(), 1, "one regime-keyed trajectory persisted: {payload}");
     let regime_key = RegimeKey::parse(persisted[0]["regimeKey"].as_str().expect("regime_key string")).unwrap();
@@ -372,7 +363,7 @@ fn a_second_ingest_over_an_unchanged_corpus_persists_zero_new_trajectories() {
     // ── First pass: the baseline write. ──
     let first = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(first.status.success(), "first canon ingest records must exit 0; stderr: {}", stderr(&first));
-    let first_payload: Value = data_of(&stdout(&first));
+    let first_payload = data_of(&stdout(&first));
     assert_eq!(first_payload["trajectoriesPersisted"].as_array().unwrap().len(), 1, "{first_payload}");
     assert_eq!(first_payload["trajectoriesSkippedDuplicate"], 0, "{first_payload}");
     let regime_key_str = first_payload["trajectoriesPersisted"][0]["regimeKey"].as_str().unwrap().to_string();
@@ -387,7 +378,7 @@ fn a_second_ingest_over_an_unchanged_corpus_persists_zero_new_trajectories() {
     // ── Second pass over the SAME, unchanged corpus. ──
     let second = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(second.status.success(), "second canon ingest records must exit 0; stderr: {}", stderr(&second));
-    let second_payload: Value = data_of(&stdout(&second));
+    let second_payload = data_of(&stdout(&second));
 
     // No NEW trajectory persisted, no verdict double-counted.
     assert_eq!(
@@ -434,7 +425,7 @@ fn an_unrouted_handoff_source_degrades_to_unavailable_without_aborting_the_rest_
     let output = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(output.status.success(), "stderr: {}", stderr(&output));
 
-    let payload: Value = data_of(&stdout(&output));
+    let payload = data_of(&stdout(&output));
     let adapters = payload["adapters"].as_array().unwrap();
     let handoff_summary = adapters.iter().find(|a| a["adapterId"] == "handoff").expect("handoff adapter entry present");
     assert_eq!(handoff_summary["status"], "unavailable", "{payload}");
@@ -526,7 +517,7 @@ fn native_flywheel_review_and_divergence_resolved_in_same_run_both_produce_traje
 
     let output = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo);
     assert!(output.status.success(), "stderr: {}", stderr(&output));
-    let payload: Value = data_of(&stdout(&output));
+    let payload = data_of(&stdout(&output));
 
     let adapters = payload["adapters"].as_array().expect("adapters array");
     let review_summary = adapters.iter().find(|a| a["adapterId"] == "review").unwrap_or_else(|| panic!("no `review` adapter entry: {payload}"));
@@ -646,11 +637,11 @@ fn handoff_adapter_is_unaffected_by_the_native_records_switch() {
 
     let off = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo_off);
     assert!(off.status.success(), "stderr: {}", stderr(&off));
-    let off_payload: Value = data_of(&stdout(&off));
+    let off_payload = data_of(&stdout(&off));
 
     let on = run_canon(&["ingest", "records", "--repo", ".", "--json"], &repo_on);
     assert!(on.status.success(), "stderr: {}", stderr(&on));
-    let on_payload: Value = data_of(&stdout(&on));
+    let on_payload = data_of(&stdout(&on));
 
     let off_handoff = off_payload["adapters"].as_array().unwrap().iter().find(|a| a["adapterId"] == "handoff").expect("handoff entry (off)");
     let on_handoff = on_payload["adapters"].as_array().unwrap().iter().find(|a| a["adapterId"] == "handoff").expect("handoff entry (on)");

@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "018-n3-impl",
+    "role": "implementer",
+    "session_id": "018-n3-impl"
+  },
+  "at": "2026-10-12T13:50:19.847368Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib markers::tests::a_standalone_marker_beside_a_path_holding_its_letters_is_still_a_finding_and_blocks_the_flip"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 2,
+  "scenario_id": "gate.markers.02",
+  "schema": 1,
+  "staging_id": "3352fcdc707b",
+  "verdict": "faithful"
+}

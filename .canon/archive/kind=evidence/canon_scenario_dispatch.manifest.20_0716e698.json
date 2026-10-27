@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-sb-f1",
+    "role": "implementer",
+    "session_id": "sb-f1-2026-10-26"
+  },
+  "at": "2026-10-26T13:01:12.056989065Z",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_dispatch_demo dispatch_manifest_20_prompt_add_registers_a_prompt_bundle_under_name_and_version"
+  },
+  "evidence_sha": "b5bb0837c492eabacbbdfeb303af3aa97bbbcc58",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 22,
+  "scenario_id": "dispatch.manifest.20",
+  "schema": 1,
+  "staging_id": "0be081d27418",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

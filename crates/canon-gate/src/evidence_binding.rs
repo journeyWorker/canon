@@ -170,6 +170,7 @@ pub fn binding_summary(ctx: &GateContext) -> Option<BindingSummary> {
 }
 
 /// The `canon gate check` arm (module doc).
+#[derive(Debug)]
 pub struct EvidenceBindingCheck;
 
 impl GateCheck for EvidenceBindingCheck {
@@ -241,7 +242,7 @@ mod tests {
     fn evidence(id: &str, attachment: Option<EvidenceAttachment>, offset: i64) -> EvidenceRecord {
         let envelope = Envelope::new(
             1,
-            RecordKind::EvidenceRecord,
+            RecordKind::Evidence,
             Utc::now() + Duration::seconds(offset),
             Actor::new("agent", RoleId::parse("implementer").unwrap()),
         );
@@ -284,7 +285,7 @@ mod tests {
         Some(EvidenceBinding::Active {
             mode,
             strength,
-            cases: cases.iter().map(|s| s.to_string()).collect(),
+            cases: cases.iter().map(std::string::ToString::to_string).collect(),
             lanes: Vec::new(),
             scope: Vec::new(),
         })

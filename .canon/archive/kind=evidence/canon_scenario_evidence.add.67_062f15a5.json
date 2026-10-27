@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "m6-impl"
+  },
+  "at": "2026-10-12T04:14:53.612158Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test write_path evidence_add_67 && cargo test -p canon-cli --test conformance (evidence-add-promote-on-write, status-refreshes-stale-index)"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 44,
+  "scenario_id": "evidence.add.67",
+  "schema": 1,
+  "staging_id": "12f89d14bb0a",
+  "verdict": "faithful"
+}

@@ -1,6 +1,6 @@
 //! `canon skills` — the handlers of the group.
 
-use crate::cli::skills::*;
+use crate::cli::skills::{SkillsCommand, SkillsInstallArgs, SkillsCheckArgs, SkillsDoctorArgs, SkillsShowArgs};
 use crate::cli_error::CliError;
 use std::process::ExitCode;
 
@@ -35,7 +35,7 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
                 }
                 ExitCode::SUCCESS
             }
-            Err(err) => ExitCode::from(skills_error(&err).emit("canon skills install", json) as u8),
+            Err(err) => ExitCode::from(skills_error(&err).emit("canon skills install", json)),
         };
     }
     match crate::skills::install_canonical(source.as_deref(), target, providers, dry_run) {
@@ -90,7 +90,7 @@ fn run_skills_install(source: Option<&std::path::Path>, target: &std::path::Path
             }
             ExitCode::SUCCESS
         }
-        Err(err) => ExitCode::from(skills_error(&err).emit("canon skills install", json) as u8),
+        Err(err) => ExitCode::from(skills_error(&err).emit("canon skills install", json)),
     }
 }
 
@@ -130,10 +130,10 @@ fn run_skills_check(source: Option<&std::path::Path>, target: &std::path::Path, 
                 let by_hand: Vec<String> = report.orphans.iter().filter(|o| o.modified).map(|o| o.path.display().to_string()).collect();
                 let hint = if by_hand.is_empty() { format!("run `{fix}`") } else { format!("run `{fix}`, which prunes the orphans whose bytes still match the install lock; it keeps the modified ones ({}), so remove those by hand", by_hand.join(", ")) };
                 let orphaned = if report.orphans.is_empty() { String::new() } else { format!("; orphaned (no longer shipped by the bundle): {}", report.orphans.iter().map(|o| o.path.display().to_string()).collect::<Vec<_>>().join(", ")) };
-                ExitCode::from(CliError::failed("SKILLS_DRIFT", format!("an installed skill is missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version{orphaned}")).hint(hint).emit_with_data_and_meta("canon skills check", json, &data, coverage.meta()) as u8)
+                ExitCode::from(CliError::failed("SKILLS_DRIFT", format!("an installed skill is missing, stale, a legacy remnant, an orphan the bundle no longer ships, or written by another canon version{orphaned}")).hint(hint).emit_with_data_and_meta("canon skills check", json, &data, coverage.meta()))
             }
         }
-        Err(err) => ExitCode::from(skills_error(&err).emit("canon skills check", json) as u8),
+        Err(err) => ExitCode::from(skills_error(&err).emit("canon skills check", json)),
     }
 }
 
@@ -147,7 +147,7 @@ fn run_skills_doctor(source: Option<&std::path::Path>, target: &std::path::Path,
             }
             ExitCode::SUCCESS
         }
-        Err(err) => ExitCode::from(skills_error(&err).emit("canon skills doctor", json) as u8),
+        Err(err) => ExitCode::from(skills_error(&err).emit("canon skills doctor", json)),
     }
 }
 

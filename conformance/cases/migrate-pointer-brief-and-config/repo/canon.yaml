@@ -8,7 +8,7 @@ routing:
   scenario: local
   task: local
   review: local
-  evidence_record: local
+  evidence: local
   finding: local
 specs:
   roots:

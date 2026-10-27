@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "018-n4-impl"
+  },
+  "at": "2026-10-12T13:56:42.400278Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test skills_install skills_install_57 && cargo test -p canon-cli --lib formatter_rewrites"
+  },
+  "evidence_note": {
+    "summary": "formatter rewrite reported formatter-rewritten with ignore entry; check exits 1"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 31,
+  "scenario_id": "skills.install.57",
+  "schema": 1,
+  "staging_id": "04eb71064a2c",
+  "verdict": "faithful"
+}

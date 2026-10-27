@@ -1,7 +1,7 @@
 Feature: platformer levels
   # canon: {"schema":1,"at":"2026-07-14T19:26:44.158043Z","actor":{"agent_id":"canon-scaffold"}}
 
-  @platformer.levels.01
+  @platformer.levels.01 @subject:platformer-traversal @case:happy
   Scenario: Completing a level unlocks the next in the menu
   # canon: {"schema":1,"at":"2026-07-14T19:26:44.158043Z","actor":{"agent_id":"canon-scaffold"}}
     Given only level one is unlocked in the level-select menu
@@ -10,7 +10,7 @@ Feature: platformer levels
     And level two becomes selectable in the menu
     And returning to the menu keeps level two unlocked
 
-  @platformer.levels.02
+  @platformer.levels.02 @subject:platformer-traversal @case:happy
   Scenario: Best acorns and time persist per level across reloads
   # canon: {"schema":1,"at":"2026-07-14T19:26:44.197954Z","actor":{"agent_id":"canon-scaffold"}}
     Given level one was cleared with a best of eleven acorns in fifty seconds
@@ -18,3 +18,14 @@ Feature: platformer levels
     Then level one still shows eleven acorns and fifty seconds as its best
     And clearing it again with fewer acorns or a slower time leaves the best unchanged
     And a faster time or more acorns replaces the stored best
+
+  # canon: {"schema":1,"at":"2026-10-26T11:45:25Z","actor":{"agent_id":"impl-030-sb-f4","role":"implementer","session_id":"sb-f4-2026-10-26"}}
+  @subject:platformer-traversal
+  @case:failure
+  @flow:canon-0-30-spec-backfill.F6
+  @platformer.levels.03
+  Scenario: Corrupted saved progress falls back to a fresh start without breaking the menu
+    Given saved progress that is not JSON, that unlocks a level beyond the last, or that carries an unknown version
+    When the game starts and the level-select menu is shown
+    Then only level one is unlocked and no best is shown
+    And saved progress holding one valid and one malformed best keeps the valid best and unlocks the saved level

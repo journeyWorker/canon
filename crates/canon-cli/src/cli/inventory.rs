@@ -3,13 +3,13 @@
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum InventoryCommand {
     /// Validate each spec root, then materialize scenario index records
     Sync(InventorySyncArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct InventorySyncArgs {
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

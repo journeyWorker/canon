@@ -26,7 +26,7 @@ routing:
   subject: local
   change: local
   scenario: local
-  evidence_record: local
+  evidence: local
 ";
 
 /// Evidence, failure cases and an independent review, all required.
@@ -90,7 +90,7 @@ fn seed_scenario(repo: &Path, id: &str, subject: Option<&str>, case: Option<&str
 }
 
 fn seed_evidence(repo: &Path, scenario: &str, verdict: EvidenceVerdict) {
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), actor("impl-agent", "implementer"));
+    let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), actor("impl-agent", "implementer"));
     let record = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(scenario).unwrap()), None, verdict).with_project_id(ProjectId::parse("demo").unwrap());
     ledger(repo).write(&record).unwrap();
 }
@@ -426,7 +426,7 @@ fn status_next_names_the_command_for_each_gap() {
 
     // The human form: each command line directly under its `# why` line.
     let text = stdout(&run(dir.path(), &["status"]));
-    let block = text.split_once("\nnext:\n").map(|(_, rest)| rest).unwrap_or_else(|| panic!("no next: block\n{text}"));
+    let block = text.split_once("\nnext:\n").map_or_else(|| panic!("no next: block\n{text}"), |(_, rest)| rest);
     let lines: Vec<&str> = block.lines().collect();
     assert_eq!(lines.len(), 10, "five `# why` + command pairs:\n{block}");
     for (pair, step) in lines.chunks(2).zip(report["next"].as_array().unwrap()) {
@@ -444,7 +444,7 @@ fn status_fails_closed_when_scenarios_route_away() {
     let dir = repo();
     std::fs::write(
         dir.path().join("canon.yaml"),
-        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  subject: local\n  scenario: hot\n  evidence_record: local\n",
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  subject: local\n  scenario: hot\n  evidence: local\n",
     )
     .unwrap();
     write_policy(dir.path(), FULL_POLICY);
@@ -627,7 +627,7 @@ fn context_status_70_the_red_flag_follows_the_ship_guard_audits_in_blockers_only
     assert!(subject(&report, "demo-subject").get("red").is_none(), "a blocker that does not refuse shipping does not make the gate red: {report}");
     assert_eq!(subject(&report, "demo-subject")["openBlockers"], 1, "status still counts it");
 
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), actor("auditor-1", "auditor"));
+    let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), actor("auditor-1", "auditor"));
     let audit = EvidenceRecord::new(envelope, None, Some(ScenarioId::parse("world.demo.01").unwrap()), None, EvidenceVerdict::Divergent)
         .with_project_id(ProjectId::parse("demo").unwrap())
         .with_audit(EvidenceAudit { evaluator_id: "auditor-1".into(), evaluator_version: "1.0.0".into(), evaluator_digest: "a".repeat(64), result: AuditResult::Refuted });
@@ -928,7 +928,7 @@ fn status_reports_an_unreadable_canon_yaml_and_is_unverifiable() {
     assert_eq!(report["ok"], false, "{report}");
     assert_eq!(report["error"]["code"], "UNVERIFIABLE", "{report}");
     assert!(report["data"]["warnings"].as_array().unwrap().iter().any(|w| w.as_str().unwrap().starts_with("cannot read this repo's ledger: parsing `")), "{report}");
-    assert_eq!(report["meta"]["coverage"]["skipped"].as_array().map(|a| a.is_empty()), Some(false), "{report}");
+    assert_eq!(report["meta"]["coverage"]["skipped"].as_array().map(std::vec::Vec::is_empty), Some(false), "{report}");
 }
 
 #[test]

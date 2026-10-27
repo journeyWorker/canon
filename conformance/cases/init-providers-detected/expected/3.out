@@ -1,4 +1,5 @@
 [PASS] tiers/routing/aging
+[PASS] hot-store: .canon/hot.db (sqlite file of this worktree; another worktree of the repository has its own)
 [PASS] specs
 [PASS] plans
 [PASS] write (promote: auto)

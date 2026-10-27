@@ -1,8 +1,8 @@
 //! The join-spine key newtypes (S1 design D3, tasks 2.1/2.2).
 //!
-//! Nine join-spine keys tie every canon record kind together:
+//! Ten join-spine keys tie every canon record kind together:
 //! `change_id`, `task_id`, `scenario_id`, `session_id`, `run_id`,
-//! `handoff_id`, `sha`/`pr`, `regime_key`, `subject_id`. Each is a
+//! `handoff_id`, `sha`/`pr`, `regime_key`, `subject_id`, `review_id`. Each is a
 //! distinct Rust
 //! (join-spine spec, "Cross-kind join keys share one type per key") — so
 //! a wrongly-shaped join is a compile-time type mismatch, not a runtime
@@ -24,7 +24,6 @@
 //! newtype-with-validated-grammar pattern.
 
 use std::borrow::Cow;
-use std::convert::TryFrom;
 use std::fmt;
 
 use schemars::{JsonSchema, SchemaGenerator, json_schema};
@@ -238,7 +237,7 @@ fn is_regime_key(s: &str) -> bool {
 /// owns only the type's shape-validation (opaque, non-empty, no control
 /// characters), not provenance.
 fn is_session_id(s: &str) -> bool {
-    !s.is_empty() && s.trim() == s && !s.chars().any(|c| c.is_control())
+    !s.is_empty() && s.trim() == s && !s.chars().any(char::is_control)
 }
 
 join_key_newtype!(
@@ -544,7 +543,7 @@ impl SpecDigest {
     pub fn of(bytes: &[u8]) -> Self {
         let hash = sha2::Sha256::digest(bytes);
         let mut hex = String::with_capacity(64);
-        for byte in hash.iter() {
+        for byte in &hash {
             hex.push_str(&format!("{byte:02x}"));
         }
         Self(hex)
@@ -569,9 +568,9 @@ impl RunId {
     }
 
     pub fn parse(s: impl AsRef<str>) -> Result<Self, JoinKeyError> {
-        ulid::Ulid::from_string(s.as_ref())
-            .map(Self)
-            .map_err(|_| JoinKeyError { key: "RunId", value: s.as_ref().to_string(), grammar: Self::GRAMMAR })
+        #[expect(clippy::map_err_ignore, reason = "`JoinKeyError` names the key, value and grammar and has no field for a cause; the ULID decoder's error says nothing more than that the value is not a ULID")]
+        let ulid = ulid::Ulid::from_string(s.as_ref()).map_err(|_| JoinKeyError { key: "RunId", value: s.as_ref().to_string(), grammar: Self::GRAMMAR })?;
+        Ok(Self(ulid))
     }
 
     pub fn as_ulid(&self) -> ulid::Ulid {
@@ -614,6 +613,69 @@ impl JsonSchema for RunId {
             "type": "string",
             "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$",
             "description": "ULID (Crockford base32, 26 chars) — joins: run ↔ events ↔ manifest",
+        })
+    }
+}
+
+/// `review_id`: a ULID made once per `canon review` run and stored in the
+/// body of every review that run writes (0.30 `record-links`). It is the
+/// key a finding's `review_id` points at: a review is found by this id,
+/// never by its file name, so the id survives a rename, a rewrite and the
+/// move to the archive.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct ReviewId(ulid::Ulid);
+
+impl ReviewId {
+    pub const GRAMMAR: &'static str = "ULID (Crockford base32, 26 chars) — `ulid::Ulid`";
+    pub const JOINS: &'static str = "finding ↔ review";
+
+    pub fn new() -> Self {
+        Self(ulid::Ulid::new())
+    }
+
+    pub fn parse(s: impl AsRef<str>) -> Result<Self, JoinKeyError> {
+        #[expect(clippy::map_err_ignore, reason = "`JoinKeyError` names the key, value and grammar and has no field for a cause; the ULID decoder's error says nothing more than that the value is not a ULID")]
+        let ulid = ulid::Ulid::from_string(s.as_ref()).map_err(|_| JoinKeyError { key: "ReviewId", value: s.as_ref().to_string(), grammar: Self::GRAMMAR })?;
+        Ok(Self(ulid))
+    }
+}
+
+impl Default for ReviewId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TryFrom<String> for ReviewId {
+    type Error = JoinKeyError;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        ReviewId::parse(s)
+    }
+}
+
+impl From<ReviewId> for String {
+    fn from(v: ReviewId) -> String {
+        v.0.to_string()
+    }
+}
+
+impl fmt::Display for ReviewId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl JsonSchema for ReviewId {
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("ReviewId")
+    }
+
+    fn json_schema(_generator: &mut SchemaGenerator) -> schemars::Schema {
+        json_schema!({
+            "type": "string",
+            "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+            "description": "ULID (Crockford base32, 26 chars) — joins: finding ↔ review",
         })
     }
 }
@@ -760,9 +822,9 @@ mod tests {
     fn task_id_parses_hierarchical_numbers() {
         let id = TaskId::parse("s1-state-model-join-spine#6.2").unwrap();
         assert_eq!(id.change_id().as_str(), "s1-state-model-join-spine");
-        assert!(TaskId::parse("s1-state-model-join-spine#1").is_ok());
-        assert!(TaskId::parse("no-hash-here").is_err());
-        assert!(TaskId::parse("bad slug#1").is_err());
+        TaskId::parse("s1-state-model-join-spine#1").unwrap();
+        TaskId::parse("no-hash-here").unwrap_err();
+        TaskId::parse("bad slug#1").unwrap_err();
     }
 
     #[test]
@@ -784,27 +846,27 @@ mod tests {
     #[test]
     fn session_id_accepts_uuid_and_non_uuid_shapes() {
         // Claude Code / Codex: filename-stem UUID.
-        assert!(SessionId::parse("f47ac10b-58cc-4372-a567-0e02b2c3d479").is_ok());
+        SessionId::parse("f47ac10b-58cc-4372-a567-0e02b2c3d479").unwrap();
         // omp/pi: opaque in-file header id, no UUID shape required.
-        assert!(SessionId::parse("pi-session-042").is_ok());
-        assert!(SessionId::parse("").is_err());
-        assert!(SessionId::parse(" leading-space").is_err());
-        assert!(SessionId::parse("has\tcontrol").is_err());
+        SessionId::parse("pi-session-042").unwrap();
+        SessionId::parse("").unwrap_err();
+        SessionId::parse(" leading-space").unwrap_err();
+        SessionId::parse("has\tcontrol").unwrap_err();
     }
 
     #[test]
     fn handoff_id_matches_drum_grammar() {
-        assert!(HandoffId::parse("20260710-1432-fix-the-thing-a1b2").is_ok());
-        assert!(HandoffId::parse("20260710-1432-handoff-a1b2").is_ok());
-        assert!(HandoffId::parse("not-a-handoff-id").is_err());
-        assert!(HandoffId::parse("20260710-1432-fix-the-thing-A1B2").is_err()); // nonce must be lowercase
+        HandoffId::parse("20260710-1432-fix-the-thing-a1b2").unwrap();
+        HandoffId::parse("20260710-1432-handoff-a1b2").unwrap();
+        HandoffId::parse("not-a-handoff-id").unwrap_err();
+        HandoffId::parse("20260710-1432-fix-the-thing-A1B2").unwrap_err(); // nonce must be lowercase
     }
 
     #[test]
     fn sha_requires_exactly_40_hex_chars() {
-        assert!(Sha::parse("8c81f9e13e9bda0a6a5ee29ba1b6b5137e7bf552").is_ok());
-        assert!(Sha::parse("8c81f9e").is_err());
-        assert!(Sha::parse("8C81F9E13E9BDA0A6A5EE29BA1B6B5137E7BF552").is_err());
+        Sha::parse("8c81f9e13e9bda0a6a5ee29ba1b6b5137e7bf552").unwrap();
+        Sha::parse("8c81f9e").unwrap_err();
+        Sha::parse("8C81F9E13E9BDA0A6A5EE29BA1B6B5137E7BF552").unwrap_err();
     }
 
     #[test]
@@ -814,8 +876,8 @@ mod tests {
         assert_eq!(key.repo(), "canon");
         assert_eq!(key.area(), "join-spine");
         assert_eq!(key.hash(), "9c93d024b1a2");
-        assert!(RegimeKey::parse("only/three/parts").is_err());
-        assert!(RegimeKey::parse("a/b/c/NOTHEX").is_err());
+        RegimeKey::parse("only/three/parts").unwrap_err();
+        RegimeKey::parse("a/b/c/NOTHEX").unwrap_err();
     }
 
     #[test]
@@ -865,12 +927,23 @@ mod tests {
         let id = RunId::new();
         let s: String = id.into();
         assert_eq!(RunId::parse(&s).unwrap(), id);
-        assert!(RunId::parse("not-a-ulid").is_err());
+        RunId::parse("not-a-ulid").unwrap_err();
+    }
+
+    #[test]
+    fn review_id_round_trips_ulid_and_refuses_anything_else() {
+        let id = ReviewId::new();
+        let s: String = id.into();
+        assert_eq!(s.len(), 26);
+        assert_eq!(ReviewId::parse(&s).unwrap(), id);
+        assert_eq!(serde_json::to_value(id).unwrap(), serde_json::Value::String(s));
+        ReviewId::parse("not-a-ulid").unwrap_err();
+        assert_eq!(ReviewId::parse("nope").unwrap_err().to_string(), format!("invalid ReviewId: \"nope\" does not match grammar `{}`", ReviewId::GRAMMAR));
     }
 
     #[test]
     fn pr_number_rejects_zero() {
-        assert!(PrNumber::parse(0).is_err());
+        PrNumber::parse(0).unwrap_err();
         assert_eq!(PrNumber::parse(42).unwrap().get(), 42);
     }
 
@@ -898,11 +971,11 @@ mod tests {
     fn spec_digest_of_computes_stable_sha256_hex() {
         let digest = SpecDigest::of(b"hello world");
         assert_eq!(digest.as_str(), "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");
-        assert!(SpecDigest::parse(digest.as_str()).is_ok());
-        assert!(SpecDigest::parse("too-short").is_err());
+        SpecDigest::parse(digest.as_str()).unwrap();
+        SpecDigest::parse("too-short").unwrap_err();
         // Distinct grammar from `Sha`'s 40-hex git sha1 — a well-formed
         // `Sha` value is too short to be a `SpecDigest`.
-        assert!(SpecDigest::parse("8c81f9e13e9bda0a6a5ee29ba1b6b5137e7bf552").is_err());
+        SpecDigest::parse("8c81f9e13e9bda0a6a5ee29ba1b6b5137e7bf552").unwrap_err();
     }
 
     #[test]

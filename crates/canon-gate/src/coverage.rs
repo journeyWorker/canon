@@ -121,6 +121,7 @@ impl CellSubject {
 /// [`FailureClass::UncoveredCell`] for every (artifact, required-role)
 /// pair `ctx.policy.risk_routing` derives as required but with no
 /// matching-role evidence record (module doc).
+#[derive(Debug)]
 pub struct CoverageCheck;
 
 impl GateCheck for CoverageCheck {
@@ -207,7 +208,7 @@ mod tests {
     use crate::policy::{PolicyField, PolicyResolution, StalenessPolicy};
 
     fn record(task: &str, role: &str, verdict: EvidenceVerdict) -> EvidenceRecord {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent", RoleId::parse(role).unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("agent", RoleId::parse(role).unwrap()));
         EvidenceRecord::new(envelope, Some(TaskId::parse(task).unwrap()), None, None, verdict)
     }
 
@@ -318,7 +319,7 @@ mod tests {
     #[test]
     fn a_record_with_no_join_key_is_excluded_from_coverage_entirely() {
         let policy = policy_with_required_roles(&["reviewer"]);
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("agent", RoleId::parse("implementer").unwrap()));
         let evidence = vec![EvidenceRecord::new(envelope, None, None, None, EvidenceVerdict::Faithful)];
         let ctx = ctx_with(policy, evidence);
 

@@ -37,3 +37,6 @@ walkdir = "2"
 # only `cargo test` links this.
 canon-store.workspace = true
 tempfile = "3"
+
+[lints]
+workspace = true

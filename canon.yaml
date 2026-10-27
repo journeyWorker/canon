@@ -39,9 +39,9 @@ routing:
   scenario: local
   review: local
   divergence: local
-  evidence_record: local
+  evidence: local
   # finding (s43): one code-review finding. `local` for the same reason
-  # `divergence`/`review`/`evidence_record` are — it is durable,
+  # `divergence`/`review`/`evidence` are — it is durable,
   # append-only review evidence that must be diffable in the repo,
   # readable offline with zero operator credentials, and committed
   # alongside the corpus it judges. It is also the SOURCE a release
@@ -67,24 +67,13 @@ aging:
   handoff: { after: 30d, to: cold }
   event: { after: 7d, to: cold }
 
-# s20 (`s20-plan-corpus-join`) self-hosted plan import (design D4): the
-# FIRST live, non-fixture, non-test `plans:` configuration in this
-# repo's own canon.yaml — `canon ingest plans` reads this repo's own
-# `openspec/changes/` tree. `root: openspec/changes` is the DIRECT-
-# changes-dir shape `discover_change_dirs` already tolerates,
-# deliberately NOT the `root: openspec` near-miss shape (tracked
-# separately, `s18-uniform-root-and-loud-import`) that makes discovery
-# treat `openspec/changes` itself as one malformed change dir.
+# canon's own changes live in .canon/changes/<slug>/ (`canon change new`
+# writes brief.md there); every reader reads them with no entry here.
+# Since 0.30 this repo keeps no external plans, so `sources` is empty.
+# Keep the key: without it the gate falls back to an openspec source at
+# the repo root.
 plans:
-  sources:
-    - dialect: openspec
-      root: openspec/changes
-    # s30 (`plan-dialect-superpowers`): this repo's own superpowers
-    # plan corpus (writing-plans skill shape) — the second live,
-    # self-hosted dialect source; `examples/platformer` is its first
-    # imported plan.
-    - dialect: superpowers
-      root: docs/superpowers/plans
+  sources: []
 
 # s15 (`spec-ledger-unification`) spec corpus (design D3): the first
 # live `.feature` corpus in this repo — `examples/platformer`'s

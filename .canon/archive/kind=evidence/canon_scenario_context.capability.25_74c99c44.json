@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-027",
+    "role": "implementer",
+    "session_id": "canon-impl-027-1"
+  },
+  "at": "2026-10-22T05:09:58.791869Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test schema enum_options_list_their_values_and_defaults"
+  },
+  "evidence_note": {
+    "summary": "schema enum_options_list_their_values_and_defaults: 1 passed, 0 failed, 7 filtered out @ a4f9cdc1"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 45,
+  "scenario_id": "context.capability.25",
+  "schema": 1,
+  "staging_id": "97d57e0ef85e",
+  "verdict": "faithful"
+}

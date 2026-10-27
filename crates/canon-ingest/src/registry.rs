@@ -48,6 +48,12 @@ pub struct AdapterEntry {
     pub file_suffix: &'static str,
 }
 
+impl std::fmt::Debug for AdapterEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AdapterEntry").field("client_id", &self.adapter.client_id()).field("file_suffix", &self.file_suffix).finish_non_exhaustive()
+    }
+}
+
 impl AdapterEntry {
     pub fn client_id(&self) -> &'static str {
         self.adapter.client_id()
@@ -98,6 +104,7 @@ pub fn find(client_id: &str) -> Option<&'static AdapterEntry> {
 /// file's own emission order, so re-running over an unchanged fixture
 /// tree yields byte-identical row order (S3 acceptance: "identical
 /// normalized output across two runs").
+#[derive(Debug)]
 pub struct AdapterScanResult {
     pub client_id: &'static str,
     pub roots: Vec<PathBuf>,

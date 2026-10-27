@@ -129,7 +129,7 @@ fn a_closed_set_lists_its_possible_values_and_a_default_is_a_real_one() {
             problems.push(format!("`{leaf}` --{n}: the table writes a closed set, the spec lists no possibleValues"));
         }
         let default = strings(&option["default"]);
-        if default.iter().any(|d| d.is_empty()) {
+        if default.iter().any(std::string::String::is_empty) {
             problems.push(format!("`{leaf}` --{n}: the default is the empty string, which is no default"));
         }
         if !values.is_empty() && !default.is_empty() && !default.iter().all(|d| values.contains(d)) {
@@ -335,7 +335,7 @@ fn sample(arg: &clap::Arg) -> String {
     if let Some(first) = arg.get_possible_values().first() {
         return first.get_name().to_string();
     }
-    match arg.get_value_names().and_then(|v| v.first()).map(|v| v.as_str()) {
+    match arg.get_value_names().and_then(|v| v.first()).map(clap::builder::Str::as_str) {
         Some("N") => "1",
         Some("TIMESTAMP") => "2030-01-01",
         Some("FORMAT:PATH") => "junit:x.xml",
@@ -344,7 +344,7 @@ fn sample(arg: &clap::Arg) -> String {
         Some("PROJECT_ID") => "root",
         Some("SUBJECT_ID") => "demo",
         Some("TASK_ID") => "add-login#1",
-        Some("RUN_ID") | Some("STRATEGY_ID") | Some("PARENT_RUN_ID") => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        Some("RUN_ID" | "STRATEGY_ID" | "PARENT_RUN_ID") => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
         Some("NAME@VERSION") => "reviewer@v1",
         Some("SHA") => "0123456789abcdef0123456789abcdef01234567",
         _ => "x",
@@ -409,7 +409,7 @@ fn every_conflict_and_requirement_the_spec_lists_is_enforced_when_parsing() {
                 line.extend(given(own));
                 match root.clone().try_get_matches_from(std::iter::once("canon".to_string()).chain(line.iter().cloned())) {
                     Err(e) if e.kind() == ErrorKind::MissingRequiredArgument => {
-                        let missing = e.get(ContextKind::InvalidArg).map(|v| v.to_string()).unwrap_or_default();
+                        let missing = e.get(ContextKind::InvalidArg).map(std::string::ToString::to_string).unwrap_or_default();
                         if !needed.iter().any(|n| missing.contains(n.as_str())) {
                             problems.push(format!("`{path}`: --{} without {needed:?} is refused for another reason: {missing}", name(option)));
                         }
@@ -433,7 +433,7 @@ fn attribution_role_is_open_and_the_declared_role_is_closed() {
         match name(option) {
             "role" => {
                 roles += 1;
-                assert!(option["possibleValues"].as_array().is_none_or(|v| v.is_empty()), "`{leaf}` --role is an open slug: {option}");
+                assert!(option["possibleValues"].as_array().is_none_or(std::vec::Vec::is_empty), "`{leaf}` --role is an open slug: {option}");
             }
             "as" => assert_eq!(strings(&option["possibleValues"]), ["planner", "implementer", "reviewer", "orchestrator"], "`{leaf}` --as"),
             _ => {}

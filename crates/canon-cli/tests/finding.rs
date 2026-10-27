@@ -106,10 +106,13 @@ fn body_at(path: &Path) -> serde_json::Value {
 
 /// The base flags every well-formed add needs, so a test naming a
 /// refusal shows only the flag it is about.
-const BASE: [&str; 8] = ["finding", "add", "--change-id", "s43-findings-are-records", "--severity", "blocker", "--repo", "."];
+const BASE: [&str; 9] = ["finding", "add", "--change-id", "s43-findings-are-records", "--severity", "blocker", "--introduced-unknown", "--repo", "."];
 
 fn add(repo: &Path, extra: &[&str]) -> Output {
     let mut args: Vec<&str> = BASE.to_vec();
+    if extra.contains(&"--introduced-rev") {
+        args.retain(|arg| *arg != "--introduced-unknown");
+    }
     args.extend_from_slice(extra);
     run_canon(&args, repo)
 }
@@ -442,7 +445,7 @@ fn finding_add_refuses_a_second_record_at_an_occupied_seq() {
 
     let staged_clash = add(repo, &["--round", "2", "--seq", "1", "--actor-id", "r", "--summary", "a completely different finding"]);
     assert_eq!(staged_clash.status.code(), Some(2), "stdout: {}", stdout(&staged_clash));
-    assert!(stderr(&staged_clash).contains("s43-findings-are-records__0002__0001"), "the refusal must name the key: {}", stderr(&staged_clash));
+    assert!(stderr(&staged_clash).contains("s43-findings-are-records_2_1"), "the refusal must name the key: {}", stderr(&staged_clash));
     assert_eq!(staged_findings(repo).len(), 1, "the clashing add must stage nothing");
 
     // And after promotion, when the occupant is COMMITTED rather than
@@ -856,7 +859,7 @@ fn hand_typed_count(text: &str) -> Option<String> {
         return None;
     }
     let last = words.len() - 1;
-    let at = |i: usize| words.get(i).map(String::as_str).unwrap_or("");
+    let at = |i: usize| words.get(i).map_or("", String::as_str);
     // Punctuation-only tokens drop out of the reported span, so the
     // message names the claim rather than the markup carrying it.
     let span = |from: usize, to: usize| words[from..=to.min(last)].iter().filter(|w| !w.is_empty()).cloned().collect::<Vec<String>>().join(" ");
@@ -1239,7 +1242,7 @@ fn an_empty_help_invocation_is_refused_rather_than_passing_vacuously() {
 
     // And the ordinary invocation still reads, so this is not a blanket
     // refusal: the marker is present in real help.
-    assert!(checked_help(&run_canon(&["finding", "--help"], dir.path()), PARENT_HELP_MARKER).is_ok());
+    checked_help(&run_canon(&["finding", "--help"], dir.path()), PARENT_HELP_MARKER).unwrap();
 }
 
 /// Three findings on one change, two committed and one still staged:
@@ -1251,7 +1254,7 @@ fn listed_repo() -> tempfile::TempDir {
     let repo = dir.path();
     let raise = |change: &str, severity: &str, round: &str, seq: &str, reviewer: &str, summary: &str| {
         let out = run_canon(
-            &["finding", "add", "--change-id", change, "--severity", severity, "--round", round, "--seq", seq, "--actor-id", reviewer, "--summary", summary],
+            &["finding", "add", "--change-id", change, "--severity", severity, "--round", round, "--seq", seq, "--actor-id", reviewer, "--summary", summary, "--introduced-unknown"],
             repo,
         );
         assert!(out.status.success(), "{}", stderr(&out));

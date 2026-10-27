@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "018-n2-impl",
+    "role": "implementer",
+    "session_id": "018-n2-impl"
+  },
+  "at": "2026-10-12T14:02:44.565862Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject subject_lifecycle_31_a_reopen_needs_a_reason_and_a_reason_needs_a_reopen"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 32,
+  "scenario_id": "subject.lifecycle.31",
+  "schema": 1,
+  "staging_id": "8d1fb00931a1",
+  "verdict": "faithful"
+}

@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::error::LearnError;
+use crate::error::{LearnError, PromotionEvidenceError};
 use crate::ids::{StrategyId, TrajectoryId};
 use crate::store::StrategyStore;
 use crate::strategy::{DemotionEvidence, StrategyLifecycle};
@@ -34,52 +34,62 @@ pub fn rollback_strategy(
     _contradicting_trajectory_id: Option<TrajectoryId>,
     _git_tier_root: &Path,
 ) -> Result<RollbackRecord, LearnError> {
-    Err(LearnError::InvalidPromotionEvidence("rollback requires a detached SSH signature and policy-pinned approval verifier".into()))
+    Err(PromotionEvidenceError::RollbackUnauthenticated.into())
 }
 
-pub fn rollback_strategy_authenticated(
-    strategy_store: &dyn StrategyStore,
-    strategy_id: StrategyId,
-    reason: &str,
-    actor: &str,
-    contradicting_trajectory_id: Option<TrajectoryId>,
-    git_tier_root: &Path,
-    signature: &str,
-    approved_at: DateTime<Utc>,
-) -> Result<RollbackRecord, LearnError> {
+/// Inputs of a signed rollback.
+#[derive(Clone, Copy)]
+pub struct AuthenticatedRollback<'a> {
+    pub strategy_store: &'a dyn StrategyStore,
+    pub strategy_id: StrategyId,
+    pub reason: &'a str,
+    pub actor: &'a str,
+    pub contradicting_trajectory_id: Option<TrajectoryId>,
+    pub git_tier_root: &'a Path,
+    pub signature: &'a str,
+    pub approved_at: DateTime<Utc>,
+}
+
+impl std::fmt::Debug for AuthenticatedRollback<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AuthenticatedRollback").field("strategy_id", &self.strategy_id).field("actor", &self.actor).field("approved_at", &self.approved_at).finish_non_exhaustive()
+    }
+}
+
+pub fn rollback_strategy_authenticated(rollback: AuthenticatedRollback<'_>) -> Result<RollbackRecord, LearnError> {
+    let AuthenticatedRollback { strategy_store, strategy_id, reason, actor, contradicting_trajectory_id, git_tier_root, signature, approved_at } = rollback;
     if reason.trim().is_empty() || actor.trim().is_empty() {
-        return Err(LearnError::InvalidPromotionEvidence("rollback reason and actor are required".into()));
+        return Err(PromotionEvidenceError::RollbackReasonAndActor.into());
     }
     let repo_root = git_tier_root.parent().and_then(Path::parent).unwrap_or(git_tier_root);
     let allowed_signers = canon_gate::policy::allowed_signers_path(repo_root)
-        .map_err(LearnError::InvalidPromotionEvidence)?
-        .ok_or_else(|| LearnError::InvalidPromotionEvidence("no policy-pinned approval.allowed_signers verifier is configured".into()))?;
+        .map_err(PromotionEvidenceError::AllowedSigners)?
+        .ok_or(PromotionEvidenceError::NoVerifierConfigured)?;
     let authorized = fs::read_to_string(&allowed_signers)
-        .map_err(|error| LearnError::InvalidPromotionEvidence(format!("cannot read approval.allowed_signers: {error}")))?
+        .map_err(PromotionEvidenceError::AllowedSignersUnreadable)?
         .lines()
         .filter(|line| !line.trim().is_empty() && !line.trim_start().starts_with('#'))
         .filter_map(|line| line.split_whitespace().next())
         .any(|principal| principal == actor);
     if !authorized {
-        return Err(LearnError::InvalidPromotionEvidence("rollback actor is not listed in policy-pinned approval.allowed_signers".into()));
+        return Err(PromotionEvidenceError::RollbackActorNotListed.into());
     }
     if signature.trim().is_empty() {
-        return Err(LearnError::InvalidPromotionEvidence("rollback detached signature is required".into()));
+        return Err(PromotionEvidenceError::RollbackSignatureRequired.into());
     }
     let reason_digest = format!("{:x}", Sha256::digest(reason.as_bytes()));
-    let payload = canon_model::approval_payload_bytes(
-        "canon-learning-approval-v1",
-        &format!("strategy:{strategy_id}:rollback:{reason_digest}"),
-        None,
-        &reason_digest,
-        None,
-        &[],
-        &[],
+    let payload = canon_model::approval_payload_bytes(&canon_model::ApprovalPayload {
+        namespace: "canon-learning-approval-v1",
+        subject: &format!("strategy:{strategy_id}:rollback:{reason_digest}"),
+        project: None,
+        artifact_sha: &reason_digest,
+        run_id: None,
+        surface: &[],
+        effects: &[],
         actor,
-        &approved_at,
-    );
-    canon_gate::verify_ssh_signature("canon-learning-approval-v1", &payload, signature.as_bytes(), actor, &allowed_signers)
-        .map_err(LearnError::InvalidPromotionEvidence)?;
+        timestamp: &approved_at,
+    });
+    canon_gate::verify_ssh_signature("canon-learning-approval-v1", &payload, signature.as_bytes(), actor, &allowed_signers).map_err(PromotionEvidenceError::Signature)?;
     let Some(item) = strategy_store.find_by_id(&strategy_id)? else {
         return Err(LearnError::UnknownStrategyId(strategy_id.to_string()));
     };
@@ -109,7 +119,7 @@ pub fn rollback_strategy_authenticated(
     };
     if let Some(contradicting_trajectory_id) = contradicting_trajectory_id {
         let evidence = DemotionEvidence {
-            envelope: canon_model::envelope::Envelope::new(1, canon_model::envelope::RecordKind::EvidenceRecord, now, canon_model::envelope::Actor::new_unattributed(actor)),
+            envelope: canon_model::envelope::Envelope::new(1, canon_model::envelope::RecordKind::Evidence, now, canon_model::envelope::Actor::new_unattributed(actor)),
             contradicting_trajectory_id,
             reason: reason.to_string(),
             evaluation_digest: record.evaluation_digest.clone(),
@@ -124,7 +134,7 @@ pub fn rollback_strategy_authenticated(
         let mut content = fs::read_to_string(&path)?;
         if content.starts_with("---\n") {
             content = content.replacen("status: active", "status: rolled_back", 1);
-            content = content.replacen("---\n", &format!("---\nrollback_reason: {:?}\nrollback_actor: {:?}\n", reason, actor), 1);
+            content = content.replacen("---\n", &format!("---\nrollback_reason: {reason:?}\nrollback_actor: {actor:?}\n"), 1);
             fs::write(path, content)?;
         }
     }

@@ -338,7 +338,7 @@ pub fn format_human(outcome: &PluginSyncOutcome) -> String {
 }
 
 /// One spec root of `canon plugin sync`'s report.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginSyncRootReport<'a> {
     pub root_id: &'a str,
@@ -351,7 +351,7 @@ pub struct PluginSyncRootReport<'a> {
 }
 
 /// `canon plugin sync`'s report (`PluginSyncReport`).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginSyncReport<'a> {
     pub plugin_id: &'a str,

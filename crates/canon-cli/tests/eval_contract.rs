@@ -88,10 +88,10 @@ fn context_json_is_byte_stable_and_has_the_public_capability_shape() {
     assert_eq!(surface["review"]["findingDispositions"], serde_json::json!(["open", "fixed", "rejected", "deferred"]));
     assert_eq!(surface["review"]["reviewFields"], surface["kinds"]["review"]["envelopeFields"], "review fields come from the kinds projection");
     assert!(surface["review"]["requireReview"].is_null(), "a repo with no policy does not require review");
-    assert_eq!(surface["kinds"].as_object().map(|k| k.len()), Some(14));
+    assert_eq!(surface["kinds"].as_object().map(serde_json::Map::len), Some(14));
     assert_eq!(
-        surface["cel"].as_object().map(|k| k.len()),
-        surface["kinds"].as_object().map(|k| k.len()),
+        surface["cel"].as_object().map(serde_json::Map::len),
+        surface["kinds"].as_object().map(serde_json::Map::len),
         "CEL projection must cover exactly the kind projection"
     );
     assert!(surface["enums"].as_object().is_some_and(|v| !v.is_empty()));

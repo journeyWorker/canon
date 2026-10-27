@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-030-ln",
+    "role": "implementer",
+    "session_id": "ln-fix-2026-10-26"
+  },
+  "at": "2026-10-26T19:15:24.448126737Z",
+  "code_tree": "009b0ebca2f6f452a9a37a3e93fec184081957b0",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test ledger_migrate (ledger_migrate_09*)"
+  },
+  "evidence_note": {
+    "summary": "order asserted against 0.29 names; backup local and ignored"
+  },
+  "evidence_sha": "230eac79859c234ccf89c88aeb786d911ea5cec5",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 21,
+  "scenario_id": "ledger.migrate.09",
+  "schema": 1,
+  "staging_id": "5781ebb8",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

@@ -1,8 +1,8 @@
 canon evidence add: artifact store holds 1 bound file(s) under .canon/artifacts/sha256/ (1 newly stored) — commit them with the ledger
-canon evidence add: staged kind=evidence_record/shop.cart.01__<digest12>.json for shop.cart.01 (verdict faithful) — run `canon gate promote` to commit it, then `canon gate check`
-canon evidence add: staged kind=evidence_record/shop.cart.02__<digest12>.json for shop.cart.02 (verdict faithful) — run `canon gate promote` to commit it, then `canon gate check`
-canon evidence add: staged kind=evidence_record/shop.cart.03__<digest12>.json for shop.cart.03 (verdict faithful) — run `canon gate promote` to commit it, then `canon gate check`
-canon evidence add: staged kind=evidence_record/shop.cart.05__<digest12>.json for shop.cart.05 (verdict divergent) — run `canon gate promote` to commit it, then `canon gate check`
+canon evidence add: staged kind=evidence/root_scenario_shop.cart.01_<digest8>.json for shop.cart.01 (verdict faithful) — run `canon gate promote` to commit it, then `canon gate check`
+canon evidence add: staged kind=evidence/root_scenario_shop.cart.02_<digest8>.json for shop.cart.02 (verdict faithful) — run `canon gate promote` to commit it, then `canon gate check`
+canon evidence add: staged kind=evidence/root_scenario_shop.cart.03_<digest8>.json for shop.cart.03 (verdict faithful) — run `canon gate promote` to commit it, then `canon gate check`
+canon evidence add: staged kind=evidence/root_scenario_shop.cart.05_<digest8>.json for shop.cart.05 (verdict divergent) — run `canon gate promote` to commit it, then `canon gate check`
 canon evidence add: skipped shop.cart.06 — not an indexed scenario of spec root `root` (case `shop.cart.06 not run yet`); index it (`canon inventory sync`) or fix the test name
 canon evidence add: skipped shop_cart_04 — not an indexed scenario of spec root `root` (case `shop_cart_04_count_never_negative()`); index it (`canon inventory sync`) or fix the test name
 next: canon gate promote — the record is staged, not in the ledger yet; promote it so status and the gate count it

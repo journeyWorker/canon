@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "agent_id": "rev-030-sb",
+    "role": "reviewer",
+    "session_id": "rev-030-sb-2026-10-26"
+  },
+  "at": "2026-10-26T13:08:15.016152698Z",
+  "change_id": "canon-0-30-spec-backfill",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "7f9f15df9b2287e3743828cd184d6cdc3e83d05c",
+  "reviewer": "rev-030-sb",
+  "round": 1,
+  "schema": 1,
+  "seq": 8,
+  "severity": "note",
+  "summary": "[brief acceptance F6] all 19 platformer scenarios sit in one subject, platformer-traversal, so the F6 failure path ('a surface with no failure scenario makes status report that subject') cannot be observed per surface: status missingCases is per subject. Each surface does have a failure scenario today (enemy.02, hud.03, levels.03, movement.04, moving.03, session.02).",
+  "worktree_dirty": false
+}

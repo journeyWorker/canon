@@ -1,0 +1,18 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-26T09:52:55.571688938Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "verifying",
+  "subject_id": "divergence-lifecycle",
+  "summary": "",
+  "title": "Divergence: stage, promote, resolve, expire"
+}

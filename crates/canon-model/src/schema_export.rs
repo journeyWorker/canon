@@ -37,7 +37,7 @@ pub fn record_schemas() -> Vec<(RecordKind, schemars::Schema)> {
         (RecordKind::Divergence, schema_for!(Divergence)),
         (RecordKind::Trajectory, schema_for!(Trajectory)),
         (RecordKind::StrategyItem, schema_for!(StrategyItem)),
-        (RecordKind::EvidenceRecord, schema_for!(EvidenceRecord)),
+        (RecordKind::Evidence, schema_for!(EvidenceRecord)),
         (RecordKind::Subject, schema_for!(Subject)),
         (RecordKind::Finding, schema_for!(Finding)),
     ]

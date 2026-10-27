@@ -110,7 +110,7 @@ pub fn bind(repo: &Path, rev: &str) -> Result<Bound, CliError> {
 /// the file or the key is absent). A malformed file or glob is `CONFIG_UNREADABLE`.
 pub fn code_exclude(repo: &Path) -> Result<Vec<String>, CliError> {
     let bad = |why: String| CliError::refused("CONFIG_UNREADABLE", why).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again");
-    let defaults = || DEFAULT_EXCLUDE.iter().map(|g| g.to_string()).collect();
+    let defaults = || DEFAULT_EXCLUDE.iter().map(std::string::ToString::to_string).collect();
     let Ok(raw) = std::fs::read_to_string(repo.join("canon.yaml")) else { return Ok(defaults()) };
     let doc: serde_yaml::Value = serde_yaml::from_str(&raw).map_err(|e| bad(format!("parsing `canon.yaml`: {e}")))?;
     let Some(code) = doc.get("code") else { return Ok(defaults()) };
@@ -133,7 +133,7 @@ fn glob_matches(glob: &str, path: &str) -> bool {
     let glob = glob.trim_start_matches('/');
     if anchored {
         // A directory name also covers everything below it.
-        path.match_indices('/').any(|(i, _)| wild(glob.as_bytes(), path[..i].as_bytes())) || wild(glob.as_bytes(), path.as_bytes())
+        path.match_indices('/').any(|(i, _)| wild(glob.as_bytes(), &path.as_bytes()[..i])) || wild(glob.as_bytes(), path.as_bytes())
     } else {
         // Any path component: the file's own name, or a directory of that name above it.
         path.split('/').any(|name| wild(glob.as_bytes(), name.as_bytes()))
@@ -221,6 +221,7 @@ pub fn code_tree(repo: &Path, rev: Option<&str>) -> Result<CodeTree, CliError> {
     let exclude = code_exclude(repo)?;
     let roots = spec_root_prefixes(repo)?;
     let fail = |why: String| no_commit(format!("git could not compute the code tree: {why}"));
+    #[expect(clippy::map_err_ignore, reason = "`no_commit` reports one fixed message; git's own stderr for a non-work-tree is the failure being named")]
     git(repo, None, &["rev-parse", "--is-inside-work-tree"], None).map_err(|_| no_commit("this directory is not a git work tree"))?;
     let head = resolve_rev(repo, "HEAD").ok();
     let tmp = TempIndex::new();

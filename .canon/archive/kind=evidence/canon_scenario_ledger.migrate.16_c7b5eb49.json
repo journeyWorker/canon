@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "impl-030-rl",
+    "role": "implementer",
+    "session_id": "rl-fix-2026-10-26"
+  },
+  "at": "2026-10-26T19:12:37.941950908Z",
+  "attachments": [
+    {
+      "case": "ledger_migrate_16_a_review_keeps_its_review_id_through_canon_migrate",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/rl-fix/junit.xml",
+      "sha256": "59cdabdefcac6071955104cd0937c58e03026bdd000ff3fd9b3ab297a4756f4a"
+    }
+  ],
+  "code_tree": "f440894f537b578019348c344ac3bfc62f81b9be",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/rl-fix/junit.xml"
+  },
+  "evidence_note": {
+    "summary": "record_links tests for ledger.migrate.16 pass"
+  },
+  "evidence_sha": "230eac79859c234ccf89c88aeb786d911ea5cec5",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 17,
+  "scenario_id": "ledger.migrate.16",
+  "schema": 1,
+  "staging_id": "63f9bdb3",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

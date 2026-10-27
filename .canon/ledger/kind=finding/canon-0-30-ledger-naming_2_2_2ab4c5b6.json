@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-030-ln",
+    "role": "reviewer",
+    "session_id": "rev-030-ln-r3-2026-10-26"
+  },
+  "at": "2026-10-26T20:46:15.523636820Z",
+  "change_id": "canon-0-30-ledger-naming",
+  "code_tree": "86779563bdaf9bb2a2dfff7f4bc7cd6f8f2b60a7",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/query.rs:384-387",
+  "introduced_by": "d8876f11f5644941ddcb28f35a62e54658a2f4bd",
+  "kind": "finding",
+  "reason": "round 3: legacy_sort_key (query.rs:407-417) compares 0.29's joined key with padded integers; all 288 findings now in 0.29's order, canon-0-24-1 before canon-0-24 as before",
+  "resolution_code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "resolution_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "bdf0ac42680d33c7a44b528115190303445447ab",
+  "reviewer": "rev-030-ln",
+  "round": 2,
+  "scenario_ids": [
+    "ledger.migrate.06"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "Finding order is now 0.29's except where one change id is a prefix of another: components compare canon-0-24 before canon-0-24-1, while 0.29 compared the joined key and put canon-0-24-1_1_1 first ('-' < '_'). On canon's repo this is the only finding difference (3 of 288 positions). Either F4's 'apart from names' covers it (human's call) or latest_order compares the 0.29 joined key.",
+  "worktree_dirty": false
+}

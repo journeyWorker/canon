@@ -1,6 +1,6 @@
 //! `canon regime` — the handlers of the group.
 
-use crate::cli::regime::*;
+use crate::cli::regime::{RegimeCommand, RegimeShowArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: RegimeCommand) -> ExitCode {

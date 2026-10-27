@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "rev-030-rl",
+    "role": "reviewer",
+    "session_id": "rev-030-rl-r2-2026-10-26"
+  },
+  "at": "2026-10-26T20:46:45.983048693Z",
+  "change_id": "canon-0-30-record-links",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/subject.rs:298-299",
+  "introduced_by": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "finding",
+  "review_id": "01M5WZDQ9TCY96B8BVCFCG3FPF",
+  "reviewed_sha": "46806bba471286cd2acb2d3f4233f0a0dfc0d1ca",
+  "reviewer": "rev-030-rl",
+  "round": 2,
+  "scenario_ids": [
+    "ingest.sessions.16"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "subject new and subject move print 'hot store: .canon/hot.db' and meta.hotStore when only change is routed hot: report_subject_warning asks HotStore::written_by for [Subject, Change] for every verb, but new and move write only the subject record. Repro on 46806bba with routing subject: local, change: hot: subject new writes kind=subject in .canon/ledger, prints the hot store line, and .canon/hot.db never exists. Fix: pass [Subject] for new and move, [Subject, Change] only for adopt and unadopt",
+  "worktree_dirty": false
+}

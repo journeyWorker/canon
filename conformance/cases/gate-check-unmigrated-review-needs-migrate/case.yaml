@@ -1,12 +1,12 @@
-description: "0.23 D6: a review written before review pinning (pinned to a commit this clone does not have, simulated with a fake sha) does not count until `canon migrate` rewrites it to what the evidence says: `canon subject status <id> --to verifying` and `canon gate check` (while the subject is still building) prints the advisory naming `canon migrate`, and after the migration, which pins it as the scenario stands because its commit cannot be read, the transition and the gate exit 0"
+description: "0.30 F2 + 0.23 D6: in a 0.29 repo the write is refused (OLD_LAYOUT) and the gate reports the old-named files, then `canon migrate` renames the ledger and pins the review in one run. A review written before review pinning (pinned to a commit this clone does not have, simulated with a fake sha) does not count until `canon migrate` rewrites it to what the evidence says: `canon subject status <id> --to verifying` and `canon gate check` (while the subject is still building) prints the advisory naming `canon migrate`, and after the migration, which pins it as the scenario stands because its commit cannot be read, the transition and the gate exit 0"
 steps:
   - args: [subject, move, cart, --to, verifying]
-    exit: 1
+    exit: 2
   - args: [gate, check]
-    exit: 0
+    exit: 1
   - args: [migrate]
     exit: 0
-  - args: [migrate, --commit, --plan-digest, "1e415a7731b2333faa6b890cadf650f441a558b242c6ddb221d187aa587df1b8"]
+  - args: [migrate, --commit, --plan-digest, "1b1294bfb40658bbdbaa8e9b400332419f5a602212cc73cb72278e9a68eb8f07"]
     exit: 0
   - args: [subject, move, cart, --to, verifying]
     exit: 0

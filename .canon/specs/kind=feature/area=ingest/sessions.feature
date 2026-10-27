@@ -155,3 +155,26 @@ Feature: ingest sessions
     When sessions are ingested with `capture_user_directives: true`
     Then the persisted user_directive event carries the user turn cut to that many characters
     And ingest fails with a config error and persists nothing when `max_directive_chars` is absent, zero, or negative
+
+  # canon: {"schema":1,"at":"2026-10-26T18:13:28Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:ingest-pipelines
+  @case:happy
+  @flow:canon-0-30-record-links.F5
+  @ingest.sessions.15
+  Scenario: A command that writes hot records prints the hot store location
+    Given a repo whose hot rung is the sqlite file `.canon/hot.db` and a session transcript
+    When canon ingest sessions writes the session, run and event records
+    Then the output names the hot store path
+    And --json carries it as `hotStore`
+
+  # canon: {"schema":1,"at":"2026-10-26T19:30:00Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-fix-2026-10-26"}}
+  @subject:ingest-pipelines
+  @case:happy
+  @flow:canon-0-30-record-links.F5
+  @ingest.sessions.16
+  Scenario: The other commands that write hot records print the hot store location too
+    Given a repo whose hot rung is the sqlite file `.canon/hot.db`
+    When canon ingest plans, ingest records and dispatch begin run, and canon subject new, subject move, subject adopt, subject unadopt and change new write records that are routed to the hot rung
+    Then each output names the hot store path
+    And the --json documents of ingest plans carry it as `hotStore`
+    And the --json documents of change new carry it as `hotStore`, and those of the subject leaves as `meta.hotStore`

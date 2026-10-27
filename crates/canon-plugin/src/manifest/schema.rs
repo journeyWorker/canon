@@ -98,13 +98,13 @@ mod tests {
     #[test]
     fn a_missing_join_key_fails_to_parse() {
         let yaml = "id: bad\nnamespace: bad\noverlays:\n  - kind: coverage\n    attaches_to:\n      core_kind: scenario\n";
-        assert!(serde_yaml::from_str::<PluginManifest>(yaml).is_err());
+        serde_yaml::from_str::<PluginManifest>(yaml).unwrap_err();
     }
 
     #[test]
     fn a_missing_namespace_fails_to_parse() {
         let yaml = "id: bad\noverlays: []\n";
-        assert!(serde_yaml::from_str::<PluginManifest>(yaml).is_err());
+        serde_yaml::from_str::<PluginManifest>(yaml).unwrap_err();
     }
 
     #[test]

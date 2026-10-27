@@ -139,6 +139,7 @@ fn chore_approvals(repo: &Path, ctx: &GateContext, subject: &Subject) -> Vec<(Ch
 /// when a subject with an approved chore needs it (`git add -A` over the
 /// work tree is the cost). Errors (no git work tree) read as `None`, the
 /// same as [`crate::git_rev::code_tree`] failing for the time-rule-only case.
+#[derive(Debug)]
 pub struct CodeTreeMemo(std::cell::OnceCell<Option<String>>);
 
 impl CodeTreeMemo {
@@ -302,7 +303,7 @@ pub fn hint(repo: &Path, ctx: Option<&GateContext>, code_tree: &CodeTreeMemo, su
         many => format!("record the suite again for the scenarios named, once per spec root: {}", many.iter().map(|c| format!("`{c}`")).collect::<Vec<_>>().join("; ")),
     };
     let review = chore_review_commands(repo, ctx, subject).first().map_or_else(
-        || String::new(),
+        String::new,
         |change| format!("; a chore also needs its change-level review (`canon review change {change}`)"),
     );
     Some(format!("{how}; reviews stay current while a scenario's verdict and checks are unchanged{review}, then ship"))

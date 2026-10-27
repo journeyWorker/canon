@@ -134,14 +134,14 @@ fn local_find<'a>(registry: &'a [PlanAdapterEntry], dialect_id: &str) -> Option<
 #[test]
 fn the_fixture_dialect_extends_the_seam_by_exactly_one_entry_beside_the_untouched_openspec_one() {
     let local = local_registry();
-    let ids: Vec<&str> = local.iter().map(|e| e.dialect_id()).collect();
+    let ids: Vec<&str> = local.iter().map(canon_ingest::PlanAdapterEntry::dialect_id).collect();
     assert_eq!(ids, vec!["openspec", "fixture-line"], "the fixture dialect is the ONLY addition -- openspec keeps its declared-order position");
 
     // Production's own registry is untouched by this test file's
     // existence -- the seam extension happened entirely in
     // `local_registry`'s test-local `Vec`, never in
     // `crate::plan_registry::registry`.
-    let production_ids: Vec<&str> = canon_ingest::plan_adapter_registry().iter().map(|e| e.dialect_id()).collect();
+    let production_ids: Vec<&str> = canon_ingest::plan_adapter_registry().iter().map(canon_ingest::PlanAdapterEntry::dialect_id).collect();
     assert_eq!(
         production_ids,
         vec!["openspec", "superpowers"],

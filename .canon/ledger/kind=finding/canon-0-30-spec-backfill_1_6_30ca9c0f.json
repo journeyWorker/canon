@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-030-sb",
+    "role": "reviewer",
+    "session_id": "rev-030-sb-2026-10-26"
+  },
+  "at": "2026-10-26T13:08:13.509967800Z",
+  "change_id": "canon-0-30-spec-backfill",
+  "code_tree": "f7ba8b5614b4f63b960ebc2269b5c555b5debc6d",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/spec030_reads.rs:244",
+  "kind": "finding",
+  "reviewed_sha": "7f9f15df9b2287e3743828cd184d6cdc3e83d05c",
+  "reviewer": "rev-030-sb",
+  "round": 1,
+  "scenario_ids": [
+    "learn.promotion.12"
+  ],
+  "schema": 1,
+  "seq": 6,
+  "severity": "note",
+  "summary": "[spec fidelity] learn.promotion.12 Then 'the rest of its front matter ... survive unchanged' is checked only by the body suffix and the three changed/added keys; compare before/after with those keys removed to cover the rest of the front matter.",
+  "worktree_dirty": false
+}

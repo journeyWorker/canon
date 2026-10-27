@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-26T09:53:00.579002282Z",
+  "change_ids": [
+    "s37-execution-graph-topology",
+    "canon-0-30-spec-backfill"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "specced",
+  "subject_id": "flywheel-execution-graph",
+  "summary": "Wire canon-learn's reward/promotion seams into the CLI, then record execution lineage and declared task dependencies so a plan-vs-actual graph diff becomes possible",
+  "title": "Flywheel repair + execution-graph lineage"
+}

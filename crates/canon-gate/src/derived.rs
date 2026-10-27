@@ -41,6 +41,7 @@ use crate::ledger::{CellKey, LedgerEntry};
 /// The three values the store's supersession rule orders a record by: its
 /// `at`, its envelope `schema`, and the digest of its JSON body (module doc of
 /// [`canon_store::fold`]).
+#[derive(Debug)]
 pub(crate) struct Stamp {
     at: DateTime<Utc>,
     schema: u32,
@@ -53,8 +54,9 @@ impl Stamp {
     pub(crate) fn of<T: serde::Serialize>(record: &T) -> Option<Self> {
         let body = serde_json::to_value(record).ok()?;
         let at = body.get("at")?.as_str()?.parse::<DateTime<Utc>>().ok()?;
+        #[expect(clippy::cast_possible_truncation, reason = "schema is a u32 on every well-formed record; wrapping keeps the prior behaviour for malformed ones")]
         let schema = body.get("schema").and_then(serde_json::Value::as_u64).unwrap_or(1) as u32;
-        let digest = canon_store::partition::content_digest12(&body);
+        let digest = canon_store::partition::content_digest(&body);
         Some(Self { at, schema, digest })
     }
 }
@@ -75,6 +77,7 @@ pub(crate) fn latest_of<K: Ord>(stamps: &[Option<Stamp>], candidates: impl IntoI
 }
 
 /// The latest generation of every scenario, and how to find one.
+#[derive(Debug)]
 pub(crate) struct ScenarioFold {
     /// Positions in `ctx.scenarios`, ordered by `(project_id, scenario_id)`.
     pub(crate) latest: Vec<usize>,
@@ -102,6 +105,7 @@ impl ScenarioFold {
 }
 
 /// The latest generation of every change, and the changes that name a subject.
+#[derive(Debug)]
 pub(crate) struct ChangeFold {
     /// Positions in `ctx.changes`, ordered by `change_id`.
     pub(crate) latest: Vec<usize>,
@@ -129,6 +133,7 @@ impl ChangeFold {
 
 /// The latest review per reviewer of each scenario, and the corpus-wide
 /// in-effect set.
+#[derive(Debug)]
 pub(crate) struct ReviewFold {
     /// Per `(project_id, scenario_id)`: positions in `ctx.reviews` of the
     /// latest review of each reviewer, in reviewer order.
@@ -158,6 +163,7 @@ impl ReviewFold {
 
 /// The ledger's declared evidence, positionally stamped and grouped by the
 /// scenario id it names.
+#[derive(Debug)]
 pub(crate) struct EvidenceIndex {
     pub(crate) stamps: Vec<Option<Stamp>>,
     /// Positions in `ctx.evidence`, in ledger order.
@@ -171,6 +177,7 @@ impl EvidenceIndex {
 }
 
 /// The archive's declared evidence, read once.
+#[derive(Debug)]
 pub(crate) struct Archive {
     pub(crate) records: Vec<EvidenceRecord>,
     pub(crate) by_scenario: HashMap<String, Vec<usize>>,
@@ -195,7 +202,7 @@ fn group_by_scenario(records: &[EvidenceRecord]) -> HashMap<String, Vec<usize>> 
 }
 
 /// Everything a [`GateContext`] derives from its corpus (module doc).
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Derived {
     scenarios: OnceLock<ScenarioFold>,
     subjects: OnceLock<Vec<usize>>,

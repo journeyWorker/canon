@@ -92,7 +92,7 @@
 //! working tree holds, because the fallback exists for records older than
 //! the store, and `canon artifacts store` uploads those. A store that
 //! cannot be reached or attached ([`Observed::Unavailable`],
-//! [`StoreError::Unattached`]) is a violation with a hint, never a pass.
+//! [`ArtifactStoreError::Unattached`]) is a violation with a hint, never a pass.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
@@ -190,13 +190,13 @@ fn store_dir_is_real(repo: &Path) -> bool {
 /// made with `create_dir` and checked again. `create_dir_all` would
 /// follow a symlinked `.canon/artifacts` and create `sha256` outside the
 /// store before any check could refuse it.
-fn create_store_dir(repo: &Path) -> Result<PathBuf, StoreError> {
+fn create_store_dir(repo: &Path) -> Result<PathBuf, ArtifactStoreError> {
     let mut path = repo.to_path_buf();
     for component in Path::new(paths::ARTIFACTS_SHA256_DIR).components() {
         path.push(component);
         match std::fs::symlink_metadata(&path) {
             Ok(meta) if meta.file_type().is_dir() => continue,
-            Ok(_) => return Err(StoreError::UnsafeStoreDir),
+            Ok(_) => return Err(ArtifactStoreError::UnsafeStoreDir),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(e) => return Err(e.into()),
         }
@@ -206,7 +206,7 @@ fn create_store_dir(repo: &Path) -> Result<PathBuf, StoreError> {
             Err(e) => return Err(e.into()),
         }
         if !std::fs::symlink_metadata(&path).is_ok_and(|meta| meta.file_type().is_dir()) {
-            return Err(StoreError::UnsafeStoreDir);
+            return Err(ArtifactStoreError::UnsafeStoreDir);
         }
     }
     Ok(path)
@@ -236,7 +236,7 @@ impl Observed {
     fn of(path: &Path) -> Self {
         let stamp = std::fs::metadata(path).ok().and_then(|meta| canon_store::git_tier::FileStamp::of(&meta));
         if let Some(stamp) = stamp {
-            let seen = OBSERVED.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let seen = OBSERVED.lock().expect("artifact observed-stamp memo lock poisoned");
             if let Some((_, sha)) = seen.get(path).filter(|(was, _)| *was == stamp) {
                 return Observed::Sha256(sha.clone());
             }
@@ -244,7 +244,7 @@ impl Observed {
         match File::open(path).and_then(sha256_reader) {
             Ok(sha) => {
                 if let Some(stamp) = stamp {
-                    OBSERVED.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).insert(path.to_path_buf(), (stamp, sha.clone()));
+                    OBSERVED.lock().expect("artifact observed-stamp memo lock poisoned").insert(path.to_path_buf(), (stamp, sha.clone()));
                 }
                 Observed::Sha256(sha)
             }
@@ -276,7 +276,7 @@ pub enum StoreOutcome {
 
 /// Why a store write wrote nothing.
 #[derive(Debug, thiserror::Error)]
-pub enum StoreError {
+pub enum ArtifactStoreError {
     /// The bytes read now hash differently from the digest being stored:
     /// the file changed after it was bound. Nothing is stored.
     #[error("its bytes now hash to {actual}, not the bound {expected}")]
@@ -297,8 +297,8 @@ pub enum StoreError {
     )]
     Locked(Duration),
     /// `canon.yaml` or its `artifact_store:` block cannot be used.
-    #[error("{0}")]
-    Config(String),
+    #[error(transparent)]
+    Config(#[from] ArtifactConfigError),
     /// The object-store tier `artifact_store.backend` names cannot be attached
     /// (credentials or bucket unset).
     #[error("the artifact store tier `{tier}` cannot be attached: {reason}")]
@@ -310,19 +310,32 @@ pub enum StoreError {
     Io(#[from] std::io::Error),
 }
 
+/// Why `canon.yaml`'s `artifact_store:` block could not be resolved.
+#[derive(Debug, thiserror::Error)]
+pub enum ArtifactConfigError {
+    #[error("reading `{}`: {source}", path.display())]
+    Read {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error(transparent)]
+    Policy(#[from] canon_store::policy::TierPolicyError),
+}
+
 /// The next step when the object store cannot be attached or reached.
 pub const OBJECT_STORE_HINT: &str = "check that the object store is reachable and that CANON_S3_ENDPOINT, CANON_S3_ACCESS_KEY, CANON_S3_SECRET_KEY and the tier's bucket variable are set, then run the command again (`canon artifacts verify` re-checks the store)";
 
-impl StoreError {
+impl ArtifactStoreError {
     /// The next step for the operator.
     pub fn hint(&self) -> &'static str {
         match self {
-            StoreError::Changed { .. } => "re-run what produced the file and bind it again, so the digest matches its bytes",
-            StoreError::InvalidDigest(_) => "a recorded digest must be 64 lowercase hex characters; fix or re-create the record",
-            StoreError::UnsafeStoreDir | StoreError::Io(_) => "check that the artifact store is writable (permissions, disk space), then run the command again",
-            StoreError::Locked(_) => "wait for the other canon process to finish, then run the command again",
-            StoreError::Config(_) => "fix the `artifact_store:` block of canon.yaml (`canon init --check` names the problem), or set `artifact_store: { backend: local }`",
-            StoreError::Unattached { .. } | StoreError::Remote { .. } => OBJECT_STORE_HINT,
+            ArtifactStoreError::Changed { .. } => "re-run what produced the file and bind it again, so the digest matches its bytes",
+            ArtifactStoreError::InvalidDigest(_) => "a recorded digest must be 64 lowercase hex characters; fix or re-create the record",
+            ArtifactStoreError::UnsafeStoreDir | ArtifactStoreError::Io(_) => "check that the artifact store is writable (permissions, disk space), then run the command again",
+            ArtifactStoreError::Locked(_) => "wait for the other canon process to finish, then run the command again",
+            ArtifactStoreError::Config(_) => "fix the `artifact_store:` block of canon.yaml (`canon init --check` names the problem), or set `artifact_store: { backend: local }`",
+            ArtifactStoreError::Unattached { .. } | ArtifactStoreError::Remote { .. } => OBJECT_STORE_HINT,
         }
     }
 }
@@ -343,7 +356,7 @@ const STORE_LOCK_WAIT: Duration = Duration::from_secs(30);
 /// the file releases it, and so does the holder's death, however it
 /// died, so a killed writer never leaves a stale lock behind and the
 /// file itself is never deleted. Waiting is bounded ([`STORE_LOCK_WAIT`],
-/// polled), and running out is [`StoreError::Locked`], naming the file.
+/// polled), and running out is [`ArtifactStoreError::Locked`], naming the file.
 #[derive(Debug)]
 pub struct StoreLock {
     repo: PathBuf,
@@ -352,14 +365,14 @@ pub struct StoreLock {
 
 impl StoreLock {
     /// Take the artifact-store lock of the repo rooted at `repo`.
-    pub fn acquire(repo: &Path) -> Result<StoreLock, StoreError> {
+    pub fn acquire(repo: &Path) -> Result<StoreLock, ArtifactStoreError> {
         Self::acquire_within(repo, STORE_LOCK_WAIT)
     }
 
-    fn acquire_within(repo: &Path, wait: Duration) -> Result<StoreLock, StoreError> {
+    fn acquire_within(repo: &Path, wait: Duration) -> Result<StoreLock, ArtifactStoreError> {
         match FileLock::acquire(&repo.join(paths::ARTIFACT_STORE_LOCK_FILE), wait) {
             Ok(lock) => Ok(StoreLock { repo: repo.to_path_buf(), _lock: lock }),
-            Err(FileLockError::Busy(waited)) => Err(StoreError::Locked(waited)),
+            Err(FileLockError::Busy(waited)) => Err(ArtifactStoreError::Locked(waited)),
             Err(FileLockError::Io(e)) => Err(e.into()),
         }
     }
@@ -367,10 +380,10 @@ impl StoreLock {
     /// Store the bytes `reader` yields as the blob for `expected`:
     /// [`StoreLock::stage`] then [`StoreLock::publish`]. Skips the write
     /// when an intact blob is already there. Refuses
-    /// ([`StoreError::Changed`]), writing nothing, when the bytes do not
+    /// ([`ArtifactStoreError::Changed`]), writing nothing, when the bytes do not
     /// hash to `expected` — the caller recorded that digest, and the
     /// store must hold exactly those bytes or nothing.
-    pub fn store(&self, expected: &str, reader: impl Read) -> Result<StoreOutcome, StoreError> {
+    pub fn store(&self, expected: &str, reader: impl Read) -> Result<StoreOutcome, ArtifactStoreError> {
         let Some(blob) = self.stage(expected, reader)? else {
             return Ok(StoreOutcome::AlreadyStored);
         };
@@ -382,7 +395,7 @@ impl StoreLock {
 
     /// Copy the bytes `reader` yields into a temp file in the store
     /// directory, hashing them on the way. `None` when an intact blob
-    /// for `expected` is already stored; [`StoreError::Changed`], with
+    /// for `expected` is already stored; [`ArtifactStoreError::Changed`], with
     /// the temp file removed, when the bytes do not hash to `expected` —
     /// identical bytes are also the size that was checked when they were
     /// bound.
@@ -391,15 +404,15 @@ impl StoreLock {
     /// follows a link: a pre-existing symlink (or any non-file) at the
     /// blob path is replaced by [`StoreLock::publish`]'s rename, which
     /// swaps the link itself, never its target.
-    pub fn stage(&self, expected: &str, mut reader: impl Read) -> Result<Option<StagedBlob<'_>>, StoreError> {
+    pub fn stage(&self, expected: &str, mut reader: impl Read) -> Result<Option<StagedBlob<'_>>, ArtifactStoreError> {
         if !is_sha256_hex(expected) {
-            return Err(StoreError::InvalidDigest(expected.to_string()));
+            return Err(ArtifactStoreError::InvalidDigest(expected.to_string()));
         }
         if stored_blob(&self.repo, expected).matches(expected) {
             return Ok(None);
         }
         let dir = create_store_dir(&self.repo)?;
-        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
         let temp = dir.join(format!(".tmp-{expected}-{}-{nanos}", std::process::id()));
         let mut file = File::options().write(true).create_new(true).open(&temp)?;
         // From here on, dropping `staged` removes the temp file.
@@ -408,7 +421,7 @@ impl StoreLock {
         drop(file);
         let actual = written?;
         if actual != expected {
-            return Err(StoreError::Changed { expected: expected.to_string(), actual });
+            return Err(ArtifactStoreError::Changed { expected: expected.to_string(), actual });
         }
         Ok(Some(staged))
     }
@@ -424,7 +437,7 @@ impl StoreLock {
     /// call itself renamed into place are removed (best effort), the
     /// rest are dropped unpublished, and the error carries the failing
     /// blob's index.
-    pub fn publish(&self, staged: Vec<StagedBlob<'_>>) -> Result<usize, (usize, StoreError)> {
+    pub fn publish(&self, staged: Vec<StagedBlob<'_>>) -> Result<usize, (usize, ArtifactStoreError)> {
         self.publish_paths(staged).map(|renamed| renamed.len())
     }
 
@@ -434,7 +447,7 @@ impl StoreLock {
     /// write fails, removes exactly these with [`StoreLock::unpublish`]:
     /// a blob already stored, or published by another writer, is never
     /// among them.
-    pub fn publish_paths(&self, staged: Vec<StagedBlob<'_>>) -> Result<Vec<PathBuf>, (usize, StoreError)> {
+    pub fn publish_paths(&self, staged: Vec<StagedBlob<'_>>) -> Result<Vec<PathBuf>, (usize, ArtifactStoreError)> {
         let mut renamed: Vec<PathBuf> = Vec::new();
         for (index, mut blob) in staged.into_iter().enumerate() {
             if stored_blob(&self.repo, &blob.sha256).matches(&blob.sha256) {
@@ -525,31 +538,31 @@ pub struct ObjectArtifacts {
 
 /// `<repo>/canon.yaml`'s `artifact_store:` block, resolved; the local default
 /// when the file or the block is absent.
-pub fn artifacts_config(repo: &Path) -> Result<ArtifactsConfig, StoreError> {
+pub fn artifacts_config(repo: &Path) -> Result<ArtifactsConfig, ArtifactStoreError> {
     let path = repo.join("canon.yaml");
     let content = match std::fs::read_to_string(&path) {
         Ok(content) => content,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(ArtifactsConfig::local()),
-        Err(e) => return Err(StoreError::Config(format!("reading `{}`: {e}", path.display()))),
+        Err(source) => return Err(ArtifactConfigError::Read { path, source }.into()),
     };
-    ArtifactsConfig::from_yaml_at(&content, repo).map_err(|e| StoreError::Config(e.to_string()))
+    Ok(ArtifactsConfig::from_yaml_at(&content, repo).map_err(ArtifactConfigError::from)?)
 }
 
 impl ArtifactStore {
     /// The store `<repo>/canon.yaml` configures. Builds the client for
     /// an object store (credentials from the tier's own configuration);
     /// performs no network I/O.
-    pub fn open(repo: &Path) -> Result<Self, StoreError> {
+    pub fn open(repo: &Path) -> Result<Self, ArtifactStoreError> {
         Self::from_config(artifacts_config(repo)?)
     }
 
     /// The store `config` names, as [`ArtifactStore::open`].
-    pub fn from_config(config: ArtifactsConfig) -> Result<Self, StoreError> {
+    pub fn from_config(config: ArtifactsConfig) -> Result<Self, ArtifactStoreError> {
         match config.backend {
             ArtifactsBackend::Local => Ok(ArtifactStore::Local),
             ArtifactsBackend::Tier { name, config: tier } => match ObjectBlobStore::attach(&tier, &config.prefix) {
                 Ok(blobs) => Ok(ArtifactStore::Object(ObjectArtifacts { tier: name, blobs })),
-                Err(e) => Err(StoreError::Unattached { tier: name, reason: e.to_string() }),
+                Err(e) => Err(ArtifactStoreError::Unattached { tier: name, reason: e.to_string() }),
             },
         }
     }
@@ -596,11 +609,11 @@ impl ArtifactStore {
 
 impl ObjectArtifacts {
     /// Upload the bytes `reader` yields as the blob for `expected`, read
-    /// it back, keep nothing locally. [`StoreError::Changed`], with
+    /// it back, keep nothing locally. [`ArtifactStoreError::Changed`], with
     /// nothing uploaded, when the bytes do not hash to `expected`;
     /// [`StoreOutcome::AlreadyStored`] when an object of that size is
     /// already there.
-    pub fn upload(&self, expected: &str, mut reader: impl Read) -> Result<StoreOutcome, StoreError> {
+    pub fn upload(&self, expected: &str, mut reader: impl Read) -> Result<StoreOutcome, ArtifactStoreError> {
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes)?;
         match self.blobs.put(expected, bytes) {
@@ -611,15 +624,15 @@ impl ObjectArtifacts {
     }
 
     /// Every digest the store holds.
-    pub fn list(&self) -> Result<Vec<String>, StoreError> {
+    pub fn list(&self) -> Result<Vec<String>, ArtifactStoreError> {
         self.blobs.list().map_err(|e| self.error(e))
     }
 
-    fn error(&self, e: BlobError) -> StoreError {
+    fn error(&self, e: BlobError) -> ArtifactStoreError {
         match e {
-            BlobError::Changed { expected, actual } => StoreError::Changed { expected, actual },
-            BlobError::InvalidDigest(digest) => StoreError::InvalidDigest(digest),
-            other => StoreError::Remote { tier: self.tier.clone(), reason: other.to_string() },
+            BlobError::Changed { expected, actual } => ArtifactStoreError::Changed { expected, actual },
+            BlobError::InvalidDigest(digest) => ArtifactStoreError::InvalidDigest(digest),
+            other => ArtifactStoreError::Remote { tier: self.tier.clone(), reason: other.to_string() },
         }
     }
 }
@@ -629,11 +642,7 @@ impl ObjectArtifacts {
 /// hand-written record; the CLI only ever records in-repo paths).
 pub fn working_tree_path(repo: &Path, relative: &str) -> Option<PathBuf> {
     let path = Path::new(relative);
-    if path.components().all(|c| matches!(c, Component::Normal(_) | Component::CurDir)) {
-        Some(repo.join(path))
-    } else {
-        None
-    }
+    path.components().all(|c| matches!(c, Component::Normal(_) | Component::CurDir)).then(|| repo.join(path))
 }
 
 fn working_tree(repo: &Path, relative: &str) -> Observed {
@@ -648,12 +657,12 @@ fn latest_records(ctx: &GateContext) -> Vec<&EvidenceRecord> {
     let by_scenario: Vec<&EvidenceRecord> = ctx.evidence.iter().filter(|r| r.scenario_id.is_some()).collect();
     let mut latest: BTreeSet<*const EvidenceRecord> = BTreeSet::new();
     for record in latest_by_key(&by_task, |r| r.task_id.clone()) {
-        latest.insert(*record as *const _);
+        latest.insert(*record as *const canon_model::EvidenceRecord);
     }
     for record in latest_by_key(&by_scenario, |r| (r.project_id.clone(), r.scenario_id.clone())) {
-        latest.insert(*record as *const _);
+        latest.insert(*record as *const canon_model::EvidenceRecord);
     }
-    let declared = ctx.evidence.iter().filter(|r| latest.contains(&(*r as *const _)));
+    let declared = ctx.evidence.iter().filter(|r| latest.contains(&(*r as *const canon_model::EvidenceRecord)));
     let audits = crate::audit::latest_audits(ctx).into_values();
     declared.chain(audits).filter(|r| !r.attachments.is_empty()).collect()
 }
@@ -703,7 +712,7 @@ pub fn bound_files(ctx: &GateContext) -> Vec<BoundFileRef> {
                 sha256: artifact.sha256.clone(),
                 binder: Binder::Review {
                     reviewer: review.reviewer.clone(),
-                    actor: review.envelope.actor.agent_id.to_string(),
+                    actor: review.envelope.actor.agent_id.clone(),
                     at: review.envelope.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
                 },
             });
@@ -827,6 +836,7 @@ fn distinct_review_files(review: &Review) -> Vec<&ReviewArtifact> {
 }
 
 /// The `canon gate check` arm (module doc).
+#[derive(Debug)]
 pub struct ArtifactStoreCheck;
 
 impl GateCheck for ArtifactStoreCheck {
@@ -893,7 +903,6 @@ fn remedy(blob: &Observed, store: &ArtifactStore, reattest: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
 
     use canon_model::{Actor, Envelope, EvidenceVerdict, ProjectId, RecordKind, RoleId, ScenarioId};
     use chrono::{Duration, Utc};
@@ -903,7 +912,7 @@ mod tests {
     use crate::policy::{PolicyField, PolicyResolution, StalenessPolicy};
 
     /// One store transaction under the repo's lock.
-    fn store(repo: &Path, expected: &str, reader: impl Read) -> Result<StoreOutcome, StoreError> {
+    fn store(repo: &Path, expected: &str, reader: impl Read) -> Result<StoreOutcome, ArtifactStoreError> {
         StoreLock::acquire(repo)?.store(expected, reader)
     }
 
@@ -912,7 +921,7 @@ mod tests {
     }
 
     fn evidence(id: &str, path: &str, digest: &str, offset: i64) -> EvidenceRecord {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now() + Duration::seconds(offset), Actor::new("agent", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now() + Duration::seconds(offset), Actor::new("agent", RoleId::parse("implementer").unwrap()));
         EvidenceRecord::new(envelope, None, Some(ScenarioId::parse(id).unwrap()), None, EvidenceVerdict::Faithful)
             .with_project_id(ProjectId::parse("p").unwrap())
             .with_attachments(vec![EvidenceAttachment { path: path.into(), sha256: digest.into(), format: None, case: None, outcome: None }])
@@ -958,7 +967,7 @@ mod tests {
 
         let other = sha(b"other");
         let refused = store(dir.path(), &other, &b"changed"[..]).unwrap_err();
-        assert!(matches!(refused, StoreError::Changed { .. }), "{refused}");
+        assert!(matches!(refused, ArtifactStoreError::Changed { .. }), "{refused}");
         assert!(!blob_path(dir.path(), &other).exists());
         let leftovers: Vec<_> = std::fs::read_dir(store_dir(dir.path())).unwrap().map(|e| e.unwrap().file_name()).collect();
         assert_eq!(leftovers.len(), 1, "a refused store leaves no temp file: {leftovers:?}");
@@ -1045,7 +1054,7 @@ mod tests {
     fn a_digest_that_is_not_64_lowercase_hex_builds_no_path() {
         let dir = TempDir::new().unwrap();
         for bad in ["../../etc/passwd", &"A".repeat(64), &"a".repeat(63), ""] {
-            assert!(matches!(store(dir.path(), bad, &b"x"[..]), Err(StoreError::InvalidDigest(_))), "{bad}");
+            assert!(matches!(store(dir.path(), bad, &b"x"[..]), Err(ArtifactStoreError::InvalidDigest(_))), "{bad}");
             assert_eq!(stored_blob(dir.path(), bad), Observed::Missing);
         }
         assert!(!store_dir(dir.path()).exists(), "no store directory is created for an invalid digest");
@@ -1085,7 +1094,7 @@ mod tests {
         std::fs::create_dir_all(dir.path().join(".canon/artifacts")).unwrap();
         std::os::unix::fs::symlink(outside.path(), store_dir(dir.path())).unwrap();
         let digest = sha(b"v1");
-        assert!(matches!(store(dir.path(), &digest, &b"v1"[..]), Err(StoreError::UnsafeStoreDir)));
+        assert!(matches!(store(dir.path(), &digest, &b"v1"[..]), Err(ArtifactStoreError::UnsafeStoreDir)));
         assert!(std::fs::read_dir(outside.path()).unwrap().next().is_none(), "nothing written through the link");
     }
 
@@ -1100,7 +1109,7 @@ mod tests {
         std::fs::create_dir_all(dir.path().join(".canon")).unwrap();
         std::os::unix::fs::symlink(outside.path(), dir.path().join(".canon/artifacts")).unwrap();
         let digest = sha(b"v1");
-        assert!(matches!(store(dir.path(), &digest, &b"v1"[..]), Err(StoreError::UnsafeStoreDir)));
+        assert!(matches!(store(dir.path(), &digest, &b"v1"[..]), Err(ArtifactStoreError::UnsafeStoreDir)));
         assert!(std::fs::read_dir(outside.path()).unwrap().next().is_none(), "the outside directory stays empty");
     }
 
@@ -1148,7 +1157,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let first = StoreLock::acquire(dir.path()).unwrap();
         let busy = StoreLock::acquire_within(dir.path(), std::time::Duration::from_millis(120)).unwrap_err();
-        assert!(matches!(busy, StoreError::Locked(_)), "{busy}");
+        assert!(matches!(busy, ArtifactStoreError::Locked(_)), "{busy}");
         assert!(busy.to_string().contains(paths::ARTIFACT_STORE_LOCK_FILE) && busy.to_string().contains("retry"), "{busy}");
         drop(first);
         // A parallel test that forks a child briefly holds a copy of the fd

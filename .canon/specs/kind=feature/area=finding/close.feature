@@ -173,3 +173,25 @@ Feature: finding close
     When it is read, listed and closed fixed
     Then the untouched record's JSON is byte-identical to what was committed
     And the list row shows no reason for it
+
+  # canon: {"schema":1,"at":"2026-10-26T18:13:00Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:finding-lifecycle
+  @case:happy
+  @flow:canon-0-30-record-links.F1
+  @finding.close.88
+  Scenario: Closing or reopening a finding copies its review id and its unknown mark
+    Given a committed finding that carries a review id and the unknown mark
+    When it is closed fixed and then reopened
+    Then each new version carries the same review id and the same unknown mark
+    And promote accepts each as a disposition transition, because neither field is allowed to change in one
+
+  # canon: {"schema":1,"at":"2026-10-26T18:13:10Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:finding-lifecycle
+  @case:edge
+  @flow:canon-0-30-record-links.F2
+  @finding.close.89
+  Scenario: A blocker written before 0.30 with neither field still closes and reopens
+    Given a committed blocker written by 0.29 with neither `introduced_by` nor the unknown mark
+    When it is closed fixed and then reopened
+    Then both transitions succeed
+    And the new versions carry neither field

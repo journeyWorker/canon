@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "017-p4-impl",
+    "role": "implementer",
+    "session_id": "017-p4-impl"
+  },
+  "at": "2026-10-12T11:49:50.987439Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test legacy_pins a_moved_root_is_searched_at_its_former_path_and_only_for_its_own_project"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 43,
+  "scenario_id": "gate.check.96",
+  "schema": 1,
+  "staging_id": "100bd355df94",
+  "verdict": "faithful"
+}

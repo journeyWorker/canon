@@ -159,7 +159,7 @@ fn git_routed_kind_query_succeeds_when_pg_and_r2_are_both_unreachable() {
     let output = run_canon(&["query", "--kind", "change", "--json"], dir.path(), &[]);
     assert!(output.status.success(), "a git-routed kind must never require live pg/r2 credentials: stderr={}", stderr(&output));
 
-    let payload: Value = data_of(&stdout(&output));
+    let payload = data_of(&stdout(&output));
     assert_eq!(payload["kind"], "change");
     assert_eq!(payload["count"], 1, "{payload}");
     assert_eq!(payload["records"][0]["change_id"], "add-widget", "{payload}");
@@ -313,7 +313,7 @@ fn plugin_git_attachment_is_unconditional_even_when_the_queried_kinds_own_routin
     );
     assert!(output.status.success(), "stderr: {}", stderr(&output));
 
-    let payload: Value = data_of(&stdout(&output));
+    let payload = data_of(&stdout(&output));
     let records = payload["records"].as_array().expect("records array");
     let record = records.iter().find(|r| r["scenario_id"] == "world.hotdeal.01").expect("planted scenario present");
     assert_eq!(

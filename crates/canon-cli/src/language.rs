@@ -22,7 +22,7 @@
 //! not counted ([`Tally::add_line`]). A section whose own script differs
 //! from the brief's is judged in its own language ([`section_language`]).
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
@@ -49,7 +49,7 @@ impl Language {
     /// Parses a tag: an ASCII language subtag of two or three letters,
     /// optionally followed by `-` subtags of letters and digits
     /// (`ko`, `en-US`, `zh-Hant`).
-    pub fn parse(raw: &str) -> Result<Self, String> {
+    pub fn parse(raw: &str) -> Result<Self, LanguageTagError> {
         let tag = raw.trim().to_ascii_lowercase();
         let mut parts = tag.split('-');
         let primary = parts.next().unwrap_or("");
@@ -58,7 +58,7 @@ impl Language {
         if primary_ok && rest_ok {
             Ok(Language { tag })
         } else {
-            Err(format!("`{}` is not a language tag (expected a BCP 47 tag such as `en` or `ko`)", raw.trim()))
+            Err(LanguageTagError::NotATag(raw.trim().to_string()))
         }
     }
 
@@ -84,38 +84,66 @@ impl Language {
     }
 }
 
+/// A string that is not a language tag.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum LanguageTagError {
+    #[error("`{0}` is not a language tag (expected a BCP 47 tag such as `en` or `ko`)")]
+    NotATag(String),
+}
+
+/// Why `canon.yaml`'s `language:` cannot be read.
+#[derive(Debug, thiserror::Error)]
+pub enum LanguageError {
+    /// `canon.yaml` exists but cannot be read.
+    #[error("cannot read `{}`: {source}", path.display())]
+    Read {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    /// `canon.yaml` is not YAML.
+    #[error("canon.yaml does not parse: {0}")]
+    Parse(#[source] serde_yaml::Error),
+    /// `language:` is a string that is not a tag.
+    #[error("canon.yaml `language:` {0}")]
+    Tag(#[source] LanguageTagError),
+    /// `language:` is not a string.
+    #[error("canon.yaml `language:` must be a string language tag such as `en` or `ko`")]
+    NotAString,
+}
+
 /// `canon.yaml`'s `language:` under `repo`, or `None` when it sets none
 /// (a missing `canon.yaml` sets none). `Err` names a `canon.yaml` that
 /// cannot be read or parsed, or a `language:` that is not a tag.
-pub fn declared(repo: &Path) -> Result<Option<Language>, String> {
+pub fn declared(repo: &Path) -> Result<Option<Language>, LanguageError> {
     let path = repo.join("canon.yaml");
     let text = match std::fs::read_to_string(&path) {
         Ok(text) => text,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(format!("cannot read `{}`: {e}", path.display())),
+        Err(source) => return Err(LanguageError::Read { path, source }),
     };
     declared_from_yaml(&text)
 }
 
 /// [`declared`] over the text of a `canon.yaml`.
-pub fn declared_from_yaml(text: &str) -> Result<Option<Language>, String> {
-    let doc: serde_yaml::Value = serde_yaml::from_str(text).map_err(|e| format!("canon.yaml does not parse: {e}"))?;
+pub fn declared_from_yaml(text: &str) -> Result<Option<Language>, LanguageError> {
+    let doc: serde_yaml::Value = serde_yaml::from_str(text).map_err(LanguageError::Parse)?;
     match doc.get("language") {
         None | Some(serde_yaml::Value::Null) => Ok(None),
-        Some(serde_yaml::Value::String(tag)) => Language::parse(tag).map(Some).map_err(|e| format!("canon.yaml `language:` {e}")),
-        Some(_) => Err("canon.yaml `language:` must be a string language tag such as `en` or `ko`".to_string()),
+        Some(serde_yaml::Value::String(tag)) => Language::parse(tag).map(Some).map_err(LanguageError::Tag),
+        Some(_) => Err(LanguageError::NotAString),
     }
 }
 
 /// The language `canon change new` writes the template in: `language:`
 /// under `repo`, `en` when unset. Judging a brief goes through
 /// [`for_brief`], never this.
-pub fn configured(repo: &Path) -> Result<Language, String> {
+pub fn configured(repo: &Path) -> Result<Language, LanguageError> {
     declared(repo).map(|language| language.unwrap_or_else(Language::unset))
 }
 
 /// [`configured`] over the text of a `canon.yaml`.
-pub fn from_yaml(text: &str) -> Result<Language, String> {
+pub fn from_yaml(text: &str) -> Result<Language, LanguageError> {
     declared_from_yaml(text).map(|language| language.unwrap_or_else(Language::unset))
 }
 
@@ -327,13 +355,28 @@ pub fn section_language(brief: &Resolved, section: &Tally) -> Language {
 
 /// The language `text`, the brief of a repo at `repo`, is judged in: the
 /// one resolution (module doc). `Err` is [`declared`]'s.
-pub fn for_brief(repo: &Path, text: &str) -> Result<Resolved, String> {
+pub fn for_brief(repo: &Path, text: &str) -> Result<Resolved, LanguageError> {
     Ok(resolve(declared(repo)?.as_ref(), &crate::brief_check::prose_tally(text)))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn language_refusals_read_as_before() {
+        assert_eq!(Language::parse(" korean language ").unwrap_err().to_string(), "`korean language` is not a language tag (expected a BCP 47 tag such as `en` or `ko`)");
+        assert_eq!(declared_from_yaml("language: k\n").unwrap_err().to_string(), "canon.yaml `language:` `k` is not a language tag (expected a BCP 47 tag such as `en` or `ko`)");
+        assert_eq!(declared_from_yaml("language: [ko]\n").unwrap_err().to_string(), "canon.yaml `language:` must be a string language tag such as `en` or `ko`");
+        let parse = declared_from_yaml("language: [\n").unwrap_err();
+        assert!(parse.to_string().starts_with("canon.yaml does not parse: "), "{parse}");
+        assert!(std::error::Error::source(&parse).is_some());
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("canon.yaml")).unwrap();
+        let read = declared(dir.path()).unwrap_err();
+        assert!(read.to_string().starts_with(&format!("cannot read `{}`: ", dir.path().join("canon.yaml").display())), "{read}");
+        assert!(std::error::Error::source(&read).is_some());
+    }
 
     #[test]
     fn tags_route_to_shipped_languages_by_primary_subtag() {
@@ -347,9 +390,9 @@ mod tests {
 
     #[test]
     fn a_malformed_tag_or_value_is_an_error() {
-        assert!(Language::parse("korean language").is_err());
-        assert!(Language::parse("k").is_err());
-        assert!(from_yaml("language: [ko]\n").is_err());
+        Language::parse("korean language").unwrap_err();
+        Language::parse("k").unwrap_err();
+        from_yaml("language: [ko]\n").unwrap_err();
         assert_eq!(from_yaml("tiers: {}\n").unwrap(), Language::unset());
         assert_eq!(from_yaml("language: ko\n").unwrap().tag, "ko");
         assert_eq!(declared_from_yaml("tiers: {}\n").unwrap(), None);

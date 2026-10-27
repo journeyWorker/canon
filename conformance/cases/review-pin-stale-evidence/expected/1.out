@@ -1,3 +1,3 @@
 canon review scenario: pinned cart.add.01 at scenario digest 6bb1bf143405 and the verdict and checks of its 1 role(s) of evidence; the review counts only while they are unchanged
-canon review scenario: wrote kind=review/area=cart/root__cart.add.01__f08a790e2fd17ac947c000f8f13df0dc412850af__<digest12>.json (new) — written directly; nothing to promote
+canon review scenario: wrote kind=review/root_scenario_cart.add.01_<digest8>.json (new) — written directly; nothing to promote; review id <ulid> of cart.add.01
 next: canon subject move cart --to verifying --actor-id <unit> --session-id <session> — cart: every scenario is evidenced and reviewed, with no blocker or case gap

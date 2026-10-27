@@ -75,6 +75,7 @@ use crate::normalize::{normalize_workspace_key, workspace_label_from_key};
 /// `clients.rs:190-201`).
 pub const CODEX_HOME_ENV: &str = "CODEX_HOME";
 
+#[derive(Debug)]
 pub struct CodexAdapter;
 
 /// Ported from `codex.rs:26-31`.
@@ -289,7 +290,7 @@ impl SessionAdapter for CodexAdapter {
     /// session Codex has rotated out.
     fn scan_roots(&self, home: &Path, use_env_roots: bool) -> Vec<PathBuf> {
         let codex_home = if use_env_roots {
-            std::env::var(CODEX_HOME_ENV).ok().filter(|value| !value.trim().is_empty()).map(PathBuf::from).unwrap_or_else(|| home.join(".codex"))
+            std::env::var(CODEX_HOME_ENV).ok().filter(|value| !value.trim().is_empty()).map_or_else(|| home.join(".codex"), PathBuf::from)
         } else {
             home.join(".codex")
         };
@@ -330,7 +331,7 @@ fn normalize_codex_workspace_key(raw: &str) -> Option<String> {
         return None;
     }
 
-    if looks_like_explicit_workspace_path(&normalized) { Some(normalized) } else { None }
+    looks_like_explicit_workspace_path(&normalized).then_some(normalized)
 }
 
 /// Ported from `codex.rs:263-270`.
@@ -778,9 +779,8 @@ fn flush_pending_model_messages_as_unknown(pending: &mut Vec<(UnifiedRow, bool)>
 /// Ported from `codex.rs:905-923`, adapted to always start from
 /// `CodexParseState::default()` (see module doc — no incremental resume).
 fn parse_codex_file(path: &Path) -> ParseOutcome {
-    let file = match std::fs::File::open(path) {
-        Ok(f) => f,
-        Err(_) => return ParseOutcome::default(),
+    let Ok(file) = std::fs::File::open(path) else {
+        return ParseOutcome::default();
     };
 
     let session_id = session_id_from_path(path);
@@ -862,9 +862,7 @@ fn file_modified_timestamp_ms(path: &Path) -> i64 {
     std::fs::metadata(path)
         .and_then(|meta| meta.modified())
         .ok()
-        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
-        .map(|duration| duration.as_millis() as i64)
-        .unwrap_or_else(|| chrono::Utc::now().timestamp_millis())
+        .and_then(|time| time.duration_since(std::time::SystemTime::UNIX_EPOCH).ok()).map_or_else(|| chrono::Utc::now().timestamp_millis(), |duration| i64::try_from(duration.as_millis()).expect("epoch millis fit in i64"))
 }
 
 /// Ported from the donor session-parser project's provider-identity module
@@ -1103,6 +1101,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(unsafe_code, reason = "std::env::set_var/remove_var are unsafe fns; the SAFETY comments below say why this test cannot race")]
     fn scan_roots_honors_codex_home_env_override_only_when_enabled() {
         // Both cases share one test (rather than two separate `#[test]`
         // fns) because `CODEX_HOME` is process-global state — two tests
@@ -1110,18 +1109,22 @@ mod tests {
         // runs tests in parallel threads by default, so two such tests
         // race each other. Sequencing both cases in one test removes
         // the race entirely.
-        // SAFETY: test-only, single-threaded within this process's test
-        // harness invocation for this var name.
+        // SAFETY: this is the only test that touches `CODEX_HOME_ENV` or calls the
+        // codex adapter's `scan_roots` with `use_env_roots = true`, so no other thread
+        // reads the variable while it is set. Rust's `std::env` serializes its own
+        // accessors and nothing here calls libc `getenv` directly.
         unsafe { std::env::set_var(CODEX_HOME_ENV, "/should/not/appear") };
         let adapter = CodexAdapter;
         let roots = adapter.scan_roots(Path::new("/home/example"), false);
         assert!(!roots.iter().any(|r| r.starts_with("/should/not/appear")), "use_env_roots=false must ignore CODEX_HOME");
 
+        // SAFETY: same as the first `set_var`; this test is the variable's only user.
         unsafe { std::env::set_var(CODEX_HOME_ENV, "/custom/codex-home") };
         let roots = adapter.scan_roots(Path::new("/home/example"), true);
         assert!(roots.contains(&PathBuf::from("/custom/codex-home/sessions")));
         assert!(roots.contains(&PathBuf::from("/custom/codex-home/archived_sessions")));
 
+        // SAFETY: same as the first `set_var`; this test is the variable's only user.
         unsafe { std::env::remove_var(CODEX_HOME_ENV) };
     }
 

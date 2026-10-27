@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "m3-impl"
+  },
+  "at": "2026-10-11T14:58:46.565300Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test init authoring_init_33 && cargo test -p canon-cli --test conformance (init-policy-refused)"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 16,
+  "scenario_id": "authoring.init.33",
+  "schema": 1,
+  "staging_id": "b14adfd37298",
+  "verdict": "faithful"
+}

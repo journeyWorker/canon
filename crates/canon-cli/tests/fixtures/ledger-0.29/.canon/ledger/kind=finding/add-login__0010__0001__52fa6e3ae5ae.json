@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "bob",
+    "role": "reviewer"
+  },
+  "at": "2026-10-26T17:03:35.520214961Z",
+  "change_id": "add-login",
+  "code_tree": "acd7450dd0cf7b248320eae870bed06ae161823a",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "b58d5aed2143f1e7d4ec0e02988134f8d75cd680",
+  "reviewer": "bob",
+  "round": 10,
+  "schema": 1,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Another",
+  "worktree_dirty": false
+}

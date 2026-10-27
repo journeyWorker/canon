@@ -1,0 +1,15 @@
+{
+  "actor": {
+    "agent_id": "canon-plan-import-canon"
+  },
+  "at": "2026-10-26T17:03:42.443503300Z",
+  "change_id": "tidy",
+  "kind": "change",
+  "schema": 2,
+  "status": "proposed",
+  "subject_ids": [
+    "demo"
+  ],
+  "summary": "Tidy up",
+  "title": "tidy"
+}

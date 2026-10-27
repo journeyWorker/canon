@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use crate::envelope::{Actor, CanonRecord, Envelope, RecordKind};
 use crate::evidence::{EvidenceViolation, FailureClass};
 use crate::ids::{
-    is_kebab_slug, ChangeId, PrNumber, ProjectId, RegimeKey, RoleId, RunId, ScenarioId, Sha, SessionId, SpecDigest, SubjectId,
+    is_kebab_slug, ChangeId, PrNumber, ProjectId, RegimeKey, ReviewId, RoleId, RunId, ScenarioId, Sha, SessionId, SpecDigest, SubjectId,
     TaskId, TotalOrder,
 };
 use crate::trust::{FlaggedOverlay, TrustLifecycle};
@@ -281,7 +281,6 @@ impl StatusOverride {
 }
 
 impl Subject {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         envelope: Envelope,
         subject_id: SubjectId,
@@ -516,12 +515,42 @@ pub struct Scenario {
     /// schema bump).
     #[serde(default, skip_serializing_if = "is_false")]
     pub removed: bool,
+    /// The scenario's steps in source order (0.30 `record-links`), as the
+    /// `.feature` file reads them, read by `canon inventory sync` with the
+    /// `gherkin` crate. A step inherited from a `Background:` comes first and
+    /// says which one ([`ScenarioStep::inherited`]). Part of the index's
+    /// "unchanged" check, so a record written before 0.30 (no `steps`) is
+    /// rewritten by the next sync. Additive and skipped when empty; the
+    /// scenario digest never covers it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub steps: Vec<ScenarioStep>,
+}
+
+/// One step of a [`Scenario`] (0.30 `record-links`): the keyword as written
+/// (`Given`, `When`, `Then`, `And`, `But`, or `*`) and the sentence after it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ScenarioStep {
+    pub keyword: String,
+    pub text: String,
+    /// Where an inherited step comes from; absent on the scenario's own steps.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inherited: Option<StepOrigin>,
+}
+
+/// The block a [`ScenarioStep`] was inherited from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum StepOrigin {
+    /// The Feature's `Background:`.
+    Background,
+    /// The enclosing `Rule:`'s `Background:`.
+    Rule,
 }
 
 impl Scenario {
     pub fn new(envelope: Envelope, project_id: ProjectId, scenario_id: ScenarioId, title: impl Into<String>, description: impl Into<String>, source_digest: SpecDigest) -> Self {
         debug_assert_eq!(envelope.kind, RecordKind::Scenario);
-        Self { envelope, project_id, scenario_id, title: title.into(), description: description.into(), source_digest, scenario_digest: None, lane: None, case: None, subject_id: None, removed: false }
+        Self { envelope, project_id, scenario_id, title: title.into(), description: description.into(), source_digest, scenario_digest: None, lane: None, case: None, subject_id: None, removed: false, steps: Vec::new() }
     }
 }
 
@@ -893,6 +922,13 @@ pub struct Review {
     /// written (0.28 D7b). Absent on a record written before 0.28.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub worktree_dirty: Option<bool>,
+    /// The id of the `canon review` run that wrote this review (0.30
+    /// `record-links`): one ULID per run, shared by every review the run
+    /// wrote, kept in the body so a rename, a rewrite or the move to the
+    /// archive never changes it. A finding's `review_id` points at it. Absent
+    /// on a review written before 0.30; such a review stays valid.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_id: Option<ReviewId>,
 }
 
 /// A file a [`Review`] binds (0.16 D5): what the reviewer looked at,
@@ -907,6 +943,12 @@ pub struct ReviewArtifact {
 }
 
 impl Review {
+    /// Name the `canon review` run that wrote this review (0.30).
+    pub fn with_review_id(mut self, review_id: ReviewId) -> Self {
+        self.review_id = Some(review_id);
+        self
+    }
+
     /// Record the code this review saw (0.28 D7b).
     pub fn with_code(mut self, code_tree: impl Into<String>, worktree_dirty: bool) -> Self {
         self.code_tree = Some(code_tree.into());
@@ -939,6 +981,7 @@ impl Review {
             artifacts: Vec::new(),
             code_tree: None,
             worktree_dirty: None,
+            review_id: None,
         }
     }
 
@@ -979,6 +1022,7 @@ impl Review {
             artifacts: Vec::new(),
             code_tree: None,
             worktree_dirty: None,
+            review_id: None,
         }
     }
 }
@@ -1086,16 +1130,20 @@ impl ReviewOutcome {
         }
     }
 
-    pub fn parse(s: &str) -> Result<Self, String> {
-        Self::ALL
-            .into_iter()
-            .find(|o| o.as_str() == s)
-            .ok_or_else(|| format!("unknown review outcome `{s}` (expected one of: signed, indeterminate, unavailable)"))
+    pub fn parse(s: &str) -> Result<Self, ReviewOutcomeError> {
+        Self::ALL.into_iter().find(|o| o.as_str() == s).ok_or_else(|| ReviewOutcomeError { value: s.to_string() })
     }
 
     pub fn is_signed(&self) -> bool {
         *self == ReviewOutcome::Signed
     }
+}
+
+/// `s` names no [`ReviewOutcome`].
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("unknown review outcome `{value}` (expected one of: signed, indeterminate, unavailable)")]
+pub struct ReviewOutcomeError {
+    pub value: String,
 }
 
 /// A divergence's fold-relevant state (design D8). `Open`/`Resolved`
@@ -1174,6 +1222,20 @@ pub struct Divergence {
     pub worktree_dirty: Option<bool>,
 }
 
+/// Fields of a new [`Divergence`]; [`Divergence::new`] leaves the code-tree stamp unset.
+#[derive(Debug, Clone)]
+pub struct DivergenceFields {
+    pub envelope: Envelope,
+    pub project_id: ProjectId,
+    pub scenario_id: ScenarioId,
+    pub sha: Sha,
+    pub status: DivergenceStatus,
+    pub run_seq: TotalOrder,
+    pub round: u32,
+    pub reviewer: String,
+    pub detail: String,
+}
+
 impl Divergence {
     /// Record the code this divergence was recorded against (0.28 D7b).
     pub fn with_code(mut self, code_tree: impl Into<String>, worktree_dirty: bool) -> Self {
@@ -1182,20 +1244,10 @@ impl Divergence {
         self
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        envelope: Envelope,
-        project_id: ProjectId,
-        scenario_id: ScenarioId,
-        sha: Sha,
-        status: DivergenceStatus,
-        run_seq: TotalOrder,
-        round: u32,
-        reviewer: impl Into<String>,
-        detail: impl Into<String>,
-    ) -> Self {
+    pub fn new(fields: DivergenceFields) -> Self {
+        let DivergenceFields { envelope, project_id, scenario_id, sha, status, run_seq, round, reviewer, detail } = fields;
         debug_assert_eq!(envelope.kind, RecordKind::Divergence);
-        Self { envelope, project_id, scenario_id, sha, status, run_seq, round, reviewer: reviewer.into(), detail: detail.into(), code_tree: None, worktree_dirty: None }
+        Self { envelope, project_id, scenario_id, sha, status, run_seq, round, reviewer, detail, code_tree: None, worktree_dirty: None }
     }
 }
 
@@ -1229,7 +1281,6 @@ pub struct Trajectory {
 }
 
 impl Trajectory {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         envelope: Envelope,
         run_id: RunId,
@@ -1540,7 +1591,7 @@ impl EvidenceRecord {
     /// no early caller needs to set. Use the `with_*` builders below to
     /// set them.
     pub fn new(envelope: Envelope, task_id: Option<TaskId>, scenario_id: Option<ScenarioId>, run_id: Option<RunId>, verdict: EvidenceVerdict) -> Self {
-        debug_assert_eq!(envelope.kind, RecordKind::EvidenceRecord);
+        debug_assert_eq!(envelope.kind, RecordKind::Evidence);
         Self {
             envelope,
             project_id: None,
@@ -1625,7 +1676,7 @@ impl EvidenceRecord {
 }
 
 impl CanonRecord for EvidenceRecord {
-    const KIND: RecordKind = RecordKind::EvidenceRecord;
+    const KIND: RecordKind = RecordKind::Evidence;
     fn envelope(&self) -> &Envelope {
         &self.envelope
     }
@@ -1845,6 +1896,21 @@ pub struct Finding {
     /// reasons a derived fix-of-fix count UNDER-counts.
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
     pub introduced_by: Option<Sha>,
+    /// The reviewer SAYS the introducing commit is not known (0.30
+    /// `record-links`): a defect finding (`blocker`, `should_fix`) that
+    /// `canon finding add` writes names its introducing commit in
+    /// `introduced_by` or sets this mark, never both and never neither. It
+    /// is its own field so "not known" is never mixed into the commit slot
+    /// and a derived count still reads an unsourced finding as UNKNOWN.
+    /// Absent unless `true`; a finding written before 0.30 has neither.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub introduced_unknown: bool,
+    /// The `canon review` run this finding came out of (0.30
+    /// `record-links`): the `review_id` its reviews carry. Absent when the
+    /// finding was not raised in a recorded review, and on every finding
+    /// written before 0.30.
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "present_value")]
+    pub review_id: Option<ReviewId>,
     /// Where in the tree, as `path/to/file.rs:120-134`. A plain string:
     /// a line range is not a canon join key and inventing a newtype for
     /// it would spine nothing.
@@ -1923,6 +1989,10 @@ struct FindingWire {
     resolution_sha: Option<Sha>,
     #[serde(default, deserialize_with = "present_value")]
     introduced_by: Option<Sha>,
+    #[serde(default)]
+    introduced_unknown: bool,
+    #[serde(default, deserialize_with = "present_value")]
+    review_id: Option<ReviewId>,
     #[serde(default, deserialize_with = "present_value")]
     file_ref: Option<String>,
     #[serde(default)]
@@ -1955,6 +2025,8 @@ impl FindingWire {
             summary: self.summary,
             resolution_sha: self.resolution_sha,
             introduced_by: self.introduced_by,
+            introduced_unknown: self.introduced_unknown,
+            review_id: self.review_id,
             file_ref: self.file_ref,
             scenario_ids: self.scenario_ids,
             reason: self.reason,
@@ -1998,7 +2070,6 @@ impl Finding {
     /// [`Self::fixed_by`]/[`Self::rejected`]/[`Self::deferred`], which
     /// is what makes the `disposition`/`resolution_sha` pairing
     /// unconstructible-wrong through this API (see the type doc).
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         envelope: Envelope,
         change_id: ChangeId,
@@ -2021,6 +2092,8 @@ impl Finding {
             summary: summary.into(),
             resolution_sha: None,
             introduced_by: None,
+            introduced_unknown: false,
+            review_id: None,
             file_ref: None,
             scenario_ids: Vec::new(),
             reason: None,
@@ -2113,6 +2186,19 @@ impl Finding {
         self
     }
 
+    /// Say the introducing commit is not known (0.30): the other half of
+    /// the rule that a new defect finding names a commit or says so.
+    pub fn introduced_unknown(mut self) -> Self {
+        self.introduced_unknown = true;
+        self
+    }
+
+    /// Name the `canon review` run this finding came out of (0.30).
+    pub fn raised_in_review(mut self, review_id: ReviewId) -> Self {
+        self.review_id = Some(review_id);
+        self
+    }
+
     pub fn with_file_ref(mut self, file_ref: impl Into<String>) -> Self {
         self.file_ref = Some(file_ref.into());
         self
@@ -2165,6 +2251,8 @@ impl Finding {
             && self.code_tree == earlier.code_tree
             && self.worktree_dirty == earlier.worktree_dirty
             && self.introduced_by == earlier.introduced_by
+            && self.introduced_unknown == earlier.introduced_unknown
+            && self.review_id == earlier.review_id
             && self.file_ref == earlier.file_ref
             && self.scenario_ids == earlier.scenario_ids
             // A no-op resubmission is not a transition: it carries no
@@ -2183,6 +2271,13 @@ impl Finding {
     /// evidence") instead of quietly counting as a fix nobody can point
     /// at a commit for.
     pub fn check_coherence(&self) -> Result<(), EvidenceViolation> {
+        if self.introduced_unknown && self.introduced_by.is_some() {
+            return Err(EvidenceViolation::new(
+                FailureClass::Malformed,
+                "introduced_unknown",
+                "`introduced_unknown` is set beside `introduced_by`: a finding names the commit that introduced the defect or says it is not known, never both",
+            ));
+        }
         match (self.disposition, &self.resolution_sha) {
             (FindingDisposition::Fixed, None) => Err(EvidenceViolation::new(
                 FailureClass::Malformed,
@@ -2230,8 +2325,6 @@ impl CanonRecord for Finding {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::envelope::Actor;
-    use crate::ids::RoleId;
 
     /// Every round-trip fixture below builds its envelope at the kind's
     /// OWN current generation ([`RecordKind::schema_version`]) — never a
@@ -2468,7 +2561,7 @@ mod tests {
     /// than reading as an unbound attestation.
     #[test]
     fn evidence_attachments_round_trip_and_reject_a_malformed_digest() {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("agent", RoleId::parse("implementer").unwrap()));
         let unbound = EvidenceRecord::new(envelope.clone(), None, Some(ScenarioId::parse("a.b.01").unwrap()), None, EvidenceVerdict::Faithful);
         assert!(serde_json::to_value(&unbound).unwrap().get("attachments").is_none());
 
@@ -2486,7 +2579,7 @@ mod tests {
 
         let mut bad = value;
         bad["attachments"][0]["sha256"] = serde_json::json!("not-a-digest");
-        assert!(serde_json::from_value::<EvidenceRecord>(bad).is_err());
+        serde_json::from_value::<EvidenceRecord>(bad).unwrap_err();
     }
 
     /// A pre-s36 `Change` (no subject key at all) still deserializes to
@@ -2529,7 +2622,7 @@ mod tests {
             "status": "building",
             "owner_role": "implementer"
         });
-        assert!(serde_json::from_value::<Subject>(json).is_err());
+        serde_json::from_value::<Subject>(json).unwrap_err();
     }
 
     round_trip_test!(
@@ -2697,7 +2790,7 @@ mod tests {
             "source_digest": SpecDigest::of(b"fixture .feature bytes").to_string(),
             "lane": "Not-a-lane",
         });
-        assert!(serde_json::from_value::<Scenario>(json).is_err());
+        serde_json::from_value::<Scenario>(json).unwrap_err();
     }
 
     round_trip_test!(
@@ -2941,24 +3034,14 @@ mod tests {
 
         let mut bad = json;
         bad["outcome"] = serde_json::json!("approved");
-        assert!(serde_json::from_value::<Review>(bad).is_err());
+        serde_json::from_value::<Review>(bad).unwrap_err();
         assert_eq!(ReviewOutcome::parse("unavailable"), Ok(ReviewOutcome::Unavailable));
-        assert!(ReviewOutcome::parse("approved").is_err());
+        assert_eq!(ReviewOutcome::parse("approved").unwrap_err().to_string(), "unknown review outcome `approved` (expected one of: signed, indeterminate, unavailable)");
     }
 
     round_trip_test!(
         divergence_round_trips,
-        Divergence::new(
-            envelope(RecordKind::Divergence),
-            project_id(),
-            ScenarioId::parse("world.place-lock.01").unwrap(),
-            Sha::parse("8c81f9e13e9bda0a6a5ee29ba1b6b5137e7bf552").unwrap(),
-            DivergenceStatus::Open,
-            TotalOrder::new(3),
-            8,
-            "reviewer",
-            "detail"
-        )
+        Divergence::new(DivergenceFields { envelope: envelope(RecordKind::Divergence), project_id: project_id(), scenario_id: ScenarioId::parse("world.place-lock.01").unwrap(), sha: Sha::parse("8c81f9e13e9bda0a6a5ee29ba1b6b5137e7bf552").unwrap(), status: DivergenceStatus::Open, run_seq: TotalOrder::new(3), round: 8, reviewer: "reviewer".into(), detail: "detail".into() })
     );
 
     #[test]
@@ -2996,11 +3079,11 @@ mod tests {
 
     round_trip_test!(
         evidence_record_round_trips,
-        EvidenceRecord::new(envelope(RecordKind::EvidenceRecord), None, None, None, EvidenceVerdict::Faithful)
+        EvidenceRecord::new(envelope(RecordKind::Evidence), None, None, None, EvidenceVerdict::Faithful)
     );
     #[test]
     fn evidence_approval_is_additive_and_malformed_attestations_are_rejected() {
-        let record = EvidenceRecord::new(envelope(RecordKind::EvidenceRecord), None, None, None, EvidenceVerdict::Faithful);
+        let record = EvidenceRecord::new(envelope(RecordKind::Evidence), None, None, None, EvidenceVerdict::Faithful);
         let legacy = serde_json::to_value(&record).unwrap();
         assert!(legacy.get("approval").is_none());
         assert!(serde_json::from_value::<EvidenceRecord>(legacy.clone()).unwrap().approval.is_none());
@@ -3028,7 +3111,7 @@ mod tests {
         ] {
             let mut candidate = legacy.clone();
             candidate["approval"] = malformed;
-            assert!(serde_json::from_value::<EvidenceRecord>(candidate).is_err());
+            serde_json::from_value::<EvidenceRecord>(candidate).unwrap_err();
         }
     }
 
@@ -3038,7 +3121,7 @@ mod tests {
         let at = serde_json::to_value(Utc::now()).unwrap();
         let json = serde_json::json!({
             "schema": 1,
-            "kind": "evidence_record",
+            "kind": "evidence",
             "at": at,
             "actor": {"agent_id": "codex-cli", "role": "implementer"},
             "verdict": "faithful",
@@ -3058,7 +3141,7 @@ mod tests {
         let at = serde_json::to_value(Utc::now()).unwrap();
         let json = serde_json::json!({
             "schema": 1,
-            "kind": "evidence_record",
+            "kind": "evidence",
             "at": at,
             "actor": {"agent_id": "codex-cli", "role": "implementer"},
             "verdict": "faithful",
@@ -3080,7 +3163,7 @@ mod tests {
         for field in ["lifecycle", "flagged", "evidence_sha", "run_seq"] {
             let mut obj = serde_json::json!({
                 "schema": 1,
-                "kind": "evidence_record",
+                "kind": "evidence",
                 "at": at,
                 "actor": {"agent_id": "codex-cli", "role": "implementer"},
                 "verdict": "faithful",
@@ -3120,6 +3203,34 @@ mod tests {
             .with_reason("covered by the retry in the caller")
     );
 
+    round_trip_test!(
+        finding_unsourced_by_choice_and_raised_in_a_review_round_trips,
+        finding(11, 5).introduced_unknown().raised_in_review(ReviewId::parse("01J9ZXQ4M2K7V8R3T5W6Y0N1PA").unwrap())
+    );
+
+    /// 0.30 `record-links`: "not known" is its own field, never the commit slot, and the two never
+    /// share one finding; both new fields are part of a finding's identity, so a transition cannot move them.
+    #[test]
+    fn introduced_unknown_is_its_own_field_and_never_beside_a_commit() {
+        let unknown = finding(1, 1).introduced_unknown();
+        let json = serde_json::to_value(&unknown).unwrap();
+        assert_eq!(json["introduced_unknown"], true);
+        assert!(json.get("introduced_by").is_none());
+        assert!(serde_json::to_value(finding(1, 1)).unwrap().get("introduced_unknown").is_none(), "an unset mark is absent, never false");
+
+        let both = finding(1, 1).introduced_unknown().with_introduced_by(sha('c'));
+        let violation = both.check_coherence().unwrap_err();
+        assert_eq!((violation.class, violation.subject.as_str()), (FailureClass::Malformed, "introduced_unknown"));
+        assert!(Finding::from_body(&serde_json::to_value(&both).unwrap()).is_err(), "the read path refuses the pair too");
+
+        let review_id = ReviewId::parse("01J9ZXQ4M2K7V8R3T5W6Y0N1PA").unwrap();
+        let open = finding(1, 1).introduced_unknown().raised_in_review(review_id);
+        assert!(open.clone().fixed_by(sha('b')).is_disposition_transition_of(&open));
+        assert!(!open.clone().fixed_by(sha('b')).raised_in_review(ReviewId::new()).is_disposition_transition_of(&open), "a transition cannot change the review id");
+        assert!(!finding(1, 1).raised_in_review(review_id).fixed_by(sha('b')).is_disposition_transition_of(&open), "a transition cannot drop the unknown mark");
+        assert!(!finding(1, 1).introduced_unknown().fixed_by(sha('b')).is_disposition_transition_of(&open), "a transition cannot drop the review id");
+    }
+
     /// `reviewed_sha` is provenance, not identity: a round that read a
     /// worktree simply omits it, and it is never backfilled with a
     /// nearby commit. The v0.4.0 campaign's round 8 was exactly this
@@ -3136,7 +3247,7 @@ mod tests {
 
     /// The additive-field discipline every canon optional follows: an
     /// unset optional is ABSENT from the wire form, never a literal
-    /// `null` (which would change the record's `content_digest12` and
+    /// `null` (which would change the record's `content_digest` and
     /// break write-time idempotence).
     #[test]
     fn finding_omits_its_unset_optionals_entirely() {
@@ -3179,7 +3290,7 @@ mod tests {
 
     /// A resubmission carrying no new fact is not a transition. Without
     /// this, an identical body could append forever at one key — each
-    /// copy a new `content_digest12` from its fresh envelope alone.
+    /// copy a new `content_digest` from its fresh envelope alone.
     #[test]
     fn an_unchanged_disposition_is_not_a_transition() {
         let earlier = finding(3, 2);

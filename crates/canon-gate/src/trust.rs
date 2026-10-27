@@ -87,7 +87,7 @@ fn subject_of(record: &EvidenceRecord) -> String {
 /// proves the root loaded successfully once for this same
 /// `GateContext`, so this should not realistically fail independently.
 fn raw_evidence(ledger_root: &Path) -> Vec<canon_model::RawRecord> {
-    GitTier::new(ledger_root).read_history(RecordKind::EvidenceRecord).map(|read| read.records).unwrap_or_default()
+    GitTier::new(ledger_root).read_history(RecordKind::Evidence).map(|read| read.records).unwrap_or_default()
 }
 
 /// Every well-formed ledger [`Review`], indexed for [`TrustRung::classify`]'s
@@ -144,6 +144,7 @@ fn ladder_state_of(record: &EvidenceRecord) -> TrustLadderState {
 /// here — spec.md's "draft is never green" is the coverage/ledger
 /// checks' job to report as not-green, not a distinct
 /// `FAILURE_CLASSES` entry this module raises.
+#[derive(Debug)]
 pub struct TrustLadderCheck;
 
 impl GateCheck for TrustLadderCheck {
@@ -186,6 +187,7 @@ impl GateCheck for TrustLadderCheck {
 /// finding only when a release profile additionally registers this
 /// check (a future `canon gate check --profile release`, task 1.9,
 /// not implemented here).
+#[derive(Debug)]
 pub struct ReleaseTrustCheck;
 
 impl GateCheck for ReleaseTrustCheck {
@@ -206,10 +208,7 @@ impl GateCheck for ReleaseTrustCheck {
             // the (potentially malformed-at-the-whole-record-level)
             // native-field deserialize below.
             let Some(class) = raw.0.get("class").and_then(|v| v.as_str()) else { continue };
-            let required = match ctx.policy.trust_required_for(class, &raw.0, now) {
-                Ok(Some(level)) => level,
-                Ok(None) | Err(_) => continue,
-            };
+            let Ok(Some(required)) = ctx.policy.trust_required_for(class, &raw.0, now) else { continue };
 
             // A present-malformed native field fails this whole
             // record's deserialize (module doc) — already reported
@@ -224,7 +223,7 @@ impl GateCheck for ReleaseTrustCheck {
             let achieved = rung.green();
 
             if achieved.is_none_or(|level| level < required) {
-                let achieved_str = achieved.map(|level| level.as_str()).unwrap_or_else(|| rung.as_str());
+                let achieved_str = achieved.map_or_else(|| rung.as_str(), super::trust_ladder::TrustLevel::as_str);
                 violations.push(Violation::new(
                     FailureClass::TrustBelowRequired,
                     subject,
@@ -289,7 +288,7 @@ pub fn attempt_clear(current: &FlaggedOverlay, clearing_actor: &Actor) -> Result
 
 #[cfg(test)]
 mod tests {
-    use canon_model::{Envelope, EvidenceVerdict, ProjectId, ProvenanceRef, RoleId};
+    use canon_model::{Envelope, EvidenceVerdict, ProvenanceRef, RoleId};
     use canon_model::Review;
     use canon_store::tier::Tier;
     use chrono::Utc;
@@ -313,11 +312,10 @@ mod tests {
     /// top-level key when given — `EvidenceRecord`'s strict
     /// `Deserialize` silently drops it as an unknown field, exactly
     /// as a production write would look.
-    #[allow(clippy::too_many_arguments)]
     fn write_tagged_evidence(tier: &GitTier, project_id: Option<&str>, scenario_id: &str, actor_role: &str, lifecycle: TrustLifecycle, flagged: bool, class: Option<&str>) {
         let actor = Actor::new("test-agent", RoleId::parse(actor_role).unwrap());
         let mut record = EvidenceRecord::new(
-            Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), actor.clone()),
+            Envelope::new(1, RecordKind::Evidence, Utc::now(), actor.clone()),
             None,
             Some(ScenarioId::parse(scenario_id).unwrap()),
             None,
@@ -398,9 +396,9 @@ mod tests {
         let gate_ctx = GateCtx::from_fixture(dir.path());
         let tier = GitTier::new(&gate_ctx.ledger_root);
         let record = EvidenceRecord::new(
-            Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("test-agent", RoleId::parse("implementer").unwrap())),
+            Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("test-agent", RoleId::parse("implementer").unwrap())),
             None,
-            None,
+            Some(canon_model::ScenarioId::parse("cart.add.01").unwrap()),
             None,
             EvidenceVerdict::Faithful,
         );
@@ -505,7 +503,7 @@ mod tests {
 
         let body = serde_json::json!({
             "schema": 1,
-            "kind": "evidence_record",
+            "kind": "evidence",
             "at": Utc::now().to_rfc3339(),
             "actor": {"agent_id": "test-agent", "role": "implementer"},
             "scenario_id": "world.firstbuy-hotdeal.91",
@@ -541,7 +539,7 @@ mod tests {
         // counts; free text never does.
         let forger = Actor::new_unattributed("human-operator");
 
-        assert!(attempt_clear(&overlay, &forger).is_err());
+        attempt_clear(&overlay, &forger).unwrap_err();
     }
 
     #[test]

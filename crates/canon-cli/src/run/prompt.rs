@@ -1,6 +1,6 @@
 //! `canon prompt` — the handlers of the group.
 
-use crate::cli::prompt::*;
+use crate::cli::prompt::{PromptCommand, PromptShowArgs, PromptAddArgs};
 use std::process::ExitCode;
 
 pub fn run(cmd: PromptCommand) -> ExitCode {
@@ -23,7 +23,7 @@ fn run_prompt_add(args: PromptAddArgs) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(error) => {
-            ExitCode::from(error.to_cli_error().emit("canon prompt add", json) as u8)
+            ExitCode::from(error.to_cli_error().emit("canon prompt add", json))
         }
     }
 }
@@ -40,7 +40,7 @@ fn run_prompt_show(repo: &std::path::Path, name: &str, version: &str, json: bool
             ExitCode::SUCCESS
         }
         Err(error) => {
-            ExitCode::from(error.to_cli_error().emit("canon prompt show", json) as u8)
+            ExitCode::from(error.to_cli_error().emit("canon prompt show", json))
         }
     }
 }

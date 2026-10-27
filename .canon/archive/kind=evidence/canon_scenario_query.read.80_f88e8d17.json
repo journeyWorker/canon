@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-023",
+    "role": "implementer",
+    "session_id": "canon-impl-023-1"
+  },
+  "at": "2026-10-17T20:04:28.795590Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test query read_commands_leave_a_directory_without_canon_yaml_unchanged"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 15,
+  "scenario_id": "query.read.80",
+  "schema": 1,
+  "staging_id": "9a02404579ce",
+  "verdict": "faithful"
+}

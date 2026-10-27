@@ -41,7 +41,7 @@ fn round_trip_well_formed(kind: RecordKind, json: &serde_json::Value) {
         RecordKind::Divergence => check!(Divergence),
         RecordKind::Trajectory => check!(Trajectory),
         RecordKind::StrategyItem => check!(StrategyItem),
-        RecordKind::EvidenceRecord => check!(EvidenceRecord),
+        RecordKind::Evidence => check!(EvidenceRecord),
         RecordKind::Subject => check!(Subject),
         RecordKind::Finding => check!(Finding),
     }
@@ -141,5 +141,5 @@ fn unregistered_domain_fixture_is_a_valid_domain_id_shape() {
     let text = std::fs::read_to_string(fixtures_dir().join("malformed/unregistered-handoff-domain.json")).unwrap();
     let json: serde_json::Value = serde_json::from_str(&text).unwrap();
     let domain = json["body"]["domain"].as_str().unwrap();
-    assert!(DomainId::parse(domain).is_ok());
+    DomainId::parse(domain).unwrap();
 }

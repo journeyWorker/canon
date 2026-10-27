@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use crate::error::LearnError;
+use crate::error::{LearnError, PromotionEvidenceError};
 use crate::ids::StrategyId;
 use crate::store::StrategyStore;
 use crate::strategy::{StrategyItem, StrategyLifecycle};
@@ -173,16 +173,16 @@ pub fn promote_strategy_approved(
     if item.lifecycle != Some(StrategyLifecycle::Quarantined) || item.demotion.is_some() {
         return Err(LearnError::PromotionApprovalRequired);
     }
-    evaluation.validate_for(&item).map_err(LearnError::InvalidPromotionEvidence)?;
+    evaluation.validate_for(&item)?;
     let repo_root = git_tier_root.parent().and_then(Path::parent).unwrap_or(git_tier_root);
     let allowed_signers = canon_gate::policy::allowed_signers_path(repo_root)
-        .map_err(LearnError::InvalidPromotionEvidence)?
-        .ok_or_else(|| LearnError::InvalidPromotionEvidence("no policy-pinned approval.allowed_signers verifier is configured".into()))?;
-    approval.verify_signature(&item, &allowed_signers).map_err(LearnError::InvalidPromotionEvidence)?;
-    approval.validate_for(&item, evaluation).map_err(LearnError::InvalidPromotionEvidence)?;
+        .map_err(PromotionEvidenceError::AllowedSigners)?
+        .ok_or(PromotionEvidenceError::NoVerifierConfigured)?;
+    approval.verify_signature(&item, &allowed_signers)?;
+    approval.validate_for(&item, evaluation)?;
     let path = git_tier_path(git_tier_root, item.role.as_str(), item.id);
     if path.exists() {
-        return Err(LearnError::InvalidPromotionEvidence("activation target already exists; rollback or remove the stale target before activation".into()));
+        return Err(PromotionEvidenceError::ActivationTargetExists.into());
     }
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -210,6 +210,7 @@ mod tests {
 
     use super::*;
     use crate::ids::TrajectoryId;
+    use crate::strategy::StrategyItemFields;
     use crate::promotion::{demote_strategy, DemotionPolicy};
     use crate::store::ParquetStrategyStore;
     use canon_model::ids::{regime_key, RegimeKey, RoleId};
@@ -217,7 +218,7 @@ mod tests {
     fn seed(store: &ParquetStrategyStore, content: &str) -> StrategyId {
         let id = StrategyId::new();
         let rk = RegimeKey::parse(regime_key("dev", "canon", "join-spine", "9c93d024b1a2")).unwrap();
-        let item = StrategyItem::new(id, rk, RoleId::parse("dev").unwrap(), "title", "description", content, vec![TrajectoryId::new()], Utc::now())
+        let item = StrategyItem::new(StrategyItemFields { id, regime_key: rk, role: RoleId::parse("dev").unwrap(), title: "title".into(), description: "description".into(), content: content.into(), source_trajectory_ids: vec![TrajectoryId::new()], recorded_at: Utc::now() })
             .with_lifecycle(StrategyLifecycle::Active);
         store.append(&item).unwrap();
         id

@@ -345,3 +345,25 @@ Feature: authoring init
     When canon inventory sync indexes the scenario, the scenario is edited, and canon inventory sync runs again
     Then the init gitignore covers .canon/archive/kind=scenario/, where the superseded index version went, which no reader needs from git
     And git status reports only the edited feature file
+
+  # canon: {"schema":1,"at":"2026-10-26T18:13:24Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @flow:canon-0-30-record-links.F5
+  @authoring.init.101
+  Scenario: init --check shows where the hot store is
+    Given a canon.yaml whose hot rung is the sqlite file `.canon/hot.db`
+    When canon init --check is run
+    Then a `hot-store` line names `.canon/hot.db` and says it belongs to this worktree
+    And --json carries the same line in `sections`
+
+  # canon: {"schema":1,"at":"2026-10-26T18:13:26Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
+  @subject:authoring-scaffold
+  @case:failure
+  @flow:canon-0-30-record-links.F5
+  @authoring.init.102
+  Scenario: init --check says so when no hot store is configured and names a hot store it cannot open
+    Given a canon.yaml with no hot rung, and another whose hot file exists but is not a database
+    When canon init --check is run on each
+    Then the first reports `hot-store` as not configured
+    And the second fails `hot-store`, names the path it could not open, and exits 1

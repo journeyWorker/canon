@@ -323,7 +323,7 @@ fn a_repository_root_source_ignores_trees_outside_openspec_changes() {
     {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(repo.join("node_modules/pkg-3/lib/deep/index.js"), std::fs::Permissions::from_mode(0o000)).unwrap();
-    }
+    };
     let second = ingest_json(repo, &[]);
     assert_eq!(second["sources"][0]["skippedUnchanged"], true, "nothing the dialect reads changed: {second}");
 
@@ -348,7 +348,7 @@ fn pg_unreachable_task_persists_git_change_but_degrades_task_to_unwritten_and_do
 
     let output = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(output.status.success(), "an unreachable pg tier must be non-fatal: stderr={}", stderr(&output));
-    let json: Value = data_of(&stdout(&output));
+    let json = data_of(&stdout(&output));
 
     assert_eq!(json["changesPersisted"], 1, "git-routed Change must still persist: {json}");
     assert_eq!(json["tasksPersisted"], 0, "{json}");
@@ -493,7 +493,7 @@ fn cross_source_change_id_collision_is_visible_in_the_default_human_summary() {
 // ── design R1: plan import is never an authority ──
 
 fn write_evidence(ledger_root: &Path, task_id: &str) {
-    let envelope = Envelope::new(1, RecordKind::EvidenceRecord, chrono::Utc::now(), Actor::new("it-agent", RoleId::parse("implementer").unwrap()));
+    let envelope = Envelope::new(1, RecordKind::Evidence, chrono::Utc::now(), Actor::new("it-agent", RoleId::parse("implementer").unwrap()));
     let record = EvidenceRecord::new(envelope, Some(TaskId::parse(task_id).unwrap()), None, None, EvidenceVerdict::Faithful);
     GitTier::new(ledger_root).write(&record).expect("write evidence record");
 }
@@ -569,7 +569,7 @@ fn root_pointed_one_level_above_openspec_changes_exits_non_zero_with_named_diagn
         assert_eq!(failure["error"]["code"], "INGEST_SOURCE_UNUSABLE", "run #{run_number}: {failure}");
         assert_eq!(stderr(&output), "", "run #{run_number}: --json writes nothing to stderr");
 
-        let json: Value = data_of(&stdout(&output));
+        let json = data_of(&stdout(&output));
         assert_eq!(json["nonCleanSources"][0]["dialect"], "openspec", "run #{run_number}: the flagged source is named: {json}");
         assert_eq!(json["nonCleanSources"][0]["malformed"], 1, "run #{run_number}: the malformed count is named: {json}");
         assert_eq!(json["changesPersisted"], 0, "run #{run_number}: {json}");
@@ -598,7 +598,7 @@ fn a_malformed_only_source_becomes_quiet_once_the_config_is_fixed() {
     // zero-persisted, loud, no cursor written (s23).
     let first = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(!first.status.success(), "run #1 must fail loud: stdout={}", stdout(&first));
-    let first_json: Value = data_of(&stdout(&first));
+    let first_json = data_of(&stdout(&first));
     assert_eq!(first_json["sources"][0]["cursorAdvanced"], false, "{first_json}");
 
     // Fix: give `openspec/changes/` (root's own immediate child, the
@@ -621,7 +621,7 @@ fn a_malformed_only_source_becomes_quiet_once_the_config_is_fixed() {
     let third_output = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(third_output.status.success(), "run #3 must be a quiet no-op once fixed: stderr={}", stderr(&third_output));
     assert!(warnings_of(&third_output).is_empty(), "a clean pass carries no meta.warnings: {}", stdout(&third_output));
-    let third: Value = data_of(&stdout(&third_output));
+    let third = data_of(&stdout(&third_output));
     assert_eq!(third["sources"][0]["skippedUnchanged"], true, "{third}");
     assert_eq!(third["changesPersisted"], 0, "{third}");
 }
@@ -640,7 +640,7 @@ fn a_legitimately_empty_source_stays_a_clean_silent_no_op() {
     let first_output = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(first_output.status.success(), "a legitimately empty source must stay a clean 0-exit no-op: stderr={}", stderr(&first_output));
     assert!(warnings_of(&first_output).is_empty(), "a clean pass carries no meta.warnings: {}", stdout(&first_output));
-    let first: Value = data_of(&stdout(&first_output));
+    let first = data_of(&stdout(&first_output));
     assert_eq!(
         first["sources"][0]["cursorAdvanced"], true,
         "a genuinely empty, well-formed source must still earn a cursor (s23 targets `malformed > 0`, never `changes_parsed == 0` alone): {first}"
@@ -652,7 +652,7 @@ fn a_legitimately_empty_source_stays_a_clean_silent_no_op() {
     let second_output = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(second_output.status.success(), "run #2 must stay a clean 0-exit no-op: stderr={}", stderr(&second_output));
     assert!(warnings_of(&second_output).is_empty(), "a clean pass carries no meta.warnings: {}", stdout(&second_output));
-    let second: Value = data_of(&stdout(&second_output));
+    let second = data_of(&stdout(&second_output));
     assert_eq!(second["sources"][0]["skippedUnchanged"], true, "{second}");
 }
 
@@ -673,7 +673,7 @@ fn a_source_with_some_malformed_dirs_but_at_least_one_persisted_record_stays_cle
     let first_output = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(first_output.status.success(), "a source with SOME malformed dirs but at least one persisted record must stay clean: stderr={}", stderr(&first_output));
     assert!(warnings_of(&first_output).is_empty(), "a clean pass carries no meta.warnings: {}", stdout(&first_output));
-    let first: Value = data_of(&stdout(&first_output));
+    let first = data_of(&stdout(&first_output));
     assert_eq!(
         first["sources"][0]["cursorAdvanced"], true,
         "partial success must still advance its cursor -- s23 does not widen the exclusion to ANY malformed entry: {first}"
@@ -685,7 +685,7 @@ fn a_source_with_some_malformed_dirs_but_at_least_one_persisted_record_stays_cle
     let second_output = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(second_output.status.success(), "run #2 must stay a clean, silent no-op: stderr={}", stderr(&second_output));
     assert!(warnings_of(&second_output).is_empty(), "a clean pass carries no meta.warnings: {}", stdout(&second_output));
-    let second: Value = data_of(&stdout(&second_output));
+    let second = data_of(&stdout(&second_output));
     assert_eq!(second["sources"][0]["skippedUnchanged"], true, "{second}");
     assert_eq!(second["changesPersisted"], 0, "{second}");
 }
@@ -705,7 +705,7 @@ fn one_flagged_source_among_several_makes_the_whole_pass_non_zero() {
     let output = run_canon(&["ingest", "plans", "--json"], dir.path());
     assert!(!output.status.success(), "one flagged source among several must make the whole pass non-zero");
 
-    let json: Value = data_of(&stdout(&output));
+    let json = data_of(&stdout(&output));
     assert_eq!(json["changesPersisted"], 1, "the well-formed source's records must still persist normally, visible in the summary: {json}");
     assert_eq!(json["tasksPersisted"], 1, "{json}");
 }
@@ -734,7 +734,7 @@ fn superpowers_dialect_end_to_end_import_via_one_shot_override() {
 
     let change_output = run_canon(&["query", "--kind", "change", "--json"], dir.path());
     assert!(change_output.status.success(), "stderr: {}", stderr(&change_output));
-    let change_payload: Value = query_data(&stdout(&change_output));
+    let change_payload = query_data(&stdout(&change_output));
     let change_records = change_payload["records"].as_array().unwrap();
     assert_eq!(change_records.len(), 1, "{change_records:?}");
     assert_eq!(change_records[0]["change_id"], "2026-07-14-demo-feature");
@@ -743,7 +743,7 @@ fn superpowers_dialect_end_to_end_import_via_one_shot_override() {
 
     let task_output = run_canon(&["query", "--kind", "task", "--json"], dir.path());
     assert!(task_output.status.success(), "stderr: {}", stderr(&task_output));
-    let task_payload: Value = query_data(&stdout(&task_output));
+    let task_payload = query_data(&stdout(&task_output));
     let mut task_records: Vec<Value> = task_payload["records"].as_array().unwrap().clone();
     task_records.sort_by(|a, b| a["task_id"].as_str().cmp(&b["task_id"].as_str()));
     assert_eq!(task_records.len(), 2, "{task_records:?}");
@@ -774,7 +774,7 @@ fn superpowers_dialect_resolves_through_the_canon_yaml_plans_config_path() {
 
     let change_output = run_canon(&["query", "--kind", "change", "--json"], dir.path());
     assert!(change_output.status.success(), "stderr: {}", stderr(&change_output));
-    let change_payload: Value = query_data(&stdout(&change_output));
+    let change_payload = query_data(&stdout(&change_output));
     let change_records = change_payload["records"].as_array().unwrap();
     assert_eq!(change_records.len(), 1, "{change_records:?}");
     assert_eq!(change_records[0]["change_id"], "2026-07-14-config-path");
@@ -782,7 +782,7 @@ fn superpowers_dialect_resolves_through_the_canon_yaml_plans_config_path() {
 
     let task_output = run_canon(&["query", "--kind", "task", "--json"], dir.path());
     assert!(task_output.status.success(), "stderr: {}", stderr(&task_output));
-    let task_payload: Value = query_data(&stdout(&task_output));
+    let task_payload = query_data(&stdout(&task_output));
     let task_records = task_payload["records"].as_array().unwrap();
     assert_eq!(task_records.len(), 1, "{task_records:?}");
     assert_eq!(task_records[0]["task_id"], "2026-07-14-config-path#1");
@@ -816,7 +816,7 @@ fn ingest_plans_11_canon_changes_are_read_first_with_no_plans_entry() {
     assert_eq!(sources[1]["duplicateChangeId"], 1, "canon's own source owns `shared`: {payload}");
 
     let out = run_canon(&["query", "--kind", "change", "--json"], dir.path());
-    let records: Value = query_data(&stdout(&out));
+    let records = query_data(&stdout(&out));
     let records = records["records"].as_array().unwrap();
     let find = |id: &str| records.iter().find(|c| c["change_id"] == id).unwrap_or_else(|| panic!("{id} missing: {records:?}"));
     assert_eq!(find("shared")["summary"], "Canon's own.");

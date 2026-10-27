@@ -1,0 +1,19 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer",
+    "session_id": "final-fix-016"
+  },
+  "at": "2026-10-11T17:33:14.806826Z",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib artifact_store::tests::evidence_add_66"
+  },
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 40,
+  "scenario_id": "evidence.add.66",
+  "schema": 1,
+  "staging_id": "1c5dad030d62",
+  "verdict": "faithful"
+}

@@ -25,7 +25,7 @@ routing:
   scenario: local
   review: local
   divergence: local
-  evidence_record: local
+  evidence: local
   finding: local
   strategy_item: local
   task: hot
@@ -230,7 +230,7 @@ fn authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout() {
         "  canon.yaml: remove the plans source `{ dialect: openspec, root: . }` canon init wrote; no change is left under it\n",
         "  remove openspec/changes/.gitkeep (canon init's placeholder for that source)\n",
         "  canon.yaml: skills.providers: [claude, codex] (from the install lock)\n",
-        "  .gitignore: add .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/\n",
+        "  .gitignore: add .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/\n",
         "  rebuild the scenario index (full sync)\n",
         "nothing written. To act: canon migrate --commit --plan-digest ",
     ] {
@@ -278,7 +278,7 @@ fn authoring_migrate_01_a_0_16_repo_moves_onto_the_0_17_layout() {
     let again = commit(repo);
     assert_eq!(again.status.code(), Some(0), "{}", text(&again));
     let again = text(&again);
-    assert!(again.starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout\n"), "{again}");
+    assert!(again.starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout and the 0.30 names\n"), "{again}");
     assert!(again.contains("canon migrate: rebuilt the scenario index: 0 record(s) written\n"), "{again}");
     assert_eq!(read(repo, "canon.yaml"), yaml, "a second run changes nothing");
     let tree_again: Vec<String> = files(repo, "").into_iter().filter(|f| !f.starts_with(".git/") && !f.starts_with(".canon/ledger/kind=scenario/")).collect();
@@ -313,7 +313,7 @@ fn authoring_migrate_02_another_root_only_drops_its_features_level() {
     assert!(out.contains("canon migrate: rebuilt the scenario index: 1 record(s) written\n"), "{out}");
 
     let again = ok_commit(repo);
-    assert!(again.starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout\n"), "a root already on the new layout is a no-op: {again}");
+    assert!(again.starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout and the 0.30 names\n"), "a root already on the new layout is a no-op: {again}");
     assert_eq!(inode("game/specs/kind=feature/area=cart/add.feature"), before);
     assert_eq!(read(repo, "canon.yaml"), yaml);
 }
@@ -539,7 +539,7 @@ fn authoring_migrate_09_a_run_stopped_before_its_canon_yaml_write_is_finished_by
     let latest = latest_change(repo, "add-cart");
     assert_eq!(latest["actor"]["agent_id"], "canon-plan-import-canon", "{latest}");
     assert_eq!(latest["subject_ids"], serde_json::json!(["cart"]), "{latest}");
-    assert!(ok_commit(repo).starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout\n"));
+    assert!(ok_commit(repo).starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout and the 0.30 names\n"));
 }
 
 /// authoring.migrate.10: when a pointer brief cannot be written, the
@@ -604,7 +604,7 @@ fn authoring_migrate_11_a_change_move_is_preflighted_and_a_half_moved_change_is_
     assert!(repo.join(".canon/changes/add-cart/brief.md").is_file() && !repo.join(".canon/changes/add-cart/proposal.md").exists());
     assert_eq!(latest_change(repo, "add-cart")["actor"]["agent_id"], "canon-plan-import-canon");
     assert_eq!(read(repo, "canon.yaml"), migrated_yaml());
-    assert!(ok_commit(repo).starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout\n"));
+    assert!(ok_commit(repo).starts_with("canon migrate: nothing to migrate; the repo is on the 0.17 layout and the 0.30 names\n"));
 }
 
 /// authoring.migrate.12: change material the openspec reader cannot read
@@ -648,11 +648,11 @@ fn authoring_migrate_13_adds_the_derived_directory_lines_to_an_existing_block_on
     commit_all(repo, "a 0.25 gitignore");
 
     let dry = ok(repo, &["migrate"]);
-    assert!(dry.contains("  .gitignore: add .canon/archive/kind=scenario/, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/\n"), "{dry}");
+    assert!(dry.contains("  .gitignore: add .canon/archive/kind=scenario/, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/\n"), "{dry}");
     assert_eq!(read(repo, ".gitignore"), old, "--dry-run writes nothing");
 
     let out = ok_commit(repo);
-    assert!(out.contains("canon migrate: added to .gitignore: .canon/archive/kind=scenario/, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/\n"), "{out}");
+    assert!(out.contains("canon migrate: added to .gitignore: .canon/archive/kind=scenario/, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/\n"), "{out}");
     let gitignore = read(repo, ".gitignore");
     assert!(gitignore.starts_with(old), "every existing byte is kept: {gitignore}");
     for line in [".canon/archive/kind=scenario/", ".canon/dashboard-snapshot/", ".canon/learn/", ".canon/r2/"] {

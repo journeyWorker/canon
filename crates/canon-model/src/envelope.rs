@@ -33,7 +33,7 @@ pub enum RecordKind {
     Divergence,
     Trajectory,
     StrategyItem,
-    EvidenceRecord,
+    Evidence,
     // The product/management unit (s36): the durable subject a team
     // plans, designs, builds, and measures across many changes — the
     // reviewed 13th kind (design D1's process). Plain line comment, NOT
@@ -68,7 +68,7 @@ impl RecordKind {
         RecordKind::Divergence,
         RecordKind::Trajectory,
         RecordKind::StrategyItem,
-        RecordKind::EvidenceRecord,
+        RecordKind::Evidence,
         RecordKind::Subject,
         RecordKind::Finding,
     ];
@@ -90,7 +90,7 @@ impl RecordKind {
             RecordKind::Divergence => "divergence",
             RecordKind::Trajectory => "trajectory",
             RecordKind::StrategyItem => "strategy_item",
-            RecordKind::EvidenceRecord => "evidence_record",
+            RecordKind::Evidence => "evidence",
             RecordKind::Subject => "subject",
             RecordKind::Finding => "finding",
         }
@@ -136,6 +136,10 @@ impl RecordKind {
     ///   boundary, or the ingested transcript's own instant), so a
     ///   re-derivation always advances `at` and the two generations can
     ///   never tie. No tie, no discriminator needed, no bump owed.
+    /// - **`Review` and `Finding` are `2`** (0.30 `record-links`) — a review
+    ///   gained its `review_id`, and a finding gained `review_id` and
+    ///   `introduced_unknown`. Bumped by decision, not by a tie: it marks the
+    ///   generation that can carry them.
     ///
     /// A field addition that is additive on the wire (`#[serde(default,
     /// skip_serializing_if)]`) still leaves the pre-change corpus
@@ -143,58 +147,26 @@ impl RecordKind {
     /// generation MARKER for the fold, not a migration trigger.
     pub const fn schema_version(self) -> u32 {
         match self {
-            RecordKind::Task | RecordKind::Change => 2,
+            RecordKind::Task | RecordKind::Change | RecordKind::Review | RecordKind::Finding => 2,
             RecordKind::Scenario
             | RecordKind::Session
             | RecordKind::Run
             | RecordKind::Event
             | RecordKind::Handoff
-            | RecordKind::Review
             | RecordKind::Divergence
             | RecordKind::Trajectory
             | RecordKind::StrategyItem
-            | RecordKind::EvidenceRecord
-            | RecordKind::Subject
-            | RecordKind::Finding => 1,
+            | RecordKind::Evidence
+            | RecordKind::Subject => 1,
         }
     }
 
-    /// The Hive-style path TEMPLATE this kind's git-tier files follow
-    /// (S2 design D2, task 1.2) — a pure, storage-agnostic path
-    /// template string; `canon-model` never resolves `{area}`/`{id}`
-    /// itself and never imports `canon-store` — only `canon-store`'s
-    /// `GitTier` interprets this template against a filesystem
-    /// (design D2's Risk-section mitigation). Exactly two shapes,
-    /// mirroring `tools/parity.py::_ledger_layout_problem`'s `run`/
-    /// `drill` (flat) vs. `review`/`design-review`/`code-review`/
-    /// `clear` (nested) split:
-    /// - flat: `"kind={kind}/{id}.json"` — every kind without a
-    ///   mandatory `scenario_id`.
-    /// - area-scoped: `"kind={kind}/area={area}/{id}.json"` — the
-    ///   three kinds whose `scenario_id` field is non-`Option`
-    ///   ([`crate::records::Scenario`], [`crate::records::Review`],
-    ///   [`crate::records::Divergence`]; see [`Self::is_area_scoped`]).
-    ///   `{area}` MUST be resolved via `ScenarioId::area()`, never
-    ///   trusted from a source directory (`tools/parity.py::_area_of`,
-    ///   six documented mismatch cases).
-    pub fn partition_template(self) -> &'static str {
-        if self.is_area_scoped() {
-            "kind={kind}/area={area}/{id}.json"
-        } else {
-            "kind={kind}/{id}.json"
-        }
-    }
-
-    /// Whether this kind's [`Self::partition_template`] requires the
-    /// Hive `area={area}/` segment — true for exactly the kinds whose
-    /// `scenario_id` field is mandatory (non-`Option`), false for the
-    /// other eleven (including [`RecordKind::EvidenceRecord`], whose
-    /// `scenario_id` is present-but-optional per S1 design — an
-    /// evidence record without a scenario tie is still a flat, valid
-    /// record, and [`RecordKind::Finding`], which is scoped to a
-    /// reviewed COMMIT rather than to a scenario at all).
-    pub fn is_area_scoped(self) -> bool {
-        matches!(self, RecordKind::Scenario | RecordKind::Review | RecordKind::Divergence)
+    /// The name template this kind's files follow in every store (0.30,
+    /// `crate::layout`): `kind=<kind>/<components>_<digest8>.json`. Pure
+    /// text for `canon context`; the components are
+    /// [`crate::layout::components`].
+    pub fn partition_template(self) -> String {
+        crate::layout::template(self)
     }
 }
 
@@ -318,13 +290,15 @@ mod tests {
     /// are named explicitly because both DID gain fields on the same
     /// branch that bumped `Task` and both deliberately stayed at `1`.
     #[test]
-    fn only_task_and_change_carry_a_bumped_schema_generation() {
+    fn only_the_bumped_kinds_carry_a_bumped_schema_generation() {
         assert_eq!(RecordKind::Task.schema_version(), 2, "Task gained `depends_on` and its byte-stable `at` can tie");
         assert_eq!(RecordKind::Change.schema_version(), 2, "Change's `subject_id` became `subject_ids` and its plan-import `at` can tie");
+        assert_eq!(RecordKind::Review.schema_version(), 2, "Review gained `review_id` in 0.30");
+        assert_eq!(RecordKind::Finding.schema_version(), 2, "Finding gained `review_id` and `introduced_unknown` in 0.30");
         assert_eq!(RecordKind::Run.schema_version(), 1, "Run's `at` is derivation-time, so its generations can never tie on `at`");
         assert_eq!(RecordKind::Handoff.schema_version(), 1, "Handoff's `at` is derivation-time, so its generations can never tie on `at`");
         for kind in RecordKind::ALL {
-            if matches!(kind, RecordKind::Task | RecordKind::Change) {
+            if matches!(kind, RecordKind::Task | RecordKind::Change | RecordKind::Review | RecordKind::Finding) {
                 continue;
             }
             assert_eq!(kind.schema_version(), 1, "{kind:?} must stay at generation 1 until its records can tie on `at`");

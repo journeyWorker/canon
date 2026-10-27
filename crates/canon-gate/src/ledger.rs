@@ -131,7 +131,7 @@ fn fold_verdicts(ctx: &GateContext) -> BTreeMap<CellKey, LedgerEntry> {
         // The record's digest is the one the shared stamp already holds.
         let digest = match &stamps[i] {
             Some(stamp) => stamp.digest.clone(),
-            None => canon_store::partition::content_digest12(&serde_json::to_value(record).unwrap_or_default()),
+            None => canon_store::partition::content_digest(&serde_json::to_value(record).unwrap_or_default()),
         };
         CellSubject::all_of(record).map(move |subject| {
             let entry = LedgerEntry { subject: subject.as_str().to_string(), role: role.clone(), verdict: record.verdict, agent_id: record.envelope.actor.agent_id.clone(), at: record.envelope.at };
@@ -149,6 +149,7 @@ fn fold_verdicts(ctx: &GateContext) -> BTreeMap<CellKey, LedgerEntry> {
 /// `malformed-evidence` (module doc). Never re-derives pass/fail —
 /// [`latest_verdicts`] is the separate, non-`GateCheck` surface for
 /// that (module doc).
+#[derive(Debug)]
 pub struct LedgerCheck;
 
 impl GateCheck for LedgerCheck {
@@ -159,7 +160,11 @@ impl GateCheck for LedgerCheck {
     fn run(&self, ctx: &GateContext) -> Vec<Violation> {
         ctx.violations
             .iter()
-            .map(|violation| Violation::new(FailureClass::MalformedEvidence, violation.subject.clone(), format!("{} ({})", violation.detail, violation.class.as_str())))
+            .map(|violation| match violation.class {
+                // A file named by the 0.29 rule: its own code, its detail already carries the `canon migrate` hint.
+                canon_model::FailureClass::OldLayout => Violation::new(FailureClass::OldLayout, violation.subject.clone(), violation.detail.clone()),
+                _ => Violation::new(FailureClass::MalformedEvidence, violation.subject.clone(), format!("{} ({})", violation.detail, violation.class.as_str())),
+            })
             .collect()
     }
 }
@@ -168,14 +173,14 @@ impl GateCheck for LedgerCheck {
 mod tests {
     use canon_model::{Actor, Envelope, EvidenceRecord, EvidenceViolation, RecordKind, RoleId, TaskId};
     use canon_model::evidence::FailureClass as EvidenceFailureClass;
-    use chrono::{Duration, Utc};
+    use chrono::Duration;
 
     use super::*;
     use crate::context::GateCtx;
     use crate::policy::{PolicyField, PolicyResolution, StalenessPolicy};
 
     fn record_at(task: &str, role: &str, agent: &str, verdict: EvidenceVerdict, at: DateTime<Utc>) -> EvidenceRecord {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, at, Actor::new(agent, RoleId::parse(role).unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, at, Actor::new(agent, RoleId::parse(role).unwrap()));
         EvidenceRecord::new(envelope, Some(TaskId::parse(task).unwrap()), None, None, verdict)
     }
 
@@ -292,7 +297,7 @@ mod tests {
 
     #[test]
     fn a_record_with_no_join_key_is_excluded_from_the_verdict_fold() {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent-a", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("agent-a", RoleId::parse("implementer").unwrap()));
         let evidence = vec![EvidenceRecord::new(envelope, None, None, None, EvidenceVerdict::Faithful)];
         let ctx = ctx_with(evidence, Vec::new());
 
@@ -305,7 +310,7 @@ mod tests {
     /// status` saw no verdict for scenarios `spec_coverage` counted.
     #[test]
     fn a_task_and_scenario_keyed_record_is_the_verdict_of_both_cells() {
-        let envelope = Envelope::new(1, RecordKind::EvidenceRecord, Utc::now(), Actor::new("agent-a", RoleId::parse("implementer").unwrap()));
+        let envelope = Envelope::new(1, RecordKind::Evidence, Utc::now(), Actor::new("agent-a", RoleId::parse("implementer").unwrap()));
         let record = EvidenceRecord::new(envelope, Some(TaskId::parse("cats#1").unwrap()), Some(canon_model::ScenarioId::parse("game.run.01").unwrap()), None, EvidenceVerdict::Faithful);
         let ctx = ctx_with(vec![record], Vec::new());
         let verdicts = latest_verdicts(&ctx);

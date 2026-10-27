@@ -83,7 +83,7 @@ struct ScratchDir(PathBuf);
 impl ScratchDir {
     fn new() -> Result<Self, String> {
         static COUNTER: AtomicU64 = AtomicU64::new(0);
-        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
         let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
         let path = std::env::temp_dir().join(format!("canon-plugin-selftest-{}-{nanos}-{unique}", std::process::id()));
         std::fs::create_dir_all(&path).map_err(|e| format!("create scratch dir {}: {e}", path.display()))?;
@@ -268,7 +268,7 @@ fn run_fixture() -> Result<FixtureRun, String> {
     // own validation) -- design.md R7's scenario: a record already on
     // disk that no longer matches the CURRENT manifest.
     let malformed_on_disk = body_missing_covered_only("world.selftest.03");
-    tier.write_namespaced(OVERLAY_IDENTITY, "root__world.selftest.03", malformed_on_disk).map_err(|e| format!("inject schema-drifted on-disk record: {e}"))?;
+    tier.write_namespaced(OVERLAY_IDENTITY, &["root".to_string(), "world.selftest.03".to_string()], malformed_on_disk).map_err(|e| format!("inject schema-drifted on-disk record: {e}"))?;
 
     let (post_records, post_violations) = tier.scan_namespaced_kind(OVERLAY_IDENTITY).map_err(|e| format!("scan after injecting schema-drifted record: {e}"))?;
 
@@ -313,10 +313,10 @@ fn check_overlay_shape(run: &FixtureRun) -> Result<(), String> {
 }
 
 fn check_writes(run: &FixtureRun) -> Result<(), String> {
-    if !run.covered_receipt_location.starts_with("kind=selftest.coverage/root__world.selftest.01__") {
+    if !run.covered_receipt_location.starts_with("kind=selftest.coverage/root_world.selftest.01_") {
         return Err(format!("unexpected covered receipt location `{}`", run.covered_receipt_location));
     }
-    if !run.uncovered_receipt_location.starts_with("kind=selftest.coverage/root__world.selftest.02__") {
+    if !run.uncovered_receipt_location.starts_with("kind=selftest.coverage/root_world.selftest.02_") {
         return Err(format!("unexpected uncovered receipt location `{}`", run.uncovered_receipt_location));
     }
     if run.pre_injection_record_count != 2 || run.pre_injection_violation_count != 0 {

@@ -158,7 +158,7 @@ pub fn lines(repo: &Path, dry_run: bool, kinds: &[KindCompaction]) -> Vec<String
 
 /// `canon ledger compact [--commit --plan-digest D]`: the bare run previews
 /// what would move; `--commit` moves exactly that plan.
-pub fn run_compact(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> i32 {
+pub fn run_compact(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
     const CMD: &str = "canon ledger compact";
     let repo_dir = resolve_repo_root(repo);
     let base = crate::safety::command("ledger compact", &[], repo);

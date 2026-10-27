@@ -131,18 +131,18 @@ use crate::tiers::{self, TierCliError};
 /// transition is well-formed but the linked scenarios are not covered
 /// by non-`Divergent` verdicts — record unchanged, fail closed
 /// (contract: "violations print by failure class, exit 1").
-const EXIT_GATED: i32 = 1;
+const EXIT_GATED: u8 = 1;
 
 /// `<id>` / `--subject-id`'s `clap` value parser — grammar-level
 /// [`SubjectId::parse`] (kebab-case slug).
-pub fn parse_subject_id(s: &str) -> Result<SubjectId, String> {
-    SubjectId::parse(s).map_err(|e| e.to_string())
+pub fn parse_subject_id(s: &str) -> Result<SubjectId, canon_model::ids::JoinKeyError> {
+    SubjectId::parse(s)
 }
 
 /// `<change_id>`'s `clap` value parser — grammar-level
 /// [`ChangeId::parse`].
-pub fn parse_change_id(s: &str) -> Result<ChangeId, String> {
-    ChangeId::parse(s).map_err(|e| e.to_string())
+pub fn parse_change_id(s: &str) -> Result<ChangeId, canon_model::ids::JoinKeyError> {
+    ChangeId::parse(s)
 }
 
 /// `<state>`'s `clap` value parser — the closed [`SubjectStatus`]
@@ -152,8 +152,15 @@ pub fn status_parser() -> impl clap::builder::TypedValueParser<Value = SubjectSt
     crate::cli_error::closed_set(["proposed", "specced", "building", "verifying", "shipped", "retired"], parse_status)
 }
 
+/// `<state>` named no subject status.
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum SubjectMoveError {
+    #[error("unknown subject move `{0}` (expected one of: proposed, specced, building, verifying, shipped, retired)")]
+    Unknown(String),
+}
+
 /// A subject move, as the CLI spells it.
-pub fn parse_status(s: &str) -> Result<SubjectStatus, String> {
+pub fn parse_status(s: &str) -> Result<SubjectStatus, SubjectMoveError> {
     match s {
         "proposed" => Ok(SubjectStatus::Proposed),
         "specced" => Ok(SubjectStatus::Specced),
@@ -161,9 +168,7 @@ pub fn parse_status(s: &str) -> Result<SubjectStatus, String> {
         "verifying" => Ok(SubjectStatus::Verifying),
         "shipped" => Ok(SubjectStatus::Shipped),
         "retired" => Ok(SubjectStatus::Retired),
-        _ => Err(format!(
-            "unknown subject move `{s}` (expected one of: proposed, specced, building, verifying, shipped, retired)"
-        )),
+        _ => Err(SubjectMoveError::Unknown(s.to_string())),
     }
 }
 
@@ -191,11 +196,12 @@ fn status_str(status: SubjectStatus) -> &'static str {
 /// shipped` EVIDENCE gate is a SEPARATE, additional requirement layered
 /// on top of this pure step check (see [`ship_gate_violations`]).
 pub fn is_valid_transition(from: SubjectStatus, to: SubjectStatus) -> bool {
-    use SubjectStatus::*;
+    use SubjectStatus::{Retired, Proposed, Specced, Building, Verifying, Shipped};
     if to == Retired {
         return from != Retired;
     }
-    matches!((from, to), (Proposed, Specced) | (Specced, Building) | (Building, Verifying) | (Verifying, Shipped) | (Shipped, Verifying))
+    matches!((from, to), (Proposed, Specced) | (Specced, Building) | (Building | Shipped, Verifying) |
+(Verifying, Shipped))
 }
 
 /// Build a [`TierRegistry`] over exactly `kinds`' routed rungs, via the
@@ -209,7 +215,7 @@ pub(crate) fn registry_for(canon_yaml_path: &Path, kinds: &[RecordKind]) -> Resu
 }
 
 /// Fold every retained version of `kind` to one latest row per natural
-/// key — winner = greatest `(at, envelope.schema, content_digest12)`,
+/// key — winner = greatest `(at, envelope.schema, content_digest)`,
 /// via the shared [`canon_store::fold_latest_by_key`] every
 /// multi-version reader uses, keyed by the SAME `resolve_partition`
 /// natural key `canon query` derives. This is how an `adopt`/`status`
@@ -229,7 +235,7 @@ fn fold_latest(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
         let key = canon_store::partition::resolve_partition(kind, &record.0).map(|p| p.natural_key).unwrap_or_default();
         let at = canon_store::tier::raw_record_at(&record);
         let schema = canon_store::tier::raw_record_schema(&record);
-        let digest = canon_store::partition::content_digest12(&record.0);
+        let digest = canon_store::partition::content_digest(&record.0);
         Candidate { key, at, schema, digest, record }
     });
     canon_store::fold_latest_by_key(candidates, |c| c.key.clone(), |c| c.at, |c| c.schema, |c| c.digest.as_str())
@@ -274,24 +280,40 @@ fn find_change(registry: &TierRegistry, id: &ChangeId) -> Result<Option<Change>,
 /// Report a written subject: `human` and the `next:` line, or on `--json`
 /// the full record body (the updated record) with `meta.next` for the
 /// subject.
-fn report_subject(repo: &Path, subject: &Subject, verb: &str, dry_run: bool, json: bool, human: &str) {
-    report_subject_warning(repo, subject, verb, dry_run, json, human, &[]);
+fn report_subject(repo: &Path, subject: &Subject, verb: &str, written: Option<bool>, json: bool, human: &str) {
+    report_subject_warning(repo, subject, verb, written, json, human, &[]);
 }
 
 /// [`report_subject`] with `warnings`: said on stderr, and in `--json`
 /// carried in `meta.warnings` ([`crate::json_out::warnings_meta`]).
-#[allow(clippy::too_many_arguments)]
 fn report_subject_warning(
     repo: &Path,
     subject: &Subject,
     verb: &str,
-    dry_run: bool,
+    written: Option<bool>,
     json: bool,
     human: &str,
     warnings: &[String],
 ) {
+    // `written`: `None` for a dry run, else whether a record was written. Where the record went, when that is the hot store:
+    // `new` and `move` write the subject only; `adopt` and `unadopt` also rewrite the change's subject list.
+    let kinds: &[RecordKind] = if matches!(verb, "adopt" | "unadopt") { &[RecordKind::Subject, RecordKind::Change] } else { &[RecordKind::Subject] };
+    let hot = written.filter(|wrote| *wrote).and_then(|_| crate::hot_store::HotStore::written_by(&resolve_canon_yaml(repo), kinds));
+    let dry_run = written.is_none();
     if !json {
         println!("{human}");
+        if let Some(hot) = &hot {
+            println!("{}", hot.line());
+        }
+    }
+    let mut meta = crate::json_out::warnings_meta(warnings);
+    if let Some(hot) = &hot {
+        let mut object = match meta {
+            serde_json::Value::Object(object) => object,
+            _ => serde_json::Map::new(),
+        };
+        object.insert("hotStore".to_string(), serde_json::Value::String(hot.location()));
+        meta = serde_json::Value::Object(object);
     }
     for warning in warnings {
         crate::human_err!("canon subject {verb}: warning: {warning}");
@@ -299,17 +321,17 @@ fn report_subject_warning(
     let scope = crate::next::Scope::Subject(subject.subject_id.as_str().to_string());
     if dry_run {
         // A preview marks itself: the subject as it would stand, plus `dryRun`.
-        crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &SubjectPreviewReport { subject, dry_run: true }, crate::json_out::warnings_meta(warnings));
+        crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &SubjectPreviewReport { subject, dry_run: true }, meta);
     } else if verb == "move" {
         let overrides = subject.status_override.iter().map(|waiver| crate::reports::Override { code: "SUBJECT_GATE_VIOLATION".to_string(), reason: waiver.reason.clone() }).collect();
-        crate::next::finish_with_meta(repo, "subject move", &scope, false, json, &SubjectMoveReport { subject, overrides }, crate::json_out::warnings_meta(warnings));
+        crate::next::finish_with_meta(repo, "subject move", &scope, false, json, &SubjectMoveReport { subject, overrides }, meta);
     } else {
-        crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &SubjectReport(subject), crate::json_out::warnings_meta(warnings));
+        crate::next::finish_with_meta(repo, &format!("subject {verb}"), &scope, false, json, &SubjectReport(subject), meta);
     }
 }
 
 /// `data` of the subject leaves: the Subject record, embedded verbatim (it keeps the ledger record's own schema and snake_case keys).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(transparent)]
 pub struct SubjectReport<'a>(pub &'a Subject);
 
@@ -343,7 +365,7 @@ pub fn override_lines(ctx: &GateContext) -> Vec<String> {
 }
 
 /// `data` of `subject move`: the Subject record, plus the refusals `--override-reason` waived (D12).
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SubjectMoveReport<'a> {
     #[serde(flatten)]
@@ -355,7 +377,7 @@ pub struct SubjectMoveReport<'a> {
 impl crate::json_out::Report for SubjectMoveReport<'_> {}
 
 /// `data` of a subject leaf under `--dry-run`: the Subject as it would stand, plus `dryRun`.
-#[derive(serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SubjectPreviewReport<'a> {
     #[serde(flatten)]
@@ -433,6 +455,23 @@ fn domain_membership_violation(repo: &Path, domain: &str) -> Option<String> {
     enum_membership_violation(repo, DOMAIN_ENUM, domain)
 }
 
+/// Who wrote a subject, and in which session.
+#[derive(Debug, Clone, Copy)]
+pub struct Actor<'a> {
+    pub id: &'a str,
+    pub session: Option<&'a canon_model::SessionId>,
+}
+
+/// The fields of a new subject ([`run_new`]).
+#[derive(Debug, Clone, Copy)]
+pub struct NewSubject<'a> {
+    pub subject_id: &'a SubjectId,
+    pub domain: &'a str,
+    pub title: &'a str,
+    pub summary: &'a str,
+    pub owner_role: &'a RoleId,
+}
+
 /// `canon subject new <id> --domain <d> --title <t> [--summary <s>]
 /// [--owner-role <r>]` (module doc): author a fresh [`Subject`] at
 /// status `proposed`. The envelope is attributed to `actor_id` (default
@@ -445,8 +484,9 @@ fn domain_membership_violation(repo: &Path, domain: &str) -> Option<String> {
 /// enum ([`domain_membership_violation`]). A `subject_id` already
 /// present in the store is a loud refusal (exit `2`), never a silent
 /// second append.
-#[allow(clippy::too_many_arguments)]
-pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, summary: &str, owner_role: &RoleId, actor_id: &str, session: Option<&canon_model::SessionId>, json: bool) -> i32 {
+pub fn run_new(repo: &Path, new: &NewSubject, actor: Actor, json: bool) -> u8 {
+    let NewSubject { subject_id, domain, title, summary, owner_role } = *new;
+    let Actor { id: actor_id, session } = actor;
     // `domain` shares `SubjectId`'s kebab-slug grammar (design D2: the
     // model validates the SAME shape via `is_kebab_slug`); validate it
     // BEFORE `Subject::new` so a malformed value is a clean refusal
@@ -461,7 +501,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
 
     let repo = resolve_repo_root(repo);
     if let Some(violation) = domain_membership_violation(&repo, domain) {
-        return CliError::refused("SUBJECT_INVALID_ARGUMENT", violation.to_string()).hint("`canon schema subject new` lists the accepted arguments and their forms").emit("canon subject new", json);
+        return CliError::refused("SUBJECT_INVALID_ARGUMENT", violation.clone()).hint("`canon schema subject new` lists the accepted arguments and their forms").emit("canon subject new", json);
     }
     let canon_yaml_path = resolve_canon_yaml(&repo);
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
@@ -477,7 +517,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
         }
         Ok(None) => {}
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject new", json);
+            return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject new", json);
         }
     }
 
@@ -487,7 +527,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
     match registry.persist(&subject) {
         Ok(_) => {
             let human = format!("canon subject new: {} ({}, {}) — {}", subject.subject_id.as_str(), subject.domain, status_str(subject.status), crate::write_mode::DIRECT);
-            report_subject(&repo, &subject, "new", false, json, &human);
+            report_subject(&repo, &subject, "new", Some(true), json, &human);
             0
         }
         Err(e) => {
@@ -503,7 +543,7 @@ pub fn run_new(repo: &Path, subject_id: &SubjectId, domain: &str, title: &str, s
 /// may belong to several subjects (0.18 D4): adopting it under a second
 /// one adds that subject and says the change now belongs to each, never
 /// re-points it.
-pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_run: bool, json: bool) -> i32 {
+pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_run: bool, json: bool) -> u8 {
     match adopt_change(repo, change_id, subject_id, dry_run) {
         Ok((subject, owners, wrote)) => {
             let (link, now_belongs) = if dry_run { ("would link", "would belong") } else { ("linked", "now belongs") };
@@ -524,11 +564,11 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_
             let warnings: Vec<String> = crate::brief::adoption_warning(repo, &subject, change_id)
                 .into_iter()
                 .collect();
-            report_subject_warning(repo, &subject, "adopt", dry_run, json, &human, &warnings);
+            report_subject_warning(repo, &subject, "adopt", (!dry_run).then_some(wrote), json, &human, &warnings);
             0
         }
         Err(e) => {
-            CliError::refused("SUBJECT_ADOPT_REFUSED", e.to_string()).hint("fix what the message names, then run `canon subject adopt` again").emit("canon subject adopt", json)
+            CliError::refused("SUBJECT_ADOPT_REFUSED", e.clone()).hint("fix what the message names, then run `canon subject adopt` again").emit("canon subject adopt", json)
         }
     }
 }
@@ -537,7 +577,7 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_
 /// the link [`run_adopt`] made back, on both sides. Refused for a change
 /// whose canon brief carries an `Approved:` line: it is the subject's
 /// approved scope. An unlinked pair writes nothing and exits `0`.
-pub fn run_unadopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_run: bool, json: bool) -> i32 {
+pub fn run_unadopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_run: bool, json: bool) -> u8 {
     match unadopt_change(repo, change_id, subject_id, dry_run) {
         Ok(UnadoptOutcome::Refused(message, hint)) => CliError::refused("SUBJECT_UNADOPT_REFUSED", message).hint(hint).emit("canon subject unadopt", json),
         Ok(UnadoptOutcome::Done(subject, wrote)) => {
@@ -548,7 +588,7 @@ pub fn run_unadopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dr
                 crate::json_out::mark_unchanged();
                 format!("canon subject unadopt: change `{}` is not linked to subject `{}`; nothing written", change_id.as_str(), subject_id.as_str())
             };
-            report_subject(repo, &subject, "unadopt", dry_run, json, &human);
+            report_subject(repo, &subject, "unadopt", (!dry_run).then_some(wrote), json, &human);
             0
         }
         Err(e) => CliError::refused("SUBJECT_ADOPT_REFUSED", e).hint("fix what the message names, then run `canon subject unadopt` again").emit("canon subject unadopt", json),
@@ -557,7 +597,7 @@ pub fn run_unadopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dr
 
 enum UnadoptOutcome {
     /// The subject as it now stands, and whether anything was written.
-    Done(Subject, bool),
+    Done(Box<Subject>, bool),
     /// The refusal message and its hint.
     Refused(String, String),
 }
@@ -589,7 +629,7 @@ fn unadopt_change(
     let on_subject = subject.change_ids.contains(change_id);
     let on_change = change.subject_ids.contains(subject_id);
     if !on_subject && !on_change {
-        return Ok(UnadoptOutcome::Done(subject, false));
+        return Ok(UnadoptOutcome::Done(Box::new(subject), false));
     }
     let resolved = resolve_repo_root(repo);
     if let Some(brief) = crate::brief::canon_brief(&resolved, change_id) {
@@ -652,7 +692,7 @@ fn unadopt_change(
             )
         })?;
     }
-    Ok(UnadoptOutcome::Done(subject, true))
+    Ok(UnadoptOutcome::Done(Box::new(subject), true))
 }
 
 /// The ids of the scenarios `subject_id` owns that carry a
@@ -744,12 +784,20 @@ pub(crate) fn adopt_command(change_id: &ChangeId, subject_id: &SubjectId) -> Str
 
 /// A failed [`persist_adoption`]: the store error, and whether the
 /// subject record had already been written when the change write failed.
+#[derive(Debug, thiserror::Error)]
+#[error("{source}")]
 pub(crate) struct AdoptionWriteError {
     pub(crate) subject_written: bool,
-    pub(crate) message: String,
+    /// The tier registry or store error that stopped the write.
+    #[source]
+    source: Box<dyn std::error::Error + Send + Sync>,
 }
 
 impl AdoptionWriteError {
+    fn new(subject_written: bool, source: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self { subject_written, source: Box::new(source) }
+    }
+
     /// The operator-facing message (no command prefix). Before any write:
     /// the error and that nothing was written. Between the two writes:
     /// which record exists, and `repair`, the command that completes the
@@ -760,10 +808,10 @@ impl AdoptionWriteError {
                 "subject `{}` now lists change `{}`, but the change record could not be written: {}; complete the link with `{repair}`",
                 subject_id.as_str(),
                 change_id.as_str(),
-                self.message
+                self.source
             )
         } else {
-            format!("failed to record the adoption: {}; nothing was written", self.message)
+            format!("failed to record the adoption: {}; nothing was written", self.source)
         }
     }
 }
@@ -805,19 +853,19 @@ pub(crate) fn persist_adoption(repo: &Path, mut change: Change, mut subject: Sub
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = resolve_canon_yaml(&repo);
     let registry = registry_for(&canon_yaml_path, &[RecordKind::Change, RecordKind::Subject])
-        .map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
+        .map_err(|e| AdoptionWriteError::new(false, e))?;
 
     let now = Utc::now();
     if needs_subject {
         subject.change_ids.push(change.change_id.clone());
         subject.envelope.at = now;
-        registry.persist(&subject).map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
+        registry.persist(&subject).map_err(|e| AdoptionWriteError::new(false, e))?;
     }
     if needs_change {
         change.subject_ids.push(subject.subject_id.clone());
         change.envelope.at = now;
         change.envelope.schema = RecordKind::Change.schema_version();
-        registry.persist(&change).map_err(|e| AdoptionWriteError { subject_written: needs_subject, message: e.to_string() })?;
+        registry.persist(&change).map_err(|e| AdoptionWriteError::new(needs_subject, e))?;
     }
     Ok((subject, change, true))
 }
@@ -832,13 +880,13 @@ fn preview_adoption(repo: &Path, mut change: Change, mut subject: Subject) -> Re
     }
     let repo = resolve_repo_root(repo);
     let registry = registry_for(&resolve_canon_yaml(&repo), &[RecordKind::Change, RecordKind::Subject])
-        .map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
+        .map_err(|e| AdoptionWriteError::new(false, e))?;
     if needs_subject {
-        registry.check_persist::<Subject>().map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
+        registry.check_persist::<Subject>().map_err(|e| AdoptionWriteError::new(false, e))?;
         subject.change_ids.push(change.change_id.clone());
     }
     if needs_change {
-        registry.check_persist::<Change>().map_err(|e| AdoptionWriteError { subject_written: false, message: e.to_string() })?;
+        registry.check_persist::<Change>().map_err(|e| AdoptionWriteError::new(false, e))?;
         change.subject_ids.push(subject.subject_id.clone());
     }
     Ok((subject, change, true))
@@ -859,17 +907,16 @@ fn preview_adoption(repo: &Path, mut change: Change, mut subject: Subject) -> Re
 /// runs no review guard, and records [`Reopen`]. A successful transition
 /// re-stamps the subject (fresh `at`) and persists it through the routed
 /// tier.
-#[allow(clippy::too_many_arguments)]
 pub fn run_move(
     repo: &Path,
     subject_id: &SubjectId,
     target: SubjectStatus,
     override_reason: Option<&str>,
     reason: Option<&str>,
-    actor_id: &str,
-    session: Option<&canon_model::SessionId>,
+    actor: Actor,
     json: bool,
-) -> i32 {
+) -> u8 {
+    let Actor { id: actor_id, session } = actor;
     for (flag, text, recorded) in [
         ("--override-reason", override_reason, "the accountable reason"),
         ("--reason", reason, "the transition note, with the actor"),
@@ -894,7 +941,7 @@ pub fn run_move(
             return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).hint("`canon subject new <id> --domain <domain> --title <title>` creates it; check the id against the subjects `canon status` lists").emit("canon subject move", json);
         }
         Err(e) => {
-            return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject move", json);
+            return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject move", json);
         }
     };
 
@@ -944,7 +991,7 @@ pub fn run_move(
                 Some(ctx)
             }
             Err(e) => {
-                return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject move", json);
+                return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject move", json);
             }
         }
     } else {
@@ -1087,7 +1134,7 @@ pub fn run_move(
 
     match registry.persist(&subject) {
         Ok(_) => {
-            report_subject_warning(&repo, &subject, "move", false, json, &format!("canon subject move: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT), &pending_note);
+            report_subject_warning(&repo, &subject, "move", Some(true), json, &format!("canon subject move: {} → {} — {}", subject_id.as_str(), status_str(target), crate::write_mode::DIRECT), &pending_note);
             0
         }
         Err(e) => {
@@ -1098,7 +1145,7 @@ pub fn run_move(
 
 /// `canon subject show <id>` (0.21 D1): show the subject and write
 /// nothing. `--override-reason` and `--reason` belong to `canon subject move`.
-pub fn run_show(repo: &Path, subject_id: &SubjectId, json: bool) -> i32 {
+pub fn run_show(repo: &Path, subject_id: &SubjectId, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let canon_yaml_path = resolve_canon_yaml(&repo);
     let registry = match registry_for(&canon_yaml_path, &[RecordKind::Subject]) {
@@ -1108,7 +1155,7 @@ pub fn run_show(repo: &Path, subject_id: &SubjectId, json: bool) -> i32 {
     let subject = match find_subject(&registry, subject_id) {
         Ok(Some(s)) => s,
         Ok(None) => return CliError::refused("SUBJECT_NOT_FOUND", format!("subject `{}` does not exist", subject_id.as_str())).hint("`canon subject new <id> --domain <domain> --title <title>` creates it; check the id against the subjects `canon status` lists").emit("canon subject show", json),
-        Err(e) => return CliError::refused("REPO_UNREADABLE", e.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject show", json),
+        Err(e) => return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon subject show", json),
     };
     if json {
         crate::json_out::data("subject show", &SubjectReport(&subject));
@@ -1119,7 +1166,7 @@ pub fn run_show(repo: &Path, subject_id: &SubjectId, json: bool) -> i32 {
         }
         println!("  owner: {}", subject.owner_role.as_str());
         if !subject.change_ids.is_empty() {
-            println!("  changes: {}", subject.change_ids.iter().map(|c| c.as_str()).collect::<Vec<_>>().join(", "));
+            println!("  changes: {}", subject.change_ids.iter().map(canon_model::ChangeId::as_str).collect::<Vec<_>>().join(", "));
         }
         if let Some(reopen) = &subject.reopen {
             println!("  reopened: {}", reopen.reason);
@@ -1374,6 +1421,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_value_parsers_and_the_adoption_error_read_as_before() {
+        assert_eq!(parse_status("sideways").unwrap_err().to_string(), "unknown subject move `sideways` (expected one of: proposed, specced, building, verifying, shipped, retired)");
+        assert_eq!(parse_subject_id("Bad Id").unwrap_err().to_string(), format!("invalid SubjectId: \"Bad Id\" does not match grammar `{}`", SubjectId::GRAMMAR));
+        assert_eq!(parse_change_id("Bad Id").unwrap_err().to_string(), format!("invalid ChangeId: \"Bad Id\" does not match grammar `{}`", ChangeId::GRAMMAR));
+        let change = ChangeId::parse("c").unwrap();
+        let subject = SubjectId::parse("s").unwrap();
+        let cause = || std::io::Error::other("disk full");
+        let before = AdoptionWriteError::new(false, cause());
+        assert_eq!(before.to_string(), "disk full");
+        assert!(std::error::Error::source(&before).is_some());
+        assert_eq!(before.describe(&change, &subject, "fix"), "failed to record the adoption: disk full; nothing was written");
+        let between = AdoptionWriteError::new(true, cause());
+        assert_eq!(between.describe(&change, &subject, "fix"), "subject `s` now lists change `c`, but the change record could not be written: disk full; complete the link with `fix`");
+    }
+
+    #[test]
     fn the_forward_chain_and_the_reopen_are_the_only_paths() {
         use SubjectStatus::*;
         assert!(is_valid_transition(Proposed, Specced));
@@ -1412,6 +1475,6 @@ mod tests {
         ] {
             assert_eq!(parse_status(status_str(status)).unwrap(), status);
         }
-        assert!(parse_status("not-a-state").is_err());
+        parse_status("not-a-state").unwrap_err();
     }
 }

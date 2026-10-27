@@ -19,7 +19,7 @@ use canon_model::envelope::{Actor, Envelope, RecordKind};
 use canon_model::handoff::{DomainId, HandoffBody};
 use canon_model::ids::{ChangeId, HandoffId, RoleId, RunId};
 use canon_model::records::{Change, ChangeStatus, Trajectory};
-use canon_model::Handoff;
+use canon_model::{Handoff, HandoffFields};
 use canon_store::git_tier::GitTier;
 use canon_store::pg_tier::PgTier;
 use canon_store::policy::TierPolicy;
@@ -67,9 +67,9 @@ fn seed_empty_learn_root(learn_root: &std::path::Path) {
         let path = learn_root.join(sub).join("_seed").join("_seed").join("_seed").join("_seed").join("_seed.parquet");
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         let empty: ArrayRef = Arc::new(StringArray::from(Vec::<&str>::new()));
-        let batch = RecordBatch::try_new(schema.clone(), vec![empty.clone(), empty.clone(), empty.clone(), empty.clone(), empty]).unwrap();
+        let batch = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::clone(&empty), Arc::clone(&empty), Arc::clone(&empty), Arc::clone(&empty), empty]).unwrap();
         let file = std::fs::File::create(&path).unwrap();
-        let mut writer = ArrowWriter::try_new(file, schema.clone(), None).unwrap();
+        let mut writer = ArrowWriter::try_new(file, Arc::clone(&schema), None).unwrap();
         writer.write(&batch).unwrap();
         writer.close().unwrap();
     }
@@ -123,16 +123,7 @@ aging:
 
     // 2. One pg-tier kind, timestamped 60 days in the past so it
     // qualifies for `aging.handoff.after: 30d`.
-    let handoff = Handoff::new(
-        Envelope::new(1, RecordKind::Handoff, Utc::now() - chrono::Duration::days(60), actor()),
-        HandoffId::parse("20260510-1200-e2e-fixture-abcd").unwrap(),
-        uuid::Uuid::new_v4(),
-        None,
-        1,
-        "E2E fixture handoff",
-        None,
-        HandoffBody { domain: DomainId::parse("기획").unwrap(), template_version: 1, fields: serde_json::json!({}) },
-    );
+    let handoff = Handoff::new(HandoffFields { envelope: Envelope::new(1, RecordKind::Handoff, Utc::now() - chrono::Duration::days(60), actor()), id: HandoffId::parse("20260510-1200-e2e-fixture-abcd").unwrap(), chain_id: uuid::Uuid::new_v4(), parent_handoff_id: None, seq: 1, title: "E2E fixture handoff".into(), openspec_change_slug: None, body: HandoffBody { domain: DomainId::parse("기획").unwrap(), template_version: 1, fields: serde_json::json!({}) } });
     registry.persist(&handoff).expect("persist handoff (pg)");
 
     // 3. One r2-tier kind.

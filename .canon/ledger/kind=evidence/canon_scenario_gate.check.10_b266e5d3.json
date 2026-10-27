@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-030-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-26-b"
+  },
+  "at": "2026-10-26T20:29:49.257629007Z",
+  "code_tree": "626a465dc0f0df465e27d63f98089e3bc62938d7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-gate --lib -- an_excluded_lane_is_out_of_scope_after_subject_scope an_unlisted_lane_remains_in_scope"
+  },
+  "evidence_sha": "dcaaa4ce1cf55195fc02ad0a94e47c2ee0ac24a3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 120,
+  "scenario_id": "gate.check.10",
+  "schema": 1,
+  "staging_id": "c1a69a42",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

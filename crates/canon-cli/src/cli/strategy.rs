@@ -4,7 +4,7 @@ use canon_learn::StrategyId;
 use clap::{Args, Subcommand};
 use std::path::PathBuf;
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum StrategyCommand {
     /// Promote a strategy after paired evaluation and signed approval
     Promote(StrategyPromoteArgs),
@@ -14,7 +14,7 @@ pub enum StrategyCommand {
     Rollback(StrategyRollbackArgs),
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct StrategyPromoteArgs {
     /// The StrategyId (ULID) to promote
     #[arg(value_name = "STRATEGY_ID", value_parser = crate::learn::parse_strategy_id)]
@@ -39,7 +39,7 @@ pub struct StrategyPromoteArgs {
     pub input: crate::cli::InputArgs,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct StrategyApprovalPayloadArgs {
     /// The StrategyId (ULID) whose approval payload to print
     #[arg(value_name = "STRATEGY_ID", value_parser = crate::learn::parse_strategy_id)]
@@ -60,7 +60,7 @@ pub struct StrategyApprovalPayloadArgs {
     pub json: bool,
 }
 
-#[derive(Args)]
+#[derive(Debug, Args)]
 pub struct StrategyRollbackArgs {
     /// The StrategyId (ULID) to roll back
     #[arg(value_name = "STRATEGY_ID", value_parser = crate::learn::parse_strategy_id)]

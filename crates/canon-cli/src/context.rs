@@ -93,18 +93,15 @@ pub struct ContextOptions {
     pub role: Option<crate::role::Role>,
 }
 
-/// The Hive-style partition layout one record kind's git-tier files follow —
+/// The name layout one record kind's files follow in every store —
 /// design D3's `partition: LayoutDescriptor`, built from
-/// [`RecordKind::partition_template`]/[`RecordKind::is_area_scoped`] (S1's
-/// own registry — never a second, hand-written layout table).
+/// [`RecordKind::partition_template`] (canon-model's component table — never
+/// a second, hand-written layout table).
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PartitionLayout {
-    /// The path template, e.g. `kind={kind}/{id}.json` or
-    /// `kind={kind}/area={area}/{id}.json`.
+    /// The path template, e.g. `kind=change/{change_id}_{digest8}.json`.
     pub template: String,
-    /// Whether `template` requires the `area={area}/` segment.
-    pub area_scoped: bool,
 }
 
 /// One record kind's authoring shape: the fields an agent must supply, the
@@ -367,9 +364,8 @@ pub struct ReviewSurface {
 #[serde(rename_all = "camelCase")]
 pub struct ContextReport {
     pub capability_version: u32,
-    /// By the name `--kind` takes ([`crate::query::kind_cli_name`]): every
-    /// `RecordKind::ALL` member. The wire string (`evidence_record`) stays
-    /// storage.
+    /// By the one name every surface uses ([`RecordKind::as_str`]): every
+    /// `RecordKind::ALL` member.
     pub kinds: BTreeMap<String, KindSurface>,
     /// Every artifact family, in `FamilyKind::ALL` order.
     pub families: Vec<FamilySurface>,
@@ -567,9 +563,9 @@ fn summarize_review(policy: &PolicyResolution, kinds: &BTreeMap<String, KindSurf
         _ => None,
     };
     ReviewSurface {
-        finding_severities: crate::finding::SEVERITY_VALUES.iter().map(|s| s.to_string()).collect(),
-        finding_dispositions: crate::finding::DISPOSITION_VALUES.iter().map(|s| s.to_string()).collect(),
-        review_fields: kinds.get(crate::query::kind_cli_name(canon_model::RecordKind::Review)).map(|k| k.envelope_fields.clone()).unwrap_or_default(),
+        finding_severities: crate::finding::SEVERITY_VALUES.iter().map(std::string::ToString::to_string).collect(),
+        finding_dispositions: crate::finding::DISPOSITION_VALUES.iter().map(std::string::ToString::to_string).collect(),
+        review_fields: kinds.get(canon_model::RecordKind::Review.as_str()).map(|k| k.envelope_fields.clone()).unwrap_or_default(),
         require_review,
     }
 }
@@ -658,9 +654,9 @@ fn collect_kinds(registry: &SchemaRegistry) -> BTreeMap<String, KindSurface> {
             .and_then(|p| p.as_object())
             .map(|props| props.keys().map(|name| (name.clone(), required.contains(name.as_str()))).collect())
             .unwrap_or_default();
-        let partition = PartitionLayout { template: kind.partition_template().to_string(), area_scoped: kind.is_area_scoped() };
+        let partition = PartitionLayout { template: kind.partition_template() };
         let schema = format!("{SCHEMA_DIR}/{}.schema.json", kind.as_str());
-        kinds.insert(crate::query::kind_cli_name(kind).to_string(), KindSurface { schema_version: kind.schema_version(), envelope_fields, partition, schema });
+        kinds.insert(kind.as_str().to_string(), KindSurface { schema_version: kind.schema_version(), envelope_fields, partition, schema });
     }
     kinds
 }
@@ -677,7 +673,7 @@ fn collect_families() -> Vec<FamilySurface> {
         .map(|family| FamilySurface {
             family: family.as_str().to_string(),
             schema: format!("{SCHEMA_DIR}/family-{}.schema.json", family.as_str()),
-            record_kinds: canon_model::RecordKind::ALL.iter().filter(|k| k.as_str() == family.as_str()).map(|k| crate::query::kind_cli_name(*k).to_string()).collect(),
+            record_kinds: canon_model::RecordKind::ALL.iter().filter(|k| k.as_str() == family.as_str()).map(|k| k.as_str().to_string()).collect(),
         })
         .collect()
 }
@@ -742,7 +738,7 @@ fn collect_cel(registry: &SchemaRegistry) -> BTreeMap<String, CelSurface> {
             .collect();
         let functions: Vec<String> =
             bindings.callable_function_names().into_iter().filter_map(|name| bindings.function(&name).map(ToString::to_string)).collect();
-        cel.insert(crate::query::kind_cli_name(kind).to_string(), CelSurface { fields, functions });
+        cel.insert(kind.as_str().to_string(), CelSurface { fields, functions });
     }
     cel
 }
@@ -890,11 +886,10 @@ pub fn render_outline(surface: &ContextReport, fields: Option<&[String]>) -> Str
         for (name, kind) in &surface.kinds {
             let _ = writeln!(
                 out,
-                "  {name}: schema={} fields={} partition={}{}",
+                "  {name}: schema={} fields={} partition={}",
                 kind.schema_version,
                 kind.envelope_fields.len(),
                 kind.partition.template,
-                if kind.partition.area_scoped { " [area-scoped]" } else { "" },
             );
         }
     }
@@ -1219,7 +1214,7 @@ mod tests {
         assert_eq!(surface.cel.keys().collect::<Vec<_>>(), surface.kinds.keys().collect::<Vec<_>>(), "cel must cover the SAME kind set as `kinds`");
         for kind in registry.kinds() {
             let expected = canon_policy::bindings_for(kind, &registry);
-            let actual = &surface.cel[crate::query::kind_cli_name(kind)];
+            let actual = &surface.cel[kind.as_str()];
 
             let expected_fields: BTreeMap<String, String> = expected
                 .field_names()
