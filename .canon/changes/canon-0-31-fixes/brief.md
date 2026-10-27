@@ -5,7 +5,7 @@
 
 0.30 스펙을 쓰며 동작 여섯 가지가 문서나 다른 명령과 어긋나는 것을 재현했다. `demo init`은 설정이 있는 디렉터리의 정책을 덮어쓰고, `gate install-hooks`는 없는 디렉터리를 만든다. `context-pack`은 틀린 id에 "없음"이라 답하고, `evidence approval-payload`는 없는 시나리오의 서명 대상을 만든다. ADAPTER_REFUSED와 `strategy rollback`은 종료 코드가 어긋난다.
 
-0.31 순서: CI → 승인과 adopt → 버그 수정 → brief 포맷 → CLI id → 검색. 여섯 brief는 함께 승인받고, 승인과 adopt 변경이 들어가기 전에는 어느 brief도 고치지 않는다.
+0.31 순서: CI → 승인과 adopt → 버그 수정 → brief 포맷 → CLI id → 검색. 여섯 brief는 함께 승인받고, 승인과 adopt 전에는 고치지 않는다.
 
 <!-- canon:section outcome role=normative -->
 ## Desired outcome
