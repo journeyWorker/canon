@@ -121,13 +121,13 @@ fn an_option_says_what_it_conflicts_with_and_requires() {
         let node = doc["commands"].as_array().expect("commands").iter().find(|n| n["command"] == command).unwrap_or_else(|| panic!("no `{command}`"));
         node["options"].as_array().expect("options").iter().find(|o| o["name"] == name).unwrap_or_else(|| panic!("no --{name} on `{command}`")).clone()
     };
-    // `scenario new --change-id` requires `--flow` (a clap `requires`, which clap does not expose).
-    assert_eq!(option("scenario new", "change-id")["requires"], serde_json::json!(["--flow"]));
-    // `--history` conflicts `--plugin-id` on `query`, whichever side declared it.
-    assert_eq!(option("query", "history")["conflictsWith"], serde_json::json!(["--plugin-id"]));
-    assert_eq!(option("query", "plugin-id")["conflictsWith"], serde_json::json!(["--history"]));
+    // `scenario new --change` requires `--flow` (a clap `requires`, which clap does not expose).
+    assert_eq!(option("scenario new", "change")["requires"], serde_json::json!(["--flow"]));
+    // `--history` conflicts `--plugin` on `query`, whichever side declared it.
+    assert_eq!(option("query", "history")["conflictsWith"], serde_json::json!(["--plugin"]));
+    assert_eq!(option("query", "plugin")["conflictsWith"], serde_json::json!(["--history"]));
     assert_eq!(option("query", "kind")["env"], Value::Null);
-    assert_eq!(option("feature new", "actor-id")["env"], "CANON_ACTOR");
+    assert_eq!(option("feature new", "actor")["env"], "CANON_ACTOR");
 }
 
 /// An embedded schema is a document of its own: it names its base URI and its

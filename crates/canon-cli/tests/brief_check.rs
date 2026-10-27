@@ -35,7 +35,7 @@ fn repo_with_change(lang: Option<&str>) -> TempDir {
     }
     ok(dir.path(), &init);
     ok(dir.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(dir.path(), &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(dir.path(), &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     dir
 }
 
@@ -290,13 +290,13 @@ fn scenario_new_flow_tags_the_step_and_status_lists_per_step_coverage() {
     ok(repo, &["subject", "move", "demo", "--to", "specced"]);
     ok(repo, &["subject", "move", "demo", "--to", "building"]);
 
-    let refused = run(repo, &["scenario", "new", "world.login.01", "--title", "x", "--subject-id", "demo", "--flow", "F9"]);
+    let refused = run(repo, &["scenario", "new", "world.login.01", "--title", "x", "--subject", "demo", "--flow", "F9"]);
     assert_eq!(refused.status.code(), Some(2), "{}", stderr(&refused));
     assert!(stderr(&refused).contains("defines no flow step `F9` (it has F1, F2)"), "{}", stderr(&refused));
     assert!(!repo.join(".canon/specs/kind=feature/area=world/login.feature").exists(), "a refused flow writes nothing");
 
-    ok(repo, &["scenario", "new", "world.login.01", "--title", "Valid sign-in", "--subject-id", "demo", "--flow", "F1"]);
-    ok(repo, &["scenario", "new", "world.login.02", "--title", "Wrong password", "--subject-id", "demo", "--flow", "F1", "--case", "failure"]);
+    ok(repo, &["scenario", "new", "world.login.01", "--title", "Valid sign-in", "--subject", "demo", "--flow", "F1"]);
+    ok(repo, &["scenario", "new", "world.login.02", "--title", "Wrong password", "--subject", "demo", "--flow", "F1", "--case", "failure"]);
     let feature = std::fs::read_to_string(repo.join(".canon/specs/kind=feature/area=world/login.feature")).unwrap();
     assert!(feature.contains("  @flow:add-login.F1\n  @world.login.01\n"), "{feature}");
 
@@ -311,7 +311,7 @@ fn scenario_new_flow_tags_the_step_and_status_lists_per_step_coverage() {
     let flow = &json["data"]["subjects"][0]["flow"];
     assert_eq!((flow[0]["id"].as_str(), flow[1]["gaps"][0].as_str()), (Some("F1"), Some("no scenario")), "{flow}");
 
-    ok(repo, &["scenario", "new", "world.login.03", "--title", "Retry", "--subject-id", "demo", "--flow", "F2"]);
+    ok(repo, &["scenario", "new", "world.login.03", "--title", "Retry", "--subject", "demo", "--flow", "F2"]);
     let text = stdout(&run(repo, &["status"]));
     assert!(text.contains("flow F2 — no failure case"), "{text}");
 }
@@ -324,8 +324,8 @@ fn operational_errors_carry_a_string_code_and_the_registry_exit() {
     assert_eq!((code, report["error"]["code"].as_str()), (2, Some("NO_BRIEF")));
 
     ok(dir.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(dir.path(), &["change", "new", "one", "--subject-id", "demo", "--title", "One"]);
-    ok(dir.path(), &["change", "new", "two", "--subject-id", "demo", "--title", "Two"]);
+    ok(dir.path(), &["change", "new", "one", "--subject", "demo", "--title", "One"]);
+    ok(dir.path(), &["change", "new", "two", "--subject", "demo", "--title", "Two"]);
     let (code, report) = check(dir.path(), &[]);
     assert_eq!((code, report["error"]["code"].as_str()), (2, Some("CHANGE_AMBIGUOUS")));
     let (code, report) = check(dir.path(), &["one"]);
@@ -395,7 +395,7 @@ fn chore_brief(category: &str) -> String {
 #[test]
 fn a_chore_brief_is_written_and_judged_by_the_chore_rule_set() {
     let dir = repo_with_change(Some("ko"));
-    ok(dir.path(), &["change", "new", "bump-client", "--subject-id", "demo", "--change-kind", "chore", "--title", "클라이언트 올리기"]);
+    ok(dir.path(), &["change", "new", "bump-client", "--subject", "demo", "--change-kind", "chore", "--title", "클라이언트 올리기"]);
     let path = dir.path().join(".canon/changes/bump-client/brief.md");
     let brief = std::fs::read_to_string(&path).unwrap();
     assert!(brief.starts_with("---\nkind: chore\n---\n\n") && brief.contains("## Invariants") && brief.contains("## Category"), "{brief}");
@@ -430,7 +430,7 @@ fn a_chore_brief_is_written_and_judged_by_the_chore_rule_set() {
     let (code, report) = check(dir.path(), &["bump-client"]);
     assert_eq!((code, report["phase"].as_str(), rules(&report)), (0, Some("building"), Vec::<String>::new()), "a chore has no flow to cover: {report}");
 
-    let out = run(dir.path(), &["change", "new", "x", "--subject-id", "demo", "--change-kind", "epic", "--title", "x"]);
+    let out = run(dir.path(), &["change", "new", "x", "--subject", "demo", "--change-kind", "epic", "--title", "x"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
 }
 

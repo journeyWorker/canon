@@ -12,7 +12,7 @@ pub fn run(cmd: ReviewCommand) -> ExitCode {
     }
 }
 
-/// Both leaves: `--actor-id` is the reviewer, so the record's `reviewer` and
+/// Both leaves: `--actor` is the reviewer, so the record's `reviewer` and
 /// its actor are the same id.
 fn run_review(command: &str, scenario_ids: Vec<ScenarioId>, change: Option<ChangeId>, options: ReviewOptions) -> ExitCode {
     let ReviewOptions {

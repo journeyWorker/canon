@@ -13,8 +13,8 @@ one, and neither can `canon gate`.
 one `<slug>/` directory per change holding `brief.md` (and a `tasks.md`
 only when someone adds one: an optional work note), written by
 `canon change new` (see `canon-subject`). Every plan reader —
-`canon ingest plans`, `canon task done`, `canon evidence add --task-id`,
-`canon dispatch begin --task-id`, `canon status` and the brief check — reads it
+`canon ingest plans`, `canon task done`, `canon evidence add --task`,
+`canon dispatch begin --task`, `canon status` and the brief check — reads it
 first whenever the directory exists, with no `plans:` entry. Being first,
 it owns a change id an external source also carries (the external copy
 is the later duplicate, skipped and counted under `duplicate_change_id`).

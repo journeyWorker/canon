@@ -119,7 +119,7 @@ Feature: finding add
   Scenario: A finding session id outside the SessionId grammar is refused
     Given a session id with surrounding whitespace
     When finding add is run with it
-    Then the command exits 2 naming --session-id and the SessionId grammar
+    Then the command exits 2 naming --session and the SessionId grammar
     And nothing is staged
 
   # canon: {"schema":1,"at":"2026-10-10T19:28:02Z","actor":{"agent_id":"canon"}}
@@ -146,9 +146,9 @@ Feature: finding add
   @subject:finding-lifecycle
   @case:happy
   @finding.add.32
-  Scenario: A finding names the scenarios it is about with a repeatable --scenario-id
+  Scenario: A finding names the scenarios it is about with a repeatable --scenario
     Given a repository whose index knows two scenarios
-    When canon finding add names one of them twice and the other once through --scenario-id, and a second finding names none
+    When canon finding add names one of them twice and the other once through --scenario, and a second finding names none
     Then the first finding's record carries each scenario id once, in the order given
     And the second finding's record carries no scenario_ids field at all
 
@@ -156,10 +156,10 @@ Feature: finding add
   @subject:finding-lifecycle
   @case:failure
   @finding.add.33
-  Scenario: A --scenario-id the index does not know is refused with its code
+  Scenario: A --scenario the index does not know is refused with its code
     Given a repository whose index does not know the scenario id world.demo.99
-    When canon finding add names world.demo.99 through --scenario-id
-    Then the command exits 2 with FINDING_UNKNOWN_SCENARIO, the field --scenario-id and a hint, naming the unknown id
+    When canon finding add names world.demo.99 through --scenario
+    Then the command exits 2 with FINDING_UNKNOWN_SCENARIO, the field --scenario and a hint, naming the unknown id
     And nothing is staged
 
   # canon: {"schema":1,"at":"2026-10-23T12:05:39Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}
@@ -209,10 +209,10 @@ Feature: finding add
   @finding.add.38
   Scenario: A finding added with a review id points at that review and a query shows the id
     Given a review written by canon review scenario and the review id it printed
-    When canon finding add is run with that id as --review-id and the finding is promoted
+    When canon finding add is run with that id as --review and the finding is promoted
     Then the committed finding carries `review_id` with that value
     And canon query --kind finding --json shows the review id on the record
-    And a finding added without --review-id has no `review_id` field
+    And a finding added without --review has no `review_id` field
 
   # canon: {"schema":1,"at":"2026-10-26T18:12:54Z","actor":{"agent_id":"impl-030-rl","role":"implementer","session_id":"rl-2026-10-26"}}
   @subject:finding-lifecycle
@@ -221,7 +221,7 @@ Feature: finding add
   @finding.add.39
   Scenario: A review id that no review has is refused and the ledger is unchanged
     Given a ledger and an archive in which no review carries the id given
-    When canon finding add is run with that id as --review-id
+    When canon finding add is run with that id as --review
     Then it is refused with FINDING_REVIEW_NOT_FOUND, exit 2, naming the id
     And nothing is staged and the ledger, the staging area and the archive are as they were
     And a value that is not a ULID is refused as an invalid argument before the ledger is read

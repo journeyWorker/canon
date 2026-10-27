@@ -33,7 +33,7 @@ fn repo() -> tempfile::TempDir {
 
 /// `finding add` as `role`, returning its envelope.
 fn add(repo: &Path, seq: &str, role: &str) -> Value {
-    let out = canon(repo, &["finding", "add", "--change-id", "c-role", "--round", "1", "--seq", seq, "--severity", "note", "--actor-id", "x", "--summary", "s", "--role", role, "--no-promote", "--json"]);
+    let out = canon(repo, &["finding", "add", "--change", "c-role", "--round", "1", "--seq", seq, "--severity", "note", "--actor", "x", "--summary", "s", "--role", role, "--no-promote", "--json"]);
     assert!(out.status.success(), "role {role}: {}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     serde_json::from_slice(&out.stdout).expect("one JSON document")
 }

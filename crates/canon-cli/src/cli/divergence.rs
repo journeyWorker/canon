@@ -12,7 +12,7 @@ pub struct DivergenceAddArgs {
     #[arg(value_name = "SCENARIO_ID", value_parser = crate::review::parse_scenario_id)]
     pub scenario_id: ScenarioId,
     /// Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root
-    #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
+    #[arg(long = "project", value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
@@ -29,7 +29,7 @@ pub struct DivergenceAddArgs {
     #[arg(long, default_value_t = 1, value_name = "N")]
     pub round: u32,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
-    #[arg(long, value_name = "ACTOR_ID")]
+    #[arg(long = "actor", value_name = "ACTOR_ID")]
     pub actor_id: String,
     #[command(flatten)]
     pub session: crate::cli::SessionArgs,
@@ -70,7 +70,7 @@ pub struct DivergenceResolveArgs {
     #[arg(value_name = "SCENARIO_ID", value_parser = crate::review::parse_scenario_id)]
     pub scenario_id: ScenarioId,
     /// Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root
-    #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
+    #[arg(long = "project", value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
@@ -78,7 +78,7 @@ pub struct DivergenceResolveArgs {
     #[arg(long, default_value_t = 1, value_name = "N")]
     pub round: u32,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
-    #[arg(long, value_name = "ACTOR_ID")]
+    #[arg(long = "actor", value_name = "ACTOR_ID")]
     pub actor_id: String,
     #[command(flatten)]
     pub session: crate::cli::SessionArgs,
@@ -103,7 +103,7 @@ pub struct DivergenceDeferArgs {
     #[arg(value_name = "SCENARIO_ID", value_parser = crate::review::parse_scenario_id)]
     pub scenario_id: ScenarioId,
     /// Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root
-    #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
+    #[arg(long = "project", value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
@@ -111,7 +111,7 @@ pub struct DivergenceDeferArgs {
     #[arg(long, default_value_t = 1, value_name = "N")]
     pub round: u32,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
-    #[arg(long, value_name = "ACTOR_ID")]
+    #[arg(long = "actor", value_name = "ACTOR_ID")]
     pub actor_id: String,
     #[command(flatten)]
     pub session: crate::cli::SessionArgs,
@@ -139,7 +139,7 @@ pub struct DivergenceAcceptArgs {
     #[arg(value_name = "SCENARIO_ID", required = true, value_parser = crate::review::parse_scenario_id)]
     pub scenario_ids: Vec<ScenarioId>,
     /// Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root
-    #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
+    #[arg(long = "project", value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     /// Why the gap is accepted
     #[arg(long, value_name = "TEXT")]
@@ -151,13 +151,13 @@ pub struct DivergenceAcceptArgs {
     #[arg(long, value_parser = crate::divergence::parse_timestamp, value_name = "TIMESTAMP")]
     pub expiry: Option<DateTime<Utc>>,
     /// The reviewer recording this (recorded as the divergence's reviewer and actor)
-    #[arg(long, value_name = "ACTOR_ID")]
+    #[arg(long = "actor", value_name = "ACTOR_ID")]
     pub actor_id: String,
     /// Must be reviewer (default: the declared role, --as / CANON_ROLE; required when none is declared)
     #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
     pub role: Option<RoleId>,
     /// The accepting session (recorded as actor.session_id); it must not be one that attested the scenario's evidence
-    #[arg(long, value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
+    #[arg(long = "session", value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
     pub session_id: Option<canon_model::SessionId>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

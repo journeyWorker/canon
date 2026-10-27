@@ -80,7 +80,7 @@ pub struct ErrorBody {
     /// Stable SCREAMING_SNAKE code, listed by `canon schema --errors`.
     pub code: String,
     pub message: String,
-    /// The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.
+    /// The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
     /// The valid values of `field`, when it takes a closed set.
@@ -399,10 +399,10 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "FINDING_NOT_FOUND", meaning: "no committed finding at that change, round and seq", exit: 2, retryable: false, fix: "Pass the change, round and seq of a committed finding; `canon finding list` shows them." },
     CodeInfo { code: "FINDING_REASON_REQUIRED", meaning: "closing a finding as rejected or deferred needs a one-line --reason", exit: 2, retryable: false, fix: "Pass a one-line --reason when closing a finding as rejected or deferred." },
     CodeInfo { code: "FINDING_RESOLUTION_REV_UNEXPECTED", meaning: "--resolution-rev was given with a disposition other than fixed", exit: 2, retryable: false, fix: "Drop --resolution-rev, or close the finding as fixed." },
-    CodeInfo { code: "FINDING_REVIEW_NOT_FOUND", meaning: "--review-id names no review in the ledger or the archive", exit: 2, retryable: false, fix: "Pass the review id that `canon review scenario` or `canon review change` printed; `canon query --kind review` shows the ids." },
+    CodeInfo { code: "FINDING_REVIEW_NOT_FOUND", meaning: "--review names no review in the ledger or the archive", exit: 2, retryable: false, fix: "Pass the review id that `canon review scenario` or `canon review change` printed; `canon query --kind review` shows the ids." },
     CodeInfo { code: "FINDING_SEQ_OCCUPIED", meaning: "a finding already holds that change, round and seq", exit: 2, retryable: false, fix: "Choose an unused seq for that change and round." },
     CodeInfo { code: "FINDING_STAGED", meaning: "the finding is still staged and cannot be closed until committed", exit: 2, retryable: false, fix: "Commit the staged finding, then close it." },
-    CodeInfo { code: "FINDING_UNKNOWN_SCENARIO", meaning: "--scenario-id names a scenario the index does not know", exit: 2, retryable: false, fix: "Pass a --scenario-id that the scenario index knows; run `canon inventory sync` if the scenario is new." },
+    CodeInfo { code: "FINDING_UNKNOWN_SCENARIO", meaning: "--scenario names a scenario the index does not know", exit: 2, retryable: false, fix: "Pass a --scenario that the scenario index knows; run `canon inventory sync` if the scenario is new." },
     CodeInfo { code: "FORMAT_VIOLATIONS", meaning: "`format` found spec-corpus violations; data.violations names each", exit: 1, retryable: false, fix: "Fix each violation listed in data.violations, then run `canon format` again." },
     CodeInfo { code: "GATE_TASK_BLOCKED", meaning: "`task done` refused to flip the task: its evidence does not support it", exit: 1, retryable: false, fix: "Attach the evidence the task requires, then run `canon task done` again." },
     CodeInfo { code: "GATE_TASK_EVIDENCE_INVALID", meaning: "the evidence or typed atom for the task is invalid", exit: 1, retryable: false, fix: "Correct the task's evidence or typed atom named in the error, then run `canon task done` again." },
@@ -483,7 +483,7 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "SKILLS_FAILED", meaning: "a skills command failed", exit: 1, retryable: false, fix: "Read the error message, fix its cause, then run the skills command again." },
     CodeInfo { code: "SKILLS_INVALID_ARGUMENT", meaning: "a skill provider is unknown, the `skills:` section of canon.yaml is malformed, or the `--skills-source` directory does not exist", exit: 2, retryable: false, fix: "Name providers from claude, codex, omp, pi (or none), and keep the canon.yaml `skills:` section a mapping whose `providers` is a list of those names." },
     CodeInfo { code: "SPEC_ROOTS_UNREADABLE", meaning: "the scenario files a brief's flow steps point at could not be read", exit: 2, retryable: false, fix: "Make the scenario files the brief's flow steps point at readable, or correct the paths." },
-    CodeInfo { code: "SPEC_ROOT_UNRESOLVED", meaning: "no single spec root could be chosen; pass --project-id", exit: 2, retryable: false, fix: "Pass --project-id with the id of the spec root to use." },
+    CodeInfo { code: "SPEC_ROOT_UNRESOLVED", meaning: "no single spec root could be chosen; pass --project", exit: 2, retryable: false, fix: "Pass --project with the id of the spec root to use." },
     CodeInfo { code: "SUBJECT_ADOPT_REFUSED", meaning: "the change could not be adopted by the subject", exit: 2, retryable: false, fix: "Fix the problem the error names, then run `canon subject adopt` again." },
     CodeInfo { code: "SUBJECT_EXISTS", meaning: "a subject with that id already exists", exit: 2, retryable: false, fix: "Choose a different subject id, or use the existing subject (`canon subject show`)." },
     CodeInfo { code: "SUBJECT_GATE_VIOLATION", meaning: "the status transition is blocked by gate violations", exit: 1, retryable: false, fix: "Fix each gate violation reported, then run `canon subject move` again." },
@@ -500,7 +500,7 @@ const CODES: &[CodeInfo] = &[
     CodeInfo { code: "UNKNOWN_ERROR_CODE", meaning: "`canon schema --error <CODE>` was given a code canon does not have", exit: 2, retryable: false, fix: "Run `canon schema --errors` to list every code." },
     CodeInfo { code: "UNKNOWN_FIELD", meaning: "`--fields` names a field the records do not have", exit: 2, retryable: false, fix: "Use only field names the records have; run `canon schema` to list them." },
     CodeInfo { code: "UNKNOWN_ROLE", meaning: "`CANON_ROLE` holds a value that is not a role (planner, implementer, reviewer, orchestrator)", exit: 2, retryable: false, fix: "Set CANON_ROLE to planner, implementer, reviewer or orchestrator, or unset it." },
-    CodeInfo { code: "UNKNOWN_SPEC_ROOT", meaning: "`--project-id` names no spec root configured in canon.yaml, so nothing was written", exit: 2, retryable: false, fix: "Pass a --project-id that names a spec root configured in canon.yaml." },
+    CodeInfo { code: "UNKNOWN_SPEC_ROOT", meaning: "`--project` names no spec root configured in canon.yaml, so nothing was written", exit: 2, retryable: false, fix: "Pass a --project that names a spec root configured in canon.yaml." },
     CodeInfo { code: "UNVERIFIABLE", meaning: "a check examined nothing, so it cannot report clean: data.unverifiable is true and meta.coverage says what was looked at", exit: 1, retryable: false, fix: "Widen the check so it examines something; meta.coverage says what was looked at." },
     CodeInfo { code: "USAGE", meaning: "the command line did not parse: an unknown flag or subcommand, or a missing or malformed argument", exit: 2, retryable: false, fix: "Run the command with --help and correct the flag, subcommand or argument." },
     CodeInfo { code: "WRITE_FAILED", meaning: "a file or ledger record could not be written", exit: 2, retryable: false, fix: "Check that the target path is writable and has space, then run the command again." },

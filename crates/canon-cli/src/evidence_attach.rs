@@ -39,7 +39,7 @@
 //! not a binding.
 //!
 //! # One report, many records (0.18 D1)
-//! With no `--scenario-id`, a task's evidence binds EVERY case in the
+//! With no `--scenario`, a task's evidence binds EVERY case in the
 //! report ([`BindRequest::all_cases`]), so a faithful verdict needs all
 //! of them to pass. `--all-scenarios` ([`bind_all_scenarios`]) binds the
 //! report once and splits it by owner: each indexed scenario that owns
@@ -237,7 +237,7 @@ pub struct BindRequest<'a> {
     /// The scenario id the default case match looks for.
     pub scenario_id: Option<&'a str>,
     /// Bind every case of every report (0.18 D1): a task's evidence with
-    /// no `--scenario-id` and no `--report-case`.
+    /// no `--scenario` and no `--report-case`.
     pub all_cases: bool,
     /// `--verdict` as claimed (an audit's result counts as a claim). `None`:
     /// with a report bound the verdict is derived from the bound cases
@@ -777,7 +777,7 @@ pub fn bind_all_scenarios(request: &BatchRequest<'_>) -> Result<BatchBound, Bind
     for (scope, attachment, _) in &scoped {
         if !batch.scenarios.iter().any(|s| s.scenario_id == *scope) {
             return Err(BindError::usage(
-                format!("--artifact `{scope}={}` names a scenario with no record in this batch; the batch writes a record only for an indexed scenario of --project-id that owns a case in the report", attachment.path),
+                format!("--artifact `{scope}={}` names a scenario with no record in this batch; the batch writes a record only for an indexed scenario of --project that owns a case in the report", attachment.path),
                 "check the scenario id, index the scenario (`canon inventory sync`) and name its test after the id so the report carries a case for it, or drop the scoped --artifact",
             )
             .on("--artifact"));
@@ -883,8 +883,8 @@ fn names_case(case: &ReportCase, name: &str) -> bool {
 /// No report case could be bound.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum CaseMatchError {
-    /// Nothing to match by: no `--scenario-id` and no `--report-case`.
-    #[error("no --scenario-id to match the report by; name the case with --report-case")]
+    /// Nothing to match by: no `--scenario` and no `--report-case`.
+    #[error("no --scenario to match the report by; name the case with --report-case")]
     NothingToMatchBy,
     /// Nothing in the report matched. `wanted` reads `for scenario `x` or named `y``.
     #[error("no case {wanted} among its {total} case(s); start the test name with the scenario id or tag it, or name the case with --report-case")]
@@ -1410,7 +1410,7 @@ mod tests {
         assert_eq!(parse_report_spec("junit").unwrap_err().to_string(), "`junit` is not <junit|cucumber|swift-testing>:<path>");
         assert_eq!(parse_report_spec("tap:a.tap").unwrap_err().to_string(), "`tap` is not a supported report format (expected junit, cucumber or swift-testing)");
         assert_eq!(parse_report_spec("junit:").unwrap_err().to_string(), "`junit:` names no file");
-        assert_eq!(match_cases(&[], &[], None).unwrap_err().to_string(), "no --scenario-id to match the report by; name the case with --report-case");
+        assert_eq!(match_cases(&[], &[], None).unwrap_err().to_string(), "no --scenario to match the report by; name the case with --report-case");
         assert_eq!(
             match_cases(&[], &["x".to_string()], Some("a.b.01")).unwrap_err().to_string(),
             "no case for scenario `a.b.01` or named `x` among its 0 case(s); start the test name with the scenario id or tag it, or name the case with --report-case"

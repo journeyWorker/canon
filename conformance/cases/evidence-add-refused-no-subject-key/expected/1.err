@@ -1,2 +1,2 @@
-canon evidence add: EVIDENCE_INVALID_ARGUMENT — give --task-id, --scenario-id, or both; a record with neither carries no coverage subject and no gate can read it back
+canon evidence add: EVIDENCE_INVALID_ARGUMENT — give --task, --scenario, or both; a record with neither carries no coverage subject and no gate can read it back
 hint: `canon schema evidence add` lists the accepted arguments and their forms

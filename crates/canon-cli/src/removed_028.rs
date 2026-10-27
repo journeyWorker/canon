@@ -1,5 +1,6 @@
-//! The "Removed in 0.28" table: every 0.27 spelling (a command, a bare group
-//! that used to run, an option) with the 0.28 spelling that replaced it.
+//! The removed-spellings table: every removed spelling (a command, a bare group
+//! that used to run, an option) with the spelling that replaced it: the 0.27
+//! spellings 0.28 replaced, and the 0.30 `--<noun>-id` options 0.31 made bare nouns.
 //!
 //! One data table, three consumers: [`crate::removed`] reads it to turn an old
 //! spelling into a usage error (exit 2, `error.hint` names the replacement,
@@ -43,7 +44,8 @@ pub struct Row {
 }
 
 const V28: &str = "0.28.0";
-const V24: &str = "0.24.0";
+/// The release that made every id option a bare noun (`--actor-id` became `--actor`).
+pub const V31: &str = "0.31.0";
 
 const fn command(old: &'static str, new: &'static str, note: &'static str, rule: &'static str) -> Row {
     Row { kind: Kind::Command, old, scope: &[], new, note, rule, since: V28, operand: false }
@@ -62,16 +64,15 @@ const fn operand(old: &'static str, scope: &'static [&'static str], new: &'stati
     Row { kind: Kind::Option, old, scope, new, note, rule, since: V28, operand: true }
 }
 
-/// An option 0.24 renamed; 0.25 stopped parsing the old name.
-const fn renamed_024(old: &'static str, scope: &'static [&'static str], new: &'static str) -> Row {
-    Row { kind: Kind::Option, old, scope, new, note: "", rule: "one name per concept", since: V24, operand: false }
+/// An id option 0.31 renamed to the bare noun: the option takes the same value on the same command.
+const fn bare_noun(old: &'static str, scope: &'static [&'static str], new: &'static str) -> Row {
+    Row { kind: Kind::Option, old, scope, new, note: "", rule: "an id option is the bare noun", since: V31, operand: false }
 }
 
 const CHANGE_OPERAND: &[&str] = &["brief show", "brief check", "brief approve"];
 const SCENARIO_OPERAND: &[&str] = &["divergence add", "divergence defer", "divergence resolve", "divergence accept"];
 const REVIEWER: &[&str] = &["divergence add", "divergence defer", "divergence resolve", "divergence accept", "finding add", "review scenario", "review change"];
 const SKILLS: &[&str] = &["skills install", "skills check", "skills doctor"];
-const TASK: &[&str] = &["dispatch begin", "evidence add", "evidence approval-payload"];
 const DESTRUCTIVE: &[&str] = &["artifacts move", "ledger compact", "migrate", "purge", "tier age"];
 
 /// Every removed spelling, in the order of the table's 0.27 → 0.28 sections.
@@ -108,7 +109,7 @@ pub const ROWS: &[Row] = &[
     operand("--change", CHANGE_OPERAND, "brief show", "the change is the operand", "D1 r2"),
     operand("--change-id", &["finding close"], "finding close", "the change is the operand", "D1 r2"),
     operand("--run-id", &["dispatch end"], "dispatch end", "the run is the operand", "D1 r1"),
-    operand("--subject-id", &["subject adopt", "subject unadopt"], "subject adopt", "the subject is the operand and the change is `--change-id`", "D1 r1"),
+    operand("--subject-id", &["subject adopt", "subject unadopt"], "subject adopt", "the subject is the operand and the change is `--change`", "D1 r1"),
     operand("--name", &["prompt add", "prompt show"], "prompt add", "name and version are one operand, name@version", "D1 r1, D12"),
     operand("--version", &["prompt add", "prompt show"], "prompt add", "name and version are one operand, name@version", "D1 r1, D12"),
     operand("--scenario-id", SCENARIO_OPERAND, "divergence add", "the scenario is the operand", "D1 r2"),
@@ -121,8 +122,8 @@ pub const ROWS: &[Row] = &[
     option("--from", &["scenario new"], "--input", "a batch is an `--input` array with `operands` per element", "D7"),
     option("--all", &["schema"], "schema", "the listing is unfiltered; `--as` filters it by role", "D3"),
     // ── Attribution and approval options ──
-    option("--agent-id", &["dispatch begin"], "--actor-id", "", "D1 Renames"),
-    option("--reviewer", REVIEWER, "--actor-id", "it is the reviewer, and required where `--reviewer` was", "D1 Renames, O9"),
+    option("--agent-id", &["dispatch begin"], "--actor", "", "D1 Renames"),
+    option("--reviewer", REVIEWER, "--actor", "it is the reviewer, and required where `--reviewer` was", "D1 Renames, O9"),
     option("--by", &["brief approve", "policy approve"], "--approver", "", "D1 Renames"),
     option("--principal", &["strategy approval-payload"], "--approver", "", "D1 Renames"),
     option("--approval-by", &["evidence add", "evidence approval-payload"], "--approver", "", "D1 Renames"),
@@ -147,9 +148,6 @@ pub const ROWS: &[Row] = &[
     option("--status", &["dispatch end"], "--run-outcome", "", "D1 Renames, D12"),
     option("--status", &["divergence add"], "--state", "", "D1 Renames, D12"),
     option("--outcome", &["review scenario", "review change"], "--review-outcome", "", "D12"),
-    option("--task", TASK, "--task-id", "", "D1 Renames"),
-    option("--plugin", &["query"], "--plugin-id", "", "D1 Renames"),
-    option("--parent-run", &["dispatch begin"], "--parent-run-id", "", "D1 Renames"),
     option("--source", SKILLS, "--skills-source", "", "D12"),
     option("--source", &["ingest plans"], "--plan-source", "", "D1 Renames, D12"),
     option("--role", &["regime show"], "--role-segment", "", "D1 Renames, D5"),
@@ -166,12 +164,21 @@ pub const ROWS: &[Row] = &[
     option("--evaluator-version", &["evidence add"], "evidence audit", "an external evaluator's re-audit is its own command", "Q3"),
     option("--evaluator-digest", &["evidence add"], "evidence audit", "an external evaluator's re-audit is its own command", "Q3"),
     option("--audit-result", &["evidence add"], "evidence audit", "an external evaluator's re-audit is its own command", "Q3"),
-    // ── 0.24 renames (removed in 0.25) ──
-    renamed_024("--change", &["scenario new"], "--change-id"),
-    renamed_024("--project", &["feature new", "scenario new"], "--project-id"),
-    renamed_024("--subject", &["change new", "retrieve", "scenario new"], "--subject-id"),
-    renamed_024("--actor", &["feature new", "strategy rollback", "scenario new"], "--actor-id"),
-    renamed_024("--run", &["ingest records"], "--run-id"),
+    // ── 0.31: an id option is the bare noun ──
+    bare_noun("--actor-id", &["dispatch begin", "divergence accept", "divergence add", "divergence defer", "divergence resolve", "evidence add", "evidence audit", "feature new", "finding add", "finding close", "review change", "review scenario", "scenario new", "strategy rollback", "subject move", "subject new"], "--actor"),
+    bare_noun("--session-id", &["dispatch begin", "divergence accept", "divergence add", "divergence defer", "divergence resolve", "evidence add", "evidence audit", "feature new", "finding add", "finding close", "review change", "review scenario", "scenario new", "subject move", "subject new"], "--session"),
+    bare_noun("--project-id", &["divergence accept", "divergence add", "divergence defer", "divergence resolve", "evidence add", "evidence approval-payload", "evidence audit", "feature new", "review change", "review scenario", "scenario new"], "--project"),
+    bare_noun("--change-id", &["finding add", "finding list", "query", "scenario new", "subject adopt", "subject unadopt"], "--change"),
+    bare_noun("--run-id", &["evidence add", "evidence approval-payload", "evidence audit", "ingest records"], "--run"),
+    bare_noun("--task-id", &["dispatch begin", "evidence add", "evidence approval-payload"], "--task"),
+    bare_noun("--subject-id", &["change new", "retrieve", "scenario new"], "--subject"),
+    bare_noun("--scenario-id", &["evidence add", "evidence approval-payload", "finding add"], "--scenario"),
+    bare_noun("--skill-id", &["dispatch begin"], "--skill"),
+    bare_noun("--parent-run-id", &["dispatch begin"], "--parent-run"),
+    bare_noun("--evaluator-id", &["evidence audit"], "--evaluator"),
+    bare_noun("--review-id", &["finding add"], "--review"),
+    bare_noun("--plugin-id", &["query"], "--plugin"),
+    bare_noun("--contradicting-trajectory-id", &["strategy rollback"], "--contradicting-trajectory"),
 ];
 
 #[cfg(test)]

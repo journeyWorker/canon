@@ -17,7 +17,7 @@ state they are in.
 The order an agent follows to claim a subject done:
 
 1. **Test-run evidence** per owned scenario (`canon evidence add
-   --scenario-id <id> --project-id <root-id> --session-id <session>` and the
+   --scenario <id> --project <root-id> --session <session>` and the
    rest of its options;
    final when it returns under `write: { promote: auto }`, which
    `canon init` writes, and followed by `canon gate promote` only under
@@ -26,9 +26,9 @@ The order an agent follows to claim a subject done:
    each issue the reviewer raises as a Finding, fix it, then close it:
 
    ```bash
-   canon finding add --change-id c-demo --round 1 --seq 1 \
-     --severity blocker --introduced-unknown --disposition open --actor-id reviewer-2 \
-     --summary "unbounded subprocess wait" --session-id review-session-1
+   canon finding add --change c-demo --round 1 --seq 1 \
+     --severity blocker --introduced-unknown --disposition open --actor reviewer-2 \
+     --summary "unbounded subprocess wait" --session review-session-1
    # ... fix, commit ...
    canon finding close c-demo --round 1 --seq 1 \
      --disposition fixed --resolution-rev HEAD
@@ -42,9 +42,9 @@ The order an agent follows to claim a subject done:
    the evidence is in (the review pins what it saw):
 
    ```bash
-   canon review scenario world.demo.01 --project-id root \
-     --actor-id reviewer-2 --role reviewer \
-     --session-id review-session-1 \
+   canon review scenario world.demo.01 --project root \
+     --actor reviewer-2 --role reviewer \
+     --session review-session-1 \
      --rev HEAD --upstream-ref "pr#41"
    ```
 
@@ -72,12 +72,12 @@ key, because two different findings under one key are two reviewers'
 work collapsed into one identity.
 
 ```text
-canon finding add --change-id <c> --round <n> --seq <n> \
+canon finding add --change <c> --round <n> --seq <n> \
   --severity blocker|should-fix|note --disposition open \
-  --actor-id <who> --summary "<one line>" \
-  [--rev <rev>] [--resolution-rev <rev>] [--introduced-rev <rev> | --introduced-unknown] [--file-ref path/to/file.rs:120-134] [--scenario-id <id>] [--session-id <id>]
+  --actor <who> --summary "<one line>" \
+  [--rev <rev>] [--resolution-rev <rev>] [--introduced-rev <rev> | --introduced-unknown] [--file-ref path/to/file.rs:120-134] [--scenario <id>] [--session <id>]
 canon finding close <c> --round <n> --seq <n> \
-  --disposition fixed --resolution-rev <rev> [--actor-id <id>] [--session-id <id>]   # or rejected / deferred / open
+  --disposition fixed --resolution-rev <rev> [--actor <id>] [--session <id>]   # or rejected / deferred / open
 canon finding close <c> --round <n> --seq <n> \
   --disposition rejected|deferred --reason "<why, one line>"
 ```
@@ -88,7 +88,7 @@ on the closing version, shown by `finding list` as `[reason: …]` and carried
 in the JSON. Give the reason when you reject or defer: it is the only record
 of why the finding was not fixed.
 
-`--scenario-id` (repeatable, each a scenario the index knows; refused with
+`--scenario` (repeatable, each a scenario the index knows; refused with
 `FINDING_UNKNOWN_SCENARIO` otherwise) names the scenarios the finding is
 about. After a `fixed` close, fresh evidence for those scenarios alone
 re-verifies the fix; a finding naming none asks every evidenced scenario of
@@ -103,7 +103,7 @@ run; nothing to promote``); under `write.promote: manual`
 changes only the disposition (and `resolution_sha` with it); severity,
 reviewer, summary, and refs are copied from the committed record. It
 appends a second version at the same natural key — the first stays. Its
-`--actor-id` and `--session-id` name who authored the transition; the
+`--actor` and `--session` name who authored the transition; the
 raiser's stay on the first version.
 
 Every commit option (`--rev`, `--resolution-rev`, `--introduced-rev`)
@@ -120,7 +120,7 @@ Outside git, or in a repository with no commit, the write is refused with
 
 Many findings at once: `--input` takes inline JSON, a file or `-`; an array
 (or NDJSON) is a batch validated before any write. Keys are the option
-names in camelCase (`changeId`, `actorId`, `resolutionRev`); `canon schema
+names in camelCase (`change`, `actor`, `resolutionRev`); `canon schema
 finding add --json` shows the input schema and an example. An identical
 repeat is `unchanged` (`meta.unchanged`) and writes nothing; a different
 finding under an occupied key is `FINDING_SEQ_OCCUPIED`.
@@ -128,13 +128,13 @@ finding under an occupied key is `FINDING_SEQ_OCCUPIED`.
 ### A defect the author found in its own work
 
 Record it like any other finding, at the moment you find it and before
-review, with `--actor-id` set to your own id; never ask
+review, with `--actor` set to your own id; never ask
 the reviewer to record it later under theirs. Nothing refuses a finding
 whose reviewer is also the implementer, and an open `blocker` the author
 raised blocks under `block_on_findings` exactly like a reviewer's.
 `--introduced-rev` names the commit that introduced the defect, not who
 found it: `--introduced-rev self` is a usage error (exit 2) that points at
-`--actor-id`.
+`--actor`.
 
 ### Severities
 
@@ -169,20 +169,20 @@ fixed finding reopened with `--disposition open` counts as open again.
 ## `canon review scenario`
 
 ```text
-canon review scenario <scenario-id> [<scenario-id>] --project-id <root-id> \
-  --actor-id <who> [--rev <rev>] --role <role> \
-  (--upstream-ref <ref> | --original-spec-ref <ref>) [--session-id <id>] \
+canon review scenario <scenario-id> [<scenario-id>] --project <root-id> \
+  --actor <who> [--rev <rev>] --role <role> \
+  (--upstream-ref <ref> | --original-spec-ref <ref>) [--session <id>] \
   [--review-outcome signed|indeterminate|unavailable] \
   [--reviewer-provider <p>] [--reviewer-model <m>] [--reviewer-harness <h>] \
   [--artifact <path>] [--artifact <path>] [--max-artifact-mib <MiB>]
-canon review change <slug> --project-id <root> --actor-id <who> [--rev <rev>] \
+canon review change <slug> --project <root> --actor <who> [--rev <rev>] \
   --role reviewer (--upstream-ref <ref> | --original-spec-ref <ref>)   # a chore, below
 ```
 
 One attributed Review record per scenario, joined on
 `(project_id, scenario_id)` — both are required because two spec roots
 may carry the same scenario id. Exactly one provenance ref is required.
-`--actor-id` is the reviewer and is required; `--session-id` fills `actor.session_id`.
+`--actor` is the reviewer and is required; `--session` fills `actor.session_id`.
 A Review carries no verdict about the behavior; the `verifying → shipped`
 ship gate still refuses missing or `Divergent` evidence verdicts on its
 own (a `Divergent` one passes only while a human's `canon divergence
@@ -321,7 +321,7 @@ sign-off or a rejection, and `review scenario` says so. `--reviewer-provider`,
 `--reviewer-model` and `--reviewer-harness` record the runtime that
 produced the review, as given. An empty or padded label is a usage error.
 
-`--session-id` (on `evidence add`, `review scenario`, `finding add` and
+`--session` (on `evidence add`, `review scenario`, `finding add` and
 `finding close`) takes one opaque token: non-empty, no surrounding
 whitespace, no control characters. Anything else is a usage error
 (exit 2) and nothing is written.
@@ -346,7 +346,7 @@ spec_coverage:
   `spec_coverage.scope`. `spec_coverage.exclude_lanes` also exempts
   scenarios from review.
 - **`distinct_actor`** — a review only counts when both its `reviewer`
-  and its actor (`--actor-id`) differ from every actor on that
+  and its actor (`--actor`) differ from every actor on that
   scenario's evidence records, and, when the review carries a session,
   that session differs from every session on those evidence records. An
   agent cannot review its own attested work, under another id or from
@@ -484,7 +484,7 @@ routing. The new Subject record lists exactly the violations it let
 through:
 `status_override: {to, reason, waived: [{class, subject}], actor: {agent_id}}`
 (`subject` is the scenario id, or `<change_id>#<round>.<seq>` for a
-blocker; actor from `--actor-id`, default `canon`). The command prints
+blocker; actor from `--actor`, default `canon`). The command prints
 the `waived ...` lines and `override recorded by `lead` for the N
 violation(s) above: <reason>`. A blank or multi-line reason exits 2. The
 waiver covers only what it recorded, and clears on the subject's next

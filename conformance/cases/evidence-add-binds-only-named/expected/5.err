@@ -1,5 +1,5 @@
 error: unexpected argument '--drop-attachment' found
 
-Usage: canon evidence add --scenario-id <SCENARIO_ID> --project-id <PROJECT_ID> --class <CLASS> --ref <TEXT> --role <ROLE> --actor-id <ACTOR_ID> --artifact <PATH>
+Usage: canon evidence add --scenario <SCENARIO_ID> --project <PROJECT_ID> --class <CLASS> --ref <TEXT> --role <ROLE> --actor <ACTOR_ID> --artifact <PATH>
 
 For more information, try '--help'.

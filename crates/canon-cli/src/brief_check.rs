@@ -300,7 +300,7 @@ pub enum FlowError {
     #[error("no subject `{0}`")]
     NoSubject(String),
     /// The subject has adopted no change.
-    #[error("subject `{0}` has not adopted a change; run `canon change new <slug> --subject-id {0}`")]
+    #[error("subject `{0}` has not adopted a change; run `canon change new <slug> --subject {0}`")]
     NoAdoptedChange(String),
 }
 
@@ -1751,7 +1751,7 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
     if let Some(change) = requested {
         return crate::brief::canon_brief(repo, change)
             .map(|path| (change.clone(), path))
-            .ok_or_else(|| CliError::failed("BRIEF_NOT_FOUND", format!("no brief at {}/{}/brief.md", paths::CHANGES_DIR, change.as_str())).hint("check the slug against the changes directory, or create the change with `canon change new <slug> --subject-id <id> --title <title>`"));
+            .ok_or_else(|| CliError::failed("BRIEF_NOT_FOUND", format!("no brief at {}/{}/brief.md", paths::CHANGES_DIR, change.as_str())).hint("check the slug against the changes directory, or create the change with `canon change new <slug> --subject <id> --title <title>`"));
     }
     let dir = repo.join(paths::CHANGES_DIR);
     let mut live: Vec<(ChangeId, PathBuf)> = std::fs::read_dir(&dir)
@@ -1763,7 +1763,7 @@ fn resolve_change(repo: &Path, requested: Option<&ChangeId>) -> Result<(ChangeId
         .collect();
     live.sort_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
     match live.len() {
-        0 => Err(CliError::failed("NO_BRIEF", format!("no brief under {}/; write one with `canon change new`", paths::CHANGES_DIR)).hint("create one with `canon change new <slug> --subject-id <id> --title <title>`; it scaffolds brief.md")),
+        0 => Err(CliError::failed("NO_BRIEF", format!("no brief under {}/; write one with `canon change new`", paths::CHANGES_DIR)).hint("create one with `canon change new <slug> --subject <id> --title <title>`; it scaffolds brief.md")),
         1 => Ok(live.remove(0)),
         _ => Err(CliError::failed(
             "CHANGE_AMBIGUOUS",
@@ -1930,7 +1930,7 @@ pub struct BriefCheckReport<'a> {
 
 impl Report for BriefCheckReport<'_> {}
 
-/// `canon brief check [--change-id <slug>] [--json]`.
+/// `canon brief check [--change <slug>] [--json]`.
 pub fn run_check(repo: &Path, change: Option<&ChangeId>, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
     let checked = match check(&repo, change) {
@@ -2133,7 +2133,7 @@ mod tests {
         assert_eq!(message(FlowError::NoFlowSteps { change: c() }), "the brief of change `add-cart` defines no flow steps (`F1`, `F2`, …); write the flow first");
         assert_eq!(message(FlowError::UnknownFlowStep { change: c(), flow: "F9".to_string(), known: "F1, F2".to_string() }), "the brief of change `add-cart` defines no flow step `F9` (it has F1, F2)");
         assert_eq!(message(FlowError::NoSubject("cart".to_string())), "no subject `cart`");
-        assert_eq!(message(FlowError::NoAdoptedChange("cart".to_string())), "subject `cart` has not adopted a change; run `canon change new <slug> --subject-id cart`");
+        assert_eq!(message(FlowError::NoAdoptedChange("cart".to_string())), "subject `cart` has not adopted a change; run `canon change new <slug> --subject cart`");
         assert_eq!(message(FlowError::ChangeUnresolved(CliError::refused("USAGE", "no live change"))), "USAGE — no live change; name the change as the operand");
     }
 
@@ -2154,7 +2154,7 @@ mod tests {
             "The `Save` button and the `Save draft` label.",
             "Next.js로 만든 화면과 `iPhone` 이용자, src/dst 두 지점.",
             "The `저장` button and the `No calendar shared` label.",
-            "Pass `--project-id` to `canon brief check`.",
+            "Pass `--project` to `canon brief check`.",
             "Read and/or write, yes/no, read/write access.",
             "On 2026/10/21 the 1/2 share opens.",
             "The /settings/profile route and https://example.com/a/b.html open.",

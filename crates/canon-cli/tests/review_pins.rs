@@ -68,7 +68,7 @@ fn reviewed_repo() -> tempfile::TempDir {
     std::fs::write(repo.join(".canon/policy.yaml"), "spec_coverage:\n  require_review:\n    scope: []\n").unwrap();
     write_feature(repo, BASE);
     for id in ["cart.add.01", "cart.add.02"] {
-        ok(repo, &["evidence", "add", "--scenario-id", id, "--project-id", "root", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
+        ok(repo, &["evidence", "add", "--scenario", id, "--project", "root", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor", "impl-agent"]);
     }
     ok(repo, &["gate", "promote"]);
     assert!(gate(repo, 1).contains("unreviewed-promotion cart.add.01 — no review record"), "require_review covers these scenarios");
@@ -76,8 +76,8 @@ fn reviewed_repo() -> tempfile::TempDir {
         let out = ok(
             repo,
             &[
-                "review", "scenario", id, "--project-id", "root", "--original-spec-ref", FEATURE, "--actor-id",
-                "reviewer-2", "--role", "reviewer", "--session-id", "sess-review",
+                "review", "scenario", id, "--project", "root", "--original-spec-ref", FEATURE, "--actor",
+                "reviewer-2", "--role", "reviewer", "--session", "sess-review",
             ],
         );
         assert!(out.contains(&format!("pinned {id} at scenario digest ")), "{out}");
@@ -132,8 +132,8 @@ fn record_suite(repo: &Path, report: &str) {
     ok(
         repo,
         &[
-            "evidence", "add", "--project-id", "root", "--all-scenarios", "--report", "junit:reports/junit.xml", "--class", "test-run", "--ref", "npm test", "--role", "implementer",
-            "--actor-id", "impl-agent",
+            "evidence", "add", "--project", "root", "--all-scenarios", "--report", "junit:reports/junit.xml", "--class", "test-run", "--ref", "npm test", "--role", "implementer",
+            "--actor", "impl-agent",
         ],
     );
     ok(repo, &["gate", "promote"]);
@@ -164,8 +164,8 @@ fn reviewed_against_a_report() -> tempfile::TempDir {
         ok(
             repo,
             &[
-                "review", "scenario", id, "--project-id", "root", "--original-spec-ref", FEATURE, "--actor-id", "reviewer-2",
-                "--role", "reviewer", "--session-id", "sess-review",
+                "review", "scenario", id, "--project", "root", "--original-spec-ref", FEATURE, "--actor", "reviewer-2",
+                "--role", "reviewer", "--session", "sess-review",
             ],
         );
     }
@@ -208,7 +208,7 @@ fn review_add_32_a_changed_verdict_stales_the_review() {
     ok(
         repo,
         &[
-            "evidence", "add", "--project-id", "root", "--scenario-id", "cart.add.02", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent",
+            "evidence", "add", "--project", "root", "--scenario", "cart.add.02", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor", "impl-agent",
             "--verdict", "divergent", "--summary", "the count is off by one",
         ],
     );

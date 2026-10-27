@@ -189,7 +189,7 @@ Feature: evidence add
   @evidence.add.19
   Scenario: Evidence records the attesting session
     Given a scenario
-    When evidence is added with --actor-id and --session-id and promoted
+    When evidence is added with --actor and --session and promoted
     Then the committed record's actor carries the agent id, the role and the session_id
 
   # canon: {"schema":1,"at":"2026-10-10T16:02:33Z","actor":{"agent_id":"canon"}}
@@ -199,7 +199,7 @@ Feature: evidence add
   Scenario: A session id outside the SessionId grammar is refused and nothing is written
     Given a session id with a control character, surrounding whitespace, or nothing at all
     When evidence add or review scenario is run with it
-    Then the command exits 2 naming --session-id
+    Then the command exits 2 naming --session
     And nothing is staged or committed
 
   # canon: {"schema":1,"at":"2026-10-10T16:02:33Z","actor":{"agent_id":"canon"}}
@@ -464,7 +464,7 @@ Feature: evidence add
     When evidence is added with --all-scenarios
     Then the add exits 1 with the brief refusal and nothing is staged for any scenario
     And a summary carrying a fabrication marker refuses the batch the same way
-    And --all-scenarios with --scenario-id, --task-id, --report-case or an approval, or without --report, is refused with exit 2
+    And --all-scenarios with --scenario, --task, --report-case or an approval, or without --report, is refused with exit 2
 
   # canon: {"schema":1,"at":"2026-10-12T15:00:00Z","actor":{"agent_id":"018-n1-impl"}}
   @subject:evidence-attestation
@@ -472,7 +472,7 @@ Feature: evidence add
   @evidence.add.84
   Scenario: A task's report with no scenario id binds every case in it
     Given a task row and a report whose cases carry no scenario id
-    When evidence is added with --task-id and --report and no --scenario-id
+    When evidence is added with --task and --report and no --scenario
     Then the record binds every case in the report
     And when any case failed, a faithful verdict is refused with exit 1 and nothing is staged
 
@@ -578,7 +578,7 @@ Feature: evidence add
   @evidence.add.98
   Scenario: A single scenario's report binds the attachments of the cases matched to it
     Given a report with attachments on the cases of two scenarios
-    When evidence is added for one scenario with --scenario-id and --report
+    When evidence is added for one scenario with --scenario and --report
     Then the record binds the report and the files of that scenario's cases only
 
   # canon: {"schema":1,"at":"2026-10-18T09:00:00Z","actor":{"agent_id":"attachments-impl"}}
@@ -627,9 +627,9 @@ Feature: evidence add
   @evidence.add.103
   Scenario: A project id that names no configured spec root is refused before anything is written
     Given a repo whose canon.yaml configures one spec root, game, and a scenario indexed under it
-    When evidence add names a --project-id that is no configured root, for one scenario and with --all-scenarios
+    When evidence add names a --project that is no configured root, for one scenario and with --all-scenarios
     Then each add exits 2 with UNKNOWN_SPEC_ROOT before anything is staged, bound or written
-    And the hint names the one root to use, `--project-id game`, and the same add under game is accepted
+    And the hint names the one root to use, `--project game`, and the same add under game is accepted
 
   # canon: {"schema":1,"at":"2026-10-21T16:35:10Z","actor":{"agent_id":"canon-impl-026"}}
   @subject:evidence-attestation
@@ -637,7 +637,7 @@ Feature: evidence add
   @evidence.add.104
   Scenario: The refusal of an unknown project id lists every configured spec root
     Given a repo whose canon.yaml configures two spec roots
-    When evidence add names a --project-id that matches neither
+    When evidence add names a --project that matches neither
     Then it exits 2 with UNKNOWN_SPEC_ROOT, and the message, the hint and the JSON expected list name both roots
     And a root id that is configured is accepted whichever order the roots are listed in
 
@@ -647,7 +647,7 @@ Feature: evidence add
   @evidence.add.105
   Scenario: An approval payload is not issued for a project id that names no configured spec root
     Given a repo whose canon.yaml configures one spec root, game
-    When evidence approval-payload names a --project-id that is no configured root
+    When evidence approval-payload names a --project that is no configured root
     Then it exits 2 with UNKNOWN_SPEC_ROOT and prints no payload bytes
     And the payload for the configured root is still printed
 
@@ -825,7 +825,7 @@ Feature: evidence add
   @evidence.add.121
   Scenario: An approval payload prints the exact bytes to sign and writes nothing
     Given a repo with one indexed scenario
-    When canon evidence approval-payload is run with --scenario-id, --project-id, --approver alice and --approval-at, with and without --json
+    When canon evidence approval-payload is run with --scenario, --project, --approver alice and --approval-at, with and without --json
     Then it exits 0 and prints one JSON document with no trailing newline, naming namespace canon-approval-v1, the scenario as subject, the project, the actor alice and the approval time
     And --json carries the same bytes as payload and their lower-case hex as payloadHex
     And nothing in the tree changed
@@ -837,7 +837,7 @@ Feature: evidence add
   @evidence.add.122
   Scenario: An approval payload is refused without a task or scenario, or with an unreadable time, and prints no bytes
     Given a repo with one indexed scenario
-    When canon evidence approval-payload is run with neither --task-id nor --scenario-id, with --approval-at yesterday, or with no --approver
+    When canon evidence approval-payload is run with neither --task nor --scenario, with --approval-at yesterday, or with no --approver
     Then each exits 2, the first with EVIDENCE_REFUSED and the others as usage errors naming invalid timestamp and --approver
     And no payload bytes reach stdout
     And the tree is unchanged
@@ -882,7 +882,7 @@ Feature: evidence add
   @evidence.add.130
   Scenario: An approval payload for a scenario the index does not hold is refused and prints no bytes
     Given a repo with one indexed scenario
-    When canon evidence approval-payload is run with --scenario-id naming a scenario the index does not hold, and then with the indexed one
+    When canon evidence approval-payload is run with --scenario naming a scenario the index does not hold, and then with the indexed one
     Then the first exits 2 with EVIDENCE_SCENARIO_NOT_INDEXED, its message names the id and the spec root and its hint points to canon inventory sync, and stdout is empty
     And the indexed scenario exits 0 and prints the bytes to sign
     And the tree is unchanged after both

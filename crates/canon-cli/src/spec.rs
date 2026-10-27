@@ -53,7 +53,7 @@ struct EnvVar {
 /// `crates/` that is neither here nor in [`INTERNAL_ENV`] fails
 /// `tests/cli_spec.rs`.
 const ENV_VARS: &[EnvVar] = &[
-    EnvVar { name: "CANON_ACTOR", about: "Default actor id (`--actor-id`) of `feature new` and `scenario new`, and the actor of `query` and `export` audit lines; falls back to `USER`" },
+    EnvVar { name: "CANON_ACTOR", about: "Default actor id (`--actor`) of `feature new` and `scenario new`, and the actor of `query` and `export` audit lines; falls back to `USER`" },
     EnvVar { name: "CANON_INGEST_CLAUDE_SESSIONS_DIR", about: "An extra directory `ingest sessions` scans for Claude Code sessions, besides `~/.claude/projects`" },
     EnvVar { name: "CANON_INGEST_OMP_SESSIONS_DIR", about: "An extra directory `ingest sessions` scans for omp sessions, besides the default roots" },
     EnvVar { name: "CANON_PG_DSN", about: "Connection string of the Postgres tier (falls back to `DATABASE_URL`)" },

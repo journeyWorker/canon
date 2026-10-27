@@ -132,7 +132,7 @@ fn a_fresh_change_is_the_planners_step_until_its_brief_is_clean() {
     for args in [&["init", "--providers", "none"][..], &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"][..]] {
         assert!(canon(repo, args).status.success(), "{args:?}");
     }
-    let created = canon(repo, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login", "--json"]);
+    let created = canon(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login", "--json"]);
     assert!(created.status.success(), "{}", String::from_utf8_lossy(&created.stderr));
     let created: Value = serde_json::from_slice(&created.stdout).unwrap();
     let step = &created["meta"]["next"][0];

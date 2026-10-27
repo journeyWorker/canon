@@ -75,7 +75,7 @@ fn repo() -> TempDir {
     for id in ["s", "t"] {
         ok(repo, &["subject", "new", id, "--domain", "dev", "--title", id]);
     }
-    ok(repo, &["feature", "new", "shop.cart", "--title", "Cart", "--actor-id", "u"]);
+    ok(repo, &["feature", "new", "shop.cart", "--title", "Cart", "--actor", "u"]);
     for step in ["specced", "building", "verifying"] {
         ok(repo, &["subject", "move", "s", "--to", step]);
     }
@@ -87,7 +87,7 @@ fn repo() -> TempDir {
 
 /// `change` adopted by `subject` with a complete brief, approved when `approve`.
 fn change(repo: &Path, subject: &str, change: &str, approve: bool) {
-    ok(repo, &["change", "new", change, "--subject-id", subject, "--title", change]);
+    ok(repo, &["change", "new", change, "--subject", subject, "--title", change]);
     std::fs::write(brief_path(repo, change), brief("")).unwrap();
     if approve {
         approve_all(repo, &[change]);
@@ -103,7 +103,7 @@ fn approve_all(repo: &Path, changes: &[&str]) {
 
 /// A scenario of `subject` tagged `@flow:<change>.F1`, `case` happy or failure.
 fn scenario(repo: &Path, id: &str, subject: &str, flow_change: Option<&str>, case: &str) {
-    ok(repo, &["scenario", "new", id, "--title", id, "--subject-id", subject, "--case", case]);
+    ok(repo, &["scenario", "new", id, "--title", id, "--subject", subject, "--case", case]);
     if let Some(change) = flow_change {
         let path = repo.join(FEATURE);
         let text = std::fs::read_to_string(&path).unwrap();
@@ -119,7 +119,7 @@ fn cover(repo: &Path, first: u32, subject: &str, c: &str) {
 }
 
 fn attest_args<'a>(scenario: &'a str, extra: &[&'a str]) -> Vec<&'a str> {
-    let mut args = vec!["evidence", "add", "--project-id", "root", "--scenario-id", scenario, "--class", "test-run", "--ref", "run", "--role", "implementer", "--actor-id", "impl", "--promote"];
+    let mut args = vec!["evidence", "add", "--project", "root", "--scenario", scenario, "--class", "test-run", "--ref", "run", "--role", "implementer", "--actor", "impl", "--promote"];
     args.extend(extra);
     args
 }
@@ -266,7 +266,7 @@ fn subject_lifecycle_45_a_chore_that_is_not_approved_now_refuses_reopen_and_ship
     }
     assert!(ship(repo, "s").status.success());
 
-    ok(repo, &["change", "new", "bump", "--subject-id", "s", "--change-kind", "chore", "--title", "Bump"]);
+    ok(repo, &["change", "new", "bump", "--subject", "s", "--change-kind", "chore", "--title", "Bump"]);
     std::fs::write(brief_path(repo, "bump"), chore_brief()).unwrap();
     // A chore governs from the moment it is adopted: no scenario can tag it.
     let out = run(repo, &["subject", "move", "s", "--to", "verifying", "--reason", "fix", "--override-reason", "go on"]);
@@ -327,7 +327,7 @@ fn context_status_86_status_lists_a_brief_per_governing_change_with_state_and_re
     change(repo, "s", "tagged-one", false);
     cover(repo, 1, "s", "tagged-one");
     change(repo, "s", "approved-one", true);
-    ok(repo, &["change", "new", "bump", "--subject-id", "s", "--change-kind", "chore", "--title", "Bump"]);
+    ok(repo, &["change", "new", "bump", "--subject", "s", "--change-kind", "chore", "--title", "Bump"]);
     std::fs::write(brief_path(repo, "bump"), chore_brief()).unwrap();
     change(repo, "s", "draft-one", false);
 
@@ -416,7 +416,7 @@ fn evidence_add_125_an_unapproved_chore_and_a_never_approved_brief_do_not_block_
     let repo = dir.path();
     change(repo, "s", "a", true);
     scenario(repo, "shop.cart.01", "s", None, "happy");
-    ok(repo, &["change", "new", "bump", "--subject-id", "s", "--change-kind", "chore", "--title", "Bump"]);
+    ok(repo, &["change", "new", "bump", "--subject", "s", "--change-kind", "chore", "--title", "Bump"]);
     std::fs::write(brief_path(repo, "bump"), chore_brief()).unwrap();
     change(repo, "s", "d", false);
 

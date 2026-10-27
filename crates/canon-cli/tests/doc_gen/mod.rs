@@ -12,7 +12,8 @@
 //!   (`canon/skills/reference/role-<role>.md`);
 //! - `cli-<group>` (`cli-top` for the top-level leaves): one table per command
 //!   group (`packages/website/src/content/docs/{,ko/}cli.mdx`);
-//! - `removed`: the 0.27 → 0.28 table (`README.md`).
+//! - `removed`: the 0.27 → 0.28 table, and `removed-031`: the 0.30 → 0.31 table of id options that became bare nouns
+//!   (`README.md`).
 //!
 //! `tests/docs_generated.rs` rewrites (`CANON_BLESS_DOCS=1`) or drift-checks
 //! every file; `tests/docs_lint.rs` lints the result.
@@ -301,11 +302,12 @@ pub fn role_commands(spec: &Value, role: &str) -> String {
     out
 }
 
-/// The removed-spellings table of the README's Upgrading list.
-pub fn removed_table(spec: &Value) -> String {
-    let mut out = String::from("| 0.27 spelling | 0.28 spelling | What changed |\n|---|---|---|\n");
+/// The removed-spellings table of the README's Upgrading list: the rows of release `since` (`0.28.0` or `0.31.0`).
+pub fn removed_table(spec: &Value, since: &str) -> String {
+    let (old_release, new_release) = if since == "0.28.0" { ("0.27", "0.28") } else { ("0.30", "0.31") };
+    let mut out = format!("| {old_release} spelling | {new_release} spelling | What changed |\n|---|---|---|\n");
     for row in spec["removed"].as_array().expect("removed") {
-        if row["since"] != "0.28.0" {
+        if row["since"] != since {
             continue;
         }
         let old = row["old"].as_str().expect("old");
@@ -334,7 +336,11 @@ pub fn render(spec: &Value, name: &str, ko: bool) -> Option<String> {
     if let Some(group) = name.strip_prefix("cli-") {
         return groups(spec).iter().any(|g| g == group).then(|| cli_table(spec, group, ko));
     }
-    (name == "removed").then(|| removed_table(spec))
+    match name {
+        "removed" => Some(removed_table(spec, "0.28.0")),
+        "removed-031" => Some(removed_table(spec, "0.31.0")),
+        _ => None,
+    }
 }
 
 /// The block name a line opens, if it is a `begin` marker.
@@ -377,7 +383,7 @@ pub fn required_blocks(spec: &Value, rel: &str) -> Vec<String> {
         return groups(spec).iter().map(|g| format!("cli-{g}")).collect();
     }
     if rel == "README.md" {
-        return vec!["removed".into()];
+        return vec!["removed".into(), "removed-031".into()];
     }
     Vec::new()
 }

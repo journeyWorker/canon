@@ -51,17 +51,17 @@ canon context
 ```
 ```text
 # Add a divergence candidate, staged with no run_seq yet
-canon divergence add <SCENARIO_ID> --actor-id <ACTOR_ID> [--project-id <PROJECT_ID>] [--rev <REV>] [--state <open|still-divergent|resolved|deferred>] [--reason <TEXT>] [--expiry <TIMESTAMP>] [--round <N>] [--session-id <SESSION_ID>] [--detail <TEXT>] [--role <ROLE>] [--promote | --no-promote] [--input]
+canon divergence add <SCENARIO_ID> --actor <ACTOR_ID> [--project <PROJECT_ID>] [--rev <REV>] [--state <open|still-divergent|resolved|deferred>] [--reason <TEXT>] [--expiry <TIMESTAMP>] [--round <N>] [--session <SESSION_ID>] [--detail <TEXT>] [--role <ROLE>] [--promote | --no-promote] [--input]
 ```
 ```bash
-canon divergence add auth.login.01 --actor-id alice --role reviewer
+canon divergence add auth.login.01 --actor alice --role reviewer
 ```
 ```text
 # Directly record a deferred divergence (requires --reason/--expiry)
-canon divergence defer <SCENARIO_ID> --actor-id <ACTOR_ID> --reason <TEXT> --expiry <TIMESTAMP> [--project-id <PROJECT_ID>] [--rev <REV>] [--round <N>] [--session-id <SESSION_ID>] [--role <ROLE>] [--input]
+canon divergence defer <SCENARIO_ID> --actor <ACTOR_ID> --reason <TEXT> --expiry <TIMESTAMP> [--project <PROJECT_ID>] [--rev <REV>] [--round <N>] [--session <SESSION_ID>] [--role <ROLE>] [--input]
 ```
 ```bash
-canon divergence defer auth.login.01 --actor-id alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer
+canon divergence defer auth.login.01 --actor alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer
 ```
 ```text
 # List the current divergence burn-down state
@@ -72,31 +72,31 @@ canon divergence list --as-of 2030-01-01
 ```
 ```text
 # Directly record a resolved divergence
-canon divergence resolve <SCENARIO_ID> --actor-id <ACTOR_ID> [--project-id <PROJECT_ID>] [--rev <REV>] [--round <N>] [--session-id <SESSION_ID>] [--detail <TEXT>] [--role <ROLE>] [--input]
+canon divergence resolve <SCENARIO_ID> --actor <ACTOR_ID> [--project <PROJECT_ID>] [--rev <REV>] [--round <N>] [--session <SESSION_ID>] [--detail <TEXT>] [--role <ROLE>] [--input]
 ```
 ```bash
-canon divergence resolve auth.login.01 --actor-id alice --role reviewer
+canon divergence resolve auth.login.01 --actor alice --role reviewer
 ```
 ```text
 # Record one code-review finding
-canon finding add --change-id <CHANGE_ID> --round <N> --seq <N> --severity <blocker|should-fix|note> --actor-id <ACTOR_ID> --summary <TEXT> [--disposition <open|fixed|rejected|deferred>] [--rev <REV>] [--resolution-rev <REV>] [--introduced-rev <REV>] [--introduced-unknown] [--review-id <REVIEW_ID>] [--file-ref <TEXT>] [--scenario-id <SCENARIO_ID>]* [--role <ROLE>] [--session-id <SESSION_ID>] [--promote | --no-promote] [--input]
+canon finding add --change <CHANGE_ID> --round <N> --seq <N> --severity <blocker|should-fix|note> --actor <ACTOR_ID> --summary <TEXT> [--disposition <open|fixed|rejected|deferred>] [--rev <REV>] [--resolution-rev <REV>] [--introduced-rev <REV>] [--introduced-unknown] [--review <REVIEW_ID>] [--file-ref <TEXT>] [--scenario <SCENARIO_ID>]* [--role <ROLE>] [--session <SESSION_ID>] [--promote | --no-promote] [--input]
 ```
 ```bash
-canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor-id alice --summary "Token is logged"
+canon finding add --change add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor alice --summary "Token is logged"
 ```
 ```text
 # Move an already-committed finding's disposition
-canon finding close <CHANGE_ID> --round <N> --seq <N> --disposition <open|fixed|rejected|deferred> [--resolution-rev <REV>] [--reason <TEXT>] [--actor-id <ACTOR_ID>] [--role <ROLE>] [--session-id <SESSION_ID>] [--promote | --no-promote] [--input]
+canon finding close <CHANGE_ID> --round <N> --seq <N> --disposition <open|fixed|rejected|deferred> [--resolution-rev <REV>] [--reason <TEXT>] [--actor <ACTOR_ID>] [--role <ROLE>] [--session <SESSION_ID>] [--promote | --no-promote] [--input]
 ```
 ```bash
 canon finding close add-login --round 1 --seq 1 --disposition rejected --reason "works as designed"
 ```
 ```text
 # List a change's committed findings at their latest version
-canon finding list --change-id <CHANGE_ID> [--open] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+canon finding list --change <CHANGE_ID> [--open] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
-canon finding list --change-id add-login
+canon finding list --change add-login
 ```
 ```text
 # Validate a spec/artifact corpus against canon's format
@@ -114,31 +114,31 @@ canon gate check
 ```
 ```text
 # Read stored records across every storage tier
-canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin-id <PLUGIN_ID> | --history] [--change-id <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
 canon query --kind evidence
 ```
 ```text
 # Fetch role-scoped strategy guidance
-canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject-id <SUBJECT_ID>] [--limit <N>]
+canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject <SUBJECT_ID>] [--limit <N>]
 ```
 ```bash
 canon retrieve --for-role reviewer --domain dev --limit 20
 ```
 ```text
 # Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required)
-canon review change <CHANGE_ID> --actor-id <ACTOR_ID> (--upstream-ref <TEXT> | --original-spec-ref <TEXT>) [--project-id <PROJECT_ID>] [--rev <REV>] [--role <ROLE>] [--session-id <SESSION_ID>] [--review-outcome <signed|indeterminate|unavailable>] [--reviewer-provider <NAME>] [--reviewer-model <NAME>] [--reviewer-harness <NAME>] [--artifact <PATH>]* [--max-artifact-mib <N>] [--input]
+canon review change <CHANGE_ID> --actor <ACTOR_ID> (--upstream-ref <TEXT> | --original-spec-ref <TEXT>) [--project <PROJECT_ID>] [--rev <REV>] [--role <ROLE>] [--session <SESSION_ID>] [--review-outcome <signed|indeterminate|unavailable>] [--reviewer-provider <NAME>] [--reviewer-model <NAME>] [--reviewer-harness <NAME>] [--artifact <PATH>]* [--max-artifact-mib <N>] [--input]
 ```
 ```bash
-canon review change add-login --actor-id alice --role reviewer --original-spec-ref docs/prd.md
+canon review change add-login --actor alice --role reviewer --original-spec-ref docs/prd.md
 ```
 ```text
 # Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required)
-canon review scenario <SCENARIO_ID>+ --actor-id <ACTOR_ID> (--upstream-ref <TEXT> | --original-spec-ref <TEXT>) [--project-id <PROJECT_ID>] [--rev <REV>] [--role <ROLE>] [--session-id <SESSION_ID>] [--review-outcome <signed|indeterminate|unavailable>] [--reviewer-provider <NAME>] [--reviewer-model <NAME>] [--reviewer-harness <NAME>] [--artifact <PATH>]* [--max-artifact-mib <N>] [--input]
+canon review scenario <SCENARIO_ID>+ --actor <ACTOR_ID> (--upstream-ref <TEXT> | --original-spec-ref <TEXT>) [--project <PROJECT_ID>] [--rev <REV>] [--role <ROLE>] [--session <SESSION_ID>] [--review-outcome <signed|indeterminate|unavailable>] [--reviewer-provider <NAME>] [--reviewer-model <NAME>] [--reviewer-harness <NAME>] [--artifact <PATH>]* [--max-artifact-mib <N>] [--input]
 ```
 ```bash
-canon review scenario auth.login.01 --actor-id alice --role reviewer --original-spec-ref docs/prd.md
+canon review scenario auth.login.01 --actor alice --role reviewer --original-spec-ref docs/prd.md
 ```
 ```text
 # Describe canon's own commands
@@ -174,20 +174,20 @@ found goes in `finding add --summary`.
 The forms you reach for most (the story's ids; swap in yours):
 
 ```bash
-canon review scenario auth.login.01 auth.login.02 --actor-id reviewer-1 --session-id session-7 --original-spec-ref docs/prd.md
-canon review scenario auth.login.01 --actor-id reviewer-1 --session-id session-7 --review-outcome indeterminate --original-spec-ref docs/prd.md
-canon review change add-login --actor-id reviewer-1 --session-id session-7 --original-spec-ref docs/prd.md
-canon finding add --change-id add-login --round 1 --seq 2 --severity blocker --actor-id reviewer-1 --session-id session-7 --summary "No rate limit" --scenario-id auth.login.01 --scenario-id auth.login.02 --introduced-rev HEAD~3
+canon review scenario auth.login.01 auth.login.02 --actor reviewer-1 --session session-7 --original-spec-ref docs/prd.md
+canon review scenario auth.login.01 --actor reviewer-1 --session session-7 --review-outcome indeterminate --original-spec-ref docs/prd.md
+canon review change add-login --actor reviewer-1 --session session-7 --original-spec-ref docs/prd.md
+canon finding add --change add-login --round 1 --seq 2 --severity blocker --actor reviewer-1 --session session-7 --summary "No rate limit" --scenario auth.login.01 --scenario auth.login.02 --introduced-rev HEAD~3
 canon finding close add-login --round 1 --seq 2 --disposition fixed --resolution-rev HEAD
 canon finding close add-login --round 1 --seq 3 --disposition rejected --reason "works as designed"
-canon finding list --change-id add-login --open
+canon finding list --change add-login --open
 ```
 
 Several findings at once are one `--input` array (the keys are option names
 in camelCase):
 
 ```text
-canon finding add --input '[{"changeId":"add-login","round":1,"seq":3,"severity":"note","actorId":"reviewer-1","summary":"Token is logged"},{"changeId":"add-login","round":1,"seq":4,"severity":"should-fix","introducedUnknown":true,"actorId":"reviewer-1","summary":"Error text leaks the user name"}]'
+canon finding add --input '[{"change":"add-login","round":1,"seq":3,"severity":"note","actor":"reviewer-1","summary":"Token is logged"},{"change":"add-login","round":1,"seq":4,"severity":"should-fix","introducedUnknown":true,"actor":"reviewer-1","summary":"Error text leaks the user name"}]'
 ```
 
 A review pins what you saw: the scenario's digest plus the verdict
@@ -210,8 +210,8 @@ or `status` again.
 ## Separate session
 
 You run as a separate process with your own session id, never the session
-that wrote the code and evidence under another `--actor-id` or
-`--session-id` label. Pass your real session id as `--session-id` on
+that wrote the code and evidence under another `--actor` or
+`--session` label. Pass your real session id as `--session` on
 everything you record. A harness with no subagent tool starts you (a new
 `codex exec` run in this repo, say). Review happens on every change.
 
@@ -274,7 +274,7 @@ confirm the evidence really is divergent and the limit is outside this
 change, then report to the human the scenario ids, the reason, the
 tracking reference and an expiry when the limit should be gone by a date.
 Give the exact call, ids filled in: the human runs `canon divergence accept
-<ids> --actor-id <name> --reason "<why>" --tracking <ref>` themselves in their
+<ids> --actor <name> --reason "<why>" --tracking <ref>` themselves in their
 own shell, from a session that did not attest the evidence
 (`DIVERGENCE_ACCEPT_REFUSED` otherwise); you never run it or unset your role to. Never suggest it to skip
 a fix the implementer can make in this change. The acceptance pins that
@@ -302,9 +302,9 @@ covered for the ship guard and stays listed as `accepted-divergence` in
 - Sign off in one batch with `review scenario <ids>`, all or nothing. It writes
   directly; nothing to promote. canon stores and re-checks attached bytes
   and never compares images.
-- Pass `--scenario-id` for each scenario a finding is about. A blocker you
+- Pass `--scenario` for each scenario a finding is about. A blocker you
   close `fixed` then stays blocking until the implementer records evidence
-  again for those scenarios alone (`evidence add --scenario-id <id>`); the
+  again for those scenarios alone (`evidence add --scenario <id>`); the
   close inherits the list. A blocker naming no scenario asks for the whole
   suite again (`evidence add --all-scenarios`), which on a big suite is
   a long e2e run for a one-scenario fix, so name them. Your pinned review
@@ -313,7 +313,7 @@ covered for the ship guard and stays listed as `accepted-divergence` in
   evidence changes a verdict or the checks and so stales your review, look
   again before you sign it again.
   A chore has no scenarios: review it with one change-level review, `canon
-  review change <slug> --actor-id <me> --session-id <session>
+  review change <slug> --actor <me> --session <session>
   --upstream-ref <ref>` (or `--original-spec-ref <path>`). It signs the
   chore's invariants and checks against the diff and pins its brief, so
   editing the brief stales it. The chore also needs new evidence on every
@@ -322,7 +322,7 @@ covered for the ship guard and stays listed as `accepted-divergence` in
 
 **Done when:** `canon gate check` lists no `unreviewed-promotion` violation
 and no open blocker for the change (read `data.violations[]` in `canon gate
-check --json`; `canon finding list --change-id add-login --open` shows the
+check --json`; `canon finding list --change add-login --open` shows the
 open findings), or each remaining one is a finding you recorded and the
 implementer owns. Your last write's `meta.next` names the next step.
 

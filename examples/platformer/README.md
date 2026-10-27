@@ -68,7 +68,7 @@ Each test checks every Then of its scenario. One call binds the report
 to all 16 scenarios, each record getting the verdict of its own case:
 
 ```bash
-canon evidence add --project-id platformer --class test-run \
+canon evidence add --project platformer --class test-run \
   --ref "cd examples/platformer && bun run test:junit" --role implementer \
   --report junit:examples/platformer/reports/junit.xml --all-scenarios
 ```

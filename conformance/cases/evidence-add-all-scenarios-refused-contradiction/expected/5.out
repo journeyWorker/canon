@@ -1,4 +1,4 @@
 promoted evidence implementer/cart-add run_seq=1 -> kind=evidence/root_scenario_cart.add.01_<digest8>.json
 promoted evidence implementer/cart-add run_seq=2 -> kind=evidence/root_scenario_cart.add.02_<digest8>.json
 canon gate promote: promoted evidence=2, finding=0, divergence=0
-next: canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> --session-id <session> — no subject exists yet; a subject is the unit status, review and shipping track (+1 more)
+next: canon subject new <id> --domain <domain> --title "<title>" --actor <unit> --session <session> — no subject exists yet; a subject is the unit status, review and shipping track (+1 more)

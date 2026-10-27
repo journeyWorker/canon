@@ -2,11 +2,11 @@ description: "0.15 D3: a sampled scenario with a faithful declared verdict and a
 steps:
   - args: [inventory, sync]
     exit: 0
-  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --class, test-run, --ref, "cargo test cart_add", --role, implementer, --actor-id, impl-agent]
+  - args: [evidence, add, --scenario, cart.add.01, --project, root, --class, test-run, --ref, "cargo test cart_add", --role, implementer, --actor, impl-agent]
     exit: 0
   - args: [gate, promote]
     exit: 0
-  - args: [evidence, audit, cart.add.01, --project-id, root, --ref, "testjack run 42", --role, auditor, --actor-id, testjack, --evaluator-id, testjack, --evaluator-version, 1.4.0, --evaluator-digest, 0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0, --audit-result, confirmed]
+  - args: [evidence, audit, cart.add.01, --project, root, --ref, "testjack run 42", --role, auditor, --actor, testjack, --evaluator, testjack, --evaluator-version, 1.4.0, --evaluator-digest, 0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0, --audit-result, confirmed]
     exit: 0
   - args: [gate, promote]
     exit: 0

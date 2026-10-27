@@ -94,7 +94,7 @@ fn seed_subject_with_changes(repo: &Path, id: &str, status: SubjectStatus, scena
         .with_change_ids(changes.iter().map(|c| ChangeId::parse(*c).unwrap()).collect());
     ledger(repo).write(&subject).unwrap();
     // The scenarios live in `demo`'s configured spec root, which is what
-    // `--project-id demo` must name; a reader's stale-index refresh then
+    // `--project demo` must name; a reader's stale-index refresh then
     // indexes them instead of tombstoning records seeded into the ledger.
     for scenario_id in scenarios {
         support::declare_scenario(repo, "demo", scenario_id, Some(id));
@@ -174,7 +174,7 @@ fn adopt_links_the_change_and_the_subject_on_both_sides() {
     seed_change(dir.path(), "s36-demo");
     assert!(run(dir.path(), &["subject", "new", "demo-subject", "--domain", "dev", "--title", "Demo"]).status.success());
 
-    let out = run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "s36-demo"]);
+    let out = run(dir.path(), &["subject", "adopt", "demo-subject", "--change", "s36-demo"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
 
     // Subject side: `change_ids` gained the change (folded to one row).
@@ -198,7 +198,7 @@ fn adopt_links_the_change_and_the_subject_on_both_sides() {
 fn adopt_refuses_an_unknown_change() {
     let dir = repo();
     assert!(run(dir.path(), &["subject", "new", "demo-subject", "--domain", "dev", "--title", "Demo"]).status.success());
-    let out = run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "no-such-change"]);
+    let out = run(dir.path(), &["subject", "adopt", "demo-subject", "--change", "no-such-change"]);
     assert_eq!(out.status.code(), Some(2));
     assert!(stderr(&out).contains("does not exist"), "stderr: {}", stderr(&out));
 }
@@ -217,10 +217,10 @@ fn adopt_is_a_no_op_on_an_already_linked_pair() {
     let dir = repo();
     seed_change(dir.path(), "s36-demo");
     assert!(run(dir.path(), &["subject", "new", "demo-subject", "--domain", "dev", "--title", "Demo"]).status.success());
-    assert!(run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "s36-demo"]).status.success());
+    assert!(run(dir.path(), &["subject", "adopt", "demo-subject", "--change", "s36-demo"]).status.success());
 
     let before = ledger_file_count(dir.path());
-    let again = run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "s36-demo"]);
+    let again = run(dir.path(), &["subject", "adopt", "demo-subject", "--change", "s36-demo"]);
     assert_eq!(again.status.code(), Some(0), "{}", stderr(&again));
     assert!(stdout(&again).contains("already linked to subject `demo-subject`; nothing written"), "{}", stdout(&again));
     assert_eq!(ledger_file_count(dir.path()), before);
@@ -246,23 +246,23 @@ fn adopt_failing_between_its_two_writes_prints_a_repair_that_completes_the_link(
         return;
     }
 
-    let out = run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "s36-demo"]);
+    let out = run(dir.path(), &["subject", "adopt", "demo-subject", "--change", "s36-demo"]);
     std::fs::set_permissions(&ledger_change, std::fs::Permissions::from_mode(0o755)).unwrap();
     assert_eq!(out.status.code(), Some(2), "{}", stdout(&out));
     assert!(
         stderr(&out).contains("subject `demo-subject` now lists change `s36-demo`, but the change record could not be written")
-            && stderr(&out).contains("complete the link with `canon subject adopt demo-subject --change-id s36-demo`"),
+            && stderr(&out).contains("complete the link with `canon subject adopt demo-subject --change s36-demo`"),
         "{}",
         stderr(&out)
     );
     let subjects = query_subjects(dir.path(), &[]);
     assert!(subjects["records"][0]["change_ids"].as_array().unwrap().iter().any(|c| c == "s36-demo"));
 
-    let repair = run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "s36-demo"]);
+    let repair = run(dir.path(), &["subject", "adopt", "demo-subject", "--change", "s36-demo"]);
     assert_eq!(repair.status.code(), Some(0), "{}", stderr(&repair));
     let changes = data_of(&run(dir.path(), &["query", "--kind", "change", "--json"]));
     assert!(changes["records"].as_array().unwrap().iter().any(|c| c["subject_ids"] == serde_json::json!(["demo-subject"])), "{changes}");
-    let again = run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "s36-demo"]);
+    let again = run(dir.path(), &["subject", "adopt", "demo-subject", "--change", "s36-demo"]);
     assert!(stdout(&again).contains("nothing written"), "{}", stdout(&again));
 }
 
@@ -540,17 +540,17 @@ fn review_via_cli(repo: &Path, actor: &str, session: Option<&str>) -> Output {
         "review",
         "scenario",
         "world.demo.01",
-        "--project-id",
+        "--project",
         "demo",
         "--original-spec-ref",
         "specs/demo.feature",
-        "--actor-id",
+        "--actor",
         actor,
         "--role",
         "reviewer",
     ];
     if let Some(session) = session {
-        args.extend(["--session-id", session]);
+        args.extend(["--session", session]);
     }
     run(repo, &args)
 }
@@ -675,7 +675,7 @@ fn a_review_from_the_evidence_session_does_not_count_under_distinct_actor() {
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert!(stdout(&out).contains("— written directly; nothing to promote"), "review add must say it committed directly: {}", stdout(&out));
     let review: Value = serde_json::from_slice(&std::fs::read(review_files(dir.path())[0].clone()).unwrap()).unwrap();
-    assert_eq!(review["actor"]["session_id"], "sess-impl", "--session-id fills actor.session_id: {review}");
+    assert_eq!(review["actor"]["session_id"], "sess-impl", "--session fills actor.session_id: {review}");
 
     let out = run(dir.path(), &["subject", "move", "demo-subject", "--to", "verifying"]);
     assert_eq!(out.status.code(), Some(1), "stderr: {}", stderr(&out));
@@ -723,7 +723,7 @@ fn a_blocker_the_author_found_in_its_own_work_is_accepted_and_still_blocks() {
         &[
             "finding",
             "add",
-            "--change-id",
+            "--change",
             "c-demo",
             "--round",
             "1",
@@ -732,13 +732,13 @@ fn a_blocker_the_author_found_in_its_own_work_is_accepted_and_still_blocks() {
             "--severity",
             "blocker",
             "--introduced-unknown",
-            "--actor-id",
+            "--actor",
             "impl-agent",
             "--summary",
             "restart leaves the old timer running",
             "--role",
             "implementer",
-            "--session-id",
+            "--session",
             "sess-impl",
         ],
     );
@@ -840,7 +840,7 @@ fn an_override_records_the_reason_and_gate_check_lists_an_advisory() {
     write_policy(dir.path(), REQUIRE_REVIEW);
     seed_attested_subject(dir.path());
 
-    let out = run(dir.path(), &["subject", "move", "demo-subject", "--to", "verifying", "--override-reason", "reviewer out until Monday", "--actor-id", "lead"]);
+    let out = run(dir.path(), &["subject", "move", "demo-subject", "--to", "verifying", "--override-reason", "reviewer out until Monday", "--actor", "lead"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains("waived unreviewed-promotion world.demo.01"), "{err}");
@@ -937,8 +937,8 @@ fn review_add_refuses_an_unsynced_scenario_and_names_inventory_sync() {
     let out = run(
         dir.path(),
         &[
-            "review", "scenario", "world.demo.99", "--project-id", "demo", "--original-spec-ref",
-            "specs/demo.feature", "--actor-id", "reviewer-2", "--role", "reviewer",
+            "review", "scenario", "world.demo.99", "--project", "demo", "--original-spec-ref",
+            "specs/demo.feature", "--actor", "reviewer-2", "--role", "reviewer",
         ],
     );
     assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
@@ -962,8 +962,8 @@ fn an_unsigned_review_is_a_gap_at_the_gate_and_the_status_guard() {
         let out = run(
             dir.path(),
             &[
-                "review", "scenario", "world.demo.01", "--project-id", "demo", "--original-spec-ref",
-                "specs/demo.feature", "--actor-id", "reviewer-2", "--role", "reviewer", "--session-id", "sess-review", "--review-outcome", outcome,
+                "review", "scenario", "world.demo.01", "--project", "demo", "--original-spec-ref",
+                "specs/demo.feature", "--actor", "reviewer-2", "--role", "reviewer", "--session", "sess-review", "--review-outcome", outcome,
             ],
         );
         assert!(out.status.success(), "{outcome}: stderr: {}", stderr(&out));
@@ -1175,7 +1175,7 @@ fn subject_lifecycle_26_an_override_ships_an_unapproved_brief_and_records_the_wa
     let dir = repo();
     seed_technically_ship_ready(dir.path(), "Status: draft, awaiting the human.\n");
 
-    let out = run(dir.path(), &["subject", "move", "demo-subject", "--to", "shipped", "--override-reason", "the human approved in chat; line to follow", "--actor-id", "lead"]);
+    let out = run(dir.path(), &["subject", "move", "demo-subject", "--to", "shipped", "--override-reason", "the human approved in chat; line to follow", "--actor", "lead"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let err = stderr(&out);
     assert!(err.contains(&BRIEF_REFUSAL.replace("canon subject move: SUBJECT_GATE_VIOLATION — unreviewed-promotion", "canon subject move: waived unreviewed-promotion")), "{err}");
@@ -1252,8 +1252,8 @@ fn seed_briefed_subject(repo: &Path, brief: &str) {
 /// `canon evidence add` for `world.demo.01` (and `extra`), promoted.
 fn attest_scenario(repo: &Path, extra: &[&str]) -> Output {
     let mut args = vec![
-        "evidence", "add", "--project-id", "demo", "--scenario-id", "world.demo.01", "--class", "test-run", "--ref", "cargo test", "--role", "implementer",
-        "--actor-id", "impl-agent", "--promote",
+        "evidence", "add", "--project", "demo", "--scenario", "world.demo.01", "--class", "test-run", "--ref", "cargo test", "--role", "implementer",
+        "--actor", "impl-agent", "--promote",
     ];
     args.extend_from_slice(extra);
     run(repo, &args)
@@ -1261,7 +1261,7 @@ fn attest_scenario(repo: &Path, extra: &[&str]) -> Output {
 
 /// `canon evidence add` for task `c-demo#1.1` (and `extra`), promoted.
 fn attest_task(repo: &Path, extra: &[&str]) -> Output {
-    let mut args = vec!["evidence", "add", "--task-id", "c-demo#1.1", "--class", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor-id", "impl-agent", "--promote"];
+    let mut args = vec!["evidence", "add", "--task", "c-demo#1.1", "--class", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor", "impl-agent", "--promote"];
     args.extend_from_slice(extra);
     run(repo, &args)
 }
@@ -1300,7 +1300,7 @@ fn evidence_add_68_an_unapproved_brief_refuses_the_attestation_and_stages_nothin
     assert!(review.status.success(), "review add is not refused: {}", stderr(&review));
     let finding = run(
         dir.path(),
-        &["finding", "add", "--change-id", "c-demo", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "reviewer-2", "--summary", "brief pending", "--promote"],
+        &["finding", "add", "--change", "c-demo", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "reviewer-2", "--summary", "brief pending", "--promote"],
     );
     assert!(finding.status.success(), "finding add is not refused: {}", stderr(&finding));
 }
@@ -1438,7 +1438,7 @@ fn evidence_add_72_an_external_change_is_answered_in_a_canon_brief_and_its_rows_
     std::fs::write(&tasks, "## 1. Build\n\n- [ ] 1.1 Build the demo\n").unwrap();
     let proposal_before = std::fs::read(&proposal).unwrap();
     let attest_ext_task = |repo: &Path| {
-        run(repo, &["evidence", "add", "--task-id", "c-ext#1.1", "--class", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor-id", "impl-agent", "--promote"])
+        run(repo, &["evidence", "add", "--task", "c-ext#1.1", "--class", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor", "impl-agent", "--promote"])
     };
 
     for (what, out) in [("world.demo.01", attest_scenario(dir.path(), &[])), ("c-ext#1.1", attest_ext_task(dir.path()))] {
@@ -1513,7 +1513,7 @@ fn seed_shipped(repo: &Path) {
 const REOPEN_REASON: &str = "follow-up: the retry path leaks a file handle";
 
 fn reopen(repo: &Path, extra: &[&str]) -> Output {
-    let mut args = vec!["subject", "move", "demo-subject", "--to", "verifying", "--reason", REOPEN_REASON, "--actor-id", "impl-agent"];
+    let mut args = vec!["subject", "move", "demo-subject", "--to", "verifying", "--reason", REOPEN_REASON, "--actor", "impl-agent"];
     args.extend_from_slice(extra);
     run(repo, &args)
 }
@@ -1558,7 +1558,7 @@ fn subject_lifecycle_30_reopening_outside_an_approved_scope_is_refused_naming_th
     let dir = repo();
     seed_shipped(dir.path());
     seed_change(dir.path(), "c-next");
-    assert!(run(dir.path(), &["subject", "adopt", "demo-subject", "--change-id", "c-next"]).status.success());
+    assert!(run(dir.path(), &["subject", "adopt", "demo-subject", "--change", "c-next"]).status.success());
     write_brief(dir.path(), "c-next", "Status: draft, awaiting the human.\n");
     // A scenario the subject owns is tagged for the draft, so it is the
     // subject's scope rather than a pending draft (subject.lifecycle.38).
@@ -1617,7 +1617,7 @@ fn subject_lifecycle_31b_any_transition_accepts_a_reason_and_records_it() {
     let dir = repo();
     seed_subject(dir.path(), "demo-subject", SubjectStatus::Building, &[]);
 
-    let out = run(dir.path(), &["subject", "move", "demo-subject", "--to", "verifying", "--reason", "story complete", "--actor-id", "impl-agent"]);
+    let out = run(dir.path(), &["subject", "move", "demo-subject", "--to", "verifying", "--reason", "story complete", "--actor", "impl-agent"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let subject = current_subject(dir.path());
     assert_eq!(subject["status"], "verifying");
@@ -1715,7 +1715,7 @@ fn subject_lifecycle_34_a_pre_0_18_change_reads_as_a_one_element_list_and_a_seco
 
     assert_eq!(latest_change(dir.path(), "refactor-core")["subject_ids"], serde_json::json!(["perception"]), "the old key reads as a list");
 
-    let out = run(dir.path(), &["subject", "adopt", "editing", "--change-id", "refactor-core"]);
+    let out = run(dir.path(), &["subject", "adopt", "editing", "--change", "refactor-core"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     assert!(stdout(&out).contains("the change now belongs to `perception` and `editing`"), "{}", stdout(&out));
     let change = latest_change(dir.path(), "refactor-core");

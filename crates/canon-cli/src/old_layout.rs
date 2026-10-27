@@ -189,7 +189,7 @@ pub fn refuses_in_old_layout(command: &str) -> bool {
 
 /// A command that writes records is refused in a 0.29 repo, with the hint of [`Found::message`]: the new-rule
 /// file a write would make must never sit beside an old one.
-pub fn refuse_write(parsed: &clap::ArgMatches) -> Option<ExitCode> {
+pub fn refuse_write(command_tree: &clap::Command, parsed: &clap::ArgMatches) -> Option<ExitCode> {
     let mut names = Vec::new();
     let mut leaf = parsed;
     while let Some((name, sub)) = leaf.subcommand() {
@@ -197,10 +197,10 @@ pub fn refuse_write(parsed: &clap::ArgMatches) -> Option<ExitCode> {
         leaf = sub;
     }
     let command = names.join(" ");
-    if !refuses_in_old_layout(&command) {
+    if !refuses_in_old_layout(&command) || !crate::run::entry::leaf_takes_repo(command_tree, &names) {
         return None;
     }
-    let repo = leaf.try_get_one::<PathBuf>("repo").ok()?;
+    let repo = leaf.get_one::<PathBuf>("repo");
     let root = crate::context::resolve_repo_root(repo.map_or(Path::new("."), PathBuf::as_path));
     if !root.join("canon.yaml").is_file() {
         return None;

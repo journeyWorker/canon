@@ -133,7 +133,7 @@ use crate::tiers::{self, TierCliError};
 /// (contract: "violations print by failure class, exit 1").
 const EXIT_GATED: u8 = 1;
 
-/// `<id>` / `--subject-id`'s `clap` value parser — grammar-level
+/// `<id>` / `--subject`'s `clap` value parser — grammar-level
 /// [`SubjectId::parse`] (kebab-case slug).
 pub fn parse_subject_id(s: &str) -> Result<SubjectId, canon_model::ids::JoinKeyError> {
     SubjectId::parse(s)
@@ -536,7 +536,7 @@ pub fn run_new(repo: &Path, new: &NewSubject, actor: Actor, json: bool) -> u8 {
     }
 }
 
-/// `canon subject adopt <subject_id> --change-id <id>` (module doc): link
+/// `canon subject adopt <subject_id> --change <id>` (module doc): link
 /// an imported plan [`Change`] to a [`Subject`] via [`adopt_change`],
 /// printing the result. Exit `2` on any refusal or store failure.
 /// Rerunning it on a linked pair writes nothing and exits `0`. A change
@@ -577,7 +577,7 @@ pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_
     }
 }
 
-/// `canon subject unadopt <subject_id> --change-id <id>` (0.25 D1): take
+/// `canon subject unadopt <subject_id> --change <id>` (0.25 D1): take
 /// the link [`run_adopt`] made back, on both sides. Refused for a change
 /// whose canon brief carries an `Approved:` line: it is the subject's
 /// approved scope. An unlinked pair writes nothing and exits `0`.
@@ -688,7 +688,7 @@ fn unadopt_change(
         let written = if dry_run { registry.check_persist::<Change>() } else { registry.persist(&change).map(drop) };
         written.map_err(|e| {
             format!(
-                "subject `{}` no longer lists change `{}`, but the change record could not be written: {e}; complete the unlink with `canon subject unadopt {} --change-id {}`",
+                "subject `{}` no longer lists change `{}`, but the change record could not be written: {e}; complete the unlink with `canon subject unadopt {} --change {}`",
                 subject_id.as_str(),
                 change_id.as_str(),
                 subject_id.as_str(),
@@ -778,12 +778,12 @@ pub(crate) fn lookup_adoption(repo: &Path, subject_id: &SubjectId, change_id: &C
     Ok((find_subject(&registry, subject_id)?, find_change(&registry, change_id)?))
 }
 
-/// `canon subject adopt <subject> --change-id <change>`: the command that
+/// `canon subject adopt <subject> --change <change>`: the command that
 /// completes a half-written adoption. Safe to rerun: [`persist_adoption`]
 /// writes only the side that still lacks the link, and nothing once both
 /// carry it.
 pub(crate) fn adopt_command(change_id: &ChangeId, subject_id: &SubjectId) -> String {
-    format!("canon subject adopt {} --change-id {}", subject_id.as_str(), change_id.as_str())
+    format!("canon subject adopt {} --change {}", subject_id.as_str(), change_id.as_str())
 }
 
 /// A failed [`persist_adoption`]: the store error, and whether the
@@ -1110,7 +1110,7 @@ pub fn run_move(
                     many => format!("record the suite again for the scenarios named with {} (a review stays current while the verdicts and checks are the same)", many.iter().map(|c| format!("`{c}`")).collect::<Vec<_>>().join("; ")),
                 });
             } else if !reverify.is_empty() {
-                fixes.push("record evidence again for the scenarios named with `canon evidence add --project-id <root> --scenario-id <id> --report <junit|cucumber|swift-testing>:<path> --role implementer`, one each (a review stays current while the verdicts and checks are the same)".to_string());
+                fixes.push("record evidence again for the scenarios named with `canon evidence add --project <root> --scenario <id> --report <junit|cucumber|swift-testing>:<path> --role implementer`, one each (a review stays current while the verdicts and checks are the same)".to_string());
             }
             return CliError::failed("SUBJECT_GATE_VIOLATION", lines)
                 .with_exit(EXIT_GATED)

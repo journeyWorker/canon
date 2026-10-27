@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-031-a",
+    "role": "reviewer",
+    "session_id": "rev-031-w2-2026-10-27"
+  },
+  "at": "2026-10-27T13:27:32.647040372Z",
+  "change_id": "canon-0-31-fixes",
+  "code_tree": "33cb4e61f63ce191f9fc1c6897efb48c058cecdb",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/evidence.rs:783-795; crates/canon-cli/src/schema_codes.rs:30-32; docs/cli/canon.cli.json",
+  "introduced_by": "344527efa7742754ac8632a769858ad05704a391",
+  "kind": "finding",
+  "reason": "schema evidence approval-payload lists EVIDENCE_SCENARIO_NOT_INDEXED; add and audit no longer do; schema_codes test maps it",
+  "resolution_code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "resolution_sha": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "344527efa7742754ac8632a769858ad05704a391",
+  "reviewer": "rev-031-a",
+  "round": 1,
+  "scenario_ids": [
+    "evidence.add.130"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[standards] EVIDENCE_SCENARIO_NOT_INDEXED is filed under the wrong commands in the schema. `canon schema evidence approval-payload --json` lists errorCodes without it, even though that leaf is the only one that emits it and its own exit row names it. `evidence add` and `evidence audit` list it but never emit it. The cause: the error is built in evidence.rs with no `emit(\"canon evidence approval-payload\")` nearby, so the code-table generator falls back to the file default. The schema-codes test compares the table with the same derivation, so it stays green. Fix: build the CliError at the approval-payload emit site, or map it explicitly; re-bless schema_codes and regenerate docs/cli/canon.cli.json.",
+  "worktree_dirty": false
+}

@@ -156,7 +156,7 @@ fn old_repo() -> TempDir {
     let dir = repo(None);
     let r = dir.path();
     for change in ["a", "b", "c"] {
-        ok(r, &["change", "new", change, "--subject-id", "demo", "--title", &change.to_uppercase()]);
+        ok(r, &["change", "new", change, "--subject", "demo", "--title", &change.to_uppercase()]);
     }
     write_brief(r, "a", &approved(&old_brief("A", false, &waive_comment("prose.length", "brief", "a long brief by design"))));
     write_brief(r, "b", &old_brief("B", true, ""));
@@ -218,7 +218,7 @@ fn todo_in_scope(text: &str) -> String {
 fn authoring_brief_check_17_english_headings_without_comments_pass_and_every_reader_finds_the_same_sections() {
     let dir = repo(None);
     let r = dir.path();
-    ok(r, &["change", "new", "a", "--subject-id", "demo", "--title", "A"]);
+    ok(r, &["change", "new", "a", "--subject", "demo", "--title", "A"]);
     let en = new_brief("A", "", "");
     write_brief(r, "a", &en);
     let (code, report) = check(r, "a");
@@ -236,6 +236,13 @@ fn authoring_brief_check_17_english_headings_without_comments_pass_and_every_rea
     assert_eq!(show["data"]["emptySections"], serde_json::json!([]), "{show}");
     let status = json(&ok(r, &["status", "--json"]));
     assert_eq!(status["data"]["subjects"][0]["briefs"][0]["findings"]["blockers"], 0, "{status}");
+
+    // The plan import reads the same Intent section, and the dashboard page (tests/dashboard_briefs.rs) the same keys and roles.
+    ok(r, &["ingest", "plans"]);
+    let changes = json(&ok(r, &["query", "--kind", "change", "--json"]));
+    let summary = changes["data"]["records"].as_array().unwrap().iter().find(|c| c["change_id"] == "a").map(|c| c["summary"].clone());
+    assert_eq!(summary, Some(Value::from("A")), "{changes}");
+    assert_eq!(canon_cli::brief_check::parse_sections(&ko).iter().map(|s| s.key.clone()).collect::<Vec<_>>(), ["intent", "outcome", "flow", "detail", "acceptance", "questions", "out-of-scope"]);
 }
 
 /// authoring.brief-check.18
@@ -243,7 +250,7 @@ fn authoring_brief_check_17_english_headings_without_comments_pass_and_every_rea
 fn authoring_brief_check_18_a_misspelt_heading_names_the_nearest_one_and_a_deleted_or_moved_section_is_reported() {
     let dir = repo(None);
     let r = dir.path();
-    ok(r, &["change", "new", "a", "--subject-id", "demo", "--title", "A"]);
+    ok(r, &["change", "new", "a", "--subject", "demo", "--title", "A"]);
     let text = new_brief("A", "", "");
     for (wrong, expected) in [("## Intnet", "`## Intnet`"), ("## intent", "`## intent`")] {
         write_brief(r, "a", &text.replace("## Intent", wrong));
@@ -278,7 +285,7 @@ fn authoring_brief_check_19_the_language_never_changes_the_headings_and_a_note_w
     let text = new_brief("A", "", "").replace("Visitors lose their cart when they switch devices.", "방문자는 기기를 바꾸면 장바구니를 잃는다.");
     let mut seen = Vec::new();
     for dir in [&ko_repo, &en_repo] {
-        ok(dir.path(), &["change", "new", "a", "--subject-id", "demo", "--title", "A"]);
+        ok(dir.path(), &["change", "new", "a", "--subject", "demo", "--title", "A"]);
         write_brief(dir.path(), "a", &text);
         let (_, report) = check(dir.path(), "a");
         seen.push(rules(&report).into_iter().filter(|r| r.starts_with("brief.")).collect::<Vec<_>>());
@@ -290,7 +297,7 @@ fn authoring_brief_check_19_the_language_never_changes_the_headings_and_a_note_w
     // A heading inside a fence is none; one known heading is a pre-PRD note.
     let dir = repo(None);
     let r = dir.path();
-    ok(r, &["change", "new", "n", "--subject-id", "demo", "--title", "N"]);
+    ok(r, &["change", "new", "n", "--subject", "demo", "--title", "N"]);
     write_brief(r, "n", "# Notes\n\n## Intent\n\nwhy\n\n```\n## User flow\n```\n\n## Open items\n\n- a\n");
     let (code, report) = check(r, "n");
     assert_eq!((code, rules(&report)), (0, vec!["brief.legacy".to_string()]), "{report}");
@@ -304,7 +311,7 @@ fn authoring_brief_check_19_the_language_never_changes_the_headings_and_a_note_w
 fn authoring_brief_check_20_a_frontmatter_waiver_clears_one_rule_is_listed_and_binds_to_the_approval() {
     let dir = repo(None);
     let r = dir.path();
-    ok(r, &["change", "new", "a", "--subject-id", "demo", "--title", "A"]);
+    ok(r, &["change", "new", "a", "--subject", "demo", "--title", "A"]);
     let waiver = "---\nwaive:\n  - rule: brief.placeholder\n    section: out-of-scope\n    reason: \"the provider list is a policy question\"\n---\n\n";
     write_brief(r, "a", &todo_in_scope(&new_brief("A", "", "")));
     assert_eq!(check(r, "a").0, 1);
@@ -341,7 +348,7 @@ fn authoring_brief_check_20_a_frontmatter_waiver_clears_one_rule_is_listed_and_b
 fn authoring_brief_check_21_invalid_waivers_and_unreadable_frontmatter_are_blockers_that_waive_nothing() {
     let dir = repo(None);
     let r = dir.path();
-    ok(r, &["change", "new", "a", "--subject-id", "demo", "--title", "A"]);
+    ok(r, &["change", "new", "a", "--subject", "demo", "--title", "A"]);
     let entry = |lines: &str| format!("---\nwaive:\n  - {lines}---\n\n");
     for lines in [
         "rule: brief.placeholder\n    section: out-of-scope\n    reason: \"\"\n",
@@ -363,6 +370,13 @@ fn authoring_brief_check_21_invalid_waivers_and_unreadable_frontmatter_are_block
         let found = rules(&report);
         assert!(found.contains(&"brief.frontmatter-invalid".to_string()) && found.contains(&"brief.placeholder".to_string()), "no waiver of a broken frontmatter is read: {found:?}");
     }
+    // A frontmatter that never closes and one behind a byte-order mark are blockers, never silently prose.
+    for frontmatter in ["---\nkind: chore\n\n", "\u{feff}---\nkind: chore\n---\n\n"] {
+        write_brief(r, "a", &new_brief("A", frontmatter, ""));
+        let (code, report) = check(r, "a");
+        assert_eq!(code, 1, "{frontmatter:?}: {report}");
+        assert!(rules(&report).contains(&"brief.frontmatter-invalid".to_string()), "{frontmatter:?}: {report}");
+    }
     // An unknown section key is no blocker: the waiver is listed as matching nothing.
     let unknown = "---\nwaive:\n  - rule: prose.length\n    section: mystery\n    reason: \"x\"\n---\n\n";
     write_brief(r, "a", &new_brief("A", unknown, ""));
@@ -376,7 +390,7 @@ fn authoring_brief_check_21_invalid_waivers_and_unreadable_frontmatter_are_block
 fn authoring_brief_check_22_kind_chore_in_the_frontmatter_makes_a_chore_and_its_absence_a_feature() {
     let dir = repo(None);
     let r = dir.path();
-    ok(r, &["change", "new", "k", "--subject-id", "demo", "--title", "K", "--change-kind", "chore"]);
+    ok(r, &["change", "new", "k", "--subject", "demo", "--title", "K", "--change-kind", "chore"]);
     write_brief(r, "k", NEW_CHORE);
     let (code, report) = check(r, "k");
     assert_eq!((code, rules(&report)), (0, Vec::<String>::new()), "{report}");
@@ -391,11 +405,21 @@ fn authoring_brief_check_22_kind_chore_in_the_frontmatter_makes_a_chore_and_its_
     write_brief(r, "k", NEW_CHORE);
     commit_all(r);
     ok(r, &["policy", "approve", "--approver", "Ana"]);
-    let out = canon_as(r, Some("reviewer"), &["review", "change", "k", "--original-spec-ref", ".canon/changes/k/brief.md", "--actor-id", "rev", "--role", "reviewer"]);
+    let out = canon_as(r, Some("reviewer"), &["review", "change", "k", "--original-spec-ref", ".canon/changes/k/brief.md", "--actor", "rev", "--role", "reviewer"]);
     assert!(out.status.success(), "{}", out_text(&out));
     write_brief(r, "k", &stripped);
-    let out = canon_as(r, Some("reviewer"), &["review", "change", "k", "--original-spec-ref", ".canon/changes/k/brief.md", "--actor-id", "rev", "--role", "reviewer"]);
+    let out = canon_as(r, Some("reviewer"), &["review", "change", "k", "--original-spec-ref", ".canon/changes/k/brief.md", "--actor", "rev", "--role", "reviewer"]);
     assert!(out_text(&out).contains("is not a chore"), "a brief without the frontmatter is no chore: {}", out_text(&out));
+
+    // The ship check reads it too: with `kind: chore` the change governs the subject as a chore, without it as a draft.
+    write_brief(r, "k", NEW_CHORE);
+    let governing = |r: &Path| {
+        let status = json(&ok(r, &["status", "--json"]));
+        status["data"]["subjects"][0]["briefs"].as_array().unwrap().iter().filter(|b| b["change"] == "k").map(|b| b["reason"].clone()).collect::<Vec<_>>()
+    };
+    assert_eq!(governing(r), vec![Value::from("chore")], "the status reads the chore from the frontmatter");
+    write_brief(r, "k", &stripped);
+    assert_ne!(governing(r), vec![Value::from("chore")], "and a feature draft without it");
 }
 
 // ─────────────────────────────── F3 ───────────────────────────────
@@ -406,7 +430,7 @@ fn authoring_change_08_change_new_writes_the_title_and_empty_headed_sections_wit
     for (language, kind) in [(None, "feature"), (Some("ko"), "feature"), (None, "chore")] {
         let dir = repo(language);
         let r = dir.path();
-        ok(r, &["change", "new", "x", "--subject-id", "demo", "--title", "Add login", "--change-kind", kind]);
+        ok(r, &["change", "new", "x", "--subject", "demo", "--title", "Add login", "--change-kind", kind]);
         let text = read_brief(r, "x");
         assert!(!text.contains("<!--"), "{text}");
         if kind == "chore" {
@@ -426,7 +450,7 @@ fn authoring_brief_check_23_show_prints_each_empty_sections_guidance_in_the_brie
     for (language, snippet) in [(Some("ko"), "출시되면 사용자 입장에서 눈에 보이는 상태"), (None, "What is observably true once this ships")] {
         let dir = repo(language);
         let r = dir.path();
-        ok(r, &["change", "new", "x", "--subject-id", "demo", "--title", "Add login"]);
+        ok(r, &["change", "new", "x", "--subject", "demo", "--title", "Add login"]);
         let (code, report) = check(r, "x");
         assert_eq!(code, 1);
         let found = report["findings"].as_array().unwrap();
@@ -447,7 +471,7 @@ fn authoring_brief_check_23_show_prints_each_empty_sections_guidance_in_the_brie
 fn authoring_brief_check_24_a_filled_section_that_keeps_a_todo_is_still_a_placeholder() {
     let dir = repo(None);
     let r = dir.path();
-    ok(r, &["change", "new", "x", "--subject-id", "demo", "--title", "A"]);
+    ok(r, &["change", "new", "x", "--subject", "demo", "--title", "A"]);
     write_brief(r, "x", &todo_in_scope(&new_brief("A", "", "")));
     let (code, report) = check(r, "x");
     assert_eq!(code, 1, "{report}");
@@ -467,7 +491,7 @@ fn authoring_brief_check_24_a_filled_section_that_keeps_a_todo_is_still_a_placeh
 fn authoring_brief_check_25_an_old_format_brief_gets_one_blocker_and_its_waiver_comments_are_not_read() {
     let dir = repo(None);
     let r = dir.path();
-    ok(r, &["change", "new", "x", "--subject-id", "demo", "--title", "A"]);
+    ok(r, &["change", "new", "x", "--subject", "demo", "--title", "A"]);
     let waivers = waive_comment("prose.length", "brief", "a long brief by design");
     write_brief(r, "x", &old_brief("A", false, &waivers).replace("Social sign-in.", "TODO decide."));
     let (code, report) = check(r, "x");
@@ -505,7 +529,7 @@ fn building_repo() -> TempDir {
     let dir = repo(None);
     let r = dir.path();
     ok(r, &["policy", "approve", "--approver", "Ana"]);
-    ok(r, &["change", "new", "a", "--subject-id", "demo", "--title", "A"]);
+    ok(r, &["change", "new", "a", "--subject", "demo", "--title", "A"]);
     write_text(r, ".canon/specs/kind=feature/area=cart/add.feature", "Feature: cart add\n  # canon: {\"schema\":1,\"at\":\"2026-10-01T00:00:00Z\",\"actor\":{\"agent_id\":\"x\"}}\n\n  # canon: {\"schema\":1,\"at\":\"2026-10-01T00:00:00Z\",\"actor\":{\"agent_id\":\"x\"}}\n  @subject:demo\n  @cart.add.01\n  Scenario: Add one\n    Given an empty cart\n    When one item is added\n    Then the cart holds 1\n");
     ok(r, &["inventory", "sync"]);
     for to in ["specced", "building"] {
@@ -527,9 +551,9 @@ fn evidence_add_131_is_refused_when_a_brief_it_judges_is_old_format_and_an_overr
             let mut args = vec![
                 "evidence",
                 "add",
-                "--scenario-id",
+                "--scenario",
                 "cart.add.01",
-                "--project-id",
+                "--project",
                 "root",
                 "--class",
                 "test-run",
@@ -554,29 +578,84 @@ fn evidence_add_131_is_refused_when_a_brief_it_judges_is_old_format_and_an_overr
     }
 }
 
+/// evidence.add.131 (every governing change): a scenario tagged for one change is refused while another governing change
+/// of the subject, one it does not answer for, is in the old format.
+#[test]
+fn evidence_add_131_every_governing_change_of_the_subject_is_checked() {
+    let dir = building_repo();
+    let r = dir.path();
+    write_brief(r, "a", &new_brief("A", "", ""));
+    ok(r, &["brief", "approve", "a", "--approver", "Ana", "--note", "ok"]);
+    ok(r, &["change", "new", "b", "--subject", "demo", "--title", "B"]);
+    write_brief(r, "b", &approved(&old_brief("B", false, "")));
+    let feature = ".canon/specs/kind=feature/area=cart/add.feature";
+    let text = fs::read_to_string(r.join(feature)).unwrap();
+    write_text(r, feature, &text.replace("  @cart.add.01\n", "  @flow:a.F1\n  @cart.add.01\n"));
+    ok(r, &["inventory", "sync"]);
+    commit_all(r);
+    let before = tree(r);
+    let out = canon_as(r, Some("implementer"), &["evidence", "add", "--scenario", "cart.add.01", "--project", "root", "--class", "test-run", "--ref", "cargo test", "--verdict", "faithful", "--role", "implementer", "--summary", "ran", "--json"]);
+    assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
+    let doc = json(&out);
+    assert_eq!(doc["error"]["code"], "OLD_BRIEF_FORMAT", "{doc}");
+    assert!(doc["error"]["message"].as_str().unwrap().contains("`b`"), "the old brief the evidence does not answer to is named: {doc}");
+    assert_eq!(tree(r), before);
+}
+
+/// scenario new --flow reads a brief's flow steps: an old-format brief is refused with OLD_BRIEF_FORMAT.
+#[test]
+fn authoring_brief_check_25_scenario_new_flow_refuses_an_old_format_brief_with_its_code() {
+    let dir = repo(None);
+    let r = dir.path();
+    ok(r, &["change", "new", "x", "--subject", "demo", "--title", "A"]);
+    write_brief(r, "x", &old_brief("A", false, ""));
+    let out = canon_as(r, Some("implementer"), &["scenario", "new", "cart.add.07", "--title", "t", "--subject", "demo", "--change", "x", "--flow", "F1", "--case", "happy", "--json"]);
+    assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
+    assert_eq!(json(&out)["error"]["code"], "OLD_BRIEF_FORMAT", "{}", out_text(&out));
+}
+
 /// subject.lifecycle.47
 #[test]
 fn subject_lifecycle_47_ship_and_reopen_refuse_an_old_brief_the_subject_answers_for_and_ignore_one_it_does_not() {
     let dir = building_repo();
     let r = dir.path();
+    let status_of = |subject: &str| {
+        let subjects = json(&ok(r, &["query", "--kind", "subject", "--json"]));
+        subjects["data"]["records"].as_array().unwrap().iter().find(|s| s["subject_id"] == subject).unwrap()["status"].as_str().unwrap().to_string()
+    };
     write_brief(r, "a", &new_brief("A", "", ""));
     ok(r, &["brief", "approve", "a", "--approver", "Ana", "--note", "ok"]);
-    ok(r, &["change", "new", "draft", "--subject-id", "demo", "--title", "D"]);
+    ok(r, &["change", "new", "draft", "--subject", "demo", "--title", "D"]);
     write_brief(r, "draft", &old_brief("D", false, ""));
     ok(r, &["subject", "move", "demo", "--to", "verifying", "--override-reason", "no review in this test"]);
-    // `demo` answers for the approved change `a`; `draft` is never approved, untagged and no chore: not judged.
+    // `demo` answers for the approved change `a`; `draft` is never approved, untagged and no chore: not judged, so the ship
+    // is refused by the gate for its own reasons (uncovered flows), never for the old format.
     let out = canon(r, &["subject", "move", "demo", "--to", "shipped", "--json"]);
     assert_ne!(json(&out)["error"]["code"], "OLD_BRIEF_FORMAT", "a change the subject does not answer for never blocks: {}", out_text(&out));
-    // Once the old brief carries an Approved line the subject answers for it, and shipping is refused naming it.
+    assert!(out_text(&out).contains("SUBJECT_GATE_VIOLATION"), "{}", out_text(&out));
+    // Once the old brief carries an Approved line the subject answers for it: the ship is refused naming it, nothing moves.
     write_brief(r, "draft", &approved(&old_brief("D", false, "")));
+    let before = tree(r);
     let out = canon(r, &["subject", "move", "demo", "--to", "shipped", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
     let doc = json(&out);
     assert_eq!(doc["error"]["code"], "OLD_BRIEF_FORMAT", "{doc}");
     assert!(doc["error"]["message"].as_str().unwrap().contains("`draft`"), "{doc}");
-    let subjects = json(&ok(r, &["query", "--kind", "subject", "--json"]));
-    let demo = subjects["data"]["records"].as_array().unwrap().iter().find(|s| s["subject_id"] == "demo").unwrap();
-    assert_eq!(demo["status"], "verifying", "{demo}");
+    let after = tree(r);
+    let changed: Vec<&String> = after.keys().chain(before.keys()).filter(|k| after.get(*k) != before.get(*k)).collect();
+    assert_eq!((status_of("demo"), changed), ("verifying".to_string(), Vec::new()));
+
+    // The same guard stops a reopen (shipped to verifying, one `if ships || reopens`); a second subject is refused at the ship too.
+    ok(r, &["subject", "new", "other", "--domain", "dev", "--title", "Other"]);
+    ok(r, &["change", "new", "old2", "--subject", "other", "--title", "O"]);
+    write_brief(r, "old2", &approved(&old_brief("O", false, "")));
+    for to in ["specced", "building", "verifying"] {
+        ok(r, &["subject", "move", "other", "--to", to, "--override-reason", "no review in this test"]);
+    }
+    let out = canon(r, &["subject", "move", "other", "--to", "shipped", "--json"]);
+    assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
+    assert_eq!(json(&out)["error"]["code"], "OLD_BRIEF_FORMAT");
+    assert_eq!(status_of("other"), "verifying");
 }
 
 /// review.add.103
@@ -585,14 +664,14 @@ fn review_add_103_a_change_review_pins_a_new_chore_brief_and_refuses_an_old_form
     let dir = repo(None);
     let r = dir.path();
     ok(r, &["policy", "approve", "--approver", "Ana"]);
-    ok(r, &["change", "new", "k", "--subject-id", "demo", "--title", "K", "--change-kind", "chore"]);
+    ok(r, &["change", "new", "k", "--subject", "demo", "--title", "K", "--change-kind", "chore"]);
     commit_all(r);
     write_brief(r, "k", &old_chore("K"));
-    let out = canon_as(r, Some("reviewer"), &["review", "change", "k", "--original-spec-ref", ".canon/changes/k/brief.md", "--actor-id", "rev", "--role", "reviewer", "--json"]);
+    let out = canon_as(r, Some("reviewer"), &["review", "change", "k", "--original-spec-ref", ".canon/changes/k/brief.md", "--actor", "rev", "--role", "reviewer", "--json"]);
     assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
     assert_eq!(json(&out)["error"]["code"], "OLD_BRIEF_FORMAT");
     write_brief(r, "k", NEW_CHORE);
-    let out = canon_as(r, Some("reviewer"), &["review", "change", "k", "--original-spec-ref", ".canon/changes/k/brief.md", "--actor-id", "rev", "--role", "reviewer"]);
+    let out = canon_as(r, Some("reviewer"), &["review", "change", "k", "--original-spec-ref", ".canon/changes/k/brief.md", "--actor", "rev", "--role", "reviewer"]);
     assert!(out.status.success(), "{}", out_text(&out));
     assert!(out_text(&out).contains(&canon_cli::brief::brief_spec_digest(NEW_CHORE).as_str()[..12]), "{}", out_text(&out));
 }
@@ -602,7 +681,7 @@ fn review_add_103_a_change_review_pins_a_new_chore_brief_and_refuses_an_old_form
 fn ingest_plans_13_the_intent_summary_is_the_first_paragraph_of_the_intent_section() {
     let dir = repo(None);
     let r = dir.path();
-    ok(r, &["change", "new", "a", "--subject-id", "demo", "--title", "A"]);
+    ok(r, &["change", "new", "a", "--subject", "demo", "--title", "A"]);
     write_brief(r, "a", &new_brief("Add\nlogin", "", "").replace("Visitors lose", "More.\n\nVisitors lose"));
     write_brief(r, "e", "# E\n\n## Intent\n\n## Desired outcome\n\nBody.\n");
     ok(r, &["ingest", "plans"]);
@@ -681,7 +760,7 @@ fn authoring_migrate_21_a_dirty_brief_is_refused_and_edited_or_role_mismatched_b
     let edited = read_brief(r, "a").replace("Social sign-in.", "Social sign-in and email links.");
     write_brief(r, "a", &edited);
     let mismatch = old_brief("M", false, "").replace("<!-- canon:section outcome role=normative -->", "<!-- canon:section outcome role=context -->");
-    ok(r, &["change", "new", "m", "--subject-id", "demo", "--title", "M"]);
+    ok(r, &["change", "new", "m", "--subject", "demo", "--title", "M"]);
     write_brief(r, "m", &approved(&mismatch));
     commit_all(r);
     let (report, _) = plan(r);
@@ -698,17 +777,38 @@ fn authoring_migrate_21_a_dirty_brief_is_refused_and_edited_or_role_mismatched_b
 fn authoring_migrate_22_commit_rewrites_every_brief_keeps_approvals_and_a_second_run_has_nothing_to_do() {
     let dir = old_repo();
     let r = dir.path();
-    let before: BTreeMap<&str, String> = ["a", "b", "c"].iter().map(|c| (*c, read_brief(r, c))).collect();
+    // A comment line between two lines of a paragraph, and a chore marker with its category, as 0.30 read them.
+    ok(r, &["change", "new", "p", "--subject", "demo", "--title", "P"]);
+    ok(r, &["change", "new", "d", "--subject", "demo", "--title", "D"]);
+    let split = "Visitors lose their cart.\n<!-- canon:hint what -->\nThey switch devices.";
+    write_brief(r, "p", &approved(&old_brief("P", false, "").replace(BODIES[0], split)));
+    write_brief(r, "d", &approved(&old_chore("D").replace("canon:kind chore", "canon:kind chore (ci)")));
+    commit_all(r);
+    let before: BTreeMap<&str, String> = ["a", "b", "c", "d", "p"].iter().map(|c| (*c, read_brief(r, c))).collect();
     let (_, digest) = plan(r);
     let out = commit(r, None, &digest);
     assert!(out.status.success(), "{}", out_text(&out));
-    for change in ["a", "b", "c"] {
+    for change in ["a", "b", "c", "d", "p"] {
         let text = read_brief(r, change);
         assert!(!text.contains("<!--"), "{change}: {text}");
         assert!(canon_ingest::brief::parse(&text).old_format.is_none());
     }
+    // The findings after are those of the same brief written in the 0.31 format by hand (the paragraph stays two paragraphs,
+    // the chore marker with its category is a chore).
+    let waiver = "---\nwaive:\n  - rule: prose.length\n    section: brief\n    reason: \"a long brief by design\"\n---\n\n";
+    let expected_p = new_brief("P", "", "").replace(BODIES[0], "Visitors lose their cart.\n\nThey switch devices.");
+    let same = |a: &str, b: &Value| -> bool { rules(&check(r, a).1) == rules(b) };
+    let probe = repo(None);
+    let pr = probe.path();
+    ok(pr, &["change", "new", "e", "--subject", "demo", "--title", "E"]);
+    for (change, text) in [("a", new_brief("A", waiver, "")), ("b", new_brief("B", "", "")), ("p", expected_p), ("d", NEW_CHORE.replace("# K", "# D"))] {
+        write_brief(pr, "e", &text);
+        let (_, want) = check(pr, "e");
+        assert!(same(change, &want), "{change}: migrated {:?}, by hand {:?}", rules(&check(r, change).1), rules(&want));
+    }
+    assert!(read_brief(r, "d").starts_with("---\nkind: chore\n---\n\n# D\n"), "the marker with its category is a chore");
     // Approved briefs read approved, with no BRIEF_CHANGED_SINCE_APPROVAL; the waived brief has no blocker.
-    for change in ["a", "c"] {
+    for change in ["a", "c", "d", "p"] {
         let shown = json(&ok(r, &["brief", "show", change, "--json"]));
         assert_ne!(shown["data"]["state"], "changed-since-approval", "{change}: {shown}");
         assert!(canon_cli::brief::approval_of(&read_brief(r, change)).approved(), "{change}");
@@ -728,7 +828,7 @@ fn authoring_migrate_22_commit_rewrites_every_brief_keeps_approvals_and_a_second
     assert_ne!(old_line, new_line);
     // The prose (everything but comments, headings, frontmatter and the digest) is byte for byte the same.
     let prose = |t: &str| t.lines().filter(|l| !l.trim().is_empty() && !l.starts_with("## ") && !l.starts_with("<!--") && !l.starts_with("Approved:")).map(str::to_string).collect::<Vec<_>>();
-    for change in ["a", "b", "c"] {
+    for change in ["a", "b", "c", "d"] {
         let new_text = read_brief(r, change);
         let body = if new_text.starts_with("---\n") { new_text.split("\n---\n\n").nth(1).unwrap_or_default().to_string() } else { new_text.clone() };
         assert_eq!(prose(&body), prose(&before[change]), "{change}");
@@ -781,7 +881,7 @@ fn authoring_migrate_24_a_plan_that_re_binds_is_human_only_and_one_that_does_not
     // A plan that re-binds nothing (no approval, no review) runs under an orchestrator.
     let plain = repo(None);
     let p = plain.path();
-    ok(p, &["change", "new", "b", "--subject-id", "demo", "--title", "B"]);
+    ok(p, &["change", "new", "b", "--subject", "demo", "--title", "B"]);
     write_brief(p, "b", &old_brief("B", true, ""));
     commit_all(p);
     let (report, digest) = plan(p);
@@ -796,6 +896,9 @@ fn authoring_migrate_24_a_plan_that_re_binds_is_human_only_and_one_that_does_not
 fn authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and_a_stopped_run_is_finished() {
     let dir = old_repo();
     let r = dir.path();
+    ok(r, &["change", "new", "z", "--subject", "demo", "--title", "Z"]);
+    write_brief(r, "z", &new_brief("Z", "", ""));
+    commit_all(r);
     let before = tree(r);
     let (_, digest) = plan(r);
     assert!(commit(r, None, &digest).status.success());
@@ -810,6 +913,21 @@ fn authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and
     assert!(json(&out)["error"]["message"].as_str().unwrap().contains(".canon/changes/b/brief.md"), "{}", out_text(&out));
     assert_eq!(read_brief(r, "b"), edited);
     write_brief(r, "b", &String::from_utf8(migrated[".canon/changes/b/brief.md"].clone()).unwrap());
+
+    // A human's approval made after the migrate is never discarded: the approval of a brief the migrate did not rewrite
+    // and a policy approval.
+    ok(r, &["brief", "approve", "z", "--approver", "Ana", "--note", "ok"]);
+    let refused = canon(r, &["migrate", "--revert", "--json"]);
+    assert_eq!(refused.status.code(), Some(2), "{}", out_text(&refused));
+    assert!(out_text(&refused).contains(".canon/changes/z/brief.md"), "{}", out_text(&refused));
+    assert!(read_brief(r, "z").contains("Approved:"), "the approval is still there");
+    git(r, &["checkout", "--", ".canon/changes/z"]);
+    let _ = fs::remove_file(r.join(".canon/policy.approval.json"));
+    ok(r, &["policy", "approve", "--approver", "Ana"]);
+    let refused = canon(r, &["migrate", "--revert", "--json"]);
+    assert_eq!(refused.status.code(), Some(2), "{}", out_text(&refused));
+    assert!(out_text(&refused).contains(".canon/policy.approval.json") && r.join(".canon/policy.approval.json").is_file(), "{}", out_text(&refused));
+    fs::remove_file(r.join(".canon/policy.approval.json")).unwrap();
 
     // The revert puts back an Approved: digest, so committing it is the human's.
     let out = ok(r, &["migrate", "--revert", "--json"]);

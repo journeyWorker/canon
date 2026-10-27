@@ -64,7 +64,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     // `promote_after_stage`'s command comes from its caller.
     ("gate.rs", &["task done", "evidence add", "evidence audit"]),
     ("init.rs", &["init"]),
-    // `require_spec_root`: the refusal of a `--project-id` no configured spec root carries, made by every write command that takes one.
+    // `require_spec_root`: the refusal of a `--project` no configured spec root carries, made by every write command that takes one.
     ("inventory.rs", &["evidence add", "evidence audit", "evidence approval-payload", "review scenario", "review change", "divergence add", "divergence resolve", "divergence defer", "divergence accept", "scenario new"]),
     ("learn.rs", &["strategy"]),
     ("ledger.rs", &["ledger compact"]),
@@ -72,7 +72,7 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("main.rs", &[]),
     ("run/mod.rs", &[]),
     ("run/entry.rs", &[]),
-    // `project_for`: `--project-id` is required when several spec roots exist, for each of these.
+    // `project_for`: `--project` is required when several spec roots exist, for each of these.
     ("run/divergence.rs", &["divergence add", "divergence resolve", "divergence defer", "divergence accept"]),
     ("run/evidence.rs", &["evidence add", "evidence audit", "evidence approval-payload"]),
     ("run/review.rs", &["review scenario", "review change"]),

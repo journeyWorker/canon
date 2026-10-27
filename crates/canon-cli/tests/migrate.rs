@@ -178,7 +178,7 @@ fn old_repo() -> tempfile::TempDir {
     ok(repo, &["subject", "new", "cart", "--domain", "shop", "--title", "Cart"]);
     scaffold(repo, "add-cart", "Add the cart", "", "\n- [ ] 1 Write the cart scenarios\n");
     plant_change(repo, "add-cart", "Add the cart", Some("cart"));
-    ok(repo, &["subject", "adopt", "cart", "--change-id", "add-cart"]);
+    ok(repo, &["subject", "adopt", "cart", "--change", "add-cart"]);
     commit_all(repo, "a 0.16 repo");
     dir
 }
@@ -383,7 +383,7 @@ fn authoring_migrate_05_an_external_approval_moves_into_a_pointer_brief() {
     assert_eq!(read(repo, "openspec/changes/checkout/proposal.md"), proposal, "the external plan is not edited");
     assert!(read(repo, "canon.yaml").contains("    - dialect: openspec\n      root: .\n"), "the source stays");
 
-    ok(repo, &["subject", "adopt", "cart", "--change-id", "checkout"]);
+    ok(repo, &["subject", "adopt", "cart", "--change", "checkout"]);
     let status = ok(repo, &["status"]);
     assert!(status.contains("brief: approved in .canon/changes/checkout/brief.md — ana 2026-10-10 — \"go\""), "{status}");
     let again = ok(repo, &["migrate"]);
@@ -434,7 +434,7 @@ fn authoring_migrate_07_legacy_reviews_pinned_before_the_move_are_pinned_current
         write(repo, ".canon/policy.yaml", "spec_coverage:\n  require_review:\n    scope: []\n");
         write(repo, "specs/kind=feature/area=cart/add.feature", CART);
         let pin = commit_all(repo, "cart add");
-        ok(repo, &["evidence", "add", "--scenario-id", "cart.add.01", "--project-id", "root", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl-agent"]);
+        ok(repo, &["evidence", "add", "--scenario", "cart.add.01", "--project", "root", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor", "impl-agent"]);
         plant(
             repo,
             RecordKind::Review,

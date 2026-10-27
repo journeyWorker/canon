@@ -46,7 +46,7 @@ const EXTRA_INVOCATIONS: &[&str] = &[
     "query --kind task",
     "query --kind run",
     "query --kind change --history",
-    "finding list --change-id add-login --json",
+    "finding list --change add-login --json",
     "divergence list --json",
     "format .canon/specs --json",
     "brief check --json",
@@ -99,7 +99,7 @@ fn fixture(home: &Path) -> TempDir {
     git(repo, &["init", "-q", "."]);
     ok(repo, home, &["init", "--providers", "none"]);
     ok(repo, home, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, home, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(repo, home, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, home, &["feature", "new", "auth.login", "--title", "Login"]);
     let feature = ".canon/specs/kind=feature/area=auth/login.feature";
     ok(repo, home, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--feature", feature]);
@@ -108,14 +108,14 @@ fn fixture(home: &Path) -> TempDir {
     ok(
         repo,
         home,
-        &["evidence", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--verdict", "faithful", "--summary", "1 passed", "--actor-id", "impl", "--session-id", "s1", "--role", "implementer"],
+        &["evidence", "add", "--project", "root", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--verdict", "faithful", "--summary", "1 passed", "--actor", "impl", "--session", "s1", "--role", "implementer"],
     );
     ok(
         repo,
         home,
-        &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "alice", "--role", "reviewer", "--session-id", "s2", "--original-spec-ref", "docs/prd.md"],
+        &["review", "scenario", "auth.login.01", "--project", "root", "--actor", "alice", "--role", "reviewer", "--session", "s2", "--original-spec-ref", "docs/prd.md"],
     );
-    ok(repo, home, &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "bob", "--summary", "Naming nit"]);
+    ok(repo, home, &["finding", "add", "--change", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "bob", "--summary", "Naming nit"]);
     ok(repo, home, &["gate", "promote"]);
     // Specs ahead of the index: no `inventory sync` after this.
     ok(repo, home, &["scenario", "new", "auth.login.02", "--title", "Sign out", "--feature", feature]);

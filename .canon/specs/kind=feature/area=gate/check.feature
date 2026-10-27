@@ -405,7 +405,7 @@ Feature: gate check
   Scenario: A fixed blocker that names its scenarios is re-verified by evidence for those scenarios alone
     Given a subject with scenarios A and B, both evidenced and reviewed, and a blocker naming only A closed fixed after that evidence
     When the subject is moved to shipped with canon subject move, and gate check and status are read
-    Then each refuses naming A only, and the remedy is the per-scenario canon evidence add --scenario-id, never the whole-suite batch
+    Then each refuses naming A only, and the remedy is the per-scenario canon evidence add --scenario, never the whole-suite batch
     And evidence for B recorded after the close does not clear it, and evidence for A recorded before the close does not either
     And evidence for A recorded after the close clears gate check and the move, while B's evidence stays older than the close
 
@@ -426,7 +426,7 @@ Feature: gate check
   Scenario: A scoped re-verification across spec roots names a runnable command for each root
     Given a blocker closed fixed naming one scenario in one spec root and two in another, all evidenced before the close
     When the subject is moved to shipped
-    Then the refusal names, per root, canon evidence add with that root's own --project-id and --scenario-id, for each of that root's scenarios
+    Then the refusal names, per root, canon evidence add with that root's own --project and --scenario, for each of that root's scenarios
     And evidence recorded for one root's scenarios leaves only the other root's scenarios named, and recording the last clears the move
 
   # canon: {"schema":1,"at":"2026-10-22T04:47:50Z","actor":{"agent_id":"canon-impl-027"}}

@@ -145,7 +145,7 @@ canon의 모든 명령은 명세 하나(`docs/cli/canon.cli.json`)에서 생성�
 
    ```bash
    bunx @journeykit/canon subject new auth --domain dev --title "Auth"
-   bunx @journeykit/canon change new add-login --subject-id auth --title "Add login"
+   bunx @journeykit/canon change new add-login --subject auth --title "Add login"
    ```
 
    `change new`는 `.canon/changes/add-login/brief.md`를 쓰고 change를
@@ -211,8 +211,8 @@ canon의 모든 명령은 명세 하나(`docs/cli/canon.cli.json`)에서 생성�
    묶이며, 커밋하지 않은 코드에 대한 기록도 허용됩니다:
 
    ```bash
-   bunx @journeykit/canon evidence add --scenario-id auth.login.01 --class test-run --ref "npm test" --role implementer
-   bunx @journeykit/canon review scenario auth.login.01 --actor-id reviewer-1 --role reviewer --original-spec-ref docs/prd.md
+   bunx @journeykit/canon evidence add --scenario auth.login.01 --class test-run --ref "npm test" --role implementer
+   bunx @journeykit/canon review scenario auth.login.01 --actor reviewer-1 --role reviewer --original-spec-ref docs/prd.md
    bunx @journeykit/canon gate check
    ```
 

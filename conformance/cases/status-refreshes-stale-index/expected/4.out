@@ -10,4 +10,4 @@ unowned: none
 
 next:
   # cart has its scenarios and every required case; move it on
-  canon subject move cart --to specced --actor-id <unit> --session-id <session>
+  canon subject move cart --to specced --actor <unit> --session <session>

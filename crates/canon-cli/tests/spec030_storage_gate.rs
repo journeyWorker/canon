@@ -112,7 +112,7 @@ impl Repo {
     fn attest_report(&self) {
         std::fs::create_dir_all(self.path().join("reports")).unwrap();
         std::fs::write(self.path().join("reports/smoke.json"), V1).unwrap();
-        self.ok(&["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke", "--role", "implementer", "--artifact", "reports/smoke.json"]);
+        self.ok(&["evidence", "add", "--scenario", "game.run.01", "--project", "root", "--class", "test-run", "--ref", "npm run smoke", "--role", "implementer", "--artifact", "reports/smoke.json"]);
         self.ok(&["gate", "promote"]);
     }
 }
@@ -234,7 +234,7 @@ fn evidence_add_120_artifacts_move_refuses_a_plan_that_changed_since_its_preview
 
     // Another blob lands after the preview, so the plan recomputed now is another plan.
     std::fs::write(repo.path().join("reports/second.json"), br#"{"checks":15}"#).unwrap();
-    repo.ok(&["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke", "--role", "reviewer", "--artifact", "reports/second.json"]);
+    repo.ok(&["evidence", "add", "--scenario", "game.run.01", "--project", "root", "--class", "test-run", "--ref", "npm run smoke", "--role", "reviewer", "--artifact", "reports/second.json"]);
     let before = snapshot(repo.path());
 
     let stale = repo.canon(&["artifacts", "move", "--tier", "cold", "--commit", "--plan-digest", &digest, "--json"]);
@@ -259,7 +259,7 @@ const AT: &str = "2026-10-26T00:00:00Z";
 fn evidence_add_121_an_approval_payload_prints_the_exact_bytes_to_sign_and_writes_nothing() {
     let repo = new_repo();
     let before = snapshot(repo.path());
-    let args = ["evidence", "approval-payload", "--scenario-id", "game.run.01", "--project-id", "root", "--approver", "alice", "--approval-at", AT];
+    let args = ["evidence", "approval-payload", "--scenario", "game.run.01", "--project", "root", "--approver", "alice", "--approval-at", AT];
 
     let human = repo.canon(&args);
     assert_eq!(human.status.code(), Some(0), "{}", text(&human));
@@ -284,7 +284,7 @@ fn evidence_add_121_an_approval_payload_prints_the_exact_bytes_to_sign_and_write
 fn evidence_add_130_an_approval_payload_for_a_scenario_the_index_does_not_hold_is_refused_and_prints_no_bytes() {
     let repo = new_repo();
     let before = snapshot(repo.path());
-    let args = ["evidence", "approval-payload", "--scenario-id", "game.run.99", "--project-id", "root", "--approver", "alice", "--approval-at", AT];
+    let args = ["evidence", "approval-payload", "--scenario", "game.run.99", "--project", "root", "--approver", "alice", "--approval-at", AT];
 
     let human = repo.canon(&args);
     assert_eq!(human.status.code(), Some(2), "{}", text(&human));
@@ -301,7 +301,7 @@ fn evidence_add_130_an_approval_payload_for_a_scenario_the_index_does_not_hold_i
     assert!(body["error"]["hint"].as_str().unwrap().contains("canon inventory sync"), "{body}");
     assert_eq!(snapshot(repo.path()), before);
 
-    let indexed = repo.canon(&["evidence", "approval-payload", "--scenario-id", "game.run.01", "--project-id", "root", "--approver", "alice", "--approval-at", AT]);
+    let indexed = repo.canon(&["evidence", "approval-payload", "--scenario", "game.run.01", "--project", "root", "--approver", "alice", "--approval-at", AT]);
     assert_eq!(indexed.status.code(), Some(0), "{}", text(&indexed));
     assert!(!indexed.stdout.is_empty());
 }
@@ -315,12 +315,12 @@ fn evidence_add_122_an_approval_payload_is_refused_without_a_task_or_scenario_or
     assert_eq!(no_target.status.code(), Some(2), "{}", text(&no_target));
     assert_eq!(stdout_json(&no_target)["error"]["code"], "EVIDENCE_REFUSED");
 
-    let bad_time = repo.canon(&["evidence", "approval-payload", "--scenario-id", "game.run.01", "--project-id", "root", "--approver", "alice", "--approval-at", "yesterday"]);
+    let bad_time = repo.canon(&["evidence", "approval-payload", "--scenario", "game.run.01", "--project", "root", "--approver", "alice", "--approval-at", "yesterday"]);
     assert_eq!(bad_time.status.code(), Some(2), "{}", text(&bad_time));
     assert!(bad_time.stdout.is_empty(), "no payload bytes on stdout: {}", text(&bad_time));
     assert!(text(&bad_time).contains("invalid timestamp"), "{}", text(&bad_time));
 
-    let no_approver = repo.canon(&["evidence", "approval-payload", "--scenario-id", "game.run.01", "--project-id", "root", "--approval-at", AT]);
+    let no_approver = repo.canon(&["evidence", "approval-payload", "--scenario", "game.run.01", "--project", "root", "--approval-at", AT]);
     assert_eq!(no_approver.status.code(), Some(2), "{}", text(&no_approver));
     assert!(no_approver.stdout.is_empty() && text(&no_approver).contains("--approver"), "{}", text(&no_approver));
     assert_eq!(snapshot(repo.path()), before);

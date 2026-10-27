@@ -215,7 +215,7 @@ pub fn stderr(output: &Output) -> String {
 }
 
 /// Declares `project` as a spec root in `<repo>/canon.yaml` (its corpus
-/// under `specs-<project>/`), once. `--project-id` must name a configured
+/// under `specs-<project>/`), once. `--project` must name a configured
 /// root, so a fixture that writes under `project` declares it first. The
 /// block goes at the end of the file, so declare roots after the rest of
 /// the config is written.

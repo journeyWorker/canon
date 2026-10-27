@@ -413,7 +413,7 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
         match trajectory_store.find_by_id(id) {
             Ok(Some(_)) => {}
             Ok(None) => {
-                return ExitCode::from(CliError::refused("LEARN_TRAJECTORY_NOT_FOUND", "contradicting trajectory does not exist").hint("check --contradicting-trajectory-id against the recorded trajectories, or omit it").emit("canon strategy rollback", json));
+                return ExitCode::from(CliError::refused("LEARN_TRAJECTORY_NOT_FOUND", "contradicting trajectory does not exist").hint("check --contradicting-trajectory against the recorded trajectories, or omit it").emit("canon strategy rollback", json));
             }
             Err(error) => {
                 return ExitCode::from(CliError::failed("REPO_UNREADABLE", format!("cannot verify contradicting trajectory: {error}")).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon strategy rollback", json));

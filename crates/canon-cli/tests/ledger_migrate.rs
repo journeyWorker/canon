@@ -329,11 +329,11 @@ fn assert_old_layout_refusal(repo: &Repo, args: &[&str]) {
 const EVIDENCE_ADD: [&str; 16] = [
     "evidence",
     "add",
-    "--scenario-id",
+    "--scenario",
     "auth.login.01",
-    "--project-id",
+    "--project",
     "root",
-    "--actor-id",
+    "--actor",
     "a",
     "--role",
     "implementer",
@@ -1175,7 +1175,7 @@ fn ledger_migrate_14_scenario_and_feature_authoring_is_refused() {
 fn ledger_migrate_15_divergence_writes_and_promotion_are_refused() {
     let repo = Repo::old();
     let before = repo.snapshot(false);
-    assert_old_layout_refusal(&repo, &["divergence", "add", "auth.login.01", "--actor-id", "r", "--role", "reviewer"]);
+    assert_old_layout_refusal(&repo, &["divergence", "add", "auth.login.01", "--actor", "r", "--role", "reviewer"]);
     assert_unchanged(&before, &repo, "the refused `canon divergence add`");
     assert_old_layout_refusal(&repo, &["gate", "promote"]);
     assert_unchanged(&before, &repo, "the refused `canon gate promote`");

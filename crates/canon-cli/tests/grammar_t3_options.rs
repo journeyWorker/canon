@@ -42,8 +42,8 @@ const NO_REPO: &[&str] = &["schema", "selftest", "completion", "regime show", "s
 const SHORTS: &[(char, Option<&str>)] = &[('h', None), ('V', None), ('o', Some("output")), ('q', None)];
 
 /// An option that is repeatable on one leaf and single on another, by the per-leaf table's own rows:
-/// `finding add --scenario-id <SCENARIO_ID>...` names every scenario a finding is about, `evidence add` takes one.
-const REPEATABLE_DIFFERS: &[&str] = &["scenario-id"];
+/// `finding add --scenario <SCENARIO_ID>...` names every scenario a finding is about, `evidence add` takes one.
+const REPEATABLE_DIFFERS: &[&str] = &["scenario"];
 
 fn all_options() -> Vec<(String, &'static Value)> {
     let mut out = Vec::new();

@@ -74,7 +74,7 @@ impl Repo {
     }
 
     fn attest(&self, extra: &[&str]) -> Output {
-        let mut args = vec!["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "npm run smoke", "--role", "implementer"];
+        let mut args = vec!["evidence", "add", "--scenario", "game.run.01", "--project", "root", "--class", "test-run", "--ref", "npm run smoke", "--role", "implementer"];
         args.extend_from_slice(extra);
         let out = self.canon(&args);
         if out.status.success() {
@@ -231,7 +231,7 @@ fn an_unreachable_or_unattachable_store_refuses_with_a_hint_and_never_passes() {
     // A write refuses and records nothing.
     std::fs::write(repo.path().join("reports/other.json"), br#"{"other":1}"#).unwrap();
     let before = std::fs::read_dir(repo.path().join(".canon/ledger/kind=evidence")).unwrap().count();
-    let mut args = vec!["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "x", "--role", "implementer", "--artifact", "reports/other.json"];
+    let mut args = vec!["evidence", "add", "--scenario", "game.run.01", "--project", "root", "--class", "test-run", "--ref", "x", "--role", "implementer", "--artifact", "reports/other.json"];
     args.push("--json");
     let add = repo.canon_s3(&args, &env);
     assert_eq!(add.status.code(), Some(2), "{}", text(&add));

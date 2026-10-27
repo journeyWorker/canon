@@ -59,11 +59,11 @@ fn fixture(home: &Path) -> TempDir {
     }
     ok(repo, home, &["init", "--providers", "none"]);
     ok(repo, home, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, home, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(repo, home, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, home, &["feature", "new", "auth.login", "--title", "Login"]);
     ok(repo, home, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--feature", ".canon/specs/kind=feature/area=auth/login.feature"]);
     ok(repo, home, &["inventory", "sync"]);
-    ok(repo, home, &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "bob", "--summary", "Naming nit"]);
+    ok(repo, home, &["finding", "add", "--change", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "bob", "--summary", "Naming nit"]);
     dir
 }
 

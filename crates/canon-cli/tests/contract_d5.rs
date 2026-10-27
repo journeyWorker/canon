@@ -27,7 +27,7 @@ fn repo() -> TempDir {
     let r = dir.path();
     ok(r, &["init", "--providers", "none"]);
     ok(r, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(r, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(r, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(r, &["feature", "new", "auth.login", "--title", "Login"]);
     ok(r, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--feature", ".canon/specs/kind=feature/area=auth/login.feature"]);
     ok(r, &["inventory", "sync"]);
@@ -100,7 +100,7 @@ fn context_keeps_only_the_named_sections() {
 #[test]
 fn divergence_status_projects_each_scenario_row() {
     let dir = repo();
-    ok(dir.path(), &["divergence", "add", "auth.login.01", "--project-id", "root", "--actor-id", "alice", "--role", "reviewer"]);
+    ok(dir.path(), &["divergence", "add", "auth.login.01", "--project", "root", "--actor", "alice", "--role", "reviewer"]);
     let all = body(&run(dir.path(), &["divergence", "list", "--json"]));
     assert!(all["data"]["scenarios"][0].as_object().unwrap().len() >= 3, "{all}");
     let out = run(dir.path(), &["divergence", "list", "--json", "--fields", "scenarioId,state"]);
@@ -114,7 +114,7 @@ fn divergence_status_projects_each_scenario_row() {
 #[test]
 fn export_projects_each_record_but_keeps_the_manifest_digests() {
     let dir = repo();
-    ok(dir.path(), &["evidence", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer"]);
+    ok(dir.path(), &["evidence", "add", "--project", "root", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer"]);
     let all = body(&run(dir.path(), &["export", "--kind", "evidence"]));
     assert_eq!(all["records"].as_array().unwrap().len(), 1);
     let out = run(dir.path(), &["export", "--kind", "evidence", "--fields", "id,digest"]);
@@ -149,7 +149,7 @@ fn usage_errors_name_the_argument_and_its_possible_values() {
     assert_eq!((e["code"].as_str(), e["field"].as_str()), (Some("USAGE"), Some("--kind")));
     assert!(strings(&e["expected"]).contains(&"evidence"));
 
-    let e = error_of(dir.path(), &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "nope", "--actor-id", "a", "--summary", "s"]);
+    let e = error_of(dir.path(), &["finding", "add", "--change", "add-login", "--round", "1", "--seq", "1", "--severity", "nope", "--actor", "a", "--summary", "s"]);
     assert_eq!(e["field"], "--severity");
     assert_eq!(strings(&e["expected"]), ["blocker", "should-fix", "note"]);
 
@@ -157,7 +157,7 @@ fn usage_errors_name_the_argument_and_its_possible_values() {
     assert_eq!(e["field"], "--disposition");
     assert_eq!(strings(&e["expected"]), ["open", "fixed", "rejected", "deferred"]);
 
-    let e = error_of(dir.path(), &["change", "new", "x", "--subject-id", "demo", "--title", "t", "--change-kind", "nope"]);
+    let e = error_of(dir.path(), &["change", "new", "x", "--subject", "demo", "--title", "t", "--change-kind", "nope"]);
     assert_eq!(e["field"], "--change-kind");
     assert_eq!(strings(&e["expected"]), ["feature", "chore"]);
 
@@ -213,7 +213,7 @@ fn a_refusal_about_no_particular_argument_carries_neither_key() {
 // ---- 4. retry safety -------------------------------------------------------
 
 fn evidence(dir: &Path, extra: &[&str]) -> Output {
-    let mut args = vec!["evidence", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--json"];
+    let mut args = vec!["evidence", "add", "--project", "root", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--json"];
     args.extend_from_slice(extra);
     run(dir, &args)
 }
@@ -259,7 +259,7 @@ fn evidence_added_again_after_a_review_is_deliberate_and_is_written() {
     // that evidence (and stales the review), so it is never read as a retry.
     let dir = repo();
     assert!(evidence(dir.path(), &[]).status.success());
-    ok(dir.path(), &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "alice", "--role", "reviewer", "--original-spec-ref", "docs/prd.md"]);
+    ok(dir.path(), &["review", "scenario", "auth.login.01", "--project", "root", "--actor", "alice", "--role", "reviewer", "--original-spec-ref", "docs/prd.md"]);
     let again = evidence(dir.path(), &[]);
     assert!(again.status.success());
     assert!(body(&again)["meta"].get("unchanged").is_none(), "{}", String::from_utf8_lossy(&again.stdout));
@@ -270,7 +270,7 @@ fn evidence_added_again_after_a_review_is_deliberate_and_is_written() {
 }
 
 fn review(dir: &Path, rev: &str) -> Output {
-    run(dir, &["review", "scenario", "auth.login.01", "--project-id", "root", "--actor-id", "alice", "--rev", rev, "--role", "reviewer", "--original-spec-ref", "docs/prd.md", "--json"])
+    run(dir, &["review", "scenario", "auth.login.01", "--project", "root", "--actor", "alice", "--rev", rev, "--role", "reviewer", "--original-spec-ref", "docs/prd.md", "--json"])
 }
 
 #[test]
@@ -375,12 +375,12 @@ fn an_identical_repeat_of_a_write_leaf_is_unchanged_and_writes_nothing() {
         &["gate", "promote"],
         &["report", "build"],
         &["report", "snapshot", "snapshot-out"],
-        &["subject", "adopt", "demo", "--change-id", "add-login"],
+        &["subject", "adopt", "demo", "--change", "add-login"],
         &["artifacts", "store"],
         &["policy", "approve", "--approver", "alice", "--note", "reviewed"],
         &["context-pack", "add", "--manifest", ".canon/context-manifest.json"],
         &["prompt", "add", "reviewer@v1", "--manifest", ".canon/prompt-manifest.json"],
-        &["divergence", "add", "auth.login.01", "--actor-id", "alice", "--role", "reviewer"],
+        &["divergence", "add", "auth.login.01", "--actor", "alice", "--role", "reviewer"],
         &["export", "--kind", "evidence", "--output", "evidence.json"],
         &["ingest", "records"],
         &["ingest", "plans"],
@@ -389,7 +389,7 @@ fn an_identical_repeat_of_a_write_leaf_is_unchanged_and_writes_nothing() {
         repeats_unchanged(d, args);
     }
     // Unlinking comes last: it takes the adoption the cases above rely on away.
-    repeats_unchanged(d, &["subject", "unadopt", "demo", "--change-id", "add-login"]);
+    repeats_unchanged(d, &["subject", "unadopt", "demo", "--change", "add-login"]);
     for args in [&["ledger", "compact"][..], &["migrate"], &["tier", "age"], &["purge", "--kind", "session", "--before", "2020-01-01T00:00:00Z"], &["artifacts", "move", "--tier", "local"]] {
         commit_repeats_unchanged(d, args);
     }

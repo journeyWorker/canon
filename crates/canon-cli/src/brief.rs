@@ -568,6 +568,35 @@ fn first_adopted_at(ctx: &GateContext, subject: &Subject) -> Option<DateTime<Utc
     by_subject.chain(by_change).min()
 }
 
+/// The briefs in the 0.30 format among every governing change of the subject the scenario (or task) belongs to, not
+/// only the ones the evidence answers for: an old-format brief the subject is governed by makes `evidence add` refuse
+/// (0.31 `brief-format`, [`crate::old_briefs`]).
+pub fn old_format_governing(
+    repo: &Path,
+    ctx: &GateContext,
+    flow_changes: &crate::brief_check::FlowChangesIndex,
+    task: Option<&TaskId>,
+    scenario: Option<(&ProjectId, &ScenarioId)>,
+) -> Vec<crate::old_briefs::OldBrief> {
+    let owner = scenario.and_then(|(project, id)| latest_scenario(ctx, project, id).and_then(|s| s.subject_id.as_ref()));
+    let task_change = task.map(TaskId::change_id);
+    let mut out: Vec<crate::old_briefs::OldBrief> = Vec::new();
+    for subject in latest_subjects(ctx) {
+        let changes = subject_change_ids(ctx, subject);
+        let involved = owner == Some(&subject.subject_id) || task_change.as_ref().is_some_and(|change| changes.contains(change));
+        if !involved {
+            continue;
+        }
+        let governed: Vec<ChangeId> = governing(repo, ctx, flow_changes, subject, &changes).governed.into_iter().map(|(change, _)| change).collect();
+        for old in crate::old_briefs::among(repo, &governed) {
+            if !out.contains(&old) {
+                out.push(old);
+            }
+        }
+    }
+    out
+}
+
 /// The changes whose briefs a scenario without a `@flow:` tag answers to
 /// (0.25 D1, 0.31), among the subject's adopted `changes`:
 /// 1. every one whose canon `brief.md` carries an `Approved:` line (approved
@@ -693,7 +722,7 @@ pub fn adoption_warning(repo: &Path, subject: &Subject, change: &ChangeId) -> Op
         .filter(|brief| brief.enforced)?;
     let (change, subject_id) = (change.as_str(), subject.subject_id.as_str());
     Some(format!(
-        "subject `{subject_id}` is {} and change `{change}` is not approved ({}): the subject's existing scenarios keep accepting evidence, and while no scenario is tagged `@flow:{change}.*` it can still be reopened and shipped for its approved scope; once a scenario is tagged `@flow:{change}.*`, those scenarios wait for the approval and `{subject_id}` cannot ship until the brief is approved; to take the adoption back run `canon subject unadopt {subject_id} --change-id {change}`",
+        "subject `{subject_id}` is {} and change `{change}` is not approved ({}): the subject's existing scenarios keep accepting evidence, and while no scenario is tagged `@flow:{change}.*` it can still be reopened and shipped for its approved scope; once a scenario is tagged `@flow:{change}.*`, those scenarios wait for the approval and `{subject_id}` cannot ship until the brief is approved; to take the adoption back run `canon subject unadopt {subject_id} --change {change}`",
         serde_json::to_value(subject.status).ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default(),
         brief.unanswered()
     ))

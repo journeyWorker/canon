@@ -1,8 +1,8 @@
 description: "0.16 M7: `canon evidence add --override-reason` attests a scenario whose subject's brief is not approved (exit 0), prints the waived `unreviewed-promotion <subject>` and who recorded the override, and records `brief_override` (reason, waived refusals, actor) on the record (its JSON shape is pinned by evidence.add.70's test, since a promoted record's staging id is not stable); `canon status` warns about it and `canon gate check` lists it as an advisory without failing; a blank reason exits 2"
 steps:
-  - args: [evidence, add, --project-id, root, --scenario-id, checkout.pay.01, --class, test-run, --ref, "cargo test", --role, implementer, --override-reason, " "]
+  - args: [evidence, add, --project, root, --scenario, checkout.pay.01, --class, test-run, --ref, "cargo test", --role, implementer, --override-reason, " "]
     exit: 2
-  - args: [evidence, add, --project-id, root, --scenario-id, checkout.pay.01, --class, test-run, --ref, "cargo test", --role, implementer, --actor-id, lead, --override-reason, "the human approved in chat; the line follows", --promote]
+  - args: [evidence, add, --project, root, --scenario, checkout.pay.01, --class, test-run, --ref, "cargo test", --role, implementer, --actor, lead, --override-reason, "the human approved in chat; the line follows", --promote]
     exit: 0
   - args: [status]
     exit: 0

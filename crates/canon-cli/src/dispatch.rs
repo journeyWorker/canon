@@ -1,6 +1,6 @@
 //! `canon dispatch begin --role <r> --regime <k> [--repo <dir>]
-//! [--actor-id <id>] [--task-id <task_id>] [--parent-run-id <run_id>]
-//! [--provider <name>] [--model <name>] [--skill-id <id>]
+//! [--actor <id>] [--task <task_id>] [--parent-run <run_id>]
+//! [--provider <name>] [--model <name>] [--skill <id>]
 //! [--skill-digest <digest>] [--json]` (S8 `retrieve-before-task`, task 2.3):
 //! the LIVE run-manifest write seam. Everything else in S8 shipped
 //! standalone (design.md Migration Plan Step 1 — `canon retrieve` + the
@@ -70,7 +70,7 @@
 //! repo's 5079 real runs `task_id` was set on ZERO of them — the
 //! execution tree and the plan DAG both existed with no edge between
 //! them, and s37's "a plan-vs-actual diff is now possible" claim was
-//! false. `--task-id` and `--parent-run-id` ([`DispatchBinding`]) populate
+//! false. `--task` and `--parent-run` ([`DispatchBinding`]) populate
 //! exactly those two fields, and [`end`] supplies the terminal status
 //! `begin` never could: `begin` mints `RunStatus::Running` and, before
 //! s40, NOTHING in the CLI ever closed it, so every dispatched run
@@ -81,10 +81,10 @@
 //! no-plan dispatch still omits both binding keys. Every begin also
 //! captures context/policy lineage, independent of those bindings.
 //!
-//! `--task-id` joins the FAIL-LOUD half (exit `2`): a typo must never
+//! `--task` joins the FAIL-LOUD half (exit `2`): a typo must never
 //! persist a dangling `Run.task_id`, which is the very
 //! relationship-asserted-without-data defect s40 exists to remove.
-//! `--parent-run-id` deliberately does NOT — see
+//! `--parent-run` deliberately does NOT — see
 //! [`DispatchBinding::parent_run_id`].
 //!
 //! # `canon dispatch diff` — the reader those two edges finally feed
@@ -141,7 +141,7 @@ pub enum DispatchError {
     RoleRegimeMismatch { role: String, regime_key: String, regime_role: String },
 
     /// A digest without a declared skill cannot identify an input.
-    #[error("--skill-digest requires --skill-id — declare the skill id, or omit the digest")]
+    #[error("--skill-digest requires --skill — declare the skill id, or omit the digest")]
     SkillDigestWithoutId,
 
     /// The dispatch record could not be written to the side-channel.
@@ -158,23 +158,23 @@ pub enum DispatchError {
     #[error(transparent)]
     ContextPack(#[from] ContextPackError),
 
-    /// `--task-id <id>` (s40 task 1.2) names a task no configured plan
+    /// `--task <id>` (s40 task 1.2) names a task no configured plan
     /// source carries. Raised BEFORE the mint and the write:
     /// persisting a dangling `Run.task_id` would assert exactly the
     /// relationship s40 exists to stop asserting without data.
     #[error(
-        "--task-id `{task_id}` names no task in this repo's plan corpus (consulted: {consulted}) — fix the id, or dispatch without --task-id rather than record a dangling binding"
+        "--task `{task_id}` names no task in this repo's plan corpus (consulted: {consulted}) — fix the id, or dispatch without --task rather than record a dangling binding"
     )]
     TaskNotFound { task_id: String, consulted: String },
 
-    /// `--task-id` was given by a repo that configures no plan corpus at
+    /// `--task` was given by a repo that configures no plan corpus at
     /// all. DISTINCT from [`DispatchError::TaskNotFound`] on purpose:
     /// "your id is wrong" and "there is nowhere for any id to be right"
     /// are different operator problems with different fixes, and
     /// collapsing them would send the caller hunting for a typo in a
     /// repo that has no plan sources to typo against.
     #[error(
-        "--task-id `{task_id}` cannot be resolved: this repo configures no plan sources (no `.canon/changes` and no `plans.sources` entries in canon.yaml), so no plan corpus exists for a task id to live in — write the change with `canon change new`, list your external plans under `plans.sources`, or dispatch without --task-id"
+        "--task `{task_id}` cannot be resolved: this repo configures no plan sources (no `.canon/changes` and no `plans.sources` entries in canon.yaml), so no plan corpus exists for a task id to live in — write the change with `canon change new`, list your external plans under `plans.sources`, or dispatch without --task"
     )]
     NoPlanSources { task_id: String },
 
@@ -186,7 +186,7 @@ pub enum DispatchError {
     /// readable source is not this: the adapter names it in
     /// `PlanParseOutcome::malformed` and the scan continues
     /// ([`validate_task_binding`]).
-    #[error("resolving --task-id `{task_id}` against the plan corpus: {detail}")]
+    #[error("resolving --task `{task_id}` against the plan corpus: {detail}")]
     PlanCorpus { task_id: String, detail: String },
 
     /// `canon dispatch end <id>` found no manifest for `<id>`.
@@ -261,7 +261,7 @@ impl DispatchError {
     /// rather than silently inherit `1` from a catch-all arm in a
     /// wrapper.
     /// `pub(crate)` since s42 (`close-the-open-loops`): `canon evidence
-    /// add` admits its `--task-id` through this module's own
+    /// add` admits its `--task` through this module's own
     /// `validate_task_binding`, so it surfaces `DispatchError` and must
     /// classify it by the SAME exhaustive match rather than restating
     /// the split in a second wrapper that a later variant could drift
@@ -312,12 +312,12 @@ impl DispatchError {
         };
         let hint = match self {
             Self::RoleRegimeMismatch { .. } => "pass --role equal to the leading segment of --regime (`canon regime show` prints a regime key)".to_string(),
-            Self::SkillDigestWithoutId => "pass --skill-id <id> with --skill-digest, or drop the digest".to_string(),
+            Self::SkillDigestWithoutId => "pass --skill <id> with --skill-digest, or drop the digest".to_string(),
             Self::Io(_) => "check that the repository's .canon directory is writable, then run the command again".to_string(),
             Self::Serialize(_) => "this is a canon bug: report it together with the command line that produced it".to_string(),
             Self::ContextPack(inner) => inner.to_cli_error().hint_text().unwrap_or_default().to_string(),
             Self::TaskNotFound { .. } => "task ids look like <change_id>#<n>; open the change's plan document to find the right number".to_string(),
-            Self::NoPlanSources { .. } => "write the change's plan document, then run `canon ingest plans` so --task-id can resolve against it".to_string(),
+            Self::NoPlanSources { .. } => "write the change's plan document, then run `canon ingest plans` so --task can resolve against it".to_string(),
             Self::PlanCorpus { .. } => "fix the plan document the message names, then run the command again".to_string(),
             Self::NoSuchRun { .. } => "pass the run id `canon dispatch begin` printed for this repository".to_string(),
             Self::AlreadyEnded { .. } => "the run is closed; start a new one with `canon dispatch begin`".to_string(),
@@ -485,7 +485,7 @@ pub struct DispatchBinding {
     /// the configured plan corpus before anything is written — see
     /// [`validate_task_binding`].
     pub task_id: Option<TaskId>,
-    /// The dispatching actor's session (`--session-id`), recorded as `actor.session_id` on the run's envelope.
+    /// The dispatching actor's session (`--session`), recorded as `actor.session_id` on the run's envelope.
     pub session_id: Option<canon_model::SessionId>,
     /// The run that dispatched this one (`Run.parent_run_id`).
     ///
@@ -601,7 +601,7 @@ fn sha256_digest(bytes: &[u8]) -> String {
 ///
 /// 1. **No compat default.** `crate::plans::load_plan_sources_for_gate`
 ///    substitutes `[{ dialect: openspec, root: <repo> }]` when `plans:`
-///    is absent, so pre-s35 gate consumers keep working. `--task-id` is
+///    is absent, so pre-s35 gate consumers keep working. `--task` is
 ///    new in s40 and has no such consumer, and reporting "no task `x`
 ///    in openspec @ <repo>" against a source the operator never
 ///    configured is misleading. Zero configured sources is therefore
@@ -636,7 +636,7 @@ fn sha256_digest(bytes: &[u8]) -> String {
 ///    [`crate::plans::admit_source_candidates`], the same call the
 ///    importer's own scan loop makes, threading one pass-wide
 ///    `seen_change_ids` across the sources in config order — so a
-///    `--task-id` is bindable IFF an import pass would persist it, and the
+///    `--task` is bindable IFF an import pass would persist it, and the
 ///    two cannot silently drift again.
 ///
 ///    `canon task done` deliberately keeps its own, laxer rule here and
@@ -668,9 +668,9 @@ fn sha256_digest(bytes: &[u8]) -> String {
 /// nothing here touches a tier or rewrites a plan document.
 ///
 /// s42 (`close-the-open-loops`) made it `pub(crate)` so `canon
-/// evidence add --task-id` refuses an unknown task through THIS one
+/// evidence add --task` refuses an unknown task through THIS one
 /// admission decision (s42 task 4.1's "the same plan-corpus admission
-/// `canon dispatch begin --task-id` uses") rather than a second copy
+/// `canon dispatch begin --task` uses") rather than a second copy
 /// that could drift from the D8 ownership rule above. Body and
 /// signature are untouched by that change.
 pub(crate) fn validate_task_binding(repo: &Path, task_id: &TaskId) -> Result<(), DispatchError> {
@@ -946,7 +946,7 @@ pub fn run_begin(
 
 // ─── s40 (`plan-vs-actual-diff`), task 1: value parsers + the close ───
 
-/// `--task-id`'s clap `value_parser` (s40 task 1.1), mirroring
+/// `--task`'s clap `value_parser` (s40 task 1.1), mirroring
 /// `crate::retrieve::parse_role`'s established shape: the `TaskId`
 /// GRAMMAR check only — `<change_id>#<n>`. Whether such a task EXISTS
 /// is [`validate_task_binding`]'s job at dispatch time, against the
@@ -955,8 +955,8 @@ pub fn parse_task_id(s: &str) -> Result<TaskId, canon_model::ids::JoinKeyError> 
     TaskId::parse(s)
 }
 
-/// `--parent-run-id`'s and `--run-id`'s clap `value_parser`: the `RunId`
-/// grammar (a ULID). For `--parent-run-id` this is the ONLY check there
+/// `--parent-run`'s and `--run`'s clap `value_parser`: the `RunId`
+/// grammar (a ULID). For `--parent-run` this is the ONLY check there
 /// is — see [`DispatchBinding::parent_run_id`] for why the parent's
 /// existence is deliberately not verified.
 pub fn parse_run_id(s: &str) -> Result<RunId, canon_model::ids::JoinKeyError> {
@@ -1102,7 +1102,7 @@ impl Drop for EndLock {
 /// Deliberately stops there. The LIFECYCLE rung — which states a run
 /// may be in — is each caller's own: [`end`] admits exactly
 /// `(RunStatus::Running, ended_at: None)` because it MUTATES the run,
-/// while a read-only caller (`crate::artifact_ingest`'s `--run-id`
+/// while a read-only caller (`crate::artifact_ingest`'s `--run`
 /// attribution) only needs the run to have been dispatched at all. Both
 /// share this function's identity rungs, which is where a false
 /// attribution would actually come from.
@@ -1613,7 +1613,7 @@ fn declared_edges(tasks: &[Value]) -> BTreeSet<TaskEdge> {
 /// (`task_id` on 0 of them). That is a legitimately EMPTY observed
 /// side and a normal zero-edge report, never an error: session ingest
 /// reconstructs a run from a transcript that cannot know a plan task,
-/// and only `canon dispatch begin --task-id` binds one. A run missing
+/// and only `canon dispatch begin --task` binds one. A run missing
 /// only `parent_run_id` is still usable as a PARENT — a root dispatch
 /// bound to a task is exactly the far end of the first edge.
 ///
@@ -2275,7 +2275,7 @@ mod tests {
     /// side-channel, NOT the canonical tier ([`begin`]'s own module
     /// doc), and no reconciliation step folds it in yet — so a diff
     /// that read only the tier would report zero observed edges no
-    /// matter how many runs were dispatched with `--task-id`.
+    /// matter how many runs were dispatched with `--task`.
     #[test]
     fn dispatch_side_channel_manifests_are_read_as_runs() {
         let dir = TempDir::new().expect("tempdir");
@@ -2399,7 +2399,7 @@ mod begin_tests {
     pub(crate) fn write_openspec_change(root: &Path, change_id: &str, rows: &str) {
         let change_dir = root.join(change_id);
         std::fs::create_dir_all(&change_dir).expect("creating the change dir");
-        std::fs::write(change_dir.join("proposal.md"), format!("# {change_id}\n\n## Why\n\nTo exercise --task-id resolution.\n"))
+        std::fs::write(change_dir.join("proposal.md"), format!("# {change_id}\n\n## Why\n\nTo exercise --task resolution.\n"))
             .expect("writing proposal.md");
         std::fs::write(change_dir.join("tasks.md"), rows).expect("writing tasks.md");
     }
@@ -2439,7 +2439,7 @@ mod begin_tests {
     }
 
     /// A repo whose canon.yaml configures no `plans:` section at all —
-    /// the DISTINCT failure `--task-id` must report separately from an
+    /// the DISTINCT failure `--task` must report separately from an
     /// unknown id.
     fn repo_without_plan_sources() -> TempDir {
         let tmp = tempfile::tempdir().expect("a temp dir");
@@ -2606,7 +2606,7 @@ mod begin_tests {
 
     /// Task 1.3's round-trip half. The parent is a freshly minted
     /// `RunId` with no manifest of its own — deliberately, since
-    /// `--parent-run-id` is documented NOT to verify the parent exists
+    /// `--parent-run` is documented NOT to verify the parent exists
     /// (a parent may not have flushed yet).
     #[test]
     fn a_dispatch_with_both_flags_round_trips_both_fields() {
@@ -2662,7 +2662,7 @@ mod begin_tests {
 
         assert!(matches!(err, DispatchError::TaskNotFound { .. }), "expected TaskNotFound, got {err:?}");
         assert!(err.to_string().contains("demo-change#9.9"), "the message must name the rejected id: {err}");
-        assert!(err.is_usage(), "an unknown --task-id is a fixable invocation, exit 2");
+        assert!(err.is_usage(), "an unknown --task is a fixable invocation, exit 2");
         assert!(!tmp.path().join(DISPATCH_DIR).exists(), "a rejected binding must leave no dispatch record behind");
     }
 
@@ -2686,7 +2686,7 @@ mod begin_tests {
     fn a_repo_with_no_plan_sources_reports_distinctly_from_an_unknown_task() {
         let tmp = repo_without_plan_sources();
         let binding = DispatchBinding { task_id: Some(TaskId::parse("demo-change#1.1").expect("a literal task id")), parent_run_id: None, ..Default::default() };
-        let err = begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect_err("--task-id against no corpus must be rejected");
+        let err = begin(tmp.path(), &role(), &regime(), "canon", &binding, &DispatchMetadata::default()).expect_err("--task against no corpus must be rejected");
 
         assert!(matches!(err, DispatchError::NoPlanSources { .. }), "expected NoPlanSources, got {err:?}");
         let message = err.to_string();
@@ -2733,7 +2733,7 @@ mod begin_tests {
     /// Two configured openspec sources that BOTH carry a
     /// `shared-change` document, each with a row the other lacks — the
     /// exact shape design D8's `duplicate_change_id` diagnostic exists
-    /// for, and the shape s41 (`review-hardening`) caught `--task-id`
+    /// for, and the shape s41 (`review-hardening`) caught `--task`
     /// admitting wrongly.
     fn repo_with_a_duplicated_change_id() -> TempDir {
         let tmp = tempfile::tempdir().expect("a temp dir");
@@ -2786,7 +2786,7 @@ mod begin_tests {
         assert!(matches!(err, DispatchError::TaskNotFound { .. }), "expected TaskNotFound, got {err:?}");
         let message = err.to_string();
         assert!(message.contains("shared-change#2.1"), "the message must name the rejected id: {message}");
-        assert!(err.is_usage(), "an unbindable --task-id is a fixable invocation, exit 2");
+        assert!(err.is_usage(), "an unbindable --task is a fixable invocation, exit 2");
         assert!(!tmp.path().join(DISPATCH_DIR).exists(), "a rejected binding must leave no dispatch record behind");
     }
 
@@ -3036,7 +3036,7 @@ mod tier_tests {
     use tempfile::TempDir;
 
     /// A repo routing `run` and `task` to a GIT-backed `local` rung,
-    /// plus the openspec plan corpus `--task-id` binds against.
+    /// plus the openspec plan corpus `--task` binds against.
     ///
     /// Git rather than postgres/sqlite is deliberate on two counts.
     /// It needs no server, so these are ordinary offline unit tests.

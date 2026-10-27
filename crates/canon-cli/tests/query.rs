@@ -258,7 +258,7 @@ fn query_audits_into_the_repo_it_read_never_into_the_cwd() {
     assert_eq!(audit.lines().count(), 1, "one event per query: {audit}");
 }
 
-// ── s19 `query-scope-filters`: --change-id/--status + rollup + deterministic sort ──
+// ── s19 `query-scope-filters`: --change/--status + rollup + deterministic sort ──
 
 use canon_model::records::{ChangeStatus, TaskStatus};
 
@@ -268,11 +268,11 @@ const CHANGE_TASK_AGING: &str = "";
 #[test]
 fn change_id_flag_with_an_unsupported_kind_fails_loud() {
     let fixture = support::Fixture::new(ROUTING, AGING);
-    let output = fixture.run_canon(&["query", "--kind", "trajectory", "--change-id", "wall-render"]);
+    let output = fixture.run_canon(&["query", "--kind", "trajectory", "--change", "wall-render"]);
     assert!(!output.status.success());
     assert_eq!(output.status.code(), Some(2));
     let stderr = support::stderr(&output);
-    assert!(stderr.contains("--change-id"), "stderr: {stderr}");
+    assert!(stderr.contains("--change"), "stderr: {stderr}");
     assert!(stderr.contains("--kind change"), "stderr must name the two supported kinds: {stderr}");
 }
 
@@ -295,7 +295,7 @@ fn change_id_scopes_a_task_query_to_one_changes_rows() {
     fixture.plant_task_in_git("add-audio-reactive#2.2", "t2", TaskStatus::Done, now + Duration::seconds(1));
     fixture.plant_task_in_git("add-widget#1.1", "t3", TaskStatus::Open, now + Duration::seconds(2));
 
-    let output = fixture.run_canon(&["query", "--kind", "task", "--change-id", "add-audio-reactive", "--json"]);
+    let output = fixture.run_canon(&["query", "--kind", "task", "--change", "add-audio-reactive", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
     let payload = data_of(&support::stdout(&output));
     let ids: Vec<String> = payload["records"].as_array().unwrap().iter().map(|r| r["task_id"].as_str().unwrap().to_string()).collect();
@@ -310,7 +310,7 @@ fn change_id_scopes_a_change_query_to_at_most_one_record() {
     fixture.plant_change_in_git("add-widget", "Add widget, refined", ChangeStatus::InProgress, now + Duration::seconds(1));
     fixture.plant_change_in_git("add-other", "Add other", ChangeStatus::Proposed, now + Duration::seconds(2));
 
-    let output = fixture.run_canon(&["query", "--kind", "change", "--change-id", "add-widget", "--json"]);
+    let output = fixture.run_canon(&["query", "--kind", "change", "--change", "add-widget", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
     let payload = data_of(&support::stdout(&output));
     let records = payload["records"].as_array().unwrap();
@@ -368,7 +368,7 @@ fn rollup_reflects_the_filtered_result_set_not_the_whole_ledger() {
     }
     fixture.plant_task_in_git("add-widget#1.1", "elsewhere", TaskStatus::Done, now + Duration::seconds(100));
 
-    let output = fixture.run_canon(&["query", "--kind", "task", "--change-id", "add-audio-reactive", "--json"]);
+    let output = fixture.run_canon(&["query", "--kind", "task", "--change", "add-audio-reactive", "--json"]);
     assert!(output.status.success(), "stderr: {}", support::stderr(&output));
     let payload = data_of(&support::stdout(&output));
     assert_eq!(payload["rollup"], serde_json::json!({"done": 2, "total": 6}));

@@ -106,7 +106,7 @@ fn body_at(path: &Path) -> serde_json::Value {
 
 /// The base flags every well-formed add needs, so a test naming a
 /// refusal shows only the flag it is about.
-const BASE: [&str; 9] = ["finding", "add", "--change-id", "s43-findings-are-records", "--severity", "blocker", "--introduced-unknown", "--repo", "."];
+const BASE: [&str; 9] = ["finding", "add", "--change", "s43-findings-are-records", "--severity", "blocker", "--introduced-unknown", "--repo", "."];
 
 fn add(repo: &Path, extra: &[&str]) -> Output {
     let mut args: Vec<&str> = BASE.to_vec();
@@ -134,7 +134,7 @@ fn the_two_command_loop_commits_a_finding_nobody_hand_wrote() {
 
     let added = add(
         repo,
-        &["--round", "8", "--seq", "3", "--disposition", "open", "--actor-id", "review-voice", "--summary", "round 8 reviewed an uncommitted worktree"],
+        &["--round", "8", "--seq", "3", "--disposition", "open", "--actor", "review-voice", "--summary", "round 8 reviewed an uncommitted worktree"],
     );
     assert!(added.status.success(), "finding add must succeed; stderr: {}", stderr(&added));
     assert!(stdout(&added).contains("staged"), "{}", stdout(&added));
@@ -173,7 +173,7 @@ fn the_two_command_loop_commits_a_finding_nobody_hand_wrote() {
     assert!(stdout(&added).contains("UNSOURCED"), "an add with no --introduced-by must say so: {}", stdout(&added));
 }
 
-/// D6: `--session-id` on `finding add` and `finding close` fills each
+/// D6: `--session` on `finding add` and `finding close` fills each
 /// record's own `actor.session_id`; the close records the session that
 /// authored the TRANSITION, never the raiser's.
 #[test]
@@ -181,13 +181,13 @@ fn session_ids_on_add_and_close_land_on_each_records_actor() {
     let dir = repo();
     let repo = dir.path();
 
-    let added = add(repo, &["--round", "1", "--seq", "1", "--actor-id", "impl-agent", "--summary", "found it myself", "--session-id", "sess-raise"]);
+    let added = add(repo, &["--round", "1", "--seq", "1", "--actor", "impl-agent", "--summary", "found it myself", "--session", "sess-raise"]);
     assert!(added.status.success(), "stderr: {}", stderr(&added));
     assert!(stdout(&added).contains("— run `canon gate promote` to commit it"), "{}", stdout(&added));
     assert!(run_canon(&["gate", "promote"], repo).status.success());
 
     let closed = run_canon(
-        &["finding", "close", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design", "--session-id", "sess-close"],
+        &["finding", "close", "s43-findings-are-records", "--round", "1", "--seq", "1", "--disposition", "rejected", "--reason", "by design", "--session", "sess-close"],
         repo,
     );
     assert!(closed.status.success(), "stderr: {}", stderr(&closed));
@@ -206,9 +206,9 @@ fn session_ids_on_add_and_close_land_on_each_records_actor() {
 #[test]
 fn finding_add_refuses_a_session_id_outside_the_grammar() {
     let dir = repo();
-    let out = add(dir.path(), &["--round", "1", "--seq", "1", "--actor-id", "r", "--summary", "s", "--session-id", " padded"]);
+    let out = add(dir.path(), &["--round", "1", "--seq", "1", "--actor", "r", "--summary", "s", "--session", " padded"]);
     assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
-    assert!(stderr(&out).contains("--session-id") && stderr(&out).contains("SessionId"), "{}", stderr(&out));
+    assert!(stderr(&out).contains("--session") && stderr(&out).contains("SessionId"), "{}", stderr(&out));
     assert!(staged_findings(dir.path()).is_empty(), "a refused add writes nothing");
 }
 
@@ -217,7 +217,7 @@ fn finding_add_refuses_a_session_id_outside_the_grammar() {
 #[test]
 fn finding_add_refuses_introduced_rev_self() {
     let dir = repo();
-    let out = add(dir.path(), &["--round", "1", "--seq", "1", "--actor-id", "impl-agent", "--summary", "s", "--introduced-rev", "self"]);
+    let out = add(dir.path(), &["--round", "1", "--seq", "1", "--actor", "impl-agent", "--summary", "s", "--introduced-rev", "self"]);
     assert_eq!(out.status.code(), Some(2), "stderr: {}", stderr(&out));
     assert!(staged_findings(dir.path()).is_empty(), "a refused add writes nothing");
 }
@@ -253,7 +253,7 @@ fn a_fixed_and_sourced_finding_round_trips_every_optional_through_promotion() {
             &reviewed,
             "--file-ref",
             "crates/canon-cli/src/finding.rs:120-134",
-            "--actor-id",
+            "--actor",
             "review-voice",
             "--summary",
             "a defect in the previous round's fix",
@@ -280,7 +280,7 @@ fn finding_add_fixed_defaults_the_resolution_to_head() {
     let (dir, head) = git_repo();
     let repo = dir.path();
 
-    let output = add(repo, &["--round", "1", "--seq", "1", "--disposition", "fixed", "--actor-id", "r", "--summary", "s"]);
+    let output = add(repo, &["--round", "1", "--seq", "1", "--disposition", "fixed", "--actor", "r", "--summary", "s"]);
     assert_eq!(output.status.code(), Some(0), "stderr: {}", stderr(&output));
     let staged = body_at(&staged_findings(repo)[0]);
     assert_eq!(staged["resolution_sha"], head.as_str(), "{staged}");
@@ -295,7 +295,7 @@ fn finding_add_04_refuses_a_resolution_rev_on_every_non_fixed_disposition() {
         let dir = repo();
         let repo = dir.path();
 
-        let output = add(repo, &["--round", "1", "--seq", "1", "--disposition", disposition, "--resolution-rev", "HEAD", "--actor-id", "r", "--summary", "s"]);
+        let output = add(repo, &["--round", "1", "--seq", "1", "--disposition", disposition, "--resolution-rev", "HEAD", "--actor", "r", "--summary", "s"]);
         assert_eq!(output.status.code(), Some(2), "{disposition} accepted a resolution rev; stdout: {}", stdout(&output));
         assert!(staged_findings(repo).is_empty(), "{disposition}: a refused add must stage nothing");
     }
@@ -309,7 +309,7 @@ fn finding_add_04_only_a_fixed_finding_carries_a_resolution_and_a_fixed_one_alwa
     let repo = dir.path();
     for (seq, disposition) in ["open", "rejected", "deferred", "fixed"].into_iter().enumerate() {
         let seq = (seq + 1).to_string();
-        let extra = ["--round", "1", "--seq", &seq, "--disposition", disposition, "--actor-id", "r", "--summary", "s"];
+        let extra = ["--round", "1", "--seq", &seq, "--disposition", disposition, "--actor", "r", "--summary", "s"];
         let output = add(repo, &extra);
         assert_eq!(output.status.code(), Some(0), "{disposition}: {}{}", stdout(&output), stderr(&output));
     }
@@ -361,7 +361,7 @@ fn a_short_revision_is_resolved_to_the_full_commit_on_add_and_close() {
     let repo = dir.path();
     let short = &head[..7];
 
-    let added = add(repo, &["--round", "1", "--seq", "1", "--actor-id", "r", "--summary", "s", "--rev", short, "--introduced-rev", short]);
+    let added = add(repo, &["--round", "1", "--seq", "1", "--actor", "r", "--summary", "s", "--rev", short, "--introduced-rev", short]);
     assert_eq!(added.status.code(), Some(0), "stderr: {}", stderr(&added));
     let staged = body_at(&staged_findings(repo)[0]);
     assert_eq!(staged["reviewed_sha"], head.as_str(), "the full sha is stored, never the abbreviation: {staged}");
@@ -376,7 +376,7 @@ fn a_short_revision_is_resolved_to_the_full_commit_on_add_and_close() {
     let transition = body_at(&staged_findings(repo)[0]);
     assert_eq!(transition["resolution_sha"], head.as_str(), "{transition}");
 
-    let fixed = add(repo, &["--round", "1", "--seq", "2", "--disposition", "fixed", "--resolution-rev", short, "--actor-id", "r", "--summary", "s"]);
+    let fixed = add(repo, &["--round", "1", "--seq", "2", "--disposition", "fixed", "--resolution-rev", short, "--actor", "r", "--summary", "s"]);
     assert_eq!(fixed.status.code(), Some(0), "stderr: {}", stderr(&fixed));
     let staged_fixed = staged_findings(repo).iter().map(|path| body_at(path)).find(|body| body["seq"] == 2).expect("the fixed finding is staged");
     assert_eq!(staged_fixed["resolution_sha"], head.as_str(), "the full 40-character sha is stored: {staged_fixed}");
@@ -394,13 +394,13 @@ fn finding_add_refuses_a_newline_that_would_forge_a_second_row() {
     // differing from a passing one in exactly one field.
     for (flag, reviewer, summary, extra) in [
         ("--summary", "r", "ok\n| forged | row |", Vec::new()),
-        ("--actor-id", "r\n| forged | row |", "s", Vec::new()),
+        ("--actor", "r\n| forged | row |", "s", Vec::new()),
         ("--file-ref", "r", "s", vec!["--file-ref", "src/x.rs:1-2\n| forged | row |"]),
     ] {
         let dir = repo();
         let repo = dir.path();
 
-        let mut flags = vec!["--round", "1", "--seq", "1", "--actor-id", reviewer, "--summary", summary];
+        let mut flags = vec!["--round", "1", "--seq", "1", "--actor", reviewer, "--summary", summary];
         flags.extend_from_slice(&extra);
         let output = add(repo, &flags);
         assert_eq!(output.status.code(), Some(2), "{flag} accepted a line separator; stdout: {}", stdout(&output));
@@ -421,7 +421,7 @@ fn finding_add_refuses_a_unicode_line_separator_from_the_shared_set() {
     let dir = repo();
     let repo = dir.path();
 
-    let output = add(repo, &["--round", "1", "--seq", "1", "--actor-id", "r", "--summary", "ok\u{2028}| forged | row |"]);
+    let output = add(repo, &["--round", "1", "--seq", "1", "--actor", "r", "--summary", "ok\u{2028}| forged | row |"]);
     assert_eq!(output.status.code(), Some(2), "stdout: {}", stdout(&output));
     assert!(stderr(&output).contains("line separator"), "{}", stderr(&output));
     assert!(staged_findings(repo).is_empty());
@@ -441,9 +441,9 @@ fn finding_add_refuses_a_second_record_at_an_occupied_seq() {
     let dir = repo();
     let repo = dir.path();
 
-    assert!(add(repo, &["--round", "2", "--seq", "1", "--actor-id", "r", "--summary", "the first finding"]).status.success());
+    assert!(add(repo, &["--round", "2", "--seq", "1", "--actor", "r", "--summary", "the first finding"]).status.success());
 
-    let staged_clash = add(repo, &["--round", "2", "--seq", "1", "--actor-id", "r", "--summary", "a completely different finding"]);
+    let staged_clash = add(repo, &["--round", "2", "--seq", "1", "--actor", "r", "--summary", "a completely different finding"]);
     assert_eq!(staged_clash.status.code(), Some(2), "stdout: {}", stdout(&staged_clash));
     assert!(stderr(&staged_clash).contains("s43-findings-are-records_2_1"), "the refusal must name the key: {}", stderr(&staged_clash));
     assert_eq!(staged_findings(repo).len(), 1, "the clashing add must stage nothing");
@@ -451,7 +451,7 @@ fn finding_add_refuses_a_second_record_at_an_occupied_seq() {
     // And after promotion, when the occupant is COMMITTED rather than
     // staged — the tier the check would be easiest to forget.
     assert!(run_canon(&["gate", "promote", "--repo", "."], repo).status.success());
-    let committed_clash = add(repo, &["--round", "2", "--seq", "1", "--actor-id", "r", "--summary", "a third distinct finding"]);
+    let committed_clash = add(repo, &["--round", "2", "--seq", "1", "--actor", "r", "--summary", "a third distinct finding"]);
     assert_eq!(committed_clash.status.code(), Some(2), "stdout: {}", stdout(&committed_clash));
     assert!(stderr(&committed_clash).contains("committed"), "the refusal must say which tier holds the occupant: {}", stderr(&committed_clash));
     assert!(staged_findings(repo).is_empty());
@@ -489,7 +489,7 @@ fn tree(root: &Path) -> std::collections::BTreeMap<PathBuf, Vec<u8>> {
 fn an_identical_finding_add_is_unchanged_and_writes_nothing() {
     let dir = repo();
     let repo = dir.path();
-    let args = ["--round", "4", "--seq", "1", "--actor-id", "r", "--summary", "the same finding", "--json"];
+    let args = ["--round", "4", "--seq", "1", "--actor", "r", "--summary", "the same finding", "--json"];
 
     let first = add(repo, &args);
     assert!(first.status.success(), "{}", stdout(&first));
@@ -508,7 +508,7 @@ fn an_identical_finding_add_is_unchanged_and_writes_nothing() {
     assert_eq!(json_of(&committed_repeat)["meta"]["unchanged"], true);
     assert_eq!(tree(repo), before, "a repeat of a committed finding writes nothing");
 
-    let other = add(repo, &["--round", "4", "--seq", "1", "--actor-id", "r", "--summary", "another finding", "--json"]);
+    let other = add(repo, &["--round", "4", "--seq", "1", "--actor", "r", "--summary", "another finding", "--json"]);
     assert_eq!(other.status.code(), Some(2), "{}", stdout(&other));
 }
 
@@ -518,7 +518,7 @@ fn closing_a_finding_to_its_current_disposition_is_unchanged() {
     let dir = repo();
     let repo = dir.path();
     for (round, disposition, reason) in [("5", "rejected", Some("works as designed")), ("6", "fixed", None)] {
-        assert!(add(repo, &["--round", round, "--seq", "1", "--actor-id", "r", "--summary", "to close"]).status.success());
+        assert!(add(repo, &["--round", round, "--seq", "1", "--actor", "r", "--summary", "to close"]).status.success());
         assert!(run_canon(&["gate", "promote", "--repo", "."], repo).status.success());
         let mut close = vec!["finding", "close", "s43-findings-are-records", "--round", round, "--seq", "1", "--disposition", disposition, "--repo", ".", "--json"];
         if let Some(reason) = reason {
@@ -545,8 +545,8 @@ fn finding_add_accepts_the_next_seq_in_the_same_round() {
     let dir = repo();
     let repo = dir.path();
 
-    assert!(add(repo, &["--round", "3", "--seq", "1", "--actor-id", "r", "--summary", "first"]).status.success());
-    assert!(add(repo, &["--round", "3", "--seq", "2", "--actor-id", "r", "--summary", "second"]).status.success());
+    assert!(add(repo, &["--round", "3", "--seq", "1", "--actor", "r", "--summary", "first"]).status.success());
+    assert!(add(repo, &["--round", "3", "--seq", "2", "--actor", "r", "--summary", "second"]).status.success());
     assert_eq!(staged_findings(repo).len(), 2);
 }
 
@@ -571,8 +571,8 @@ fn gate_promote_tallies_per_kind_and_names_an_empty_staging_area() {
     assert!(empty_out.contains("finding"), "an empty promote must name the kinds it CAN drain: {empty_out}");
     assert!(empty_out.contains("evidence"), "{empty_out}");
 
-    assert!(add(repo, &["--round", "4", "--seq", "1", "--actor-id", "r", "--summary", "first"]).status.success());
-    assert!(add(repo, &["--round", "4", "--seq", "2", "--actor-id", "r", "--summary", "second"]).status.success());
+    assert!(add(repo, &["--round", "4", "--seq", "1", "--actor", "r", "--summary", "first"]).status.success());
+    assert!(add(repo, &["--round", "4", "--seq", "2", "--actor", "r", "--summary", "second"]).status.success());
 
     let promoted = run_canon(&["gate", "promote", "--repo", "."], repo);
     assert!(promoted.status.success(), "stderr: {}", stderr(&promoted));
@@ -593,15 +593,15 @@ fn context_capability_23_gate_promote_tallies_the_staged_kinds_by_the_names_kind
     assert!(empty.contains("nothing staged") && empty.contains("(evidence, finding"), "{empty}");
     assert!(!empty.contains("evidence_record"), "{empty}");
 
-    assert!(add(repo, &["--round", "5", "--seq", "1", "--actor-id", "r", "--summary", "first"]).status.success());
+    assert!(add(repo, &["--round", "5", "--seq", "1", "--actor", "r", "--summary", "first"]).status.success());
     let promoted = stdout(&run_canon(&["gate", "promote", "--repo", "."], repo));
     assert!(promoted.contains("evidence=0, finding=1"), "{promoted}");
     assert!(!promoted.contains("evidence_record"), "{promoted}");
 
     // A staged evidence record and a staged finding together: both are named as `--kind` takes them.
-    let evidence = run_canon(&["evidence", "add", "--project-id", "root", "--scenario-id", "a.b.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--repo", "."], repo);
+    let evidence = run_canon(&["evidence", "add", "--project", "root", "--scenario", "a.b.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--repo", "."], repo);
     assert!(evidence.status.success(), "stderr: {}", stderr(&evidence));
-    assert!(add(repo, &["--round", "5", "--seq", "2", "--actor-id", "r", "--summary", "second"]).status.success());
+    assert!(add(repo, &["--round", "5", "--seq", "2", "--actor", "r", "--summary", "second"]).status.success());
     let tally = stdout(&run_canon(&["gate", "promote", "--repo", "."], repo));
     let tally_line = tally.lines().find(|l| l.starts_with("canon gate promote:")).expect("a tally line");
     assert!(tally_line.contains("evidence=1, finding=1"), "{tally}");
@@ -1035,7 +1035,7 @@ fn the_count_guard_catches_the_class_and_spares_the_indices() {
         ("round 4 finding 2", "The finding count excludes round 3."),
         ("round 4 finding 2", "Round 3 review findings are recorded here."),
         // Indices, from the surfaces that carry them.
-        ("finding --help example", "canon finding add --change-id s43-findings-are-records --round 1 --seq 1"),
+        ("finding --help example", "canon finding add --change s43-findings-are-records --round 1 --seq 1"),
         ("src/finding.rs", "a finding's natural key is `{change_id}__{round:04}__{seq:04}`"),
         ("--round help", "Which review round on this change raised it (1-based)"),
         ("--seq help", "This finding's index within the round (1-based)"),
@@ -1254,7 +1254,7 @@ fn listed_repo() -> tempfile::TempDir {
     let repo = dir.path();
     let raise = |change: &str, severity: &str, round: &str, seq: &str, reviewer: &str, summary: &str| {
         let out = run_canon(
-            &["finding", "add", "--change-id", change, "--severity", severity, "--round", round, "--seq", seq, "--actor-id", reviewer, "--summary", summary, "--introduced-unknown"],
+            &["finding", "add", "--change", change, "--severity", severity, "--round", round, "--seq", seq, "--actor", reviewer, "--summary", summary, "--introduced-unknown"],
             repo,
         );
         assert!(out.status.success(), "{}", stderr(&out));
@@ -1269,7 +1269,7 @@ fn listed_repo() -> tempfile::TempDir {
     let closed = run_canon(&["finding", "close", "closed-only", "--round", "1", "--seq", "1", "--disposition", "deferred", "--reason", "by design"], repo);
     assert!(closed.status.success(), "{}", stderr(&closed));
     assert!(run_canon(&["gate", "promote"], repo).status.success());
-    assert!(add(repo, &["--round", "2", "--seq", "1", "--actor-id", "rev-a", "--summary", "still staged"]).status.success());
+    assert!(add(repo, &["--round", "2", "--seq", "1", "--actor", "rev-a", "--summary", "still staged"]).status.success());
     dir
 }
 
@@ -1279,7 +1279,7 @@ fn listed_repo() -> tempfile::TempDir {
 #[test]
 fn finding_list_prints_each_committed_finding_at_its_latest_version() {
     let dir = listed_repo();
-    let out = run_canon(&["finding", "list", "--change-id", "s43-findings-are-records"], dir.path());
+    let out = run_canon(&["finding", "list", "--change", "s43-findings-are-records"], dir.path());
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     assert_eq!(
         stdout(&out),
@@ -1298,19 +1298,19 @@ fn finding_list_prints_each_committed_finding_at_its_latest_version() {
 #[test]
 fn finding_list_open_keeps_only_currently_open_findings() {
     let dir = listed_repo();
-    let out = run_canon(&["finding", "list", "--change-id", "s43-findings-are-records", "--open"], dir.path());
+    let out = run_canon(&["finding", "list", "--change", "s43-findings-are-records", "--open"], dir.path());
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     assert_eq!(stdout(&out), "round  seq  severity    disposition  reviewer  summary\n1      2    should-fix  open         rev-b     the count was typed by hand\n");
 
-    let none = run_canon(&["finding", "list", "--change-id", "other-change", "--open"], dir.path());
+    let none = run_canon(&["finding", "list", "--change", "other-change", "--open"], dir.path());
     assert_eq!(none.status.code(), Some(0));
     assert_eq!(stdout(&none), "round  seq  severity  disposition  reviewer  summary\n1      1    note      open         rev-c     elsewhere\n");
-    let closed = run_canon(&["finding", "list", "--change-id", "closed-only", "--open"], dir.path());
+    let closed = run_canon(&["finding", "list", "--change", "closed-only", "--open"], dir.path());
     assert_eq!(closed.status.code(), Some(0), "{}", stderr(&closed));
     assert_eq!(stdout(&closed), "canon finding list: no committed open findings on change `closed-only`\n", "a change whose findings are all closed has none open");
-    let all = run_canon(&["finding", "list", "--change-id", "closed-only"], dir.path());
+    let all = run_canon(&["finding", "list", "--change", "closed-only"], dir.path());
     assert!(stdout(&all).contains("deferred") && stdout(&all).contains("fixed long ago"), "without --open the closed finding lists: {}", stdout(&all));
-    let empty = run_canon(&["finding", "list", "--change-id", "no-findings-here", "--open"], dir.path());
+    let empty = run_canon(&["finding", "list", "--change", "no-findings-here", "--open"], dir.path());
     assert_eq!(empty.status.code(), Some(0));
     assert_eq!(stdout(&empty), "canon finding list: no committed open findings on change `no-findings-here`\n");
 }
@@ -1319,7 +1319,7 @@ fn finding_list_open_keeps_only_currently_open_findings() {
 #[test]
 fn finding_list_json_carries_the_same_rows() {
     let dir = listed_repo();
-    let out = run_canon(&["finding", "list", "--change-id", "s43-findings-are-records", "--json"], dir.path());
+    let out = run_canon(&["finding", "list", "--change", "s43-findings-are-records", "--json"], dir.path());
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     let json: serde_json::Value = serde_json::from_str(&stdout(&out)).expect("stdout is one JSON document");
     assert_eq!(json["ok"], true, "{json}");
@@ -1337,7 +1337,7 @@ fn finding_list_json_carries_the_same_rows() {
             ]
         })
     );
-    let open = run_canon(&["finding", "list", "--change-id", "s43-findings-are-records", "--open", "--json"], dir.path());
+    let open = run_canon(&["finding", "list", "--change", "s43-findings-are-records", "--open", "--json"], dir.path());
     let json: serde_json::Value = serde_json::from_str(&stdout(&open)).unwrap();
     assert_eq!(json["data"]["findings"].as_array().unwrap().len(), 1, "{json}");
     assert_eq!(json["data"]["findings"][0]["seq"], 2, "{json}");
@@ -1348,17 +1348,17 @@ fn finding_list_json_carries_the_same_rows() {
 #[test]
 fn finding_list_refuses_a_malformed_change_id() {
     let dir = repo();
-    let out = run_canon(&["finding", "list", "--change-id", "Not A Change"], dir.path());
+    let out = run_canon(&["finding", "list", "--change", "Not A Change"], dir.path());
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     assert!(stdout(&out).is_empty(), "{}", stdout(&out));
-    assert!(stderr(&out).contains("--change-id"), "{}", stderr(&out));
+    assert!(stderr(&out).contains("--change"), "{}", stderr(&out));
 }
 
 const CHANGE: &str = "s43-findings-are-records";
 
 /// Raise round 1 seq 1 (open) and commit it.
 fn committed_open(repo: &Path) {
-    let added = add(repo, &["--round", "1", "--seq", "1", "--actor-id", "r", "--summary", "needs a guard"]);
+    let added = add(repo, &["--round", "1", "--seq", "1", "--actor", "r", "--summary", "needs a guard"]);
     assert!(added.status.success(), "stderr: {}", stderr(&added));
     assert!(run_canon(&["gate", "promote"], repo).status.success());
 }
@@ -1409,12 +1409,12 @@ fn finding_close_83_a_reason_is_recorded_on_the_closing_version() {
     let originals: Vec<_> = committed_findings(repo).iter().map(|p| body_at(p)).filter(|b| b["disposition"] == "open").collect();
     assert!(originals.len() == 1 && originals[0].get("reason").is_none(), "the raised version keeps no reason: {originals:?}");
 
-    let table = run_canon(&["finding", "list", "--change-id", CHANGE], repo);
+    let table = run_canon(&["finding", "list", "--change", CHANGE], repo);
     assert!(stdout(&table).contains("deferred") && stdout(&table).contains("needs a guard [reason: next release]"), "{}", stdout(&table));
-    let listed: serde_json::Value = serde_json::from_str(&stdout(&run_canon(&["finding", "list", "--change-id", CHANGE, "--json"], repo))).unwrap();
+    let listed: serde_json::Value = serde_json::from_str(&stdout(&run_canon(&["finding", "list", "--change", CHANGE, "--json"], repo))).unwrap();
     assert_eq!(listed["data"]["findings"][0]["reason"], "next release", "{listed}");
     let kept: serde_json::Value =
-        serde_json::from_str(&stdout(&run_canon(&["finding", "list", "--change-id", CHANGE, "--json", "--fields", "disposition,reason"], repo))).unwrap();
+        serde_json::from_str(&stdout(&run_canon(&["finding", "list", "--change", CHANGE, "--json", "--fields", "disposition,reason"], repo))).unwrap();
     assert_eq!(kept["data"]["findings"][0]["reason"], "next release", "{kept}");
 }
 
@@ -1425,7 +1425,7 @@ fn finding_list_05_shows_the_reason_in_the_table_and_in_json() {
     let (dir, head) = git_repo();
     let repo = dir.path();
     for seq in ["1", "2"] {
-        assert!(add(repo, &["--round", "1", "--seq", seq, "--actor-id", "r", "--summary", &format!("finding {seq}")]).status.success());
+        assert!(add(repo, &["--round", "1", "--seq", seq, "--actor", "r", "--summary", &format!("finding {seq}")]).status.success());
     }
     assert!(run_canon(&["gate", "promote"], repo).status.success());
     assert!(close(repo, &["--disposition", "rejected", "--reason", "works as designed"]).status.success());
@@ -1433,9 +1433,9 @@ fn finding_list_05_shows_the_reason_in_the_table_and_in_json() {
     assert!(fixed.status.success(), "{}", stderr(&fixed));
     assert!(run_canon(&["gate", "promote"], repo).status.success());
 
-    let table = stdout(&run_canon(&["finding", "list", "--change-id", CHANGE], repo));
+    let table = stdout(&run_canon(&["finding", "list", "--change", CHANGE], repo));
     assert!(table.contains("finding 1 [reason: works as designed]\n") && table.contains("finding 2\n"), "{table}");
-    let json: serde_json::Value = serde_json::from_str(&stdout(&run_canon(&["finding", "list", "--change-id", CHANGE, "--json"], repo))).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout(&run_canon(&["finding", "list", "--change", CHANGE, "--json"], repo))).unwrap();
     assert_eq!(json["data"]["findings"][0]["reason"], "works as designed");
     assert!(json["data"]["findings"][1]["reason"].is_null(), "{json}");
 }
@@ -1446,7 +1446,7 @@ fn finding_close_84_fixed_takes_a_reason_but_does_not_need_one() {
     let (dir, head) = git_repo();
     let repo = dir.path();
     for seq in ["1", "2"] {
-        assert!(add(repo, &["--round", "1", "--seq", seq, "--actor-id", "r", "--summary", "s"]).status.success());
+        assert!(add(repo, &["--round", "1", "--seq", seq, "--actor", "r", "--summary", "s"]).status.success());
     }
     assert!(run_canon(&["gate", "promote"], repo).status.success());
     let bare = close(repo, &["--disposition", "fixed", "--resolution-rev", &head]);
@@ -1485,12 +1485,12 @@ fn finding_close_85_a_blank_or_multi_line_reason_is_refused() {
 fn finding_close_02_a_close_adds_only_the_disposition_resolution_sha_reason_actor_and_time() {
     let (dir, head) = git_repo();
     let repo = dir.path();
-    let added = add(repo, &["--round", "1", "--seq", "1", "--actor-id", "r", "--summary", "needs a guard", "--file-ref", "src/a.rs:1-2", "--introduced-rev", &head, "--rev", &head]);
+    let added = add(repo, &["--round", "1", "--seq", "1", "--actor", "r", "--summary", "needs a guard", "--file-ref", "src/a.rs:1-2", "--introduced-rev", &head, "--rev", &head]);
     assert!(added.status.success(), "{}", stderr(&added));
     assert!(run_canon(&["gate", "promote"], repo).status.success());
     let previous = body_at(&committed_findings(repo).remove(0));
 
-    let closed = close(repo, &["--disposition", "rejected", "--reason", "works as designed", "--actor-id", "closer"]);
+    let closed = close(repo, &["--disposition", "rejected", "--reason", "works as designed", "--actor", "closer"]);
     assert!(closed.status.success(), "{}{}", stdout(&closed), stderr(&closed));
     assert!(run_canon(&["gate", "promote"], repo).status.success());
     let next = committed_findings(repo).iter().map(|p| body_at(p)).find(|b| b["disposition"] == "rejected").expect("the close");
@@ -1565,9 +1565,9 @@ fn finding_close_87_an_old_record_without_reason_is_untouched_by_reading_listing
     let before = std::fs::read(&path).unwrap();
     assert!(!String::from_utf8_lossy(&before).contains("reason"));
 
-    let listed: serde_json::Value = serde_json::from_str(&stdout(&run_canon(&["finding", "list", "--change-id", CHANGE, "--json"], repo))).unwrap();
+    let listed: serde_json::Value = serde_json::from_str(&stdout(&run_canon(&["finding", "list", "--change", CHANGE, "--json"], repo))).unwrap();
     assert!(listed["data"]["findings"][0]["reason"].is_null(), "{listed}");
-    let table = stdout(&run_canon(&["finding", "list", "--change-id", CHANGE], repo));
+    let table = stdout(&run_canon(&["finding", "list", "--change", CHANGE], repo));
     assert!(!table.contains("[reason"), "{table}");
 
     assert!(close(repo, &["--disposition", "fixed", "--resolution-rev", &head]).status.success());

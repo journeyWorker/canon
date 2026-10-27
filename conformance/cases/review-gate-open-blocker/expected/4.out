@@ -1,2 +1,2 @@
 canon evidence add: wrote kind=evidence/root_scenario_cart.add.01_<digest8>.json for cart.add.01 (verdict faithful) — staged and promoted in this run; nothing to promote, then `canon gate check`
-next: canon subject move cart --to verifying --actor-id <unit> --session-id <session> — cart: every scenario is evidenced and reviewed, with no blocker or case gap
+next: canon subject move cart --to verifying --actor <unit> --session <session> — cart: every scenario is evidenced and reviewed, with no blocker or case gap

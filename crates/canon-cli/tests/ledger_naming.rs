@@ -520,7 +520,7 @@ fn repo30(scenarios: usize) -> tempfile::TempDir {
     git(repo, &["init", "-q", "."]);
     ok(repo, &["init", "--providers", "none"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, &["feature", "new", "auth.login", "--title", "Login"]);
     for n in 1..=scenarios {
         ok(repo, &["scenario", "new", &format!("auth.login.{n:02}"), "--title", "Case", "--feature", FEATURE]);
@@ -532,7 +532,7 @@ fn repo30(scenarios: usize) -> tempfile::TempDir {
 }
 
 fn evidence_add(repo: &Path, extra: &[&str]) -> Output {
-    let mut args = vec!["evidence", "add", "--override-reason", "fixture", "--class", "test-run", "--ref", "r", "--verdict", "faithful", "--actor-id", "a", "--role", "implementer"];
+    let mut args = vec!["evidence", "add", "--override-reason", "fixture", "--class", "test-run", "--ref", "r", "--verdict", "faithful", "--actor", "a", "--role", "implementer"];
     args.extend_from_slice(extra);
     canon_in(repo, &args, &[])
 }
@@ -623,13 +623,13 @@ fn ledger_naming_11_effect_and_manifest_ids_follow_the_new_rule() {
 
 // ── ledger.naming.12 ─────────────────────────────────────────────────────
 
-/// ledger.naming.12: `canon evidence add --scenario-id` names `kind=evidence/<project>_scenario_<id>_<digest8>.json`,
+/// ledger.naming.12: `canon evidence add --scenario` names `kind=evidence/<project>_scenario_<id>_<digest8>.json`,
 /// and the stored file holds `kind: evidence`.
 #[test]
 fn ledger_naming_12_the_write_result_line_names_the_file_under_the_new_rule() {
     let dir = repo30(1);
     let repo = dir.path();
-    let out = evidence_add(repo, &["--project-id", "root", "--scenario-id", "auth.login.01", "--summary", "s"]);
+    let out = evidence_add(repo, &["--project", "root", "--scenario", "auth.login.01", "--summary", "s"]);
     assert!(out.status.success(), "{}", text(&out));
     let files = ledger_files(repo, "evidence");
     assert_eq!(files.len(), 1, "{files:?}");
@@ -651,7 +651,7 @@ fn ledger_naming_12_the_write_result_line_names_the_file_under_the_new_rule() {
 fn ledger_naming_13_messages_that_quote_a_key_quote_the_typed_key() {
     let dir = repo30(1);
     let repo = dir.path();
-    let add = |summary: &str| canon_in(repo, &["finding", "add", "--change-id", "add-login", "--round", "2", "--seq", "3", "--severity", "note", "--actor-id", "bob", "--summary", summary], &[]);
+    let add = |summary: &str| canon_in(repo, &["finding", "add", "--change", "add-login", "--round", "2", "--seq", "3", "--severity", "note", "--actor", "bob", "--summary", summary], &[]);
     assert!(add("first").status.success());
     let again = add("second");
     assert!(!again.status.success());
@@ -788,7 +788,7 @@ fn porting_repo() -> tempfile::TempDir {
 }
 
 fn overlay_query(repo: &Path) -> Value {
-    let o = canon_in(repo, &["query", "--kind", "scenario", "--plugin-id", "porting", "--json"], &[]);
+    let o = canon_in(repo, &["query", "--kind", "scenario", "--plugin", "porting", "--json"], &[]);
     assert!(o.status.success(), "{}", text(&o));
     json_of(&o)
 }
@@ -846,7 +846,7 @@ fn ledger_naming_20_overlay_files_that_do_not_match_are_reported_and_skipped() {
 fn ledger_naming_16_the_kind_is_called_evidence_in_every_place() {
     let dir = repo30(1);
     let repo = dir.path();
-    assert!(evidence_add(repo, &["--project-id", "root", "--scenario-id", "auth.login.01", "--summary", "s"]).status.success());
+    assert!(evidence_add(repo, &["--project", "root", "--scenario", "auth.login.01", "--summary", "s"]).status.success());
 
     // The ledger directory and the record's kind field.
     assert!(repo.join(".canon/ledger/kind=evidence").is_dir());
@@ -1013,10 +1013,10 @@ fn ledger_naming_18_keyless_evidence_is_refused_by_the_model_for_every_writer() 
     // the CLI's own requirement of a task or scenario id
     let repo = repo30(1);
     let before = files(&repo.path().join(".canon/ledger"));
-    let out = canon_in(repo.path(), &["evidence", "add", "--class", "test-run", "--ref", "r", "--verdict", "faithful", "--summary", "s", "--actor-id", "a", "--role", "implementer"], &[]);
+    let out = canon_in(repo.path(), &["evidence", "add", "--class", "test-run", "--ref", "r", "--verdict", "faithful", "--summary", "s", "--actor", "a", "--role", "implementer"], &[]);
     assert!(!out.status.success(), "{}", text(&out));
     let message = text(&out);
-    assert!(message.contains("--task-id") && message.contains("--scenario-id"), "the CLI names the same requirement: {message}");
+    assert!(message.contains("--task") && message.contains("--scenario"), "the CLI names the same requirement: {message}");
     assert_eq!(files(&repo.path().join(".canon/ledger")), before);
 }
 
@@ -1033,7 +1033,7 @@ fn ledger_naming_19_a_029_cursor_is_refused_with_a_way_to_start_over() {
     let dir = repo30(1);
     let repo = dir.path();
     for seq in ["1", "2"] {
-        ok(repo, &["finding", "add", "--change-id", "add-login", "--round", "2", "--seq", seq, "--severity", "note", "--actor-id", "bob", "--summary", "s"]);
+        ok(repo, &["finding", "add", "--change", "add-login", "--round", "2", "--seq", seq, "--severity", "note", "--actor", "bob", "--summary", "s"]);
     }
     // What 0.29 issued for the first of two findings: `query:finding`, then `<at>|<id>__<round:04>__<seq:04>|<12 hex>#1`.
     let at = json_of(&canon_in(repo, &["query", "--kind", "finding", "--json", "--limit", "1"], &[]))["data"]["records"][0]["at"].as_str().unwrap().to_string();
@@ -1063,8 +1063,8 @@ fn ledger_naming_21_promotion_breaks_ties_by_components_then_digest() {
     let dir = repo30(1);
     let repo = dir.path();
     for detail in ["alpha", "beta", "gamma"] {
-        ok(repo, &["divergence", "add", "auth.login.01", "--actor-id", "r", "--round", "1", "--role", "reviewer", "--no-promote", "--detail", detail]);
-        let out = evidence_add(repo, &["--project-id", "root", "--scenario-id", "auth.login.01", "--summary", detail, "--no-promote"]);
+        ok(repo, &["divergence", "add", "auth.login.01", "--actor", "r", "--round", "1", "--role", "reviewer", "--no-promote", "--detail", detail]);
+        let out = evidence_add(repo, &["--project", "root", "--scenario", "auth.login.01", "--summary", detail, "--no-promote"]);
         assert!(out.status.success(), "{}", text(&out));
     }
     // The staged bodies, by the digest in each staged name.
@@ -1141,7 +1141,7 @@ fn ledger_naming_22_a_canon_yaml_key_spelled_evidence_record_sends_the_user_to_m
     assert_eq!(doc["meta"]["next"][0]["command"], "canon migrate --json", "{doc}");
 
     let before = files(&repo.join(".canon"));
-    let o = canon(&["evidence", "add", "--scenario-id", "cart.add.01", "--class", "test-run", "--ref", "x", "--verdict", "faithful", "--role", "implementer", "--actor-id", "a", "--session-id", "s", "--json"]);
+    let o = canon(&["evidence", "add", "--scenario", "cart.add.01", "--class", "test-run", "--ref", "x", "--verdict", "faithful", "--role", "implementer", "--actor", "a", "--session", "s", "--json"]);
     assert_eq!(o.status.code(), Some(2), "{}", text(&o));
     let doc = json_of(&o);
     assert_eq!(doc["error"]["code"], "OLD_LAYOUT", "{doc}");
@@ -1158,7 +1158,7 @@ fn ledger_naming_22_a_canon_yaml_key_spelled_evidence_record_sends_the_user_to_m
 fn ledger_naming_23_a_misnamed_divergence_is_a_layout_violation_that_gate_check_names() {
     let dir = repo30(1);
     let repo = dir.path();
-    ok(repo, &["divergence", "add", "auth.login.01", "--actor-id", "r", "--round", "1", "--role", "reviewer", "--detail", "d"]);
+    ok(repo, &["divergence", "add", "auth.login.01", "--actor", "r", "--round", "1", "--role", "reviewer", "--detail", "d"]);
     let ledger = repo.join(".canon/ledger/kind=divergence");
     let name = ledger_names(&ledger).remove(0);
     assert!(name.starts_with("root_auth.login.01_1_1_"), "{name}");
@@ -1195,7 +1195,7 @@ fn ledger_naming_23_a_misnamed_divergence_is_a_layout_violation_that_gate_check_
 fn ledger_naming_23b_a_misnamed_finding_is_named_once() {
     let dir = repo30(1);
     let repo = dir.path();
-    ok(repo, &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "bob", "--summary", "s"]);
+    ok(repo, &["finding", "add", "--change", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "bob", "--summary", "s"]);
     let ledger = repo.join(".canon/ledger/kind=finding");
     let name = ledger_names(&ledger).remove(0);
     assert!(name.starts_with("add-login_1_1_"), "{name}");

@@ -61,7 +61,7 @@ fn repo_with_briefs() -> TempDir {
     ok(repo, &["init", "--providers", "none"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
     for change in ["ready", "blocked", "settled"] {
-        ok(repo, &["change", "new", change, "--subject-id", "demo", "--title", change]);
+        ok(repo, &["change", "new", change, "--subject", "demo", "--title", change]);
     }
     std::fs::write(brief_path(repo, "ready"), clean_brief("Ready change")).unwrap();
     std::fs::write(brief_path(repo, "settled"), clean_brief("Settled change")).unwrap();
@@ -370,7 +370,7 @@ fn repo_with_more_briefs() -> TempDir {
     let dir = repo_with_briefs();
     let repo = dir.path();
     for change in ["ready2", "ready3", "ready4"] {
-        ok(repo, &["change", "new", change, "--subject-id", "demo", "--title", change]);
+        ok(repo, &["change", "new", change, "--subject", "demo", "--title", change]);
         std::fs::write(brief_path(repo, change), clean_brief(change)).unwrap();
     }
     dir

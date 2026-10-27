@@ -69,7 +69,7 @@ pub struct StrategyRollbackArgs {
     #[arg(long, value_name = "TEXT")]
     pub reason: String,
     /// The approver; must be a policy-pinned approver
-    #[arg(long, value_name = "ACTOR_ID")]
+    #[arg(long = "actor", value_name = "ACTOR_ID")]
     pub actor_id: String,
     /// Detached signature file over the rollback payload
     #[arg(long, value_name = "FILE")]
@@ -78,7 +78,7 @@ pub struct StrategyRollbackArgs {
     #[arg(long, value_name = "TIMESTAMP", value_parser = crate::timestamp::normalize)]
     pub approval_at: String,
     /// A trajectory that contradicts the strategy (must exist in the trajectory store)
-    #[arg(long, value_name = "ID")]
+    #[arg(long = "contradicting-trajectory", value_name = "ID")]
     pub contradicting_trajectory_id: Option<String>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

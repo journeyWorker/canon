@@ -72,7 +72,7 @@ test("mart_flywheel_funnel fixture exercises all three shapes of the applied spl
   // A fixture where every row reads the same way would render the split
   // columns without ever demonstrating that they split anything —
   // "all-proxy" in particular is the shape of a repo that never passes
-  // `canon ingest artifacts --run-id`, which the panel's tooltip names.
+  // `canon ingest records --run`, which the panel's tooltip names.
   const shapes = [...new Set(funnel.map(shape))].sort();
   expect(shapes).toEqual(["all-attributed", "all-proxy", "mixed"]);
 });

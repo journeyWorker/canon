@@ -122,6 +122,23 @@ fn parse_waive(body: &str) -> Option<OldWaiver> {
 /// What reading the old text by its markers (the way canon 0.30 did) found in one section.
 type ReadSection = (String, Role, Vec<String>);
 
+/// A section body's lines with every run of blank lines one blank and the ends trimmed: its paragraph structure,
+/// which the length and sentence rules read (a removed comment line must not join two paragraphs).
+fn paragraphs<'a>(lines: impl Iterator<Item = &'a str>) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for line in lines {
+        let blank = line.trim().is_empty();
+        if blank && out.last().is_none_or(String::is_empty) {
+            continue;
+        }
+        out.push(if blank { String::new() } else { line.to_string() });
+    }
+    while out.last().is_some_and(String::is_empty) {
+        out.pop();
+    }
+    out
+}
+
 /// The sections of an old-format brief by their `canon:section` markers: key,
 /// effective role (the marker's, else the table's) and the non-blank lines
 /// after the section's heading.
@@ -144,19 +161,13 @@ fn read_by_markers(brief: &Brief) -> Vec<ReadSection> {
             let end = markers.get(i + 1).map_or(usize::MAX, |m| m.0);
             let effective = role.or_else(|| reader::canonical_role(key)).unwrap_or(Role::Context);
             let mut heading_dropped = false;
-            let body = brief
-                .lines
-                .iter()
-                .filter(|l| l.no > *line && l.no < end && !l.text.trim().is_empty())
-                .filter(|l| {
-                    if !heading_dropped && l.text.trim_start().starts_with('#') {
-                        heading_dropped = true;
-                        return false;
-                    }
-                    true
-                })
-                .map(|l| l.text.clone())
-                .collect();
+            let body = paragraphs(brief.lines.iter().filter(|l| l.no > *line && l.no < end).map(|l| l.text.as_str()).filter(|t| {
+                if !heading_dropped && t.trim_start().starts_with('#') {
+                    heading_dropped = true;
+                    return false;
+                }
+                true
+            }));
             (key.clone(), effective, body)
         })
         .collect()
@@ -164,7 +175,7 @@ fn read_by_markers(brief: &Brief) -> Vec<ReadSection> {
 
 /// The sections of a 0.31 brief by their headings, in the same shape.
 fn read_by_headings(brief: &Brief) -> Vec<ReadSection> {
-    brief.sections.iter().map(|s| (s.key.to_string(), s.role, brief.section_lines(s).iter().skip(1).filter(|l| !l.text.trim().is_empty()).map(|l| l.text.clone()).collect())).collect()
+    brief.sections.iter().map(|s| (s.key.to_string(), s.role, paragraphs(brief.section_lines(s).iter().skip(1).map(|l| l.text.as_str())))).collect()
 }
 
 /// The keys the rules judge: every section of a feature brief, the chore set's of a chore.
@@ -262,7 +273,8 @@ fn rewrite(old: &str, brief: &Brief) -> Result<Rewrite, String> {
                 waivers.push(waiver);
             }
         }
-        if comment.body.split_whitespace().collect::<Vec<_>>() == ["canon:kind", "chore"] {
+        let mut tokens = comment.body.split_whitespace();
+        if tokens.next() == Some("canon:kind") && tokens.next() == Some("chore") {
             chore = true;
         }
         for line in comment.line..=comment.end_line {
@@ -296,6 +308,9 @@ fn rewrite(old: &str, brief: &Brief) -> Result<Rewrite, String> {
         let blank = line.trim().is_empty();
         if blank && dropped && (previous_blank || body.is_empty()) {
             continue;
+        }
+        if dropped && !blank && !previous_blank && !body.is_empty() {
+            body.push('\n');
         }
         trailing_dropped = false;
         body.push_str(retitled[no].as_deref().unwrap_or(line));
@@ -651,6 +666,11 @@ pub fn resume_backup(repo: &Path) -> Option<PathBuf> {
 /// already done, so a repeat after a stop finishes the rest.
 pub fn apply(repo: &Path, plan: &Plan, backup: &Path) -> Result<(), String> {
     if !plan.writes() {
+        // Nothing left to write: a stopped run whose work is all done is complete.
+        if let Some(mut journal) = read_journal(backup).filter(|j| !j.complete) {
+            journal.complete = true;
+            write_file(&backup.join(JOURNAL), &serde_json::to_vec_pretty(&journal).map_err(|e| e.to_string())?)?;
+        }
         return Ok(());
     }
     let mut journal = read_journal(backup).unwrap_or_default();
@@ -691,7 +711,11 @@ pub fn apply(repo: &Path, plan: &Plan, backup: &Path) -> Result<(), String> {
     for (review, bytes) in plan.reviews.iter().zip(&new_review_bytes) {
         let old_file = ledger_root.join(&review.from);
         if old_file.is_file() {
-            tier.write_unarchived(&review.new).map_err(|e| format!("cannot write the new version of the review {}: {e}", review.from_path))?;
+            // A stopped run may have written the new version already: when it holds the expected bytes, go on.
+            let written = std::fs::read(ledger_root.join(&review.to)).is_ok_and(|now| sha256_hex(&now) == sha256_hex(bytes));
+            if !written {
+                tier.write_unarchived(&review.new).map_err(|e| format!("cannot write the new version of the review {}: {e}", review.from_path))?;
+            }
             if let Some(root) = &archive {
                 let kept = root.join(&review.from);
                 let old_bytes = std::fs::read(&old_file).map_err(|e| format!("cannot read {}: {e}", review.from_path))?;
@@ -766,6 +790,28 @@ pub fn check_revert(repo: &Path, backup: &Path) -> Result<RevertNote, String> {
     }
 }
 
+/// The files a revert would remove or overwrite that hold a human's act made after the migrate: the policy approval
+/// file (a file the snapshot did not have, or one that changed) and a brief whose `Approved:` line differs from the
+/// snapshot's, for a brief the migrate did not rewrite (the rewritten ones are [`check_revert`]'s). A revert never
+/// discards one of these: it refuses and names them.
+pub fn later_human_acts(repo: &Path, backup: &Path, snapshot_dir: &str, remove: &[String], restore: &[String]) -> Vec<String> {
+    let journal = read_journal(backup);
+    let rewritten: BTreeSet<&str> = journal.iter().flat_map(|j| j.briefs.iter().map(|b| b.path.as_str())).collect();
+    let mut acts = Vec::new();
+    for path in remove.iter().chain(restore) {
+        if path == paths::POLICY_APPROVAL_FILE {
+            acts.push(path.clone());
+        } else if path.ends_with("/brief.md") && path.starts_with(paths::CHANGES_DIR) && !rewritten.contains(path.as_str()) {
+            let now = std::fs::read_to_string(repo.join(path)).ok().and_then(|t| canon_ingest::markdown::field(&t, "Approved:").map(str::to_string));
+            let then = std::fs::read_to_string(backup.join(snapshot_dir).join(path)).ok().and_then(|t| canon_ingest::markdown::field(&t, "Approved:").map(str::to_string));
+            if now != then {
+                acts.push(path.clone());
+            }
+        }
+    }
+    acts
+}
+
 /// The paths of the briefs and reviews a run rewrote, for a journal-aware preview of a revert.
 pub fn journal_paths(backup: &Path) -> BTreeSet<String> {
     read_journal(backup).map(|j| j.briefs.into_iter().map(|b| b.path).chain(j.reviews.into_iter().map(|r| r.to)).collect()).unwrap_or_default()
@@ -814,6 +860,16 @@ mod tests {
         let unknown = "# t\n\n<!-- canon:section intent role=context -->\n## Intent\n\nx\n\n<!-- canon:section mystery role=context -->\n## Mystery\n\ny\n";
         let why = equivalent(&reader::parse(unknown), &reader::parse(&migrated(unknown).text)).unwrap_err();
         assert!(why.contains("mystery"), "{why}");
+    }
+
+    #[test]
+    fn a_removed_comment_line_between_two_lines_keeps_them_two_paragraphs() {
+        let old = "# t\n\n<!-- canon:section intent role=context -->\n## Intent\n\nfirst\n<!-- canon:hint x -->\nsecond\n\n<!-- canon:section out-of-scope role=context -->\n## Out of scope\n\ny\n";
+        let out = migrated(old);
+        assert!(out.text.contains("first\n\nsecond"), "{:?}", out.text);
+        equivalent(&reader::parse(old), &reader::parse(&out.text)).unwrap();
+        let joined = "# t\n\n## Intent\n\nfirst\nsecond\n\n## Out of scope\n\ny\n";
+        assert!(equivalent(&reader::parse(old), &reader::parse(joined)).is_err(), "joined paragraphs are not equivalent");
     }
 
     #[test]

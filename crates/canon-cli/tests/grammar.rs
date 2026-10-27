@@ -82,7 +82,7 @@ fn the_removed_command_names_are_clap_usage_errors() {
     for args in [
         &["context-pack", "create", "--manifest", "manifest.json"][..],
         &["prompt", "register", "--name", "r", "--version", "v1", "--manifest", "manifest.json"],
-        &["divergence", "stage", "--project-id", "root"],
+        &["divergence", "stage", "--project", "root"],
         &["demo", "attest"],
     ] {
         let mut argv = args.to_vec();
@@ -104,7 +104,7 @@ fn the_new_forms_run_without_any_deprecation_marker() {
     ok(dir.path(), &["prompt", "add", "reviewer@v2", "--manifest", "manifest.json", "--json"]);
 
     let scenario = repo_with_scenario();
-    ok(scenario.path(), &["divergence", "add", "game.run.01", "--project-id", "root", "--round", "2", "--actor-id", "r", "--role", "reviewer", "--json"]);
+    ok(scenario.path(), &["divergence", "add", "game.run.01", "--project", "root", "--round", "2", "--actor", "r", "--role", "reviewer", "--json"]);
 
     let tmp = tempfile::tempdir().unwrap();
     let demo = tmp.path().join("demo");
@@ -262,7 +262,7 @@ fn an_unknown_canon_role_is_refused_with_unknown_role() {
 }
 
 fn evidence_without_role(repo: &Path, env: &[(&str, &str)]) -> Output {
-    canon_with(repo, &["evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "cargo test", "--actor-id", "impl", "--json"], env)
+    canon_with(repo, &["evidence", "add", "--scenario", "game.run.01", "--project", "root", "--class", "test-run", "--ref", "cargo test", "--actor", "impl", "--json"], env)
 }
 
 #[test]
@@ -283,6 +283,6 @@ fn record_role_defaults_to_the_declared_implementer_or_reviewer() {
     let text = std::fs::read_to_string(record).unwrap();
     assert!(text.contains("\"implementer\""), "the record carries the declared role: {text}");
 
-    let flag_wins = canon(repo, &["--as", "reviewer", "evidence", "add", "--scenario-id", "game.run.01", "--project-id", "root", "--class", "test-run", "--ref", "cargo test 2", "--actor-id", "rev", "--role", "implementer"]);
+    let flag_wins = canon(repo, &["--as", "reviewer", "evidence", "add", "--scenario", "game.run.01", "--project", "root", "--class", "test-run", "--ref", "cargo test 2", "--actor", "rev", "--role", "implementer"]);
     assert!(flag_wins.status.success(), "{}{}", stdout(&flag_wins), stderr(&flag_wins));
 }

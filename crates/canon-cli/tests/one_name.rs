@@ -1,9 +1,10 @@
 //! One name per concept (0.24 D1-D3, #85) through the built binary.
 //!
-//! The contract: a concept has one flag spelling across every command
-//! (`--<noun>-id`), a `--kind` value names a record kind without the
-//! `_record` suffix, and the 0.23 spellings 0.24 deprecated are refused (0.25 D6)
-//! as usage errors whose hint names the spelling that replaced them.
+//! The contract: a concept has one flag spelling across every command, the
+//! bare noun (`--change`; no option ends in `-id`, 0.31), a `--kind` value
+//! names a record kind without the `_record` suffix, and the spellings 0.24
+//! deprecated (0.25 D6) and the id-suffixed ones 0.31 renamed are refused as
+//! usage errors whose hint names the spelling that replaced them.
 //! The checker is a function over (command path, flags, `--kind` values), so
 //! its own test can feed it a synthetic split and prove it would catch one.
 
@@ -24,13 +25,9 @@ struct Surface {
     kind_values: Vec<String>,
 }
 
-/// Concepts whose flag is always `--<noun>-id` (the id of a record or a
-/// configured entity), never `--<noun>`.
-const CONCEPTS: &[&str] = &["change", "project", "subject", "actor", "scenario", "session", "run"];
-
 /// Every way `commands` breaks the one-name rule: (a) two flags that differ
-/// only by an `-id` suffix, (b) a concept spelled without `-id`, (c) a
-/// `--kind` value that ends in `_record`.
+/// only by an `-id` suffix, (b) a flag that ends in `-id` (an option that takes
+/// an id is the bare noun), (c) a `--kind` value that ends in `_record`.
 fn one_name_problems(commands: &[Surface]) -> Vec<String> {
     let mut carriers: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for command in commands {
@@ -46,8 +43,8 @@ fn one_name_problems(commands: &[Surface]) -> Vec<String> {
         }
     }
     for (flag, paths) in &carriers {
-        if CONCEPTS.contains(flag) {
-            problems.push(format!("--{flag} ({}) is spelled without -id: use --{flag}-id", paths.join(", ")));
+        if let Some(stem) = flag.strip_suffix("-id") {
+            problems.push(format!("--{flag} ({}) ends in -id: use --{stem}", paths.join(", ")));
         }
     }
     for command in commands {
@@ -62,27 +59,38 @@ fn surface(path: &str, flags: &[&str], kind_values: &[&str]) -> Surface {
     Surface { path: path.to_string(), flags: flags.iter().map(std::string::ToString::to_string).collect(), kind_values: kind_values.iter().map(std::string::ToString::to_string).collect() }
 }
 
-/// context.capability.22: the checker reports a split, a bare concept and a
+/// context.capability.22: the checker reports a split, an `-id` option and a
 /// `_record` value, and stays quiet on a tree without them.
 #[test]
 fn context_capability_22_the_checker_reports_a_concept_spelled_two_ways() {
     let split = [surface("brief check", &["change", "json"], &[]), surface("finding list", &["change-id", "json"], &[])];
     let problems = one_name_problems(&split);
     assert!(problems.iter().any(|p| p.contains("--change (brief check) and --change-id (finding list) name one concept two ways")), "{problems:?}");
-    assert!(problems.iter().any(|p| p.contains("--change (brief check) is spelled without -id")), "{problems:?}");
+    assert!(problems.iter().any(|p| p.contains("--change-id (finding list) ends in -id: use --change")), "{problems:?}");
 
-    let bare = [surface("retrieve", &["subject"], &[])];
-    assert_eq!(one_name_problems(&bare), vec!["--subject (retrieve) is spelled without -id: use --subject-id".to_string()]);
+    let suffixed = [surface("retrieve", &["subject-id"], &[])];
+    assert_eq!(one_name_problems(&suffixed), vec!["--subject-id (retrieve) ends in -id: use --subject".to_string()]);
 
-    let suffixed = [surface("query", &["json"], &["evidence", "review_record"])];
-    assert_eq!(one_name_problems(&suffixed), vec!["`query` --kind value `review_record` ends in _record: use `review`".to_string()]);
+    let record = [surface("query", &["json"], &["evidence", "review_record"])];
+    assert_eq!(one_name_problems(&record), vec!["`query` --kind value `review_record` ends in _record: use `review`".to_string()]);
 
-    let clean = [surface("brief check", &["change-id", "json"], &[]), surface("query", &["change-id", "kind"], &["evidence", "review"]), surface("evidence add", &["kind"], &[])];
+    let clean = [surface("brief check", &["change", "json"], &[]), surface("query", &["change", "kind"], &["evidence", "review"]), surface("evidence add", &["kind"], &[])];
     assert!(one_name_problems(&clean).is_empty());
 
-    // Flags that merely share a stem are not a split: `--scenario-ids-from` is not `--scenario-id`.
-    let shared = [surface("review add", &["scenario-id", "scenario-ids-from", "evaluator-id", "evaluator-version"], &[])];
+    // Flags that merely share a stem are not a split: `--evaluator` and `--evaluator-version` are one concept's properties.
+    let shared = [surface("evidence audit", &["evaluator", "evaluator-version", "evaluator-digest", "scenario"], &[])];
     assert!(one_name_problems(&shared).is_empty());
+}
+
+/// context.capability.58: the checker reports an option that ends in `-id` on its own, and a concept spelled two ways with
+/// the commands that carry each spelling.
+#[test]
+fn context_capability_58_the_checker_reports_an_id_option_and_a_concept_spelled_two_ways() {
+    let tree = [surface("finding add", &["change", "actor-id"], &[]), surface("finding list", &["change-id"], &[]), surface("query", &["change-id", "change"], &[])];
+    let problems = one_name_problems(&tree);
+    assert!(problems.iter().any(|p| p == "--change (finding add, query) and --change-id (finding list, query) name one concept two ways"), "{problems:?}");
+    assert!(problems.iter().any(|p| p == "--actor-id (finding add) ends in -id: use --actor"), "{problems:?}");
+    assert!(problems.iter().any(|p| p == "--change-id (finding list, query) ends in -id: use --change"), "{problems:?}");
 }
 
 // ── the real tree ────────────────────────────────────────────────────────
@@ -137,13 +145,16 @@ fn command_tree() -> Vec<Surface> {
 }
 
 /// context.capability.14 and .15: `canon schema --all` shows no concept spelled
-/// two ways, no concept without `-id`, and no `--kind` value ending in `_record`.
+/// two ways, no option ending in `-id`, and no `--kind` value ending in `_record`.
 #[test]
 fn context_capability_14_one_concept_has_one_flag_spelling_across_every_command() {
     let tree = command_tree();
     assert!(tree.len() > 60, "the walk covers the whole tree: {} commands", tree.len());
     let problems = one_name_problems(&tree);
     assert!(problems.is_empty(), "{}", problems.join("\n"));
+    for concept in ["change", "project", "subject", "actor", "scenario", "session", "run"] {
+        assert!(tree.iter().any(|c| c.flags.iter().any(|f| f == concept)), "--{concept} is a bare noun somewhere in the tree");
+    }
 }
 
 #[test]
@@ -160,7 +171,7 @@ fn context_capability_15_a_kind_value_never_carries_the_record_suffix() {
     // One name everywhere (0.30): the record's own `kind`, the ledger directory and the routing key all say `evidence`.
     let dir = repo_with_change();
     let repo = dir.path();
-    let out = canon_in(repo, &["evidence", "add", "--project-id", "root", "--scenario-id", "demo.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer"]);
+    let out = canon_in(repo, &["evidence", "add", "--project", "root", "--scenario", "demo.login.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer"]);
     assert!(out.status.success(), "{}{}", stdout(&out), stderr(&out));
     let ledger = repo.join(".canon/ledger/kind=evidence");
     let files: Vec<_> = std::fs::read_dir(&ledger).expect("the ledger directory is named evidence").flatten().collect();
@@ -184,7 +195,7 @@ fn repo_with_change() -> tempfile::TempDir {
     for args in [
         &["init", "--repo", ".", "--no-policy", "--providers", "none"][..],
         &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"],
-        &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"],
+        &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"],
     ] {
         let out = canon_in(dir.path(), args);
         assert!(out.status.success(), "canon {args:?}: {}{}", stdout(&out), stderr(&out));
@@ -209,24 +220,27 @@ fn context_capability_16_a_removed_flag_spelling_is_refused_with_the_flag_that_r
     let dir = repo_with_change();
     let repo = dir.path();
 
-    let old = canon_in(repo, &["change", "new", "add-search", "--subject", "demo", "--title", "Add search", "--json"]);
+    let old = canon_in(repo, &["change", "new", "add-search", "--subject-id", "demo", "--title", "Add search", "--json"]);
     let body = usage_error(&old);
-    assert_eq!(body["error"]["expected"], serde_json::json!(["--subject-id"]), "{body}");
-    assert_eq!(body["error"]["field"], "--subject", "{body}");
+    assert_eq!(body["error"]["expected"], serde_json::json!(["--subject"]), "{body}");
+    assert_eq!(body["error"]["field"], "--subject-id", "{body}");
+    assert_eq!(body["error"]["message"], "--subject-id was removed in 0.31.0", "{body}");
+    assert!(body["error"]["hint"].as_str().unwrap().contains("`canon change new add-search --subject demo --title 'Add search' --json`"), "{body}");
     assert!(!repo.join(".canon/changes/add-search").exists(), "a refused spelling runs nothing");
 
-    let new = canon_in(repo, &["change", "new", "add-cart", "--subject-id", "demo", "--title", "Add cart", "--json"]);
+    let new = canon_in(repo, &["change", "new", "add-cart", "--subject", "demo", "--title", "Add cart", "--json"]);
     assert!(new.status.success(), "{}", stderr(&new));
     assert!(serde_json::from_slice::<Value>(&new.stdout).unwrap()["meta"].get("deprecated").is_none());
 
-    // The `=` form, a global argument placed before the subcommand, and a flag missing its value.
+    // The `=` form, and a flag missing its value.
     for args in [
-        &["scenario", "new", "demo.login.01", "--title", "A", "--change=add-login", "--json"][..],
-        &["scenario", "new", "demo.login.01", "--title", "A", "--change", "add-login", "--json"],
-        &["scenario", "new", "demo.login.01", "--title", "A", "--change", "--json"],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--change-id=add-login", "--json"][..],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--change-id", "add-login", "--json"],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--change-id", "--json"],
     ] {
         let body = usage_error(&canon_in(repo, args));
-        assert_eq!(body["error"]["expected"], serde_json::json!(["--change-id"]), "{args:?}: {body}");
+        assert_eq!(body["error"]["expected"], serde_json::json!(["--change"]), "{args:?}: {body}");
+        assert_eq!(body["error"]["field"], "--change-id", "{args:?}: {body}");
     }
     let canonical = canon_in(repo, &["brief", "check", "add-login", "--json"]);
     let report: Value = serde_json::from_slice(&canonical.stdout).expect("one JSON document");
@@ -235,9 +249,9 @@ fn context_capability_16_a_removed_flag_spelling_is_refused_with_the_flag_that_r
 
     // Every removed flag, on a command that renamed it.
     for (args, old, new) in [
-        (&["scenario", "new", "demo.login.01", "--title", "A", "--actor", "alice", "--json"][..], "--actor", "--actor-id"),
-        (&["scenario", "new", "demo.login.01", "--title", "A", "--project", "root", "--json"], "--project", "--project-id"),
-        (&["ingest", "records", "--run", "r1", "--json"], "--run", "--run-id"),
+        (&["scenario", "new", "demo.login.01", "--title", "A", "--actor-id", "alice", "--json"][..], "--actor-id", "--actor"),
+        (&["scenario", "new", "demo.login.01", "--title", "A", "--project-id", "root", "--json"], "--project-id", "--project"),
+        (&["ingest", "records", "--run-id", "r1", "--json"], "--run-id", "--run"),
     ] {
         let body = usage_error(&canon_in(repo, args));
         assert_eq!(body["error"]["field"], old, "{args:?}: {body}");
@@ -245,9 +259,9 @@ fn context_capability_16_a_removed_flag_spelling_is_refused_with_the_flag_that_r
     }
 
     // Without --json the refusal is still exit 2, on stderr, with the hint.
-    let human = canon_in(repo, &["scenario", "new", "demo.login.01", "--title", "A", "--change", "add-login"]);
+    let human = canon_in(repo, &["scenario", "new", "demo.login.01", "--title", "A", "--change-id", "add-login"]);
     assert_eq!(human.status.code(), Some(2));
-    assert!(stderr(&human).contains("--change-id"), "{}", stderr(&human));
+    assert!(stderr(&human).contains("--change"), "{}", stderr(&human));
 }
 
 /// context.capability.17: a removed `--kind` value is a usage error naming the
@@ -282,11 +296,11 @@ fn context_capability_17_a_removed_kind_value_is_refused_with_the_value_that_rep
 #[test]
 fn context_capability_18_help_and_schema_show_only_the_one_name() {
     let dir = tempfile::tempdir().unwrap();
-    for (args, canonical) in [(&["brief", "approve", "--help"][..], "CHANGE_ID"), (&["change", "new", "--help"], "--subject-id"), (&["query", "--help"], "--kind <KIND>"), (&["scenario", "new", "--help"], "--subject-id")] {
+    for (args, canonical) in [(&["brief", "approve", "--help"][..], "CHANGE_ID"), (&["change", "new", "--help"], "--subject <SUBJECT_ID>"), (&["query", "--help"], "--kind <KIND>"), (&["scenario", "new", "--help"], "--subject <SUBJECT_ID>")] {
         let help = stdout(&canon_in(dir.path(), args));
         assert!(help.contains(canonical), "{args:?} help shows the canonical `{canonical}`:\n{help}");
-        for old in ["--change ", "--change\n", "--subject ", "--subject\n", "--project ", "--actor ", "--run "] {
-            assert!(!help.contains(old), "{args:?} help shows the removed `{old:?}`:\n{help}");
+        for old in ["--change-id", "--subject-id", "--project-id", "--actor-id", "--session-id", "--run-id", "--plugin-id"] {
+            assert!(!help.contains(old), "{args:?} help shows the removed `{old}`:\n{help}");
         }
         assert!(!help.contains("_record"), "{args:?} help shows a _record kind:\n{help}");
         if args[0] == "query" {
@@ -302,6 +316,7 @@ fn context_capability_18_help_and_schema_show_only_the_one_name() {
         for option in schema["options"].as_array().unwrap() {
             assert!(option.get("deprecatedAliases").is_none() && option.get("deprecatedValues").is_none(), "{command:?}: {option}");
             assert!(option["aliases"].as_array().unwrap().is_empty(), "{command:?}: no alias keeps an old spelling: {option}");
+            assert!(!option["name"].as_str().unwrap().ends_with("-id"), "{command:?}: {option}");
         }
     }
     let kind = schema_json(&["schema", "query", "--json"])["options"].as_array().unwrap().iter().find(|o| o["name"] == "kind").unwrap().clone();
@@ -316,29 +331,28 @@ fn context_capability_19_a_token_after_the_separator_or_an_option_value_is_never
     let repo = dir.path();
 
     // A value that is spelled like a removed flag.
-    let value = canon_in(repo, &["change", "new", "add-search", "--subject-id", "demo", "--title=--subject", "--json"]);
+    let value = canon_in(repo, &["change", "new", "add-search", "--subject", "demo", "--title=--subject-id", "--json"]);
     assert!(value.status.success(), "{}", stderr(&value));
     let brief = std::fs::read_to_string(repo.join(".canon/changes/add-search/brief.md")).unwrap();
-    assert!(brief.contains("--subject"), "the value reached the brief untouched: {brief}");
+    assert!(brief.contains("--subject-id"), "the value reached the brief untouched: {brief}");
 
     // Lines clap refuses for another reason (`--bogus`), so the removed-spelling
     // scan runs: a removed spelling after `--` or as an option's value is not
     // reported.
     for args in [
-        &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--json", "--", "--change"][..],
-        &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--change-id", "--change", "--json"],
-        &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--change-id=--change", "--json"],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--json", "--", "--change-id"][..],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--lane", "--change-id", "--json"],
+        &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--lane=--change-id", "--json"],
     ] {
         let refused = usage_error(&canon_in(repo, args));
-        let hint = refused["error"]["hint"].as_str().unwrap_or_default().to_string();
-        assert!(!refused.to_string().contains("was removed") && !hint.contains("--change "), "{args:?}: {refused}");
+        assert!(!refused.to_string().contains("was removed"), "{args:?}: {refused}");
     }
     // The same line with the spelling as a real flag is reported.
-    let flagged = usage_error(&canon_in(repo, &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--change", "x", "--json"]));
-    assert_eq!(flagged["error"]["expected"], serde_json::json!(["--change-id"]), "{flagged}");
+    let flagged = usage_error(&canon_in(repo, &["scenario", "new", "demo.login.01", "--title", "A", "--bogus", "--change-id", "x", "--json"]));
+    assert_eq!(flagged["error"]["expected"], serde_json::json!(["--change"]), "{flagged}");
 
     // As a flag it is refused, with a space or an equals sign.
-    for args in [&["scenario", "new", "demo.login.01", "--title", "A", "--change=add-login", "--json"][..], &["scenario", "new", "demo.login.01", "--title", "A", "--change", "add-login", "--json"]] {
+    for args in [&["scenario", "new", "demo.login.01", "--title", "A", "--change-id=add-login", "--json"][..], &["scenario", "new", "demo.login.01", "--title", "A", "--change-id", "add-login", "--json"]] {
         usage_error(&canon_in(repo, args));
     }
 }
@@ -348,10 +362,13 @@ fn context_capability_19_a_token_after_the_separator_or_an_option_value_is_never
 #[test]
 fn context_capability_20_a_removed_spelling_is_refused_only_on_the_commands_that_renamed_it() {
     let dir = repo_with_change();
-    let other = usage_error(&canon_in(dir.path(), &["status", "--subject", "demo", "--json"]));
+    let other = usage_error(&canon_in(dir.path(), &["status", "--subject-id", "demo", "--json"]));
     assert!(!other.to_string().contains("was removed"), "{other}");
-    let renamed = usage_error(&canon_in(dir.path(), &["scenario", "new", "demo.login.01", "--title", "A", "--change", "--json"]));
-    assert_eq!(renamed["error"]["expected"], serde_json::json!(["--change-id"]), "{renamed}");
+    let renamed = usage_error(&canon_in(dir.path(), &["scenario", "new", "demo.login.01", "--title", "A", "--change-id", "--json"]));
+    assert_eq!(renamed["error"]["expected"], serde_json::json!(["--change"]), "{renamed}");
+    // A spelling 0.28 removed is valid again where the option came back: `dispatch begin --task` runs its own checks.
+    let valid = canon_in(dir.path(), &["dispatch", "begin", "--task", "no-such#1", "--regime", "implementer/canon/search/abcdef", "--json"]);
+    assert!(!String::from_utf8_lossy(&valid.stdout).contains("was removed"), "{}", String::from_utf8_lossy(&valid.stdout));
 }
 
 /// context.capability.21: a batch element with a removed key name is refused, and the refusal
@@ -360,21 +377,24 @@ fn context_capability_20_a_removed_spelling_is_refused_only_on_the_commands_that
 fn context_capability_21_a_batch_element_with_a_removed_key_name_refuses_the_batch() {
     let dir = repo_with_change();
     let repo = dir.path();
-    for (key, new) in [("subject", "subjectId"), ("project", "projectId"), ("change", "changeId")] {
-        let doc = format!(r#"[{{"operands":["demo.login.01"],"title":"One","subjectId":"demo"}},{{"operands":["demo.login.02"],"title":"Two","{key}":"x"}}]"#);
+    for new in ["subject", "project", "change"] {
+        let key = format!("{new}Id");
+        let doc = format!(r#"[{{"operands":["demo.login.01"],"title":"One","subject":"demo"}},{{"operands":["demo.login.02"],"title":"Two","{key}":"x"}}]"#);
         let out = canon_in(repo, &["scenario", "new", "--input", &doc, "--json"]);
         assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
         let body: Value = serde_json::from_slice(&out.stdout).expect("one JSON document");
         assert_eq!(body["error"]["code"], "INPUT_UNKNOWN_FIELD", "{body}");
         assert_eq!(body["error"]["field"], format!("/items/1/{key}"), "{body}");
         assert!(body["error"]["expected"].as_array().unwrap().iter().any(|k| k == new), "{body}");
-        assert!(!repo.join(".canon/specs/kind=feature/area=demo/login.feature").exists(), "a refused batch writes nothing");
+        assert_eq!(body["error"]["suggestions"][0], new, "{body}");
+        assert!(body["error"]["hint"].as_str().unwrap().contains(&format!("use \"{new}\"")), "{body}");
+        assert!(!repo.join(".canon/specs/kind=feature/area=demo/login.feature").exists(), "a refused batch writes nothing, the first element included");
     }
 
     let brief_path = repo.join(".canon/changes/add-login/brief.md");
     let brief = std::fs::read_to_string(&brief_path).unwrap().replace("## User flow\n", "## User flow\n\n1. F1 The visitor submits credentials → lands on the catalog.\n");
     std::fs::write(&brief_path, brief).unwrap();
-    let doc = r#"[{"operands":["demo.login.01"],"title":"One","subjectId":"demo","projectId":"root"},{"operands":["demo.login.02"],"title":"Two","subjectId":"demo","case":"failure","flow":"F1","changeId":"add-login"}]"#;
+    let doc = r#"[{"operands":["demo.login.01"],"title":"One","subject":"demo","project":"root"},{"operands":["demo.login.02"],"title":"Two","subject":"demo","case":"failure","flow":"F1","change":"add-login"}]"#;
     let out = canon_in(repo, &["scenario", "new", "--input", doc, "--json"]);
     assert!(out.status.success(), "{}", stderr(&out));
     let feature = std::fs::read_to_string(repo.join(".canon/specs/kind=feature/area=demo/login.feature")).unwrap();

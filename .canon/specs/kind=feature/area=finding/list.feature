@@ -7,7 +7,7 @@ Feature: finding list
   @finding.list.01
   Scenario: A change's committed findings list one row each at their latest version
     Given a change with a blocker raised open and later closed rejected, an open should-fix, a staged finding, and a finding on another change
-    When canon finding list --change-id runs for that change
+    When canon finding list --change runs for that change
     Then it prints a header and one row per committed finding with round, seq, severity, disposition, reviewer and summary, ordered by round and seq
     And the closed finding shows rejected, its latest disposition
     And the other change's finding is not listed
@@ -40,7 +40,7 @@ Feature: finding list
   Scenario: A malformed change id is refused before anything is read
     Given a repo with a canon.yaml
     When canon finding list runs with a change id outside the grammar
-    Then it exits 2 naming --change-id and prints nothing to stdout
+    Then it exits 2 naming --change and prints nothing to stdout
 
   # canon: {"schema":1,"at":"2026-10-21T11:47:25Z","actor":{"agent_id":"canon-impl-025"}}
   @subject:finding-lifecycle

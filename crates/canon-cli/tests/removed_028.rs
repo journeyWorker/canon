@@ -1,4 +1,4 @@
-//! The "Removed in 0.28" table, run row by row against the built `canon`
+//! The removed-spellings table (0.27 → 0.28 and the 0.31 id options), run row by row against the built `canon`
 //! binary: every old spelling the clap tree no longer parses exits 2 with an
 //! `error.hint` that names the replacement, and lists it in `error.expected`.
 
@@ -151,21 +151,21 @@ fn an_operand_hint_names_the_typed_leaf_with_the_typed_values() {
         ("brief check --change=pause-menu", "brief check pause-menu"),
         ("brief approve --change-id pause-menu --approver alice --note ok", "brief approve pause-menu --approver alice --note ok"),
         ("brief approve --change pause-menu --approver alice --note ok", "brief approve pause-menu --approver alice --note ok"),
-        ("subject adopt --subject-id cart --change-id add-cart", "subject adopt cart --change-id add-cart"),
-        ("subject unadopt --subject-id cart --change-id add-cart", "subject unadopt cart --change-id add-cart"),
+        ("subject adopt --subject-id cart --change-id add-cart", "subject adopt cart --change add-cart"),
+        ("subject unadopt --subject-id cart --change-id add-cart", "subject unadopt cart --change add-cart"),
         ("dispatch end --run-id 01ARZ3NDEKTSV4RRFFQ69G5FAV --run-outcome succeeded", "dispatch end 01ARZ3NDEKTSV4RRFFQ69G5FAV --run-outcome succeeded"),
         ("prompt show --name p --version 1", "prompt show p@1"),
         ("prompt show --version 1 --name p", "prompt show p@1"),
         ("prompt add --name p --version 1 --manifest m.json", "prompt add p@1 --manifest m.json"),
-        ("divergence add --scenario-id a.b.01 --actor-id x", "divergence add a.b.01 --actor-id x"),
-        ("divergence defer --scenario-id a.b.01 --actor-id x --reason r --expiry 2030-01-01", "divergence defer a.b.01 --actor-id x --reason r --expiry 2030-01-01"),
-        ("divergence resolve --scenario-id a.b.01 --actor-id x", "divergence resolve a.b.01 --actor-id x"),
-        ("divergence accept --scenario-id a.b.01 --reason r --tracking t --actor-id x", "divergence accept a.b.01 --reason r --tracking t --actor-id x"),
+        ("divergence add --scenario-id a.b.01 --actor-id x", "divergence add a.b.01 --actor x"),
+        ("divergence defer --scenario-id a.b.01 --actor-id x --reason r --expiry 2030-01-01", "divergence defer a.b.01 --actor x --reason r --expiry 2030-01-01"),
+        ("divergence resolve --scenario-id a.b.01 --actor-id x", "divergence resolve a.b.01 --actor x"),
+        ("divergence accept --scenario-id a.b.01 --reason r --tracking t --actor-id x", "divergence accept a.b.01 --reason r --tracking t --actor x"),
         ("finding close --change-id c1 --round 1 --seq 1 --disposition fixed", "finding close c1 --round 1 --seq 1 --disposition fixed"),
-        ("review scenario --scenario-id a.b.01 --actor-id x --upstream-ref u", "review scenario a.b.01 --actor-id x --upstream-ref u"),
-        ("review change --change-id c1 --actor-id x --upstream-ref u", "review change c1 --actor-id x --upstream-ref u"),
-        ("review scenario --change-id c1 --actor-id x --upstream-ref u", "review change c1 --actor-id x --upstream-ref u"),
-        ("review change --scenario-id a.b.01 --actor-id x --upstream-ref u", "review scenario a.b.01 --actor-id x --upstream-ref u"),
+        ("review scenario --scenario-id a.b.01 --actor-id x --upstream-ref u", "review scenario a.b.01 --actor x --upstream-ref u"),
+        ("review change --change-id c1 --actor-id x --upstream-ref u", "review change c1 --actor x --upstream-ref u"),
+        ("review scenario --change-id c1 --actor-id x --upstream-ref u", "review change c1 --actor x --upstream-ref u"),
+        ("review change --scenario-id a.b.01 --actor-id x --upstream-ref u", "review scenario a.b.01 --actor x --upstream-ref u"),
         ("report --snapshot out", "report snapshot out"),
     ];
     let dir = tempfile::tempdir().unwrap();
@@ -183,6 +183,76 @@ fn an_operand_hint_names_the_typed_leaf_with_the_typed_values() {
         let words: Vec<&str> = std::iter::once("canon").chain(first.split(' ')).collect();
         if let Err(e) = tree().try_get_matches_from(words) {
             panic!("`canon {first}` does not parse: {e}");
+        }
+    }
+}
+
+/// The 0.30 id options became bare nouns on exactly the 67 places of 24 commands the table lists: every row's
+/// leaf has the new option and not the old one, and every row is of release 0.31.0.
+#[test]
+fn the_bare_noun_rows_cover_the_67_places_of_the_14_options() {
+    let root = tree();
+    let rows: Vec<&Row> = ROWS.iter().filter(|row| row.since == canon_cli::removed_028::V31).collect();
+    assert_eq!(rows.len(), 14, "one row per option");
+    let mut commands = std::collections::BTreeSet::new();
+    let mut places = 0;
+    for row in &rows {
+        assert_eq!(row.kind, Kind::Option, "{row:?}");
+        assert_eq!(row.new, format!("--{}", row.old.trim_start_matches("--").strip_suffix("-id").expect("every old spelling ends in -id")), "{row:?}");
+        for scope in row.scope {
+            let node = resolve(&root, scope).unwrap_or_else(|| panic!("`{scope}` does not exist: {row:?}"));
+            assert!(defines_option(node, row.new), "`{scope}` has no {}", row.new);
+            assert!(!defines_option(node, row.old), "`{scope}` still has {}", row.old);
+            commands.insert(*scope);
+            places += 1;
+        }
+    }
+    assert_eq!((places, commands.len()), (67, 24));
+}
+
+/// No option of any command ends in `-id`, and a removed row names an old spelling only on commands that no longer parse it.
+#[test]
+fn no_option_of_the_tree_ends_in_id() {
+    fn walk(node: &clap::Command, path: &str, found: &mut Vec<String>) {
+        for arg in node.get_arguments() {
+            if let Some(long) = arg.get_long().filter(|long| long.ends_with("-id")) {
+                found.push(format!("{path}: --{long}"));
+            }
+        }
+        for sub in node.get_subcommands() {
+            walk(sub, &format!("{path} {}", sub.get_name()), found);
+        }
+    }
+    let mut found = Vec::new();
+    walk(&tree(), "canon", &mut found);
+    assert!(found.is_empty(), "{found:#?}");
+}
+
+/// A line with several removed spellings is refused once, and the hint line is the typed line with all of them
+/// replaced: it parses against the tree, one 0.28 operand move included.
+#[test]
+fn the_hint_of_a_line_with_several_removed_spellings_parses() {
+    let cases: &[(&str, &str)] = &[
+        ("evidence add --scenario-id a.b.01 --project-id root --actor-id x --session-id s --class test-run --ref r", "--scenario-id"),
+        ("finding add --change-id c --round 1 --seq 1 --severity note --actor-id x --scenario-id a.b.01 --scenario-id a.b.02 --review-id 01ARZ3NDEKTSV4RRFFQ69G5FAV --summary s --introduced-unknown", "--change-id"),
+        ("scenario new a.b.01 --title T --subject-id s --change-id=c --flow F1 --actor-id x", "--subject-id"),
+        ("review scenario --scenario-id a.b.01 --project-id root --actor-id x --session-id s --upstream-ref u", "--scenario-id"),
+        ("subject adopt --subject-id cart --change-id add-cart", "--subject-id"),
+        ("evidence audit a.b.01 --ref r --evaluator-id e --evaluator-version 1 --evaluator-digest 0000000000000000000000000000000000000000000000000000000000000000 --audit-result confirmed --run-id 01ARZ3NDEKTSV4RRFFQ69G5FAV", "--evaluator-id"),
+    ];
+    let dir = tempfile::tempdir().unwrap();
+    for (typed, first) in cases {
+        let argv: Vec<&str> = typed.split(' ').collect();
+        let out = Command::new(env!("CARGO_BIN_EXE_canon")).args(&argv).arg("--json").current_dir(dir.path()).output().expect("spawn canon");
+        assert_eq!(out.status.code(), Some(2), "canon {typed}: {}", String::from_utf8_lossy(&out.stdout));
+        let body: Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(body["error"]["field"], *first, "{body}");
+        let hint = body["error"]["hint"].as_str().unwrap();
+        let line = hint.split('`').nth(1).unwrap_or_else(|| panic!("no command line in {hint}"));
+        assert!(!line.split(' ').any(|w| w.starts_with("--") && w.split('=').next().is_some_and(|name| name.ends_with("-id"))), "an old spelling is left in {line}");
+        let words: Vec<&str> = line.split(' ').collect();
+        if let Err(e) = tree().try_get_matches_from(words) {
+            panic!("`{line}` does not parse: {e}");
         }
     }
 }

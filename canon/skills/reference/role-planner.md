@@ -37,10 +37,10 @@ canon brief show
 ```
 ```text
 # Write .canon/changes/<slug>/brief.md, import it, and adopt it into a subject
-canon change new <CHANGE_ID> --subject-id <SUBJECT_ID> --title <TEXT> [--change-kind <feature|chore>] [--input]
+canon change new <CHANGE_ID> --subject <SUBJECT_ID> --title <TEXT> [--change-kind <feature|chore>] [--input]
 ```
 ```bash
-canon change new add-search --subject-id demo --title "Add search"
+canon change new add-search --subject demo --title "Add search"
 ```
 ```text
 # Write the shell completion script for canon (bash, zsh or fish)
@@ -65,17 +65,17 @@ canon divergence list --as-of 2030-01-01
 ```
 ```text
 # Create a fresh .feature file for a new area.surface
-canon feature new <SURFACE> --title <TEXT> [--actor-id <ACTOR_ID>] [--session-id <SESSION_ID>] [--project-id <PROJECT_ID>] [--input]
+canon feature new <SURFACE> --title <TEXT> [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--project <PROJECT_ID>] [--input]
 ```
 ```bash
 canon feature new billing.invoice --title Invoices
 ```
 ```text
 # List a change's committed findings at their latest version
-canon finding list --change-id <CHANGE_ID> [--open] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+canon finding list --change <CHANGE_ID> [--open] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
-canon finding list --change-id add-login
+canon finding list --change add-login
 ```
 ```text
 # Validate a spec/artifact corpus against canon's format
@@ -93,21 +93,21 @@ canon gate check
 ```
 ```text
 # Read stored records across every storage tier
-canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin-id <PLUGIN_ID> | --history] [--change-id <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
 canon query --kind evidence
 ```
 ```text
 # Fetch role-scoped strategy guidance
-canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject-id <SUBJECT_ID>] [--limit <N>]
+canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject <SUBJECT_ID>] [--limit <N>]
 ```
 ```bash
 canon retrieve --for-role reviewer --domain dev --limit 20
 ```
 ```text
 # Append a tagged scenario stub to its .feature file (created if missing); many at once with `--input`
-canon scenario new <SCENARIO_ID> --title <TEXT> [--subject-id <SUBJECT_ID>] [--lane <NAME>] [--case <NAME>] [--flow <FLOW_ID>] [--change-id <CHANGE_ID> (with --flow)] [--actor-id <ACTOR_ID>] [--session-id <SESSION_ID>] [--feature <FILE>] [--project-id <PROJECT_ID>] [--input]
+canon scenario new <SCENARIO_ID> --title <TEXT> [--subject <SUBJECT_ID>] [--lane <NAME>] [--case <NAME>] [--flow <FLOW_ID>] [--change <CHANGE_ID> (with --flow)] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--feature <FILE>] [--project <PROJECT_ID>] [--input]
 ```
 ```bash
 canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature
@@ -135,24 +135,24 @@ canon status
 ```
 ```text
 # Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several)
-canon subject adopt <SUBJECT_ID> --change-id <CHANGE_ID> [--dry-run] [--input]
+canon subject adopt <SUBJECT_ID> --change <CHANGE_ID> [--dry-run] [--input]
 ```
 ```bash
-canon subject adopt demo --change-id add-login
+canon subject adopt demo --change add-login
 ```
 ```text
 # Author a new subject at status `proposed`
-canon subject new <SUBJECT_ID> --domain <NAME> --title <TEXT> [--summary <TEXT>] [--owner-role <ROLE>] [--actor-id <ACTOR_ID>] [--session-id <SESSION_ID>] [--input]
+canon subject new <SUBJECT_ID> --domain <NAME> --title <TEXT> [--summary <TEXT>] [--owner-role <ROLE>] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--input]
 ```
 ```bash
 canon subject new payments --domain dev --title Payments
 ```
 ```text
 # Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved)
-canon subject unadopt <SUBJECT_ID> --change-id <CHANGE_ID> [--dry-run] [--input]
+canon subject unadopt <SUBJECT_ID> --change <CHANGE_ID> [--dry-run] [--input]
 ```
 ```bash
-canon subject unadopt demo --change-id add-login
+canon subject unadopt demo --change add-login
 ```
 <!-- canon:generated commands-planner end -->
 

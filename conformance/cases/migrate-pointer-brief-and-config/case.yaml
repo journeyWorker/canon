@@ -9,7 +9,7 @@ steps:
     exit: 0
   - args: [ingest, plans]
     exit: 0
-  - args: [subject, adopt, checkout, --change-id, c-checkout]
+  - args: [subject, adopt, checkout, --change, c-checkout]
     exit: 0
   - args: [status]
     exit: 0

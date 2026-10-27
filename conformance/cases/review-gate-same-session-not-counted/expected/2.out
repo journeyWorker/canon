@@ -1,3 +1,3 @@
 promoted evidence implementer/cart-add run_seq=1 -> kind=evidence/root_scenario_cart.add.01_<digest8>.json
 canon gate promote: promoted evidence=1, finding=0, divergence=0
-next: canon review scenario cart.add.01 --project-id root --actor-id <reviewer> --session-id <review-session> --role reviewer --original-spec-ref "<feature file>" — cart: 1 of 1 scenario(s) lack a qualifying review; review from another session (--session-id must differ from every evidence session), as an actor other than the evidence actor
+next: canon review scenario cart.add.01 --project root --actor <reviewer> --session <review-session> --role reviewer --original-spec-ref "<feature file>" — cart: 1 of 1 scenario(s) lack a qualifying review; review from another session (--session must differ from every evidence session), as an actor other than the evidence actor

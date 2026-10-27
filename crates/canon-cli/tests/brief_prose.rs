@@ -41,7 +41,7 @@ fn repo_with_change(lang: Option<&str>) -> TempDir {
     }
     ok(dir.path(), &init);
     ok(dir.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(dir.path(), &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(dir.path(), &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     dir
 }
 

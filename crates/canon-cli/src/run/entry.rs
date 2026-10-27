@@ -31,12 +31,12 @@ pub fn set_sigpipe(_default: bool) {}
 /// caller that asked for JSON gets JSON on stdout.
 pub fn usage_error(error: &clap::Error) -> ExitCode {
     let json = argv_wants_json();
-    // A removed spelling (the "Removed in 0.28" table): the refusal names its replacement.
+    // A removed spelling (the removed-spellings table): the refusal names its replacement.
     if error.use_stderr() {
         let args: Vec<String> = std::env::args().skip(1).collect();
         if let Some(removed) = crate::removed::find(&crate::cli::command(), &args) {
             let command = format!("canon {}", removed.command);
-            return ExitCode::from(CliError::refused("USAGE", removed.message()).hint(removed.hint()).field(removed.field.clone()).expected([removed.replacement.clone()]).emit(command.trim(), json));
+            return ExitCode::from(CliError::refused("USAGE", removed.message()).hint(removed.hint()).field(removed.field.clone()).expected([removed.expected()]).emit(command.trim(), json));
         }
     }
     if !json || !error.use_stderr() {
@@ -113,8 +113,8 @@ pub(crate) fn usage_parts(error: &clap::Error, root: &clap::Command) -> (String,
         let takes = crate::suggest::long_options(node).join(" ");
         hint.push_str(&format!("; `canon {joined}` takes only: {takes} (and the global --as)"));
         let read = crate::schema::META.iter().any(|row| row.path == joined && row.effect == crate::schema::Effect::Read);
-        if read && matches!(arg.as_str(), "--actor-id" | "--session-id" | "--role") {
-            hint.push_str(&format!("; `canon {joined}` is a read leaf: it records nothing, so the attribution flags (--actor-id, --session-id, --role) do not apply to it"));
+        if read && matches!(arg.as_str(), "--actor" | "--session" | "--role") {
+            hint.push_str(&format!("; `canon {joined}` is a read leaf: it records nothing, so the attribution flags (--actor, --session, --role) do not apply to it"));
         }
     }
     (joined, usage.hint(hint))
@@ -194,12 +194,27 @@ pub fn argv_wants_json() -> bool {
     std::env::args().skip(1).take_while(|arg| arg != "--").any(|arg| arg == "--json")
 }
 
+/// Whether the leaf at `names` (`["gate", "check"]`) declares a `--repo` option. Asked of the command tree, not
+/// of the matches: `ArgMatches::try_get_one` reports an undeclared id as an error only in debug builds, and in a
+/// release build answers `Ok(None)`, which read as "no `--repo` given" and refused `canon schema` outside a repo.
+pub fn leaf_takes_repo(command: &clap::Command, names: &[&str]) -> bool {
+    let mut leaf = command;
+    for name in names {
+        match leaf.find_subcommand(name) {
+            Some(sub) => leaf = sub,
+            None => return false,
+        }
+    }
+    leaf.get_arguments().any(|arg| arg.get_id() == "repo")
+}
+
 /// A command that needs canon state refuses, `CONFIG_MISSING`, when `--repo`
 /// (absent: the nearest ancestor of cwd with a `canon.yaml`; present: that
 /// directory as given) holds no `canon.yaml`. The exceptions are
-/// [`crate::context::CONFIG_EXEMPT`], and `canon format <DIR>` without
-/// `--repo`, which validates the corpus it is handed.
-pub fn refuse_without_config(parsed: &clap::ArgMatches) -> Option<ExitCode> {
+/// [`crate::context::CONFIG_EXEMPT`], a leaf without `--repo` (`schema`,
+/// `selftest`, ...: it names no repo to check), and `canon format <DIR>`
+/// without `--repo`, which validates the corpus it is handed.
+pub fn refuse_without_config(command_tree: &clap::Command, parsed: &clap::ArgMatches) -> Option<ExitCode> {
     let mut names = Vec::new();
     let mut leaf = parsed;
     while let Some((name, sub)) = leaf.subcommand() {
@@ -207,15 +222,31 @@ pub fn refuse_without_config(parsed: &clap::ArgMatches) -> Option<ExitCode> {
         leaf = sub;
     }
     let command = names.join(" ");
-    if !crate::context::needs_config(&command) {
+    if !crate::context::needs_config(&command) || !leaf_takes_repo(command_tree, &names) {
         return None;
     }
-    // A leaf without `--repo` (`schema`, `selftest`, ...) names no repo to check.
-    let repo = leaf.try_get_one::<PathBuf>("repo").ok()?;
+    let repo = leaf.get_one::<PathBuf>("repo");
     if command == "format" && leaf.try_get_one::<PathBuf>("dir").ok().flatten().is_some() && repo.is_none() {
         return None;
     }
     let json = leaf.try_get_one::<bool>("json").ok().flatten().copied().unwrap_or(false);
     let error = crate::context::require_config(repo.map(PathBuf::as_path)).err()?;
     Some(ExitCode::from(error.emit(&format!("canon {command}"), json)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::leaf_takes_repo;
+
+    /// The context check reads `--repo` from the command tree: a leaf that declares none (`schema`) is never
+    /// judged against a `canon.yaml`, in debug and release builds alike.
+    #[test]
+    fn only_leaves_that_declare_repo_are_judged_against_a_canon_yaml() {
+        let tree = crate::cli::command();
+        assert!(!leaf_takes_repo(&tree, &["schema"]));
+        assert!(!leaf_takes_repo(&tree, &["skills", "show"]));
+        assert!(leaf_takes_repo(&tree, &["gate", "check"]));
+        assert!(leaf_takes_repo(&tree, &["evidence", "add"]));
+        assert!(!leaf_takes_repo(&tree, &["no-such-command"]));
+    }
 }

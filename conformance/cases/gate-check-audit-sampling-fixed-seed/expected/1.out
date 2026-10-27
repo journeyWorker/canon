@@ -1,2 +1,2 @@
 canon inventory sync: root `root` (<repo>/specs) — 6 scenario(s) scanned, 6 record(s) written
-next: canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> --session-id <session> — no subject exists yet; a subject is the unit status, review and shipping track (+1 more)
+next: canon subject new <id> --domain <domain> --title "<title>" --actor <unit> --session <session> — no subject exists yet; a subject is the unit status, review and shipping track (+1 more)

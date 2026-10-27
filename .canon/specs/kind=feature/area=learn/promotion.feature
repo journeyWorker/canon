@@ -126,7 +126,7 @@ Feature: learn promotion
   @learn.promotion.12
   Scenario: A rollback of a promoted strategy signed by the pinned approver disables it and prints the rollback record
     Given a strategy promoted with a paired evaluation and an approval signed by the pinned approver alice, and a rollback signature over the strategy, the reason and the time
-    When canon strategy rollback runs with that reason, --actor-id alice, the signature file and the approval time
+    When canon strategy rollback runs with that reason, --actor alice, the signature file and the approval time
     Then it exits 0 and prints the record: the strategy id, the actor alice, the reason, an approval digest and the rollback time
     And the promoted file's status changes from active to rolled_back and gains the rollback reason and actor
     And the rest of its front matter and its body survive unchanged

@@ -1,16 +1,16 @@
-description: "0.26 #104: a `--project-id` that names no spec root configured in canon.yaml (here `root`, in a repo whose only root is `game`) is refused with exit 2 and UNKNOWN_SPEC_ROOT before anything is written, by `canon evidence add` (single scenario, `--all-scenarios`, and `--json`), `canon review scenario` and `canon divergence add`; the hint names the one root to use, and the same commands succeed under `game`"
+description: "0.26 #104: a `--project` that names no spec root configured in canon.yaml (here `root`, in a repo whose only root is `game`) is refused with exit 2 and UNKNOWN_SPEC_ROOT before anything is written, by `canon evidence add` (single scenario, `--all-scenarios`, and `--json`), `canon review scenario` and `canon divergence add`; the hint names the one root to use, and the same commands succeed under `game`"
 steps:
   - args: [inventory, sync]
     exit: 0
-  - args: [evidence, add, --project-id, root, --scenario-id, cart.add.01, --class, test-run, --ref, "npm test", --role, implementer, --actor-id, impl-agent]
+  - args: [evidence, add, --project, root, --scenario, cart.add.01, --class, test-run, --ref, "npm test", --role, implementer, --actor, impl-agent]
     exit: 2
-  - args: [evidence, add, --project-id, root, --all-scenarios, --report, "junit:reports/junit.xml", --class, test-run, --ref, "npm test", --role, implementer, --actor-id, impl-agent]
+  - args: [evidence, add, --project, root, --all-scenarios, --report, "junit:reports/junit.xml", --class, test-run, --ref, "npm test", --role, implementer, --actor, impl-agent]
     exit: 2
-  - args: [evidence, add, --project-id, root, --scenario-id, cart.add.01, --class, test-run, --ref, "npm test", --role, implementer, --actor-id, impl-agent, --json]
+  - args: [evidence, add, --project, root, --scenario, cart.add.01, --class, test-run, --ref, "npm test", --role, implementer, --actor, impl-agent, --json]
     exit: 2
-  - args: [review, scenario, cart.add.01, --project-id, root, --original-spec-ref, specs/cart.md, --actor-id, reviewer-2, --role, reviewer]
+  - args: [review, scenario, cart.add.01, --project, root, --original-spec-ref, specs/cart.md, --actor, reviewer-2, --role, reviewer]
     exit: 2
-  - args: [divergence, add, cart.add.01, --project-id, root, --state, open, --round, "1", --actor-id, reviewer-2, --role, reviewer]
+  - args: [divergence, add, cart.add.01, --project, root, --state, open, --round, "1", --actor, reviewer-2, --role, reviewer]
     exit: 2
-  - args: [evidence, add, --project-id, game, --scenario-id, cart.add.01, --class, test-run, --ref, "npm test", --role, implementer, --actor-id, impl-agent]
+  - args: [evidence, add, --project, game, --scenario, cart.add.01, --class, test-run, --ref, "npm test", --role, implementer, --actor, impl-agent]
     exit: 0

@@ -745,7 +745,9 @@ pub(crate) fn derive_status(archived: bool, done_count: usize, open_count: usize
 /// heading and its first content line are skipped.
 fn why_summary(proposal_text: &str) -> (String, bool) {
     let brief = crate::brief::parse(proposal_text);
-    if !brief.sections.is_empty() {
+    // A proposal with a `## Why` heading is read as one whatever other known headings it has.
+    let has_why = proposal_text.lines().any(|line| line.trim() == "## Why");
+    if !brief.sections.is_empty() && !has_why {
         return match crate::brief::intent_summary(&brief) {
             Some(summary) => (summary, true),
             None => (String::new(), false),

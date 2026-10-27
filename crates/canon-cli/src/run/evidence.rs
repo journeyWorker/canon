@@ -7,7 +7,7 @@ use std::path::Path;
 use std::process::ExitCode;
 use super::record_role;
 
-/// `--project-id` of a leaf that needs a spec root (D1): the one given, else
+/// `--project` of a leaf that needs a spec root (D1): the one given, else
 /// the only root `canon.yaml` configures.
 fn project_for(repo: &Path, given: Option<ProjectId>, command: &str, json: bool) -> Result<ProjectId, ExitCode> {
     let repo = crate::context::resolve_repo_root(repo);
@@ -75,7 +75,7 @@ pub fn run(cmd: EvidenceCommand) -> ExitCode {
                 return ExitCode::from(
                     CliError::refused("EVIDENCE_INVALID_ARGUMENT", "`--class audit` is not an `evidence add` class: an external evaluator's re-audit is its own command")
                         .field("--class")
-                        .hint("use `canon evidence audit <SCENARIO_ID> --ref <REF> --evaluator-id <ID> --evaluator-version <TEXT> --evaluator-digest <SHA256> --audit-result <confirmed|refuted|indeterminate>`")
+                        .hint("use `canon evidence audit <SCENARIO_ID> --ref <REF> --evaluator <ID> --evaluator-version <TEXT> --evaluator-digest <SHA256> --audit-result <confirmed|refuted|indeterminate>`")
                         .emit("canon evidence add", json),
                 );
             }

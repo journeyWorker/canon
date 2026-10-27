@@ -127,7 +127,7 @@ them in git history, e.g. `git show 0977bce1:<path>`.
 - `canon context-pack show` and `verify` take a pack id of `sha256:` and 64
   lower-case hex digits; anything else is `USAGE` (exit 2). A well-formed id with
   no pack is still `CONTEXT_PACK_NOT_FOUND`.
-- `canon evidence approval-payload` refuses a `--scenario-id` the scenario index
+- `canon evidence approval-payload` refuses a `--scenario` the scenario index
   does not hold (`EVIDENCE_SCENARIO_NOT_INDEXED`, exit 2; run
   `canon inventory sync`).
 - `ADAPTER_REFUSED`: `adapter authorize` exits 2 for a response whose envelope
@@ -176,9 +176,51 @@ them in git history, e.g. `git show 0977bce1:<path>`.
   `canon migrate --revert` restores the briefs and reviews byte for byte and
   refuses, naming the file, when one changed since the migrate.
 
+### `canon-0-31-cli-ids`: an option that takes an id is the bare noun
+
+- The 14 options that took a record or config id lose their `-id` suffix, on all 67 places of 24 commands:
+  `--actor`, `--session`, `--project` (the spec root's id; the repository directory stays `--repo`), `--change`,
+  `--run`, `--task`, `--subject`, `--scenario`, `--skill`, `--parent-run`, `--evaluator`, `--review`, `--plugin` and
+  `--contradicting-trajectory`. Value names, value formats, repetition, defaults, required conditions, environment
+  variables (`CANON_ACTOR`), commands, operands, effects, exit codes, stored records and report JSON are unchanged.
+- The old spelling has no alias and no grace period: it is a usage error (exit 2, `USAGE`) before anything is
+  written, `field` is the spelling typed, `expected` is the option that replaced it, and `error.hint` is the typed line
+  with every old `-id` spelling replaced, which runs as printed (`--old=value` and a missing value are refused the
+  same way; a token after `--` and the value of another option are not read as an option).
+- `--input` document keys follow the option names: `scenarioId` is `scenario`, `actorId` is `actor`, `parentRunId`
+  is `parentRun`, and so on for the other twelve. The old keys are refused with `INPUT_UNKNOWN_FIELD` (exit 2,
+  nothing written), `field` the pointer into the document, `expected` the valid keys and the hint the new key.
+  Record keys, report keys, error JSON keys, `--fields` values and the dashboard's HTTP request keys keep their
+  `*_id` / `*Id` names. No ledger migration, and no report schema version changes.
+- `canon schema`, the skills, the website (English and Korean), the grammar document and the option vocabulary use the
+  new names only. The one-name checker now reports an option that ends in `-id` and a concept spelled two ways.
+- The dashboard's hint for an unattributed run names `canon ingest records --run` (it still named `ingest artifacts`,
+  which 0.28 removed).
+
 ### Upgrading
 
 Run `canon migrate` once on a repo with 0.30 briefs: until the human commits it, `canon evidence add` and the other writes above refuse.
+
+Scripts and CI that pass an id option with its old spelling get exit 2 and the line to run instead on the first run:
+
+<!-- canon:generated removed-031 begin -->
+| 0.30 spelling | 0.31 spelling | What changed |
+|---|---|---|
+| `--actor-id` on `canon dispatch begin`, `canon divergence accept`, `canon divergence add`, `canon divergence defer`, `canon divergence resolve`, `canon evidence add`, `canon evidence audit`, `canon feature new`, `canon finding add`, `canon finding close`, `canon review change`, `canon review scenario`, `canon scenario new`, `canon strategy rollback`, `canon subject move`, `canon subject new` | `--actor` |  |
+| `--session-id` on `canon dispatch begin`, `canon divergence accept`, `canon divergence add`, `canon divergence defer`, `canon divergence resolve`, `canon evidence add`, `canon evidence audit`, `canon feature new`, `canon finding add`, `canon finding close`, `canon review change`, `canon review scenario`, `canon scenario new`, `canon subject move`, `canon subject new` | `--session` |  |
+| `--project-id` on `canon divergence accept`, `canon divergence add`, `canon divergence defer`, `canon divergence resolve`, `canon evidence add`, `canon evidence approval-payload`, `canon evidence audit`, `canon feature new`, `canon review change`, `canon review scenario`, `canon scenario new` | `--project` |  |
+| `--change-id` on `canon finding add`, `canon finding list`, `canon query`, `canon scenario new`, `canon subject adopt`, `canon subject unadopt` | `--change` |  |
+| `--run-id` on `canon evidence add`, `canon evidence approval-payload`, `canon evidence audit`, `canon ingest records` | `--run` |  |
+| `--task-id` on `canon dispatch begin`, `canon evidence add`, `canon evidence approval-payload` | `--task` |  |
+| `--subject-id` on `canon change new`, `canon retrieve`, `canon scenario new` | `--subject` |  |
+| `--scenario-id` on `canon evidence add`, `canon evidence approval-payload`, `canon finding add` | `--scenario` |  |
+| `--skill-id` on `canon dispatch begin` | `--skill` |  |
+| `--parent-run-id` on `canon dispatch begin` | `--parent-run` |  |
+| `--evaluator-id` on `canon evidence audit` | `--evaluator` |  |
+| `--review-id` on `canon finding add` | `--review` |  |
+| `--plugin-id` on `canon query` | `--plugin` |  |
+| `--contradicting-trajectory-id` on `canon strategy rollback` | `--contradicting-trajectory` |  |
+<!-- canon:generated removed-031 end -->
 
 `canon status --json` `statusVersion` is `4`. A subject's `brief` object is
 gone; read `briefs` instead, a list with one entry per change the subject
@@ -552,7 +594,7 @@ names its replacement. The table is generated from the command spec
 | `--change` on `canon brief show`, `canon brief check`, `canon brief approve` | `canon brief show` | the change is the operand |
 | `--change-id` on `canon finding close` | `canon finding close` | the change is the operand |
 | `--run-id` on `canon dispatch end` | `canon dispatch end` | the run is the operand |
-| `--subject-id` on `canon subject adopt`, `canon subject unadopt` | `canon subject adopt` | the subject is the operand and the change is `--change-id` |
+| `--subject-id` on `canon subject adopt`, `canon subject unadopt` | `canon subject adopt` | the subject is the operand and the change is `--change` |
 | `--name` on `canon prompt add`, `canon prompt show` | `canon prompt add` | name and version are one operand, name@version |
 | `--version` on `canon prompt add`, `canon prompt show` | `canon prompt add` | name and version are one operand, name@version |
 | `--scenario-id` on `canon divergence add`, `canon divergence defer`, `canon divergence resolve`, `canon divergence accept` | `canon divergence add` | the scenario is the operand |
@@ -564,8 +606,8 @@ names its replacement. The table is generated from the command spec
 | `--change-id` on `canon review change` | `canon review change` | the change is the operand |
 | `--from` on `canon scenario new` | `--input` | a batch is an `--input` array with `operands` per element |
 | `--all` on `canon schema` | `canon schema` | the listing is unfiltered; `--as` filters it by role |
-| `--agent-id` on `canon dispatch begin` | `--actor-id` |  |
-| `--reviewer` on `canon divergence add`, `canon divergence defer`, `canon divergence resolve`, `canon divergence accept`, `canon finding add`, `canon review scenario`, `canon review change` | `--actor-id` | it is the reviewer, and required where `--reviewer` was |
+| `--agent-id` on `canon dispatch begin` | `--actor` |  |
+| `--reviewer` on `canon divergence add`, `canon divergence defer`, `canon divergence resolve`, `canon divergence accept`, `canon finding add`, `canon review scenario`, `canon review change` | `--actor` | it is the reviewer, and required where `--reviewer` was |
 | `--by` on `canon brief approve`, `canon policy approve` | `--approver` |  |
 | `--principal` on `canon strategy approval-payload` | `--approver` |  |
 | `--approval-by` on `canon evidence add`, `canon evidence approval-payload` | `--approver` |  |
@@ -588,9 +630,6 @@ names its replacement. The table is generated from the command spec
 | `--status` on `canon dispatch end` | `--run-outcome` |  |
 | `--status` on `canon divergence add` | `--state` |  |
 | `--outcome` on `canon review scenario`, `canon review change` | `--review-outcome` |  |
-| `--task` on `canon dispatch begin`, `canon evidence add`, `canon evidence approval-payload` | `--task-id` |  |
-| `--plugin` on `canon query` | `--plugin-id` |  |
-| `--parent-run` on `canon dispatch begin` | `--parent-run-id` |  |
 | `--source` on `canon skills install`, `canon skills check`, `canon skills doctor` | `--skills-source` |  |
 | `--source` on `canon ingest plans` | `--plan-source` |  |
 | `--role` on `canon regime show` | `--role-segment` |  |

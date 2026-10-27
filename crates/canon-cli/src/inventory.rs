@@ -188,7 +188,7 @@ fn load_spec_roots_with_former(canon_yaml: &Path) -> Result<Vec<(SpecRoot, Vec<P
     Ok(roots)
 }
 
-/// The refusal every write command makes when its `--project-id` names
+/// The refusal every write command makes when its `--project` names
 /// no spec root configured in `<repo>/canon.yaml` (0.26, #104). A record
 /// written under such an id attests nothing the gate counts (a scenario
 /// is keyed `(project_id, scenario_id)`), and no command removes one
@@ -213,19 +213,19 @@ pub fn check_spec_root(roots: &[SpecRoot], project_id: &ProjectId) -> Result<(),
     }
     let ids: Vec<&str> = roots.iter().map(|root| root.id.as_str()).collect();
     let hint = match ids.as_slice() {
-        [one] => format!("the only spec root canon.yaml configures is `{one}`; pass `--project-id {one}`"),
-        many => format!("canon.yaml configures the spec roots {}; pass `--project-id <one of them>`", many.iter().map(|id| format!("`{id}`")).collect::<Vec<_>>().join(", ")),
+        [one] => format!("the only spec root canon.yaml configures is `{one}`; pass `--project {one}`"),
+        many => format!("canon.yaml configures the spec roots {}; pass `--project <one of them>`", many.iter().map(|id| format!("`{id}`")).collect::<Vec<_>>().join(", ")),
     };
     Err(CliError::refused(
         "UNKNOWN_SPEC_ROOT",
-        format!("`--project-id {}` names no spec root configured in canon.yaml (`specs.roots[]`: {}); nothing was written", project_id.as_str(), ids.join(", ")),
+        format!("`--project {}` names no spec root configured in canon.yaml (`specs.roots[]`: {}); nothing was written", project_id.as_str(), ids.join(", ")),
     )
     .hint(hint)
-    .field("--project-id")
+    .field("--project")
     .expected(ids))
 }
 
-/// The spec root a leaf writes under when `--project-id` is optional (D1):
+/// The spec root a leaf writes under when `--project` is optional (D1):
 /// the one given, else the only root `canon.yaml` configures. With several
 /// roots and none given the leaf refuses with `code`, naming the roots. The
 /// id given is not checked here ([`require_spec_root`] does that).
@@ -246,9 +246,9 @@ pub fn resolve_project_id(repo: &Path, given: Option<&ProjectId>, code: &'static
         [one] => Ok(one.id.clone()),
         many => {
             let ids: Vec<&str> = many.iter().map(|root| root.id.as_str()).collect();
-            Err(CliError::refused(code, format!("canon.yaml configures {} spec roots ({}); `--project-id` names the one to use", ids.len(), ids.join(", ")))
-                .hint(format!("pass `--project-id <one of {}>`", ids.join(", ")))
-                .field("--project-id")
+            Err(CliError::refused(code, format!("canon.yaml configures {} spec roots ({}); `--project` names the one to use", ids.len(), ids.join(", ")))
+                .hint(format!("pass `--project <one of {}>`", ids.join(", ")))
+                .field("--project")
                 .expected(ids)
                 .emit(command, json))
         }

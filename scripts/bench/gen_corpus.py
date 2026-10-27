@@ -29,7 +29,7 @@ every 2nd subject adopts a chore change with an approved brief (the gate and
 `--staged-batch B` (repeatable) also commits `bench/batch-B.xml`, a JUnit
 report with one case for each of B scenarios spread across the corpus. The
 batch entry point under test is
-`canon evidence add --project-id root --all-scenarios --report junit:bench/batch-B.xml ...`
+`canon evidence add --project root --all-scenarios --report junit:bench/batch-B.xml ...`
 (`land_batch` in canon-cli/src/evidence.rs): B records landing in a ledger
 that already holds S*N*E.
 

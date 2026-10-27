@@ -1,3 +1,3 @@
 promoted finding -> kind=finding/c-cart_1_1_<digest8>.json
 canon gate promote: promoted evidence=0, finding=1, divergence=0
-next: canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> --session-id <session> — no subject exists yet; a subject is the unit status, review and shipping track
+next: canon subject new <id> --domain <domain> --title "<title>" --actor <unit> --session <session> — no subject exists yet; a subject is the unit status, review and shipping track

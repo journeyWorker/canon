@@ -444,7 +444,7 @@ fn locate_task(repo: &Path, task_id: &TaskId) -> Result<LocatedTask, String> {
         // ANY task id to live in. Naming a synthesized openspec source
         // here would blame a dialect the operator never configured —
         // the same refusal `crate::dispatch::DispatchError::NoPlanSources`
-        // already makes for `--task-id`.
+        // already makes for `--task`.
         return Err(format!(
             "this repo configures no plan sources (no `{}` and no `plans.sources` entries in canon.yaml), so no plan document exists for {task_id} to live in — write the change with `canon change new`, or list your external plans under `plans.sources`",
             canon_model::paths::CHANGES_DIR
@@ -643,7 +643,7 @@ pub fn run_task(repo: &Path, task_id_str: &str, json: bool) -> u8 {
             0
         }
         TaskFlipDecision::Blocked { violations } => {
-            CliError::failed("GATE_TASK_BLOCKED", violations.iter().map(canon_gate::Violation::line).collect::<Vec<_>>().join("\n")).hint("record the missing evidence with `canon evidence add --task-id <id> ...`, then run `canon task done` again").emit("canon task done", json)
+            CliError::failed("GATE_TASK_BLOCKED", violations.iter().map(canon_gate::Violation::line).collect::<Vec<_>>().join("\n")).hint("record the missing evidence with `canon evidence add --task <id> ...`, then run `canon task done` again").emit("canon task done", json)
         }
     }
 }
@@ -665,7 +665,7 @@ fn canon_command_proof_warning(task_id: &TaskId, raw_records: &[RawRecord]) -> O
     }
     let canon_ref = task_records.iter().find_map(|body| body.get("evidence").and_then(|e| e.get("ref")).and_then(|r| r.as_str()).filter(|r| r.starts_with("canon ")))?;
     Some(format!(
-        "canon task done: warning — {task_id}'s evidence binds no file, and its --ref is a canon command (`{canon_ref}`), which reports on canon's own records rather than proving the task; bind the artifact or report that proves it: canon evidence add --task-id {task_id} --artifact <path> (or --report <format>:<path>)"
+        "canon task done: warning — {task_id}'s evidence binds no file, and its --ref is a canon command (`{canon_ref}`), which reports on canon's own records rather than proving the task; bind the artifact or report that proves it: canon evidence add --task {task_id} --artifact <path> (or --report <format>:<path>)"
     ))
 }
 

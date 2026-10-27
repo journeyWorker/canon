@@ -53,7 +53,7 @@
 //! its transcript. Neither is verification.
 //!
 //! # A defect the author found in its own work
-//! Record it like any other: `--actor-id` and `--actor-id` name the
+//! Record it like any other: `--actor` and `--actor` name the
 //! author itself. Nothing refuses a finding whose reviewer is also the
 //! change's implementer or evidence actor, and none should: hiding a
 //! defect because nobody else saw it is exactly how a review round looks
@@ -61,7 +61,7 @@
 //! `require_review.block_on_findings` like one a reviewer raised.
 //! `--introduced-rev` is not where "the author found it" goes: it names
 //! the commit that introduced the defect, so `--introduced-rev self` is
-//! refused with a pointer to `--actor-id`.
+//! refused with a pointer to `--actor`.
 //!
 //! # `--introduced-rev` must be SOURCED, and unset is the CORRECT answer
 //! This is the decision the CLI is where a user makes, so it is where
@@ -90,7 +90,7 @@
 //! both fields and is never blocked by their absence, so a finding written
 //! by 0.29 still closes and reopens.
 //!
-//! # `--review-id` ties a finding to the review it came out of (0.30)
+//! # `--review` ties a finding to the review it came out of (0.30)
 //! The id is the ULID `canon review scenario|change` printed. `add` refuses an
 //! id that no review in the ledger or the archive carries
 //! (`FINDING_REVIEW_NOT_FOUND`), so a finding can never point at nothing the
@@ -127,7 +127,7 @@
 //! `Finding` under `canon_gate::StagedAssignment::Nothing`). The loop:
 //!
 //! ```text
-//! canon finding add --change-id <c> --round <n> --seq <n> ...
+//! canon finding add --change <c> --round <n> --seq <n> ...
 //! canon gate promote
 //! ```
 //!
@@ -219,7 +219,7 @@
 //! JSON, and one such loop read the wrong file.
 //!
 //! # Line breaks are refused, not escaped
-//! `--summary`, `--actor-id`, `--file-ref` and `--actor-id` are the
+//! `--summary`, `--actor`, `--file-ref` and `--actor` are the
 //! free-text fields of this record — the ones with no grammar
 //! constraining them — and they are what a rendered finding row is
 //! built from. A row is ONE line, so a line separator in any of them
@@ -327,7 +327,7 @@ pub enum FindingArgError {
     #[error("`{0}` is not a finding disposition — expected one of: {allowed}", allowed = DISPOSITION_VALUES.join(", "))]
     UnknownDisposition(String),
     /// `--introduced-rev self`.
-    #[error("--introduced-rev names the COMMIT that introduced the defect, not who found it; to record a defect you found in your own work, set --actor-id to your own id, and leave --introduced-rev unset unless the introducing commit was sourced")]
+    #[error("--introduced-rev names the COMMIT that introduced the defect, not who found it; to record a defect you found in your own work, set --actor to your own id, and leave --introduced-rev unset unless the introducing commit was sourced")]
     IntroducedRevIsSelf,
     /// `--introduced-rev` empty or blank.
     #[error("--introduced-rev must name a git revision")]
@@ -359,7 +359,7 @@ pub fn parse_disposition(s: &str) -> Result<FindingDisposition, FindingArgError>
     }
 }
 
-/// `--change-id`'s clap `value_parser` — grammar-level
+/// `--change`'s clap `value_parser` — grammar-level
 /// [`ChangeId::parse`], the same shape `crate::query::parse_change_id`
 /// and `crate::subject::parse_change_id` already expose.
 pub fn parse_change_id(s: &str) -> Result<ChangeId, canon_model::ids::JoinKeyError> {
@@ -379,7 +379,7 @@ pub fn parse_introduced_rev(s: &str) -> Result<String, FindingArgError> {
     Ok(s.to_string())
 }
 
-/// `--review-id`'s clap `value_parser`: the ULID a review run printed.
+/// `--review`'s clap `value_parser`: the ULID a review run printed.
 pub fn parse_review_id(s: &str) -> Result<ReviewId, canon_model::ids::JoinKeyError> {
     ReviewId::parse(s)
 }
@@ -433,13 +433,13 @@ pub struct FindingArgs {
     /// Exclusive with `introduced_rev`; a new blocker or should-fix needs
     /// one of the two (module doc).
     pub introduced_unknown: bool,
-    /// `--review-id` (0.30): the review this finding came out of, checked
+    /// `--review` (0.30): the review this finding came out of, checked
     /// against the ledger and the archive.
     pub review_id: Option<ReviewId>,
     /// Where in the tree, as `path/to/file.rs:120-134`. Refused when it
     /// carries a line separator.
     pub file_ref: Option<String>,
-    /// The scenarios this finding is about (`--scenario-id`, repeatable;
+    /// The scenarios this finding is about (`--scenario`, repeatable;
     /// [`Finding::scenario_ids`]). Each must exist in the scenario index;
     /// empty names none, and the whole subject re-verifies a `fixed` fix.
     pub scenario_ids: Vec<ScenarioId>,
@@ -578,7 +578,7 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
         )).hint("--round and --seq start at 1; pass --round 1 --seq 1 for the first finding").emit("canon finding add", args.json);
     }
 
-    for (flag, value) in [("--actor-id", args.reviewer.as_str()), ("--summary", args.summary.as_str())] {
+    for (flag, value) in [("--actor", args.reviewer.as_str()), ("--summary", args.summary.as_str())] {
         if value.trim().is_empty() {
             return CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} must be non-empty; a finding with no {} is a row that records nothing", &flag[2..])).hint("`canon schema finding add` lists the accepted arguments and their forms").emit("canon finding add", args.json);
         }
@@ -592,9 +592,9 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
     // safe to put in a row.
     for (flag, value) in [
         ("--summary", Some(args.summary.as_str())),
-        ("--actor-id", Some(args.reviewer.as_str())),
+        ("--actor", Some(args.reviewer.as_str())),
         ("--file-ref", args.file_ref.as_deref()),
-        ("--actor-id", Some(args.actor_id.as_str())),
+        ("--actor", Some(args.actor_id.as_str())),
     ] {
         let Some((offset, separator)) = value.and_then(first_row_line_break) else { continue };
         return CliError::refused("FINDING_INVALID_ARGUMENT", format!("{flag} carries the line separator {separator:?} at byte offset {offset}; a finding is rendered as ONE row, so a separator there appends a second row that no finding record backs")).hint("`canon schema finding add` lists the accepted arguments and their forms").emit("canon finding add", args.json);
@@ -698,8 +698,8 @@ pub fn run_add(repo: &Path, args: &FindingArgs) -> u8 {
             Ok(true) => {}
             Ok(false) => {
                 return CliError::refused("FINDING_REVIEW_NOT_FOUND", format!("no review in the ledger or the archive carries review id `{review_id}`; a finding points only at a review that exists"))
-                    .hint("pass the review id `canon review scenario` or `canon review change` printed (`canon query --kind review --json` shows the ids), or leave --review-id out")
-                    .field("--review-id")
+                    .hint("pass the review id `canon review scenario` or `canon review change` printed (`canon query --kind review --json` shows the ids), or leave --review out")
+                    .field("--review")
                     .emit("canon finding add", args.json);
             }
             Err(e) => {
@@ -1275,7 +1275,7 @@ fn find_finding(args: &FindingCloseArgs, tier: &GitTier) -> Result<Option<Findin
 }
 
 /// Whether a review in the ledger or the archive carries `review_id` in its
-/// body (0.30): the one place `--review-id` is checked. The archive is read
+/// body (0.30): the one place `--review` is checked. The archive is read
 /// because the next review of the same scenario by the same reviewer moves
 /// the earlier one there, and its id still names the review a finding came
 /// out of. A review the tiers report as a violation carries no body to read
@@ -1314,7 +1314,7 @@ fn occupied_by(natural_key: &str, staging: &GitTier, committed: &GitTier) -> Res
     Ok(None)
 }
 
-/// Refuse a `--scenario-id` the scenario index does not know, naming it,
+/// Refuse a `--scenario` the scenario index does not know, naming it,
 /// so a finding never scopes a re-verification to a scenario that cannot
 /// be evidenced. Matched by id across spec roots, as the finding keys it.
 fn check_scenarios_exist(repo: &Path, ids: &[ScenarioId]) -> Result<(), CliError> {
@@ -1332,7 +1332,7 @@ fn check_scenarios_exist(repo: &Path, ids: &[ScenarioId]) -> Result<(), CliError
         "FINDING_UNKNOWN_SCENARIO",
         format!("no scenario record for {}; a finding names scenarios the index knows, so fresh evidence for them can re-verify its fix", missing.join(", ")),
     )
-    .field("--scenario-id")
+    .field("--scenario")
     .hint("run `canon inventory sync`, or name an id from `canon query --kind scenario`, then run `canon finding add` again"))
 }
 
@@ -1390,7 +1390,7 @@ mod tests {
     fn the_value_parsers_refuse_in_their_old_words() {
         assert_eq!(parse_severity("minor").unwrap_err().to_string(), "`minor` is not a finding severity — expected one of: blocker, should-fix, note");
         assert_eq!(parse_disposition("wontfix").unwrap_err().to_string(), "`wontfix` is not a finding disposition — expected one of: open, fixed, rejected, deferred");
-        assert_eq!(parse_introduced_rev("self").unwrap_err().to_string(), "--introduced-rev names the COMMIT that introduced the defect, not who found it; to record a defect you found in your own work, set --actor-id to your own id, and leave --introduced-rev unset unless the introducing commit was sourced");
+        assert_eq!(parse_introduced_rev("self").unwrap_err().to_string(), "--introduced-rev names the COMMIT that introduced the defect, not who found it; to record a defect you found in your own work, set --actor to your own id, and leave --introduced-rev unset unless the introducing commit was sourced");
         assert_eq!(parse_introduced_rev(" ").unwrap_err().to_string(), "--introduced-rev must name a git revision");
         assert_eq!(parse_change_id("Bad Id").unwrap_err().to_string(), format!("invalid ChangeId: \"Bad Id\" does not match grammar `{}`", ChangeId::GRAMMAR));
     }

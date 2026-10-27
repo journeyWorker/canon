@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "rev-031-a",
+    "role": "reviewer",
+    "session_id": "rev-031-w2-2026-10-27"
+  },
+  "at": "2026-10-27T13:28:03.677208295Z",
+  "code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "kind": "review",
+  "pin": "008e5eb34d6d920782ab69721486f43aec6994ed",
+  "pins": {
+    "checks": [
+      {
+        "checks": [],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "e1936a34028097c8c0525b520643dff27b0aa1867eeb9bbfda2f8c69b59b0d87",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": ".canon/changes/canon-0-31-fixes/brief.md"
+  },
+  "review_id": "01M5YRQTAXNPS4AK1ZKE7F9701",
+  "reviewer": "rev-031-a",
+  "scenario_id": "dispatch.manifest.32",
+  "schema": 2,
+  "worktree_dirty": false
+}

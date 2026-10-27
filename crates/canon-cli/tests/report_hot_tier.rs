@@ -39,7 +39,7 @@ fn fresh_repo_with_tasks() -> tempfile::TempDir {
     }
     ok(run_canon(&["init", "--no-agents-md", "--no-policy"], repo), "init");
     ok(run_canon(&["subject", "new", "auth", "--domain", "dev", "--title", "Auth"], repo), "subject new");
-    ok(run_canon(&["change", "new", "add-login", "--subject-id", "auth", "--title", "Add login"], repo), "change new");
+    ok(run_canon(&["change", "new", "add-login", "--subject", "auth", "--title", "Add login"], repo), "change new");
     let tasks = repo.join(".canon/changes/add-login/tasks.md");
     fs::write(&tasks, "- [ ] 1 Write the login scenarios\n- [ ] 2 Implement login\n").unwrap();
     let brief = repo.join(".canon/changes/add-login/brief.md");
@@ -66,7 +66,7 @@ fn report_generation_10_task_columns_fill_from_the_sqlite_hot_tier() {
     assert!(canon_yaml.contains("backend: sqlite") && canon_yaml.contains("task: hot"), "init's default routing: {canon_yaml}");
 
     ok(
-        run_canon(&["evidence", "add", "--task-id", "add-login#1", "--class", "test-run", "--ref", "cargo test login", "--role", "implementer", "--summary", "login scenarios written"], repo),
+        run_canon(&["evidence", "add", "--task", "add-login#1", "--class", "test-run", "--ref", "cargo test login", "--role", "implementer", "--summary", "login scenarios written"], repo),
         "evidence add",
     );
     ok(run_canon(&["task", "done", "add-login#1"], repo), "task done");
@@ -125,7 +125,7 @@ fn report_generation_12_a_record_in_both_tiers_counts_once() {
     let dir = fresh_repo_with_tasks();
     let repo = dir.path();
     ok(
-        run_canon(&["evidence", "add", "--task-id", "add-login#1", "--class", "test-run", "--ref", "cargo test login", "--role", "implementer", "--summary", "login scenarios written"], repo),
+        run_canon(&["evidence", "add", "--task", "add-login#1", "--class", "test-run", "--ref", "cargo test login", "--role", "implementer", "--summary", "login scenarios written"], repo),
         "evidence add",
     );
     ok(run_canon(&["task", "done", "add-login#1"], repo), "task done");

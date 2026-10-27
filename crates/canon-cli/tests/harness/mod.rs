@@ -273,7 +273,7 @@ pub fn fixture(home: &Path) -> TempDir {
     git(repo, &["init", "-q", "."]);
     ok(repo, home, &["init", "--providers", "none"]);
     ok(repo, home, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, home, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(repo, home, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, home, &["feature", "new", "auth.login", "--title", "Login"]);
     let feature = ".canon/specs/kind=feature/area=auth/login.feature";
     ok(repo, home, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--feature", feature]);
@@ -281,11 +281,11 @@ pub fn fixture(home: &Path) -> TempDir {
     // Records about a commit need one.
     git(repo, &["add", "-A"]);
     git(repo, &["commit", "-q", "-m", "seed"]);
-    ok(repo, home, &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "bob", "--summary", "Naming nit"]);
+    ok(repo, home, &["finding", "add", "--change", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "bob", "--summary", "Naming nit"]);
     ok(
         repo,
         home,
-        &["evidence", "add", "--project-id", "root", "--scenario-id", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--verdict", "faithful", "--summary", "1 passed", "--actor-id", "impl", "--session-id", "s1", "--role", "implementer"],
+        &["evidence", "add", "--project", "root", "--scenario", "auth.login.01", "--class", "test-run", "--ref", "npm test", "--verdict", "faithful", "--summary", "1 passed", "--actor", "impl", "--session", "s1", "--role", "implementer"],
     );
     ok(repo, home, &["scenario", "new", "auth.login.02", "--title", "Sign out", "--feature", feature]);
     git(repo, &["add", "-A"]);
@@ -506,7 +506,7 @@ pub fn case(name: &str, base: &Path, home: &Path) -> Case {
         // The example's `auth.login.02` is in the fixture already.
         "scenario new" => argv = swapped(argv, "auth.login.02", "auth.login.03"),
         "review change" => {
-            ok(&repo, home, &["change", "new", "tidy", "--subject-id", "demo", "--title", "Tidy", "--change-kind", "chore"]);
+            ok(&repo, home, &["change", "new", "tidy", "--subject", "demo", "--title", "Tidy", "--change-kind", "chore"]);
             argv = swapped(argv, "add-login", "tidy");
         }
         "context-pack add" | "prompt add" => put(&repo, &manifest_of(&argv), MANIFEST),
@@ -527,7 +527,7 @@ pub fn case(name: &str, base: &Path, home: &Path) -> Case {
             put(&repo, ".canon/changes/add-login/tasks.md", "# Tasks: Add login\n\n- [ ] 1 Write the failure-path scenarios\n");
             ok(&repo, home, &["ingest", "plans"]);
             ok(&repo, home, &["brief", "approve", "add-login", "--approver", "alice", "--note", "approved as written"]);
-            ok(&repo, home, &["evidence", "add", "--task-id", "add-login#1", "--class", "test-run", "--ref", "npm test", "--verdict", "faithful", "--summary", "1 passed", "--role", "implementer", "--actor-id", "impl"]);
+            ok(&repo, home, &["evidence", "add", "--task", "add-login#1", "--class", "test-run", "--ref", "npm test", "--verdict", "faithful", "--summary", "1 passed", "--role", "implementer", "--actor", "impl"]);
         }
         "plugin sync" => {
             put(&repo, ".canon/plugins/porting/plugin.yaml", PORTING_YAML);

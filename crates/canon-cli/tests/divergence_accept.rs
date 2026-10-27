@@ -84,19 +84,19 @@ fn attest_binding(repo: &Path, verdict: EvidenceVerdict, binding: Option<&str>) 
 }
 
 /// `canon divergence accept` with the defaults below; each `(flag, value)` in
-/// `overrides` replaces that flag's default (`--scenario-id` adds another).
+/// `overrides` replaces that flag's default (`--scenario` adds another).
 fn accept(repo: &Path, overrides: &[(&str, &str)]) -> Output {
     let mut flags: Vec<(&str, &str)> = vec![
-        ("--project-id", "demo"),
+        ("--project", "demo"),
         ("--reason", "the engine drops the event"),
         ("--tracking", TRACKING),
         ("--role", "reviewer"),
-        ("--actor-id", "reviewer-2"),
-        ("--session-id", "review-session"),
+        ("--actor", "reviewer-2"),
+        ("--session", "review-session"),
     ];
     let mut ids: Vec<&str> = vec![SCENARIO];
     for (flag, value) in overrides {
-        if *flag == "--scenario-id" {
+        if *flag == "--scenario" {
             ids.push(value);
             continue;
         }
@@ -131,7 +131,7 @@ fn a_divergent_verdict_blocks_shipping_and_the_hint_names_both_ways_out() {
     assert_eq!(body["error"]["code"], "SUBJECT_GATE_VIOLATION");
     assert!(body["error"]["message"].as_str().unwrap().contains("uncovered-cell world.demo.01 — verifying → shipped: latest verdict is divergent (by impl-agent)"), "{body}");
     let hint = body["error"]["hint"].as_str().expect("the refusal carries a hint");
-    assert!(hint.contains("re-attest") && hint.contains("canon divergence accept world.demo.01 --project-id demo"), "{hint}");
+    assert!(hint.contains("re-attest") && hint.contains("canon divergence accept world.demo.01 --project demo"), "{hint}");
 }
 
 /// A reviewer's acceptance lets the subject ship; `status` and `gate check`
@@ -177,11 +177,11 @@ fn an_acceptance_without_an_expiry_says_so() {
 fn acceptance_from_the_evidence_actor_or_session_is_refused() {
     let dir = repo();
     let repo = dir.path();
-    let same_session = accept(repo, &[("--session-id", "impl-session")]);
+    let same_session = accept(repo, &[("--session", "impl-session")]);
     assert_eq!(same_session.status.code(), Some(2), "{}", out(&same_session));
     assert!(out(&same_session).contains("DIVERGENCE_ACCEPT_REFUSED") && out(&same_session).contains("session `impl-session`"), "{}", out(&same_session));
 
-    let same_actor = accept(repo, &[("--actor-id", "impl-agent")]);
+    let same_actor = accept(repo, &[("--actor", "impl-agent")]);
     assert_eq!(same_actor.status.code(), Some(2), "{}", out(&same_actor));
     assert!(out(&same_actor).contains("`impl-agent` attested"), "{}", out(&same_actor));
 
@@ -234,11 +234,11 @@ fn refusals_name_the_missing_condition_and_a_batch_writes_nothing() {
     assert_eq!(empty.status.code(), Some(2), "{}", out(&empty));
     assert!(out(&empty).contains("--tracking is empty"), "{}", out(&empty));
 
-    let implementer = canon(repo, &["divergence", "accept", SCENARIO, "--project-id", "demo", "--reason", "r", "--tracking", TRACKING, "--actor-id", "r2", "--role", "implementer"]);
+    let implementer = canon(repo, &["divergence", "accept", SCENARIO, "--project", "demo", "--reason", "r", "--tracking", TRACKING, "--actor", "r2", "--role", "implementer"]);
     assert_eq!(implementer.status.code(), Some(2), "{}", out(&implementer));
     assert!(out(&implementer).contains("reviewer step"), "{}", out(&implementer));
 
-    let unknown = accept(repo, &[("--scenario-id", "world.demo.99")]);
+    let unknown = accept(repo, &[("--scenario", "world.demo.99")]);
     assert_eq!(unknown.status.code(), Some(2), "{}", out(&unknown));
     assert!(out(&unknown).contains("world.demo.99"), "{}", out(&unknown));
     assert!(out(&canon(repo, &["divergence", "list"])).contains("accepted=0"), "the unknown scenario refused the whole batch");

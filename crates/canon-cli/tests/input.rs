@@ -62,7 +62,7 @@ fn fixture(home: &Path, second: bool) -> TempDir {
     git(&["add", "-A"]);
     git(&["commit", "-q", "-m", "fixture"]);
     ok(repo, home, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, home, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(repo, home, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, home, &["feature", "new", "auth.login", "--title", "Login"]);
     let feature = ".canon/specs/kind=feature/area=auth/login.feature";
     ok(repo, home, &["scenario", "new", "auth.login.01", "--title", "Sign in", "--feature", feature]);
@@ -70,7 +70,7 @@ fn fixture(home: &Path, second: bool) -> TempDir {
         ok(repo, home, &["scenario", "new", "auth.login.02", "--title", "Sign out", "--feature", feature]);
     }
     ok(repo, home, &["inventory", "sync"]);
-    ok(repo, home, &["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "bob", "--summary", "Naming nit"]);
+    ok(repo, home, &["finding", "add", "--change", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "bob", "--summary", "Naming nit"]);
     dir
 }
 
@@ -488,11 +488,11 @@ fn unknown_keys_null_conflicts_and_the_flags_only_options_are_refused() {
     assert_eq!((code, body["error"]["code"].as_str()), (Some(2), Some("INPUT_UNKNOWN_FIELD")), "{body}");
     assert_eq!(body["error"]["suggestions"][0], "title", "{body}");
     assert!(body["error"]["hint"].as_str().unwrap().contains("\"title\""), "{body}");
-    let out = canon(repo, home.path(), &["finding", "add", "--input", r#"[{"changeId":"c","round":1,"seq":1,"severity":"note","actorId":"a","summary":"s","scenarioIds":["a.b.01"]}]"#, "--json"], None);
+    let out = canon(repo, home.path(), &["finding", "add", "--input", r#"[{"change":"c","round":1,"seq":1,"severity":"note","actor":"a","summary":"s","scenarios":["a.b.01"]}]"#, "--json"], None);
     let body = json_of(&out);
     assert_eq!((out.status.code(), body["error"]["code"].as_str()), (Some(2), Some("INPUT_UNKNOWN_FIELD")), "{body}");
-    assert_eq!(body["error"]["suggestions"][0], "scenarioId", "{body}");
-    assert!(body["error"]["hint"].as_str().unwrap().contains("\"scenarioId\": [...]"), "{body}");
+    assert_eq!(body["error"]["suggestions"][0], "scenario", "{body}");
+    assert!(body["error"]["hint"].as_str().unwrap().contains("\"scenario\": [...]"), "{body}");
 
     for key in ["repo", "as", "json", "commit", "planDigest"] {
         let doc = format!(r#"{{"operands":["a"],"domain":"dev","title":"A","{key}":"x"}}"#);
@@ -521,7 +521,7 @@ fn unknown_keys_null_conflicts_and_the_flags_only_options_are_refused() {
     let (code, body) = run(&["--input", r#"{"operands":["c"],"title":"C"}"#], None);
     assert_eq!((code, body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("USAGE"), Some("/domain")), "{body}");
     // and so does a value set
-    let out = canon(repo, home.path(), &["finding", "add", "--input", r#"{"changeId":"add-login","round":1,"seq":1,"severity":"urgent","actorId":"a","summary":"s"}"#, "--json"], None);
+    let out = canon(repo, home.path(), &["finding", "add", "--input", r#"{"change":"add-login","round":1,"seq":1,"severity":"urgent","actor":"a","summary":"s"}"#, "--json"], None);
     let body = json_of(&out);
     assert_eq!((out.status.code(), body["error"]["code"].as_str(), body["error"]["field"].as_str()), (Some(2), Some("USAGE"), Some("/severity")), "{body}");
     assert!(body["error"]["expected"].as_array().is_some_and(|e| e.iter().any(|v| v == "blocker")), "{body}");
@@ -534,7 +534,7 @@ fn stdin_conflicts_and_oversize_documents_are_refused() {
     let repo = base.path();
     let before = tree(repo);
 
-    let out = canon(repo, home.path(), &["evidence", "add", "--input", "-", "--report", "junit:-", "--json"], Some(r#"{"scenarioId":"auth.login.01","class":"test-run","ref":"x","role":"implementer"}"#));
+    let out = canon(repo, home.path(), &["evidence", "add", "--input", "-", "--report", "junit:-", "--json"], Some(r#"{"scenario":"auth.login.01","class":"test-run","ref":"x","role":"implementer"}"#));
     let body = json_of(&out);
     assert_eq!((out.status.code(), body["error"]["code"].as_str()), (Some(2), Some("INPUT_STDIN_CONFLICT")), "{body}");
 
@@ -595,14 +595,14 @@ fn one_invalid_element_writes_nothing_and_points_at_it() {
     assert_eq!(tree(repo), before, "nothing was written, not even the valid elements");
 
     // an unknown key and a bad value of a leaf with a value set
-    let doc = json!([{"changeId":"add-login","round":1,"seq":2,"severity":"note","actorId":"a","summary":"s"},{"changeId":"add-login","round":1,"seq":3,"severity":"urgent","actorId":"a","summary":"s"}]).to_string();
+    let doc = json!([{"change":"add-login","round":1,"seq":2,"severity":"note","actor":"a","summary":"s"},{"change":"add-login","round":1,"seq":3,"severity":"urgent","actor":"a","summary":"s"}]).to_string();
     let out = canon(repo, home.path(), &["finding", "add", "--input", &doc, "--json"], None);
     let body = json_of(&out);
     assert_eq!((out.status.code(), body["error"]["field"].as_str()), (Some(2), Some("/items/1/severity")), "{body}");
     assert_eq!(tree(repo), before);
 
     // the destructive leaves' own refusals ride the leaf's --dry-run: a leaf with one validates the whole batch first
-    let doc = json!([{"operands": ["demo"], "changeId": "add-login"}, {"operands": ["demo"], "changeId": "no-such-change"}]).to_string();
+    let doc = json!([{"operands": ["demo"], "change": "add-login"}, {"operands": ["demo"], "change": "no-such-change"}]).to_string();
     let out = canon(repo, home.path(), &["subject", "unadopt", "--input", &doc, "--json"], None);
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(2), "{body}");
@@ -616,9 +616,9 @@ fn a_batch_stops_at_the_first_write_failure_and_a_rerun_reports_unchanged() {
     let base = fixture(home.path(), true);
     let repo = base.path();
     let schemas = spec_schemas();
-    let element = |scenario: &str| json!({"scenarioId": scenario, "class": "test-run", "ref": "npm test", "role": "implementer"});
+    let element = |scenario: &str| json!({"scenario": scenario, "class": "test-run", "ref": "npm test", "role": "implementer"});
     // element 2 names a task no plan has: it passes clap and is refused when it runs
-    let unknown_task = json!({"taskId": "no-such-change#1", "class": "test-run", "ref": "npm test", "role": "implementer"});
+    let unknown_task = json!({"task": "no-such-change#1", "class": "test-run", "ref": "npm test", "role": "implementer"});
     let doc = json!([element("auth.login.01"), element("auth.login.02"), unknown_task, element("auth.login.01")]).to_string();
 
     let out = canon(repo, home.path(), &["evidence", "add", "--input", &doc, "--json"], None);
@@ -660,14 +660,14 @@ fn a_batch_writes_what_the_same_calls_one_by_one_write() {
     let (_single_scratch, single) = scratch_copy(base.path());
     let schemas = spec_schemas();
 
-    let ndjson = "# the login scenarios\n\n{\"operands\":[\"auth.login.02\"],\"title\":\"Wrong password\",\"subjectId\":\"demo\",\"lane\":\"behavior\",\"case\":\"failure\"}\n{\"operands\":[\"auth.session.01\"],\"title\":\"Session expires\"}\n";
+    let ndjson = "# the login scenarios\n\n{\"operands\":[\"auth.login.02\"],\"title\":\"Wrong password\",\"subject\":\"demo\",\"lane\":\"behavior\",\"case\":\"failure\"}\n{\"operands\":[\"auth.session.01\"],\"title\":\"Session expires\"}\n";
     let out = canon(&batch, home.path(), &["scenario", "new", "--input", "-", "--json"], Some(ndjson));
     let body = json_of(&out);
     assert_eq!(out.status.code(), Some(0), "{body}");
     assert_eq!(body["data"]["items"].as_array().unwrap().len(), 2);
     validates(&schemas, "BatchScenarioNewReport", &body["data"]);
 
-    ok(&single, home.path(), &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject-id", "demo", "--lane", "behavior", "--case", "failure"]);
+    ok(&single, home.path(), &["scenario", "new", "auth.login.02", "--title", "Wrong password", "--subject", "demo", "--lane", "behavior", "--case", "failure"]);
     ok(&single, home.path(), &["scenario", "new", "auth.session.01", "--title", "Session expires"]);
     assert_eq!(normalized_tree(&batch), normalized_tree(&single));
 

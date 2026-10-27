@@ -88,7 +88,7 @@ fn repo_with_subject(status: &str) -> TempDir {
             "shop.cart",
             "--title",
             "Cart",
-            "--actor-id",
+            "--actor",
             "u",
         ],
     );
@@ -112,7 +112,7 @@ fn change(repo: &Path, change: &str, approve: bool) -> Output {
             "change",
             "new",
             change,
-            "--subject-id",
+            "--subject",
             "s",
             "--title",
             change,
@@ -146,7 +146,7 @@ fn scenario(repo: &Path, id: &str, flow: Option<&str>) {
             id,
             "--title",
             id,
-            "--subject-id",
+            "--subject",
             "s",
             "--case",
             "happy",
@@ -169,9 +169,9 @@ fn attest(repo: &Path, scenario: &str, reference: &str) -> Output {
         &[
             "evidence",
             "add",
-            "--project-id",
+            "--project",
             "root",
-            "--scenario-id",
+            "--scenario",
             scenario,
             "--class",
             "test-run",
@@ -179,7 +179,7 @@ fn attest(repo: &Path, scenario: &str, reference: &str) -> Output {
             reference,
             "--role",
             "implementer",
-            "--actor-id",
+            "--actor",
             "impl",
             "--promote",
         ],
@@ -192,7 +192,7 @@ fn attest_task(repo: &Path, task: &str) -> Output {
         &[
             "evidence",
             "add",
-            "--task-id",
+            "--task",
             task,
             "--class",
             "test-run",
@@ -200,7 +200,7 @@ fn attest_task(repo: &Path, task: &str) -> Output {
             "cargo test",
             "--role",
             "implementer",
-            "--actor-id",
+            "--actor",
             "impl",
         ],
     )
@@ -229,7 +229,7 @@ fn evidence_add_100_a_draft_change_freezes_only_the_scenarios_it_is_tagged_on() 
     let err = stderr(&adopted);
     assert!(
         err.contains("warning:")
-            && err.contains("canon subject unadopt s --change-id b")
+            && err.contains("canon subject unadopt s --change b")
             && err.contains("@flow:b.*"),
         "{err}"
     );
@@ -379,7 +379,7 @@ fn subject_lifecycle_35_adopting_an_unapproved_change_warns_only_where_it_matter
                 "change",
                 "new",
                 "a",
-                "--subject-id",
+                "--subject",
                 "s",
                 "--title",
                 "A",
@@ -400,7 +400,7 @@ fn subject_lifecycle_35_adopting_an_unapproved_change_warns_only_where_it_matter
             "change",
             "new",
             "a",
-            "--subject-id",
+            "--subject",
             "s",
             "--title",
             "A",
@@ -410,7 +410,7 @@ fn subject_lifecycle_35_adopting_an_unapproved_change_warns_only_where_it_matter
     let found = warnings(&out);
     assert_eq!(found.len(), 1, "{found:?}");
     assert!(
-        found[0].contains("canon subject unadopt s --change-id a")
+        found[0].contains("canon subject unadopt s --change a")
             && found[0].contains("cannot ship"),
         "{found:?}"
     );
@@ -431,7 +431,7 @@ fn subject_lifecycle_35_adopting_an_unapproved_change_warns_only_where_it_matter
             "change",
             "new",
             "c",
-            "--subject-id",
+            "--subject",
             "holding",
             "--title",
             "C",
@@ -439,10 +439,10 @@ fn subject_lifecycle_35_adopting_an_unapproved_change_warns_only_where_it_matter
     );
     let out = ok(
         repo2,
-        &["subject", "adopt", "s", "--change-id", "c", "--json"],
+        &["subject", "adopt", "s", "--change", "c", "--json"],
     );
     assert_eq!(warnings(&out).len(), 1, "{}", stdout(&out));
-    ok(repo2, &["subject", "unadopt", "s", "--change-id", "c"]);
+    ok(repo2, &["subject", "unadopt", "s", "--change", "c"]);
     std::fs::write(brief_path(repo2, "c"), brief("")).unwrap();
     ok(
         repo2,
@@ -458,7 +458,7 @@ fn subject_lifecycle_35_adopting_an_unapproved_change_warns_only_where_it_matter
     );
     let out = ok(
         repo2,
-        &["subject", "adopt", "s", "--change-id", "c", "--json"],
+        &["subject", "adopt", "s", "--change", "c", "--json"],
     );
     assert!(warnings(&out).is_empty(), "{}", stdout(&out));
 }
@@ -486,7 +486,7 @@ fn subject_lifecycle_36_unadopt_removes_the_link_on_both_sides() {
 
     let out = ok(
         repo,
-        &["subject", "unadopt", "s", "--change-id", "b", "--json"],
+        &["subject", "unadopt", "s", "--change", "b", "--json"],
     );
     let json: Value = serde_json::from_str(&stdout(&out)).unwrap();
     assert_eq!(json["meta"]["command"], "subject unadopt");
@@ -517,9 +517,9 @@ fn subject_lifecycle_36_unadopt_removes_the_link_on_both_sides() {
     assert!(!status.contains("changes/b/brief.md"), "{status}");
 
     // The change stays: a holding subject adopts it.
-    ok(repo, &["subject", "adopt", "holding", "--change-id", "b"]);
+    ok(repo, &["subject", "adopt", "holding", "--change", "b"]);
     // An unlinked pair is a no-op.
-    let again = ok(repo, &["subject", "unadopt", "s", "--change-id", "b"]);
+    let again = ok(repo, &["subject", "unadopt", "s", "--change", "b"]);
     assert!(
         stdout(&again).contains("not linked") && stdout(&again).contains("nothing written"),
         "{}",
@@ -536,7 +536,7 @@ fn subject_lifecycle_37_unadopt_refuses_an_approved_change() {
     change(repo, "a", true);
     let out = run(
         repo,
-        &["subject", "unadopt", "s", "--change-id", "a", "--json"],
+        &["subject", "unadopt", "s", "--change", "a", "--json"],
     );
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     let json: Value = serde_json::from_str(&stdout(&out)).unwrap();
@@ -566,7 +566,7 @@ fn evidence_add_100_a_tag_naming_a_change_the_subject_did_not_adopt_is_ignored()
     );
     ok(
         repo,
-        &["change", "new", "x", "--subject-id", "other", "--title", "X"],
+        &["change", "new", "x", "--subject", "other", "--title", "X"],
     );
     std::fs::write(brief_path(repo, "x"), brief("")).unwrap();
     ok(
@@ -603,9 +603,9 @@ fn evidence_add_101_an_override_attestation_does_not_exempt_the_scenario_later()
     let waived = run(
         repo,
         &[
-            "evidence", "add", "--project-id", "root", "--scenario-id", "shop.cart.01",
+            "evidence", "add", "--project", "root", "--scenario", "shop.cart.01",
             "--class", "test-run", "--ref", "waived run", "--role", "implementer",
-            "--actor-id", "impl", "--promote", "--override-reason", "urgent fix",
+            "--actor", "impl", "--promote", "--override-reason", "urgent fix",
         ],
     );
     assert!(waived.status.success(), "{}", stderr(&waived));
@@ -626,7 +626,7 @@ fn subject_lifecycle_37_unadopt_refuses_a_change_a_scenario_is_tagged_for() {
     ok(repo, &["inventory", "sync"]);
     let out = run(
         repo,
-        &["subject", "unadopt", "s", "--change-id", "b", "--json"],
+        &["subject", "unadopt", "s", "--change", "b", "--json"],
     );
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
     let json: Value = serde_json::from_str(&stdout(&out)).unwrap();
@@ -643,7 +643,7 @@ fn subject_lifecycle_37_unadopt_refuses_a_change_a_scenario_is_tagged_for() {
     let text = std::fs::read_to_string(&path).unwrap();
     std::fs::write(&path, text.replace("  @flow:b.F1\n", "")).unwrap();
     ok(repo, &["inventory", "sync"]);
-    ok(repo, &["subject", "unadopt", "s", "--change-id", "b"]);
+    ok(repo, &["subject", "unadopt", "s", "--change", "b"]);
 }
 
 /// subject.lifecycle.35: the shipped arm of the adoption warning.
@@ -656,14 +656,14 @@ fn subject_lifecycle_35_adopting_an_unapproved_change_into_a_shipped_subject_war
     ok(repo, &["subject", "move", "s", "--to", "shipped"]);
     let out = ok(
         repo,
-        &["change", "new", "a", "--subject-id", "s", "--title", "A", "--json"],
+        &["change", "new", "a", "--subject", "s", "--title", "A", "--json"],
     );
     let found = warnings(&out);
     assert_eq!(found.len(), 1, "{found:?}");
     assert!(
         found[0].contains("is shipped")
             && found[0].contains("can still be reopened and shipped for its approved scope")
-            && found[0].contains("canon subject unadopt s --change-id a"),
+            && found[0].contains("canon subject unadopt s --change a"),
         "{found:?}"
     );
 }
@@ -766,7 +766,7 @@ fn subject_lifecycle_38_a_pending_drafts_next_step_follows_its_brief_check() {
         assert!(attest(repo, id, "run").status.success());
     }
     // An unfilled brief skeleton: blockers.
-    ok(repo, &["change", "new", "b", "--subject-id", "s", "--title", "B"]);
+    ok(repo, &["change", "new", "b", "--subject", "s", "--title", "B"]);
 
     let steps = |repo: &Path| -> Vec<Value> {
         let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();
@@ -920,7 +920,7 @@ fn context_status_82_a_pending_draft_with_advisories_is_polished_before_it_is_re
     let repo = dir.path();
     change(repo, "a", true);
     scenario(repo, "shop.cart.01", Some("a.F1"));
-    ok(repo, &["change", "new", "b", "--subject-id", "s", "--title", "B"]);
+    ok(repo, &["change", "new", "b", "--subject", "s", "--title", "B"]);
     std::fs::write(brief_path(repo, "b"), brief("").replace(" ==**F1 is the happy path.**==", "")).unwrap();
 
     let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();

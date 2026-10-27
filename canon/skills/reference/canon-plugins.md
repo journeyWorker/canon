@@ -70,12 +70,12 @@ error; the next step (3) reads the overlay back.
 ## 3. Project a read
 
 ```bash
-canon query --kind scenario --plugin-id porting          # human table, projected fields appended
-canon query --kind scenario --plugin-id porting --json   # merged record bodies
-canon query --kind scenario                           # no --plugin-id: byte-identical to the core view
+canon query --kind scenario --plugin porting          # human table, projected fields appended
+canon query --kind scenario --plugin porting --json   # merged record bodies
+canon query --kind scenario                           # no --plugin: byte-identical to the core view
 ```
 
-`--plugin-id <id>` folds the plugin's overlay records (latest-by-
+`--plugin <id>` folds the plugin's overlay records (latest-by-
 `(join_key, at)`) onto each queried core record. Fail-soft everywhere:
 
 - No overlay record for a core key → that record projects UNMODIFIED (no
@@ -85,7 +85,7 @@ canon query --kind scenario                           # no --plugin-id: byte-ide
   SKIPPED + diagnosed; siblings still project.
 - An absent plugin/manifest → the unmodified core view + a diagnostic,
   never a process error.
-- Omitting `--plugin-id` is byte-identical to `canon query`'s output without
+- Omitting `--plugin` is byte-identical to `canon query`'s output without
   plugins — it's a purely additive layer.
 
 **Done when:** the projected table or JSON shows the plugin's fields on the
@@ -108,7 +108,7 @@ scenarios you synced.
    (zero new files) and a genuine coverage edit supersedes the prior
    overlay via latest-`at`-wins.
 3. `canon plugin sync porting` writes/dedupes those candidates.
-4. `canon query --kind scenario --plugin-id porting [--json]` projects
+4. `canon query --kind scenario --plugin porting [--json]` projects
    `covered`/`surface_ref` back onto each scenario.
 
 `canon gate check`'s verdicts are byte-identical with and without a

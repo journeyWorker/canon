@@ -215,7 +215,7 @@ fn learn_promotion_12_a_rollback_of_a_promoted_strategy_signed_by_the_pinned_app
     let id = candidate.id.to_string();
     let promoted = repo.join(".canon/strategies/dev").join(format!("{id}.md"));
     let before = fs::read_to_string(&promoted).unwrap();
-    let out = canon(repo, &["strategy", "rollback", &id, "--reason", reason, "--actor-id", "alice", "--signature-file", "rollback.sig", "--approval-at", &at, "--json"]);
+    let out = canon(repo, &["strategy", "rollback", &id, "--reason", reason, "--actor", "alice", "--signature-file", "rollback.sig", "--approval-at", &at, "--json"]);
     assert_eq!(out.status.code(), Some(0));
     let doc = json(&out);
     assert_eq!(doc["ok"], true, "{doc}");
@@ -240,7 +240,7 @@ fn learn_promotion_13_a_rollback_with_an_unreadable_or_invalid_signature_or_a_ma
     fs::write(repo.join("bad.sig"), "not a signature\n").unwrap();
     let before = tree(repo);
     let rollback = |id: &str, sig: &str, at: &str| {
-        canon(repo, &["strategy", "rollback", id, "--reason", "regressed", "--actor-id", "alice", "--signature-file", sig, "--approval-at", at, "--json"])
+        canon(repo, &["strategy", "rollback", id, "--reason", "regressed", "--actor", "alice", "--signature-file", sig, "--approval-at", at, "--json"])
     };
     let unreadable = rollback(&id, "missing.sig", "2030-01-01T00:00:00Z");
     assert_eq!(unreadable.status.code(), Some(2));
@@ -287,8 +287,8 @@ fn context_capability_45_brief_show_of_a_change_with_no_brief_or_in_a_repo_with_
     assert_eq!(none.status.code(), Some(2));
     assert_eq!(error_code(&none), "NO_BRIEF");
 
-    assert!(canon(repo.path(), &["change", "new", "a", "--subject-id", "demo", "--title", "A"]).status.success());
-    assert!(canon(repo.path(), &["change", "new", "b", "--subject-id", "demo", "--title", "B"]).status.success());
+    assert!(canon(repo.path(), &["change", "new", "a", "--subject", "demo", "--title", "A"]).status.success());
+    assert!(canon(repo.path(), &["change", "new", "b", "--subject", "demo", "--title", "B"]).status.success());
     let before = tree(repo.path());
     let unknown = canon(repo.path(), &["brief", "show", "nope", "--json"]);
     assert_eq!(unknown.status.code(), Some(2));
@@ -359,12 +359,12 @@ fn learn_promotion_14_a_rollback_of_an_unknown_strategy_is_refused_before_any_si
     fs::write(repo.join("bad.sig"), "not a signature\n").unwrap();
     let before = tree(repo);
     for sig in ["missing.sig", "bad.sig"] {
-        let out = canon(repo, &["strategy", "rollback", UNKNOWN_STRATEGY, "--reason", "regressed", "--actor-id", "alice", "--signature-file", sig, "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
+        let out = canon(repo, &["strategy", "rollback", UNKNOWN_STRATEGY, "--reason", "regressed", "--actor", "alice", "--signature-file", sig, "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
         assert_eq!(out.status.code(), Some(2), "{sig}");
         assert_eq!(error_code(&out), "LEARN_STRATEGY_NOT_FOUND", "{sig}");
         assert!(json(&out)["error"]["message"].as_str().unwrap().contains(UNKNOWN_STRATEGY));
     }
-    let existing = canon(repo, &["strategy", "rollback", &candidate.id.to_string(), "--reason", "regressed", "--actor-id", "alice", "--signature-file", "bad.sig", "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
+    let existing = canon(repo, &["strategy", "rollback", &candidate.id.to_string(), "--reason", "regressed", "--actor", "alice", "--signature-file", "bad.sig", "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
     assert_eq!(existing.status.code(), Some(1));
     assert_eq!(error_code(&existing), "LEARN_ROLLBACK_FAILED");
     assert_eq!(tree(repo), before, "a refused rollback writes nothing");

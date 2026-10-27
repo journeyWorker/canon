@@ -16,4 +16,4 @@ unowned: none
 
 next:
   # cart: 1 open blocker finding(s) (first: adding an item twice duplicates the line); fix it, commit, then close it
-  canon finding close c-cart --round 1 --seq 1 --disposition fixed --actor-id <unit> --session-id <session>
+  canon finding close c-cart --round 1 --seq 1 --disposition fixed --actor <unit> --session <session>

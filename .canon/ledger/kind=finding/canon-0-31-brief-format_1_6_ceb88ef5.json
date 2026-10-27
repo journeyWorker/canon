@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-031-b",
+    "role": "reviewer",
+    "session_id": "rev-031-w2-2026-10-27"
+  },
+  "at": "2026-10-27T13:26:31.206228119Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/migrate_briefs.rs:693-702",
+  "introduced_by": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "kind": "finding",
+  "reviewed_sha": "008e5eb34d6d920782ab69721486f43aec6994ed",
+  "reviewer": "rev-031-b",
+  "round": 1,
+  "schema": 2,
+  "seq": 6,
+  "severity": "note",
+  "summary": "[standards] An interrupted review re-pin cannot be resumed (read from the code, not run). If the run stops after tier.write_unarchived wrote the new version but before remove_file(from), the next plan finds the same old-pin review at from and apply takes the old_file.is_file() branch again; plan_write refuses with DuplicatePath because to exists, so every rerun is MIGRATE_STOPPED although the message says rerunning finishes it. Fix: when to already holds the expected bytes, skip the write and go on to archive and remove.",
+  "worktree_dirty": false
+}

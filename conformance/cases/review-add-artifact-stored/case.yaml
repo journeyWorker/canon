@@ -2,7 +2,7 @@ description: "0.16 D5: `canon review add --artifact` stores what the reviewer lo
 steps:
   - args: [inventory, sync]
     exit: 0
-  - args: [review, scenario, cart.add.01, --project-id, root, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor-id, reviewer-2, --role, reviewer, --artifact, reports/cart-badge.png]
+  - args: [review, scenario, cart.add.01, --project, root, --original-spec-ref, specs/kind=feature/area=cart/add.feature, --actor, reviewer-2, --role, reviewer, --artifact, reports/cart-badge.png]
     exit: 0
   - args: [gate, check]
     exit: 0

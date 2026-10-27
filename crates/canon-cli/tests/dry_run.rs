@@ -290,7 +290,7 @@ fn ingest_records_dry_run_counts_the_trajectories_it_would_persist() {
 fn ingest_records_dry_run_refuses_like_the_real_run() {
     let dir = records_repo();
     // A well-formed run id that no dispatch ever minted.
-    assert_eq!(bad_preview(&["ingest", "records", "--run-id", "01ARZ3NDEKTSV4RRFFQ69G5FAV"], dir.path(), &[dir.path()]), "INGEST_FAILED");
+    assert_eq!(bad_preview(&["ingest", "records", "--run", "01ARZ3NDEKTSV4RRFFQ69G5FAV"], dir.path(), &[dir.path()]), "INGEST_FAILED");
 }
 
 // ── ingest plans ──
@@ -417,27 +417,27 @@ fn subject_repo(listing: &[&str]) -> tempfile::TempDir {
 #[test]
 fn subject_adopt_dry_run_records_no_link() {
     let dir = subject_repo(&[]);
-    let data = valid_preview(&["subject", "adopt", "checkout", "--change-id", "2026-10-01-demo"], dir.path(), &[dir.path()]);
+    let data = valid_preview(&["subject", "adopt", "checkout", "--change", "2026-10-01-demo"], dir.path(), &[dir.path()]);
     assert_eq!(data["change_ids"], serde_json::json!(["2026-10-01-demo"]), "{data}");
 }
 
 #[test]
 fn subject_adopt_dry_run_refuses_like_the_real_run() {
     let dir = subject_repo(&[]);
-    assert_eq!(bad_preview(&["subject", "adopt", "nosuch", "--change-id", "2026-10-01-demo"], dir.path(), &[dir.path()]), "SUBJECT_ADOPT_REFUSED");
+    assert_eq!(bad_preview(&["subject", "adopt", "nosuch", "--change", "2026-10-01-demo"], dir.path(), &[dir.path()]), "SUBJECT_ADOPT_REFUSED");
 }
 
 #[test]
 fn subject_unadopt_dry_run_removes_no_link() {
     let dir = subject_repo(&["2026-10-01-demo"]);
-    let data = valid_preview(&["subject", "unadopt", "checkout", "--change-id", "2026-10-01-demo"], dir.path(), &[dir.path()]);
+    let data = valid_preview(&["subject", "unadopt", "checkout", "--change", "2026-10-01-demo"], dir.path(), &[dir.path()]);
     assert!(data["change_ids"].as_array().is_none_or(Vec::is_empty), "{data}");
 }
 
 #[test]
 fn subject_unadopt_dry_run_refuses_like_the_real_run() {
     let dir = subject_repo(&["2026-10-01-demo"]);
-    let code = bad_preview(&["subject", "unadopt", "nosuch", "--change-id", "2026-10-01-demo"], dir.path(), &[dir.path()]);
+    let code = bad_preview(&["subject", "unadopt", "nosuch", "--change", "2026-10-01-demo"], dir.path(), &[dir.path()]);
     assert!(code.starts_with("SUBJECT_"), "{code}");
 }
 

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-031-b",
+    "role": "reviewer",
+    "session_id": "rev-031-w2-2026-10-27"
+  },
+  "at": "2026-10-27T13:26:15.478398174Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/src/migrate_briefs.rs:723-767",
+  "introduced_by": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "kind": "finding",
+  "reviewed_sha": "008e5eb34d6d920782ab69721486f43aec6994ed",
+  "reviewer": "rev-031-b",
+  "round": 1,
+  "scenario_ids": [
+    "authoring.migrate.25"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] migrate --revert discards an approval recorded after the migrate, without refusing and without HUMAN_ONLY. check_revert only checks journal files and RevertNote.rebinds comes only from the journal, but the revert restores/removes the whole snapshot. Repro: migrate a repo with an unapproved old brief x and a 0.31 brief y, commit; the human approves y, commit; CANON_ROLE=orchestrator canon migrate --revert --commit exits 0, y loses its Approved: line and .canon/policy.approval.json is removed (a brief created and approved after the migrate is removed the same way). F6: a file changed since (a later approval, edit, review version) is named and refused, and a revert that changes Approved: lines is the human's. Fix: refuse on any restore/remove under changes/ and the review ledger that differs from what the run wrote, and count Approved:/pin changes from the diff.",
+  "worktree_dirty": false
+}

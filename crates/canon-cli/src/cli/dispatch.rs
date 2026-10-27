@@ -23,20 +23,20 @@ pub struct DispatchBeginArgs {
     #[arg(long, value_parser = crate::retrieve::parse_regime, value_name = "KEY")]
     pub regime: RegimeKey,
     /// The dispatching agent's id (recorded as the run's actor)
-    #[arg(long, default_value = "canon", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID")]
     pub actor_id: String,
     #[command(flatten)]
     pub session: crate::cli::SessionArgs,
-    /// Declared provider metadata (copied verbatim; never inferred from --actor-id)
+    /// Declared provider metadata (copied verbatim; never inferred from --actor)
     #[arg(long, value_name = "NAME")]
     pub provider: Option<String>,
     /// Declared model metadata (copied verbatim)
     #[arg(long, value_name = "NAME")]
     pub model: Option<String>,
     /// Skill that contributed to this run
-    #[arg(long, value_name = "ID")]
+    #[arg(long = "skill", value_name = "ID")]
     pub skill_id: Option<String>,
-    /// Declared skill digest; requires --skill-id
+    /// Declared skill digest; requires --skill
     #[arg(long, value_name = "DIGEST")]
     pub skill_digest: Option<String>,
     /// Explicit repository-relative ContextPack input manifest
@@ -46,10 +46,10 @@ pub struct DispatchBeginArgs {
     #[arg(long, value_parser = crate::dispatch::parse_prompt_bundle, value_name = "NAME@VERSION")]
     pub prompt_bundle: Option<crate::context_pack::PromptBundleSelection>,
     /// Plan task this run serves (<change_id>#<n>); validated against the plan corpus
-    #[arg(long, value_parser = crate::dispatch::parse_task_id, value_name = "TASK_ID")]
+    #[arg(long = "task", value_parser = crate::dispatch::parse_task_id, value_name = "TASK_ID")]
     pub task_id: Option<TaskId>,
     /// RunId (ULID) of the run that dispatched this one
-    #[arg(long, value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
+    #[arg(long = "parent-run", value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
     pub parent_run_id: Option<RunId>,
     #[command(flatten)]
     pub repo: crate::cli::RepoArgs,

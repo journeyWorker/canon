@@ -42,10 +42,10 @@ pub struct ReviewChangeArgs {
 #[derive(Debug, Args)]
 pub struct ReviewOptions {
     /// Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root
-    #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
+    #[arg(long = "project", value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     /// The reviewer's id (recorded as the review's author and as its reviewer; line breaks refused)
-    #[arg(long, value_name = "ACTOR_ID")]
+    #[arg(long = "actor", value_name = "ACTOR_ID")]
     pub actor_id: String,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
@@ -59,7 +59,7 @@ pub struct ReviewOptions {
     #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
     pub role: Option<RoleId>,
     /// The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count
-    #[arg(long, value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
+    #[arg(long = "session", value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
     pub session_id: Option<canon_model::SessionId>,
     /// How the reviewer's run ended: signed (an approval), indeterminate (ran, reached no verdict) or unavailable (could not run). Only signed counts; the others are recorded as review gaps
     #[arg(long, default_value = "signed", value_parser = crate::review::outcome_parser(), value_name = "REVIEW_OUTCOME")]

@@ -98,7 +98,7 @@ Feature: divergence lifecycle
   @divergence.lifecycle.10
   Scenario: A divergence command whose project id names no configured spec root is refused
     Given a repo whose canon.yaml configures one spec root, game
-    When divergence add, resolve, defer and accept each name a --project-id that is no configured root, with no agent role declared
+    When divergence add, resolve, defer and accept each name a --project that is no configured root, with no agent role declared
     Then each exits 2 with UNKNOWN_SPEC_ROOT and stages or commits no divergence record
     And divergence list, which only reads, still lists what the ledger holds
 

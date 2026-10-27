@@ -98,14 +98,14 @@ pub struct RetrieveArgs {
     /// Role scope; with --regime must equal its leading segment
     #[arg(long = "for-role", value_name = "ROLE", value_parser = crate::retrieve::parse_role)]
     pub for_role: RoleId,
-    /// Full regime key (<role>/<repo>/<area>/<hash>); mutually exclusive with --domain/--subject-id
+    /// Full regime key (<role>/<repo>/<area>/<hash>); mutually exclusive with --domain/--subject
     #[arg(long, value_parser = crate::retrieve::parse_regime, value_name = "KEY")]
     pub regime: Option<RegimeKey>,
     /// Derive the regime from a domain slug; mutually exclusive with --regime
     #[arg(long, value_name = "NAME")]
     pub domain: Option<String>,
     /// Narrow --domain to one subject_id; requires --domain, mutually exclusive with --regime
-    #[arg(long, value_parser = crate::retrieve::parse_subject, value_name = "SUBJECT_ID")]
+    #[arg(long = "subject", value_parser = crate::retrieve::parse_subject, value_name = "SUBJECT_ID")]
     pub subject_id: Option<SubjectId>,
     /// Cap on the guidance items returned (default: 5)
     #[arg(long, value_name = "N", default_value = "5")]
@@ -131,13 +131,13 @@ pub struct QueryArgs {
     #[arg(long)]
     pub json: bool,
     /// Project a plugin's overlay fields onto each record (fail-soft)
-    #[arg(long, value_name = "PLUGIN_ID")]
+    #[arg(long = "plugin", value_name = "PLUGIN_ID")]
     pub plugin_id: Option<String>,
     /// Every version of the kind, the ledger's and the archive's, oldest first, instead of the current records
     #[arg(long, conflicts_with = "plugin_id")]
     pub history: bool,
     /// Scope --kind change/task to one ChangeId (other kinds exit 2)
-    #[arg(long, value_parser = crate::query::parse_change_id, value_name = "CHANGE_ID")]
+    #[arg(long = "change", value_parser = crate::query::parse_change_id, value_name = "CHANGE_ID")]
     pub change_id: Option<ChangeId>,
     /// Scope --kind change/task by status field (other kinds exit 2)
     #[arg(long, value_name = "STATUS")]

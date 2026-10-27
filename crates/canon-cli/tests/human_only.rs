@@ -12,7 +12,7 @@ const ROLES: [&str; 4] = ["planner", "implementer", "reviewer", "orchestrator"];
 const LEAVES: [(&str, &[&str]); 3] = [
     ("brief approve", &["brief", "approve", "--approver", "alice", "--note", "approved as written"]),
     ("policy approve", &["policy", "approve", "--approver", "alice", "--note", "reviewed"]),
-    ("divergence accept", &["divergence", "accept", "auth.login.01", "--actor-id", "alice", "--reason", "known gap", "--tracking", "https://example.com/issues/1", "--role", "reviewer"]),
+    ("divergence accept", &["divergence", "accept", "auth.login.01", "--actor", "alice", "--reason", "known gap", "--tracking", "https://example.com/issues/1", "--role", "reviewer"]),
 ];
 
 fn run(repo: &Path, args: &[&str], role_flag: Option<&str>, role_env: Option<&str>) -> Output {
@@ -53,7 +53,7 @@ fn every_agent_role_is_refused_by_flag_and_by_environment() {
                 assert_eq!(body["error"]["retryable"], Value::Bool(false), "{leaf} as {role}: {body}");
                 let hint = body["error"]["hint"].as_str().unwrap_or_default();
                 assert!(hint.contains(leaf), "the hint names the leaf ({leaf}): {hint}");
-                assert!(hint.contains("--approver") || hint.contains("--actor-id"), "the hint names the options only the human supplies: {hint}");
+                assert!(hint.contains("--approver") || hint.contains("--actor"), "the hint names the options only the human supplies: {hint}");
             }
         }
     }

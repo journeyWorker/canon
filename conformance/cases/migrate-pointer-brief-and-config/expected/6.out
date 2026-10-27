@@ -12,6 +12,6 @@ unowned (2, no @subject): cart.add.01, cart.add.02
 
 next:
   # checkout owns no scenario; specify its behavior, one scenario per behavior
-  canon scenario new <area>.<surface>.01 --title "<behavior>" --subject-id checkout --case happy --actor-id <unit> --session-id <session>
+  canon scenario new <area>.<surface>.01 --title "<behavior>" --subject checkout --case happy --actor <unit> --session <session>
   # 2 scenario(s) carry no @subject tag (first: cart.add.01); add `@subject:<id>` above each in its .feature file, then check again: status re-indexes the edited files itself
   canon status

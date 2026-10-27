@@ -445,13 +445,14 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
         }
         log.line(format!("canon migrate: renamed {} record file(s) to the 0.30 rule (kind=<kind>/<components>_<digest8>.json)", names.moves.len()));
     }
-    if let Some(dir) = backup_path.as_ref().filter(|_| briefs.writes()) {
+    if let Some(dir) = backup_path.as_ref() {
         if let Err(e) = migrate_briefs::apply(&repo, &briefs, dir) {
             return CliError::refused("MIGRATE_STOPPED", format!("{e}; running `canon migrate` again finishes the rest"))
                 .hint("fix what the message names, then run `canon migrate` again; the originals are in .canon/migrate-backup/")
                 .emit("canon migrate", json);
         }
-        log.line(format!(
+        if briefs.writes() {
+            log.line(format!(
             "canon migrate: rewrote {} brief(s) to the 0.31 format{}",
             briefs.briefs.len(),
             if briefs.rebinds() {
@@ -460,6 +461,7 @@ pub fn run(repo: &crate::cli::RepoArgs, mode: &Mode, json: bool) -> u8 {
                 String::new()
             }
         ));
+        }
     }
     if let Err(e) = plan.legacy.apply(&repo) {
         return CliError::refused("MIGRATE_STOPPED", format!("{e}; running `canon migrate` again finishes the rest")).hint("fix what the message names, then run `canon migrate` again; the originals are in .canon/migrate-backup/").emit("canon migrate", json);

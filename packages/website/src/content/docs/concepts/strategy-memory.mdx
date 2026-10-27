@@ -204,9 +204,9 @@ rollback and does not produce a rollback record. An explicit rollback is
 separate:
 
 ```bash
-canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regression" --actor-id alice \
+canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regression" --actor alice \
   --signature-file rollback.sig --approval-at 2026-10-02T12:00:00Z \
-  --contradicting-trajectory-id 01ARZ3NDEKTSV4RRFFQ69G5FAW --repo .
+  --contradicting-trajectory 01ARZ3NDEKTSV4RRFFQ69G5FAW --repo .
 ```
 
 The rollback signature covers the

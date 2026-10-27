@@ -36,7 +36,7 @@ written, so the first run measures steady state. It holds:
   gate and `status` derive the code tree;
 - with `--staged-batch B`, `bench/batch-B.xml`, a JUnit report with one case for
   each of B scenarios spread over the corpus. The batch entry point is
-  `canon evidence add --project-id root --all-scenarios --report junit:bench/batch-B.xml --class test-run --ref bench --role implementer --actor-id bench-batch`
+  `canon evidence add --project root --all-scenarios --report junit:bench/batch-B.xml --class test-run --ref bench --role implementer --actor bench-batch`
   (`land_batch` in `crates/canon-cli/src/evidence.rs`).
 
 The policy asks for evidence, a failure case per feature and reviews, so the

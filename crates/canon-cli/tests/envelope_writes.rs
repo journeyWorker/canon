@@ -153,7 +153,7 @@ fn strategy_rollback_json_is_the_record_as_data_with_a_next_step() {
 
     let out = canon(
         repo,
-        &["strategy", "rollback", &candidate.id.to_string(), "--reason", reason, "--actor-id", "alice", "--signature-file", "rollback.sig", "--approval-at", &at.to_rfc3339_opts(SecondsFormat::Nanos, true), "--repo", ".", "--json"],
+        &["strategy", "rollback", &candidate.id.to_string(), "--reason", reason, "--actor", "alice", "--signature-file", "rollback.sig", "--approval-at", &at.to_rfc3339_opts(SecondsFormat::Nanos, true), "--repo", ".", "--json"],
     );
     let shown = body(&out);
     assert_eq!(shown["meta"]["command"], "strategy rollback", "{shown}");

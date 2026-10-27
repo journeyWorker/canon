@@ -11,27 +11,27 @@ pub enum EvidenceCommand {
     ApprovalPayload(EvidenceApprovalPayloadArgs),
     /// Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write: { promote: auto }` or with --promote; under `write.promote: manual`, commit it with `canon gate promote`)
     #[command(
-        after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path>, cucumber:<path> or swift-testing:<path> (the JSON-lines event stream of `swift test --experimental-event-stream-output`) also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case whose own scenario id (the first id in its classname, then name, a Swift Testing display name, then function name, or a Cucumber tag) is this one is bound; a case that only mentions it is not; --report-case adds more. With --task and no --scenario-id, every case in the report is bound. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).\n\nONE REPORT, MANY SCENARIOS (--all-scenarios).\nWith --report, writes one record per indexed scenario that owns a case in the report, each with its own cases and its own verdict: --verdict when given, else derived (faithful when every case passed, divergent when one failed, not-applicable when one was skipped). A case whose id is not indexed is named and skipped. All or nothing: any refusal (a claimed faithful verdict over a failed case, a fabrication marker, an unapproved brief, a dropped binding) writes no record. The records share the stored report file.\n\nFILES BELONG TO TESTS (--artifact).\nA record binds the attachments of the cases it owns: JUnit `[[ATTACHMENT|<path>]]` lines in a test's <system-out> (Playwright's reporter; the path is relative to the report's directory) and Cucumber JSON embeddings, in a batch and with --scenario-id alike. A missing, out-of-repo or oversized attachment is refused naming the case and the path. With --all-scenarios a bare --artifact <path> is refused (it would bind to every record); bind a file to one scenario with --artifact <scenario-id>=<path> (the part before the first `=` counts only when shaped like a scenario id; write ./<path> for a file named otherwise).\n\nA WRITE THAT BREAKS A REVIEW PIN SAYS SO.\nWhen the new record supersedes evidence a current pinned review saw, one line per review now stale names the reviewer, the scenario and the `canon review scenario` command that re-pins it (`--rev` names the commit).\n\nRE-ATTESTING NEVER DROPS A BINDING SILENTLY (--drop-attachment).\nFor a scenario, a record that leaves out a file the scenario's latest record binds is refused (exit 2) until it re-binds the file (new bytes at the same path are fine) or names it with --drop-attachment <path> (repeatable) --drop-reason <text>. The drop is recorded on the record and listed by canon status. Task-only evidence has no drop guard.\n\nNOTHING IS ATTESTED BEFORE THE BRIEF IS APPROVED (--override-reason).\nWhile a subject this record attests for (the scenario's @subject owner, or any subject adopting the task's change) has an unapproved brief the record answers to, the add is refused. A scenario tagged @flow:<change>.<F-id> answers to the changes its tags name; an untagged one to every adopted change whose brief has an `Approved:` line (an edit since refuses it), or, with none, to its subject's newest tagged change or newest adopted change; a task to its own change; an unapproved chore or a pending draft never blocks evidence (exit 1, nothing staged): stop, report the brief and wait for the human's answer. --override-reason <text> attests anyway; the reason, the waived subjects and --actor-id are recorded on the record and listed by canon status and canon gate check. A subject with no proposal.md to answer is unaffected; review scenario and finding add are never refused.\n\nAUDITS.\nAn external evaluator's re-audit is `canon evidence audit <SCENARIO_ID>`, not `--kind audit`."
+        after_help = "ATTESTATION, NOT PROOF.\nThe evidence command never runs, resolves, or checks --ref. The attestor can authorize its own checkbox; this is an attestation, not independent approval.\nThe gate skips the staleness, trust-ladder, release-trust, and divergence dimensions.\nDetached approvals require an external signature; canon never signs on the user's behalf.\n\nEXPERIMENTAL BINDING (--artifact, --report).\nCanon reads files your runner or agent already wrote; it never runs a test. --artifact binds any file by sha256; --report junit:<path>, cucumber:<path> or swift-testing:<path> (the JSON-lines event stream of `swift test --experimental-event-stream-output`) also records the matched case and its outcome (a faithful verdict needs every bound case to pass). Every case whose own scenario id (the first id in its classname, then name, a Swift Testing display name, then function name, or a Cucumber tag) is this one is bound; a case that only mentions it is not; --report-case adds more. With --task and no --scenario, every case in the report is bound. Bound files are copied into .canon/artifacts/sha256/<hex> (commit them with the ledger; per-file limit --max-artifact-mib, default 25), and canon gate check re-hashes them: a bound file whose bytes are gone is stale-evidence. Strength requirements are opt-in via policy experimental.evidence_binding (off by default).\n\nONE REPORT, MANY SCENARIOS (--all-scenarios).\nWith --report, writes one record per indexed scenario that owns a case in the report, each with its own cases and its own verdict: --verdict when given, else derived (faithful when every case passed, divergent when one failed, not-applicable when one was skipped). A case whose id is not indexed is named and skipped. All or nothing: any refusal (a claimed faithful verdict over a failed case, a fabrication marker, an unapproved brief, a dropped binding) writes no record. The records share the stored report file.\n\nFILES BELONG TO TESTS (--artifact).\nA record binds the attachments of the cases it owns: JUnit `[[ATTACHMENT|<path>]]` lines in a test's <system-out> (Playwright's reporter; the path is relative to the report's directory) and Cucumber JSON embeddings, in a batch and with --scenario alike. A missing, out-of-repo or oversized attachment is refused naming the case and the path. With --all-scenarios a bare --artifact <path> is refused (it would bind to every record); bind a file to one scenario with --artifact <scenario-id>=<path> (the part before the first `=` counts only when shaped like a scenario id; write ./<path> for a file named otherwise).\n\nA WRITE THAT BREAKS A REVIEW PIN SAYS SO.\nWhen the new record supersedes evidence a current pinned review saw, one line per review now stale names the reviewer, the scenario and the `canon review scenario` command that re-pins it (`--rev` names the commit).\n\nRE-ATTESTING NEVER DROPS A BINDING SILENTLY (--drop-attachment).\nFor a scenario, a record that leaves out a file the scenario's latest record binds is refused (exit 2) until it re-binds the file (new bytes at the same path are fine) or names it with --drop-attachment <path> (repeatable) --drop-reason <text>. The drop is recorded on the record and listed by canon status. Task-only evidence has no drop guard.\n\nNOTHING IS ATTESTED BEFORE THE BRIEF IS APPROVED (--override-reason).\nWhile a subject this record attests for (the scenario's @subject owner, or any subject adopting the task's change) has an unapproved brief the record answers to, the add is refused. A scenario tagged @flow:<change>.<F-id> answers to the changes its tags name; an untagged one to every adopted change whose brief has an `Approved:` line (an edit since refuses it), or, with none, to its subject's newest tagged change or newest adopted change; a task to its own change; an unapproved chore or a pending draft never blocks evidence (exit 1, nothing staged): stop, report the brief and wait for the human's answer. --override-reason <text> attests anyway; the reason, the waived subjects and --actor are recorded on the record and listed by canon status and canon gate check. A subject with no proposal.md to answer is unaffected; review scenario and finding add are never refused.\n\nAUDITS.\nAn external evaluator's re-audit is `canon evidence audit <SCENARIO_ID>`, not `--kind audit`."
     )]
     Add(EvidenceAddArgs),
     /// Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator)
-    #[command(after_help = "Records an external evaluator's re-audit of one scenario: --evaluator-id, --evaluator-version, --evaluator-digest <sha256>, --audit-result confirmed|refuted|indeterminate, and optional --report/--artifact counterexamples, bound and stored like any report. canon never generates or runs the audit. An audit never becomes the scenario's declared verdict; a refuted latest audit is false-success in canon gate check, whatever the declared verdict says.")]
+    #[command(after_help = "Records an external evaluator's re-audit of one scenario: --evaluator, --evaluator-version, --evaluator-digest <sha256>, --audit-result confirmed|refuted|indeterminate, and optional --report/--artifact counterexamples, bound and stored like any report. canon never generates or runs the audit. An audit never becomes the scenario's declared verdict; a refuted latest audit is false-success in canon gate check, whatever the declared verdict says.")]
     Audit(EvidenceAuditArgs),
 }
 
 #[derive(Debug, Args)]
 pub struct EvidenceApprovalPayloadArgs {
-    /// The plan task the approval is for (<change_id>#<n>); give this or --scenario-id
-    #[arg(long, value_parser = crate::dispatch::parse_task_id, value_name = "TASK_ID")]
+    /// The plan task the approval is for (<change_id>#<n>); give this or --scenario
+    #[arg(long = "task", value_parser = crate::dispatch::parse_task_id, value_name = "TASK_ID")]
     pub task_id: Option<TaskId>,
-    /// Spec corpus id for --scenario-id. Required only when canon.yaml configures more than one spec root
-    #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
+    /// Spec corpus id for --scenario. Required only when canon.yaml configures more than one spec root
+    #[arg(long = "project", value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
-    /// The scenario the approval is for; give this or --task-id
-    #[arg(long, value_parser = crate::review::parse_scenario_id, value_name = "SCENARIO_ID")]
+    /// The scenario the approval is for; give this or --task
+    #[arg(long = "scenario", value_parser = crate::review::parse_scenario_id, value_name = "SCENARIO_ID")]
     pub scenario_id: Option<ScenarioId>,
     /// The dispatch run the approved work belongs to
-    #[arg(long, value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
+    #[arg(long = "run", value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
     pub run_id: Option<RunId>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
@@ -53,11 +53,11 @@ pub struct EvidenceApprovalPayloadArgs {
 
 #[derive(Debug, Args)]
 pub struct EvidenceAddArgs {
-    /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given
-    #[arg(long, value_parser = crate::dispatch::parse_task_id, value_name = "TASK_ID")]
+    /// Plan task this evidence attests to (<change_id>#<n>); required unless --scenario is given
+    #[arg(long = "task", value_parser = crate::dispatch::parse_task_id, value_name = "TASK_ID")]
     pub task_id: Option<TaskId>,
-    /// Spec corpus id for --scenario-id (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (UNKNOWN_SPEC_ROOT) before anything is written
-    #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
+    /// Spec corpus id for --scenario (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (UNKNOWN_SPEC_ROOT) before anything is written
+    #[arg(long = "project", value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     /// What CLASS of evidence is attested to (test-run, review, ...); default `test-run` when a --report is given. `audit` is refused: an external evaluator's re-audit is `canon evidence audit`
     #[arg(long, value_name = "CLASS", required_unless_present = "reports")]
@@ -75,22 +75,22 @@ pub struct EvidenceAddArgs {
     #[arg(long, value_name = "TEXT")]
     pub command_result: Option<String>,
     /// Scenario this evidence also joins to
-    #[arg(long, value_parser = crate::review::parse_scenario_id, value_name = "SCENARIO_ID")]
+    #[arg(long = "scenario", value_parser = crate::review::parse_scenario_id, value_name = "SCENARIO_ID")]
     pub scenario_id: Option<ScenarioId>,
     /// RunId (ULID) of the run that produced this evidence
-    #[arg(long, value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
+    #[arg(long = "run", value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
     pub run_id: Option<RunId>,
     /// Explicit risk binding: repository-relative path or effect:<kebab-slug>; persisted as surface_ref
     #[arg(long = "surface-ref", value_parser = crate::evidence::parse_surface_ref, value_name = "PATH_OR_EFFECT")]
     pub surface_ref: Vec<String>,
     /// The attesting actor's id (recorded as the attestation's author; line breaks refused)
-    #[arg(long, default_value = "canon", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID")]
     pub actor_id: String,
     /// The attesting role; `canon gate promote` derives its run_seq partition key from it. Default: the declared role (--as / CANON_ROLE); required when none is declared
     #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
     pub role: Option<RoleId>,
     /// The attesting session (recorded as actor.session_id). Under require_review.distinct_actor a review from this session does not count
-    #[arg(long, value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
+    #[arg(long = "session", value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
     pub session_id: Option<canon_model::SessionId>,
     /// Human approval identity; authentication comes only from the detached signature.
     #[arg(long, value_name = "NAME")]
@@ -115,13 +115,13 @@ pub struct EvidenceAddArgs {
     /// EXPERIMENTAL: also bind this report case (a Rust test: its function name); repeatable. Cases whose own scenario id is this one are always bound
     #[arg(long = "report-case", value_name = "NAME")]
     pub report_cases: Vec<String>,
-    /// One record per indexed scenario of --project-id that owns a case in the --report(s), all or nothing (see below)
+    /// One record per indexed scenario of --project that owns a case in the --report(s), all or nothing (see below)
     #[arg(long)]
     pub all_scenarios: bool,
     /// Per-file size limit for the artifact store (.canon/artifacts/sha256/), in MiB; a larger bound file is refused
     #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
     pub max_artifact_mib: u64,
-    /// Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor-id)
+    /// Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor)
     #[arg(long, value_name = "TEXT")]
     pub override_reason: Option<String>,
     #[command(flatten)]
@@ -143,7 +143,7 @@ pub struct EvidenceAuditArgs {
     #[arg(value_name = "SCENARIO_ID", value_parser = crate::review::parse_scenario_id)]
     pub scenario_id: ScenarioId,
     /// Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root; refused (UNKNOWN_SPEC_ROOT) when it names none
-    #[arg(long, value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
+    #[arg(long = "project", value_parser = crate::review::parse_project_id, value_name = "PROJECT_ID")]
     pub project_id: Option<ProjectId>,
     /// The reference a reader can resolve: a command line, commit sha, or report path. NEVER run or resolved by canon
     #[arg(long = "ref", value_name = "TEXT")]
@@ -155,16 +155,16 @@ pub struct EvidenceAuditArgs {
     #[arg(long, value_name = "TEXT")]
     pub command_result: Option<String>,
     /// RunId (ULID) of the run that produced this evidence
-    #[arg(long, value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
+    #[arg(long = "run", value_parser = crate::dispatch::parse_run_id, value_name = "RUN_ID")]
     pub run_id: Option<RunId>,
     /// The attesting actor's id (recorded as the attestation's author; line breaks refused)
-    #[arg(long, default_value = "canon", value_name = "ACTOR_ID")]
+    #[arg(long = "actor", default_value = "canon", value_name = "ACTOR_ID")]
     pub actor_id: String,
     /// The attesting role; `canon gate promote` derives its run_seq partition key from it. Default: the declared role (--as / CANON_ROLE); required when none is declared
     #[arg(long, value_parser = crate::retrieve::parse_role, value_name = "ROLE")]
     pub role: Option<RoleId>,
     /// The attesting session (recorded as actor.session_id)
-    #[arg(long, value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
+    #[arg(long = "session", value_parser = crate::review::parse_session_id, value_name = "SESSION_ID")]
     pub session_id: Option<canon_model::SessionId>,
     #[command(flatten)]
     pub rev: crate::cli::RevArgs,
@@ -181,7 +181,7 @@ pub struct EvidenceAuditArgs {
     #[arg(long, value_name = "N", default_value_t = canon_gate::DEFAULT_MAX_ARTIFACT_MIB, value_parser = clap::value_parser!(u64).range(1..))]
     pub max_artifact_mib: u64,
     /// The external evaluator that re-audited the scenario (canon never runs it)
-    #[arg(long, value_name = "ID")]
+    #[arg(long = "evaluator", value_name = "ID")]
     pub evaluator_id: String,
     /// The evaluator's version
     #[arg(long, value_name = "TEXT")]
@@ -192,7 +192,7 @@ pub struct EvidenceAuditArgs {
     /// confirmed / refuted / indeterminate; the record's verdict follows it (confirmed → faithful, refuted → divergent, indeterminate → not-applicable)
     #[arg(long, value_parser = ["confirmed", "refuted", "indeterminate"], value_name = "RESULT")]
     pub audit_result: String,
-    /// Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor-id)
+    /// Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor)
     #[arg(long, value_name = "TEXT")]
     pub override_reason: Option<String>,
     #[command(flatten)]

@@ -99,7 +99,7 @@ fn repo() -> TempDir {
 
     ok(r, &["evidence", "add", "--all-scenarios", "--report", "junit:a.xml", "--report", "junit:b.xml", "--role", "implementer"]);
     for scenario in ["shop.cart.01", "shop.cart.02"] {
-        ok(r, &["review", "scenario", scenario, "--actor-id", "reviewer-2", "--role", "reviewer", "--original-spec-ref", "docs/prd.md"]);
+        ok(r, &["review", "scenario", scenario, "--actor", "reviewer-2", "--role", "reviewer", "--original-spec-ref", "docs/prd.md"]);
     }
     commit_all(r, "baseline");
     dir
@@ -142,7 +142,7 @@ fn a_docs_only_chore_needs_no_new_evidence_only_its_change_review() {
     assert!(steps[0]["command"].as_str().unwrap().starts_with("canon review change bump-client"), "{steps:?}");
     assert!(steps.iter().all(|s| !s["command"].as_str().unwrap().contains("evidence add")), "no evidence is asked for: {steps:?}");
 
-    ok(r, &["review", "change", "bump-client", "--actor-id", "reviewer-3", "--role", "reviewer", "--original-spec-ref", ".canon/changes/bump-client/brief.md"]);
+    ok(r, &["review", "change", "bump-client", "--actor", "reviewer-3", "--role", "reviewer", "--original-spec-ref", ".canon/changes/bump-client/brief.md"]);
     let out = ship(r);
     assert!(out.status.success(), "{}", text(&out.stderr));
     assert_eq!(subject_status(r), "shipped");
@@ -162,7 +162,7 @@ fn a_chore_after_a_code_change_asks_for_every_scenario_with_one_runnable_batch_c
     assert!(err.contains("no evidence recorded after") && err.contains("`shop.cart.01`") && err.contains("`shop.cart.02`"), "{err}");
     let hint = err.lines().find(|l| l.starts_with("hint: ")).unwrap_or_else(|| panic!("a refusal carries a hint: {err}"));
     assert!(hint.contains(&format!("`{BATCH}`")), "the hint leads with the generated batch command: {hint}");
-    assert!(!err.contains("--scenario-id"), "never a per-scenario loop: {err}");
+    assert!(!err.contains("--scenario"), "never a per-scenario loop: {err}");
 
     let steps = status_steps(r);
     assert_eq!(steps[0]["command"], BATCH, "{steps:?}");
@@ -197,7 +197,7 @@ fn a_bound_report_decides_the_verdict_of_a_single_scenario_add() {
     write(r, "skipped.xml", r#"<testsuite><testcase name="shop.cart.01 adds"/><testcase name="shop.cart.01 flaky"><skipped/></testcase></testsuite>"#);
     write(r, "failed.xml", r#"<testsuite><testcase name="shop.cart.01 adds"/><testcase name="shop.cart.01 breaks"><failure/></testcase></testsuite>"#);
     let add = |report: &str, extra: &[&str]| {
-        let mut args = vec!["evidence", "add", "--scenario-id", "shop.cart.01", "--report", report, "--role", "implementer"];
+        let mut args = vec!["evidence", "add", "--scenario", "shop.cart.01", "--report", report, "--role", "implementer"];
         args.extend_from_slice(extra);
         canon(r, &args)
     };
@@ -230,9 +230,9 @@ fn an_override_is_recorded_echoed_and_listed_by_status() {
     for change in ["add-cart", "bump-client"] {
         write(r, &format!(".canon/changes/{change}/brief.md"), "## Why\n\nSeeded, never answered.\n");
     }
-    let refused = canon(r, &["evidence", "add", "--scenario-id", "shop.cart.01", "--report", "junit:a.xml", "--role", "implementer"]);
+    let refused = canon(r, &["evidence", "add", "--scenario", "shop.cart.01", "--report", "junit:a.xml", "--role", "implementer"]);
     assert_eq!(refused.status.code(), Some(1), "{}", text(&refused.stderr));
-    let waived = canon(r, &["evidence", "add", "--scenario-id", "shop.cart.01", "--report", "junit:a.xml", "--role", "implementer", "--override-reason", "ship it", "--json"]);
+    let waived = canon(r, &["evidence", "add", "--scenario", "shop.cart.01", "--report", "junit:a.xml", "--role", "implementer", "--override-reason", "ship it", "--json"]);
     assert!(waived.status.success(), "{}{}", text(&waived.stdout), text(&waived.stderr));
     let report: Value = serde_json::from_str(&text(&waived.stdout)).unwrap();
     let overrides = report["data"]["overrides"].as_array().expect("data.overrides[] is always present");

@@ -114,7 +114,7 @@ canon demo review
 ```
 ```text
 # Mint a Run manifest with retrieved guidance and context/policy lineage
-canon dispatch begin --regime <KEY> [--role <ROLE>] [--actor-id <ACTOR_ID>] [--session-id <SESSION_ID>] [--provider <NAME>] [--model <NAME>] [--skill-id <ID>] [--skill-digest <DIGEST>] [--manifest <FILE>] [--prompt-bundle <NAME@VERSION>] [--task-id <TASK_ID>] [--parent-run-id <RUN_ID>] [--input]
+canon dispatch begin --regime <KEY> [--role <ROLE>] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--provider <NAME>] [--model <NAME>] [--skill <ID>] [--skill-digest <DIGEST>] [--manifest <FILE>] [--prompt-bundle <NAME@VERSION>] [--task <TASK_ID>] [--parent-run <RUN_ID>] [--input]
 ```
 ```bash
 canon dispatch begin --regime implementer/my-repo/api/abcdef012345 --role implementer
@@ -142,10 +142,10 @@ canon divergence list --as-of 2030-01-01
 ```
 ```text
 # Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1`
-canon evidence approval-payload --approver <NAME> --approval-at <TIMESTAMP> [--task-id <TASK_ID>] [--project-id <PROJECT_ID>] [--scenario-id <SCENARIO_ID>] [--run-id <RUN_ID>] [--rev <REV>] [--surface-ref <PATH_OR_EFFECT>]*
+canon evidence approval-payload --approver <NAME> --approval-at <TIMESTAMP> [--task <TASK_ID>] [--project <PROJECT_ID>] [--scenario <SCENARIO_ID>] [--run <RUN_ID>] [--rev <REV>] [--surface-ref <PATH_OR_EFFECT>]*
 ```
 ```bash
-canon evidence approval-payload --scenario-id auth.login.01 --project-id root --approver alice --approval-at 2030-01-01T00:00:00Z
+canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z
 ```
 ```text
 # Export a redacted retention manifest without deleting records
@@ -156,10 +156,10 @@ canon export --kind evidence --output evidence.json
 ```
 ```text
 # List a change's committed findings at their latest version
-canon finding list --change-id <CHANGE_ID> [--open] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+canon finding list --change <CHANGE_ID> [--open] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
-canon finding list --change-id add-login
+canon finding list --change add-login
 ```
 ```text
 # Validate a spec/artifact corpus against canon's format
@@ -191,7 +191,7 @@ canon ingest plans
 ```
 ```text
 # Import review/divergence/task/handoff records and derive verdicts
-canon ingest records [--watch] [--interval-secs <N>] [--dry-run] [--run-id <RUN_ID>] [--input]
+canon ingest records [--watch] [--interval-secs <N>] [--dry-run] [--run <RUN_ID>] [--input]
 ```
 ```bash
 canon ingest records
@@ -271,7 +271,7 @@ canon purge --kind session --before 2020-01-01T00:00:00Z
 ```
 ```text
 # Read stored records across every storage tier
-canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin-id <PLUGIN_ID> | --history] [--change-id <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
 canon query --kind evidence
@@ -306,7 +306,7 @@ canon report snapshot snapshot-out
 ```
 ```text
 # Fetch role-scoped strategy guidance
-canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject-id <SUBJECT_ID>] [--limit <N>]
+canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject <SUBJECT_ID>] [--limit <N>]
 ```
 ```bash
 canon retrieve --for-role reviewer --domain dev --limit 20
@@ -376,28 +376,28 @@ canon strategy promote 01ARZ3NDEKTSV4RRFFQ69G5FAV
 ```
 ```text
 # Disable an active strategy with durable rollback provenance
-canon strategy rollback <STRATEGY_ID> --reason <TEXT> --actor-id <ACTOR_ID> --signature-file <FILE> --approval-at <TIMESTAMP> [--contradicting-trajectory-id <ID>] [--input]
+canon strategy rollback <STRATEGY_ID> --reason <TEXT> --actor <ACTOR_ID> --signature-file <FILE> --approval-at <TIMESTAMP> [--contradicting-trajectory <ID>] [--input]
 ```
 ```bash
-canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regressed in production" --actor-id alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z
+canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regressed in production" --actor alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z
 ```
 ```text
 # Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several)
-canon subject adopt <SUBJECT_ID> --change-id <CHANGE_ID> [--dry-run] [--input]
+canon subject adopt <SUBJECT_ID> --change <CHANGE_ID> [--dry-run] [--input]
 ```
 ```bash
-canon subject adopt demo --change-id add-login
+canon subject adopt demo --change add-login
 ```
 ```text
 # Move a subject to another lifecycle state (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason)
-canon subject move <SUBJECT_ID> --to <proposed|specced|building|verifying|shipped|retired> [--override-reason <TEXT>] [--reason <TEXT>] [--actor-id <ACTOR_ID>] [--session-id <SESSION_ID>] [--input]
+canon subject move <SUBJECT_ID> --to <proposed|specced|building|verifying|shipped|retired> [--override-reason <TEXT>] [--reason <TEXT>] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--input]
 ```
 ```bash
 canon subject move demo --to specced
 ```
 ```text
 # Author a new subject at status `proposed`
-canon subject new <SUBJECT_ID> --domain <NAME> --title <TEXT> [--summary <TEXT>] [--owner-role <ROLE>] [--actor-id <ACTOR_ID>] [--session-id <SESSION_ID>] [--input]
+canon subject new <SUBJECT_ID> --domain <NAME> --title <TEXT> [--summary <TEXT>] [--owner-role <ROLE>] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--input]
 ```
 ```bash
 canon subject new payments --domain dev --title Payments
@@ -411,10 +411,10 @@ canon subject show demo
 ```
 ```text
 # Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved)
-canon subject unadopt <SUBJECT_ID> --change-id <CHANGE_ID> [--dry-run] [--input]
+canon subject unadopt <SUBJECT_ID> --change <CHANGE_ID> [--dry-run] [--input]
 ```
 ```bash
-canon subject unadopt demo --change-id add-login
+canon subject unadopt demo --change add-login
 ```
 ```text
 # Apply canon.yaml aging rules, moving old records to their destination tier
@@ -454,7 +454,7 @@ on every canon call (or run `export CANON_ROLE=<role>` first in its own
 shell).
 
 Order: planner, then (after the human's answer) implementer, then reviewer.
-Give each a unit: its own `--actor-id` and a session id.
+Give each a unit: its own `--actor` and a session id.
 
 ### Spawn contract
 
@@ -463,7 +463,7 @@ one flow step or review it serves); the scope it owns (the scenarios or
 paths it may write); what it must not touch (the brief, the policy, other
 units' scenarios, anything outside its scope); the command that proves it is
 done (the unit's verify command, or `canon gate check` for the reviewer); and
-its own `--actor-id` and `--session-id`. Two agents never write the same
+its own `--actor` and `--session`. Two agents never write the same
 paths: give parallel implementers disjoint scopes, and where the harness can
 isolate a child in its own worktree, use it. The child reports what it
 verified apart from what it only claims.
@@ -490,7 +490,7 @@ The reviewer is a separate process with its own session id, never your
 session or the implementer's under another label. Start it as a new process
 (a new `codex exec` run, or the harness's subagent), pass nothing of the
 implementer's context, and have it record its real session id as
-`--session-id` (#39). A reviewer that cannot run the tests says so and does
+`--session` (#39). A reviewer that cannot run the tests says so and does
 not sign off.
 
 ## Relay the human stop

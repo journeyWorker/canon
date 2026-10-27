@@ -86,7 +86,7 @@ fn run_ingest_sessions(canon_yaml: &std::path::Path, home: Option<&std::path::Pa
 /// half of canon's join spine, mirroring `run_ingest_sessions`'s
 /// scan-loop shape one level up (`--repo`-resolved, never `--home`).
 ///
-/// `--run-id` is the explicit attribution edge (s42
+/// `--run` is the explicit attribution edge (s42
 /// `close-the-open-loops`, task 3.2) — omitted, a trajectory records no
 /// run rather than a guessed one.
 fn run_ingest_records(repo: &std::path::Path, watch: bool, interval_secs: u64, dry_run: bool, json: bool, run_id: Option<&RunId>) -> ExitCode {

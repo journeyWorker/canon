@@ -1,0 +1,29 @@
+{
+  "actor": {
+    "agent_id": "rev-031-a",
+    "role": "reviewer",
+    "session_id": "rev-031-w2-2026-10-27"
+  },
+  "at": "2026-10-27T13:27:32.805086192Z",
+  "change_id": "canon-0-31-fixes",
+  "code_tree": "33cb4e61f63ce191f9fc1c6897efb48c058cecdb",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/tests/spec030_dispatch_demo.rs:476-490",
+  "introduced_by": "344527efa7742754ac8632a769858ad05704a391",
+  "kind": "finding",
+  "reason": "dispatch_manifest_32 now asserts the authorize exit-1/exit-2 rows and validate's exit-1/exit-2 rows",
+  "resolution_code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "resolution_sha": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "344527efa7742754ac8632a769858ad05704a391",
+  "reviewer": "rev-031-a",
+  "round": 1,
+  "scenario_ids": [
+    "dispatch.manifest.32"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "note",
+  "summary": "[spec-fidelity] The dispatch.manifest.32 test only checks that the ADAPTER_REFUSED meaning contains `adapter authorize`, `adapter validate` and `exit 1`. It never asserts the exit-2 rows (an unreadable response file, every authorize refusal), or that authorize's exit-2 row names ADAPTER_REFUSED. I read `canon schema --error ADAPTER_REFUSED` and the code by hand; both state the full F5 table. No red (pre-fix) evidence or named closest reproduction exists for the six fixes: the reworded scenarios' earlier evidence is faithful to the 0.30 wording. Fix: assert the exit-2 text and the authorize row.",
+  "worktree_dirty": false
+}

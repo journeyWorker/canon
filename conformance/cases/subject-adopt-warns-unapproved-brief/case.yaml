@@ -1,8 +1,8 @@
-description: "0.25 D1 (#96): `canon change new b --subject-id s` into a building subject whose change `a` is approved adopts the draft brief (exit 0) with one warning on stderr and in JSON `meta.warnings`: existing scenarios keep accepting evidence, while no scenario is tagged `@flow:b.*` s can still be reopened and shipped for its approved scope (once one is, it cannot ship until b is approved), and `canon subject unadopt b --subject-id s` takes it back; the unadopt removes the link (exit 0) and a rerun is a no-op (exit 0)"
+description: "0.25 D1 (#96): `canon change new b --subject s` into a building subject whose change `a` is approved adopts the draft brief (exit 0) with one warning on stderr and in JSON `meta.warnings`: existing scenarios keep accepting evidence, while no scenario is tagged `@flow:b.*` s can still be reopened and shipped for its approved scope (once one is, it cannot ship until b is approved), and `canon subject unadopt b --subject s` takes it back; the unadopt removes the link (exit 0) and a rerun is a no-op (exit 0)"
 steps:
-  - args: [change, new, b, --subject-id, s, --title, B, --json]
+  - args: [change, new, b, --subject, s, --title, B, --json]
     exit: 0
-  - args: [subject, unadopt, s, --change-id, b]
+  - args: [subject, unadopt, s, --change, b]
     exit: 0
-  - args: [subject, unadopt, s, --change-id, b]
+  - args: [subject, unadopt, s, --change, b]
     exit: 0

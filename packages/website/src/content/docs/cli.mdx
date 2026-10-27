@@ -85,7 +85,7 @@ Write a plan change (.canon/changes/&lt;slug&gt;/brief.md) and adopt it into a s
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon change new` | `<change-id>` | `--subject-id <SUBJECT_ID>`, `--title <TEXT>` | write: Write .canon/changes/&lt;slug&gt;/brief.md, import it, and adopt it into a subject | `canon change new add-search --subject-id demo --title "Add search"` |
+| `canon change new` | `<change-id>` | `--subject <SUBJECT_ID>`, `--title <TEXT>` | write: Write .canon/changes/&lt;slug&gt;/brief.md, import it, and adopt it into a subject | `canon change new add-search --subject demo --title "Add search"` |
 {/* canon:generated cli-change end */}
 
 ### `canon context-pack`
@@ -130,11 +130,11 @@ Stage, promote, resolve, and inspect spec divergences.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon divergence accept` | `<scenario-id>` (repeatable) | `--reason <TEXT>`, `--tracking <TEXT>`, `--actor-id <ACTOR_ID>` | write: Accept a divergent scenario as a tracked known gap (a reviewer step) | `canon divergence accept auth.login.01 --actor-id alice --reason "the engine drops the event" --tracking https://example.com/engine/issues/118 --expiry 2030-01-01 --role reviewer` |
-| `canon divergence add` | `<scenario-id>` | `--actor-id <ACTOR_ID>` | write: Add a divergence candidate, staged with no run_seq yet (commit it with `canon gate promote --kind divergence`, or in the same run with --promote / `write | `canon divergence add auth.login.01 --actor-id alice --role reviewer` |
-| `canon divergence defer` | `<scenario-id>` | `--actor-id <ACTOR_ID>`, `--reason <TEXT>`, `--expiry <TIMESTAMP>` | write: Directly record a deferred divergence (requires --reason/--expiry) | `canon divergence defer auth.login.01 --actor-id alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer` |
+| `canon divergence accept` | `<scenario-id>` (repeatable) | `--reason <TEXT>`, `--tracking <TEXT>`, `--actor <ACTOR_ID>` | write: Accept a divergent scenario as a tracked known gap (a reviewer step) | `canon divergence accept auth.login.01 --actor alice --reason "the engine drops the event" --tracking https://example.com/engine/issues/118 --expiry 2030-01-01 --role reviewer` |
+| `canon divergence add` | `<scenario-id>` | `--actor <ACTOR_ID>` | write: Add a divergence candidate, staged with no run_seq yet (commit it with `canon gate promote --kind divergence`, or in the same run with --promote / `write | `canon divergence add auth.login.01 --actor alice --role reviewer` |
+| `canon divergence defer` | `<scenario-id>` | `--actor <ACTOR_ID>`, `--reason <TEXT>`, `--expiry <TIMESTAMP>` | write: Directly record a deferred divergence (requires --reason/--expiry) | `canon divergence defer auth.login.01 --actor alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer` |
 | `canon divergence list` | none | none | read: List the current divergence burn-down state | `canon divergence list --as-of 2030-01-01` |
-| `canon divergence resolve` | `<scenario-id>` | `--actor-id <ACTOR_ID>` | write: Directly record a resolved divergence | `canon divergence resolve auth.login.01 --actor-id alice --role reviewer` |
+| `canon divergence resolve` | `<scenario-id>` | `--actor <ACTOR_ID>` | write: Directly record a resolved divergence | `canon divergence resolve auth.login.01 --actor alice --role reviewer` |
 {/* canon:generated cli-divergence end */}
 
 ### `canon evidence`
@@ -144,9 +144,9 @@ Author a staged, attributed evidence attestation for a plan task.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon evidence add` | none | none | write: Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write | `canon evidence add --scenario-id auth.login.01 --class test-run --ref "npm test" --role implementer` |
-| `canon evidence approval-payload` | none | `--approver <NAME>`, `--approval-at <TIMESTAMP>` | read: Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1` | `canon evidence approval-payload --scenario-id auth.login.01 --project-id root --approver alice --approval-at 2030-01-01T00:00:00Z` |
-| `canon evidence audit` | `<scenario-id>` | `--ref <TEXT>`, `--evaluator-id <ID>`, `--evaluator-version <TEXT>`, `--evaluator-digest <DIGEST>`, `--audit-result <RESULT>` | write: Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator) | `canon evidence audit auth.login.01 --ref audit-report.json --evaluator-id eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer` |
+| `canon evidence add` | none | none | write: Record one attributed EvidenceRecord for a task or scenario (promoted in the same run under `write | `canon evidence add --scenario auth.login.01 --class test-run --ref "npm test" --role implementer` |
+| `canon evidence approval-payload` | none | `--approver <NAME>`, `--approval-at <TIMESTAMP>` | read: Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1` | `canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z` |
+| `canon evidence audit` | `<scenario-id>` | `--ref <TEXT>`, `--evaluator <ID>`, `--evaluator-version <TEXT>`, `--evaluator-digest <DIGEST>`, `--audit-result <RESULT>` | write: Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator) | `canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer` |
 {/* canon:generated cli-evidence end */}
 
 ### `canon feature`
@@ -166,9 +166,9 @@ Record one code-review finding as a durable record.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon finding add` | none | `--change-id <CHANGE_ID>`, `--round <N>`, `--seq <N>`, `--severity <SEVERITY>`, `--actor-id <ACTOR_ID>`, `--summary <TEXT>` | write: Record one code-review finding (promoted in the same run under `write | `canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor-id alice --summary "Token is logged"` |
+| `canon finding add` | none | `--change <CHANGE_ID>`, `--round <N>`, `--seq <N>`, `--severity <SEVERITY>`, `--actor <ACTOR_ID>`, `--summary <TEXT>` | write: Record one code-review finding (promoted in the same run under `write | `canon finding add --change add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor alice --summary "Token is logged"` |
 | `canon finding close` | `<change-id>` | `--round <N>`, `--seq <N>`, `--disposition <DISPOSITION>` | write: Move an already-committed finding's disposition (promoted in the same run under `write | `canon finding close add-login --round 1 --seq 1 --disposition rejected --reason "works as designed"` |
-| `canon finding list` | none | `--change-id <CHANGE_ID>` | read: List a change's committed findings at their latest version | `canon finding list --change-id add-login` |
+| `canon finding list` | none | `--change <CHANGE_ID>` | read: List a change's committed findings at their latest version | `canon finding list --change add-login` |
 {/* canon:generated cli-finding end */}
 
 ### `canon gate`
@@ -276,8 +276,8 @@ Record an attributed review verdict.
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon review change` | `<change-id>` | `--actor-id <ACTOR_ID>`, one of `--upstream-ref` or `--original-spec-ref` | write: Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required) | `canon review change add-login --actor-id alice --role reviewer --original-spec-ref docs/prd.md` |
-| `canon review scenario` | `<scenario-id>` (repeatable) | `--actor-id <ACTOR_ID>`, one of `--upstream-ref` or `--original-spec-ref` | write: Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required) | `canon review scenario auth.login.01 --actor-id alice --role reviewer --original-spec-ref docs/prd.md` |
+| `canon review change` | `<change-id>` | `--actor <ACTOR_ID>`, one of `--upstream-ref` or `--original-spec-ref` | write: Write one attributed Review record for a chore change directly to the ledger (exactly one provenance ref required) | `canon review change add-login --actor alice --role reviewer --original-spec-ref docs/prd.md` |
+| `canon review scenario` | `<scenario-id>` (repeatable) | `--actor <ACTOR_ID>`, one of `--upstream-ref` or `--original-spec-ref` | write: Write one attributed Review record per scenario directly to the ledger, nothing to promote (exactly one provenance ref required) | `canon review scenario auth.login.01 --actor alice --role reviewer --original-spec-ref docs/prd.md` |
 {/* canon:generated cli-review end */}
 
 ### `canon scenario`
@@ -312,7 +312,7 @@ Promote a proven strategy into the git-tracked tier.
 |---|---|---|---|---|
 | `canon strategy approval-payload` | `<strategy-id>` | `--evaluation <FILE>`, `--approver <NAME>`, `--approval-at <TIMESTAMP>` | read: The unsigned approval payload bytes an external signer signs (a read | `canon strategy approval-payload 01ARZ3NDEKTSV4RRFFQ69G5FAV --evaluation evaluation.json --approver alice --approval-at 2030-01-01T00:00:00Z` |
 | `canon strategy promote` | `<strategy-id>` | none | write: Promote a strategy after paired evaluation and signed approval | `canon strategy promote 01ARZ3NDEKTSV4RRFFQ69G5FAV` |
-| `canon strategy rollback` | `<strategy-id>` | `--reason <TEXT>`, `--actor-id <ACTOR_ID>`, `--signature-file <FILE>`, `--approval-at <TIMESTAMP>` | write: Disable an active strategy with durable rollback provenance | `canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regressed in production" --actor-id alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z` |
+| `canon strategy rollback` | `<strategy-id>` | `--reason <TEXT>`, `--actor <ACTOR_ID>`, `--signature-file <FILE>`, `--approval-at <TIMESTAMP>` | write: Disable an active strategy with durable rollback provenance | `canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason "regressed in production" --actor alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z` |
 {/* canon:generated cli-strategy end */}
 
 ### `canon subject`
@@ -322,11 +322,11 @@ Create and manage subjects (durable product units).
 
 | Command | Operands | Required options | Effect | Example |
 |---|---|---|---|---|
-| `canon subject adopt` | `<subject-id>` | `--change-id <CHANGE_ID>` | write: Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several) | `canon subject adopt demo --change-id add-login` |
+| `canon subject adopt` | `<subject-id>` | `--change <CHANGE_ID>` | write: Link an imported plan change to a subject (adopting it under another subject adds that subject; a change may belong to several) | `canon subject adopt demo --change add-login` |
 | `canon subject move` | `<subject-id>` | `--to <STATE>` | write: Move a subject to another lifecycle state (shipping is evidence-gated; with spec_coverage.require_review, entering its scope is review-gated; shipped → verifying reopens with --reason) | `canon subject move demo --to specced` |
 | `canon subject new` | `<subject-id>` | `--domain <NAME>`, `--title <TEXT>` | write: Author a new subject at status `proposed` | `canon subject new payments --domain dev --title Payments` |
 | `canon subject show` | `<subject-id>` | none | read: Show a subject (read-only) | `canon subject show demo` |
-| `canon subject unadopt` | `<subject-id>` | `--change-id <CHANGE_ID>` | write: Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved) | `canon subject unadopt demo --change-id add-login` |
+| `canon subject unadopt` | `<subject-id>` | `--change <CHANGE_ID>` | write: Take a change back out of a subject (the mirror of adopt; refused for a change whose brief is approved) | `canon subject unadopt demo --change add-login` |
 {/* canon:generated cli-subject end */}
 
 ### `canon task`

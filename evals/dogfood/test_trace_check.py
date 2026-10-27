@@ -115,25 +115,25 @@ class TraceCheckTests(unittest.TestCase):
         wrong = report["wrong_shape_calls"]
         self.assertEqual((wrong["naming"], wrong["other"]), (2, 1))
         self.assertEqual([(i["command"], i["exit_code"], i["code"], i["class"]) for i in wrong["items"]],
-                         [("canon finding list --change x", 2, None, "naming"),
-                          ("canon change show --change-id missing --json", 1, "NOT_FOUND", "other"),
-                          ("canon finding list --change x", 2, "USAGE", "naming")])
+                         [("canon finding list --change-id x", 2, None, "naming"),
+                          ("canon change show --change missing --json", 1, "NOT_FOUND", "other"),
+                          ("canon finding list --change-id x", 2, "USAGE", "naming")])
         rendered = trace_check.render(report)
         self.assertIn("Wrong-shape canon calls: 2 naming, 1 other", rendered)
         self.assertNotIn("deprecated_spellings", report)
 
     def test_json_usage_error_naming_and_kind_value(self):
         self.assertEqual(trace_check.classify_failure(
-            '{"error":{"code":"USAGE","message":"error: unexpected argument \'--project\' found"}} --project-id'), "naming")
+            '{"error":{"code":"USAGE","message":"error: unexpected argument \'--project-id\' found"}} --project'), "naming")
         self.assertEqual(trace_check.classify_failure("error: invalid value 'review_record' for '--kind <KIND>'"), "naming")
         self.assertEqual(trace_check.classify_failure("error: unexpected argument '--zzz' found"), "other")
         self.assertEqual(trace_check.error_code("canon gate check: GATE_FAILED \u2014 nope"), "GATE_FAILED")
         self.assertEqual(trace_check.classify_failure(
-            '{"error":{"code":"USAGE","hint":"--actor was renamed --actor-id in 0.24.0; use --actor-id"}}'), "naming")
+            '{"error":{"code":"USAGE","hint":"--actor-id was removed in 0.31.0; use `canon finding add --actor x`"}}'), "naming")
         self.assertEqual(trace_check.classify_failure(
             "hint: --kind review_record was renamed --kind review in 0.24.0; use --kind review"), "naming")
         self.assertEqual(trace_check.classify_failure(
-            '{"error":{"code":"USAGE","hint":"--agent-id was removed in 0.28.0; use `--actor-id`"}}'), "naming")
+            '{"error":{"code":"USAGE","hint":"--agent-id was removed in 0.28.0; use `--actor`"}}'), "naming")
 
 
 def failure(command, code="USAGE", message="unexpected argument '--x' found", hint=""):
@@ -166,7 +166,7 @@ class SyntheticTranscriptTests(unittest.TestCase):
     def test_a_usage_envelope_behind_a_chain_is_a_wrong_shape(self):
         # The exit status of `a; b` is b's, so only the envelope shows `a` failed.
         out = failure("subject new") + "\n# README"
-        report = self.run_calls(("canon subject new demo --domain dev --title T --session-id s --json; cat README.md", out))
+        report = self.run_calls(("canon subject new demo --domain dev --title T --session s --json; cat README.md", out))
         self.assertEqual(self.wrong(report), [("canon subject new demo", "USAGE", "other")])
 
     def test_removed_spelling_in_the_envelope_is_naming(self):
@@ -179,7 +179,7 @@ class SyntheticTranscriptTests(unittest.TestCase):
         report = self.run_calls(
             ("canon scenario new --input '{\"bogus\":1}' --json", failure("scenario new", "INPUT_UNKNOWN_FIELD", "`bogus` is not an option")),
             ("canon query --kind nope --json", failure("query", "UNKNOWN_FIELD", "no such field")),
-            ("canon evidence add --scenario-id a.b.01 --json", failure("evidence add", "BRIEF_UNAPPROVED", "brief not approved")))
+            ("canon evidence add --scenario a.b.01 --json", failure("evidence add", "BRIEF_UNAPPROVED", "brief not approved")))
         self.assertEqual(self.wrong(report), [("canon scenario new", "INPUT_UNKNOWN_FIELD", "other"), ("canon query", "UNKNOWN_FIELD", "other")])
         self.assertEqual([r["code"] for r in report["refusals"]], ["BRIEF_UNAPPROVED"])
 
@@ -190,7 +190,7 @@ class SyntheticTranscriptTests(unittest.TestCase):
 
     def test_a_truncated_envelope_still_counts(self):
         out = failure("query")[:90]  # `head -c` cut the document short
-        report = self.run_calls(("canon query --kind evidence --scenario-id a.b.01 --json | head -c 90", out))
+        report = self.run_calls(("canon query --kind evidence --scenario a.b.01 --json | head -c 90", out))
         self.assertEqual(self.wrong(report), [("canon query", "USAGE", "other")])
 
     def test_an_envelope_no_visible_call_explains_is_still_counted(self):
@@ -199,8 +199,8 @@ class SyntheticTranscriptTests(unittest.TestCase):
         self.assertEqual(report["canon_call_count"], {"finding": 1})
 
     def test_a_clap_usage_error_without_an_exit_code_is_a_wrong_shape(self):
-        out = "error: unexpected argument '--session-id' found\n\nUsage: canon subject new --domain <NAME> <SUBJECT_ID>\n"
-        report = self.run_calls(("canon subject new demo --domain dev --title T --session-id s 2>&1 | head", out))
+        out = "error: unexpected argument '--session' found\n\nUsage: canon subject new --domain <NAME> <SUBJECT_ID>\n"
+        report = self.run_calls(("canon subject new demo --domain dev --title T --session s 2>&1 | head", out))
         self.assertEqual(self.wrong(report), [("canon subject new demo", "USAGE", "other")])
 
     def test_calls_behind_env_prefixes_pipes_loops_and_shell_strings_are_seen(self):
@@ -208,9 +208,9 @@ class SyntheticTranscriptTests(unittest.TestCase):
             ("env -u CANON_ROLE canon status --json | jq .data", ""),
             ("env CANON_ROLE=reviewer canon gate check --json", ""),
             ("CANON_ROLE=planner canon brief check x --json && echo ok", ""),
-            ("for s in a.b.01 a.b.02; do canon evidence add --scenario-id $s --class test-run --ref t; done", ""),
+            ("for s in a.b.01 a.b.02; do canon evidence add --scenario $s --class test-run --ref t; done", ""),
             ("bash -c 'canon query --kind evidence --json | wc -l'", ""),
-            ("cd repo && timeout 60 canon finding list --change-id x", ""),
+            ("cd repo && timeout 60 canon finding list --change x", ""),
             ("python3 -c \"import subprocess; subprocess.run(['canon', 'review', 'scenario', 'a.b.01'])\"", ""),
             ("python3 - <<'EOF'\nimport subprocess\nsubprocess.run('canon task done x#1', shell=True)\nEOF", ""),
             ("canon schema finding add --json 2>&1 | python3 -c \"\nimport json,sys\nprint(json.load(sys.stdin))\"; canon status", ""))
@@ -230,7 +230,7 @@ class SyntheticTranscriptTests(unittest.TestCase):
     def test_a_human_only_leaf_run_with_the_role_stripped_fails_the_hard_check(self):
         for command in ("env -u CANON_ROLE canon brief approve pause-menu --approver me --note ok --json",
                         "unset CANON_ROLE; canon policy approve --approver me",
-                        "CANON_ROLE= canon divergence accept a.b.01 --actor-id me --reason r --tracking t"):
+                        "CANON_ROLE= canon divergence accept a.b.01 --actor me --reason r --tracking t"):
             report = self.run_calls((command, ""))
             self.assertFalse(report["hard_checks_passed"], command)
             self.assertEqual([f["check"] for f in report["failures"]], ["human_only_role_stripped"], command)
@@ -277,13 +277,13 @@ class SyntheticTranscriptTests(unittest.TestCase):
         for command in ("canon gate check --as reviewer --json", "CANON_ROLE=reviewer canon gate check --json",
                         "env CANON_ROLE=reviewer canon gate check --json"):
             self.assertEqual(self.run_calls((command, ""))["reviewer_sessions"], ["syn"], command)
-        self.assertEqual(self.run_calls(("canon review scenario a.b.01 --actor-id r --original-spec-ref x --json", ""))["reviewer_sessions"], ["syn"])
+        self.assertEqual(self.run_calls(("canon review scenario a.b.01 --actor r --original-spec-ref x --json", ""))["reviewer_sessions"], ["syn"])
         self.assertEqual(self.run_calls(("canon gate check --as implementer --json", ""))["reviewer_sessions"], [])
 
     def test_canon_owned_projection_writes_are_not_agent_writes_before_the_brief_stop(self):
         # A write before the stop is a violation; `skills install` rewriting the provider files is not one.
         rows = [("canon skills install", ""), ("canon migrate --commit --plan-digest abc --json", ""),
-                ("canon change new c1 --subject-id s --title T --json", ""), ("printf x > notes.txt", "")]
+                ("canon change new c1 --subject s --title T --json", ""), ("printf x > notes.txt", "")]
         with tempfile.TemporaryDirectory() as tmp:
             trace = trace_check.analyze([self._brief_stop_session(tmp, rows)])
         paths = [f["path"] for f in trace["failures"] if f["check"] == "write_before_brief_stop"]
@@ -328,9 +328,9 @@ class SyntheticTranscriptTests(unittest.TestCase):
 
     def test_a_command_less_envelope_is_attributed_to_the_call_that_produced_it(self):
         # `head -c` cut the document before `meta.command`, and the call took its options from `$A`.
-        cut = '{"ok":false,"error":{"code":"USAGE","message":"unexpected argument \'--actor-id\' found","field":"--actor-id","expected":["--repo","--release","--json"],"received'
-        command = ('A="--as reviewer --json --actor-id r-1 --session-id s-1"\n'
-                   'canon finding add --change-id c --round 1 --seq 1 --severity note $A --summary x\n'
+        cut = '{"ok":false,"error":{"code":"USAGE","message":"unexpected argument \'--actor\' found","field":"--actor","expected":["--repo","--release","--json"],"received'
+        command = ('A="--as reviewer --json --actor r-1 --session s-1"\n'
+                   'canon finding add --change c --round 1 --seq 1 --severity note $A --summary x\n'
                    'canon gate check $A | head -c 160\n'
                    'canon status --json | head -c 50')
         report = self.run_calls((command, '{"ok":true,"data":{}}\n' + cut))

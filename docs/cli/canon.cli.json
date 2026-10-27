@@ -975,7 +975,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon change new add-search --subject-id demo --title \"Add search\""
+        "canon change new add-search --subject demo --title \"Add search\""
       ],
       "exits": [
         {
@@ -999,7 +999,7 @@
             "operands": [
               "add-search"
             ],
-            "subjectId": "demo",
+            "subject": "demo",
             "title": "Add search"
           },
           "maxBytes": 8388608,
@@ -1030,7 +1030,7 @@
           "default": [],
           "help": "The existing subject to adopt the change under",
           "kind": "value",
-          "name": "subject-id",
+          "name": "subject",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
@@ -2101,7 +2101,7 @@
           ],
           "help": "The dispatching agent's id (recorded as the run's actor)",
           "kind": "value",
-          "name": "actor-id",
+          "name": "actor",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -2112,7 +2112,7 @@
           "default": [],
           "help": "The acting session (recorded as actor.session_id); optional",
           "kind": "value",
-          "name": "session-id",
+          "name": "session",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -2121,7 +2121,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Declared provider metadata (copied verbatim; never inferred from --actor-id)",
+          "help": "Declared provider metadata (copied verbatim; never inferred from --actor)",
           "kind": "value",
           "name": "provider",
           "possibleValues": [],
@@ -2145,7 +2145,7 @@
           "default": [],
           "help": "Skill that contributed to this run",
           "kind": "value",
-          "name": "skill-id",
+          "name": "skill",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -2154,7 +2154,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Declared skill digest; requires --skill-id",
+          "help": "Declared skill digest; requires --skill",
           "kind": "value",
           "name": "skill-digest",
           "possibleValues": [],
@@ -2189,7 +2189,7 @@
           "default": [],
           "help": "Plan task this run serves (<change_id>#<n>); validated against the plan corpus",
           "kind": "value",
-          "name": "task-id",
+          "name": "task",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -2200,7 +2200,7 @@
           "default": [],
           "help": "RunId (ULID) of the run that dispatched this one",
           "kind": "value",
-          "name": "parent-run-id",
+          "name": "parent-run",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -2531,7 +2531,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon divergence accept auth.login.01 --actor-id alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --expiry 2030-01-01 --role reviewer"
+        "canon divergence accept auth.login.01 --actor alice --reason \"the engine drops the event\" --tracking https://example.com/engine/issues/118 --expiry 2030-01-01 --role reviewer"
       ],
       "exits": [
         {
@@ -2552,7 +2552,7 @@
         {
           "batch": true,
           "example": {
-            "actorId": "alice",
+            "actor": "alice",
             "expiry": "2030-01-01",
             "operands": [
               "auth.login.01"
@@ -2588,7 +2588,7 @@
           "default": [],
           "help": "Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root",
           "kind": "value",
-          "name": "project-id",
+          "name": "project",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -2632,7 +2632,7 @@
           "default": [],
           "help": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
           "kind": "value",
-          "name": "actor-id",
+          "name": "actor",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
@@ -2654,7 +2654,7 @@
           "default": [],
           "help": "The accepting session (recorded as actor.session_id); it must not be one that attested the scenario's evidence",
           "kind": "value",
-          "name": "session-id",
+          "name": "session",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -2744,7 +2744,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon divergence add auth.login.01 --actor-id alice --role reviewer"
+        "canon divergence add auth.login.01 --actor alice --role reviewer"
       ],
       "exits": [
         {
@@ -2766,14 +2766,14 @@
           "batch": true,
           "batchExample": [
             {
-              "actorId": "reviewer-1",
+              "actor": "reviewer-1",
               "operands": [
                 "auth.login.01"
               ],
               "role": "reviewer"
             },
             {
-              "actorId": "reviewer-1",
+              "actor": "reviewer-1",
               "operands": [
                 "auth.login.02"
               ],
@@ -2781,7 +2781,7 @@
             }
           ],
           "example": {
-            "actorId": "alice",
+            "actor": "alice",
             "operands": [
               "auth.login.01"
             ],
@@ -2815,7 +2815,7 @@
           "default": [],
           "help": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root",
           "kind": "value",
-          "name": "project-id",
+          "name": "project",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -2892,7 +2892,7 @@
           "default": [],
           "help": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
           "kind": "value",
-          "name": "actor-id",
+          "name": "actor",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
@@ -2903,7 +2903,7 @@
           "default": [],
           "help": "The acting session (recorded as actor.session_id); optional",
           "kind": "value",
-          "name": "session-id",
+          "name": "session",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -3044,7 +3044,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon divergence defer auth.login.01 --actor-id alice --reason \"waiting on the vendor\" --expiry 2030-01-01T00:00:00Z --role reviewer"
+        "canon divergence defer auth.login.01 --actor alice --reason \"waiting on the vendor\" --expiry 2030-01-01T00:00:00Z --role reviewer"
       ],
       "exits": [
         {
@@ -3065,7 +3065,7 @@
         {
           "batch": true,
           "example": {
-            "actorId": "alice",
+            "actor": "alice",
             "expiry": "2030-01-01T00:00:00Z",
             "operands": [
               "auth.login.01"
@@ -3101,7 +3101,7 @@
           "default": [],
           "help": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root",
           "kind": "value",
-          "name": "project-id",
+          "name": "project",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -3138,7 +3138,7 @@
           "default": [],
           "help": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
           "kind": "value",
-          "name": "actor-id",
+          "name": "actor",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
@@ -3149,7 +3149,7 @@
           "default": [],
           "help": "The acting session (recorded as actor.session_id); optional",
           "kind": "value",
-          "name": "session-id",
+          "name": "session",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -3412,7 +3412,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon divergence resolve auth.login.01 --actor-id alice --role reviewer"
+        "canon divergence resolve auth.login.01 --actor alice --role reviewer"
       ],
       "exits": [
         {
@@ -3433,7 +3433,7 @@
         {
           "batch": true,
           "example": {
-            "actorId": "alice",
+            "actor": "alice",
             "operands": [
               "auth.login.01"
             ],
@@ -3467,7 +3467,7 @@
           "default": [],
           "help": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root",
           "kind": "value",
-          "name": "project-id",
+          "name": "project",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -3504,7 +3504,7 @@
           "default": [],
           "help": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
           "kind": "value",
-          "name": "actor-id",
+          "name": "actor",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
@@ -3515,7 +3515,7 @@
           "default": [],
           "help": "The acting session (recorded as actor.session_id); optional",
           "kind": "value",
-          "name": "session-id",
+          "name": "session",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -3660,7 +3660,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon evidence add --scenario-id auth.login.01 --class test-run --ref \"npm test\" --role implementer"
+        "canon evidence add --scenario auth.login.01 --class test-run --ref \"npm test\" --role implementer"
       ],
       "exits": [
         {
@@ -3685,20 +3685,20 @@
               "class": "test-run",
               "ref": "npm test",
               "role": "implementer",
-              "scenarioId": "auth.login.01"
+              "scenario": "auth.login.01"
             },
             {
               "class": "test-run",
               "ref": "npm test",
               "role": "implementer",
-              "scenarioId": "auth.login.02"
+              "scenario": "auth.login.02"
             }
           ],
           "example": {
             "class": "test-run",
             "ref": "npm test",
             "role": "implementer",
-            "scenarioId": "auth.login.01"
+            "scenario": "auth.login.01"
           },
           "maxBytes": 8388608,
           "maxElements": 10000,
@@ -3713,9 +3713,9 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given",
+          "help": "Plan task this evidence attests to (<change_id>#<n>); required unless --scenario is given",
           "kind": "value",
-          "name": "task-id",
+          "name": "task",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -3724,9 +3724,9 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Spec corpus id for --scenario-id (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (UNKNOWN_SPEC_ROOT) before anything is written",
+          "help": "Spec corpus id for --scenario (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (UNKNOWN_SPEC_ROOT) before anything is written",
           "kind": "value",
-          "name": "project-id",
+          "name": "project",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -3796,7 +3796,7 @@
           "default": [],
           "help": "Scenario this evidence also joins to",
           "kind": "value",
-          "name": "scenario-id",
+          "name": "scenario",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -3807,7 +3807,7 @@
           "default": [],
           "help": "RunId (ULID) of the run that produced this evidence",
           "kind": "value",
-          "name": "run-id",
+          "name": "run",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -3831,7 +3831,7 @@
           ],
           "help": "The attesting actor's id (recorded as the attestation's author; line breaks refused)",
           "kind": "value",
-          "name": "actor-id",
+          "name": "actor",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -3853,7 +3853,7 @@
           "default": [],
           "help": "The attesting session (recorded as actor.session_id). Under require_review.distinct_actor a review from this session does not count",
           "kind": "value",
-          "name": "session-id",
+          "name": "session",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -3954,7 +3954,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "One record per indexed scenario of --project-id that owns a case in the --report(s), all or nothing (see below)",
+          "help": "One record per indexed scenario of --project that owns a case in the --report(s), all or nothing (see below)",
           "kind": "flag",
           "name": "all-scenarios",
           "possibleValues": [],
@@ -3977,7 +3977,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor-id)",
+          "help": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor)",
           "kind": "value",
           "name": "override-reason",
           "possibleValues": [],
@@ -4087,7 +4087,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon evidence approval-payload --scenario-id auth.login.01 --project-id root --approver alice --approval-at 2030-01-01T00:00:00Z"
+        "canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z"
       ],
       "exits": [
         {
@@ -4108,9 +4108,9 @@
         {
           "aliases": [],
           "default": [],
-          "help": "The plan task the approval is for (<change_id>#<n>); give this or --scenario-id",
+          "help": "The plan task the approval is for (<change_id>#<n>); give this or --scenario",
           "kind": "value",
-          "name": "task-id",
+          "name": "task",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -4119,9 +4119,9 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Spec corpus id for --scenario-id. Required only when canon.yaml configures more than one spec root",
+          "help": "Spec corpus id for --scenario. Required only when canon.yaml configures more than one spec root",
           "kind": "value",
-          "name": "project-id",
+          "name": "project",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -4130,9 +4130,9 @@
         {
           "aliases": [],
           "default": [],
-          "help": "The scenario the approval is for; give this or --task-id",
+          "help": "The scenario the approval is for; give this or --task",
           "kind": "value",
-          "name": "scenario-id",
+          "name": "scenario",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -4143,7 +4143,7 @@
           "default": [],
           "help": "The dispatch run the approved work belongs to",
           "kind": "value",
-          "name": "run-id",
+          "name": "run",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -4279,7 +4279,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon evidence audit auth.login.01 --ref audit-report.json --evaluator-id eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer"
+        "canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer"
       ],
       "exits": [
         {
@@ -4301,8 +4301,8 @@
           "batch": true,
           "example": {
             "auditResult": "confirmed",
+            "evaluator": "eval-1",
             "evaluatorDigest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-            "evaluatorId": "eval-1",
             "evaluatorVersion": "2.1",
             "operands": [
               "auth.login.01"
@@ -4338,7 +4338,7 @@
           "default": [],
           "help": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root; refused (UNKNOWN_SPEC_ROOT) when it names none",
           "kind": "value",
-          "name": "project-id",
+          "name": "project",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -4382,7 +4382,7 @@
           "default": [],
           "help": "RunId (ULID) of the run that produced this evidence",
           "kind": "value",
-          "name": "run-id",
+          "name": "run",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -4395,7 +4395,7 @@
           ],
           "help": "The attesting actor's id (recorded as the attestation's author; line breaks refused)",
           "kind": "value",
-          "name": "actor-id",
+          "name": "actor",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -4417,7 +4417,7 @@
           "default": [],
           "help": "The attesting session (recorded as actor.session_id)",
           "kind": "value",
-          "name": "session-id",
+          "name": "session",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -4487,7 +4487,7 @@
           "default": [],
           "help": "The external evaluator that re-audited the scenario (canon never runs it)",
           "kind": "value",
-          "name": "evaluator-id",
+          "name": "evaluator",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
@@ -4533,7 +4533,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor-id)",
+          "help": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor)",
           "kind": "value",
           "name": "override-reason",
           "possibleValues": [],
@@ -4978,7 +4978,7 @@
           "env": "CANON_ACTOR",
           "help": "Agent id written into provenance (env: CANON_ACTOR)",
           "kind": "value",
-          "name": "actor-id",
+          "name": "actor",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -4989,7 +4989,7 @@
           "default": [],
           "help": "The acting session (recorded as actor.session_id); optional",
           "kind": "value",
-          "name": "session-id",
+          "name": "session",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -5000,7 +5000,7 @@
           "default": [],
           "help": "Which configured `specs.roots[]` entry to write under, by its id. Required only when the repo configures more than one",
           "kind": "value",
-          "name": "project-id",
+          "name": "project",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -5112,7 +5112,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon finding add --change-id add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor-id alice --summary \"Token is logged\""
+        "canon finding add --change add-login --round 1 --seq 2 --severity should-fix --introduced-unknown --actor alice --summary \"Token is logged\""
       ],
       "exits": [
         {
@@ -5134,16 +5134,16 @@
           "batch": true,
           "batchExample": [
             {
-              "actorId": "reviewer-1",
-              "changeId": "add-login",
+              "actor": "reviewer-1",
+              "change": "add-login",
               "round": 1,
               "seq": 1,
               "severity": "note",
               "summary": "Token is logged"
             },
             {
-              "actorId": "reviewer-1",
-              "changeId": "add-login",
+              "actor": "reviewer-1",
+              "change": "add-login",
               "introducedUnknown": true,
               "round": 1,
               "seq": 2,
@@ -5152,8 +5152,8 @@
             }
           ],
           "example": {
-            "actorId": "alice",
-            "changeId": "add-login",
+            "actor": "alice",
+            "change": "add-login",
             "introducedUnknown": true,
             "round": 1,
             "seq": 2,
@@ -5175,7 +5175,7 @@
           "default": [],
           "help": "The change under review (e.g. s43-findings-are-records) — first component of the natural key",
           "kind": "value",
-          "name": "change-id",
+          "name": "change",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
@@ -5241,7 +5241,7 @@
           "default": [],
           "help": "The reviewer who raised it, recorded as the finding's reviewer and author (line breaks refused)",
           "kind": "value",
-          "name": "actor-id",
+          "name": "actor",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
@@ -5308,7 +5308,7 @@
           "default": [],
           "help": "The review this finding came out of: the review id `canon review scenario` or `canon review change` printed. Refused when no review in the ledger or the archive carries it; a close copies it",
           "kind": "value",
-          "name": "review-id",
+          "name": "review",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -5330,7 +5330,7 @@
           "default": [],
           "help": "A scenario this finding is about (repeatable). After a `fixed` close, fresh evidence for these scenarios alone re-verifies the fix; with none named, every evidenced scenario of the subject does. Each must be a scenario the index knows; a close inherits the list",
           "kind": "value",
-          "name": "scenario-id",
+          "name": "scenario",
           "possibleValues": [],
           "repeatable": true,
           "required": false,
@@ -5354,7 +5354,7 @@
           "default": [],
           "help": "The authoring session (recorded as actor.session_id)",
           "kind": "value",
-          "name": "session-id",
+          "name": "session",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -5594,7 +5594,7 @@
           ],
           "help": "The actor recorded as authoring the TRANSITION — not the original finding's author, which is preserved on the record this supersedes",
           "kind": "value",
-          "name": "actor-id",
+          "name": "actor",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -5618,7 +5618,7 @@
           "default": [],
           "help": "The session that authored the TRANSITION (recorded as actor.session_id)",
           "kind": "value",
-          "name": "session-id",
+          "name": "session",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -5723,7 +5723,7 @@
         "USAGE"
       ],
       "examples": [
-        "canon finding list --change-id add-login"
+        "canon finding list --change add-login"
       ],
       "exits": [
         {
@@ -5745,7 +5745,7 @@
           "default": [],
           "help": "The change whose findings to list",
           "kind": "value",
-          "name": "change-id",
+          "name": "change",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
@@ -6634,7 +6634,7 @@
           "default": [],
           "help": "Attribute this pass's trajectories to a dispatched run (a RunId minted by `canon dispatch begin`)",
           "kind": "value",
-          "name": "run-id",
+          "name": "run",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -8443,7 +8443,7 @@
           "default": [],
           "help": "Project a plugin's overlay fields onto each record (fail-soft)",
           "kind": "value",
-          "name": "plugin-id",
+          "name": "plugin",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -8452,7 +8452,7 @@
         {
           "aliases": [],
           "conflictsWith": [
-            "--plugin-id"
+            "--plugin"
           ],
           "default": [],
           "help": "Every version of the kind, the ledger's and the archive's, oldest first, instead of the current records",
@@ -8467,7 +8467,7 @@
           "default": [],
           "help": "Scope --kind change/task to one ChangeId (other kinds exit 2)",
           "kind": "value",
-          "name": "change-id",
+          "name": "change",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -9063,7 +9063,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "Full regime key (<role>/<repo>/<area>/<hash>); mutually exclusive with --domain/--subject-id",
+          "help": "Full regime key (<role>/<repo>/<area>/<hash>); mutually exclusive with --domain/--subject",
           "kind": "value",
           "name": "regime",
           "possibleValues": [],
@@ -9087,7 +9087,7 @@
           "default": [],
           "help": "Narrow --domain to one subject_id; requires --domain, mutually exclusive with --regime",
           "kind": "value",
-          "name": "subject-id",
+          "name": "subject",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -9192,7 +9192,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon review change add-login --actor-id alice --role reviewer --original-spec-ref docs/prd.md"
+        "canon review change add-login --actor alice --role reviewer --original-spec-ref docs/prd.md"
       ],
       "exits": [
         {
@@ -9213,7 +9213,7 @@
         {
           "batch": true,
           "example": {
-            "actorId": "alice",
+            "actor": "alice",
             "operands": [
               "add-login"
             ],
@@ -9248,7 +9248,7 @@
           "default": [],
           "help": "Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root",
           "kind": "value",
-          "name": "project-id",
+          "name": "project",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -9259,7 +9259,7 @@
           "default": [],
           "help": "The reviewer's id (recorded as the review's author and as its reviewer; line breaks refused)",
           "kind": "value",
-          "name": "actor-id",
+          "name": "actor",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
@@ -9322,7 +9322,7 @@
           "default": [],
           "help": "The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count",
           "kind": "value",
-          "name": "session-id",
+          "name": "session",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -9494,7 +9494,7 @@
         "WRITE_FAILED"
       ],
       "examples": [
-        "canon review scenario auth.login.01 --actor-id alice --role reviewer --original-spec-ref docs/prd.md"
+        "canon review scenario auth.login.01 --actor alice --role reviewer --original-spec-ref docs/prd.md"
       ],
       "exits": [
         {
@@ -9515,7 +9515,7 @@
         {
           "batch": true,
           "example": {
-            "actorId": "alice",
+            "actor": "alice",
             "operands": [
               "auth.login.01"
             ],
@@ -9549,7 +9549,7 @@
           "default": [],
           "help": "Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root",
           "kind": "value",
-          "name": "project-id",
+          "name": "project",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -9560,7 +9560,7 @@
           "default": [],
           "help": "The reviewer's id (recorded as the review's author and as its reviewer; line breaks refused)",
           "kind": "value",
-          "name": "actor-id",
+          "name": "actor",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
@@ -9623,7 +9623,7 @@
           "default": [],
           "help": "The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count",
           "kind": "value",
-          "name": "session-id",
+          "name": "session",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -9892,7 +9892,7 @@
           "default": [],
           "help": "Optional subject id tag to pin above the scenario",
           "kind": "value",
-          "name": "subject-id",
+          "name": "subject",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -9923,7 +9923,7 @@
         {
           "aliases": [],
           "default": [],
-          "help": "The brief flow step this scenario covers (`F1`): writes `@flow:<change>.<F-id>`. The change is --change-id, else the newest change of --subject-id, else the only live change",
+          "help": "The brief flow step this scenario covers (`F1`): writes `@flow:<change>.<F-id>`. The change is --change, else the newest change of --subject, else the only live change",
           "kind": "value",
           "name": "flow",
           "possibleValues": [],
@@ -9934,9 +9934,9 @@
         {
           "aliases": [],
           "default": [],
-          "help": "The change whose brief defines --flow (default: --subject-id's newest adopted change)",
+          "help": "The change whose brief defines --flow (default: --subject's newest adopted change)",
           "kind": "value",
-          "name": "change-id",
+          "name": "change",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -9953,7 +9953,7 @@
           "env": "CANON_ACTOR",
           "help": "Agent id written into provenance (env: CANON_ACTOR)",
           "kind": "value",
-          "name": "actor-id",
+          "name": "actor",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -9964,7 +9964,7 @@
           "default": [],
           "help": "The acting session (recorded as actor.session_id); optional",
           "kind": "value",
-          "name": "session-id",
+          "name": "session",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -9986,7 +9986,7 @@
           "default": [],
           "help": "Which configured `specs.roots[]` entry to write under, by its id. Required only when the repo configures more than one",
           "kind": "value",
-          "name": "project-id",
+          "name": "project",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -11136,7 +11136,7 @@
         "USAGE"
       ],
       "examples": [
-        "canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason \"regressed in production\" --actor-id alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z"
+        "canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --reason \"regressed in production\" --actor alice --signature-file approval.sig --approval-at 2030-01-01T00:00:00Z"
       ],
       "exits": [
         {
@@ -11157,7 +11157,7 @@
         {
           "batch": true,
           "example": {
-            "actorId": "alice",
+            "actor": "alice",
             "approvalAt": "2030-01-01T00:00:00Z",
             "operands": [
               "01ARZ3NDEKTSV4RRFFQ69G5FAV"
@@ -11204,7 +11204,7 @@
           "default": [],
           "help": "The approver; must be a policy-pinned approver",
           "kind": "value",
-          "name": "actor-id",
+          "name": "actor",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
@@ -11237,7 +11237,7 @@
           "default": [],
           "help": "A trajectory that contradicts the strategy (must exist in the trajectory store)",
           "kind": "value",
-          "name": "contradicting-trajectory-id",
+          "name": "contradicting-trajectory",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -11342,7 +11342,7 @@
         "USAGE"
       ],
       "examples": [
-        "canon subject adopt demo --change-id add-login"
+        "canon subject adopt demo --change add-login"
       ],
       "exits": [
         {
@@ -11363,7 +11363,7 @@
         {
           "batch": true,
           "example": {
-            "changeId": "add-login",
+            "change": "add-login",
             "operands": [
               "demo"
             ]
@@ -11396,7 +11396,7 @@
           "default": [],
           "help": "The imported Change's id",
           "kind": "value",
-          "name": "change-id",
+          "name": "change",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
@@ -11599,7 +11599,7 @@
           ],
           "help": "The invoking actor's id, recorded with an --override-reason waiver or a --reason",
           "kind": "value",
-          "name": "actor-id",
+          "name": "actor",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -11610,7 +11610,7 @@
           "default": [],
           "help": "The acting session (recorded as actor.session_id); optional",
           "kind": "value",
-          "name": "session-id",
+          "name": "session",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -11819,7 +11819,7 @@
           ],
           "help": "The invoking actor's id",
           "kind": "value",
-          "name": "actor-id",
+          "name": "actor",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -11830,7 +11830,7 @@
           "default": [],
           "help": "The acting session (recorded as actor.session_id); optional",
           "kind": "value",
-          "name": "session-id",
+          "name": "session",
           "possibleValues": [],
           "repeatable": false,
           "required": false,
@@ -12008,7 +12008,7 @@
         "USAGE"
       ],
       "examples": [
-        "canon subject unadopt demo --change-id add-login"
+        "canon subject unadopt demo --change add-login"
       ],
       "exits": [
         {
@@ -12029,7 +12029,7 @@
         {
           "batch": true,
           "example": {
-            "changeId": "add-login",
+            "change": "add-login",
             "operands": [
               "demo"
             ]
@@ -12062,7 +12062,7 @@
           "default": [],
           "help": "The change to take out of the subject",
           "kind": "value",
-          "name": "change-id",
+          "name": "change",
           "possibleValues": [],
           "repeatable": false,
           "required": true,
@@ -12436,7 +12436,7 @@
   ],
   "envVars": [
     {
-      "about": "Default actor id (`--actor-id`) of `feature new` and `scenario new`, and the actor of `query` and `export` audit lines; falls back to `USER`",
+      "about": "Default actor id (`--actor`) of `feature new` and `scenario new`, and the actor of `query` and `export` audit lines; falls back to `USER`",
       "name": "CANON_ACTOR"
     },
     {
@@ -12526,7 +12526,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -13386,7 +13386,7 @@
       "code": "FINDING_REVIEW_NOT_FOUND",
       "exit": 2,
       "fix": "Pass the review id that `canon review scenario` or `canon review change` printed; `canon query --kind review` shows the ids.",
-      "meaning": "--review-id names no review in the ledger or the archive",
+      "meaning": "--review names no review in the ledger or the archive",
       "retryable": false
     },
     {
@@ -13406,8 +13406,8 @@
     {
       "code": "FINDING_UNKNOWN_SCENARIO",
       "exit": 2,
-      "fix": "Pass a --scenario-id that the scenario index knows; run `canon inventory sync` if the scenario is new.",
-      "meaning": "--scenario-id names a scenario the index does not know",
+      "fix": "Pass a --scenario that the scenario index knows; run `canon inventory sync` if the scenario is new.",
+      "meaning": "--scenario names a scenario the index does not know",
       "retryable": false
     },
     {
@@ -13973,8 +13973,8 @@
     {
       "code": "SPEC_ROOT_UNRESOLVED",
       "exit": 2,
-      "fix": "Pass --project-id with the id of the spec root to use.",
-      "meaning": "no single spec root could be chosen; pass --project-id",
+      "fix": "Pass --project with the id of the spec root to use.",
+      "meaning": "no single spec root could be chosen; pass --project",
       "retryable": false
     },
     {
@@ -14092,8 +14092,8 @@
     {
       "code": "UNKNOWN_SPEC_ROOT",
       "exit": 2,
-      "fix": "Pass a --project-id that names a spec root configured in canon.yaml.",
-      "meaning": "`--project-id` names no spec root configured in canon.yaml, so nothing was written",
+      "fix": "Pass a --project that names a spec root configured in canon.yaml.",
+      "meaning": "`--project` names no spec root configured in canon.yaml, so nothing was written",
       "retryable": false
     },
     {
@@ -14542,7 +14542,7 @@
     {
       "kind": "option",
       "new": "subject adopt",
-      "note": "the subject is the operand and the change is `--change-id`",
+      "note": "the subject is the operand and the change is `--change`",
       "old": "--subject-id",
       "rule": "D1 r1",
       "scope": [
@@ -14679,7 +14679,7 @@
     },
     {
       "kind": "option",
-      "new": "--actor-id",
+      "new": "--actor",
       "note": "",
       "old": "--agent-id",
       "rule": "D1 Renames",
@@ -14690,7 +14690,7 @@
     },
     {
       "kind": "option",
-      "new": "--actor-id",
+      "new": "--actor",
       "note": "it is the reviewer, and required where `--reviewer` was",
       "old": "--reviewer",
       "rule": "D1 Renames, O9",
@@ -14958,41 +14958,6 @@
     },
     {
       "kind": "option",
-      "new": "--task-id",
-      "note": "",
-      "old": "--task",
-      "rule": "D1 Renames",
-      "scope": [
-        "dispatch begin",
-        "evidence add",
-        "evidence approval-payload"
-      ],
-      "since": "0.28.0"
-    },
-    {
-      "kind": "option",
-      "new": "--plugin-id",
-      "note": "",
-      "old": "--plugin",
-      "rule": "D1 Renames",
-      "scope": [
-        "query"
-      ],
-      "since": "0.28.0"
-    },
-    {
-      "kind": "option",
-      "new": "--parent-run-id",
-      "note": "",
-      "old": "--parent-run",
-      "rule": "D1 Renames",
-      "scope": [
-        "dispatch begin"
-      ],
-      "since": "0.28.0"
-    },
-    {
-      "kind": "option",
       "new": "--skills-source",
       "note": "",
       "old": "--source",
@@ -15157,63 +15122,210 @@
     },
     {
       "kind": "option",
-      "new": "--change-id",
+      "new": "--actor",
       "note": "",
-      "old": "--change",
-      "rule": "one name per concept",
+      "old": "--actor-id",
+      "rule": "an id option is the bare noun",
       "scope": [
-        "scenario new"
-      ],
-      "since": "0.24.0"
-    },
-    {
-      "kind": "option",
-      "new": "--project-id",
-      "note": "",
-      "old": "--project",
-      "rule": "one name per concept",
-      "scope": [
+        "dispatch begin",
+        "divergence accept",
+        "divergence add",
+        "divergence defer",
+        "divergence resolve",
+        "evidence add",
+        "evidence audit",
         "feature new",
-        "scenario new"
+        "finding add",
+        "finding close",
+        "review change",
+        "review scenario",
+        "scenario new",
+        "strategy rollback",
+        "subject move",
+        "subject new"
       ],
-      "since": "0.24.0"
+      "since": "0.31.0"
     },
     {
       "kind": "option",
-      "new": "--subject-id",
+      "new": "--session",
       "note": "",
-      "old": "--subject",
-      "rule": "one name per concept",
+      "old": "--session-id",
+      "rule": "an id option is the bare noun",
+      "scope": [
+        "dispatch begin",
+        "divergence accept",
+        "divergence add",
+        "divergence defer",
+        "divergence resolve",
+        "evidence add",
+        "evidence audit",
+        "feature new",
+        "finding add",
+        "finding close",
+        "review change",
+        "review scenario",
+        "scenario new",
+        "subject move",
+        "subject new"
+      ],
+      "since": "0.31.0"
+    },
+    {
+      "kind": "option",
+      "new": "--project",
+      "note": "",
+      "old": "--project-id",
+      "rule": "an id option is the bare noun",
+      "scope": [
+        "divergence accept",
+        "divergence add",
+        "divergence defer",
+        "divergence resolve",
+        "evidence add",
+        "evidence approval-payload",
+        "evidence audit",
+        "feature new",
+        "review change",
+        "review scenario",
+        "scenario new"
+      ],
+      "since": "0.31.0"
+    },
+    {
+      "kind": "option",
+      "new": "--change",
+      "note": "",
+      "old": "--change-id",
+      "rule": "an id option is the bare noun",
+      "scope": [
+        "finding add",
+        "finding list",
+        "query",
+        "scenario new",
+        "subject adopt",
+        "subject unadopt"
+      ],
+      "since": "0.31.0"
+    },
+    {
+      "kind": "option",
+      "new": "--run",
+      "note": "",
+      "old": "--run-id",
+      "rule": "an id option is the bare noun",
+      "scope": [
+        "evidence add",
+        "evidence approval-payload",
+        "evidence audit",
+        "ingest records"
+      ],
+      "since": "0.31.0"
+    },
+    {
+      "kind": "option",
+      "new": "--task",
+      "note": "",
+      "old": "--task-id",
+      "rule": "an id option is the bare noun",
+      "scope": [
+        "dispatch begin",
+        "evidence add",
+        "evidence approval-payload"
+      ],
+      "since": "0.31.0"
+    },
+    {
+      "kind": "option",
+      "new": "--subject",
+      "note": "",
+      "old": "--subject-id",
+      "rule": "an id option is the bare noun",
       "scope": [
         "change new",
         "retrieve",
         "scenario new"
       ],
-      "since": "0.24.0"
+      "since": "0.31.0"
     },
     {
       "kind": "option",
-      "new": "--actor-id",
+      "new": "--scenario",
       "note": "",
-      "old": "--actor",
-      "rule": "one name per concept",
+      "old": "--scenario-id",
+      "rule": "an id option is the bare noun",
       "scope": [
-        "feature new",
-        "strategy rollback",
-        "scenario new"
+        "evidence add",
+        "evidence approval-payload",
+        "finding add"
       ],
-      "since": "0.24.0"
+      "since": "0.31.0"
     },
     {
       "kind": "option",
-      "new": "--run-id",
+      "new": "--skill",
       "note": "",
-      "old": "--run",
-      "rule": "one name per concept",
+      "old": "--skill-id",
+      "rule": "an id option is the bare noun",
       "scope": [
-        "ingest records"
+        "dispatch begin"
       ],
-      "since": "0.24.0"
+      "since": "0.31.0"
+    },
+    {
+      "kind": "option",
+      "new": "--parent-run",
+      "note": "",
+      "old": "--parent-run-id",
+      "rule": "an id option is the bare noun",
+      "scope": [
+        "dispatch begin"
+      ],
+      "since": "0.31.0"
+    },
+    {
+      "kind": "option",
+      "new": "--evaluator",
+      "note": "",
+      "old": "--evaluator-id",
+      "rule": "an id option is the bare noun",
+      "scope": [
+        "evidence audit"
+      ],
+      "since": "0.31.0"
+    },
+    {
+      "kind": "option",
+      "new": "--review",
+      "note": "",
+      "old": "--review-id",
+      "rule": "an id option is the bare noun",
+      "scope": [
+        "finding add"
+      ],
+      "since": "0.31.0"
+    },
+    {
+      "kind": "option",
+      "new": "--plugin",
+      "note": "",
+      "old": "--plugin-id",
+      "rule": "an id option is the bare noun",
+      "scope": [
+        "query"
+      ],
+      "since": "0.31.0"
+    },
+    {
+      "kind": "option",
+      "new": "--contradicting-trajectory",
+      "note": "",
+      "old": "--contradicting-trajectory-id",
+      "rule": "an id option is the bare noun",
+      "scope": [
+        "strategy rollback"
+      ],
+      "since": "0.31.0"
     }
   ],
   "schemas": {
@@ -15817,7 +15929,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -15853,7 +15965,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -15993,7 +16105,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -16029,7 +16141,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -16141,7 +16253,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -16205,7 +16317,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -16317,7 +16429,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -16490,7 +16602,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -16766,7 +16878,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -16825,7 +16937,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -16937,7 +17049,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -16992,7 +17104,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -17104,7 +17216,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -17225,7 +17337,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -17435,7 +17547,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -17513,7 +17625,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -17642,7 +17754,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -17705,7 +17817,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -17817,7 +17929,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -17875,7 +17987,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -17987,7 +18099,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -18036,7 +18148,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -18148,7 +18260,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -18197,7 +18309,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -18309,7 +18421,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -18345,7 +18457,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -18610,7 +18722,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -18646,7 +18758,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -18911,7 +19023,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -18947,7 +19059,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -19314,7 +19426,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -19350,7 +19462,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -19479,7 +19591,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -19515,7 +19627,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -19689,7 +19801,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -19725,7 +19837,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -19884,7 +19996,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -19920,7 +20032,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -20055,7 +20167,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -20091,7 +20203,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -20315,7 +20427,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -20415,7 +20527,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -20970,7 +21082,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -21037,7 +21149,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -21214,7 +21326,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -21250,7 +21362,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -21728,7 +21840,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -21764,7 +21876,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -21912,7 +22024,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -21948,7 +22060,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -22171,7 +22283,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -22207,7 +22319,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -22404,7 +22516,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -22440,7 +22552,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -22580,7 +22692,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -22637,7 +22749,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -22834,7 +22946,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -22870,7 +22982,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -22995,7 +23107,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -23031,7 +23143,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -23178,7 +23290,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -23214,7 +23326,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -23396,7 +23508,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -23432,7 +23544,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -23614,7 +23726,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -23650,7 +23762,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -23779,7 +23891,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -23871,7 +23983,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -24080,7 +24192,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -24116,7 +24228,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -24257,7 +24369,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -24293,7 +24405,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -24493,7 +24605,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -24533,7 +24645,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -24916,7 +25028,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -24956,7 +25068,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -25339,7 +25451,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -25379,7 +25491,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -25762,7 +25874,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -25802,7 +25914,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -26147,7 +26259,7 @@
                   "type": "null"
                 }
               ],
-              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenarioId`)."
+              "description": "The element's ordinary error, `field` a pointer into the batch (`/items/2/scenario`)."
             },
             "index": {
               "description": "0-based position in the input.",
@@ -26183,7 +26295,7 @@
               ]
             },
             "field": {
-              "description": "The refused argv name (`--scenario-id`) or an RFC 6901 JSON pointer into `--input`.",
+              "description": "The refused argv name (`--scenario`) or an RFC 6901 JSON pointer into `--input`.",
               "type": [
                 "string",
                 "null"
@@ -26790,7 +26902,7 @@
           "minItems": 1,
           "type": "array"
         },
-        "subjectId": {
+        "subject": {
           "description": "The existing subject to adopt the change under",
           "type": [
             "string",
@@ -26807,7 +26919,7 @@
       },
       "required": [
         "operands",
-        "subjectId",
+        "subject",
         "title"
       ],
       "title": "`canon change new` --input document",
@@ -28881,7 +28993,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "actorId": {
+        "actor": {
           "default": "canon",
           "description": "The dispatching agent's id (recorded as the run's actor)",
           "type": [
@@ -28903,7 +29015,7 @@
             "number"
           ]
         },
-        "parentRunId": {
+        "parentRun": {
           "description": "RunId (ULID) of the run that dispatched this one",
           "type": [
             "string",
@@ -28918,7 +29030,7 @@
           ]
         },
         "provider": {
-          "description": "Declared provider metadata (copied verbatim; never inferred from --actor-id)",
+          "description": "Declared provider metadata (copied verbatim; never inferred from --actor)",
           "type": [
             "string",
             "number"
@@ -28938,28 +29050,28 @@
             "number"
           ]
         },
-        "sessionId": {
+        "session": {
           "description": "The acting session (recorded as actor.session_id); optional",
           "type": [
             "string",
             "number"
           ]
         },
-        "skillDigest": {
-          "description": "Declared skill digest; requires --skill-id",
-          "type": [
-            "string",
-            "number"
-          ]
-        },
-        "skillId": {
+        "skill": {
           "description": "Skill that contributed to this run",
           "type": [
             "string",
             "number"
           ]
         },
-        "taskId": {
+        "skillDigest": {
+          "description": "Declared skill digest; requires --skill",
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "task": {
           "description": "Plan task this run serves (<change_id>#<n>); validated against the plan corpus",
           "type": [
             "string",
@@ -29336,7 +29448,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "actorId": {
+        "actor": {
           "description": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
           "type": [
             "string",
@@ -29361,7 +29473,7 @@
           "minItems": 1,
           "type": "array"
         },
-        "projectId": {
+        "project": {
           "description": "Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root",
           "type": [
             "string",
@@ -29382,7 +29494,7 @@
             "number"
           ]
         },
-        "sessionId": {
+        "session": {
           "description": "The accepting session (recorded as actor.session_id); it must not be one that attested the scenario's evidence",
           "type": [
             "string",
@@ -29401,7 +29513,7 @@
         "operands",
         "reason",
         "tracking",
-        "actorId"
+        "actor"
       ],
       "title": "`canon divergence accept` --input document",
       "type": "object"
@@ -29460,7 +29572,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "actorId": {
+        "actor": {
           "description": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
           "type": [
             "string",
@@ -29497,7 +29609,7 @@
           "minItems": 1,
           "type": "array"
         },
-        "projectId": {
+        "project": {
           "description": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root",
           "type": [
             "string",
@@ -29538,7 +29650,7 @@
             "string"
           ]
         },
-        "sessionId": {
+        "session": {
           "description": "The acting session (recorded as actor.session_id); optional",
           "type": [
             "string",
@@ -29558,7 +29670,7 @@
       },
       "required": [
         "operands",
-        "actorId"
+        "actor"
       ],
       "title": "`canon divergence add` --input document",
       "type": "object"
@@ -29593,7 +29705,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "actorId": {
+        "actor": {
           "description": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
           "type": [
             "string",
@@ -29619,7 +29731,7 @@
           "minItems": 1,
           "type": "array"
         },
-        "projectId": {
+        "project": {
           "description": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root",
           "type": [
             "string",
@@ -29656,7 +29768,7 @@
             "string"
           ]
         },
-        "sessionId": {
+        "session": {
           "description": "The acting session (recorded as actor.session_id); optional",
           "type": [
             "string",
@@ -29666,7 +29778,7 @@
       },
       "required": [
         "operands",
-        "actorId",
+        "actor",
         "reason",
         "expiry"
       ],
@@ -29815,7 +29927,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "actorId": {
+        "actor": {
           "description": "The reviewer recording this (recorded as the divergence's reviewer and actor)",
           "type": [
             "string",
@@ -29841,7 +29953,7 @@
           "minItems": 1,
           "type": "array"
         },
-        "projectId": {
+        "project": {
           "description": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root",
           "type": [
             "string",
@@ -29871,7 +29983,7 @@
             "string"
           ]
         },
-        "sessionId": {
+        "session": {
           "description": "The acting session (recorded as actor.session_id); optional",
           "type": [
             "string",
@@ -29881,7 +29993,7 @@
       },
       "required": [
         "operands",
-        "actorId"
+        "actor"
       ],
       "title": "`canon divergence resolve` --input document",
       "type": "object"
@@ -29907,7 +30019,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "actorId": {
+        "actor": {
           "default": "canon",
           "description": "The attesting actor's id (recorded as the attestation's author; line breaks refused)",
           "type": [
@@ -29916,7 +30028,7 @@
           ]
         },
         "allScenarios": {
-          "description": "One record per indexed scenario of --project-id that owns a case in the --report(s), all or nothing (see below)",
+          "description": "One record per indexed scenario of --project that owns a case in the --report(s), all or nothing (see below)",
           "type": "boolean"
         },
         "approvalAt": {
@@ -29976,14 +30088,14 @@
           "type": "boolean"
         },
         "overrideReason": {
-          "description": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor-id)",
+          "description": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor)",
           "type": [
             "string",
             "number"
           ]
         },
-        "projectId": {
-          "description": "Spec corpus id for --scenario-id (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (UNKNOWN_SPEC_ROOT) before anything is written",
+        "project": {
+          "description": "Spec corpus id for --scenario (canon keys a scenario by the composite (project_id, scenario_id)). Must name a spec root configured in canon.yaml, or the add is refused (UNKNOWN_SPEC_ROOT) before anything is written",
           "type": [
             "string",
             "number"
@@ -30035,21 +30147,21 @@
             "number"
           ]
         },
-        "runId": {
+        "run": {
           "description": "RunId (ULID) of the run that produced this evidence",
           "type": [
             "string",
             "number"
           ]
         },
-        "scenarioId": {
+        "scenario": {
           "description": "Scenario this evidence also joins to",
           "type": [
             "string",
             "number"
           ]
         },
-        "sessionId": {
+        "session": {
           "description": "The attesting session (recorded as actor.session_id). Under require_review.distinct_actor a review from this session does not count",
           "type": [
             "string",
@@ -30080,8 +30192,8 @@
           },
           "type": "array"
         },
-        "taskId": {
-          "description": "Plan task this evidence attests to (<change_id>#<n>); required unless --scenario-id is given",
+        "task": {
+          "description": "Plan task this evidence attests to (<change_id>#<n>); required unless --scenario is given",
           "type": [
             "string",
             "number"
@@ -30300,7 +30412,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "actorId": {
+        "actor": {
           "default": "canon",
           "description": "The attesting actor's id (recorded as the attestation's author; line breaks refused)",
           "type": [
@@ -30333,15 +30445,15 @@
             "number"
           ]
         },
-        "evaluatorDigest": {
-          "description": "sha256 of the evaluator (64 lowercase hex)",
+        "evaluator": {
+          "description": "The external evaluator that re-audited the scenario (canon never runs it)",
           "type": [
             "string",
             "number"
           ]
         },
-        "evaluatorId": {
-          "description": "The external evaluator that re-audited the scenario (canon never runs it)",
+        "evaluatorDigest": {
+          "description": "sha256 of the evaluator (64 lowercase hex)",
           "type": [
             "string",
             "number"
@@ -30379,13 +30491,13 @@
           "type": "array"
         },
         "overrideReason": {
-          "description": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor-id)",
+          "description": "Attest anyway while a subject this record attests for has a brief awaiting the human's answer (one line, recorded on the record with --actor)",
           "type": [
             "string",
             "number"
           ]
         },
-        "projectId": {
+        "project": {
           "description": "Spec corpus id of the scenario. Required only when canon.yaml configures more than one spec root; refused (UNKNOWN_SPEC_ROOT) when it names none",
           "type": [
             "string",
@@ -30438,14 +30550,14 @@
             "number"
           ]
         },
-        "runId": {
+        "run": {
           "description": "RunId (ULID) of the run that produced this evidence",
           "type": [
             "string",
             "number"
           ]
         },
-        "sessionId": {
+        "session": {
           "description": "The attesting session (recorded as actor.session_id)",
           "type": [
             "string",
@@ -30463,7 +30575,7 @@
       "required": [
         "operands",
         "ref",
-        "evaluatorId",
+        "evaluator",
         "evaluatorVersion",
         "evaluatorDigest",
         "auditResult"
@@ -30979,7 +31091,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "actorId": {
+        "actor": {
           "default": "canon-scaffold",
           "description": "Agent id written into provenance (env: CANON_ACTOR)",
           "type": [
@@ -30999,14 +31111,14 @@
           "minItems": 1,
           "type": "array"
         },
-        "projectId": {
+        "project": {
           "description": "Which configured `specs.roots[]` entry to write under, by its id. Required only when the repo configures more than one",
           "type": [
             "string",
             "number"
           ]
         },
-        "sessionId": {
+        "session": {
           "description": "The acting session (recorded as actor.session_id); optional",
           "type": [
             "string",
@@ -31053,14 +31165,14 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "actorId": {
+        "actor": {
           "description": "The reviewer who raised it, recorded as the finding's reviewer and author (line breaks refused)",
           "type": [
             "string",
             "number"
           ]
         },
-        "changeId": {
+        "change": {
           "description": "The change under review (e.g. s43-findings-are-records) — first component of the natural key",
           "type": [
             "string",
@@ -31118,7 +31230,7 @@
             "number"
           ]
         },
-        "reviewId": {
+        "review": {
           "description": "The review this finding came out of: the review id `canon review scenario` or `canon review change` printed. Refused when no review in the ledger or the archive carries it; a close copies it",
           "type": [
             "string",
@@ -31140,7 +31252,7 @@
             "string"
           ]
         },
-        "scenarioId": {
+        "scenario": {
           "description": "A scenario this finding is about (repeatable). After a `fixed` close, fresh evidence for these scenarios alone re-verifies the fix; with none named, every evidenced scenario of the subject does. Each must be a scenario the index knows; a close inherits the list",
           "items": {
             "type": [
@@ -31157,7 +31269,7 @@
             "string"
           ]
         },
-        "sessionId": {
+        "session": {
           "description": "The authoring session (recorded as actor.session_id)",
           "type": [
             "string",
@@ -31181,11 +31293,11 @@
         }
       },
       "required": [
-        "changeId",
+        "change",
         "round",
         "seq",
         "severity",
-        "actorId",
+        "actor",
         "summary"
       ],
       "title": "`canon finding add` --input document",
@@ -31261,7 +31373,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "actorId": {
+        "actor": {
           "default": "canon",
           "description": "The actor recorded as authoring the TRANSITION — not the original finding's author, which is preserved on the record this supersedes",
           "type": [
@@ -31334,7 +31446,7 @@
             "string"
           ]
         },
-        "sessionId": {
+        "session": {
           "description": "The session that authored the TRANSITION (recorded as actor.session_id)",
           "type": [
             "string",
@@ -32256,7 +32368,7 @@
             "string"
           ]
         },
-        "runId": {
+        "run": {
           "description": "Attribute this pass's trajectories to a dispatched run (a RunId minted by `canon dispatch begin`)",
           "type": [
             "string",
@@ -34388,7 +34500,7 @@
           ]
         },
         "plugin": {
-          "description": "The resolved plugin id (`--plugin-id`) when its overlays were projected.",
+          "description": "The resolved plugin id (`--plugin`) when its overlays were projected.",
           "type": [
             "string",
             "null"
@@ -34611,7 +34723,7 @@
         }
       ],
       "properties": {
-        "actorId": {
+        "actor": {
           "description": "The reviewer's id (recorded as the review's author and as its reviewer; line breaks refused)",
           "type": [
             "string",
@@ -34655,7 +34767,7 @@
             "number"
           ]
         },
-        "projectId": {
+        "project": {
           "description": "Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root",
           "type": [
             "string",
@@ -34707,7 +34819,7 @@
             "number"
           ]
         },
-        "sessionId": {
+        "session": {
           "description": "The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count",
           "type": [
             "string",
@@ -34724,7 +34836,7 @@
       },
       "required": [
         "operands",
-        "actorId"
+        "actor"
       ],
       "title": "`canon review change` --input document",
       "type": "object"
@@ -34825,7 +34937,7 @@
         }
       ],
       "properties": {
-        "actorId": {
+        "actor": {
           "description": "The reviewer's id (recorded as the review's author and as its reviewer; line breaks refused)",
           "type": [
             "string",
@@ -34868,7 +34980,7 @@
             "number"
           ]
         },
-        "projectId": {
+        "project": {
           "description": "Spec corpus id of the scenarios. Required only when canon.yaml configures more than one spec root",
           "type": [
             "string",
@@ -34920,7 +35032,7 @@
             "number"
           ]
         },
-        "sessionId": {
+        "session": {
           "description": "The reviewing session (recorded as actor.session_id). Under require_review.distinct_actor a review whose session also attested the scenario's evidence does not count",
           "type": [
             "string",
@@ -34937,7 +35049,7 @@
       },
       "required": [
         "operands",
-        "actorId"
+        "actor"
       ],
       "title": "`canon review scenario` --input document",
       "type": "object"
@@ -35022,7 +35134,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "actorId": {
+        "actor": {
           "default": "canon-scaffold",
           "description": "Agent id written into provenance (env: CANON_ACTOR)",
           "type": [
@@ -35037,8 +35149,8 @@
             "number"
           ]
         },
-        "changeId": {
-          "description": "The change whose brief defines --flow (default: --subject-id's newest adopted change)",
+        "change": {
+          "description": "The change whose brief defines --flow (default: --subject's newest adopted change)",
           "type": [
             "string",
             "number"
@@ -35052,7 +35164,7 @@
           ]
         },
         "flow": {
-          "description": "The brief flow step this scenario covers (`F1`): writes `@flow:<change>.<F-id>`. The change is --change-id, else the newest change of --subject-id, else the only live change",
+          "description": "The brief flow step this scenario covers (`F1`): writes `@flow:<change>.<F-id>`. The change is --change, else the newest change of --subject, else the only live change",
           "type": [
             "string",
             "number"
@@ -35077,21 +35189,21 @@
           "minItems": 1,
           "type": "array"
         },
-        "projectId": {
+        "project": {
           "description": "Which configured `specs.roots[]` entry to write under, by its id. Required only when the repo configures more than one",
           "type": [
             "string",
             "number"
           ]
         },
-        "sessionId": {
+        "session": {
           "description": "The acting session (recorded as actor.session_id); optional",
           "type": [
             "string",
             "number"
           ]
         },
-        "subjectId": {
+        "subject": {
           "description": "Optional subject id tag to pin above the scenario",
           "type": [
             "string",
@@ -36964,7 +37076,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "actorId": {
+        "actor": {
           "description": "The approver; must be a policy-pinned approver",
           "type": [
             "string",
@@ -36978,7 +37090,7 @@
             "number"
           ]
         },
-        "contradictingTrajectoryId": {
+        "contradictingTrajectory": {
           "description": "A trajectory that contradicts the strategy (must exist in the trajectory store)",
           "type": [
             "string",
@@ -37015,7 +37127,7 @@
       "required": [
         "operands",
         "reason",
-        "actorId",
+        "actor",
         "signatureFile",
         "approvalAt"
       ],
@@ -37080,7 +37192,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "changeId": {
+        "change": {
           "description": "The imported Change's id",
           "type": [
             "string",
@@ -37106,7 +37218,7 @@
       },
       "required": [
         "operands",
-        "changeId"
+        "change"
       ],
       "title": "`canon subject adopt` --input document",
       "type": "object"
@@ -37396,7 +37508,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "actorId": {
+        "actor": {
           "default": "canon",
           "description": "The invoking actor's id, recorded with an --override-reason waiver or a --reason",
           "type": [
@@ -37430,7 +37542,7 @@
             "number"
           ]
         },
-        "sessionId": {
+        "session": {
           "description": "The acting session (recorded as actor.session_id); optional",
           "type": [
             "string",
@@ -37763,7 +37875,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "actorId": {
+        "actor": {
           "default": "canon",
           "description": "The invoking actor's id",
           "type": [
@@ -37798,7 +37910,7 @@
             "number"
           ]
         },
-        "sessionId": {
+        "session": {
           "description": "The acting session (recorded as actor.session_id); optional",
           "type": [
             "string",
@@ -38393,7 +38505,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
       "properties": {
-        "changeId": {
+        "change": {
           "description": "The change to take out of the subject",
           "type": [
             "string",
@@ -38419,7 +38531,7 @@
       },
       "required": [
         "operands",
-        "changeId"
+        "change"
       ],
       "title": "`canon subject unadopt` --input document",
       "type": "object"

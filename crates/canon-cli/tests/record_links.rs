@@ -55,7 +55,7 @@ fn fixture() -> tempfile::TempDir {
 fn review(repo: &Path, ids: &[&str]) -> Value {
     let mut args = vec!["review", "scenario"];
     args.extend_from_slice(ids);
-    args.extend(["--upstream-ref", "r", "--actor-id", "rev", "--role", "reviewer", "--json"]);
+    args.extend(["--upstream-ref", "r", "--actor", "rev", "--role", "reviewer", "--json"]);
     let out = canon(&args, repo);
     assert!(out.status.success(), "{}", text(&out));
     json(&out)
@@ -81,7 +81,7 @@ fn archive(repo: &Path, kind: &str) -> Vec<(PathBuf, Value)> {
 }
 
 fn add_finding(repo: &Path, change: &str, seq: &str, severity: &str, extra: &[&str]) -> Output {
-    let mut args = vec!["finding", "add", "--change-id", change, "--round", "1", "--seq", seq, "--severity", severity, "--actor-id", "rev", "--summary", "s", "--promote"];
+    let mut args = vec!["finding", "add", "--change", change, "--round", "1", "--seq", seq, "--severity", severity, "--actor", "rev", "--summary", "s", "--promote"];
     args.extend_from_slice(extra);
     canon(&args, repo)
 }
@@ -191,7 +191,7 @@ fn finding_add_38_a_finding_added_with_a_review_id_points_at_that_review_and_a_q
         "kept",
         "1",
         "blocker",
-        &["--introduced-unknown", "--review-id", &id]
+        &["--introduced-unknown", "--review", &id]
     )
     .status
     .success());
@@ -216,11 +216,11 @@ fn finding_add_39_a_review_id_that_no_review_has_is_refused_and_the_ledger_is_un
     let dir = fixture();
     let repo = dir.path();
     review(repo, &["cart.add.01"]);
-    let out = add_finding(repo, "kept", "1", "note", &["--review-id", ABSENT_ID]);
+    let out = add_finding(repo, "kept", "1", "note", &["--review", ABSENT_ID]);
     assert_eq!(out.status.code(), Some(2));
     assert!(text(&out).contains("FINDING_REVIEW_NOT_FOUND") && text(&out).contains(ABSENT_ID), "{}", text(&out));
     assert!(ledger(repo, "finding").is_empty() && !repo.join(".canon/ledger/_staging/kind=finding").exists());
-    let bad = add_finding(repo, "kept", "1", "note", &["--review-id", "nope"]);
+    let bad = add_finding(repo, "kept", "1", "note", &["--review", "nope"]);
     assert_eq!(bad.status.code(), Some(2));
 }
 
@@ -241,7 +241,7 @@ fn finding_add_40_the_id_of_a_review_that_moved_to_the_archive_is_still_accepted
     assert!(!ledger(repo, "review")
         .iter()
         .any(|(_, v)| v["review_id"] == old.as_str()));
-    let out = add_finding(repo, "kept", "1", "note", &["--review-id", &old]);
+    let out = add_finding(repo, "kept", "1", "note", &["--review", &old]);
     assert!(out.status.success(), "{}", text(&out));
 }
 
@@ -255,7 +255,7 @@ fn finding_close_88_closing_or_reopening_a_finding_copies_its_review_id_and_its_
         "kept",
         "1",
         "blocker",
-        &["--introduced-unknown", "--review-id", &id]
+        &["--introduced-unknown", "--review", &id]
     )
     .status
     .success());
@@ -509,7 +509,7 @@ fn context_status_84_status_counts_references_to_missing_sources_per_kind_and_gi
         "gone-change",
         "1",
         "note",
-        &["--review-id", &review_id]
+        &["--review", &review_id]
     )
     .status
     .success());
@@ -522,7 +522,7 @@ fn context_status_84_status_counts_references_to_missing_sources_per_kind_and_gi
         &[
             "evidence",
             "add",
-            "--scenario-id",
+            "--scenario",
             "cart.add.01",
             "--class",
             "test-run",
@@ -530,7 +530,7 @@ fn context_status_84_status_counts_references_to_missing_sources_per_kind_and_gi
             "x",
             "--role",
             "implementer",
-            "--actor-id",
+            "--actor",
             "a",
             "--promote",
         ],
@@ -551,7 +551,7 @@ fn context_status_84_status_counts_references_to_missing_sources_per_kind_and_gi
             "d",
             "--title",
             "T",
-            "--actor-id",
+            "--actor",
             "a",
         ],
         repo,
@@ -694,7 +694,7 @@ fn ingest_sessions_16_the_other_hot_writers_print_the_hot_store_location_too() {
     assert_eq!(json(&plans)["data"]["hotStore"], ".canon/hot.db", "{}", text(&plans));
     let records = canon(&["ingest", "records"], repo);
     assert!(text(&records).contains("hot store: .canon/hot.db"), "{}", text(&records));
-    let begin = canon(&["dispatch", "begin", "--role", "implementer", "--regime", "implementer/app/api/abcdef012345", "--actor-id", "a", "--json"], repo);
+    let begin = canon(&["dispatch", "begin", "--role", "implementer", "--regime", "implementer/app/api/abcdef012345", "--actor", "a", "--json"], repo);
     assert!(text(&begin).contains(".canon/hot.db"), "{}", text(&begin));
 }
 
@@ -713,7 +713,7 @@ fn ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_loca
             "d",
             "--title",
             "T",
-            "--actor-id",
+            "--actor",
             "a",
         ],
         repo,
@@ -732,7 +732,7 @@ fn ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_loca
             "d",
             "--title",
             "T",
-            "--actor-id",
+            "--actor",
             "a",
             "--json",
         ],
@@ -744,7 +744,7 @@ fn ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_loca
             "change",
             "new",
             "add-it",
-            "--subject-id",
+            "--subject",
             "demo",
             "--title",
             "Add it",
@@ -763,7 +763,7 @@ fn ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_loca
             "change",
             "new",
             "add-two",
-            "--subject-id",
+            "--subject",
             "demo",
             "--title",
             "Add two",
@@ -776,7 +776,7 @@ fn ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_loca
         text(&human)
     );
     let adopt = canon(
-        &["subject", "adopt", "other", "--change-id", "add-it"],
+        &["subject", "adopt", "other", "--change", "add-it"],
         repo,
     );
     assert!(
@@ -789,7 +789,7 @@ fn ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_loca
             "subject",
             "unadopt",
             "other",
-            "--change-id",
+            "--change",
             "add-it",
             "--json",
         ],
@@ -813,7 +813,7 @@ fn ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_loca
             "subject",
             "adopt",
             "other",
-            "--change-id",
+            "--change",
             "add-it",
             "--dry-run",
         ],
@@ -821,7 +821,7 @@ fn ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_loca
     );
     assert!(!text(&preview).contains("hot store:"), "{}", text(&preview));
     let again = canon(
-        &["subject", "unadopt", "other", "--change-id", "add-it"],
+        &["subject", "unadopt", "other", "--change", "add-it"],
         repo,
     );
     assert!(!text(&again).contains("hot store:"), "{}", text(&again));
@@ -836,7 +836,7 @@ fn ingest_sessions_16b_subject_and_change_writes_to_the_hot_store_print_its_loca
             "d",
             "--title",
             "T",
-            "--actor-id",
+            "--actor",
             "a",
         ],
         local.path(),
@@ -921,9 +921,9 @@ fn ingest_sessions_16c_a_subject_write_routed_to_the_ledger_prints_no_hot_store_
     let dir = init_repo(routing);
     let repo = dir.path();
     git(repo, &["init", "-q", "-b", "main"]);
-    let new = canon(&["subject", "new", "demo", "--domain", "d", "--title", "T", "--actor-id", "a"], repo);
+    let new = canon(&["subject", "new", "demo", "--domain", "d", "--title", "T", "--actor", "a"], repo);
     assert!(new.status.success(), "{}", text(&new));
     assert!(!text(&new).contains("hot store:"), "{}", text(&new));
-    let new_json = json(&canon(&["subject", "new", "other", "--domain", "d", "--title", "T", "--actor-id", "a", "--json"], repo));
+    let new_json = json(&canon(&["subject", "new", "other", "--domain", "d", "--title", "T", "--actor", "a", "--json"], repo));
     assert!(new_json["meta"].get("hotStore").is_none(), "{new_json}");
 }

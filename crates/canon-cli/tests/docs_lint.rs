@@ -386,7 +386,7 @@ fn next_commands(spec: &Value) -> Vec<Cmd> {
     let repo = base.path();
     ok(repo, home.path(), &["init", "--providers", "none"]);
     ok(repo, home.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, home.path(), &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(repo, home.path(), &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     ok(repo, home.path(), &["feature", "new", "auth.login", "--title", "Login"]);
     ok(repo, home.path(), &["scenario", "new", "auth.login.01", "--title", "Sign in", "--feature", ".canon/specs/kind=feature/area=auth/login.feature"]);
     ok(repo, home.path(), &["inventory", "sync"]);
@@ -477,6 +477,23 @@ fn the_extractor_reads_what_the_convention_says() {
     assert!(check(&root, &placeholder).is_some());
     let agents = extract(canon_cli::init::AGENTS_BLOCK, false, "AGENTS block");
     assert!(agents.len() >= 8, "the AGENTS block yields {} commands", agents.len());
+}
+
+/// context.capability.58: a skill that keeps an id-suffixed option fails the parse check, whatever the mode of its line.
+#[test]
+fn context_capability_58_a_skill_command_that_keeps_an_old_id_spelling_fails_the_parse_check() {
+    let root = canon_cli::cli::command();
+    let old = "```bash\ncanon evidence add --actor-id impl-1 --scenario auth.login.01 --class test-run --ref r\n```\n```text\ncanon finding list --change-id <slug>\n```\nProse `canon scenario new <id> --project-id <root>`.\n";
+    let cmds = extract(old, false, "reference/role-implementer.md");
+    assert_eq!(cmds.len(), 3, "{cmds:?}");
+    for cmd in &cmds {
+        let problem = check(&root, cmd).unwrap_or_else(|| panic!("`{}` passes the parse check", cmd.text));
+        assert!(problem.contains("role-implementer.md") && problem.contains("-id"), "{problem}");
+    }
+    let new = old.replace("--actor-id", "--actor").replace("--change-id", "--change").replace("--project-id", "--project");
+    for cmd in extract(&new, false, "reference/role-implementer.md") {
+        assert!(check(&root, &cmd).is_none(), "`{}` fails: {:?}", cmd.text, check(&root, &cmd));
+    }
 }
 
 /// A guide is read through `canon skills show`, and the consumer's repo holds no `reference/` tree, so no guide

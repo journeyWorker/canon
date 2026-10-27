@@ -15,7 +15,7 @@ pub struct ChangeNewArgs {
     #[arg(value_name = "CHANGE_ID", value_parser = crate::subject::parse_change_id)]
     pub slug: ChangeId,
     /// The existing subject to adopt the change under
-    #[arg(long, value_parser = crate::subject::parse_subject_id, value_name = "SUBJECT_ID")]
+    #[arg(long = "subject", value_parser = crate::subject::parse_subject_id, value_name = "SUBJECT_ID")]
     pub subject_id: SubjectId,
     /// `feature` (default): the PRD brief. `chore`: a short brief for work that
     /// changes how the subject is built or kept, never what it does

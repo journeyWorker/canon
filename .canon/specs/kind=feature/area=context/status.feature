@@ -149,7 +149,7 @@ Feature: context status
     Given a subject with an unevidenced scenario, an open blocker finding and a due review
     When status is run
     Then every suggested command parses as printed
-    And every write suggestion carries `--actor-id <unit>` and `--session-id <session>` wherever its command takes them
+    And every write suggestion carries `--actor <unit>` and `--session <session>` wherever its command takes them
 
   # canon: {"schema":1,"at":"2026-10-10T18:33:15Z","actor":{"agent_id":"canon"}}
   @subject:context-capability

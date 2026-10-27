@@ -63,17 +63,17 @@ canon context-pack verify sha256:00000000000000000000000000000000000000000000000
 ```
 ```text
 # Add a divergence candidate, staged with no run_seq yet
-canon divergence add <SCENARIO_ID> --actor-id <ACTOR_ID> [--project-id <PROJECT_ID>] [--rev <REV>] [--state <open|still-divergent|resolved|deferred>] [--reason <TEXT>] [--expiry <TIMESTAMP>] [--round <N>] [--session-id <SESSION_ID>] [--detail <TEXT>] [--role <ROLE>] [--promote | --no-promote] [--input]
+canon divergence add <SCENARIO_ID> --actor <ACTOR_ID> [--project <PROJECT_ID>] [--rev <REV>] [--state <open|still-divergent|resolved|deferred>] [--reason <TEXT>] [--expiry <TIMESTAMP>] [--round <N>] [--session <SESSION_ID>] [--detail <TEXT>] [--role <ROLE>] [--promote | --no-promote] [--input]
 ```
 ```bash
-canon divergence add auth.login.01 --actor-id alice --role reviewer
+canon divergence add auth.login.01 --actor alice --role reviewer
 ```
 ```text
 # Directly record a deferred divergence (requires --reason/--expiry)
-canon divergence defer <SCENARIO_ID> --actor-id <ACTOR_ID> --reason <TEXT> --expiry <TIMESTAMP> [--project-id <PROJECT_ID>] [--rev <REV>] [--round <N>] [--session-id <SESSION_ID>] [--role <ROLE>] [--input]
+canon divergence defer <SCENARIO_ID> --actor <ACTOR_ID> --reason <TEXT> --expiry <TIMESTAMP> [--project <PROJECT_ID>] [--rev <REV>] [--round <N>] [--session <SESSION_ID>] [--role <ROLE>] [--input]
 ```
 ```bash
-canon divergence defer auth.login.01 --actor-id alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer
+canon divergence defer auth.login.01 --actor alice --reason "waiting on the vendor" --expiry 2030-01-01T00:00:00Z --role reviewer
 ```
 ```text
 # List the current divergence burn-down state
@@ -84,45 +84,45 @@ canon divergence list --as-of 2030-01-01
 ```
 ```text
 # Directly record a resolved divergence
-canon divergence resolve <SCENARIO_ID> --actor-id <ACTOR_ID> [--project-id <PROJECT_ID>] [--rev <REV>] [--round <N>] [--session-id <SESSION_ID>] [--detail <TEXT>] [--role <ROLE>] [--input]
+canon divergence resolve <SCENARIO_ID> --actor <ACTOR_ID> [--project <PROJECT_ID>] [--rev <REV>] [--round <N>] [--session <SESSION_ID>] [--detail <TEXT>] [--role <ROLE>] [--input]
 ```
 ```bash
-canon divergence resolve auth.login.01 --actor-id alice --role reviewer
+canon divergence resolve auth.login.01 --actor alice --role reviewer
 ```
 ```text
 # Record one attributed EvidenceRecord for a task or scenario
-canon evidence add [--task-id <TASK_ID>] [--project-id <PROJECT_ID>] [--class <CLASS>] [--ref <TEXT>] [--verdict <faithful|not-applicable|divergent>] [--summary <TEXT>] [--command-result <TEXT>] [--scenario-id <SCENARIO_ID>] [--run-id <RUN_ID>] [--surface-ref <PATH_OR_EFFECT>]* [--actor-id <ACTOR_ID>] [--role <ROLE>] [--session-id <SESSION_ID>] [--approver <NAME>] [--approval-role <human>] [--signature-file <FILE>] [--approval-at <TIMESTAMP>] [--rev <REV>] [--artifact <PATH>]* [--report <FORMAT:PATH>]* [--report-case <NAME>]* [--all-scenarios] [--max-artifact-mib <N>] [--override-reason <TEXT>] [--promote | --no-promote] [--input]
+canon evidence add [--task <TASK_ID>] [--project <PROJECT_ID>] [--class <CLASS>] [--ref <TEXT>] [--verdict <faithful|not-applicable|divergent>] [--summary <TEXT>] [--command-result <TEXT>] [--scenario <SCENARIO_ID>] [--run <RUN_ID>] [--surface-ref <PATH_OR_EFFECT>]* [--actor <ACTOR_ID>] [--role <ROLE>] [--session <SESSION_ID>] [--approver <NAME>] [--approval-role <human>] [--signature-file <FILE>] [--approval-at <TIMESTAMP>] [--rev <REV>] [--artifact <PATH>]* [--report <FORMAT:PATH>]* [--report-case <NAME>]* [--all-scenarios] [--max-artifact-mib <N>] [--override-reason <TEXT>] [--promote | --no-promote] [--input]
 ```
 ```bash
-canon evidence add --scenario-id auth.login.01 --class test-run --ref "npm test" --role implementer
+canon evidence add --scenario auth.login.01 --class test-run --ref "npm test" --role implementer
 ```
 ```text
 # Emit exact bytes for external `ssh-keygen -Y sign -n canon-approval-v1`
-canon evidence approval-payload --approver <NAME> --approval-at <TIMESTAMP> [--task-id <TASK_ID>] [--project-id <PROJECT_ID>] [--scenario-id <SCENARIO_ID>] [--run-id <RUN_ID>] [--rev <REV>] [--surface-ref <PATH_OR_EFFECT>]*
+canon evidence approval-payload --approver <NAME> --approval-at <TIMESTAMP> [--task <TASK_ID>] [--project <PROJECT_ID>] [--scenario <SCENARIO_ID>] [--run <RUN_ID>] [--rev <REV>] [--surface-ref <PATH_OR_EFFECT>]*
 ```
 ```bash
-canon evidence approval-payload --scenario-id auth.login.01 --project-id root --approver alice --approval-at 2030-01-01T00:00:00Z
+canon evidence approval-payload --scenario auth.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z
 ```
 ```text
 # Record an external evaluator's re-audit of one scenario (class `audit`; the verdict follows --audit-result; canon never runs the evaluator)
-canon evidence audit <SCENARIO_ID> --ref <TEXT> --evaluator-id <ID> --evaluator-version <TEXT> --evaluator-digest <DIGEST> --audit-result <confirmed|refuted|indeterminate> [--project-id <PROJECT_ID>] [--summary <TEXT>] [--command-result <TEXT>] [--run-id <RUN_ID>] [--actor-id <ACTOR_ID>] [--role <ROLE>] [--session-id <SESSION_ID>] [--rev <REV>] [--artifact <PATH>]* [--report <FORMAT:PATH>]* [--report-case <NAME>]* [--max-artifact-mib <N>] [--override-reason <TEXT>] [--promote | --no-promote] [--input]
+canon evidence audit <SCENARIO_ID> --ref <TEXT> --evaluator <ID> --evaluator-version <TEXT> --evaluator-digest <DIGEST> --audit-result <confirmed|refuted|indeterminate> [--project <PROJECT_ID>] [--summary <TEXT>] [--command-result <TEXT>] [--run <RUN_ID>] [--actor <ACTOR_ID>] [--role <ROLE>] [--session <SESSION_ID>] [--rev <REV>] [--artifact <PATH>]* [--report <FORMAT:PATH>]* [--report-case <NAME>]* [--max-artifact-mib <N>] [--override-reason <TEXT>] [--promote | --no-promote] [--input]
 ```
 ```bash
-canon evidence audit auth.login.01 --ref audit-report.json --evaluator-id eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer
+canon evidence audit auth.login.01 --ref audit-report.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer
 ```
 ```text
 # Create a fresh .feature file for a new area.surface
-canon feature new <SURFACE> --title <TEXT> [--actor-id <ACTOR_ID>] [--session-id <SESSION_ID>] [--project-id <PROJECT_ID>] [--input]
+canon feature new <SURFACE> --title <TEXT> [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--project <PROJECT_ID>] [--input]
 ```
 ```bash
 canon feature new billing.invoice --title Invoices
 ```
 ```text
 # List a change's committed findings at their latest version
-canon finding list --change-id <CHANGE_ID> [--open] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+canon finding list --change <CHANGE_ID> [--open] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
-canon finding list --change-id add-login
+canon finding list --change add-login
 ```
 ```text
 # Validate a spec/artifact corpus against canon's format
@@ -154,21 +154,21 @@ canon inventory sync
 ```
 ```text
 # Read stored records across every storage tier
-canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin-id <PLUGIN_ID> | --history] [--change-id <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
+canon query --kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding> [--since <TIMESTAMP>] [--plugin <PLUGIN_ID> | --history] [--change <CHANGE_ID>] [--status <STATUS>] [--domain <NAME>] [--include-sensitive] [--limit <N> | --all] [--cursor <CURSOR>] [--fields <FIELDS>]
 ```
 ```bash
 canon query --kind evidence
 ```
 ```text
 # Fetch role-scoped strategy guidance
-canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject-id <SUBJECT_ID>] [--limit <N>]
+canon retrieve --for-role <ROLE> [--regime <KEY>] [--domain <NAME>] [--subject <SUBJECT_ID>] [--limit <N>]
 ```
 ```bash
 canon retrieve --for-role reviewer --domain dev --limit 20
 ```
 ```text
 # Append a tagged scenario stub to its .feature file (created if missing); many at once with `--input`
-canon scenario new <SCENARIO_ID> --title <TEXT> [--subject-id <SUBJECT_ID>] [--lane <NAME>] [--case <NAME>] [--flow <FLOW_ID>] [--change-id <CHANGE_ID> (with --flow)] [--actor-id <ACTOR_ID>] [--session-id <SESSION_ID>] [--feature <FILE>] [--project-id <PROJECT_ID>] [--input]
+canon scenario new <SCENARIO_ID> --title <TEXT> [--subject <SUBJECT_ID>] [--lane <NAME>] [--case <NAME>] [--flow <FLOW_ID>] [--change <CHANGE_ID> (with --flow)] [--actor <ACTOR_ID>] [--session <SESSION_ID>] [--feature <FILE>] [--project <PROJECT_ID>] [--input]
 ```
 ```bash
 canon scenario new auth.login.02 --title "Sign out" --feature .canon/specs/kind=feature/area=auth/login.feature
@@ -214,9 +214,9 @@ The forms you reach for most (the story's ids; swap in yours):
 
 ```bash
 canon evidence add --all-scenarios --report junit:a.xml --report junit:b.xml --role implementer
-canon evidence add --scenario-id auth.login.01 --report junit:red.xml
-canon evidence add --scenario-id auth.login.01 --verdict divergent --class test-run --ref "upstream limit, tracked in issue 118" --artifact limit.log
-canon finding add --change-id add-login --round 1 --seq 1 --severity should-fix --introduced-unknown --actor-id unit-1 --summary "Token is logged"
+canon evidence add --scenario auth.login.01 --report junit:red.xml
+canon evidence add --scenario auth.login.01 --verdict divergent --class test-run --ref "upstream limit, tracked in issue 118" --artifact limit.log
+canon finding add --change add-login --round 1 --seq 1 --severity should-fix --introduced-unknown --actor unit-1 --summary "Token is logged"
 ```
 
 Batches are one `--input` document (the keys are option names in camelCase,
@@ -224,7 +224,7 @@ Batches are one `--input` document (the keys are option names in camelCase,
 
 ```text
 canon scenario new --input '[{"operands":["auth.login.01"],"title":"Logs in","case":"happy","flow":"F1"},{"operands":["auth.login.02"],"title":"Rejects a wrong password","case":"failure","flow":"F1"}]'
-canon evidence add --input '[{"scenarioId":"auth.login.01","class":"test-run","ref":"npm test","role":"implementer"},{"scenarioId":"auth.login.02","class":"test-run","ref":"npm test","role":"implementer"}]'
+canon evidence add --input '[{"scenario":"auth.login.01","class":"test-run","ref":"npm test","role":"implementer"},{"scenario":"auth.login.02","class":"test-run","ref":"npm test","role":"implementer"}]'
 ```
 
 ## Steps
@@ -247,7 +247,7 @@ canon evidence add --input '[{"scenarioId":"auth.login.01","class":"test-run","r
    under a `specs.roots[]` root (default `.canon/specs`); `canon skills show
    canon-authoring` has the scaffold. When you fill in a scenario, keep its
    `# canon: {...}` provenance lines: dropping one aborts `inventory sync`
-   on `missing-provenance`. `--project-id` is needed only when the repo
+   on `missing-provenance`. `--project` is needed only when the repo
    configures more than one spec root.
 2. **Units.** One unit is one flow step's complete path (sees, does,
    becomes) that can be verified on its own, sized to one session. Name the
@@ -262,7 +262,7 @@ canon evidence add --input '[{"scenarioId":"auth.login.01","class":"test-run","r
    with `finding add` the moment you find it, before review.
    **A fix fails first.** For a bug fix, write or extend the scenario's test
    and run it red on the unfixed code, then bind that failing run before you
-   change the code (`evidence add --scenario-id <id> --report <fmt>:<path>`).
+   change the code (`evidence add --scenario <id> --report <fmt>:<path>`).
    A bound report decides the verdict: a failed case records `divergent`, a
    skipped case and none failed records `not-applicable`, otherwise
    `faithful`; an explicit `--verdict faithful` over a failed or skipped case
@@ -276,8 +276,8 @@ canon evidence add --input '[{"scenarioId":"auth.login.01","class":"test-run","r
    One test run that proves several scenarios is bound once with
    `--all-scenarios`: one record per indexed scenario owning a case, each
    with the verdict its own cases show; any refusal writes none. It needs
-   `--project-id` only when the repo has several spec roots. For one scenario
-   use `--scenario-id <id>` with `--report` or `--artifact`; for many
+   `--project` only when the repo has several spec roots. For one scenario
+   use `--scenario <id>` with `--report` or `--artifact`; for many
    records with different values, one `evidence add --input` with an array
    (validated before any write; a write that fails stops the batch, the
    earlier elements stay written and a rerun reports them `unchanged`).
@@ -299,7 +299,7 @@ canon evidence add --input '[{"scenarioId":"auth.login.01","class":"test-run","r
    with `--artifact <scenario-id>=<path>`; a bare `--artifact` in a batch is
    refused. An external evaluator's audit is
    `canon evidence audit`; canon never generates one. Evidence for a task of an
-   imported plan (`--task-id <id>`) must bind the artifact or report that proves
+   imported plan (`--task <id>`) must bind the artifact or report that proves
    the task; a canon command is never that proof. When the behavior cannot
    match the scenario because of something outside this change, record the
    evidence `divergent` and say why in `--ref`; never record `faithful` to
@@ -328,7 +328,7 @@ canon evidence add --input '[{"scenarioId":"auth.login.01","class":"test-run","r
    is `docs/**` and `*.md`). A docs-only chore needs its change-level review
    alone. When code did change, the shipping refusal, `status` and
    `meta.next` lead with one command over every report, with the real paths
-   (`--project-id <id>` is added only with several spec roots):
+   (`--project <id>` is added only with several spec roots):
    `canon evidence add --all-scenarios --report junit:a.xml --report junit:b.xml --role implementer`.
    Run the suite and bind it with that one command, not one scenario at a
    time. Reviews stay current while the verdicts and checks are unchanged; a

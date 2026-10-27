@@ -15,6 +15,6 @@ audits: 0 sampled, 0 confirmed, 0 owed, 1 refuted
 
 next:
   # no subject exists yet; a subject is the unit status, review and shipping track
-  canon subject new <id> --domain <domain> --title "<title>" --actor-id <unit> --session-id <session>
+  canon subject new <id> --domain <domain> --title "<title>" --actor <unit> --session <session>
   # 1 scenario(s) carry no @subject tag (first: cart.add.01); add `@subject:<id>` above each in its .feature file, then check again: status re-indexes the edited files itself
   canon status

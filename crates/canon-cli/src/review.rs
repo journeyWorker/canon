@@ -38,10 +38,10 @@
 //! ([`crate::retry`], which leaves the id out of the comparison as it leaves
 //! out the time) shows the id of the stored review instead, so a run that
 //! mixes written and skipped reviews shows several. `canon finding add
-//! --review-id` takes one of them.
+//! --review` takes one of them.
 //!
 //! # A chore is reviewed as a change (0.23 D5)
-//! `--change-id <slug>` writes one review of a chore change instead of one
+//! `--change <slug>` writes one review of a chore change instead of one
 //! per scenario: the reviewer signs the chore's invariants and checks
 //! against the diff. It pins the brief ([`PinnedSpec::Brief`], the digest
 //! [`crate::brief::brief_digest`] computes), so an edit to the brief
@@ -82,17 +82,17 @@ use serde::Serialize;
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 
-/// `--project-id`'s `clap` value parser.
+/// `--project`'s `clap` value parser.
 pub fn parse_project_id(s: &str) -> Result<ProjectId, JoinKeyError> {
     ProjectId::parse(s)
 }
 
-/// `--scenario-id`'s `clap` value parser.
+/// `--scenario`'s `clap` value parser.
 pub fn parse_scenario_id(s: &str) -> Result<ScenarioId, JoinKeyError> {
     ScenarioId::parse(s)
 }
 
-/// `--session-id`'s `clap` value parser, shared by every command that
+/// `--session`'s `clap` value parser, shared by every command that
 /// records an actor (`evidence add`, `review add`, `finding add|close`).
 /// The grammar is [`SessionId`]'s: one non-empty opaque token, no
 /// surrounding whitespace, no control characters.
@@ -499,7 +499,7 @@ mod tests {
     }
 
     /// A repo whose `canon.yaml` configures the spec root `app-a`, the
-    /// project id these tests write under (`--project-id` must name one).
+    /// project id these tests write under (`--project` must name one).
     fn repo_dir() -> TempDir {
         let dir = TempDir::new().unwrap();
         std::fs::write(dir.path().join("canon.yaml"), "specs:\n  roots:\n    - id: app-a\n      root: specs\n").unwrap();

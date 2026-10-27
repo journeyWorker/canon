@@ -48,7 +48,7 @@ a feature, a one-line request included. A human is needed once per scope:
   needs the approval of the changes its tags name only, so a new unapproved
   change on a live subject waits on its own scenarios; an untagged scenario
   answers to every change with an `Approved:` line (an edited one refuses); `change new` and
-  `subject adopt` warn when the subject is live. `canon subject unadopt <subject-id> --change-id <change>`
+  `subject adopt` warn when the subject is live. `canon subject unadopt <subject-id> --change <change>`
   takes a draft change back off (refused once approved). The subject
   answers for every adopted change that is tagged (a scenario of the subject
   is tagged `@flow:<change>.*`), has an `Approved:` line, or is a chore:
@@ -115,7 +115,7 @@ needs its change-level review alone. What counts as code is `code.exclude` in
 `canon status`, `meta.next` and the refusal hint lead with one batch over
 every report, for example
 `canon evidence add --all-scenarios --report junit:a.xml --report junit:b.xml --role implementer`
-(with the real report paths, and `--project-id <id>` when the repo has several
+(with the real report paths, and `--project <id>` when the repo has several
 spec roots), never a loop per scenario. With a `--report`, `--class` defaults
 to `test-run` and `--ref` to the report paths, and the bound cases decide the
 verdict: any failed case `divergent`, a skipped one and none failed
@@ -180,7 +180,7 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   `warnings` and, for a repeated write that changed nothing, `unchanged: true`.
   On failure branch on `error.code`, fix the option `error.field` names
   using the `error.expected` values (`field` is an option name, or a JSON
-  pointer such as `/items/2/scenarioId` into an `--input` document), and
+  pointer such as `/items/2/scenario` into an `--input` document), and
   follow `error.hint`: every refusal carries a working invocation. The codes
   are stable; `canon schema --errors --json` lists them and
   `canon schema --error <CODE>` explains one.
@@ -190,9 +190,11 @@ A role is guidance, not enforcement: `--role` on `evidence add` and
   A refusal leaves the tree unchanged.
 - Repeating a write is safe: a record that already exists with identical
   content is reported `unchanged` (`meta.unchanged`), not duplicated.
-- Flags that name an id are spelled `--<noun>-id` everywhere (`--change-id`,
-  `--project-id`, `--subject-id`, `--scenario-id`, `--actor-id`,
-  `--session-id`), the primary object of a command is its operand
+- An option that takes an id is the bare noun (`--change add-login`,
+  `--scenario auth.login.01`, `--actor reviewer-1`, `--project root`,
+  `--session s-1`), and an `--input` document key is that name without `Id`
+  (`scenario`, `actor`; the stored record and report JSON keep `scenario_id`,
+  `scenarioId`). The primary object of a command is its operand
   (`canon subject move <id> --to verifying`, `canon change new <slug>`), and
   `--kind` values carry no `_record` suffix (`--kind evidence`).
 - `canon status` sends the planner to write the brief while `brief check`
@@ -223,8 +225,8 @@ before anything is written: an invalid element writes nothing and exits 2,
 
 ```text
 canon scenario new --input '[{"operands":["auth.login.01"],"title":"Logs in","case":"happy"},{"operands":["auth.login.02"],"title":"Wrong password","case":"failure"}]'
-canon evidence add --input '[{"scenarioId":"auth.login.01","class":"test-run","ref":"npm test","role":"implementer"},{"scenarioId":"auth.login.02","class":"test-run","ref":"npm test","role":"implementer"}]'
-canon finding add --input '[{"changeId":"add-login","round":1,"seq":1,"severity":"note","actorId":"reviewer-1","summary":"Token is logged"},{"changeId":"add-login","round":1,"seq":2,"severity":"blocker","introducedUnknown":true,"actorId":"reviewer-1","summary":"No rate limit"}]'
+canon evidence add --input '[{"scenario":"auth.login.01","class":"test-run","ref":"npm test","role":"implementer"},{"scenario":"auth.login.02","class":"test-run","ref":"npm test","role":"implementer"}]'
+canon finding add --input '[{"change":"add-login","round":1,"seq":1,"severity":"note","actor":"reviewer-1","summary":"Token is logged"},{"change":"add-login","round":1,"seq":2,"severity":"blocker","introducedUnknown":true,"actor":"reviewer-1","summary":"No rate limit"}]'
 ```
 
 `--input` never carries `--commit` or `--plan-digest`, and the destructive
@@ -298,10 +300,10 @@ on the list.
 
 - **Fix a bug:** the approved change if there is one, else the planner (`canon change new`); first a failing run of the scenario (`canon scenario new --case failure`, then `canon evidence add`), then the fix. `canon skills show role-implementer`.
 - **Add or change a feature:** `canon subject new`, `canon change new`, then the brief. `canon skills show role-planner`.
-- **Pure refactor, dependency, build, CI or infra:** `canon change new <slug> --subject-id <id> --change-kind chore`; data or interface changes are not chores. `canon skills show role-planner`.
+- **Pure refactor, dependency, build, CI or infra:** `canon change new <slug> --subject <id> --change-kind chore`; data or interface changes are not chores. `canon skills show role-planner`.
 - **Review someone's change:** `CANON_ROLE=reviewer`, `canon brief check <slug>`. `canon skills show role-reviewer`.
 - **Resume:** `canon status --json`, then follow `meta.next`. `canon skills show role-orchestrator`.
-- **Plan more work on a live subject:** `canon change new <slug> --subject-id <id>` (it warns until the brief is approved; `canon subject unadopt` parks a draft). `canon skills show canon-subject`, `canon skills show role-planner`.
+- **Plan more work on a live subject:** `canon change new <slug> --subject <id>` (it warns until the brief is approved; `canon subject unadopt` parks a draft). `canon skills show canon-subject`, `canon skills show role-planner`.
 - **Upgrade canon in a repo:** `canon migrate` (previews), then `canon migrate --commit --plan-digest <digest>`, then `canon skills install`. See "Upgrading a repo from 0.27" above and `canon skills show role-orchestrator`.
 
 **Done when:** you have named your role and loaded its guide, and `canon status --json` lists your next step in `meta.next`.

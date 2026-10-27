@@ -80,7 +80,7 @@ fn brief_check_16_blockers_exit_1_with_the_report_and_a_refusal_exits_2() {
     let dir = repo();
     let repo = dir.path();
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     let brief = repo.join(".canon/changes/add-login/brief.md");
 
     // The fresh skeleton holds placeholders: structure blockers.
@@ -210,7 +210,7 @@ fn skills_install_22_the_write_commands_do_their_own_bookkeeping() {
     let dir = repo();
     let repo = dir.path();
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, &["scenario", "new", "demo.login.01", "--title", "Logs in", "--subject-id", "demo", "--case", "failure"]);
+    ok(repo, &["scenario", "new", "demo.login.01", "--title", "Logs in", "--subject", "demo", "--case", "failure"]);
     ok(repo, &["format", ".canon/specs"]);
 
     // The gate indexes the new scenario itself and names it as having no evidence.
@@ -219,17 +219,17 @@ fn skills_install_22_the_write_commands_do_their_own_bookkeeping() {
     assert!(text(&gate).contains("uncovered-cell demo.login.01"), "{}", text(&gate));
 
     // evidence add promotes in the same run: the gate no longer names the scenario.
-    let staged = ["evidence", "add", "--scenario-id", "demo.login.01", "--class", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor-id", "impl"];
+    let staged = ["evidence", "add", "--scenario", "demo.login.01", "--class", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor", "impl"];
     let add = json(&ok(repo, &[&staged[..], &["--json"]].concat()));
     assert!(add["data"]["records"][0]["committed"].is_string(), "promoted in the same run: {add}");
     let gate = canon(repo, &["gate", "check"]);
     assert!(!text(&gate).contains("uncovered-cell demo.login.01"), "{}", text(&gate));
 
     // --no-promote stages only: the gate still names the scenario and the next step is the promote.
-    ok(repo, &["scenario", "new", "demo.login.02", "--title", "Fails", "--subject-id", "demo", "--case", "failure"]);
+    ok(repo, &["scenario", "new", "demo.login.02", "--title", "Fails", "--subject", "demo", "--case", "failure"]);
     let held = json(&ok(
         repo,
-        &["evidence", "add", "--scenario-id", "demo.login.02", "--class", "test-run", "--ref", "cargo test 2", "--role", "implementer", "--actor-id", "impl", "--no-promote", "--json"],
+        &["evidence", "add", "--scenario", "demo.login.02", "--class", "test-run", "--ref", "cargo test 2", "--role", "implementer", "--actor", "impl", "--no-promote", "--json"],
     ));
     assert!(held["data"]["records"][0]["committed"].is_null(), "{held}");
     assert_eq!(held["meta"]["next"][0]["argv"], serde_json::json!(["canon", "gate", "promote"]), "{held}");

@@ -432,9 +432,23 @@ fn waiver_entry(item: &Value, line: usize) -> WaiverEntry {
 
 /// Reads `text` as a brief (module doc).
 pub fn parse(text: &str) -> Brief {
+    let had_bom = text.starts_with('\u{feff}');
+    let text = text.trim_start_matches('\u{feff}');
     let fm_end = frontmatter_end(text);
     let (lines, comments) = scan(text, fm_end.map_or(1, |end| end + 1));
-    let frontmatter = fm_end.map(|end| parse_frontmatter(text, end));
+    let mut frontmatter = fm_end.map(|end| parse_frontmatter(text, end));
+    // A `---` first line with no closing `---` is a frontmatter that never ends, and a BOM before the opening fence
+    // hides it from a reader that expects it on the first byte: both are reported, never silently read as prose.
+    let opens = text.lines().next().is_some_and(is_frontmatter_fence);
+    if opens && fm_end.is_none() {
+        frontmatter = Some(Frontmatter { end_line: 1, problems: vec![(1, "the frontmatter opened by `---` on line 1 is never closed by a `---` line".to_string())], ..Frontmatter::default() });
+    }
+    if had_bom && opens {
+        if let Some(front) = frontmatter.as_mut() {
+            front.problems.push((1, "a byte-order mark sits before the frontmatter's opening `---`; save the file without it".to_string()));
+            front.waivers.clear();
+        }
+    }
 
     let mut old = OldFormat::default();
     for comment in &comments {
@@ -478,7 +492,10 @@ pub fn parse(text: &str) -> Brief {
     };
     old.markers.sort_by_key(|m| m.line);
     let old_format = (!old.markers.is_empty()).then_some(old);
-    let legacy_chore = old_format.as_ref().is_some_and(|_| comments.iter().any(|c| c.body.split_whitespace().collect::<Vec<_>>() == ["canon:kind", "chore"]));
+    let legacy_chore = old_format.as_ref().is_some_and(|_| comments.iter().any(|c| {
+        let mut tokens = c.body.split_whitespace();
+        tokens.next() == Some("canon:kind") && tokens.next() == Some("chore")
+    }));
     let kind = if frontmatter.as_ref().and_then(|f| f.kind) == Some(Kind::Chore) || legacy_chore { Kind::Chore } else { Kind::Feature };
     Brief { lines, comments, frontmatter, sections, other_h2, kind, old_format }
 }
@@ -605,6 +622,20 @@ mod tests {
         assert_eq!(korean.old_format.unwrap().markers.iter().map(|m| m.what).collect::<Vec<_>>(), vec!["heading", "heading"]);
         let approval_note = parse("# t\n\n## Intent\n\nx\n\n## Out of scope\n\ny\n\n<!-- The human records their answer -->\n");
         assert!(approval_note.old_format.is_none(), "an approval note is not a marker");
+    }
+
+    #[test]
+    fn an_unclosed_or_bom_frontmatter_is_reported_not_ignored() {
+        let unclosed = parse("---\nkind: chore\n\n# t\n\n## Intent\n\nx\n");
+        assert!(unclosed.frontmatter.as_ref().is_some_and(|f| f.problems.iter().any(|(_, m)| m.contains("never closed"))));
+        let bom = parse("\u{feff}---\nkind: chore\n---\n# t\n");
+        assert!(bom.frontmatter.as_ref().is_some_and(|f| f.problems.iter().any(|(_, m)| m.contains("byte-order mark"))));
+        assert!(parse("\u{feff}# t\n").frontmatter.is_none(), "a BOM alone is no frontmatter");
+    }
+
+    #[test]
+    fn an_old_chore_marker_with_a_category_still_reads_as_a_chore() {
+        assert!(is_chore("# t\n\n<!-- canon:kind chore (ci) -->\n"));
     }
 
     #[test]

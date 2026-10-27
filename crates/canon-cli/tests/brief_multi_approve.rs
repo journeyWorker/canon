@@ -67,7 +67,7 @@ fn repo() -> TempDir {
     ok(repo, &["init", "--providers", "none", "--no-agents-md"]);
     ok(repo, &["subject", "new", "s", "--domain", "dev", "--title", "S"]);
     for change in ["a", "b", "c"] {
-        ok(repo, &["change", "new", change, "--subject-id", "s", "--title", change]);
+        ok(repo, &["change", "new", change, "--subject", "s", "--title", change]);
         std::fs::write(brief_path(repo, change), brief()).unwrap();
     }
     dir
@@ -143,7 +143,7 @@ fn skills_install_70_a_blocked_a_missing_and_an_unclosed_brief_refuse_all_and_wr
     let dir = repo();
     let repo = dir.path();
     // `d` keeps the skeleton `change new` wrote, whose blockers refuse an approval.
-    ok(repo, &["change", "new", "d", "--subject-id", "s", "--title", "d"]);
+    ok(repo, &["change", "new", "d", "--subject", "s", "--title", "d"]);
     std::fs::write(brief_path(repo, "c"), format!("{}\n```\nunclosed\n", brief())).unwrap();
     let before: Vec<String> = ["a", "b", "c", "d"].iter().map(|c| std::fs::read_to_string(brief_path(repo, c)).unwrap()).collect();
 

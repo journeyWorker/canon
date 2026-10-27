@@ -1,4 +1,4 @@
-//! `canon change new <slug> --subject-id <id> --title <t>` (0.14 D2, 0.17
+//! `canon change new <slug> --subject <id> --title <t>` (0.14 D2, 0.17
 //! D2): the official path to a plan change. It writes canon's own
 //! change dir, `.canon/changes/<slug>/` (`brief.md` only, 0.19 D4: flow coverage
 //! replaces the task checklist; an existing `tasks.md` is still read), reads
@@ -25,7 +25,7 @@
 //! [`crate::subject::persist_adoption`] for the order) cannot be written
 //! atomically, so a failure between them keeps the change dir and the
 //! subject record and prints the command that completes the link,
-//! `canon ingest plans && canon subject adopt <id> --change-id <slug>`,
+//! `canon ingest plans && canon subject adopt <id> --change <slug>`,
 //! which is safe to rerun.
 //!
 //! # Refusals (exit `2`, nothing written)

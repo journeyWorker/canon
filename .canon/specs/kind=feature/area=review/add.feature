@@ -80,7 +80,7 @@ Feature: review scenario
   @review.add.08
   Scenario: A review records the reviewing session and says it was written directly
     Given evidence attested for a scenario
-    When a review is added with --session-id
+    When a review is added with --session
     Then the review's actor carries that session_id
     And the command says it was written directly, with nothing to promote
 
@@ -310,7 +310,7 @@ Feature: review scenario
   @review.add.92
   Scenario: A review for a project id that names no configured spec root is refused
     Given a repo whose canon.yaml configures one spec root, game, and a scenario indexed under it
-    When review scenario names a --project-id that is no configured root
+    When review scenario names a --project that is no configured root
     Then it exits 2 with UNKNOWN_SPEC_ROOT, writes no review record, and the hint names the configured root
 
   # canon: {"schema":1,"at":"2026-10-23T12:07:06Z","actor":{"agent_id":"canon-impl-028","role":"implementer"}}

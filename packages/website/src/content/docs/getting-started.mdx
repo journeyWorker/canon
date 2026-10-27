@@ -123,7 +123,7 @@ is attributed, and is fresh — never on a self-report. See
 
    ```bash
    bunx @journeykit/canon subject new auth --domain dev --title "Auth"
-   bunx @journeykit/canon change new add-login --subject-id auth --title "Add login"
+   bunx @journeykit/canon change new add-login --subject auth --title "Add login"
    ```
 
    `change new` writes `.canon/changes/add-login/brief.md` and adopts the
@@ -210,7 +210,7 @@ the input schema and an example.
 
 ```bash
 canon scenario new auth.login.02 --title "Sign out"
-canon evidence add --scenario-id auth.login.02 --class test-run --ref "npm test" --role implementer
+canon evidence add --scenario auth.login.02 --class test-run --ref "npm test" --role implementer
 ```
 
 The same calls as one batch, validated before anything is written:

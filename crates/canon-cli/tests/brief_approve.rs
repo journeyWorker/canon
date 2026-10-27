@@ -48,7 +48,7 @@ fn repo_with_clean_brief() -> TempDir {
     let repo = dir.path();
     ok(repo, &["init", "--providers", "none"]);
     ok(repo, &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
-    ok(repo, &["change", "new", "add-login", "--subject-id", "demo", "--title", "Add login"]);
+    ok(repo, &["change", "new", "add-login", "--subject", "demo", "--title", "Add login"]);
     std::fs::write(brief_path(repo), en_brief("")).unwrap();
     let tasks = repo.join(".canon/changes/add-login/tasks.md");
     let mut text = std::fs::read_to_string(&tasks).unwrap_or_else(|_| "# Tasks: Add login\n".to_string());
@@ -58,7 +58,7 @@ fn repo_with_clean_brief() -> TempDir {
     dir
 }
 
-const ATTEST: [&str; 12] = ["evidence", "add", "--task-id", "add-login#1", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor-id", "impl"];
+const ATTEST: [&str; 12] = ["evidence", "add", "--task", "add-login#1", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor", "impl"];
 
 fn approve(repo: &Path, who: &str, words: &str) -> Output {
     run(repo, &["brief", "approve", "--approver", who, "--note", words])

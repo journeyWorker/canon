@@ -1,6 +1,6 @@
 description: "`canon gate task` flips a task whose only evidence binds no file and cites a canon command as its --ref (exit 0), and warns on stderr that the artifact or report proving the task should be bound"
 steps:
-  - args: [evidence, add, --task-id, "it-circular#1.1", --class, test-run, --ref, canon gate check, --role, implementer]
+  - args: [evidence, add, --task, "it-circular#1.1", --class, test-run, --ref, canon gate check, --role, implementer]
     exit: 0
   - args: [gate, promote]
     exit: 0

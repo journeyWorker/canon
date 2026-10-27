@@ -1174,6 +1174,10 @@ pub fn revert_plan(repo: &Path, backup: &Path) -> Result<RevertPlan, String> {
     }
     let briefs = crate::migrate_briefs::check_revert(repo, backup)?;
     let diff = diff(repo, &manifest)?;
+    let acts = crate::migrate_briefs::later_human_acts(repo, backup, SNAPSHOT_DIR, &diff.remove, &diff.restore);
+    if !acts.is_empty() {
+        return Err(format!("a human's approval was made after `canon migrate` ran, and a revert would discard it: {}; nothing was written. Revert by hand, or approve again after the revert", acts.join(", ")));
+    }
     let journal = match std::fs::read_to_string(backup.join(JOURNAL)) {
         Ok(text) if !diff.is_empty() => Some(serde_json::from_str::<Journal>(&text).map_err(|e| format!("the journal in {} is unreadable: {e}", backup.display()))?),
         _ => None,

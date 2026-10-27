@@ -48,7 +48,7 @@ GRIDS = {
     "full": {"scenarios": [300, 1000, 3000], "batch": [10, 30, 100, 300]},
 }
 
-BATCH_ARGS = ["--project-id", "root", "--all-scenarios", "--class", "test-run", "--ref", "bench", "--role", "implementer", "--actor-id", "bench-batch"]
+BATCH_ARGS = ["--project", "root", "--all-scenarios", "--class", "test-run", "--ref", "bench", "--role", "implementer", "--actor", "bench-batch"]
 
 # Runs in a fresh interpreter: resource.getrusage(RUSAGE_CHILDREN) then covers exactly one command.
 CHILD = (

@@ -1,4 +1,4 @@
 description: "`canon evidence add --artifact` exits 2 on a file that resolves outside the repository, since bound files are recorded by repository-relative path"
 steps:
-  - args: [evidence, add, --scenario-id, cart.add.01, --project-id, root, --class, test-run, --ref, cargo test, --role, implementer, --artifact, /etc/hosts]
+  - args: [evidence, add, --scenario, cart.add.01, --project, root, --class, test-run, --ref, cargo test, --role, implementer, --artifact, /etc/hosts]
     exit: 2
