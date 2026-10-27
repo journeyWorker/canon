@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "impl-031-loop",
+    "role": "implementer",
+    "session_id": "loop-2026-10-27-r1"
+  },
+  "at": "2026-10-27T13:05:17.517747854Z",
+  "code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test brief_multi_approve skills_install_73"
+  },
+  "evidence_note": {
+    "command_result": "ok",
+    "summary": "r1 fix, cargo nextest workspace 3208 passed"
+  },
+  "evidence_sha": "552059516bcf1bee0abc4407bde588cfcf08be56",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 166,
+  "scenario_id": "skills.install.73",
+  "schema": 1,
+  "staging_id": "590a386a",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
