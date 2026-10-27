@@ -696,6 +696,8 @@ def main(argv: list[str] | None = None) -> int:
         ".gitignore",
         "Cargo.lock",
         "Cargo.toml",
+        # Workspace clippy configuration (rust-coding-rules.md §1); clippy reads it from the root.
+        "clippy.toml",
         "README.md",
         "bun.lock",
         "canon.yaml",
