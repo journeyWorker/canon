@@ -5,28 +5,44 @@
 <!-- canon:section intent role=context -->
 ## Intent
 
-0.31 툴체인 고정과 CI 보강
+0.30의 CI는 clippy 잡만 툴체인 1.99.1이고 나머지 잡은 떠 있는 `stable`이라서, 새 stable이 나오면 코드 변경 없이 잡 일부만 달라질 수 있다. 또 0.30 릴리스는 태그를 단 뒤에야 두 번 실패했다(릴리스 워크플로 안전 검사, 맨페이지 생성기 빌드). 툴체인을 저장소 한 곳에서 고정하고, 그 두 검사를 PR에서 먼저 돌려 태그 전에 잡는다.
 
-<!-- canon:hint What problem this solves, for whom, and why now. One to three sentences. -->
+0.31 순서: CI → 버그 수정 → 승인과 adopt → brief 포맷 → CLI id → 검색. 여섯 brief는 함께 승인받는다.
 
 <!-- canon:section category role=context -->
 ## Category
 
-<!-- canon:hint Exactly one of `refactor`, `dependency`, `build`, `ci`, `infra`. -->
+ci
 
 <!-- canon:section invariants role=normative -->
 ## Invariants
 
-<!-- canon:hint What must not change: behavior, public interfaces, data, outputs. A change that alters any of them is a feature, not a chore. -->
+- ==**canon 바이너리, 출력, 레저는 바뀌지 않는다.**== CI 정의, 툴체인 고정 파일, 검사 스크립트만 바뀐다.
+- 툴체인은 저장소 루트의 고정 파일 한 곳(1.99.1)에서 정해진다. 테스트 워크플로, 네이티브 빌드 워크플로, 발행 워크플로의 모든 Rust 설치 단계는 이 파일을 따르고, 떠 있는 `stable`을 쓰지 않는다.
+- 고정 파일은 clippy와 rustfmt 컴포넌트를 담는다. 릴리스 매트릭스의 세 타깃도 담는다: aarch64 macOS, x86_64 Linux gnu, x86_64 Windows msvc.
+- 릴리스 워크플로 안전 검사는 새 고정 파일이 있어도 통과하고, 액션을 전체 커밋 SHA로 고정하라는 기존 규칙을 그대로 지킨다.
+- 툴체인 고정을 올리는 일은 PR 하나에서 하며, 같은 PR에서 clippy 잡의 lint 목록을 다시 확인한다.
+- 릴리스 워크플로 안전 검사와 맨페이지 생성기 빌드는 매 PR의 CI에서 돈다. 맨페이지 생성기 빌드는 지금 네이티브 빌드 워크플로에서, 그것도 Rust 소스를 건드린 PR에서만 돈다.
 
 <!-- canon:section checks role=normative -->
 ## Checks
 
-<!-- canon:hint How you show the invariants held: the suite that is run again at the chore commit, and anything else you compare. -->
+- ==**마지막 커밋에서 모든 CI 잡이 통과한다.**== 툴체인이 하나로 고정된 뒤에도 기존 테스트, canon 자체 gate, 벤치 모양, live tier 잡이 같은 결과를 낸다.
+- 버리는 브랜치에서 새 단계 각각에 위반 하나를 한 번씩 넣어 그 단계가 실패하는 것을 확인하고, 결과를 리뷰에 남긴다. 위반은 (1) 액션을 SHA 없이 가리키는 참조, (2) 맨페이지 생성기가 빌드되지 않게 하는 변경이다.
+- 고정 파일이 실제로 쓰이는지 CI 로그에서 확인한다: 각 잡이 설치한 `rustc` 버전이 1.99.1이다.
+- 변경 단위 리뷰는 다른 세션의 reviewer가 한다.
 
 <!-- canon:section out-of-scope role=context -->
 ## Out of scope
 
-<!-- canon:hint What this change deliberately does not do. Write `None.` if nothing. -->
+- 툴체인 버전을 1.99.1에서 올리는 일.
+- 코드 수정과 rustfmt 검사 단계 추가(컴포넌트는 설치만 한다).
+- 릴리스 절차 자체의 변경.
 
-<!-- The human records their answer, and only that answer, with: canon brief approve --approver <who> --note "<their words>" -->
+<!-- canon:section questions role=context -->
+## Questions and assumptions
+
+- 어떻게 고정 파일을 잡에 적용하나? 가정: 설치 액션 입력에 버전을 다시 적지 않고 고정 파일을 따르게 하여 버전이 한 곳에만 있게 한다. 액션이 파일을 읽지 못하면 rustup으로 파일대로 설치한다. 어느 쪽이든 액션 참조는 SHA 고정을 유지한다.
+- "매 PR"의 범위는? 가정: `test.yml`의 경로 필터에 워크플로, 스크립트, 고정 파일 경로를 더해 이들을 건드린 PR에서도 돌게 하고, 안전 검사와 맨페이지 빌드를 `test.yml`에 둔다. 경로 필터 없는 별도 워크플로로 만들지는 않는다.
+- 안전 검사 스크립트가 고정 파일 자체를 검사해야 하나? 가정: 스크립트는 고정 파일을 거부하지 않는 것으로 충분하고, 워크플로에 떠 있는 `stable` 설치가 남지 않도록 하는 검사 추가는 하지 않는다.
+- 맨페이지 빌드를 PR에서 debug로 돌릴까 release로 돌릴까? 가정: 릴리스와 같은 명령(release)을 쓴다.

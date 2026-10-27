@@ -1,0 +1,21 @@
+{
+  "actor": {
+    "agent_id": "canon",
+    "role": "implementer"
+  },
+  "at": "2026-10-27T08:41:31.905163730Z",
+  "change_ids": [
+    "canon-0-30-rust-sweep",
+    "canon-0-30-ledger-naming",
+    "canon-0-30-spec-backfill",
+    "canon-0-31-loop"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "shipped",
+  "subject_id": "evidence-attestation",
+  "summary": "",
+  "title": "Evidence: staged attributed attestation"
+}
