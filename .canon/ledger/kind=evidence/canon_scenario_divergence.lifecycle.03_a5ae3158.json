@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:18:20.714530992Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --lib divergence::tests::resolve_and_defer_promote_only_their_own_record_and_leave_other_staged_work"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 42,
+  "scenario_id": "divergence.lifecycle.03",
+  "schema": 1,
+  "staging_id": "0a7187a9",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

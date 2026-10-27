@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:22:01.286917268Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test evidence_store a_stored_blob_keeps_a_rewritten_report_provable_and_a_lost_one_is_stale_evidence"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 196,
+  "scenario_id": "gate.check.22",
+  "schema": 1,
+  "staging_id": "fda70a59",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

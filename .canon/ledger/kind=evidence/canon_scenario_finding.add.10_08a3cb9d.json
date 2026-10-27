@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:20:25.208148760Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject a_blocker_the_author_found_in_its_own_work_is_accepted_and_still_blocks"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 108,
+  "scenario_id": "finding.add.10",
+  "schema": 1,
+  "staging_id": "225591d6",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

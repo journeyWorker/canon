@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:24:47.885594942Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test ledger_migrate ledger_migrate_12_the_old_key_routes_the_kind_and_warns"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 66,
+  "scenario_id": "ledger.migrate.12",
+  "schema": 1,
+  "staging_id": "2cb1cb8d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

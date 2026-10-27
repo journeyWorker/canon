@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:21:55.022902253Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject gate_check_reports_unreviewed_and_open_blocker_for_an_in_scope_subject"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 191,
+  "scenario_id": "gate.check.17",
+  "schema": 1,
+  "staging_id": "17108ffb",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

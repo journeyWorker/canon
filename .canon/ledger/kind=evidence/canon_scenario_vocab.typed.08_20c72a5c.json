@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:30:42.974776677Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-vocab --lib an_invalid_atom_produces_no_task_only_diagnostics"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 26,
+  "scenario_id": "vocab.typed.08",
+  "schema": 1,
+  "staging_id": "eb0cab5d",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

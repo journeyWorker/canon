@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:25:29.896663605Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test plugin_sync a_covered_scenario_projects_covered_true_with_its_surface_ref"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 25,
+  "scenario_id": "plugin.overlay.04",
+  "schema": 1,
+  "staging_id": "d6a3bd90",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

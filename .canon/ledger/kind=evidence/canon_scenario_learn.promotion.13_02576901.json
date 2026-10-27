@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:24:30.440224964Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_reads learn_promotion_13_a_rollback_with_an_unreadable_or_invalid_signature_or_a_malformed_timestamp_is_refused_and_writes_nothing"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 57,
+  "scenario_id": "learn.promotion.13",
+  "schema": 1,
+  "staging_id": "5b4d6436",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

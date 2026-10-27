@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:15:37.170202536Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test scaffold scenario_new_emits_leading_provenance_subject_lane_and_actor"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 66,
+  "scenario_id": "authoring.scaffold.09",
+  "schema": 1,
+  "staging_id": "6420da9f",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

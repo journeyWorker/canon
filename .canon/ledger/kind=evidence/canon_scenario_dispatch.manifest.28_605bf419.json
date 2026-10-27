@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:18:12.515067024Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_dispatch_demo dispatch_manifest_28_dispatch_diff_outside_a_canon_repository_is_refused_and_writes_nothing"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 112,
+  "scenario_id": "dispatch.manifest.28",
+  "schema": 1,
+  "staging_id": "1a993506",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

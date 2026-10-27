@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:27:34.557064453Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test subject review_add_61_the_guard_and_status_judge_a_review_that_predates_pinning_as_the_gate_does"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 157,
+  "scenario_id": "review.add.61",
+  "schema": 1,
+  "staging_id": "b804fbdf",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

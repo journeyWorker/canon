@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:18:32.536844445Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_reads divergence_lifecycle_13_list_refuses_an_invalid_timestamp_a_zero_limit_or_a_cursor_canon_did_not_issue_with_exit_2"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 52,
+  "scenario_id": "divergence.lifecycle.13",
+  "schema": 1,
+  "staging_id": "89274214",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

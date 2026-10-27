@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "impl-031-final",
+    "role": "implementer",
+    "session_id": "final-2026-10-27"
+  },
+  "at": "2026-10-27T16:21:17.051067524Z",
+  "code_tree": "49ce3e80a26918732e55c838d61561d3998a95f7",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-fmt --test schema_and_surface_checks inventory_file_with_a_surface_segment_disagreeing_with_content_is_rejected"
+  },
+  "evidence_sha": "aadde3a3b72978e1a7cf3673420e042316515b3d",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 41,
+  "scenario_id": "format.corpus.06",
+  "schema": 1,
+  "staging_id": "84133d68",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
