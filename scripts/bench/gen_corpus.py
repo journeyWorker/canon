@@ -11,7 +11,7 @@ per S, N tagged scenarios per feature, E evidence records and R review
 records per scenario, all committed.
 
 Records are written straight into `.canon/ledger` with the file names the git
-tier derives (`<natural key>__<content_digest12>.json`, partition.rs), so
+tier derives (`<components joined by _>_<digest8>.json`, canon-model layout.rs), so
 generating thousands of records takes seconds and the output is
 byte-deterministic: fixed timestamps, fixed commit dates, no randomness. The
 derived scenario index (gitignored, normally rebuilt by `canon inventory
@@ -117,17 +117,22 @@ def sha256(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def digest12(record):
-    """canon-store `content_digest12`: sha256 over the canonical (sorted-key, compact) JSON."""
+def digest8(record):
+    """canon-store's name digest: sha256 over the canonical (sorted-key, compact) JSON, first 8 hex."""
     body = json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    return sha256(body.encode())[:12]
+    return sha256(body.encode())[:8]
 
 
-def write_record(root, kind, area, natural_key, record, archive=False):
-    name = f"{natural_key}__{digest12(record)}.json"
+def escape(component):
+    """canon-model layout R6: bytes outside [a-z0-9.-] become `+` and two lowercase hex digits."""
+    safe = set(b"abcdefghijklmnopqrstuvwxyz0123456789.-")
+    return "".join(chr(b) if b in safe else f"+{b:02x}" for b in str(component).encode())
+
+
+def write_record(root, kind, components, record, archive=False):
+    """One file named by the 0.30 rule: `kind=<kind>/<components joined by _>_<digest8>.json`."""
+    name = "_".join([*(escape(c) for c in components), digest8(record)]) + ".json"
     directory = root / ".canon" / ("archive" if archive else "ledger") / f"kind={kind}"
-    if area:
-        directory = directory / f"area={area}"
     directory.mkdir(parents=True, exist_ok=True)
     (directory / name).write_text(json.dumps(record, sort_keys=True, indent=2), encoding="utf-8")
 
@@ -336,8 +341,7 @@ def generate(out, subjects, per_subject, evidence_n, reviews_n, batches, uncover
             write_record(
                 out,
                 "change",
-                None,
-                chore_id(s),
+                [chore_id(s)],
                 {
                     "actor": {"agent_id": "bench-gen"},
                     "at": stamp(clock),
@@ -353,8 +357,7 @@ def generate(out, subjects, per_subject, evidence_n, reviews_n, batches, uncover
         write_record(
             out,
             "subject",
-            None,
-            subject_id(s),
+            [subject_id(s)],
             {
                 "actor": {"agent_id": "bench-gen", "role": "implementer"},
                 "at": stamp(clock),
@@ -403,7 +406,7 @@ def generate(out, subjects, per_subject, evidence_n, reviews_n, batches, uncover
         }
         if n == per_subject - 1:
             index_record["case"] = "failure"
-        write_record(out, "scenario", area_of(s), f"{PROJECT}__{sid}", index_record)
+        write_record(out, "scenario", [PROJECT, sid], index_record)
         if evidence_n > 0 and not (uncovered_every and index % uncovered_every == 3 % uncovered_every):
             covered.append((index, s, sid, digest, bool(stale_every) and index % stale_every == 0))
 
@@ -421,11 +424,11 @@ def generate(out, subjects, per_subject, evidence_n, reviews_n, batches, uncover
             # An older run alternates failing and passing; the latest always passes.
             verdict = "faithful" if latest or round_n % 2 == 0 else "divergent"
             record = evidence_body(clock, sid, run_seq[s], sha, tree, verdict, f"impl-{index % 7}")
-            write_record(out, "evidence", None, sid, record, archive=not latest)
+            write_record(out, "evidence", [PROJECT, "scenario", sid], record, archive=not latest)
     for _, s, sid, digest, _ in covered:
         for r in range(reviews_n):
             clock += 1
-            write_record(out, "review", area_of(s), f"{PROJECT}__{sid}__{second}", review_body(clock, sid, f"bench-rev-{r + 1}", second, second_tree, digest, "faithful"))
+            write_record(out, "review", [PROJECT, "scenario", sid], review_body(clock, sid, f"bench-rev-{r + 1}", second, second_tree, digest, "faithful"))
 
     head = commit(out, "bench corpus: evidence and reviews", GIT_DATES[2])
     summary = {
