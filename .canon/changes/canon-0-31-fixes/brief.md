@@ -7,6 +7,8 @@
 
 0.31 순서: CI → 승인과 adopt → 버그 수정 → brief 포맷 → CLI id → 검색. 여섯 brief는 함께 승인받고, 승인과 adopt 전에는 고치지 않는다.
 
+<!-- canon:waive prose.length brief "여섯 동작마다 실패 경로와 바뀌는 종료 코드를 정해야 해서, 순서 줄을 더한 만큼 줄이면 조건이 빠진다" -->
+
 <!-- canon:section outcome role=normative -->
 ## Desired outcome
 
