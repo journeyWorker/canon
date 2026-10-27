@@ -35,7 +35,7 @@ status: Accepted
 
 | Topic | Decision | Same as lute? |
 |---|---|---|
-| Lints | Declared once in `[workspace.lints]`; every crate sets `lints.workspace = true`. `clippy.toml` holds the configuration. The pedantic group is not enabled as a whole; the lints in §1 are. A new `clippy` CI job runs with `-D warnings` on a pinned toolchain. | yes, plus the CI job canon lacks |
+| Lints | Declared once in `[workspace.lints]`; every crate sets `lints.workspace = true`. `clippy.toml` holds the configuration. The pedantic group is not enabled as a whole; the lints in §1 are. A `clippy` CI job runs with `-D warnings` on the toolchain pinned in `rust-toolchain.toml`. | yes, plus the CI job canon lacks |
 | Module files | `foo/mod.rs` for every module with submodules. Already true: 10 `mod.rs`, 0 self-named. The lint keeps it that way. | yes |
 | Visibility | Private, `pub(crate)`, `pub`. No `pub(super)` or `pub(in …)`. | yes |
 | Error types | User mistakes are `CliError`s with stable codes. Rust error types are per failure domain, implement `std::error::Error`, and are written with `thiserror`. A `pub fn` does not return `Result<_, String>`. No `anyhow`. | differs: canon keeps `thiserror` |
@@ -54,10 +54,12 @@ status: Accepted
 - Every lint is `warn` except `unsafe_code`, which is `deny`. The CI job's
   `-D warnings` turns warnings into failures; no crate-level `#![deny]` is
   added (*Design Patterns* "`#![deny(warnings)]`").
-- canon's CI has no clippy job today (`.github/workflows/test.yml` runs
-  `cargo test` and canon's own gate on `stable`, unpinned). 0.30 adds a
-  `clippy` job pinned to 1.99.1, the toolchain these counts were taken on.
-  When the pin moves, the lists below are re-checked in the same change.
+- The toolchain is pinned in `rust-toolchain.toml` (1.99.1, the toolchain
+  these counts were taken on). Every CI job that installs Rust, the test jobs,
+  the native builds and the publish workflow included, installs that file's
+  toolchain with rustup and fails when `rustc --version` differs. 0.30 added
+  the `clippy` job (`.github/workflows/test.yml`). When the pin moves, it moves
+  in one PR, and the lists below are re-checked in that same PR.
 - A local exception is `#[expect(lint, reason = "…")]`, never `#[allow]`
   (MS M-LINT-OVERRIDE-EXPECT), enforced by `allow_attributes*`.
 

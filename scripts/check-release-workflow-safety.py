@@ -698,6 +698,8 @@ def main(argv: list[str] | None = None) -> int:
         "Cargo.toml",
         # Workspace clippy configuration (rust-coding-rules.md §1); clippy reads it from the root.
         "clippy.toml",
+        # The one Rust toolchain pin; rustup and cargo read it from the root.
+        "rust-toolchain.toml",
         "README.md",
         "bun.lock",
         "canon.yaml",
