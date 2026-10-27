@@ -7,7 +7,7 @@ brief에는 사람이 읽지 않는 HTML 주석이 네 종류 들어 있다. 섹
 
 Source: GitHub 이슈 #121
 
-0.31 순서: CI → 승인과 adopt → 버그 수정 → brief 포맷 → CLI id → 검색. 여섯 brief는 함께 승인받고, 승인과 adopt 변경이 들어가기 전에는 어느 brief도 고치지 않는다.
+0.31 순서: CI → 승인과 adopt → 버그 수정 → brief 포맷 → CLI id → 검색. 여섯 brief는 함께 승인받는다. 승인한 brief를 고치면 그 brief를 adopt한 모든 subject가 재승인 전까지 막힌다.
 
 <!-- canon:section outcome role=normative -->
 ## Desired outcome
@@ -66,7 +66,9 @@ Source: GitHub 이슈 #121
 
 - 옛 형식은 `canon:section`, `canon:hint`, `canon:waive`, `canon:kind` 주석이 하나라도 있거나 shipped 한국어 제목이 있는 brief다. 표지 없이 한국어 제목만 있는 brief도 옛 형식이고 근접 제목 안내를 받지 않는다. 승인 안내 주석은 감지 기준이 아니다.
 - 옛 형식 brief에 `brief check`는 섹션 규칙을 적용하지 않고 blocker 하나로 `canon migrate`를 안내한다. 그 면제 주석을 읽지 않는 것이 조용히 규칙을 되살리는 일이 되지 않게 하기 위해서다.
-- 읽는 명령(`status`, `gate check`, `context`, `brief show`)은 설정 오류 없이 경고하고 `canon migrate`를 다음 단계 첫 줄로 낸다. 쓰는 명령은 자기가 읽는 brief가 옛 형식일 때만 같은 hint로 거절된다. 레포 전체의 brief를 훑지 않고, 다른 변경의 옛 brief는 쓰기를 막지 않는다. 0.30 이름 변경 때 옛 레포를 다룬 방식과 같다.
+- 읽는 명령(`status`, `gate check`, `context`, `brief show`)은 설정 오류 없이 경고하고 `canon migrate`를 다음 단계 첫 줄로 낸다.
+- 쓰는 명령은 그 명령이 판정하는 brief 중 하나라도 옛 형식이면 같은 hint로 거절된다. 판정 대상은 순환 변경의 규칙이 정한다. 그 subject의 효력 있는 변경 전부다.
+- 그래서 승인된 옛 brief가 있는 subject는 migrate 전에 evidence 쓰기가 막힌다. 명령이 판정하지 않는 변경의 옛 brief는 막지 않는다. 0.30 이름 변경 때 옛 레포를 다룬 방식과 같다.
 - 승인 줄이 digest와 맞는 옛 brief는 migrate 전에도 승인된 것으로 읽힌다. 옛 형식 감지가 승인 상태를 바꾸지 않는다.
 
 ### F5 미리보기
@@ -87,8 +89,8 @@ Source: GitHub 이슈 #121
 - 면제 주석은 `waive` 항목으로 옮기고 `reason`과 `match`를 그대로 둔다. 같은 규칙·섹션·이유 항목이 이미 있으면 겹치지 않게 하나만 쓴다.
 - 한국어 제목은 같은 키의 영어 제목으로 바꾼다. 본문의 산문, 흐름 id, 강조한 핵심 문장은 그대로다.
 - 다시 묶을 brief는 새 본문의 digest를 계산해 기존 `Approved:` 줄의 누가·언제·말은 그대로 두고 digest만 바꾼다.
-- chore 변경 리뷰의 핀은 계획이 나열한 것만 새 digest로 바꾼다. 바꾼 리뷰는 같은 리뷰의 새 버전으로 쓰이고 옛 버전은 보관된다. git에 있는 리뷰만 바꾸고, hot이나 cold 저장소의 리뷰는 계획이 이름으로 나열해 두고 바꾸지 않는다.
-- 되돌리기는 `canon migrate --revert`다. 백업에서 옛 brief와 옛 리뷰와 옛 digest를 바이트 단위로 복원한다. 복원이 `Approved:` 줄이나 핀을 바꾸면 되돌리기도 사람 전용이다.
+- chore 변경 리뷰의 핀은 계획이 나열한 것만 새 digest로 바꾼다. 바꾼 리뷰는 같은 리뷰의 새 버전으로 쓰이고 옛 버전은 보관된다. 새 버전은 리뷰어, 행위자, `at`, 결과를 포함해 핀을 뺀 모든 필드를 옛 버전 그대로 갖는다. git에 있는 리뷰만 바꾼다. hot이나 cold 저장소의 리뷰는 바꾸지 않으므로 그 chore는 다시 리뷰받아야 하고, 계획이 그 리뷰를 이름으로 나열한다.
+- 되돌리기는 `canon migrate --revert`다. 백업에서 옛 brief와 옛 리뷰와 옛 digest를 바이트 단위로 복원한다. 복원이 `Approved:` 줄이나 핀을 바꾸면 되돌리기도 사람 전용이다. 복원할 파일이 migrate 뒤에 바뀌었으면 되돌리기는 그 파일 이름을 대고 거절한다. 나중의 승인, 편집, 새 리뷰 버전이 그런 경우이고 아무것도 쓰지 않는다.
 - canon 자기 레포의 0.30·0.31 brief는 옛 형식으로 쓰고 승인받은 것이므로 이 변경이 같은 방식으로 옮긴다. 새 파서와 이 옮기기는 한 커밋에 들어가며, 사람이 그 커밋에서 `--commit`을 실행한다. 새 파서는 옮기기 전에는 옛 brief가 있는 쓰기를 거절하기 때문이다.
 - 두 번째 실행은 할 일이 없다. 중간에 멈춘 실행은 다음 실행이 끝낸다.
 
@@ -101,7 +103,8 @@ Source: GitHub 이슈 #121
 - F2: frontmatter 면제가 규칙을 한 섹션에서 걸러 내고, `match` 면제는 그 글을 담은 발견만 거르며, 출력의 면제 목록에 보인다. 실패 경로: 이유가 비었거나 규칙 id나 키를 모르면 면제 형식 blocker가 되고 아무것도 면제되지 않는다. 읽을 수 없는 YAML도 같다. 모르는 섹션 키는 적용되지 않은 면제로 나온다. 승인된 brief에 면제를 더하면 승인 이후 변경으로 읽힌다.
 - F2 chore: `kind: chore` frontmatter가 있는 brief는 chore로 읽고, 없는 brief는 feature로 읽는다.
 - F3: 새로 쓴 brief(feature와 chore)에 HTML 주석이 없고 섹션이 비어 있으며, `brief check`가 빈 섹션마다 blocker를 낸다. 실패 경로: 빈 섹션만 채우고 미완성 표시를 남기면 그 blocker가 남는다. `brief show`는 `language: ko`에서 한국어, 아니면 영어로 안내 문구를 낸다.
-- F4: 0.30 형식 fixture에서 `status`, `gate check`, `context`가 경고하고 `canon migrate`를 첫 다음 단계로 낸다. 실패 경로: 옛 형식 brief에서 쓰는 명령(`evidence add`)은 같은 hint로 거절되고 아무것도 쓰지 않는다. 이 brief의 면제 주석은 읽히지 않는다. 같은 레포의 다른 변경에서 쓰는 명령은 막히지 않는다. 표지 없이 한국어 제목만 있는 brief도 옛 형식으로 안내받는다.
+- F4: 0.30 형식 fixture에서 `status`, `gate check`, `context`가 경고하고 `canon migrate`를 첫 다음 단계로 낸다. 실패 경로: 옛 형식 brief에서 쓰는 명령(`evidence add`)은 같은 hint로 거절되고 아무것도 쓰지 않는다. 이 brief의 면제 주석은 읽히지 않는다.
+- F4 영향 범위: 승인된 옛 brief를 가진 subject의 evidence 쓰기도 같은 hint로 거절된다. 그 subject가 판정하지 않는 변경의 옛 brief만 쓰기를 막지 않는다. 표지 없이 한국어 제목만 있는 brief도 옛 형식으로 안내받는다.
 - F5: 미리보기 뒤 작업 트리가 바이트 단위로 같다. 계획은 brief마다 지울 주석, 옮길 면제, 바꿀 제목, 다시 묶을 digest를 보인다. 실패 경로: 다시 쓸 brief에 커밋하지 않은 변경이 있으면 거절된다. 승인 뒤에 편집된 brief와 표지 역할이 표와 다른 brief는 다시 묶지 않는 brief로 따로 나열된다.
 - F6: canon 자기 레포의 모든 변경 brief와 한국어 제목 fixture를 옮긴다. 옮긴 뒤 승인된 brief는 모두 승인된 채로 읽히고 `BRIEF_CHANGED_SINCE_APPROVAL`이 나는 brief가 없다. 옮긴 brief의 blocker와 advisory는 면제를 포함해 줄 번호를 빼고 옮기기 전과 같다.
 - F6 산문과 실패: 주석과 제목 번역을 뺀 산문은 바이트 단위로 같다. 실패 경로: 다른 digest로 적용하면 거절되고 아무것도 바뀌지 않으며, 옛 digest가 맞지 않던 brief는 옮긴 뒤에도 `BRIEF_CHANGED_SINCE_APPROVAL`로 남는다. 두 번째 실행은 할 일이 없다고 말한다.
@@ -115,14 +118,14 @@ Source: GitHub 이슈 #121
 
 - 질문, 승인 무결성: `Approved:` digest를 사람 없이 다시 묶어도 되는가? 승인은 사람의 행위다. 가정: 된다. 단 옛 digest가 옛 본문과 맞고 바뀐 것이 표지, 안내 문구, 승인 안내 주석의 삭제, 면제의 이동, 제목 번역뿐일 때만이다. 계획이 이 조건과 다시 묶을 brief 목록을 먼저 보여 주고, 다시 묶는 `--commit`은 사람만 실행한다(F6). 승인 뒤에 편집된 brief는 다시 묶지 않는다.
 - 질문: chore 변경 리뷰가 brief digest에 핀을 박고 있어 brief를 다시 묶으면 그 리뷰가 오래된 것이 된다. 서명한 리뷰의 핀을 migrate가 바꿔도 되는가? 가정: 바꾼다. 옛 digest에 핀이 있던 리뷰만 새 digest로 옮기고 계획에 한 줄씩 보인다. 이전 migrate도 리뷰 기록을 계획에 나열하고 다시 썼다. 반대라면 리뷰어가 chore를 다시 리뷰해야 한다.
-- 질문: 이슈가 말하지 않은 두 주석을 어떻게 하는가? chore 표지(`canon:kind chore`)와 템플릿 끝의 승인 안내 주석이다. 본문에 주석이 남지 않게 하려면 둘 다 없어져야 한다. 가정: chore 표지는 frontmatter의 `kind: chore`로 옮기고, 승인 안내 주석은 쓰지 않으며 안내는 `brief show`와 스킬이 한다.
+- 질문: 이슈가 말하지 않은 두 주석을 어떻게 하는가? chore 표지(`canon:kind chore`)와 템플릿 끝의 승인 안내 주석이다. migrate는 현재 영어 문구, 한국어 문구, 옛 `--by` 형식을 지운다. 본문에 주석이 남지 않게 하려면 둘 다 없어져야 한다. 가정: chore 표지는 frontmatter의 `kind: chore`로 옮기고, 승인 안내 주석은 쓰지 않으며 안내는 `brief show`와 스킬이 한다.
 - 질문: 옛 형식 brief를 새 canon이 migrate 전에 어떻게 읽는가? 가정: F4처럼 감지해 경고하고 쓰기를 거절한다. 주석을 말없이 무시하면 면제가 풀리고 chore가 feature로 읽힌다.
 - 가정: 제목 비교는 정확히 일치(대소문자 구분)이고, 가까운 제목은 대소문자 차이나 두 글자 이내의 편집 거리다. 알려진 제목이 아닌 `##`는 앞 섹션의 본문이다.
 - 가정: 한국어가 아닌 다른 언어(ja, zh)로 쓴 제목은 shipped 제목이 아니므로 migrate가 번역하지 않는다. 그 brief는 사람이 영어 제목으로 고친다. 이슈가 말한 `ko` 제목만 바꾼다.
 - 가정: frontmatter의 알 수 없는 키는 오타를 숨기지 않도록 blocker다. 이후 키를 추가하는 변경이 이 목록을 넓힌다.
 - 가정: 승인 뒤에 면제를 더하면 다시 승인받아야 한다는 말은, 승인 뒤에 편집된 brief가 태그와 관계없이 계속 효력을 가진다는 승인과 순환 변경의 규칙에 기댄다. 그 규칙이 없으면 이 보장이 약해진다.
 - 가정: Kino의 승인된 brief 19건은 이 레포에 없다. 수락 코퍼스는 이 레포의 변경 brief 전부와 영어·한국어 제목, 모든 표지 종류를 담은 fixture다. Kino 레포에서의 실행은 미리보기로 확인한다.
-- 가정: 표지의 역할이 표와 달라 판정이 바뀌는 brief는 사람이 고친 뒤 다시 승인받는다. 이 레포에서는 승인 전 CI brief가 그 경우이고, 승인 전에 Questions를 chore 섹션 집합 밖의 판정 없는 섹션으로 두거나 Invariants로 옮기는 것은 그 brief의 몫이다.
+- 가정: 표지의 역할이 표와 달라 판정이 바뀌는 brief는 사람이 고친 뒤 다시 승인받는다. 이 레포의 brief에는 지금 그런 것이 없다.
 - 가정: 승인 줄 위치(파일 끝)와 `Source:` 줄 형식은 바뀌지 않는다.
 
 <!-- canon:section out-of-scope role=context -->

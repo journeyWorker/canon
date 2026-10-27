@@ -7,7 +7,7 @@ Source: skill cli-interface-design "Identifier options" (소유자 기본 규칙
 
 canon은 레코드나 설정 항목의 id를 받는 옵션 14개를 `--<명사>-id`로 쓴다. 24개 명령에 모두 67곳이다. `--actor-id` 16, `--session-id` 15, `--project-id` 11, `--change-id` 6, `--run-id` 4, `--task-id`·`--subject-id`·`--scenario-id` 각 3, 나머지 여섯 옵션 각 1이다. 옵션 이름이 대상을 가리키고 값이 그 대상의 id인데 이름에 `-id`가 또 붙는다. `--input` 문서의 키에도 `Id`가 붙는다. 소유자의 기본 규칙은 접미사 없는 명사다. 이 변경이 14개를 모두 그 규칙에 맞춘다.
 
-0.31 순서: CI → 승인과 adopt → 버그 수정 → brief 포맷 → CLI id → 검색. 여섯 brief는 함께 승인받고, 승인과 adopt 변경이 들어가기 전에는 어느 brief도 고치지 않는다.
+0.31 순서: CI → 승인과 adopt → 버그 수정 → brief 포맷 → CLI id → 검색. 여섯 brief는 함께 승인받는다. 승인한 brief를 고치면 그 brief를 adopt한 모든 subject가 재승인 전까지 막힌다.
 
 <!-- canon:section outcome role=normative -->
 ## Desired outcome
@@ -142,8 +142,8 @@ canon retrieve --for-role reviewer --domain dev --subject payments
 - 가정: 이 변경은 CI, 버그 수정, 승인과 adopt, brief 포맷 뒤에 들어간다. 그 변경들이 쓰거나 만든 `-id` 철자는 이 변경이 옮긴다. 검색 변경은 이미 새 이름을 전제한다.
 - 추측한 곳: `finding add --scenario`는 반복할 수 있고 `evidence add --scenario`는 한 번만 받는다. 기존 동작이므로 가정: 바꾸지 않는다.
 - 질문(정책): 옛 철자를 쓰는 사람의 스크립트에도 유예가 없다. `divergence accept`와 `strategy rollback`은 사람이 쓰는 명령이고 스킬은 사람과 스크립트에 한 릴리스 유예를 권한다. 가정: 이 둘도 유예 없이 제거한다. 이유는 위 첫 질문과 같고, 힌트가 첫 실행에서 고칠 줄을 보여 준다.
-- 가정: 스펙 코퍼스의 재작성은 시나리오의 `@subject` 태그를 따라 adopt한다. 옛 철자를 말하는 시나리오 33개는 8개 subject에 있다. `tier-storage`의 레저 이름 시나리오는 id를 레코드 필드로만 말하고 옵션 철자를 말하지 않아 adopt하지 않는다. 한 파일의 시나리오가 여러 subject에 속하므로 파일 단위로 adopt하지 않는다.
-- 가정: 이 brief는 승인 뒤 수정하지 않는다. 승인과 adopt 변경이 들어가기 전에는 수정된 brief가 이 변경을 adopt한 shipped subject 8개의 reopen과 ship을 막는다.
+- 가정: 스펙 코퍼스의 재작성은 시나리오의 `@subject` 태그를 따라 adopt한다. 옛 철자를 말하는 시나리오 33개는 8개 subject에 있다. 레저 이름 파일에서 옵션 철자를 말하는 시나리오는 하나다. evidence 기록 결과 줄의 시나리오로 `evidence-attestation`에 속하고 이미 adopt했다. `tier-storage`의 시나리오(tier age, export, purge의 id 규칙)는 옵션 철자를 말하지 않아 adopt하지 않는다. 파일 하나에 여러 subject의 시나리오가 있으므로 파일 단위로 adopt하지 않는다.
+- 가정: 승인한 이 brief를 고치면 이 brief를 adopt한 8개 subject가 재승인 전까지 reopen, ship, evidence 기록이 막힌다. 승인 전에 brief를 확정하고, 승인 뒤에는 고치지 않는다.
 
 <!-- canon:section out-of-scope role=context -->
 ## Out of scope

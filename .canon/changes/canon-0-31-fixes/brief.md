@@ -5,7 +5,7 @@
 
 0.30 스펙을 쓰며 동작 여섯 가지가 문서나 다른 명령과 어긋나는 것을 재현했다. `demo init`은 설정이 있는 디렉터리의 정책을 덮어쓰고, `gate install-hooks`는 없는 디렉터리를 만든다. `context-pack`은 틀린 id에 "없음"이라 답하고, `evidence approval-payload`는 없는 시나리오의 서명 대상을 만든다. ADAPTER_REFUSED와 `strategy rollback`은 종료 코드가 어긋난다.
 
-0.31 순서: CI → 승인과 adopt → 버그 수정 → brief 포맷 → CLI id → 검색. 여섯 brief는 함께 승인받고, 승인과 adopt 전에는 고치지 않는다.
+0.31 순서: CI → 승인과 adopt → 버그 수정 → brief 포맷 → CLI id → 검색. 여섯 brief는 함께 승인받는다. 승인한 brief를 고치면 그 brief를 adopt한 모든 subject가 재승인 전까지 막힌다.
 
 <!-- canon:waive prose.length brief "여섯 동작마다 실패 경로와 바뀌는 종료 코드를 정해야 해서, 순서 줄을 더한 만큼 줄이면 조건이 빠진다" -->
 
@@ -14,7 +14,7 @@
 
 - ==**아래 여섯 동작에서 없는 대상과 잘못된 입력은 종료 2이고, 종료 1은 검사 결과나 거절된 판정에만 남는다.**==
 - 여섯 동작이 문서와 서로 같고, 거절된 호출은 파일을 바꾸지 않는다.
-- 바뀐 동작마다 시나리오가 있고, 지금 동작을 적은 것은 고쳐 쓴다. 이 변경의 단계로 태그한다.
+- 바뀐 동작마다 시나리오가 있고, 지금 동작을 적은 것은 고쳐 쓴다. 고친 시나리오는 0.30 단계 태그를 두고 이 변경의 단계 태그를 더한다.
 
 <!-- canon:section flow role=normative -->
 ## User flow
@@ -40,7 +40,7 @@
 - 사람이 읽는 출력은 `--dry-run`에서도 에이전트 훅 파일 둘과 훅 스크립트를 이름으로 말한다. ==**git 훅은 설치하지 않았고, 스크립트를 git의 pre-commit 훅 자리에 복사하거나 훅 실행기에서 부르면 된다고 적는다.**==
 - JSON 보고서는 세 필드를 지키고, 스키마 설명이 `installed`는 에이전트 훅 파일이 바뀐 것, 스크립트 필드는 스크립트를 쓴 것이라 말한다.
 - `schema gate install-hooks`의 종료 2 설명에서 CONFIG_MISSING을 뺀다.
-- 시나리오: gate.check.105에 출력 단언을, 107에 없는 디렉터리 사례를 더한다. 106은 JSON만 봐서 그대로다.
+- 시나리오: gate.check.105에 출력 단언을, 107에 없는 디렉터리 사례를 더한다. 106은 "파일 이름이 없다"를 JSON 보고서에 한정하고 사람이 읽는 출력이 파일을 이름으로 말함을 더한다.
 
 ### F3 context-pack 팩 id
 
@@ -62,6 +62,7 @@
 | authorize | 응답 파일 없음·읽을 수 없음 | 2 |
 | authorize | 봉투가 규칙을 어기거나 정책 파일이 깨짐 | 2 (지금 1) |
 
+- 깨진 정책 파일의 힌트는 정책 파일을 고치라고 한다.
 - authorize의 종료 1은 ADAPTER_EXECUTION_NOT_AUTHORIZED에만 남는다. 그 종료 표의 2와 `schema --error ADAPTER_REFUSED`가 이 구분을 적는다.
 - 시나리오: dispatch.manifest.10, 12, 13은 그대로다. authorize의 깨진 봉투와 `schema --error` 표를 더한다.
 
