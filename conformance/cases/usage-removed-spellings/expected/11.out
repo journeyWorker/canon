@@ -1,9 +1,9 @@
 Record the human's approval of the brief, bound to its text; refused while `brief check` has blockers
 
-Usage: canon brief approve [OPTIONS] --approver <NAME> --note <TEXT> [CHANGE_ID]
+Usage: canon brief approve [OPTIONS] --approver <NAME> --note <TEXT> [CHANGE_ID]...
 
 Arguments:
-  [CHANGE_ID]  The change to read (default: the repo's only live change)
+  [CHANGE_ID]...  The changes to approve, one answer for all, none written unless every one is approvable (default: the repo's only live change)
 
 Options:
       --approver <NAME>      Who approved (the human, not the agent)
@@ -17,8 +17,11 @@ Options:
 
 Examples:
   canon brief approve add-login --approver Ana --note 'Go. Ship the failure flow too.'
+  canon brief approve add-login add-search fix-sync --approver Ana --note 'All three, go.'
 
-Writes `Approved: <who> <when> — "<words>" (brief sha256:<digest>)` into the
+Several ids take one name, one answer and one timestamp. Every id is checked
+first; one refused id refuses the call (BRIEF_APPROVE_REFUSED) and nothing is
+written. Writes `Approved: <who> <when> — "<words>" (brief sha256:<digest>)` into the
 brief (the digest covers the brief without its `Approved:` lines) and records
 `canon policy approve` in the same call. Edit the brief afterwards and it reads as
 not approved (BRIEF_CHANGED_SINCE_APPROVAL) until a human answers again and this

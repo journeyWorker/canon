@@ -10,7 +10,10 @@
 //! brief makes every reader say `BRIEF_CHANGED_SINCE_APPROVAL`.
 //!
 //! Refused (exit 2) while `canon brief check` has blocker findings, and
-//! for an empty `--approver`/`--note`; exit 1 for an operational error. Existing
+//! for an empty `--approver`/`--note`; exit 1 for an operational error. It takes
+//! one or more change ids (0.31): one name and answer for all, every id checked
+//! before any is written ([`approve_all`]), and one refused id refuses the call
+//! (`BRIEF_APPROVE_REFUSED`, naming each). Existing
 //! `Approved:` lines are replaced, so re-approving leaves exactly one.
 //! Canon cannot tell a human from an agent running this command: the
 //! skill makes it a human stop, and `--note` carries their words.
@@ -55,7 +58,7 @@ pub fn approved_text(text: &str, by: &str, when: &str, note: &str) -> Result<Str
     Ok(approved)
 }
 
-/// What one approval recorded: the `brief approve --json` data.
+/// What one approval recorded: the `brief approve --json` data of one id.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Approved {
@@ -67,6 +70,66 @@ pub struct Approved {
 }
 
 impl Report for Approved {}
+
+/// What happened to one id of a call with several ([`ApprovedMany`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Outcome {
+    /// The brief and the policy now carry the approval.
+    Written,
+    /// They already carried this very approval: nothing was written.
+    Unchanged,
+    /// Writing this id failed (a disk error after the checks passed).
+    Failed,
+    /// An earlier id failed to write, so this one was not tried.
+    Skipped,
+}
+
+/// One id of an [`ApprovedMany`].
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ApprovalEntry {
+    pub change: String,
+    pub outcome: Outcome,
+    /// The brief file; omitted for a `skipped` id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub brief: Option<String>,
+    /// The digest the approval binds; omitted for a `failed` or `skipped` id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub digest: Option<String>,
+    /// Why a `failed` id failed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// `brief approve --json` data for several ids: one answer, one entry per id.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ApprovedMany {
+    pub approved_by: String,
+    pub policy_approved: bool,
+    pub approvals: Vec<ApprovalEntry>,
+}
+
+impl Report for ApprovedMany {}
+
+/// A refused id of a call with several: the data of `BRIEF_APPROVE_REFUSED`.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Refusal {
+    pub change_id: String,
+    pub code: String,
+    pub message: String,
+}
+
+/// The data of a `BRIEF_APPROVE_REFUSED` over several ids.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Refused {
+    pub refused: Vec<Refusal>,
+}
+
+impl Report for Refused {}
 
 /// The next step for each code [`approve`] refuses with.
 fn hint_for(code: &str) -> &'static str {
@@ -90,31 +153,32 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
-/// The one approval: used by `canon brief approve` and by the dashboard's
-/// briefs page, so both record exactly the same. `repo` is a resolved repo
-/// root. With `expected_sha256` (the hex digest of the brief file's bytes
-/// the caller showed the human), the approval is refused with
-/// [`crate::dashboard_briefs::CHANGED_SINCE_PAGE_LOAD`] when the file's
-/// bytes differ, and nothing is written.
-pub fn approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, expected_sha256: Option<&str>) -> Result<Approved, CliError> {
-    approve_checked(repo, change, by, note, expected_sha256).map(|(approved, _)| approved)
+/// One id of a call, and the sha256 of the brief file the caller showed the
+/// human, when it did (the dashboard's briefs page).
+#[derive(Debug, Clone, Copy)]
+pub struct Item<'a> {
+    pub change: Option<&'a ChangeId>,
+    pub expected_sha256: Option<&'a str>,
 }
 
-/// [`approve`], also saying whether the brief and the policy already carried
-/// this very approval, in which case nothing was written.
-fn approve_checked(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, expected_sha256: Option<&str>) -> Result<(Approved, bool), CliError> {
-    let (by, note) = (by.trim(), note.trim());
-    for (flag, value) in [("--approver", by), ("--note", note)] {
-        if value.is_empty() {
-            return Err(refuse("APPROVAL_INCOMPLETE", &format!("{flag} must carry the human's answer, not be empty"), EXIT_REFUSED));
-        }
-        if value.contains(['\n', '\r']) {
-            return Err(refuse("APPROVAL_INCOMPLETE", &format!("{flag} must be one line"), EXIT_REFUSED));
-        }
-    }
-    let checked = check(repo, change)?;
+/// A brief that passed every check and waits to be written.
+struct Checked {
+    change: ChangeId,
+    brief: String,
+    path: std::path::PathBuf,
+    text: String,
+    /// The brief and the policy already carry this very approval.
+    unchanged: bool,
+}
+
+/// The checks of one approval, none of which writes: the answer is one line,
+/// the brief exists and reads, `canon brief check` has no blocker, the page's
+/// copy (when there is one) is the file, and an `Approved:` line can be
+/// appended where it will be read.
+fn check_one(repo: &Path, item: Item<'_>, by: &str, note: &str, policy_approved: bool) -> Result<Checked, CliError> {
+    let checked = check(repo, item.change)?;
     let path = repo.join(&checked.brief);
-    if let Some(expected) = expected_sha256 {
+    if let Some(expected) = item.expected_sha256 {
         verify_bytes(&checked.brief, std::fs::read(&path).ok().as_deref(), expected)?;
     }
     // Coverage rules (a flow step with no scenario or no failure case) gate
@@ -130,24 +194,146 @@ fn approve_checked(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str,
         ));
     }
     let text = std::fs::read_to_string(&path).map_err(|e| refuse("BRIEF_UNREADABLE", &format!("cannot read `{}`: {e}", checked.brief), EXIT_ERROR))?;
-    if let Some(expected) = expected_sha256 {
+    if let Some(expected) = item.expected_sha256 {
         verify_bytes(&checked.brief, Some(text.as_bytes()), expected)?;
     }
     // The same approval again, by the same human, on a brief and a policy
     // that already carry it: nothing to write.
-    let policy_approved = !matches!(crate::policy_approval::approval_state(repo), ApprovalState::NoPolicy);
-    if already_approved_so(&text, by, note) && (!policy_approved || crate::policy_approval::matching_approval(repo, by, Some(note)).is_some()) {
-        return Ok((Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&text), approved_by: by.to_string(), policy_approved }, true));
+    let unchanged = already_approved_so(&text, by, note) && (!policy_approved || crate::policy_approval::matching_approval(repo, by, Some(note)).is_some());
+    if !unchanged {
+        approved_text(&text, by, "1970-01-01T00:00:00Z", note).map_err(|e| refuse("BRIEF_UNAPPROVABLE", &format!("{}: {e}", checked.brief), EXIT_REFUSED))?;
     }
-    let when = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    let approved = approved_text(&text, by, &when, note).map_err(|e| refuse("BRIEF_UNAPPROVABLE", &e.to_string(), EXIT_REFUSED))?;
+    Ok(Checked { change: checked.change, brief: checked.brief, path, text, unchanged })
+}
+
+/// The answer's own two lines, trimmed: refused up front, for every id alike.
+fn answer(by: &str, note: &str) -> Result<(String, String), CliError> {
+    let (by, note) = (by.trim(), note.trim());
+    for (flag, value) in [("--approver", by), ("--note", note)] {
+        if value.is_empty() {
+            return Err(refuse("APPROVAL_INCOMPLETE", &format!("{flag} must carry the human's answer, not be empty"), EXIT_REFUSED));
+        }
+        if value.contains(['\n', '\r']) {
+            return Err(refuse("APPROVAL_INCOMPLETE", &format!("{flag} must be one line"), EXIT_REFUSED));
+        }
+    }
+    Ok((by.to_string(), note.to_string()))
+}
+
+/// Writes one approved brief (and, first, the policy approval) at `when`.
+fn write_one(repo: &Path, checked: Checked, by: &str, note: &str, when: &str, policy_approved: bool) -> Result<Approved, CliError> {
+    let approved = approved_text(&checked.text, by, when, note).map_err(|e| refuse("BRIEF_UNAPPROVABLE", &e.to_string(), EXIT_REFUSED))?;
     // Policy first: a failed policy write leaves the brief untouched, and a
     // failed brief write leaves a policy approval that is true on its own.
     if policy_approved {
         crate::policy_approval::record(repo, by, Some(note)).map_err(|e| refuse("POLICY_APPROVAL_FAILED", &e.to_string(), EXIT_ERROR))?;
     }
-    std::fs::write(&path, &approved).map_err(|e| refuse("BRIEF_WRITE_FAILED", &format!("cannot write `{}`: {e}", checked.brief), EXIT_ERROR))?;
-    Ok((Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&approved), approved_by: by.to_string(), policy_approved }, false))
+    std::fs::write(&checked.path, &approved).map_err(|e| refuse("BRIEF_WRITE_FAILED", &format!("cannot write `{}`: {e}", checked.brief), EXIT_ERROR))?;
+    Ok(Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&approved), approved_by: by.to_string(), policy_approved })
+}
+
+fn already(checked: Checked, by: &str, policy_approved: bool) -> Approved {
+    Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&checked.text), approved_by: by.to_string(), policy_approved }
+}
+
+/// The one approval: used by `canon brief approve` and by the dashboard's
+/// briefs page, so both record exactly the same. `repo` is a resolved repo
+/// root. With `expected_sha256` (the hex digest of the brief file's bytes
+/// the caller showed the human), the approval is refused with
+/// [`crate::dashboard_briefs::CHANGED_SINCE_PAGE_LOAD`] when the file's
+/// bytes differ, and nothing is written.
+pub fn approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, expected_sha256: Option<&str>) -> Result<Approved, CliError> {
+    approve_checked(repo, change, by, note, expected_sha256).map(|(approved, _)| approved)
+}
+
+/// [`approve`], also saying whether the brief and the policy already carried
+/// this very approval, in which case nothing was written.
+fn approve_checked(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, expected_sha256: Option<&str>) -> Result<(Approved, bool), CliError> {
+    let (by, note) = answer(by, note)?;
+    let policy_approved = !matches!(crate::policy_approval::approval_state(repo), ApprovalState::NoPolicy);
+    let checked = check_one(repo, Item { change, expected_sha256 }, &by, &note, policy_approved)?;
+    if checked.unchanged {
+        return Ok((already(checked, &by, policy_approved), true));
+    }
+    let when = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    write_one(repo, checked, &by, &note, &when, policy_approved).map(|approved| (approved, false))
+}
+
+/// The error of a call with several ids when any is refused (0.31): one
+/// `BRIEF_APPROVE_REFUSED` naming every refused id with its own code and
+/// reason; nothing was written.
+fn refused_many(refused: Vec<(String, CliError)>, total: usize) -> (CliError, Refused) {
+    let named = refused.iter().map(|(id, e)| format!("`{id}` ({}: {})", e.code, e.message)).collect::<Vec<_>>().join("; ");
+    let error = refuse("BRIEF_APPROVE_REFUSED", &format!("{} of {total} briefs refused, so none was approved and nothing was written: {named}", refused.len()), EXIT_REFUSED);
+    let data = Refused { refused: refused.into_iter().map(|(change_id, e)| Refusal { change_id, code: e.code.to_string(), message: e.message }).collect() };
+    (error, data)
+}
+
+/// What [`approve_all`] recorded, id by id, in the order given.
+#[derive(Debug)]
+pub struct Many {
+    pub approved_by: String,
+    pub policy_approved: bool,
+    pub entries: Vec<(ApprovalEntry, Option<Approved>)>,
+    /// The first write failure, when one stopped the call.
+    pub failure: Option<CliError>,
+}
+
+/// Approves every id of `items` with one name and one answer, at one time,
+/// all or nothing on refusals (0.31): every id is checked before any is
+/// written, and one refused id refuses the call with `BRIEF_APPROVE_REFUSED`
+/// naming each refused id. Then the ids are written in the order given,
+/// exactly as one id is; a write failure (exit 1) leaves the ids already
+/// written approved and skips the rest. A repeated id counts once.
+pub fn approve_all(repo: &Path, items: &[Item<'_>], by: &str, note: &str) -> Result<Many, (CliError, Option<Refused>)> {
+    let (by, note) = answer(by, note).map_err(|e| (e, None))?;
+    let mut distinct: Vec<Item<'_>> = Vec::new();
+    for item in items {
+        if item.change.is_none() || !distinct.iter().any(|seen| seen.change == item.change) {
+            distinct.push(*item);
+        }
+    }
+    let policy_approved = !matches!(crate::policy_approval::approval_state(repo), ApprovalState::NoPolicy);
+    let mut checked: Vec<Checked> = Vec::new();
+    let mut refused: Vec<(String, CliError)> = Vec::new();
+    for item in &distinct {
+        match check_one(repo, *item, &by, &note, policy_approved) {
+            Ok(one) => checked.push(one),
+            Err(e) => refused.push((item.change.map_or_else(|| "<the only live change>".to_string(), |c| c.as_str().to_string()), e)),
+        }
+    }
+    if distinct.len() == 1 {
+        if let Some((_, e)) = refused.pop() {
+            return Err((e, None));
+        }
+    } else if !refused.is_empty() {
+        let (error, data) = refused_many(refused, distinct.len());
+        return Err((error, Some(data)));
+    }
+    let when = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let mut entries: Vec<(ApprovalEntry, Option<Approved>)> = Vec::new();
+    let mut failure: Option<CliError> = None;
+    for one in checked {
+        let change = one.change.as_str().to_string();
+        if failure.is_some() {
+            entries.push((ApprovalEntry { change, outcome: Outcome::Skipped, brief: None, digest: None, error: None }, None));
+            continue;
+        }
+        if one.unchanged {
+            let done = already(one, &by, policy_approved);
+            entries.push((ApprovalEntry { change, outcome: Outcome::Unchanged, brief: Some(done.brief.clone()), digest: Some(done.digest.clone()), error: None }, Some(done)));
+            continue;
+        }
+        let brief = one.brief.clone();
+        match write_one(repo, one, &by, &note, &when, policy_approved) {
+            Ok(done) => entries.push((ApprovalEntry { change, outcome: Outcome::Written, brief: Some(done.brief.clone()), digest: Some(done.digest.clone()), error: None }, Some(done))),
+            Err(e) => {
+                entries.push((ApprovalEntry { change, outcome: Outcome::Failed, brief: Some(brief), digest: None, error: Some(e.message.clone()) }, None));
+                failure = Some(e);
+            }
+        }
+    }
+    Ok(Many { approved_by: by, policy_approved, entries, failure })
 }
 
 /// The findings that stop an approval: blockers, coverage rules excluded.
@@ -163,22 +349,57 @@ fn verify_bytes(brief: &str, bytes: Option<&[u8]>, expected: &str) -> Result<(),
     Err(crate::dashboard_briefs::changed_since_page_load(brief))
 }
 
-/// `canon brief approve`. Returns the process exit code.
-pub fn run_approve(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str, json: bool) -> u8 {
+/// `canon brief approve`. Returns the process exit code. One id (or none: the
+/// only live change) prints what it always printed; several print one entry
+/// each.
+pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
-    let (approved, unchanged) = match approve_checked(&repo, change, by, note, None) {
-        Ok(done) => done,
-        Err(e) => return e.emit("canon brief approve", json),
+    let items: Vec<Item<'_>> = if changes.is_empty() { vec![Item { change: None, expected_sha256: None }] } else { changes.iter().map(|change| Item { change: Some(change), expected_sha256: None }).collect() };
+    let many = match approve_all(&repo, &items, by, note) {
+        Ok(many) => many,
+        Err((e, Some(data))) if json => return e.emit_with_data("canon brief approve", true, &data),
+        Err((e, _)) => return e.emit("canon brief approve", json),
     };
-    if unchanged {
+    if let [(_, Some(approved))] = many.entries.as_slice() {
+        let unchanged = many.entries[0].0.outcome == Outcome::Unchanged;
+        if unchanged {
+            crate::json_out::mark_unchanged();
+        }
+        if !json {
+            let policy = if approved.policy_approved { "; policy approval recorded too" } else { "; no policy file, so no policy approval" };
+            let verb = if unchanged { "already approved, unchanged" } else { "approved" };
+            println!("canon brief approve: {} {verb} by `{}` ({}){policy}", approved.brief, approved.approved_by, approved.digest);
+        }
+        crate::next::finish(&repo, "brief approve", &crate::next::Scope::Change(approved.change.clone()), false, json, approved);
+        return 0;
+    }
+    if let (Some(e), 1) = (&many.failure, many.entries.len()) {
+        return e.emit("canon brief approve", json);
+    }
+    let all_unchanged = many.failure.is_none() && many.entries.iter().all(|(entry, _)| entry.outcome == Outcome::Unchanged);
+    if all_unchanged {
         crate::json_out::mark_unchanged();
     }
+    let report = ApprovedMany { approved_by: many.approved_by.clone(), policy_approved: many.policy_approved, approvals: many.entries.into_iter().map(|(entry, _)| entry).collect() };
     if !json {
-        let policy = if approved.policy_approved { "; policy approval recorded too" } else { "; no policy file, so no policy approval" };
-        let verb = if unchanged { "already approved, unchanged" } else { "approved" };
-        println!("canon brief approve: {} {verb} by `{}` ({}){policy}", approved.brief, approved.approved_by, approved.digest);
+        let policy = if report.policy_approved { "; policy approval recorded too" } else { "; no policy file, so no policy approval" };
+        for entry in &report.approvals {
+            let what = match entry.outcome {
+                Outcome::Written => "approved",
+                Outcome::Unchanged => "already approved, unchanged",
+                Outcome::Failed => "failed",
+                Outcome::Skipped => "skipped",
+            };
+            println!("canon brief approve: {} {what} by `{}`{}", entry.change, report.approved_by, entry.error.as_ref().map(|e| format!(" — {e}")).unwrap_or_default());
+        }
+        println!("canon brief approve: {} change(s){policy}", report.approvals.len());
     }
-    crate::next::finish(&repo, "brief approve", &crate::next::Scope::Change(approved.change.clone()), false, json, &approved);
+    if let Some(e) = many.failure {
+        let named = report.approvals.iter().map(|entry| format!("`{}` {}", entry.change, match entry.outcome { Outcome::Written => "written", Outcome::Unchanged => "unchanged", Outcome::Failed => "failed", Outcome::Skipped => "skipped" })).collect::<Vec<_>>().join(", ");
+        let error = refuse(e.code, &format!("{}; {named}; the ids written stay approved and the rest were skipped", e.message), EXIT_ERROR);
+        return if json { error.emit_with_data("canon brief approve", true, &report) } else { error.emit("canon brief approve", false) };
+    }
+    crate::next::finish(&repo, "brief approve", &crate::next::Scope::Repo, false, json, &report);
     0
 }
 

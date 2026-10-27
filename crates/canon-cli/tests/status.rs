@@ -192,6 +192,16 @@ fn subject<'a>(report: &'a Value, id: &str) -> &'a Value {
     report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == id).unwrap_or_else(|| panic!("no subject `{id}` in {report}"))
 }
 
+/// The brief entries of `id` (`briefs`, one per change the subject answers for), `[]` when it has none.
+fn briefs<'a>(report: &'a Value, id: &str) -> &'a Value {
+    subject(report, id).get("briefs").unwrap_or(&Value::Null)
+}
+
+/// The first entry of `briefs`.
+fn brief<'a>(report: &'a Value, id: &str) -> &'a Value {
+    &briefs(report, id)[0]
+}
+
 /// The agent's steps: each a canon command line that parses as printed.
 fn commands(report: &Value) -> Vec<String> {
     let commands: Vec<String> =
@@ -306,7 +316,7 @@ fn status_counts_each_subject_through_the_gates_joins() {
     seed_blocker(dir.path(), "c-demo");
 
     let report = status_json(dir.path());
-    assert_eq!(report["statusVersion"], 3);
+    assert_eq!(report["statusVersion"], 4);
     assert_eq!(report["canonVersion"], env!("CARGO_PKG_VERSION"));
     assert_eq!(report["policy"]["present"], true);
     assert_eq!(report["policy"]["spec_coverage"]["require_cases"], serde_json::json!(["failure"]));
@@ -569,7 +579,7 @@ fn context_status_62_ship_is_the_agents_step_once_the_brief_is_approved() {
     assert!(out.status.success(), "the suggested transition must pass its gates: {}", stderr(&out));
     let report = status_json(dir.path());
     assert_eq!(subject(&report, "demo-subject")["status"], "shipped");
-    assert_eq!(subject(&report, "demo-subject")["brief"]["approved"], true, "a shipped subject still shows its brief");
+    assert_eq!(brief(&report, "demo-subject")["status"], "approved", "a shipped subject still shows its brief");
     assert_eq!(report["next"], serde_json::json!([]));
     assert!(stdout(&run(dir.path(), &["status"])).contains("next: nothing"));
 }
@@ -674,10 +684,11 @@ fn context_status_61_an_unapproved_brief_is_the_only_human_step_and_blocks_the_m
     }
     let demo = subject(&report, "demo-subject");
     assert_eq!(
-        demo["brief"],
-        serde_json::json!({"approved": false, "enforced": true, "change": "c-demo-subject", "brief": ".canon/changes/c-demo-subject/brief.md", "briefExists": true})
+        demo["briefs"],
+        serde_json::json!([{"status": "unapproved", "enforced": true, "change": "c-demo-subject", "brief": ".canon/changes/c-demo-subject/brief.md", "briefExists": true}]),
+        "the one change with no approved scope yet awaits its first approval, with no reason"
     );
-    assert_eq!(subject(&report, "bare-subject")["brief"], serde_json::json!({"approved": false, "enforced": false, "briefExists": false}));
+    assert_eq!(subject(&report, "bare-subject")["briefs"], serde_json::json!([{"status": "unapproved", "enforced": false, "briefExists": false}]));
 
     let text = stdout(&run(dir.path(), &["status"]));
     assert!(text.contains("      brief: not approved (.canon/changes/c-demo-subject/brief.md has no `Approved:` line)\n"), "{text}");
@@ -702,16 +713,19 @@ fn context_status_60_status_reads_the_approval_from_the_changes_brief() {
     let report = status_json(dir.path());
     let words = APPROVED.strip_prefix("Approved: ").unwrap();
     assert_eq!(
-        subject(&report, "demo-subject")["brief"],
-        serde_json::json!({"approved": true, "enforced": false, "change": "c-second", "brief": ".canon/changes/c-second/brief.md", "briefExists": true, "approval": words, "legacyApproval": true})
+        subject(&report, "demo-subject")["briefs"],
+        serde_json::json!([{"status": "approved", "reason": "approved", "enforced": false, "change": "c-second", "brief": ".canon/changes/c-second/brief.md", "briefExists": true, "approval": words, "legacyApproval": true}]),
+        "the change with an approval line is the one the subject answers for; the never-approved one is a pending draft"
     );
+    assert_eq!(subject(&report, "demo-subject")["pendingDrafts"], serde_json::json!(["c-first"]), "{report}");
     assert_eq!(
-        subject(&report, "done-subject")["brief"],
-        serde_json::json!({"approved": true, "enforced": false, "change": "c-done-subject", "brief": ".canon/changes/c-done-subject/brief.md", "briefExists": true, "approval": words, "legacyApproval": true}),
+        subject(&report, "done-subject")["briefs"],
+        serde_json::json!([{"status": "approved", "reason": "approved", "enforced": false, "change": "c-done-subject", "brief": ".canon/changes/c-done-subject/brief.md", "briefExists": true, "approval": words, "legacyApproval": true}]),
         "a shipped subject shows its brief in full"
     );
-    assert!(subject(&report, "early-subject").get("brief").is_none(), "a specced subject carries no brief field");
-    assert!(human_steps(&report).is_empty(), "{report}");
+    assert!(subject(&report, "early-subject").get("briefs").is_none(), "a specced subject carries no briefs field");
+    assert_eq!(human_steps(&report), ["demo-subject"], "only the pending draft is reported to the human: {report}");
+    assert!(report["next"].as_array().unwrap().iter().any(|n| n["actor"] == "human" && n["command"].as_str().unwrap().starts_with("report the pending draft's brief")), "{report}");
     let text = stdout(&run(dir.path(), &["status"]));
     assert!(text.contains(&format!("      brief: approved in .canon/changes/c-second/brief.md — {words}\n")), "{text}");
     assert!(text.contains(&format!("      brief: approved in .canon/changes/c-done-subject/brief.md — {words}\n")), "{text}");
@@ -753,7 +767,7 @@ fn context_status_63_a_line_that_only_mentions_approval_does_not_approve() {
 
     for (case, body) in &refused {
         let report = report_for(case, body);
-        assert_eq!(subject(&report, "demo-subject")["brief"]["approved"], false, "{case} must not approve:\n{body}");
+        assert_eq!(brief(&report, "demo-subject")["status"], "unapproved", "{case} must not approve:\n{body}");
         let humans: Vec<&Value> = report["next"].as_array().unwrap().iter().filter(|n| n["actor"] == "human").collect();
         assert_eq!(humans.len(), 1, "{case}: exactly one human step: {report}");
         assert_eq!(humans[0]["command"], brief_step("demo-subject", &format!("c-{case}")), "{case}: {report}");
@@ -762,7 +776,7 @@ fn context_status_63_a_line_that_only_mentions_approval_does_not_approve() {
     }
     for (case, body) in &accepted {
         let report = report_for(case, body);
-        assert_eq!(subject(&report, "demo-subject")["brief"]["approved"], true, "{case} must approve:\n{body}");
+        assert_eq!(brief(&report, "demo-subject")["status"], "approved", "{case} must approve:\n{body}");
         assert!(human_steps(&report).is_empty(), "{case}: an approved brief asks no human: {report}");
     }
 }
@@ -784,14 +798,11 @@ fn context_status_65_an_older_changes_approval_does_not_cover_a_newer_change() {
 
     let report = status_json(dir.path());
     assert_eq!(
-        subject(&report, "demo-subject")["brief"],
-        serde_json::json!({"approved": false, "enforced": true, "change": "c-scope-two", "brief": ".canon/changes/c-scope-two/brief.md", "briefExists": true})
+        subject(&report, "demo-subject")["briefs"],
+        serde_json::json!([{"status": "approved", "reason": "approved", "enforced": false, "change": "c-demo-subject", "brief": ".canon/changes/c-demo-subject/brief.md", "briefExists": true, "approval": APPROVED.strip_prefix("Approved: ").unwrap(), "legacyApproval": true}]),
+        "the older change's approval is the subject's whole answered scope"
     );
-    assert_eq!(
-        subject(&report, "other-subject")["brief"],
-        serde_json::json!({"approved": false, "enforced": false, "change": "c-other-new", "briefExists": false}),
-        "no brief for the newest change"
-    );
+    assert_eq!(subject(&report, "other-subject")["pendingDrafts"], serde_json::json!(["c-other-new"]), "a draft with no brief is a pending draft too: {report}");
     assert_eq!(human_steps(&report), ["demo-subject"], "a change with no brief has no brief to answer: {report}");
     // The newest change is a pending draft: no scenario is tagged for it, so
     // the subject is still shipped for its approved scope and says why.
@@ -800,9 +811,8 @@ fn context_status_65_an_older_changes_approval_does_not_cover_a_newer_change() {
     let why = |id: &str| report["next"].as_array().unwrap().iter().find(|n| n["actor"] == "human" && n["why"].as_str().unwrap().starts_with(id)).unwrap()["why"].as_str().unwrap().to_string();
     assert!(why("demo-subject").contains(".canon/changes/c-scope-two/brief.md"), "{}", why("demo-subject"));
     let text = stdout(&run(dir.path(), &["status"]));
-    assert!(text.contains("      brief: not approved (.canon/changes/c-scope-two/brief.md has no `Approved:` line)\n"), "{text}");
     assert!(text.contains("`c-scope-two` is a pending draft: not yet part of the subject's scope"), "{text}");
-    assert!(text.contains("      brief: not approved (change `c-other-new` has no brief; advisory, nothing to approve yet)\n"), "{text}");
+    assert!(text.contains("`c-other-new` is a pending draft: not yet part of the subject's scope"), "{text}");
 }
 
 /// context.status.64 (0.17 D3): an external openspec change with no
@@ -838,14 +848,14 @@ fn context_status_64_an_external_change_is_answered_in_a_canon_brief_that_points
 
     let report = status_json(dir.path());
     assert_eq!(
-        subject(&report, "live-subject")["brief"],
-        serde_json::json!({"approved": false, "enforced": true, "change": "c-live", "brief": ".canon/changes/c-live/brief.md", "briefExists": false, "source": "plans/changes/c-live/proposal.md"}),
+        subject(&report, "live-subject")["briefs"],
+        serde_json::json!([{"status": "unapproved", "enforced": true, "change": "c-live", "brief": ".canon/changes/c-live/brief.md", "briefExists": false, "source": "plans/changes/c-live/proposal.md"}]),
         "{report}"
     );
     let words = APPROVED.strip_prefix("Approved: ").unwrap();
     assert_eq!(
-        subject(&report, "old-subject")["brief"],
-        serde_json::json!({"approved": true, "enforced": false, "change": "c-old", "brief": ".canon/changes/c-old/brief.md", "briefExists": true, "source": "plans/changes/archive/c-old/proposal.md", "approval": words, "legacyApproval": true}),
+        subject(&report, "old-subject")["briefs"],
+        serde_json::json!([{"status": "approved", "reason": "approved", "enforced": false, "change": "c-old", "brief": ".canon/changes/c-old/brief.md", "briefExists": true, "source": "plans/changes/archive/c-old/proposal.md", "approval": words, "legacyApproval": true}]),
         "{report}"
     );
     let human: Vec<&Value> = report["next"].as_array().unwrap().iter().filter(|n| n["actor"] == "human").collect();
@@ -868,8 +878,8 @@ fn context_status_64_an_external_change_is_answered_in_a_canon_brief_that_points
 
     std::fs::write(dir.path().join("canon.yaml"), format!("{CANON_YAML}plans:\n  sources: []\n")).unwrap();
     let report = status_json(dir.path());
-    assert_eq!(subject(&report, "live-subject")["brief"], serde_json::json!({"approved": false, "enforced": false, "change": "c-live", "briefExists": false}), "{report}");
-    assert_eq!(subject(&report, "old-subject")["brief"]["approved"], true, "the canon brief needs no plan source: {report}");
+    assert_eq!(subject(&report, "live-subject")["briefs"], serde_json::json!([{"status": "unapproved", "enforced": false, "change": "c-live", "briefExists": false}]), "{report}");
+    assert_eq!(brief(&report, "old-subject")["status"], "approved", "the canon brief needs no plan source: {report}");
 }
 
 /// context.status.04: untagged scenarios are listed as unowned, and the
@@ -1020,8 +1030,8 @@ fn context_status_66_a_proposed_subject_with_an_unapproved_brief_asks_only_the_h
 
     let report = status_json(dir.path());
     assert_eq!(
-        subject(&report, "demo-subject")["brief"],
-        serde_json::json!({"approved": false, "enforced": true, "change": "c-demo-subject", "brief": ".canon/changes/c-demo-subject/brief.md", "briefExists": true})
+        subject(&report, "demo-subject")["briefs"],
+        serde_json::json!([{"status": "unapproved", "enforced": true, "change": "c-demo-subject", "brief": ".canon/changes/c-demo-subject/brief.md", "briefExists": true}])
     );
     assert_eq!(human_steps(&report), ["demo-subject"], "{report}");
     assert_eq!(report["next"].as_array().unwrap().len(), 1, "the human step is the only step: {report}");
@@ -1032,7 +1042,7 @@ fn context_status_66_a_proposed_subject_with_an_unapproved_brief_asks_only_the_h
 
     write_brief(dir.path(), "c-demo-subject", &format!("{APPROVED}\n"));
     let report = status_json(dir.path());
-    assert_eq!(subject(&report, "demo-subject")["brief"]["approved"], true, "{report}");
+    assert_eq!(brief(&report, "demo-subject")["status"], "approved", "{report}");
     assert!(human_steps(&report).is_empty(), "{report}");
     assert_eq!(
         commands(&report),

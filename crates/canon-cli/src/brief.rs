@@ -6,13 +6,25 @@
 //! attestation `evidence add` would refuse, and the guards never refuse
 //! a subject move reads as needing no brief.
 //!
-//! One human answer approves a subject's scope: its brief and the
-//! policy. The agent records it, from that answer only, as an
-//! `Approved:` line in canon's own file for the change,
-//! `.canon/changes/<change>/brief.md` (no record kind), read outside HTML
-//! comments and code fences ([`canon_ingest::markdown::field`]). Fixes
-//! stay in the approved change, so the subject's newest adopted
-//! change is its current scope.
+//! One human answer approves a change's brief and the policy. The human
+//! records it, from that answer only, as an `Approved:` line in canon's own
+//! file for the change, `.canon/changes/<change>/brief.md` (no record kind),
+//! read outside HTML comments and code fences
+//! ([`canon_ingest::markdown::field`]); `canon brief approve` takes several
+//! ids and records one answer for all (0.31). Fixes stay in the approved
+//! change.
+//!
+//! # The changes a subject answers for (0.31)
+//! A subject answers for every adopted change that is **tagged** (a
+//! scenario it owns is tagged `@flow:<change>.*`), has an **approved** line
+//! (edited since or not), or is a **chore** ([`governing`], [`Reason`]).
+//! Reopen, ship and `canon status` judge each of them, whatever the order of
+//! adoption and of approval. A never-approved, untagged feature change is a
+//! pending draft and blocks nothing. With no such change the subject keeps
+//! the older rule: its newest adopted change awaits its first approval.
+//! Evidence follows the scenario ([`attested_briefs`]): a tagged scenario
+//! answers to the changes it tags, an untagged one to every change with an
+//! approved line; an unapproved chore never blocks evidence.
 //!
 //! # The approval is bound to the brief's bytes (0.19 D3, #46)
 //! `canon brief approve` records the line as
@@ -36,7 +48,7 @@
 //!
 //! # Enforced only where a brief exists
 //! The approval is enforced ([`BriefStatus::enforced`]) only when there
-//! is a brief a human can answer for the newest adopted change: its
+//! is a brief a human can answer for the change: its
 //! canon `brief.md`, or, with no canon `brief.md`, an external openspec
 //! `proposal.md` under the plan sources. Without an `Approved:` line in
 //! the canon `brief.md` (which, in the second case, does not exist yet),
@@ -152,23 +164,30 @@ pub fn approved_at(line: &str) -> Option<DateTime<Utc>> {
         .or_else(|| NaiveDate::parse_from_str(when, "%Y-%m-%d").ok().and_then(|day| day.and_hms_opt(0, 0, 0)).map(|at| at.and_utc()))
 }
 
-/// Whether a subject's newest adopted change records the human's
-/// approval of its brief: an `Approved:` line in that change's canon
-/// `brief.md` (module doc). A fix stays inside the approved
-/// change, so a newer adopted change is a new scope, and an older
-/// change's approval does not cover it.
+/// Whether one adopted change records the human's approval of its brief: an
+/// `Approved:` line in that change's canon `brief.md` (module doc). A fix
+/// stays inside the approved change, so a newer adopted change is a new
+/// scope, and an older change's approval does not cover it. One entry per
+/// change the subject answers for ([`governing`]) is `canon status`'s
+/// `briefs`.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BriefStatus {
+    /// `approved`, `unapproved` or `changed` (edited after its approval).
+    pub status: BriefState,
+    /// Why the subject answers for this change ([`Reason`]); `None` for the
+    /// newest adopted change of a subject with no governing change.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<Reason>,
+    #[serde(skip)]
     pub approved: bool,
     /// Whether the missing approval blocks (module doc): not approved,
-    /// and the newest adopted change has a brief to answer. Then status
+    /// and the change has a brief to answer. Then status
     /// asks the human and the ship guard refuses; otherwise both only
     /// report it.
     pub enforced: bool,
-    /// The newest adopted change (the last of the subject's adopted
-    /// changes, adoption order), whose canon `brief.md` must carry the
-    /// approval. Omitted when the subject adopts no change.
+    /// The adopted change this entry judges, whose canon `brief.md` must carry
+    /// the approval. Omitted when the subject adopts no change.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub change: Option<String>,
     /// That change's canon `brief.md`, relative to the repo root: the one
@@ -192,7 +211,7 @@ pub struct BriefStatus {
     /// The brief changed after its approval (0.19 D3): the line's digest
     /// no longer matches, so it is not approved and `canon brief approve`
     /// must run again.
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(skip)]
     pub changed: bool,
     /// The approval line has no digest (pre-0.19): approved, but status
     /// advises re-approving it so it binds to the brief's text.
@@ -295,6 +314,8 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
     }
     let Some(change) = changes.last() else {
         return (!proposed).then_some(BriefStatus {
+            status: BriefState::Unapproved,
+            reason: None,
             approved: false,
             enforced: false,
             change: None,
@@ -316,6 +337,8 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
             let verdict = approval_of(&text);
             let approval = field(&text, "Approved:").map(str::to_string);
             BriefStatus {
+                status: BriefState::of(&verdict),
+                reason: None,
                 approved: verdict.approved(),
                 enforced: !verdict.approved(),
                 change: Some(change.as_str().to_string()),
@@ -331,6 +354,8 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
         }
         None => match external() {
             Some(proposal) => BriefStatus {
+                status: BriefState::Unapproved,
+                reason: None,
                 approved: false,
                 enforced: true,
                 change: Some(change.as_str().to_string()),
@@ -345,6 +370,8 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
             },
             None if proposed => return None,
             None => BriefStatus {
+                status: BriefState::Unapproved,
+                reason: None,
                 approved: false,
                 enforced: false,
                 change: Some(change.as_str().to_string()),
@@ -370,34 +397,145 @@ fn has_approved_line(repo: &Path, change: &ChangeId) -> bool {
         .is_some_and(|text| field(&text, "Approved:").is_some())
 }
 
-/// The adopted changes the subject-level brief rules (reopen guard, ship
-/// guard, the brief-structure check) read, whose last is the subject's
-/// scope, and the pending drafts set aside above it. Walking the adopted
-/// changes from the newest back, only a change whose brief was never
-/// approved (no `Approved:` line) and that no scenario owned by the subject
-/// is tagged `@flow:<change>.*` for is set aside; the first change that is
-/// approved (now, or edited since) or has a tagged scenario ends the walk and
-/// is the scope's last. So a tagged unapproved draft anywhere above the
-/// newest approved change blocks. When every adopted change is such a draft,
-/// nothing is set aside and `changes` is returned unchanged. `canon status`
-/// keeps showing the set-aside drafts as awaiting the human.
-pub fn scope_changes(repo: &Path, ctx: &GateContext, flow_changes: &crate::brief_check::FlowChangesIndex, subject: &Subject, changes: &[ChangeId]) -> (Vec<ChangeId>, Vec<ChangeId>) {
+/// What a brief's approval reads as ([`BriefStatus::status`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum BriefState {
+    /// An `Approved:` line binds the brief's text (or predates digests).
+    Approved,
+    /// No `Approved:` line, or no canon brief yet.
+    Unapproved,
+    /// The brief changed after its approval.
+    Changed,
+}
+
+impl BriefState {
+    fn of(approval: &Approval) -> Self {
+        match approval {
+            Approval::Bound { .. } | Approval::Unbound { .. } => Self::Approved,
+            Approval::Missing => Self::Unapproved,
+            Approval::Changed { .. } => Self::Changed,
+        }
+    }
+}
+
+/// Why a subject answers for an adopted change ([`governing`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Reason {
+    /// A scenario the subject owns is tagged `@flow:<change>.*`.
+    Tagged,
+    /// The change's brief carries an `Approved:` line (edited since or not),
+    /// whatever tags say.
+    Approved,
+    /// The change is a chore: it has no scenario to tag, so it governs from
+    /// the moment it is adopted.
+    Chore,
+}
+
+/// A subject's adopted changes sorted by how the subject-level brief rules
+/// read them (0.31).
+#[derive(Debug, Clone, Default)]
+pub struct Governing {
+    /// The changes the subject answers for, in adoption order: reopen, ship
+    /// and status judge each one's brief.
+    pub governed: Vec<(ChangeId, Reason)>,
+    /// The adopted changes no rule reads: never approved, not a chore, no
+    /// scenario tagged for them. They block nothing.
+    pub drafts: Vec<ChangeId>,
+    /// With no governing change, the newest adopted change, whose first
+    /// approval the subject waits for (the pre-0.31 rule, kept for a subject
+    /// that has no approved scope yet).
+    pub awaiting: Option<ChangeId>,
+}
+
+impl Governing {
+    /// The changes whose brief reopen, ship and the structure check read, in
+    /// adoption order.
+    pub fn judged(&self) -> Vec<ChangeId> {
+        self.governed.iter().map(|(change, _)| change.clone()).chain(self.awaiting.clone()).collect()
+    }
+
+    /// The last judged change: where a reopen keeps its follow-up.
+    pub fn last(&self) -> Option<ChangeId> {
+        self.judged().pop()
+    }
+
+    /// The reason `change` governs, when it does.
+    pub fn reason_of(&self, change: &ChangeId) -> Option<Reason> {
+        self.governed.iter().find(|(c, _)| c == change).map(|(_, reason)| *reason)
+    }
+}
+
+/// Sorts the subject's adopted `changes` (module doc, 0.31): a change
+/// governs when a scenario the subject owns is tagged `@flow:<change>.*`
+/// ([`Reason::Tagged`]), when its brief has an `Approved:` line
+/// ([`Reason::Approved`]) or when it is a chore ([`Reason::Chore`]); the
+/// rest are pending drafts. Independent of adoption order and approval order.
+pub fn governing(repo: &Path, ctx: &GateContext, flow_changes: &crate::brief_check::FlowChangesIndex, subject: &Subject, changes: &[ChangeId]) -> Governing {
     let tagged: Vec<ChangeId> = canon_gate::spec_coverage::subject_scenarios(ctx, &subject.subject_id)
         .into_iter()
         .flat_map(|s| flow_changes.changes_of(repo, &s.project_id, &s.scenario_id).iter().cloned())
         .collect();
-    match changes.iter().rposition(|c| has_approved_line(repo, c) || tagged.contains(c)) {
-        Some(at) => (changes[..=at].to_vec(), changes[at + 1..].to_vec()),
-        None => (changes.to_vec(), Vec::new()),
+    let mut out = Governing::default();
+    for change in changes {
+        let text = canon_brief(repo, change).and_then(|path| std::fs::read_to_string(path).ok());
+        let reason = if tagged.contains(change) {
+            Some(Reason::Tagged)
+        } else if text.as_deref().is_some_and(|text| field(text, "Approved:").is_some()) {
+            Some(Reason::Approved)
+        } else if text.as_deref().is_some_and(crate::brief_check::is_chore) {
+            Some(Reason::Chore)
+        } else {
+            None
+        };
+        match reason {
+            Some(reason) => out.governed.push((change.clone(), reason)),
+            None => out.drafts.push(change.clone()),
+        }
     }
+    if out.governed.is_empty() {
+        out.awaiting = changes.last().cloned();
+        out.drafts.retain(|draft| Some(draft) != out.awaiting.as_ref());
+    }
+    out
 }
 
-/// The one line a transition prints when [`scope_changes`] set `drafts`
-/// aside, naming every one.
+/// The one line a transition prints when `drafts` are pending drafts,
+/// naming every one.
 pub fn pending_draft_line(drafts: &[ChangeId]) -> String {
     let names = drafts.iter().map(|d| format!("`{}`", d.as_str())).collect::<Vec<_>>().join(", ");
     let (verb, tags) = if drafts.len() == 1 { ("is a pending draft", format!("`@flow:{}.*`", drafts[0].as_str())) } else { ("are pending drafts", "`@flow:<change>.*`".to_string()) };
-    format!("{names} {verb} (brief not approved, no scenario tagged {tags}): not part of this transition, which reads the subject's newest approved or tagged change")
+    format!("{names} {verb} (never approved, not a chore, no scenario tagged {tags}): not part of this transition, which judges the subject's tagged, approved and chore changes")
+}
+
+/// How the human's answer to `blockers` is recorded, for the briefs that wait
+/// for it: [`BriefStatus::record`] for one, otherwise one call naming every
+/// id, preceded by the canon `brief.md` an external change still needs.
+pub fn record_all(blockers: &[&BriefStatus]) -> String {
+    match blockers {
+        [only] => only.record(),
+        many => {
+            let creates = many
+                .iter()
+                .filter(|brief| !brief.brief_exists)
+                .map(|brief| format!("create {} holding a `Source: {}` line", brief.brief.as_deref().unwrap_or_default(), brief.source.as_deref().unwrap_or_default()))
+                .collect::<Vec<_>>();
+            let call = approve_all_call(many);
+            if creates.is_empty() {
+                format!("when they answer, the human records them with {call}")
+            } else {
+                format!("{}; when they answer, the human records them with {call}", creates.join("; "))
+            }
+        }
+    }
+}
+
+/// The human's call that answers every brief in `blockers` at once, as the
+/// hint of a refusal names it: one `canon brief approve <id>…` line.
+pub fn approve_all_call(blockers: &[&BriefStatus]) -> String {
+    let ids = blockers.iter().filter_map(|b| b.change.as_deref()).collect::<Vec<_>>().join(" ");
+    format!("`canon brief approve {ids} --approver <their name> --note \"<their words>\"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role to run it")
 }
 
 /// When `subject` first adopted a change: the earliest of its own record
@@ -421,12 +559,13 @@ fn first_adopted_at(ctx: &GateContext, subject: &Subject) -> Option<DateTime<Utc
     by_subject.chain(by_change).min()
 }
 
-/// The change whose brief a scenario without a `@flow:` tag answers to
-/// (0.25 D1), among the subject's adopted `changes`:
-/// 1. the newest whose canon `brief.md` carries an `Approved:` line
-///    (approved now, or edited since: [`BriefStatus::changed`] still
-///    refuses), so a change adopted later does not freeze scenarios an
-///    approved scope already covers;
+/// The changes whose briefs a scenario without a `@flow:` tag answers to
+/// (0.25 D1, 0.31), among the subject's adopted `changes`:
+/// 1. every one whose canon `brief.md` carries an `Approved:` line (approved
+///    now, or edited since: [`BriefState::Changed`] still refuses; a chore
+///    with one included), so a change adopted later does not freeze
+///    scenarios an approved scope already covers, and an unapproved chore
+///    never blocks evidence;
 /// 2. otherwise, when the scenario already has an evidence record, recorded
 ///    before the subject first adopted a change and carrying no brief
 ///    override (`evidenced`), none: it is existing
@@ -435,19 +574,15 @@ fn first_adopted_at(ctx: &GateContext, subject: &Subject) -> Option<DateTime<Utc
 ///    standing exemption);
 /// 3. otherwise the newest adopted change, so a new subject's first
 ///    scenarios wait for its first brief.
-fn untagged_scope(
-    repo: &Path,
-    changes: &[ChangeId],
-    evidenced: impl FnOnce() -> bool,
-) -> Option<ChangeId> {
-    let approved = |change: &&ChangeId| has_approved_line(repo, change);
-    if let Some(change) = changes.iter().rev().find(approved) {
-        return Some(change.clone());
+fn untagged_scope(repo: &Path, changes: &[ChangeId], evidenced: impl FnOnce() -> bool) -> Vec<ChangeId> {
+    let approved: Vec<ChangeId> = changes.iter().filter(|change| has_approved_line(repo, change)).cloned().collect();
+    if !approved.is_empty() {
+        return approved;
     }
     if evidenced() {
-        return None;
+        return Vec::new();
     }
-    changes.last().cloned()
+    changes.last().cloned().into_iter().collect()
 }
 
 /// Every subject an attestation for `task` and/or `scenario` builds

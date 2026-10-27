@@ -111,7 +111,7 @@ fn a_pre_0_19_brief_checks_as_legacy_advisory_and_status_shows_no_finding_counts
     assert_eq!(report["legacy"], true);
 
     let status: Value = serde_json::from_str(&stdout(&run(dir.path(), &["status", "--json"]))).unwrap();
-    let brief = &status["data"]["subjects"][0]["brief"];
+    let brief = &status["data"]["subjects"][0]["briefs"][0];
     assert!(brief.get("findings").is_none(), "a legacy brief reads as before: {brief}");
 }
 

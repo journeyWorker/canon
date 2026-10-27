@@ -114,7 +114,7 @@ pub const FACTS: &[LeafFacts] = &[
     leaf("adapter validate").out(&[report("AdapterValidateReport")]),
     leaf("artifacts move").idem(ReplaySafe).out(&[report("ArtifactsMoveReport")]),
     leaf("artifacts verify").out(&[report("ArtifactsVerifyReport")]),
-    leaf("brief approve").idem(ReplaySafe).out(&[report("BriefApproveReport")]),
+    leaf("brief approve").idem(ReplaySafe).out(&[report("BriefApproveReport"), report("BriefApproveManyReport")]),
     leaf("brief check").out(&[report("BriefCheckReport")]),
     leaf("brief show").out(&[report("BriefShowReport")]),
     leaf("change new").idem(Once).out(&[report("ChangeNewReport")]),

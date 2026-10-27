@@ -350,3 +350,22 @@ fn report_generation_14_snapshot_without_an_output_directory_is_refused_with_exi
     assert_eq!(json(&out)["error"]["field"], "<DIR>");
     assert_eq!(tree(repo.path()), before, "a refused snapshot writes nothing");
 }
+
+#[test]
+fn learn_promotion_14_a_rollback_of_an_unknown_strategy_is_refused_before_any_signature_is_read_and_writes_nothing() {
+    let signing = Signing::new();
+    let repo = signing.repo.path();
+    let (candidate, _) = candidate_and_evaluation(repo);
+    fs::write(repo.join("bad.sig"), "not a signature\n").unwrap();
+    let before = tree(repo);
+    for sig in ["missing.sig", "bad.sig"] {
+        let out = canon(repo, &["strategy", "rollback", UNKNOWN_STRATEGY, "--reason", "regressed", "--actor-id", "alice", "--signature-file", sig, "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
+        assert_eq!(out.status.code(), Some(2), "{sig}");
+        assert_eq!(error_code(&out), "LEARN_STRATEGY_NOT_FOUND", "{sig}");
+        assert!(json(&out)["error"]["message"].as_str().unwrap().contains(UNKNOWN_STRATEGY));
+    }
+    let existing = canon(repo, &["strategy", "rollback", &candidate.id.to_string(), "--reason", "regressed", "--actor-id", "alice", "--signature-file", "bad.sig", "--approval-at", "2030-01-01T00:00:00Z", "--json"]);
+    assert_eq!(existing.status.code(), Some(1));
+    assert_eq!(error_code(&existing), "LEARN_ROLLBACK_FAILED");
+    assert_eq!(tree(repo), before, "a refused rollback writes nothing");
+}

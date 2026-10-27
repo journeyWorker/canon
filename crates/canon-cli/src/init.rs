@@ -746,7 +746,8 @@ pub(crate) fn run_init_in(repo: &Path, options: InitOptions, json: bool, emit_da
         }
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
             let missing = missing_gitignore_lines(repo);
-            if agents.is_none() && missing.is_empty() {
+            // `canon demo init` (`emit_data` false) scaffolds a fresh repo and has nothing to refresh: any existing config refuses, before the policy it would overwrite.
+            if !emit_data || (agents.is_none() && missing.is_empty()) {
                 if emit_data {
                     log.step("config-exists", canon_yaml_path.display().to_string(), format!("canon init: {} already exists and nothing is left to refresh", canon_yaml_path.display()));
                     return log.finish(repo);

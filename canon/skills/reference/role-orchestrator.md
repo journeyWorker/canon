@@ -499,8 +499,9 @@ When `status` or `meta.next` shows a step with `actor: human` (the brief's
 approval), stop everything for that scope, report the brief to the human in
 its language, and wait. Tell the human they can approve the clean briefs in
 `canon dashboard` (the briefs page) or run, in their own shell, the exact call
-with the slug filled in: `canon brief approve <slug> --approver <their name>
---note "<their own words>"`. You never click Approve, fill the form or run
+with every slug filled in: `canon brief approve <slug> <slug> --approver <their name>
+--note "<their own words>"` (several slugs take one answer; nothing is written if
+one is refused). You never click Approve, fill the form or run
 `brief approve` yourself: it refuses you (`HUMAN_ONLY`), and removing or
 unsetting your declared role (`env -u CANON_ROLE`, dropping `--as`) to get past
 that is the same act under another label. Report the call and wait. Do not start the

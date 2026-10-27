@@ -142,8 +142,8 @@ is attributed, and is fresh — never on a self-report. See
    again. Each scenario points at the step it proves
    (`canon scenario new --flow F1`), and `canon status` lists each step
    with its scenarios, flagging a step with no scenario or no failure case;
-   `canon status` reads the approval in the subject's newest adopted change
-   to show whether its brief is approved, and asks for a human only when it
+   `canon status` reads the approval in each change the subject answers
+   for (tagged by its scenarios, approved, or a chore) and lists them in `briefs`, and asks for a human only when it
    is missing. Work that changes nothing a user can observe (a dependency,
    build or refactor change) is `canon change new <slug> --change-kind chore`, with a
    short brief and no new scenarios. A change from an external plan (an

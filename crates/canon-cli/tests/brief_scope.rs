@@ -702,7 +702,7 @@ fn subject_lifecycle_38_a_pending_draft_does_not_freeze_a_shipped_subject() {
     );
     assert!(reopen.status.success(), "{}", stderr(&reopen));
     assert!(
-        stderr(&reopen).contains("`b` is a pending draft (brief not approved, no scenario tagged `@flow:b.*`): not part of this transition"),
+        stderr(&reopen).contains("`b` is a pending draft (never approved, not a chore, no scenario tagged `@flow:b.*`): not part of this transition"),
         "{}",
         stderr(&reopen)
     );
@@ -720,10 +720,9 @@ fn subject_lifecycle_38_a_pending_draft_does_not_freeze_a_shipped_subject() {
     // part of the subject's scope.
     let status: Value = serde_json::from_str(&stdout(&ok(repo, &["status", "--json"]))).unwrap();
     let text = status.to_string();
-    assert!(
-        text.contains("\"change\":\"b\"") && text.contains("\"approved\":false") && text.contains("\"pendingDrafts\":[\"b\"]"),
-        "{text}"
-    );
+    assert!(text.contains("\"pendingDrafts\":[\"b\"]"), "{text}");
+    let briefs = status["data"]["subjects"][0]["briefs"].to_string();
+    assert!(!briefs.contains("\"change\":\"b\""), "a pending draft is shown, never judged: {briefs}");
     let human = stdout(&ok(repo, &["status"]));
     assert!(human.contains("`b` is a pending draft: not yet part of the subject's scope"), "{human}");
     // The guidance says what is refused: only what answers to the draft.
@@ -833,7 +832,7 @@ fn subject_lifecycle_39_a_tagged_draft_under_a_newer_untagged_draft_still_blocks
     assert!(stderr(&out).contains(".canon/changes/b/brief.md"), "{}", stderr(&out));
     assert!(!stderr(&out).contains(".canon/changes/c/brief.md"), "{}", stderr(&out));
     assert!(
-        stderr(&out).contains("`c` is a pending draft (brief not approved, no scenario tagged `@flow:c.*`): not part of this transition"),
+        stderr(&out).contains("`c` is a pending draft (never approved, not a chore, no scenario tagged `@flow:c.*`): not part of this transition"),
         "a refused reopen names what it set aside: {}",
         stderr(&out)
     );

@@ -87,6 +87,66 @@ Since 0.30 canon plans its own work as canon changes in
 cite under `docs/superpowers/` and `openspec/` were removed in 0.30; read
 them in git history, e.g. `git show 0977bce1:<path>`.
 
+## 0.31.0 release
+
+### `canon-0-31-loop`: approval and adopt flow
+
+- `canon brief approve` takes one or more change ids: one name, one answer and
+  one timestamp for all of them. Every id is checked before any is written, and
+  one refused id (a blocker, no brief, an open code fence) refuses the call with
+  `BRIEF_APPROVE_REFUSED` (exit 2) naming every refused id with its own code;
+  nothing is written. A disk error while writing (exit 1) leaves the ids already
+  written approved and skips the rest. With one id the output is unchanged; with
+  several, `--json` carries one entry per id (`written`, `unchanged`, `failed`,
+  `skipped`). The briefs page of `canon dashboard` selects several briefs and
+  approves them with one name and answer.
+- A subject answers for every adopted change that is **tagged** (a scenario it
+  owns is tagged `@flow:<change>.*`), has an **approved** line (even when edited
+  since), or is a **chore**. Reopen, ship and `canon status` judge all of them;
+  the order of adoption and of approval no longer matters. A never-approved,
+  untagged feature change is a pending draft and blocks nothing. Evidence
+  follows the scenario: a tagged scenario answers to the changes it tags, an
+  untagged one to every approved-line change (chores included); an unapproved
+  chore blocks reopen and ship, not evidence. A subject with no governing change
+  keeps the old rule (its newest adopted change awaits its first approval).
+- A directory, or a file that is no SQLite database, at the hot path makes
+  `canon report build`, `check` and `snapshot` fail (exit 1) naming the path,
+  as `canon query` does; the dashboard comes up and says why it has no snapshot
+  (#114). A path with nothing at it still reads as no hot records.
+
+### `canon-0-31-fixes`: six behaviors that disagreed with the docs
+
+- Not-found and invalid input exit 2; exit 1 stays with check results and
+  refused verdicts.
+- `canon demo init` refuses (`INIT_CONFIG_EXISTS`, exit 2) any directory that
+  holds a `canon.yaml`, and leaves its policy file as it was.
+- `canon gate install-hooks` refuses a `--repo` that is no existing directory
+  (`HOOKS_INSTALL_FAILED`, exit 2, also under `--dry-run`). Its output names the
+  two agent hook files and the script, says no git hook was installed, and says
+  to copy the script into git's pre-commit hook or call it from a hook runner.
+- `canon context-pack show` and `verify` take a pack id of `sha256:` and 64
+  lower-case hex digits; anything else is `USAGE` (exit 2). A well-formed id with
+  no pack is still `CONTEXT_PACK_NOT_FOUND`.
+- `canon evidence approval-payload` refuses a `--scenario-id` the scenario index
+  does not hold (`EVIDENCE_SCENARIO_NOT_INDEXED`, exit 2; run
+  `canon inventory sync`).
+- `ADAPTER_REFUSED`: `adapter authorize` exits 2 for a response whose envelope
+  breaks a rule and for a broken policy file (it was 1); exit 1 there is only
+  `ADAPTER_EXECUTION_NOT_AUTHORIZED`. `adapter validate` keeps exit 1 for a
+  rule-breaking envelope and exit 2 for an unreadable file.
+- `canon strategy rollback` looks the strategy id up first:
+  `LEARN_STRATEGY_NOT_FOUND`, exit 2, whatever the signature file is. A
+  signature that does not verify stays `LEARN_ROLLBACK_FAILED`, exit 1.
+
+### Upgrading
+
+`canon status --json` `statusVersion` is `4`. A subject's `brief` object is
+gone; read `briefs` instead, a list with one entry per change the subject
+answers for: `change`, `brief` (path), `status` (`approved`, `unapproved`,
+`changed`), `reason` (`tagged`, `approved`, `chore`) and `findings` (the check
+counts). `pendingDrafts` holds only pending drafts, and `flow` the steps of
+every tagged change. Tools that read the old `brief` field must read `briefs`.
+
 ## 0.30.0 release
 
 0.30 is canon's first release planned and shipped through canon itself: six

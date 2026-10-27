@@ -300,3 +300,48 @@ Feature: dispatch manifest
     When canon dispatch diff runs there
     Then it exits 2 with CONFIG_MISSING on field --repo
     And no file is created in the directory
+
+  # canon: {"schema":1,"at":"2026-10-27T10:48:52Z","actor":{"agent_id":"impl-031-fixes","role":"implementer","session_id":"fixes-2026-10-27"}}
+  @subject:dispatch-manifest
+  @case:failure
+  @flow:canon-0-31-fixes.F3
+  @dispatch.manifest.29
+  Scenario: context-pack show on a malformed pack id is a usage error
+    Given a repo and the ids sha256:abc, an upper-case sha256 id and an empty id
+    When canon context-pack show runs with each
+    Then each exits 2 with USAGE naming the pack id operand
+    And the repo tree is identical to before each call
+
+  # canon: {"schema":1,"at":"2026-10-27T10:48:56Z","actor":{"agent_id":"impl-031-fixes","role":"implementer","session_id":"fixes-2026-10-27"}}
+  @subject:dispatch-manifest
+  @case:failure
+  @flow:canon-0-31-fixes.F3
+  @dispatch.manifest.30
+  Scenario: context-pack verify on a malformed pack id is a usage error
+    Given a repo and the ids sha256:abc, an upper-case sha256 id and an empty id
+    When canon context-pack verify runs with each
+    Then each exits 2 with USAGE naming the pack id operand
+    And the repo tree is identical to before each call
+
+  # canon: {"schema":1,"at":"2026-10-27T10:48:57Z","actor":{"agent_id":"impl-031-fixes","role":"implementer","session_id":"fixes-2026-10-27"}}
+  @subject:dispatch-manifest
+  @case:failure
+  @flow:canon-0-31-fixes.F5
+  @dispatch.manifest.31
+  Scenario: adapter authorize on a response whose envelope breaks a rule is refused as a fixable invocation
+    Given an adapter response whose telemetry cost is negative, and a policy file that is not valid YAML
+    When canon adapter authorize --response names that file, then runs with the broken policy
+    Then each exits 2 with ADAPTER_REFUSED, the first naming telemetry.cost_usd and the second hinting to fix the policy file
+    And authorize still exits 1 with ADAPTER_EXECUTION_NOT_AUTHORIZED for a policy that sets no budget
+    And no file is created or changed in the repo
+
+  # canon: {"schema":1,"at":"2026-10-27T10:48:59Z","actor":{"agent_id":"impl-031-fixes","role":"implementer","session_id":"fixes-2026-10-27"}}
+  @subject:dispatch-manifest
+  @case:edge
+  @flow:canon-0-31-fixes.F5
+  @dispatch.manifest.32
+  Scenario: schema --error ADAPTER_REFUSED states the exit of each adapter call
+    Given any directory
+    When canon schema --error ADAPTER_REFUSED runs, and canon schema adapter authorize lists its exit codes
+    Then the error table gives validate a rule-breaking envelope exit 1, and an unreadable response file or any authorize refusal exit 2
+    And the authorize exit table says exit 1 is only ADAPTER_EXECUTION_NOT_AUTHORIZED and exit 2 includes ADAPTER_REFUSED

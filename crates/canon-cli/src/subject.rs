@@ -999,16 +999,21 @@ pub fn run_move(
     };
     // The subject's adopted changes, joined from both sides (0.18 D4).
     let changes = gate_context.as_ref().map_or_else(|| subject.change_ids.clone(), |ctx| subject_change_ids(ctx, &subject));
-    // The subject-level brief rules read its scope: a pending draft (no
-    // scenario tagged for it) does not freeze the maintenance loop.
+    // The subject-level brief rules judge every change the subject answers
+    // for (tagged, approved or chore); a pending draft blocks nothing.
     let adopted = changes.len();
-    let (changes, pending_drafts) = match &gate_context {
-        Some(ctx) if ships || reopens => crate::brief::scope_changes(&repo, ctx, &crate::brief_check::FlowChangesIndex::lazy(), &subject, &changes),
+    let (judged, pending_drafts) = match &gate_context {
+        Some(ctx) if ships || reopens => {
+            let governing = crate::brief::governing(&repo, ctx, &crate::brief_check::FlowChangesIndex::lazy(), &subject, &changes);
+            (governing.judged(), governing.drafts)
+        }
         _ => (changes, Vec::new()),
     };
     let pending_note: Vec<String> = (!pending_drafts.is_empty()).then(|| crate::brief::pending_draft_line(&pending_drafts)).into_iter().collect();
 
     let code_tree = crate::reverify::CodeTreeMemo::lazy();
+    // With several briefs to approve, the one call that answers them all.
+    let mut approve_call: Option<String> = None;
     let mut blocking = match (ships, &gate_context) {
         (true, Some(ctx)) => ship_gate_violations(ctx, subject_id),
         _ => Vec::new(),
@@ -1017,13 +1022,15 @@ pub fn run_move(
     // an index the `.feature` edits are not in would ship ungraded specs.
     if ships {
         blocking.extend(crate::inventory::unrefreshable_roots(&repo).into_iter().map(|root| root.violation("verifying → shipped: ")));
-        blocking.extend(brief_check_violation(&repo, subject_id, &changes));
+        blocking.extend(brief_check_violations(&repo, subject_id, &judged));
         if let Some(ctx) = &gate_context {
             blocking.extend(crate::reverify::chore_violations(&repo, ctx, &code_tree, &subject));
         }
     }
     if reopens {
-        blocking.extend(reopen_violation(&repo, &subject, &changes));
+        let gap = reopen_violation(&repo, &subject, &judged);
+        approve_call = gap.as_ref().and_then(|gap| gap.call.clone());
+        blocking.extend(gap.map(|gap| gap.violation));
     }
     let mut waivable = Vec::new();
     report_review_guard(&policy, current, target, adopted);
@@ -1041,9 +1048,10 @@ pub fn run_move(
             }
         }
     }
-    let brief_gap = if ships { brief_violation(&repo, &subject, &changes) } else { None };
+    let brief_gap = if ships { brief_violation(&repo, &subject, &judged) } else { None };
+    approve_call = approve_call.or_else(|| brief_gap.as_ref().and_then(|gap| gap.call.clone()));
     let review_gaps = !waivable.is_empty();
-    waivable.extend(brief_gap.iter().cloned());
+    waivable.extend(brief_gap.iter().map(|gap| gap.violation.clone()));
 
     if !blocking.is_empty() {
         let lines = blocking.iter().chain(&waivable).map(Violation::line).collect::<Vec<_>>().join("\n");
@@ -1057,6 +1065,7 @@ pub fn run_move(
         if override_reason.is_some() {
             hints.push("--override-reason waives only the review checks (unreviewed-promotion, open-blocker); the violations above that are not review checks still refuse this transition".to_string());
         }
+        hints.extend(approve_call.iter().map(|call| format!("the human answers every brief named above with one call: {call}")));
         if hints.is_empty() {
             hints.push("fix each violation above (`canon gate check` lists them with their causes), then run this transition again".to_string());
         }
@@ -1078,7 +1087,10 @@ pub fn run_move(
                 fixes.push("record an independent review (`canon review scenario`) and close blocker findings".to_string());
             }
             if brief_gap.is_some() {
-                fixes.push("get the human's answer to the brief; the human records it with `canon brief approve` in their own shell".to_string());
+                fixes.push(match &approve_call {
+                    Some(call) => format!("get the human's answer to the briefs; the human records them all with one call: {call}"),
+                    None => "get the human's answer to the brief; the human records it with `canon brief approve` in their own shell".to_string(),
+                });
             }
             let reverify: Vec<&Violation> = waivable.iter().filter(|v| canon_gate::review_gate::is_reverify(v)).collect();
             if reverify.iter().any(|v| !canon_gate::review_gate::is_scoped_reverify(v)) {
@@ -1114,7 +1126,7 @@ pub fn run_move(
         crate::warn_err!("canon subject move: --override-reason not recorded — no review check refused this transition");
     }
     if let (true, Some(reason)) = (reopens, reason) {
-        let change = changes.last().cloned();
+        let change = judged.last().cloned();
         let into = match &change {
             Some(change) => format!("keep the follow-up in its approved change `{}`", change.as_str()),
             None => "keep the follow-up in its change".to_string(),
@@ -1341,79 +1353,102 @@ fn divergent_cells(ctx: &GateContext, subject_id: &SubjectId, blocking: &[Violat
 }
 
 /// The `verifying → shipped` brief-structure check (0.19 D2): the blocker
-/// rules of `canon brief check` over the subject's newest adopted change's
-/// brief, as one `unreviewed-promotion` naming each finding. Not waivable
-/// by `--override-reason`: the brief waives its own findings, one rule in
-/// one section (`canon:waive`). `None` when there is no such brief, it is a
-/// pre-0.19 brief, or nothing blocks.
-fn brief_check_violation(repo: &Path, subject_id: &SubjectId, changes: &[ChangeId]) -> Option<Violation> {
-    let findings = crate::brief_check::guard_blockers(repo, changes.last()?);
-    if findings.is_empty() {
-        return None;
-    }
-    let listed = findings
+/// rules of `canon brief check` over the brief of each change the subject
+/// answers for (`judged`, 0.31), one `unreviewed-promotion` per brief naming
+/// each finding. Not waivable by `--override-reason`: the brief waives its
+/// own findings, one rule in one section (`canon:waive`). Nothing for a
+/// change with no such brief, a pre-0.19 brief, or no blocker.
+fn brief_check_violations(repo: &Path, subject_id: &SubjectId, judged: &[ChangeId]) -> Vec<Violation> {
+    judged
         .iter()
-        .map(|f| format!("{} [{}] line {}", f.rule, f.section.as_deref().unwrap_or("-"), f.line))
-        .collect::<Vec<_>>()
-        .join("; ");
-    Some(Violation::new(
-        FailureClass::UnreviewedPromotion,
-        subject_id.as_str(),
-        format!("verifying → shipped: the brief has {} blocker finding(s): {listed}; `canon brief check` shows them", findings.len()),
-    ))
+        .filter_map(|change| {
+            let findings = crate::brief_check::guard_blockers(repo, change);
+            if findings.is_empty() {
+                return None;
+            }
+            let listed = findings
+                .iter()
+                .map(|f| format!("{} [{}] line {}", f.rule, f.section.as_deref().unwrap_or("-"), f.line))
+                .collect::<Vec<_>>()
+                .join("; ");
+            let which = if judged.len() == 1 { "the brief".to_string() } else { format!("the brief of `{}`", change.as_str()) };
+            Some(Violation::new(
+                FailureClass::UnreviewedPromotion,
+                subject_id.as_str(),
+                format!("verifying → shipped: {which} has {} blocker finding(s): {listed}; `canon brief check` shows them", findings.len()),
+            ))
+        })
+        .collect()
 }
 
-/// The `verifying → shipped` brief check (module doc): an
-/// `unreviewed-promotion` naming the subject when [`crate::brief::brief_of`],
-/// the decision `canon status` reports, reads its brief as enforced and
-/// not approved. An unapproved brief that is not enforced (nothing to
-/// answer) prints an advisory instead. `None` when the brief is
-/// approved, not enforced, or the subject needs none. `changes` is the
-/// subject's adopted changes, joined from both sides.
-fn brief_violation(repo: &Path, subject: &Subject, changes: &[ChangeId]) -> Option<Violation> {
-    brief_gap(repo, subject, changes, "verifying → shipped", "shipping")
+/// The `verifying → shipped` brief check (module doc): one
+/// `unreviewed-promotion` naming the subject and every brief of `judged`
+/// that [`crate::brief::brief_of`], the decision `canon status` reports,
+/// reads as enforced and not approved. An unapproved brief that is not
+/// enforced (nothing to answer) prints an advisory instead. `None` when
+/// every brief is approved or not enforced, or the subject needs none.
+/// `judged` is [`crate::brief::Governing::judged`].
+fn brief_violation(repo: &Path, subject: &Subject, judged: &[ChangeId]) -> Option<BriefGap> {
+    brief_gap(repo, subject, judged, "verifying → shipped", "shipping")
 }
 
-/// The reopen check (0.18 D3): `shipped → verifying` needs no human
-/// inside the approved scope, the subject's newest adopted change whose
-/// brief is approved, or when there is no brief to answer. Otherwise it
-/// refuses with the same `unreviewed-promotion` the ship guard prints,
-/// naming the brief to approve; `--override-reason` does not waive it.
-fn reopen_violation(repo: &Path, subject: &Subject, changes: &[ChangeId]) -> Option<Violation> {
-    brief_gap(repo, subject, changes, "shipped → verifying", "reopening").map(|mut violation| {
-        violation.detail = violation.detail.replacen("brief not approved", "reopening needs the approved scope, and the brief is not approved", 1);
-        violation
-    })
+/// The reopen check (0.18 D3, 0.31): `shipped → verifying` needs every
+/// change the subject answers for to be approved now, or to have no brief to
+/// answer. Otherwise it refuses with the same `unreviewed-promotion` the
+/// ship guard prints, naming every brief to approve; `--override-reason`
+/// does not waive it.
+fn reopen_violation(repo: &Path, subject: &Subject, judged: &[ChangeId]) -> Option<BriefGap> {
+    brief_gap(repo, subject, judged, "shipped → verifying", "reopening")
+}
+
+/// What the brief check found: the violation, and, with several briefs to
+/// approve, the one call that answers them all.
+struct BriefGap {
+    violation: Violation,
+    call: Option<String>,
 }
 
 /// The brief check of `transition` (`verb` is how its advisory names
 /// it): [`brief_violation`] and [`reopen_violation`].
-fn brief_gap(repo: &Path, subject: &Subject, changes: &[ChangeId], transition: &str, verb: &str) -> Option<Violation> {
+fn brief_gap(repo: &Path, subject: &Subject, judged: &[ChangeId], transition: &str, verb: &str) -> Option<BriefGap> {
     let (roots, unreadable) = match crate::brief::plan_roots(repo) {
         Ok(roots) => (roots, None),
         Err(e) => (Vec::new(), Some(e)),
     };
-    let brief = crate::brief::brief_of(repo, &roots, subject, changes).filter(|brief| !brief.approved)?;
     let id = subject.subject_id.as_str();
-    if !brief.enforced {
-        let why = match (unreadable, &brief.change) {
-            (Some(e), Some(change)) => format!("its newest adopted change `{change}` has no brief, and canon.yaml's `plans:` section cannot be read ({e}), so no external proposal.md is found"),
+    // No adopted change at all: one status with no change, an advisory only.
+    let briefs: Vec<crate::brief::BriefStatus> = if judged.is_empty() {
+        crate::brief::brief_of(repo, &roots, subject, &[]).into_iter().collect()
+    } else {
+        judged.iter().filter_map(|change| crate::brief::brief_of(repo, &roots, subject, std::slice::from_ref(change))).collect()
+    };
+    let mut blockers: Vec<&crate::brief::BriefStatus> = Vec::new();
+    for brief in briefs.iter().filter(|brief| !brief.approved) {
+        if brief.enforced {
+            blockers.push(brief);
+            continue;
+        }
+        let why = match (&unreadable, &brief.change) {
+            (Some(e), Some(change)) => format!("its adopted change `{change}` has no brief, and canon.yaml's `plans:` section cannot be read ({e}), so no external proposal.md is found"),
             (Some(e), None) => format!("canon.yaml's `plans:` section cannot be read ({e}), and {id} adopts no change"),
-            (None, Some(change)) => format!("its newest adopted change `{change}` has no brief (no {}/{change}/brief.md, no openspec proposal.md)", canon_model::paths::CHANGES_DIR),
+            (None, Some(change)) => format!("its adopted change `{change}` has no brief (no {}/{change}/brief.md, no openspec proposal.md)", canon_model::paths::CHANGES_DIR),
             (None, None) => format!("{id} adopts no change"),
         };
         crate::warn_err!("canon subject move: advisory: {id}'s brief is not approved — {why}, so there is no brief to answer and {verb} is not refused");
+    }
+    if blockers.is_empty() {
         return None;
     }
-    Some(Violation::new(
-        FailureClass::UnreviewedPromotion,
-        id,
-        format!(
-            "{transition}: brief not approved — {}; a human must answer the brief; {}",
-            brief.unanswered(),
-            brief.record()
-        ),
-    ))
+    let named = blockers.iter().map(|brief| brief.unanswered()).collect::<Vec<_>>().join("; ");
+    let record = crate::brief::record_all(&blockers);
+    let lead = match (verb, blockers.len()) {
+        ("reopening", 1) => "reopening needs the approved scope, and the brief is not approved",
+        ("reopening", _) => "reopening needs every brief the subject answers for approved, and these are not",
+        _ => "brief not approved",
+    };
+    let call = (blockers.len() > 1).then(|| crate::brief::approve_all_call(&blockers));
+    let violation = Violation::new(FailureClass::UnreviewedPromotion, id, format!("{transition}: {lead} — {named}; a human must answer the brief; {record}"));
+    Some(BriefGap { violation, call })
 }
 
 #[cfg(test)]

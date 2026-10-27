@@ -151,12 +151,16 @@ canon dashboard --snapshot /tmp/canon-snap --port 8080
 `/briefs.html` lists every live change whose brief awaits the human (no
 `Approved:` line, or edited since) with its intent, outcome, flow steps,
 acceptance, questions and assumptions, and its `canon brief check`
-blockers and advisories. The human types their name and their answer and
-clicks Approve: that records exactly what `canon brief approve
-<id> --approver <name> --note <text>` records, the `Approved:` line bound to the
-brief digest and the policy approval. It is refused when the brief changed
-after the page loaded (`BRIEF_CHANGED_SINCE_PAGE_LOAD`: reload) or while it
-has blockers (`BRIEF_APPROVE_REFUSED`). The server is localhost only and
+blockers and advisories. Each brief that has no blocker has a selection box
+and the page shows how many are selected. The human types their name and their
+answer once and clicks Approve: one request carries every selected brief with
+the sha256 of the file the page read, and records exactly what `canon brief
+approve <id>… --approver <name> --note <text>` records, the `Approved:` line
+bound to the brief digest and the policy approval, for each. A brief that
+changed after the page loaded (`BRIEF_CHANGED_SINCE_PAGE_LOAD`) or that has
+blockers refuses the whole request (409 `BRIEF_APPROVE_REFUSED`, naming each
+refused brief): nothing is written and the page says to read it again. A request
+naming one brief the old way (`changeId`, `sha256`) is still accepted. The server is localhost only and
 refuses requests from other origins (`DASHBOARD_ORIGIN_REFUSED`).
 
 For an agent the human stop is unchanged: when clean briefs are waiting,

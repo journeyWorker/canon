@@ -148,6 +148,9 @@ pub enum AdapterError {
     },
     #[error("cannot read adapter response `{path}`: {source}")]
     Io { path: String, source: std::io::Error },
+    /// `authorize` only: `.canon/policy.yaml` does not parse or its `adapter_capabilities` is malformed.
+    #[error("adapter authorization failed: {0}")]
+    Policy(String),
 }
 
 impl TryFrom<RawAdapterResponse> for AdapterResponse {
@@ -433,11 +436,11 @@ pub fn authorize_response<P: AsRef<Path>, R: AsRef<Path>>(response_path: P, repo
     let response = parse_response(fs::read(response_path.as_ref()).map_err(|source| AdapterError::Io { path: response_path.as_ref().display().to_string(), source })?)?;
     let policy_path = repo.as_ref().join(".canon/policy.yaml");
     let text = fs::read_to_string(&policy_path).unwrap_or_default();
-    let root: serde_yaml::Value = serde_yaml::from_str(&text).map_err(|e| AdapterError::Validation(format!("malformed policy: {e}")))?;
+    let root: serde_yaml::Value = serde_yaml::from_str(&text).map_err(|e| AdapterError::Policy(format!("malformed policy: {e}")))?;
     let root = if root.is_null() { serde_yaml::Value::Mapping(Default::default()) } else { root };
-    let root = root.as_mapping().ok_or_else(|| AdapterError::Validation("malformed policy: expected mapping".into()))?;
+    let root = root.as_mapping().ok_or_else(|| AdapterError::Policy("malformed policy: expected mapping".into()))?;
     let policy = root.get(serde_yaml::Value::String("adapter_capabilities".into())).cloned().unwrap_or_else(|| serde_yaml::Value::Mapping(Default::default()));
-    let policy: CapabilityPolicy = serde_yaml::from_value(policy).map_err(|e| AdapterError::Validation(format!("malformed adapter_capabilities policy: {e}")))?;
+    let policy: CapabilityPolicy = serde_yaml::from_value(policy).map_err(|e| AdapterError::Policy(format!("malformed adapter_capabilities policy: {e}")))?;
     let mut reasons = Vec::new();
     if !policy.runtime_enforced { reasons.push("runtime_enforced=false; no enforcement adapter is available".into()); }
     let fs_rank = |v: FilesystemCapability| match v { FilesystemCapability::None => 0, FilesystemCapability::ReadOnly => 1, FilesystemCapability::WorkspaceWrite => 2 };

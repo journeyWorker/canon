@@ -740,7 +740,11 @@ pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> u8 {
             return error.emit("canon evidence approval-payload", args.json);
         }
     }
-    match approval_binding(&repo, args) {
+    let bound = approval_binding(&repo, args).map_err(ApprovalRefusal::from).and_then(|bound| {
+        ensure_scenario_indexed(&repo, args)?;
+        Ok(bound)
+    });
+    match bound {
         Ok((payload, surface, effects)) if args.json => {
             let hex: String = payload.iter().map(|byte| format!("{byte:02x}")).collect();
             crate::json_out::data(
@@ -754,10 +758,40 @@ pub fn run_approval_payload(repo: &Path, args: &ApprovalPayloadArgs) -> u8 {
                 CliError::refused("WRITE_FAILED", error.to_string()).hint("check that the path is writable and the disk has room, then run the command again").emit("canon evidence approval-payload", false)
             }
         },
-        Err(error) => {
+        Err(ApprovalRefusal::NotIndexed(error)) => error.emit("canon evidence approval-payload", args.json),
+        Err(ApprovalRefusal::Binding(error)) => {
             CliError::refused("EVIDENCE_REFUSED", error.clone()).hint("fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)").emit("canon evidence approval-payload", args.json)
         }
     }
+}
+
+/// Why `approval-payload` printed no bytes.
+enum ApprovalRefusal {
+    /// The binding itself was refused (`EVIDENCE_REFUSED`).
+    Binding(String),
+    /// The scenario is not in the scenario index (`EVIDENCE_SCENARIO_NOT_INDEXED`).
+    NotIndexed(CliError),
+}
+
+impl From<String> for ApprovalRefusal {
+    fn from(message: String) -> Self {
+        Self::Binding(message)
+    }
+}
+
+/// Refuse a `--scenario-id` the scenario index does not hold: there is nothing a signer could attest to.
+fn ensure_scenario_indexed(repo: &Path, args: &ApprovalPayloadArgs) -> Result<(), ApprovalRefusal> {
+    let (Some(scenario), Some(project)) = (&args.scenario_id, &args.project_id) else {
+        return Ok(());
+    };
+    let context = load_gate_context(repo).map_err(|e| ApprovalRefusal::NotIndexed(CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root")))?;
+    if canon_gate::spec_coverage::latest_scenarios(&context).iter().any(|s| &s.project_id == project && &s.scenario_id == scenario) {
+        return Ok(());
+    }
+    Err(ApprovalRefusal::NotIndexed(
+        CliError::refused("EVIDENCE_SCENARIO_NOT_INDEXED", format!("scenario `{scenario}` is not in the scenario index of spec root `{project}`; no bytes were produced"))
+            .hint("run `canon inventory sync` so the spec root's scenarios are indexed (and check the id), then run `canon evidence approval-payload` again"),
+    ))
 }
 
 /// `canon evidence add` (module doc). Returns the process exit code.

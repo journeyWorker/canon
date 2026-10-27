@@ -131,7 +131,7 @@ const REFUSALS: &[Row] = &[
     lit("scenario new", &["scenario", "new", "auth.login.02", "--title", "Again", "--feature", FEATURE], "SCENARIO_TAG_EXISTS"),
     lit("skills install", &["skills", "install", "--providers", "bogus"], "SKILLS_INVALID_ARGUMENT"),
     lit("strategy promote", &["strategy", "promote", "01ARZ3NDEKTSV4RRFFQ69G5FAV"], "CONFIG_UNREADABLE").setup(BROKEN_CONFIG),
-    lit("strategy rollback", &["strategy", "rollback", "01ARZ3NDEKTSV4RRFFQ69G5FAV", "--reason", "regressed", "--actor-id", "alice", "--signature-file", "missing.sig", "--approval-at", "2030-01-01T00:00:00Z"], "LEARN_SIGNATURE_UNREADABLE"),
+    lit("strategy rollback", &["strategy", "rollback", "01ARZ3NDEKTSV4RRFFQ69G5FAV", "--reason", "regressed", "--actor-id", "alice", "--signature-file", "missing.sig", "--approval-at", "2030-01-01T00:00:00Z"], "LEARN_STRATEGY_NOT_FOUND"),
     lit("subject adopt", &["subject", "adopt", "no-such", "--change-id", "add-login"], "SUBJECT_ADOPT_REFUSED"),
     lit("subject move", &["subject", "move", "demo", "--to", "shipped"], "SUBJECT_INVALID_TRANSITION"),
     lit("subject new", &["subject", "new", "demo", "--domain", "dev", "--title", "Again"], "SUBJECT_EXISTS"),

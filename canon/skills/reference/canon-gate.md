@@ -303,8 +303,8 @@ The approval is never assumed: the agent writes the brief, stops and
 reports it, and builds nothing for that scope until the human answers.
 `canon evidence add` is the backstop for that stop (0.16 M7). It
 refuses (exit `1`, nothing staged or stored) while a subject the record
-attests for has an enforced, unapproved brief: the newest adopted
-change's canon `.canon/changes/<change>/brief.md` has no `Approved:`
+attests for has an enforced, unapproved brief: a change the record
+answers to (below) has a canon `.canon/changes/<change>/brief.md` with no `Approved:`
 line, was edited after its approval (`BRIEF_CHANGED_SINCE_APPROVAL`), or
 there is no canon `brief.md` yet but the change comes from an
 external openspec plan with a `proposal.md` under the plan sources (the
@@ -376,8 +376,9 @@ review waivers: 1 advisory(ies) — not failing the gate:
 The waiver lasts only until the subject's next status write.
 
 `canon subject move <id> --to shipped` also refuses where a brief exists and
-is not approved (the subject's scope, its newest adopted change walking back past pending drafts
-no scenario is tagged `@flow:<change>.*` for, has a canon
+is not approved (a change the subject answers for, that is one a scenario of
+the subject is tagged `@flow:<change>.*` for, one with an `Approved:` line,
+or a chore, has a canon
 `brief.md` with no `Approved:` line or one the brief's text no longer
 matches, or an external `proposal.md` and no canon `brief.md` yet;
 see `canon-subject`), as an `unreviewed-promotion` naming
@@ -778,6 +779,14 @@ canon gate install-hooks --repo .
 # non-default wiring:
 canon gate install-hooks --repo . --event PreToolUse --matcher Edit --command "canon gate check" --timeout 30
 ```
+
+It installs no git hook: copy the script into git's `pre-commit` hook
+(`.git/hooks/pre-commit`) or call it from a hook runner. The output names the two
+agent hook files and the script, also under `--dry-run`. In `--json`,
+`installed` is true when an agent hook file changed and
+`preCommitScriptWritten` when the script was written. A `--repo` that is not an
+existing directory exits 2 with `HOOKS_INSTALL_FAILED` (also under `--dry-run`)
+and creates nothing.
 
 Prefer this over hand-editing `settings.json`/`hooks.json`.
 

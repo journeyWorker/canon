@@ -76,7 +76,7 @@ Check a change's brief (PRD format) and see the next steps; never edits.
 
 | 명령 | 피연산자 | 필수 옵션 | 효과 | 예시 |
 |---|---|---|---|---|
-| `canon brief approve` | `<change-id>` (optional) | `--approver <NAME>`, `--note <TEXT>` | 쓰기: Record the human's approval of the brief, bound to its text; refused while `brief check` has blockers | `canon brief approve add-search --approver alice --note "approved as written"` |
+| `canon brief approve` | `<change-id>` (optional) (repeatable) | `--approver <NAME>`, `--note <TEXT>` | 쓰기: Record the human's approval of the brief, bound to its text; refused while `brief check` has blockers | `canon brief approve add-search --approver alice --note "approved as written"` |
 | `canon brief check` | `<change-id>` (optional) | none | 읽기: Read the brief against the rules | `canon brief check` |
 | `canon brief show` | `<change-id>` (optional) | none | 읽기: Show where the change stands and the next one to three steps; never edits | `canon brief show` |
 {/* canon:generated cli-brief end */}

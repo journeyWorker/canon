@@ -1,0 +1,26 @@
+{
+  "actor": {
+    "agent_id": "impl-031-loop",
+    "role": "implementer",
+    "session_id": "loop-2026-10-27"
+  },
+  "at": "2026-10-27T11:03:39.767154402Z",
+  "code_tree": "3a25cd810e85a89da5925ec37bd9f75fae18210b",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test brief_multi_approve skills_install_69"
+  },
+  "evidence_note": {
+    "command_result": "ok",
+    "summary": "test run green, branch feat/0.31"
+  },
+  "evidence_sha": "cbfb7db731bebcb11314a9a8cb965036f4b6680b",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 158,
+  "scenario_id": "skills.install.69",
+  "schema": 1,
+  "staging_id": "c435e677",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}

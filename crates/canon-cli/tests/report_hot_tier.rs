@@ -142,3 +142,61 @@ fn report_generation_12_a_record_in_both_tiers_counts_once() {
     let content = fs::read_to_string(repo.join(".canon/REPORT.md")).unwrap();
     assert!(content.contains("| add-login | add-login#1 | Write the login scenarios | done | ✓ | ✓ | canon | 1 |"), "{content}");
 }
+
+/// A repo whose canon.yaml backs the `task` rung with the sqlite file `.canon/hot.db`.
+fn repo_with_hot_path() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(
+        dir.path().join("canon.yaml"),
+        "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  task: hot\n  change: local\n",
+    )
+    .unwrap();
+    dir
+}
+
+/// report.generation.15: a directory at the hot path, or a file that is no
+/// database, makes report build, check and snapshot exit 1 naming the path.
+#[test]
+fn report_generation_15_a_directory_or_junk_at_the_hot_path_fails_build_check_and_snapshot() {
+    if !duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    for (case, make) in [
+        ("a directory", (|path: &Path| fs::create_dir_all(path.join("nested")).unwrap()) as fn(&Path)),
+        ("a file that is no database", |path: &Path| fs::write(path, "not a sqlite database, just text\n".repeat(64)).unwrap()),
+    ] {
+        let dir = repo_with_hot_path();
+        let repo = dir.path();
+        let hot = repo.join(".canon/hot.db");
+        fs::create_dir_all(repo.join(".canon")).unwrap();
+        make(&hot);
+        let snapshot = repo.join("out");
+        for args in [&["report", "build"][..], &["report", "check"], &["report", "snapshot", snapshot.to_str().unwrap()]] {
+            let out = run_canon(args, repo);
+            assert_eq!(out.status.code(), Some(1), "{case}: {args:?}: stdout: {} stderr: {}", stdout(&out), stderr(&out));
+            let err = stderr(&out);
+            assert!(err.contains("reading the sqlite hot tier at") && err.contains(".canon/hot.db"), "{case}: {args:?}: {err}");
+        }
+        assert!(!repo.join(".canon/REPORT.md").exists(), "{case}: no report was written");
+        assert_eq!(hot.is_dir(), case == "a directory", "{case}: the hot path is left as it was found");
+    }
+}
+
+/// report.generation.16: nothing at the hot path reads as no hot records, and
+/// the path is never created, by build, check or snapshot.
+#[test]
+fn report_generation_16_nothing_at_the_hot_path_is_no_rows_and_creates_nothing() {
+    if !duckdb_available() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = repo_with_hot_path();
+    let repo = dir.path();
+    let snapshot = repo.join("out");
+    for args in [&["report", "build"][..], &["report", "check"], &["report", "snapshot", snapshot.to_str().unwrap()]] {
+        let out = run_canon(args, repo);
+        assert!(out.status.success(), "{args:?}: stdout: {} stderr: {}", stdout(&out), stderr(&out));
+    }
+    assert!(!repo.join(".canon/hot.db").exists(), "reading never creates the hot db");
+}

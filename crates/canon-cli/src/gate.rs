@@ -1216,7 +1216,9 @@ fn promotable_kinds() -> String {
 pub struct GateInstallHooksReport {
     /// True when `--dry-run` previewed the install without writing.
     pub dry_run: bool,
+    /// True when an agent hook file (`.claude/settings.json` or `.codex/hooks.json`) changed or, under `--dry-run`, would change; it says nothing of the pre-commit script or of any git hook.
     pub installed: bool,
+    /// True when the pre-commit script was written or, under `--dry-run`, would be; no git hook is installed either way.
     pub pre_commit_script_written: bool,
 }
 
@@ -1235,6 +1237,10 @@ impl crate::reports::Report for GateInstallHooksReport {}
 /// pre-commit script" scenario.
 pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, command: &str, timeout: u32, dry_run: bool, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
+    if !repo.is_dir() {
+        let what = if repo.exists() { "is not a directory" } else { "does not exist" };
+        return CliError::refused("HOOKS_INSTALL_FAILED", format!("`{}` {what}", repo.display())).hint("pass --repo <dir> naming an existing directory (a git checkout whose hooks you want installed), then run `canon gate install-hooks` again").emit("canon gate install-hooks", json);
+    }
     let entry = HookEntry::new(event, matcher.map(str::to_string), command, timeout);
 
     let claude_path = repo.join(".claude").join("settings.json");
@@ -1277,15 +1283,21 @@ pub fn run_install_hooks(repo: &Path, event: &str, matcher: Option<&str>, comman
             }
         }
         script_written = true;
-        crate::say!(json, "canon gate install-hooks: {} {}", if dry_run { "would write" } else { "wrote" }, script_path.display());
     }
 
     let changed = !matches!((claude_outcome, codex_outcome), (InstallOutcome::Unchanged, InstallOutcome::Unchanged));
+    let hook_files = format!("{} and {}", claude_path.display(), codex_path.display());
     if changed {
-        crate::say!(json, "canon gate install-hooks: {}", if dry_run { "would install" } else { "installed" });
+        crate::say!(json, "canon gate install-hooks: {} the agent hook in {hook_files}", if dry_run { "would install" } else { "installed" });
     } else {
-        crate::say!(json, "canon gate install-hooks: no diff, nothing written");
+        crate::say!(json, "canon gate install-hooks: no diff, nothing written to {hook_files}");
     }
+    if script_written {
+        crate::say!(json, "canon gate install-hooks: {} the pre-commit script {}", if dry_run { "would write" } else { "wrote" }, script_path.display());
+    } else {
+        crate::say!(json, "canon gate install-hooks: the pre-commit script {} is not written here (a canon gate hook or the script already exists)", script_path.display());
+    }
+    crate::say!(json, "canon gate install-hooks: no git hook was installed; copy the script to .git/hooks/pre-commit or call it from a hook runner");
     if !changed && !script_written {
         crate::json_out::mark_unchanged();
     }

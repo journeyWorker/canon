@@ -60,7 +60,7 @@ impl Reply {
 
 /// A request the server cannot make sense of: a 400.
 pub fn bad_request(message: impl Into<String>) -> Reply {
-    Reply::error(400, &CliError::refused("DASHBOARD_BAD_REQUEST", message).hint("send a JSON body `{\"changeId\", \"by\", \"note\", \"sha256\"}` with `Content-Type: application/json`, as the briefs page does"))
+    Reply::error(400, &CliError::refused("DASHBOARD_BAD_REQUEST", message).hint("send a JSON body `{\"changeId\", \"by\", \"note\", \"sha256\"}` (or `briefs` for several) with `Content-Type: application/json`, as the briefs page does"))
 }
 
 /// The HTTP status of a refusal from the approval core.
@@ -216,40 +216,106 @@ pub struct DashboardBriefsReport {
 
 impl crate::json_out::Report for DashboardBriefsReport {}
 
-/// The `POST /api/briefs/approve` body.
+/// The `POST /api/briefs/approve` body: one name and answer, and either the
+/// one brief of the single form (`changeId` + `sha256`) or the `briefs` of
+/// the multi form (0.31), each with the sha256 of the file the page read.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ApproveRequest {
-    change_id: String,
+    change_id: Option<String>,
+    sha256: Option<String>,
+    briefs: Option<Vec<ApproveBrief>>,
     by: String,
     note: String,
+}
+
+/// One brief of a multi-brief approval request.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ApproveBrief {
+    change_id: String,
     sha256: String,
 }
 
-/// `POST /api/briefs/approve` (the guards have passed): the answer is
-/// `canon brief approve --json`'s document, or its error.
+fn bad_change_id(id: &str) -> Reply {
+    Reply::error(400, &CliError::refused("DASHBOARD_BAD_REQUEST", format!("`{id}` is not a change id")).field("changeId").hint("send the changeId the briefs list gave"))
+}
+
+fn no_live_brief(ids: &[&str]) -> Reply {
+    let named = ids.iter().map(|id| format!("`{id}`")).collect::<Vec<_>>().join(", ");
+    Reply::error(404, &CliError::failed("BRIEF_NOT_FOUND", format!("no live change {named} has a brief")).hint("reload the page: the change may have been archived or removed"))
+}
+
+/// `POST /api/briefs/approve` (the guards have passed): the single form's
+/// answer is `canon brief approve --json`'s document, or its error; the
+/// multi form's answer is its several-id document ([`ApprovedMany`]), and a
+/// refused brief refuses them all with `BRIEF_APPROVE_REFUSED` naming each.
 pub fn approve(repo: &Path, body: &[u8]) -> Reply {
     let request: ApproveRequest = match serde_json::from_slice(body) {
         Ok(request) => request,
         Err(e) => return bad_request(format!("the body is not the approval request: {e}")),
     };
-    let Ok(change) = ChangeId::parse(&request.change_id) else {
-        return Reply::error(400, &CliError::refused("DASHBOARD_BAD_REQUEST", format!("`{}` is not a change id", request.change_id)).field("changeId").hint("send the changeId the briefs list gave"));
-    };
-    if !repo.join(paths::CHANGES_DIR).join(change.as_str()).join("brief.md").is_file() {
-        return Reply::error(404, &CliError::failed("BRIEF_NOT_FOUND", format!("no live change `{}` has a brief", change.as_str())).hint("reload the page: the change may have been archived or removed"));
+    match (&request.change_id, &request.sha256, &request.briefs) {
+        (Some(id), Some(sha256), None) => approve_one(repo, id, sha256, &request),
+        (None, None, Some(briefs)) if !briefs.is_empty() => approve_many(repo, briefs, &request),
+        _ => bad_request("the body names either one brief (`changeId` and `sha256`) or `briefs`, a non-empty list of `{changeId, sha256}`"),
     }
-    match crate::brief_approve::approve(repo, Some(&change), &request.by, &request.note, Some(&request.sha256)) {
+}
+
+fn approve_one(repo: &Path, id: &str, sha256: &str, request: &ApproveRequest) -> Reply {
+    let Ok(change) = ChangeId::parse(id) else { return bad_change_id(id) };
+    if !repo.join(paths::CHANGES_DIR).join(change.as_str()).join("brief.md").is_file() {
+        return no_live_brief(&[change.as_str()]);
+    }
+    match crate::brief_approve::approve(repo, Some(&change), &request.by, &request.note, Some(sha256)) {
         Ok(approved) => {
             crate::human_err!("canon dashboard: {} approved by `{}` ({})", approved.brief, approved.approved_by, approved.digest);
             let after = crate::next::after_with(repo, &crate::next::Scope::Change(approved.change.clone()), false, Vec::new());
             let body = crate::json_out::envelope_with_next("brief approve", &approved, &after, Value::Null);
             Reply::ok(body)
         }
-        Err(e) => {
-            let status = status_of(e.code);
-            let e = if e.code == "BRIEF_APPROVE_REFUSED" { e.hint("clear the blockers in the brief (`canon brief check` lists them), then reload this page") } else { e };
-            Reply::error(status, &e)
+        Err(e) => refused_reply(e, None),
+    }
+}
+
+fn approve_many(repo: &Path, briefs: &[ApproveBrief], request: &ApproveRequest) -> Reply {
+    let mut changes: Vec<(ChangeId, &str)> = Vec::new();
+    for brief in briefs {
+        let Ok(change) = ChangeId::parse(&brief.change_id) else { return bad_change_id(&brief.change_id) };
+        changes.push((change, &brief.sha256));
+    }
+    let missing: Vec<&str> = changes.iter().filter(|(change, _)| !repo.join(paths::CHANGES_DIR).join(change.as_str()).join("brief.md").is_file()).map(|(change, _)| change.as_str()).collect();
+    if !missing.is_empty() {
+        return no_live_brief(&missing);
+    }
+    let items: Vec<crate::brief_approve::Item<'_>> = changes.iter().map(|(change, sha256)| crate::brief_approve::Item { change: Some(change), expected_sha256: Some(sha256) }).collect();
+    match crate::brief_approve::approve_all(repo, &items, &request.by, &request.note) {
+        Ok(many) => {
+            for (entry, _) in &many.entries {
+                crate::human_err!("canon dashboard: {} {:?} by `{}`", entry.change, entry.outcome, many.approved_by);
+            }
+            let report = crate::brief_approve::ApprovedMany { approved_by: many.approved_by, policy_approved: many.policy_approved, approvals: many.entries.into_iter().map(|(entry, _)| entry).collect() };
+            if let Some(e) = many.failure {
+                return Reply { status: 500, body: crate::json_out::failure_value("dashboard briefs", &e, Some(&report)) };
+            }
+            let after = crate::next::after_with(repo, &crate::next::Scope::Repo, false, Vec::new());
+            Reply::ok(crate::json_out::envelope_with_next("brief approve", &report, &after, Value::Null))
         }
+        Err((e, data)) => refused_reply(e, data),
+    }
+}
+
+/// The reply of a refused approval: the code's status, and the refused ids as `data`
+/// when the call named several.
+fn refused_reply(e: CliError, data: Option<crate::brief_approve::Refused>) -> Reply {
+    let status = status_of(e.code);
+    let e = match (e.code, data.is_some()) {
+        ("BRIEF_APPROVE_REFUSED", true) => e.hint("nothing was recorded: reload this page to read the briefs named as they are now, clear any blockers (`canon brief check` lists them), then select and approve again"),
+        ("BRIEF_APPROVE_REFUSED", false) => e.hint("clear the blockers in the brief (`canon brief check` lists them), then reload this page"),
+        _ => e,
+    };
+    match data {
+        Some(data) => Reply { status, body: crate::json_out::failure_value("dashboard briefs", &e, Some(&data)) },
+        None => Reply::error(status, &e),
     }
 }

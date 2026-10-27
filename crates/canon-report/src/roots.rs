@@ -206,10 +206,13 @@ impl Roots {
     /// `canon_body_digest` of it is [`content_digest`] of the body, the
     /// value a git record has, and the two tiers fold against each other.
     /// The name is for humans; the views never read the digest from it. Nothing is
-    /// written when there is no hot db or its file does not exist yet:
-    /// opening a missing db would create it.
+    /// written when there is no hot db or nothing exists at its path yet (as `canon query` reads it):
+    /// opening a missing db would create it. Anything that does exist there
+    /// is opened as a SQLite file, so a directory or a file that is no
+    /// database makes the hot tier unavailable ([`ReportError::HotTier`],
+    /// naming the path) instead of reading as no hot records.
     pub fn materialize_hot(&self, dir: &Path) -> Result<(), ReportError> {
-        let Some(db) = self.hot_db.as_deref().filter(|db| db.is_file()) else {
+        let Some(db) = self.hot_db.as_deref().filter(|db| fs::symlink_metadata(db).is_ok()) else {
             return Ok(());
         };
         let hot_error = |source| ReportError::HotTier { path: db.to_path_buf(), source };

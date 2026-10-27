@@ -392,6 +392,16 @@ pub fn run_rollback(request: &RollbackRequest<'_>) -> ExitCode {
         }
     };
     let store = ParquetStrategyStore::open(repo.join(&config.root).join("strategies"));
+    // The id is looked up before anything else is read or checked: an unknown strategy is refused as `strategy approval-payload` refuses it.
+    match store.find_by_id(strategy_id) {
+        Ok(Some(_)) => {}
+        Ok(None) => {
+            return ExitCode::from(CliError::refused("LEARN_STRATEGY_NOT_FOUND", format!("unknown strategy {strategy_id}")).hint("check the StrategyId (a ULID) against the strategies this repository holds").emit("canon strategy rollback", json));
+        }
+        Err(error) => {
+            return ExitCode::from(CliError::failed("REPO_UNREADABLE", error.to_string()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit("canon strategy rollback", json));
+        }
+    }
     let contradicting = match contradicting.map(canon_learn::TrajectoryId::parse).transpose() {
         Ok(value) => value,
         Err(error) => {

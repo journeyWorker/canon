@@ -180,10 +180,11 @@ ids); the human step comes after it. A policy that no longer matches its approva
    `building`, `verifying` or `shipped` subject warns (stderr and JSON
    `meta.warnings`) until its brief is approved: evidence for its existing scenarios is not
    frozen and the subject can still be reopened and shipped for its approved
-   scope while no scenario is tagged for the draft (a pending draft); once one
-   is, the subject cannot ship before the approval.
-   A scenario answers to the changes its `@flow:<change>.<F-id>`
-   tags name (`canon scenario new --flow <F-id>` tags one for this change).
+   scope while no scenario is tagged for the draft and it was never approved
+   (a pending draft); once one is, the subject cannot ship before the approval.
+   A tagged scenario answers to the changes its `@flow:<change>.<F-id>`
+   tags name (`canon scenario new --flow <F-id>` tags one for this change);
+   an untagged one answers to every change with an `Approved:` line.
    To park a draft that should not gate a live subject, `subject unadopt`
    it and adopt it into a `proposed` subject. Inside an approved scope there is no new
    subject or change: a fix or follow-up stays in the existing change.

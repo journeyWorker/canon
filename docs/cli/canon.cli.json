@@ -41,11 +41,11 @@
         },
         {
           "code": 1,
-          "meaning": "not authorized: the report stays in data"
+          "meaning": "not authorized (ADAPTER_EXECUTION_NOT_AUTHORIZED): the report stays in data; the only exit 1"
         },
         {
           "code": 2,
-          "meaning": "refused: the response file is missing or unreadable"
+          "meaning": "refused (ADAPTER_REFUSED): the response file is missing or unreadable, its envelope breaks a rule, or the policy file is broken; fix the file and run again"
         }
       ],
       "inputs": [],
@@ -124,11 +124,11 @@
         },
         {
           "code": 1,
-          "meaning": "invalid envelope"
+          "meaning": "invalid envelope (ADAPTER_REFUSED): the envelope breaks a rule"
         },
         {
           "code": 2,
-          "meaning": "refused: the response file is missing or unreadable"
+          "meaning": "refused (ADAPTER_REFUSED): the response file is missing or unreadable"
         }
       ],
       "inputs": [],
@@ -658,14 +658,13 @@
       "operands": [
         {
           "arity": {
-            "max": 1,
             "min": 0
           },
-          "description": "The change to read (default: the repo's only live change)",
+          "description": "The changes to approve, one answer for all, none written unless every one is approvable (default: the repo's only live change)",
           "kind": "CHANGE_ID",
-          "name": "change_id",
+          "name": "change_ids",
           "possibleValues": [],
-          "repeatable": false,
+          "repeatable": true,
           "required": false
         }
       ],
@@ -730,6 +729,12 @@
           "kind": "report",
           "report": "BriefApproveReport",
           "schemaRef": "#/schemas/BriefApproveReport",
+          "schemaVersion": "1.0"
+        },
+        {
+          "kind": "report",
+          "report": "BriefApproveManyReport",
+          "schemaRef": "#/schemas/BriefApproveManyReport",
           "schemaVersion": "1.0"
         },
         {
@@ -1454,7 +1459,7 @@
         },
         {
           "code": 2,
-          "meaning": "refused: CONFIG_MISSING, or no such pack"
+          "meaning": "refused: CONFIG_MISSING, a pack id that is not sha256: and 64 lower-case hex digits (USAGE), or no such pack"
         }
       ],
       "inputs": [],
@@ -1550,7 +1555,7 @@
         },
         {
           "code": 2,
-          "meaning": "refused: CONFIG_MISSING, or no such pack"
+          "meaning": "refused: CONFIG_MISSING, a pack id that is not sha256: and 64 lower-case hex digits (USAGE), or no such pack"
         }
       ],
       "inputs": [],
@@ -3631,6 +3636,7 @@
         "EVIDENCE_INVALID_ARGUMENT",
         "EVIDENCE_REFUSED",
         "EVIDENCE_REPORT_CONTRADICTION",
+        "EVIDENCE_SCENARIO_NOT_INDEXED",
         "EVIDENCE_STORE_FAILED",
         "GATE_TASK_EVIDENCE_INVALID",
         "INPUT_CONFLICT",
@@ -4085,11 +4091,11 @@
       "exits": [
         {
           "code": 0,
-          "meaning": "success"
+          "meaning": "the bytes to sign"
         },
         {
           "code": 2,
-          "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
+          "meaning": "refused: CONFIG_MISSING, a scenario the index does not hold (EVIDENCE_SCENARIO_NOT_INDEXED; run `canon inventory sync`), or an input that is missing, unreadable or invalid; no bytes are printed"
         }
       ],
       "idempotency": "replay-safe",
@@ -4248,6 +4254,7 @@
         "EVIDENCE_INVALID_ARGUMENT",
         "EVIDENCE_REFUSED",
         "EVIDENCE_REPORT_CONTRADICTION",
+        "EVIDENCE_SCENARIO_NOT_INDEXED",
         "EVIDENCE_STORE_FAILED",
         "GATE_TASK_EVIDENCE_INVALID",
         "INPUT_CONFLICT",
@@ -6066,7 +6073,7 @@
       "exits": [
         {
           "code": 0,
-          "meaning": "success"
+          "meaning": "installed, unchanged, or previewed"
         },
         {
           "code": 1,
@@ -6074,7 +6081,7 @@
         },
         {
           "code": 2,
-          "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
+          "meaning": "refused: --repo is not an existing directory, a hook file cannot be written, or an input that is invalid; nothing is written"
         }
       ],
       "idempotency": "replay-safe",
@@ -11116,6 +11123,7 @@
         "LEARN_INVALID_ARGUMENT",
         "LEARN_ROLLBACK_FAILED",
         "LEARN_SIGNATURE_UNREADABLE",
+        "LEARN_STRATEGY_NOT_FOUND",
         "LEARN_TRAJECTORY_NOT_FOUND",
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
@@ -11128,15 +11136,15 @@
       "exits": [
         {
           "code": 0,
-          "meaning": "success"
+          "meaning": "rolled back"
         },
         {
           "code": 1,
-          "meaning": "failed: INPUT_ELEMENT_FAILED, LEARN_DEMOTION_FAILED, LEARN_ROLLBACK_FAILED"
+          "meaning": "LEARN_ROLLBACK_FAILED: the signature does not verify, or the rollback could not be recorded"
         },
         {
           "code": 2,
-          "meaning": "refused: CONFIG_MISSING, or an input that is missing, unreadable or invalid; nothing is written"
+          "meaning": "refused: CONFIG_MISSING, an unknown strategy id (LEARN_STRATEGY_NOT_FOUND, checked first), or an input that is missing, unreadable or invalid; nothing is written"
         }
       ],
       "idempotency": "replay-safe",
@@ -12914,9 +12922,9 @@
     },
     {
       "code": "ADAPTER_REFUSED",
-      "exit": 1,
-      "fix": "Fix the adapter so it returns a well-formed response, then run the command again.",
-      "meaning": "an adapter response was malformed or refused",
+      "exit": 2,
+      "fix": "Fix the response file, or the policy file `.canon/policy.yaml` when the message names it, then run the command again; `adapter validate` re-checks a response.",
+      "meaning": "an adapter response was malformed or refused; exit 2 for an unreadable response file and for every `adapter authorize` refusal (a rule-breaking envelope, a broken policy file), exit 1 only for `adapter validate` on an envelope that breaks a rule",
       "retryable": false
     },
     {
@@ -12957,8 +12965,8 @@
     {
       "code": "BRIEF_APPROVE_REFUSED",
       "exit": 2,
-      "fix": "Resolve every blocker finding the brief has (see `canon brief check`), then ask the human to approve.",
-      "meaning": "`brief approve` was refused because the brief has blocker findings; nothing was written",
+      "fix": "Resolve what each refused id names (`canon brief check` lists blocker findings), then ask the human to approve again.",
+      "meaning": "`brief approve` was refused because a brief has blocker findings, or, for several ids, because at least one id was refused (a blocker, no brief, a brief that cannot carry the line); data.refused names each with its own code; nothing was written",
       "retryable": false
     },
     {
@@ -13098,7 +13106,7 @@
       "code": "CONTEXT_PACK_NOT_FOUND",
       "exit": 2,
       "fix": "Pass the id of an existing context pack; `canon context list` shows them.",
-      "meaning": "no context pack with that id",
+      "meaning": "no context pack with that well-formed id (a malformed id is USAGE)",
       "retryable": false
     },
     {
@@ -13305,6 +13313,13 @@
       "retryable": false
     },
     {
+      "code": "EVIDENCE_SCENARIO_NOT_INDEXED",
+      "exit": 2,
+      "fix": "Run `canon inventory sync` so the scenario is indexed, or pass the id of a scenario the spec root declares.",
+      "meaning": "`evidence approval-payload` names a scenario the scenario index does not hold, so there are no bytes to sign",
+      "retryable": false
+    },
+    {
       "code": "EVIDENCE_STORE_FAILED",
       "exit": 2,
       "fix": "Check the artifact store is reachable and writable, then run the command again.",
@@ -13433,8 +13448,8 @@
     {
       "code": "HOOKS_INSTALL_FAILED",
       "exit": 2,
-      "fix": "Check that the hook file is writable and not conflicting, then run the install again.",
-      "meaning": "a hook entry could not be installed",
+      "fix": "Pass --repo naming an existing directory, check that the hook file is writable and not conflicting, then run the install again.",
+      "meaning": "a hook entry could not be installed: --repo is not an existing directory, or a hook file is unwritable or conflicting",
       "retryable": false
     },
     {
@@ -13468,8 +13483,8 @@
     {
       "code": "INIT_CONFIG_EXISTS",
       "exit": 2,
-      "fix": "Nothing to do: canon.yaml already exists; run `canon init --check` to verify it.",
-      "meaning": "canon.yaml already exists and there is nothing else to refresh",
+      "fix": "Nothing to do: canon.yaml already exists; run `canon init --check` to verify it, or `canon demo init` in a directory without one.",
+      "meaning": "canon.yaml already exists and there is nothing else to refresh; `demo init` refuses any directory that holds one",
       "retryable": false
     },
     {
@@ -13629,8 +13644,8 @@
     {
       "code": "LEARN_ROLLBACK_FAILED",
       "exit": 1,
-      "fix": "Read the error message, fix its cause, then run `canon strategy rollback` again.",
-      "meaning": "the strategy could not be rolled back",
+      "fix": "Read the error message, fix its cause (sign the rollback again if the signature failed), then run `canon strategy rollback` again.",
+      "meaning": "the strategy exists but could not be rolled back: its signature does not verify, or the rollback could not be recorded",
       "retryable": false
     },
     {
@@ -13644,7 +13659,7 @@
       "code": "LEARN_STRATEGY_NOT_FOUND",
       "exit": 2,
       "fix": "Pass the id of an existing strategy.",
-      "meaning": "no strategy with that id",
+      "meaning": "no strategy with that id; `strategy rollback` and `strategy approval-payload` look the id up first",
       "retryable": false
     },
     {
@@ -15914,7 +15929,7 @@
     "BatchBriefApproveReport": {
       "$defs": {
         "Approved": {
-          "description": "What one approval recorded: the `brief approve --json` data.",
+          "description": "What one approval recorded: the `brief approve --json` data of one id.",
           "properties": {
             "approvedBy": {
               "type": "string"
@@ -19943,9 +19958,11 @@
               "type": "boolean"
             },
             "installed": {
+              "description": "True when an agent hook file (`.claude/settings.json` or `.codex/hooks.json`) changed or, under `--dry-run`, would change; it says nothing of the pre-commit script or of any git hook.",
               "type": "boolean"
             },
             "preCommitScriptWritten": {
+              "description": "True when the pre-commit script was written or, under `--dry-run`, would be; no git hook is installed either way.",
               "type": "boolean"
             }
           },
@@ -26283,14 +26300,13 @@
           ]
         },
         "operands": {
-          "description": "The change to read (default: the repo's only live change)",
+          "description": "The changes to approve, one answer for all, none written unless every one is approvable (default: the repo's only live change)",
           "items": {
             "type": [
               "string",
               "number"
             ]
           },
-          "maxItems": 1,
           "minItems": 0,
           "type": "array"
         }
@@ -26302,10 +26318,100 @@
       "title": "`canon brief approve` --input document",
       "type": "object"
     },
+    "BriefApproveManyReport": {
+      "$defs": {
+        "ApprovalEntry": {
+          "description": "One id of an [`ApprovedMany`].",
+          "properties": {
+            "brief": {
+              "description": "The brief file; omitted for a `skipped` id.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "change": {
+              "type": "string"
+            },
+            "digest": {
+              "description": "The digest the approval binds; omitted for a `failed` or `skipped` id.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "error": {
+              "description": "Why a `failed` id failed.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "outcome": {
+              "$ref": "#/$defs/Outcome"
+            }
+          },
+          "required": [
+            "change",
+            "outcome"
+          ],
+          "type": "object"
+        },
+        "Outcome": {
+          "description": "What happened to one id of a call with several ([`ApprovedMany`]).",
+          "oneOf": [
+            {
+              "const": "written",
+              "description": "The brief and the policy now carry the approval.",
+              "type": "string"
+            },
+            {
+              "const": "unchanged",
+              "description": "They already carried this very approval: nothing was written.",
+              "type": "string"
+            },
+            {
+              "const": "failed",
+              "description": "Writing this id failed (a disk error after the checks passed).",
+              "type": "string"
+            },
+            {
+              "const": "skipped",
+              "description": "An earlier id failed to write, so this one was not tried.",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "$id": "urn:canon:report:BriefApproveManyReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`brief approve --json` data for several ids: one answer, one entry per id.",
+      "properties": {
+        "approvals": {
+          "items": {
+            "$ref": "#/$defs/ApprovalEntry"
+          },
+          "type": "array"
+        },
+        "approvedBy": {
+          "type": "string"
+        },
+        "policyApproved": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "approvedBy",
+        "policyApproved",
+        "approvals"
+      ],
+      "title": "ApprovedMany",
+      "type": "object"
+    },
     "BriefApproveReport": {
       "$id": "urn:canon:report:BriefApproveReport",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "description": "What one approval recorded: the `brief approve --json` data.",
+      "description": "What one approval recorded: the `brief approve --json` data of one id.",
       "properties": {
         "approvedBy": {
           "type": "string"
@@ -31524,9 +31630,11 @@
           "type": "boolean"
         },
         "installed": {
+          "description": "True when an agent hook file (`.claude/settings.json` or `.codex/hooks.json`) changed or, under `--dry-run`, would change; it says nothing of the pre-commit script or of any git hook.",
           "type": "boolean"
         },
         "preCommitScriptWritten": {
+          "description": "True when the pre-commit script was written or, under `--dry-run`, would be; no git hook is installed either way.",
           "type": "boolean"
         }
       },
@@ -36078,8 +36186,28 @@
           ],
           "type": "object"
         },
+        "BriefState": {
+          "description": "What a brief's approval reads as ([`BriefStatus::status`]).",
+          "oneOf": [
+            {
+              "const": "approved",
+              "description": "An `Approved:` line binds the brief's text (or predates digests).",
+              "type": "string"
+            },
+            {
+              "const": "unapproved",
+              "description": "No `Approved:` line, or no canon brief yet.",
+              "type": "string"
+            },
+            {
+              "const": "changed",
+              "description": "The brief changed after its approval.",
+              "type": "string"
+            }
+          ]
+        },
         "BriefStatus": {
-          "description": "Whether a subject's newest adopted change records the human's\napproval of its brief: an `Approved:` line in that change's canon\n`brief.md` (module doc). A fix stays inside the approved\nchange, so a newer adopted change is a new scope, and an older\nchange's approval does not cover it.",
+          "description": "Whether one adopted change records the human's approval of its brief: an\n`Approved:` line in that change's canon `brief.md` (module doc). A fix\nstays inside the approved change, so a newer adopted change is a new\nscope, and an older change's approval does not cover it. One entry per\nchange the subject answers for ([`governing`]) is `canon status`'s\n`briefs`.",
           "properties": {
             "approval": {
               "description": "The approval line's text after `Approved:`.",
@@ -36087,9 +36215,6 @@
                 "string",
                 "null"
               ]
-            },
-            "approved": {
-              "type": "boolean"
             },
             "brief": {
               "description": "That change's canon `brief.md`, relative to the repo root: the one\nfile the approval is read from. Omitted when the change has no\nbrief to answer (neither a canon `brief.md` nor an external\n`proposal.md`).",
@@ -36103,18 +36228,14 @@
               "type": "boolean"
             },
             "change": {
-              "description": "The newest adopted change (the last of the subject's adopted\nchanges, adoption order), whose canon `brief.md` must carry the\napproval. Omitted when the subject adopts no change.",
+              "description": "The adopted change this entry judges, whose canon `brief.md` must carry\nthe approval. Omitted when the subject adopts no change.",
               "type": [
                 "string",
                 "null"
               ]
             },
-            "changed": {
-              "description": "The brief changed after its approval (0.19 D3): the line's digest\nno longer matches, so it is not approved and `canon brief approve`\nmust run again.",
-              "type": "boolean"
-            },
             "enforced": {
-              "description": "Whether the missing approval blocks (module doc): not approved,\nand the newest adopted change has a brief to answer. Then status\nasks the human and the ship guard refuses; otherwise both only\nreport it.",
+              "description": "Whether the missing approval blocks (module doc): not approved,\nand the change has a brief to answer. Then status\nasks the human and the ship guard refuses; otherwise both only\nreport it.",
               "type": "boolean"
             },
             "findings": {
@@ -36132,16 +36253,31 @@
               "description": "The approval line has no digest (pre-0.19): approved, but status\nadvises re-approving it so it binds to the brief's text.",
               "type": "boolean"
             },
+            "reason": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Reason"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Why the subject answers for this change ([`Reason`]); `None` for the\nnewest adopted change of a subject with no governing change."
+            },
             "source": {
               "description": "The external plan document the change comes from: the `Source:`\nline of the canon `brief.md`, or, before that file exists, the\nexternal openspec `proposal.md` found under the plan sources.",
               "type": [
                 "string",
                 "null"
               ]
+            },
+            "status": {
+              "$ref": "#/$defs/BriefState",
+              "description": "`approved`, `unapproved` or `changed` (edited after its approval)."
             }
           },
           "required": [
-            "approved",
+            "status",
             "enforced",
             "briefExists"
           ],
@@ -36311,6 +36447,26 @@
           ],
           "type": "object"
         },
+        "Reason": {
+          "description": "Why a subject answers for an adopted change ([`governing`]).",
+          "oneOf": [
+            {
+              "const": "tagged",
+              "description": "A scenario the subject owns is tagged `@flow:<change>.*`.",
+              "type": "string"
+            },
+            {
+              "const": "approved",
+              "description": "The change's brief carries an `Approved:` line (edited since or not),\nwhatever tags say.",
+              "type": "string"
+            },
+            {
+              "const": "chore",
+              "description": "The change is a chore: it has no scenario to tag, so it governs from\nthe moment it is adopted.",
+              "type": "string"
+            }
+          ]
+        },
         "RequireAuditSurface": {
           "description": "`spec_coverage.require_audit` in the `policy` section, keyed like\n`policy.yaml` (0.15 D3). `scope` is the resolved status list (the\ndefault `[verifying, shipped]` when the key is omitted); empty means\nevery scenario.",
           "properties": {
@@ -36438,16 +36594,12 @@
               },
               "type": "array"
             },
-            "brief": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/BriefStatus"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Whether the brief is approved (0.16 D1): present for `building`,\n`verifying` and `shipped` subjects, and for a `proposed` subject\nwhose newest adopted change has a brief to answer; omitted for\nthe others."
+            "briefs": {
+              "description": "The briefs the subject answers for (0.31): one entry per adopted\nchange that is tagged by one of its scenarios, has an `Approved:`\nline, or is a chore, in adoption order, each with whether it reads as\napproved, why it governs and what `canon brief check` found. A subject\nwith no such change has the one entry of its newest adopted change,\nwhich its reopen, ship and evidence wait on for a first approval, with\nno `reason` (or, adopting no change, an entry with no `change`).\nPresent for `building`, `verifying` and `shipped` subjects, and for a\n`proposed` subject whose change has a brief to answer; omitted when\nempty.",
+              "items": {
+                "$ref": "#/$defs/BriefStatus"
+              },
+              "type": "array"
             },
             "choreReviews": {
               "description": "Approved chore changes with no qualifying change-level review (0.23 D5).",
@@ -36485,7 +36637,7 @@
               "type": "integer"
             },
             "flow": {
-              "description": "The flow steps of the subject's current (newest adopted) change's\nbrief with the scenarios tagged `@flow:<change>.<F-id>` (0.19 D4).\nOmitted for a brief with no flow steps (a legacy brief) or no brief.",
+              "description": "The flow steps of the briefs of every tagged change the subject answers\nfor, with the scenarios tagged `@flow:<change>.<F-id>` (0.19 D4, 0.31).\nOmitted for a brief with no flow steps (a legacy brief) or no brief.",
               "items": {
                 "$ref": "#/$defs/FlowStep"
               },
@@ -36507,7 +36659,7 @@
               "type": "integer"
             },
             "pendingDrafts": {
-              "description": "The adopted changes set aside as pending drafts\n([`crate::brief::scope_changes`]): each one's brief is not approved\nand no scenario of the subject is tagged `@flow:<change>.*` for it,\nso it is not part of the subject's scope yet and reopen, evidence and\nship read the newest approved or tagged change. Omitted when empty.",
+              "description": "The adopted changes that are pending drafts ([`crate::brief::governing`]):\nnever approved, not a chore, and no scenario of the subject tagged\n`@flow:<change>.*` for them, so reopen, evidence and ship do not read\nthem. Omitted when empty.",
               "items": {
                 "type": "string"
               },

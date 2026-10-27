@@ -1,12 +1,13 @@
 import "./style.css";
 import { renderNav } from "./nav";
-import { advisoryTotal, renderBriefs, approveDisabled, type Brief, type BriefHandlers } from "./briefs-render";
+import { advisoryTotal, approvalRequest, approveDisabled, refusedIds, renderApproveError, renderBriefs, selectionText, type Brief, type BriefHandlers, type Refusal } from "./briefs-render";
 import { h, toDom } from "./vnode";
 
 // The briefs page: the changes whose brief awaits the human, and the form
-// that records the approval through `POST /api/briefs/approve`, bound to the
-// sha256 of the brief file this page rendered. The name and the answer are
-// typed here and nowhere else: never prefilled, never stored.
+// that records the approval of every selected brief through one `POST
+// /api/briefs/approve`, each bound to the sha256 of the brief file this page
+// rendered. The name and the answer are typed once, here and nowhere else:
+// never prefilled, never stored.
 
 interface ApiError {
   error: { code: string; message: string; hint: string | null };
@@ -18,63 +19,88 @@ const nav = document.querySelector<HTMLElement>("#nav");
 if (!main || !notices || !nav) throw new Error("missing briefs page containers");
 renderNav(nav, "briefs");
 
-function field(card: HTMLElement, cls: string): HTMLInputElement {
-  return card.querySelector<HTMLInputElement>(`.${cls}`) as HTMLInputElement;
+interface ApprovalEntry {
+  change: string;
+  outcome: "written" | "unchanged" | "failed" | "skipped";
+  brief?: string;
+  digest?: string;
+  error?: string;
 }
 
-function say(card: HTMLElement, node: ReturnType<typeof h> | null): void {
-  const slot = card.querySelector<HTMLElement>(".approve-message") as HTMLElement;
+interface ApprovalsData {
+  approvedBy: string;
+  policyApproved: boolean;
+  approvals: ApprovalEntry[];
+}
+
+function bar(): HTMLElement {
+  return main!.querySelector<HTMLElement>(".approve-bar") as HTMLElement;
+}
+
+function input(cls: string): HTMLInputElement {
+  return bar().querySelector<HTMLInputElement>(`.${cls}`) as HTMLInputElement;
+}
+
+function say(node: ReturnType<typeof h> | null): void {
+  const slot = bar().querySelector<HTMLElement>(".approve-message") as HTMLElement;
   slot.replaceChildren(...(node ? [toDom(node)] : []));
 }
 
-function refreshButton(card: HTMLElement, brief: Pick<Brief, "approvable">, busy = false): void {
-  const button = card.querySelector<HTMLButtonElement>(".approve-button") as HTMLButtonElement;
-  button.disabled = approveDisabled(brief, field(card, "approve-by").value, field(card, "approve-note").value, busy);
+/** The briefs whose selection box is ticked. */
+function selected(): Brief[] {
+  const ticked = new Set([...main!.querySelectorAll<HTMLInputElement>(".brief-select:checked")].map((box) => box.dataset.change));
+  return shown.filter((b) => ticked.has(b.changeId));
 }
 
-function afterApproval(brief: Brief, card: HTMLElement, data: { brief: string; digest: string; approvedBy: string; policyApproved: boolean }): void {
-  card.remove();
+function refresh(busy = false): void {
+  const form = bar();
+  const picked = selected();
+  (form.querySelector(".selected-count") as HTMLElement).textContent = selectionText(picked.length);
+  (form.querySelector(".approve-button") as HTMLButtonElement).disabled = approveDisabled(picked.length, input("approve-by").value, input("approve-note").value, busy);
+}
+
+function afterApproval(data: ApprovalsData): void {
+  const done = new Set(data.approvals.filter((a) => a.outcome === "written" || a.outcome === "unchanged").map((a) => a.change));
+  for (const card of main!.querySelectorAll<HTMLElement>(".brief")) if (done.has(card.dataset.change ?? "")) card.remove();
   notices!.append(
     toDom(
       h(
         "div",
         { class: "banner notice-approved", role: "status" },
-        h("strong", {}, `Approved ${brief.changeId}`),
-        ` by ${data.approvedBy}: ${data.brief} is now bound to ${data.digest}`,
-        data.policyApproved ? "; the policy approval is recorded too." : ".",
+        h("strong", {}, `Approved ${[...done].join(", ")}`),
+        ` by ${data.approvedBy}${data.policyApproved ? "; the policy approval is recorded too." : "."}`,
       ),
     ),
   );
-  shown = shown.filter((b) => b.changeId !== brief.changeId);
+  shown = shown.filter((b) => !done.has(b.changeId));
   const total = main!.querySelector(".briefs-total");
   if (total) total.textContent = advisoryTotal(shown);
-  if (!main!.querySelector(".brief")) render([]);
+  if (shown.length === 0) render([]);
+  else {
+    say(null);
+    refresh();
+  }
 }
 
-async function approve(brief: Brief, card: HTMLElement): Promise<void> {
-  refreshButton(card, brief, true);
-  say(card, null);
-  const body = JSON.stringify({ changeId: brief.changeId, by: field(card, "approve-by").value, note: field(card, "approve-note").value, sha256: brief.sha256 });
+async function approve(): Promise<void> {
+  const picked = selected();
+  if (picked.length === 0) return;
+  refresh(true);
+  say(null);
+  const body = JSON.stringify(approvalRequest(picked, input("approve-by").value, input("approve-note").value));
   try {
     const response = await fetch("/api/briefs/approve", { method: "POST", headers: { "content-type": "application/json" }, body });
-    const json = (await response.json()) as { data?: { brief: string; digest: string; approvedBy: string; policyApproved: boolean } } & Partial<ApiError>;
-    if (response.ok && json.data) return afterApproval(brief, card, json.data);
+    const json = (await response.json()) as { data?: ApprovalsData & { refused?: Refusal[] } } & Partial<ApiError>;
+    if (response.ok && json.data && json.data.approvals) return afterApproval(json.data);
     const error = json.error ?? { code: "UNKNOWN", message: `the server answered ${response.status}`, hint: null };
-    const changed = error.code === "BRIEF_CHANGED_SINCE_PAGE_LOAD";
-    say(
-      card,
-      h(
-        "div",
-        { class: "approve-error", role: "alert" },
-        h("p", {}, error.message),
-        error.hint ? h("p", { class: "finding-hint" }, error.hint) : null,
-        changed ? withReload() : null,
-      ),
-    );
+    const failure = { ...error, refused: json.data?.refused ?? [] };
+    for (const id of refusedIds(failure)) main!.querySelector(`.brief[data-change="${CSS.escape(id)}"]`)?.classList.add("brief-refused");
+    const stale = failure.refused.length > 0 || error.code === "BRIEF_CHANGED_SINCE_PAGE_LOAD";
+    say(renderApproveError(failure, stale ? withReload() : null));
   } catch (e) {
-    say(card, h("div", { class: "approve-error", role: "alert" }, h("p", {}, `The request failed: ${e instanceof Error ? e.message : String(e)}`)));
+    say(h("div", { class: "approve-error", role: "alert" }, h("p", {}, `The request failed: ${e instanceof Error ? e.message : String(e)}`)));
   }
-  refreshButton(card, brief);
+  refresh();
 }
 
 function withReload() {
@@ -84,8 +110,8 @@ function withReload() {
 }
 
 const handlers: BriefHandlers = {
-  onInput: (card) => refreshButton(card, { approvable: card.dataset.approvable === "true" }),
-  onApprove: (brief, card) => void approve(brief, card),
+  onChange: () => refresh(),
+  onApprove: () => void approve(),
 };
 
 let shown: Brief[] = [];

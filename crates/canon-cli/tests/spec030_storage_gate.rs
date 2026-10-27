@@ -281,6 +281,32 @@ fn evidence_add_121_an_approval_payload_prints_the_exact_bytes_to_sign_and_write
 }
 
 #[test]
+fn evidence_add_130_an_approval_payload_for_a_scenario_the_index_does_not_hold_is_refused_and_prints_no_bytes() {
+    let repo = new_repo();
+    let before = snapshot(repo.path());
+    let args = ["evidence", "approval-payload", "--scenario-id", "game.run.99", "--project-id", "root", "--approver", "alice", "--approval-at", AT];
+
+    let human = repo.canon(&args);
+    assert_eq!(human.status.code(), Some(2), "{}", text(&human));
+    assert!(human.stdout.is_empty(), "no bytes to sign: {}", text(&human));
+    assert!(text(&human).contains("EVIDENCE_SCENARIO_NOT_INDEXED") && text(&human).contains("canon inventory sync"), "{}", text(&human));
+    let mut json_args = args.to_vec();
+    json_args.push("--json");
+    let json = repo.canon(&json_args);
+    assert_eq!(json.status.code(), Some(2));
+    let body = stdout_json(&json);
+    assert_eq!(body["error"]["code"], "EVIDENCE_SCENARIO_NOT_INDEXED", "{body}");
+    let message = body["error"]["message"].as_str().unwrap();
+    assert!(message.contains("game.run.99") && message.contains("root"), "{body}");
+    assert!(body["error"]["hint"].as_str().unwrap().contains("canon inventory sync"), "{body}");
+    assert_eq!(snapshot(repo.path()), before);
+
+    let indexed = repo.canon(&["evidence", "approval-payload", "--scenario-id", "game.run.01", "--project-id", "root", "--approver", "alice", "--approval-at", AT]);
+    assert_eq!(indexed.status.code(), Some(0), "{}", text(&indexed));
+    assert!(!indexed.stdout.is_empty());
+}
+
+#[test]
 fn evidence_add_122_an_approval_payload_is_refused_without_a_task_or_scenario_or_with_an_unreadable_time_and_prints_no_bytes() {
     let repo = new_repo();
     let before = snapshot(repo.path());
@@ -596,6 +622,13 @@ fn gate_check_105_gate_install_hooks_writes_the_hook_commands_and_the_pre_commit
     assert!(repo.join(".canon/scripts/canon-gate-pre-commit.sh").is_file(), "the pre-commit script is written");
 
     let after_first = snapshot(repo);
+    let again = hook_repo();
+    let human = canon_in(again.path(), &["gate", "install-hooks"]);
+    assert_eq!(human.status.code(), Some(0), "{}", text(&human));
+    let said = String::from_utf8_lossy(&human.stdout).to_string();
+    for named in [".claude/settings.json", ".codex/hooks.json", "canon-gate-pre-commit.sh", "no git hook was installed", ".git/hooks/pre-commit", "hook runner"] {
+        assert!(said.contains(named), "the output names {named}: {said}");
+    }
     let second = canon_in(repo, &["gate", "install-hooks", "--json"]);
     assert_eq!(second.status.code(), Some(0), "{}", text(&second));
     let body = stdout_json(&second);
@@ -624,6 +657,12 @@ fn gate_check_106_gate_install_hooks_with_dry_run_reports_what_it_would_install_
     assert_eq!(fields, ["dryRun", "installed", "preCommitScriptWritten"], "the preview reports three fields and names no file: {body}");
     assert_eq!((body["data"]["dryRun"].as_bool(), body["data"]["installed"].as_bool(), body["data"]["preCommitScriptWritten"].as_bool()), (Some(true), Some(true), Some(true)), "{body}");
     assert_eq!(snapshot(repo), before, "the preview writes nothing");
+    let human = canon_in(repo, &["gate", "install-hooks", "--dry-run"]);
+    assert_eq!(human.status.code(), Some(0), "{}", text(&human));
+    let said = String::from_utf8_lossy(&human.stdout).to_string();
+    for named in [".claude/settings.json", ".codex/hooks.json", "canon-gate-pre-commit.sh", "no git hook was installed"] {
+        assert!(said.contains(named), "the preview names {named}: {said}");
+    }
     assert!(!repo.join(".claude").exists() && !repo.join(".codex").exists() && !repo.join(".canon").exists());
 
     let real = canon_in(repo, &["gate", "install-hooks", "--json"]);
@@ -646,6 +685,15 @@ fn gate_check_107_gate_install_hooks_refuses_a_repo_that_is_no_directory_and_an_
     let body = stdout_json(&not_dir);
     assert_eq!(body["error"]["code"], "HOOKS_INSTALL_FAILED", "{body}");
     assert!(body["error"]["message"].as_str().unwrap().contains("is not a directory"), "{body}");
+
+    for dry in [&[][..], &["--dry-run"][..]] {
+        let mut args = vec!["gate", "install-hooks", "--repo", "nowhere", "--json"];
+        args.extend_from_slice(dry);
+        let missing = canon_in(repo, &args);
+        assert_eq!(missing.status.code(), Some(2), "{}", text(&missing));
+        assert_eq!(stdout_json(&missing)["error"]["code"], "HOOKS_INSTALL_FAILED");
+        assert!(!repo.join("nowhere").exists(), "the missing directory is not created");
+    }
 
     let timeout = canon_in(repo, &["gate", "install-hooks", "--timeout", "abc", "--json"]);
     assert_eq!(timeout.status.code(), Some(2), "{}", text(&timeout));

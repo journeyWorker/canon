@@ -120,3 +120,36 @@ Feature: report dashboard
     When the briefs page renders them (the total and the grouping are the page's own; the API returns only per-brief findings and counts)
     Then the page shows a total line counting the advisories of all listed briefs and the briefs holding them
     And the brief with none shows no advisory badge, and a page with no advisories says so
+
+  # canon: {"schema":1,"at":"2026-10-27T10:24:12Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
+  @subject:report-generation
+  @case:happy
+  @flow:canon-0-31-loop.F2
+  @report.dashboard.13
+  Scenario: The briefs page approves several selected briefs in one request, recorded as the CLI records them
+    Given a repository with three unapproved briefs without blockers, a policy file, and a copy of it
+    When the briefs page selects all three, one name and answer are given, and one POST /api/briefs/approve carries the three change ids with the sha256 the page read
+    Then the three briefs and the policy approval carry that name and answer, and equal what canon brief approve with the three ids writes in the copy, up to the timestamp
+    And the three leave GET /api/briefs, and a request naming one brief the old way is still accepted
+
+  # canon: {"schema":1,"at":"2026-10-27T10:24:13Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
+  @subject:report-generation
+  @case:failure
+  @flow:canon-0-31-loop.F2
+  @report.dashboard.14
+  Scenario: A selected brief edited after the page read it refuses the whole request and names it
+    Given a briefs page that read three briefs and one of them edited afterwards
+    When the page's request approves all three
+    Then the server answers 409 BRIEF_APPROVE_REFUSED naming the edited brief and its code BRIEF_CHANGED_SINCE_PAGE_LOAD
+    And none of the three briefs and no policy approval changed, and the page names the refused brief and says to read it again
+
+  # canon: {"schema":1,"at":"2026-10-27T10:24:14Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
+  @subject:report-generation
+  @case:failure
+  @flow:canon-0-31-loop.F2
+  @report.dashboard.15
+  Scenario: A brief with blockers cannot be selected and a request that includes one refuses them all
+    Given a brief with a blocker finding and a brief without one
+    When the page lists them and then a request approves both
+    Then the page offers no selection for the brief with the blocker, and shows how many briefs are selected
+    And the request answers 409 BRIEF_APPROVE_REFUSED naming the blocked brief, and neither brief nor the policy approval changed

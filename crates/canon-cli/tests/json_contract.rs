@@ -59,6 +59,8 @@ fn value_for(command: &str, name: &str, regime: &str) -> String {
         (("subject adopt", "subject-id"), "demo"),
         (("subject unadopt", "subject-id"), "demo"),
         (("skills show", "name"), "canon"),
+        (("context-pack show", "id"), "sha256:0000000000000000000000000000000000000000000000000000000000000000"),
+        (("context-pack verify", "id"), "sha256:0000000000000000000000000000000000000000000000000000000000000000"),
     ]);
     if let Some(value) = by_command.get(&(command, name)) {
         return value.to_string();

@@ -352,6 +352,108 @@ fn report_dashboard_08_refuses_a_brief_with_blockers() {
     assert_eq!(policy_approval(dir.path()), policy_before, "no policy approval was recorded");
 }
 
+/// `repo_with_briefs` with more clean unapproved changes: `ready2`, `ready3`, `ready4`.
+fn repo_with_more_briefs() -> TempDir {
+    let dir = repo_with_briefs();
+    let repo = dir.path();
+    for change in ["ready2", "ready3", "ready4"] {
+        ok(repo, &["change", "new", change, "--subject-id", "demo", "--title", change]);
+        std::fs::write(brief_path(repo, change), clean_brief(change)).unwrap();
+    }
+    dir
+}
+
+fn multi_request(live: &Live, changes: &[&str]) -> Value {
+    let briefs: Vec<Value> = changes.iter().map(|c| json!({ "changeId": c, "sha256": brief_of(live, c)["sha256"] })).collect();
+    json!({ "by": "Ana", "note": "Ship them.", "briefs": briefs })
+}
+
+/// report.dashboard.13: three briefs selected on the page are approved by one
+/// request, recorded as `canon brief approve` with the three ids records
+/// them, and a request naming one brief the old way still works.
+#[test]
+fn report_dashboard_13_several_selected_briefs_are_approved_as_the_cli_approves_them() {
+    let dir = repo_with_more_briefs();
+    let twin = TempDir::new().unwrap();
+    copy_tree(dir.path(), twin.path());
+    let live = serve(dir.path());
+
+    let reply = post_approval(&live, &multi_request(&live, &["ready", "ready2", "ready3"]));
+    assert_eq!(reply.code, 200, "{}", reply.body);
+    let page = reply.json();
+    let cli = canon(twin.path(), &["brief", "approve", "ready", "ready2", "ready3", "--approver", "Ana", "--note", "Ship them.", "--json"]);
+    assert!(cli.status.success(), "{}", String::from_utf8_lossy(&cli.stderr));
+    let cli: Value = serde_json::from_slice(&cli.stdout).unwrap();
+    assert_eq!(page["data"], cli["data"], "the response is the several-id `brief approve --json` data");
+    assert_eq!(page["data"]["approvals"].as_array().unwrap().len(), 3);
+    for change in ["ready", "ready2", "ready3"] {
+        let from_page = std::fs::read_to_string(brief_path(dir.path(), change)).unwrap();
+        let from_cli = std::fs::read_to_string(brief_path(twin.path(), change)).unwrap();
+        assert_eq!(without_timestamp(&from_page), without_timestamp(&from_cli), "{change}");
+        assert!(from_page.contains("Approved: Ana "), "{from_page}");
+    }
+    let strip = |repo: &Path| -> Value {
+        let mut approval: Value = serde_json::from_str(&std::fs::read_to_string(repo.join(".canon/policy.approval.json")).unwrap()).unwrap();
+        approval.as_object_mut().unwrap().remove("approved_at");
+        approval
+    };
+    assert_eq!(strip(dir.path()), strip(twin.path()));
+    let ids: Vec<String> = get(&live, "/api/briefs").json()["data"]["briefs"].as_array().unwrap().iter().map(|b| b["changeId"].as_str().unwrap().to_string()).collect();
+    assert_eq!(ids, ["blocked", "ready4"], "the three left the list");
+
+    let legacy = post_approval(&live, &approval_request(&live, "ready4"));
+    assert_eq!(legacy.code, 200, "a request with one brief in the old shape is still accepted: {}", legacy.body);
+    assert_eq!(legacy.json()["data"]["change"], "ready4");
+}
+
+/// report.dashboard.14: a selected brief edited after the page read it
+/// refuses the whole request with a 409 naming it, and nothing is written.
+#[test]
+fn report_dashboard_14_a_selected_brief_edited_after_the_page_read_it_refuses_all_of_them() {
+    let dir = repo_with_more_briefs();
+    let live = serve(dir.path());
+    let request = multi_request(&live, &["ready", "ready2", "ready3"]);
+    let before: Vec<Vec<u8>> = ["ready", "ready2", "ready3"].iter().map(|c| std::fs::read(brief_path(dir.path(), c)).unwrap()).collect();
+    let policy_before = policy_approval(dir.path());
+    let path = brief_path(dir.path(), "ready2");
+    let edited = format!("{}\nOne more line.\n", std::fs::read_to_string(&path).unwrap());
+    std::fs::write(&path, &edited).unwrap();
+
+    let reply = post_approval(&live, &request);
+    assert_eq!(reply.code, 409, "{}", reply.body);
+    let doc = reply.json();
+    assert_eq!(doc["error"]["code"], "BRIEF_APPROVE_REFUSED", "{doc}");
+    assert!(doc["error"]["message"].as_str().unwrap().contains("`ready2`") && doc["error"]["hint"].as_str().unwrap().contains("reload"), "{doc}");
+    let refused: Vec<(&str, &str)> = doc["data"]["refused"].as_array().unwrap().iter().map(|r| (r["changeId"].as_str().unwrap(), r["code"].as_str().unwrap())).collect();
+    assert_eq!(refused, [("ready2", "BRIEF_CHANGED_SINCE_PAGE_LOAD")], "{doc}");
+    assert_eq!(std::fs::read(brief_path(dir.path(), "ready")).unwrap(), before[0]);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), edited, "the edited brief is as its editor left it");
+    assert_eq!(std::fs::read(brief_path(dir.path(), "ready3")).unwrap(), before[2]);
+    assert_eq!(policy_approval(dir.path()), policy_before, "no policy approval was recorded");
+}
+
+/// report.dashboard.15: a brief with blockers is refused with the rest, named.
+#[test]
+fn report_dashboard_15_a_request_that_includes_a_blocked_brief_refuses_all_of_them() {
+    let dir = repo_with_more_briefs();
+    let live = serve(dir.path());
+    let request = multi_request(&live, &["ready", "blocked"]);
+    let before = std::fs::read(brief_path(dir.path(), "ready")).unwrap();
+    let policy_before = policy_approval(dir.path());
+    assert_eq!(brief_of(&live, "blocked")["approvable"], false, "the page offers no selection for it");
+
+    let reply = post_approval(&live, &request);
+    assert_eq!(reply.code, 409, "{}", reply.body);
+    let doc = reply.json();
+    assert_eq!(doc["error"]["code"], "BRIEF_APPROVE_REFUSED");
+    assert_eq!(doc["data"]["refused"][0]["changeId"], "blocked", "{doc}");
+    assert_eq!(std::fs::read(brief_path(dir.path(), "ready")).unwrap(), before);
+    assert_eq!(policy_approval(dir.path()), policy_before);
+
+    let neither = post_approval(&live, &json!({ "by": "Ana", "note": "x", "briefs": [] }));
+    assert_eq!(neither.code, 400, "{}", neither.body);
+}
+
 /// report.dashboard.09: a request that is not the page's own is refused before the brief is read.
 #[test]
 fn report_dashboard_09_refuses_requests_that_are_not_the_pages_own() {
@@ -492,6 +594,44 @@ fn report_dashboard_04_a_repo_whose_snapshot_cannot_be_generated_is_still_served
     assert_eq!(get(&live, "/live-snapshot/manifest.json").code, 404);
     let demo = get(&live, "/snapshot/manifest.json");
     assert_eq!(demo.code, 404, "the demo fixture is never served: {}", demo.body);
+}
+
+/// report.generation.17: over a hot path that is a directory the dashboard is
+/// up, says the snapshot is unavailable naming the path, and serves the briefs.
+#[test]
+fn report_generation_17_a_hot_path_that_is_a_directory_is_named_as_why_there_is_no_snapshot() {
+    if Command::new("duckdb").arg("--version").output().is_err() {
+        eprintln!("skipping: `duckdb` CLI not found on PATH");
+        return;
+    }
+    let dir = repo_with_briefs();
+    let repo = dir.path();
+    std::fs::write(repo.join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\n  hot: { backend: sqlite, path: .canon/hot.db }\nrouting:\n  task: hot\n  change: local\n").unwrap();
+    std::fs::create_dir_all(repo.join(".canon/hot.db/nested")).unwrap();
+    let stderr = repo.join("dashboard.stderr");
+    let mut child = Command::new(env!("CARGO_BIN_EXE_canon"))
+        .args(["dashboard", "--port", "0", "--json"])
+        .current_dir(repo)
+        .stdout(Stdio::piped())
+        .stderr(std::fs::File::create(&stderr).unwrap())
+        .spawn()
+        .expect("spawn canon dashboard");
+    let mut line = String::new();
+    BufReader::new(child.stdout.take().unwrap()).read_line(&mut line).expect("the startup document");
+    let startup: Value = serde_json::from_str(&line).unwrap_or_else(|e| panic!("startup document {line:?}: {e}"));
+    let url = startup["data"]["url"].as_str().expect("data.url").to_string();
+    let port = url.trim_start_matches("http://127.0.0.1:").split('/').next().unwrap().parse().unwrap();
+    let live = Live { child, port, startup, stderr };
+
+    assert_eq!(live.startup["data"]["snapshotAvailable"], false, "{}", live.startup);
+    let status = get(&live, "/api/status");
+    assert_eq!(status.code, 200);
+    let snapshot = &status.json()["data"]["snapshot"];
+    assert_eq!(snapshot["available"], false);
+    let reason = snapshot["reason"].as_str().unwrap();
+    assert!(reason.contains("reading the sqlite hot tier at") && reason.contains(".canon/hot.db"), "{reason}");
+    assert_eq!(get(&live, "/briefs.html").code, 200, "the briefs page works");
+    assert_eq!(get(&live, "/api/briefs").code, 200);
 }
 
 /// report.dashboard.04: an explicit snapshot with a manifest is served and reported available.

@@ -146,3 +146,35 @@ Feature: report generation
     When canon report snapshot runs without the directory operand
     Then it exits 2 with USAGE naming the missing <DIR>
     And no file in the repo changed
+
+  # canon: {"schema":1,"at":"2026-10-27T10:24:15Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
+  @subject:report-generation
+  @case:failure
+  @flow:canon-0-31-loop.F4
+  @report.generation.15
+  Scenario: A directory or a file that is no database at the hot path makes report build, check and snapshot fail naming the path
+    Given a repository whose canon.yaml backs a rung with a sqlite hot path, and a directory at that path, or a file that is no database
+    When canon report build, report check and report snapshot run
+    Then each exits 1 and the error names the hot path
+    And no report file was written for the directory case
+
+  # canon: {"schema":1,"at":"2026-10-27T10:24:16Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
+  @subject:report-generation
+  @case:edge
+  @flow:canon-0-31-loop.F4
+  @report.generation.16
+  Scenario: A hot path with nothing at it reads as no hot records and is never created
+    Given a repository whose canon.yaml backs a rung with a sqlite hot path and nothing at that path
+    When canon report build, report check and report snapshot run
+    Then each succeeds, reads no hot record, and the path stays absent
+
+  # canon: {"schema":1,"at":"2026-10-27T10:24:17Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
+  @subject:report-generation
+  @case:failure
+  @flow:canon-0-31-loop.F4
+  @report.generation.17
+  Scenario: The dashboard comes up over a hot path that is a directory, names the path as why there is no snapshot, and serves the briefs page
+    Given a repository whose hot path is a directory
+    When canon dashboard starts
+    Then the dashboard is up, GET /api/status says the snapshot is unavailable and the reason names the hot path
+    And GET /api/briefs answers with the briefs

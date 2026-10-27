@@ -373,11 +373,11 @@ Feature: evidence add
   @case:failure
   @evidence.add.68
   Scenario: Evidence for a subject whose brief is not approved is refused, and nothing is staged
-    Given a building subject owning a scenario and adopting a change whose .canon/changes brief.md has no "Approved:" line, with a task row in its tasks.md
+    Given a building subject owning a scenario tagged @flow:<change>.F1 and adopting that change, whose .canon/changes brief.md has no "Approved:" line, with a task row in its tasks.md
     When evidence is added for the scenario, and then for the task
     Then each add exits 1 with an unreviewed-promotion line naming the subject and that brief.md
     And the refusal tells the agent to stop, report the brief and wait for the human's answer, and names --override-reason
-    And nothing is staged or committed
+    And nothing is staged or committed, and once the change is approved, alone or with others in one call, both adds succeed
     And canon review scenario and canon finding add for the same scenario and change are not refused
 
   # canon: {"schema":1,"at":"2026-10-12T07:30:41Z","actor":{"agent_id":"canon"}}
@@ -841,3 +841,48 @@ Feature: evidence add
     Then each exits 2, the first with EVIDENCE_REFUSED and the others as usage errors naming invalid timestamp and --approver
     And no payload bytes reach stdout
     And the tree is unchanged
+
+  # canon: {"schema":1,"at":"2026-10-27T10:24:25Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
+  @subject:evidence-attestation
+  @case:failure
+  @flow:canon-0-31-loop.F3
+  @evidence.add.123
+  Scenario: A tagged scenario's evidence waits only for its tagged changes and a scenario whose tag was removed reads as untagged
+    Given a building subject owning a scenario tagged @flow:a.F1 and another tagged @flow:b.F1, with a approved and b's brief edited after its approval
+    When evidence is added for each scenario
+    Then the scenario tagged for a is attested and the one tagged for b is refused BRIEF_CHANGED_SINCE_APPROVAL naming b's brief.md
+    And a scenario whose tags were removed is read as untagged and answers to every approved change instead
+
+  # canon: {"schema":1,"at":"2026-10-27T10:24:26Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
+  @subject:evidence-attestation
+  @case:failure
+  @flow:canon-0-31-loop.F3
+  @evidence.add.124
+  Scenario: An untagged scenario's evidence is refused when an approved governing change was edited since its approval
+    Given a building subject owning a scenario with no @flow tag, adopting an approved change whose brief was edited after its approval
+    When evidence is added for that scenario
+    Then it exits 1 with BRIEF_CHANGED_SINCE_APPROVAL naming that brief.md and nothing is staged
+    And once the brief is approved again the same add succeeds
+
+  # canon: {"schema":1,"at":"2026-10-27T10:24:28Z","actor":{"agent_id":"impl-031-loop","role":"implementer","session_id":"loop-2026-10-27"}}
+  @subject:evidence-attestation
+  @case:edge
+  @flow:canon-0-31-loop.F3
+  @evidence.add.125
+  Scenario: An unapproved chore and a never-approved feature brief do not block evidence
+    Given a building subject owning an untagged scenario, adopting an approved change, an unapproved chore and a never-approved feature change no scenario is tagged for
+    When evidence is added for the scenario
+    Then the add succeeds with no brief refusal and no brief override
+    And moving the subject on to ship still refuses on the unapproved chore
+
+  # canon: {"schema":1,"at":"2026-10-27T10:49:01Z","actor":{"agent_id":"impl-031-fixes","role":"implementer","session_id":"fixes-2026-10-27"}}
+  @subject:evidence-attestation
+  @case:failure
+  @flow:canon-0-31-fixes.F4
+  @evidence.add.130
+  Scenario: An approval payload for a scenario the index does not hold is refused and prints no bytes
+    Given a repo with one indexed scenario
+    When canon evidence approval-payload is run with --scenario-id naming a scenario the index does not hold, and then with the indexed one
+    Then the first exits 2 with EVIDENCE_SCENARIO_NOT_INDEXED, its message names the id and the spec root and its hint points to canon inventory sync, and stdout is empty
+    And the indexed scenario exits 0 and prints the bytes to sign
+    And the tree is unchanged after both

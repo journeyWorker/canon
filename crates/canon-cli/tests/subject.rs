@@ -1106,7 +1106,7 @@ fn status_brief(repo: &Path) -> Value {
     let out = run(repo, &["status", "--json"]);
     assert!(out.status.success(), "stderr: {}", stderr(&out));
     let report = data_of(&out);
-    report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "demo-subject").unwrap()["brief"].clone()
+    report["subjects"].as_array().unwrap().iter().find(|s| s["id"] == "demo-subject").unwrap()["briefs"][0].clone()
 }
 
 const BRIEF_REFUSAL: &str = "canon subject move: SUBJECT_GATE_VIOLATION — unreviewed-promotion demo-subject — verifying → shipped: brief not approved — .canon/changes/c-demo/brief.md has no `Approved:` line; a human must answer the brief; when they answer, the human records it with `canon brief approve c-demo --approver <their name> --note \"<their words>\"` in their own shell (or on `canon dashboard`); never run it yourself or unset your role to run it\n";
@@ -1134,7 +1134,7 @@ fn subject_lifecycle_24_shipping_is_refused_while_the_brief_has_no_approved_line
     assert_eq!(current_subject(dir.path())["status"], "verifying", "a refusal leaves the record unchanged");
     assert_eq!(
         status_brief(dir.path()),
-        serde_json::json!({"approved": false, "enforced": true, "change": "c-demo", "brief": ".canon/changes/c-demo/brief.md", "briefExists": true})
+        serde_json::json!({"status": "unapproved", "enforced": true, "change": "c-demo", "brief": ".canon/changes/c-demo/brief.md", "briefExists": true})
     );
 
     write_brief(dir.path(), "c-demo", &format!("Status: approved.\n\n{APPROVED}\n"));
@@ -1162,7 +1162,7 @@ fn subject_lifecycle_25_an_approved_line_in_a_comment_or_fence_does_not_ship() {
         assert_eq!(out.status.code(), Some(1), "{case}: stderr: {}", stderr(&out));
         assert!(stderr(&out).contains(BRIEF_REFUSAL), "{case}: {}", stderr(&out));
         assert_eq!(current_subject(dir.path())["status"], "verifying", "{case}");
-        assert_eq!(status_brief(dir.path())["approved"], false, "{case}: status and the guard agree");
+        assert_eq!(status_brief(dir.path())["status"], "unapproved", "{case}: status and the guard agree");
     }
 }
 
@@ -1203,7 +1203,7 @@ fn subject_lifecycle_27_a_subject_with_no_adopted_change_ships_with_an_advisory(
     let dir = repo();
     seed_subject(dir.path(), "demo-subject", SubjectStatus::Verifying, &["world.demo.01"]);
     seed_scenario_verdict(dir.path(), "world.demo.01", EvidenceVerdict::Faithful);
-    assert_eq!(status_brief(dir.path()), serde_json::json!({"approved": false, "enforced": false, "briefExists": false}));
+    assert_eq!(status_brief(dir.path()), serde_json::json!({"status": "unapproved", "enforced": false, "briefExists": false}));
     let status = run(dir.path(), &["status"]);
     assert!(!stdout(&status).contains("human:"), "nothing to answer, so no human step: {}", stdout(&status));
     assert!(stdout(&status).contains("      brief: not approved (no adopted change; advisory, nothing to approve yet)\n"), "{}", stdout(&status));
@@ -1491,7 +1491,7 @@ fn subject_lifecycle_28_shipping_an_external_change_needs_its_canon_brief() {
     assert_eq!(current_subject(dir.path())["status"], "verifying");
     assert_eq!(
         status_brief(dir.path()),
-        serde_json::json!({"approved": false, "enforced": true, "change": "c-ext", "brief": ".canon/changes/c-ext/brief.md", "briefExists": false, "source": "openspec/changes/c-ext/proposal.md"})
+        serde_json::json!({"status": "unapproved", "enforced": true, "change": "c-ext", "brief": ".canon/changes/c-ext/brief.md", "briefExists": false, "source": "openspec/changes/c-ext/proposal.md"})
     );
 
     write_pointer_brief(dir.path(), "c-ext");

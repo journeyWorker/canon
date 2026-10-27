@@ -143,3 +143,15 @@ Feature: learn promotion
     And the file that is not a signature exits 1 with LEARN_ROLLBACK_FAILED, its message saying the ssh signature verification failed
     And the malformed timestamp and the missing reason each exit 2 with USAGE
     And no file in the repo changed
+
+  # canon: {"schema":1,"at":"2026-10-27T10:49:05Z","actor":{"agent_id":"impl-031-fixes","role":"implementer","session_id":"fixes-2026-10-27"}}
+  @subject:learn-promotion
+  @case:failure
+  @flow:canon-0-31-fixes.F6
+  @learn.promotion.14
+  Scenario: A rollback of an unknown strategy is refused before any signature is read and writes nothing
+    Given a repo with no strategy of a well-formed id, and a signature file that is missing or wrong
+    When canon strategy rollback runs for that id with that signature file
+    Then it exits 2 with LEARN_STRATEGY_NOT_FOUND, with the file missing and with it wrong alike
+    And a rollback of an existing strategy with a wrong signature still exits 1 with LEARN_ROLLBACK_FAILED
+    And no file in the repo changed

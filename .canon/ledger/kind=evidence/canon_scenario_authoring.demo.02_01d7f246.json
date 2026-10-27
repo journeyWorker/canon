@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "impl-031-fixes",
+    "role": "implementer",
+    "session_id": "fixes-2026-10-27"
+  },
+  "at": "2026-10-27T11:19:39.700556993Z",
+  "code_tree": "33cb4e61f63ce191f9fc1c6897efb48c058cecdb",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "cargo test -p canon-cli --test spec030_dispatch_demo authoring_demo_02"
+  },
+  "evidence_note": {
+    "summary": "workspace cargo test passed, including authoring_demo_02*"
+  },
+  "evidence_sha": "cbfb7db731bebcb11314a9a8cb965036f4b6680b",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 17,
+  "scenario_id": "authoring.demo.02",
+  "schema": 1,
+  "staging_id": "eb07c68d",
+  "verdict": "faithful",
+  "worktree_dirty": true
+}
