@@ -1,15 +1,56 @@
+---
+waive:
+  - rule: "prose.length"
+    section: "brief"
+    reason: "옵션 14개 표, 철자 거절 규칙, 입력 문서 키, 생성 명령, 호출자 조사를 한 변경에서 정해야 해서 줄이면 사실이 빠진다"
+  - rule: "prose.length"
+    section: "intent"
+    reason: "14개 옵션의 개수와 명령 수를 근거 숫자로 적어서 줄이면 현재 동작이 빠진다"
+  - rule: "prose.length"
+    section: "detail"
+    reason: "단계마다 규칙과 호출자 조사 결과를 담아야 하는 변경이라 줄이면 사실이 빠진다"
+  - rule: "prose.length"
+    section: "questions"
+    reason: "정책 질문 셋과 가정이 서로 다른 결정이라 함께 적어야 한다"
+  - rule: "prose.length"
+    section: "acceptance"
+    reason: "여섯 단계마다 실패 경로를 요구하는 규칙과 스펙 코퍼스 재리뷰 조건 때문에 줄일 수 없다"
+  - rule: "prose.code-citation"
+    section: "detail"
+    reason: "CANON_ACTOR는 사용자가 설정하는 환경 변수 이름이다"
+    match: "CANON_ACTOR"
+  - rule: "prose.code-citation"
+    section: "detail"
+    reason: "scenarioId는 사용자가 쓰는 JSON 키 철자 자체다"
+    match: "scenarioId"
+  - rule: "prose.code-citation"
+    section: "acceptance"
+    reason: "scenarioId는 사용자가 쓰는 JSON 키 철자 자체다"
+    match: "scenarioId"
+  - rule: "prose.code-citation"
+    section: "acceptance"
+    reason: "INPUT_UNKNOWN_FIELD는 사용자가 받는 오류 코드다"
+    match: "INPUT_UNKNOWN_FIELD"
+  - rule: "prose.code-citation"
+    section: "acceptance"
+    reason: "SPEC_ROOT_UNRESOLVED는 사용자가 받는 오류 코드다"
+    match: "SPEC_ROOT_UNRESOLVED"
+  - rule: "prose.code-citation"
+    section: "detail"
+    reason: "INPUT_UNKNOWN_FIELD는 사용자가 받는 오류 코드다"
+    match: "INPUT_UNKNOWN_FIELD"
+---
+
 # 0.31 CLI id 플래그를 명사로
 
 Source: skill cli-interface-design "Identifier options" (소유자 기본 규칙 2026-10-26); docs/design/cli-commands-0.28.md; docs/design/cli-vocabulary.tsv; docs/cli/canon.cli.json
 
-<!-- canon:section intent role=context -->
 ## Intent
 
 canon은 레코드나 설정 항목의 id를 받는 옵션 14개를 `--<명사>-id`로 쓴다. 24개 명령에 모두 67곳이다. `--actor-id` 16, `--session-id` 15, `--project-id` 11, `--change-id` 6, `--run-id` 4, `--task-id`·`--subject-id`·`--scenario-id` 각 3, 나머지 여섯 옵션 각 1이다. 옵션 이름이 대상을 가리키고 값이 그 대상의 id인데 이름에 `-id`가 또 붙는다. `--input` 문서의 키에도 `Id`가 붙는다. 소유자의 기본 규칙은 접미사 없는 명사다. 이 변경이 14개를 모두 그 규칙에 맞춘다.
 
 0.31 순서: CI → 승인과 adopt → 버그 수정 → brief 포맷 → CLI id → 검색. 여섯 brief는 함께 승인받는다. 승인한 brief를 고치면 그 brief를 adopt한 모든 subject가 재승인 전까지 막힌다.
 
-<!-- canon:section outcome role=normative -->
 ## Desired outcome
 
 - ==**id를 받는 옵션은 접미사 없는 명사이고, 값은 그 대상의 정확한 id다.**== 예를 들어 `--change add-login`, `--scenario auth.login.01`, `--actor reviewer-1`이다.
@@ -19,7 +60,6 @@ canon은 레코드나 설정 항목의 id를 받는 옵션 14개를 `--<명사>-
 - canon이 출력하는 명령 줄, 스킬, 웹사이트, README는 새 철자만 쓴다.
 - 새 이름이 기존 옵션 이름과 겹치지 않는지 기계가 검사한다.
 
-<!-- canon:section flow role=normative -->
 ## User flow
 
 1. F1 에이전트나 사람이 id를 가리키는 명령을 쓴다 → 옵션을 접미사 없는 명사로 쓴다 → canon이 이전과 같은 일을 하고 같은 레코드를 쓴다.
@@ -28,7 +68,6 @@ canon은 레코드나 설정 항목의 id를 받는 옵션 14개를 `--<명사>-
 4. F4 canon이 오류, 힌트, 다음 단계를 낸다 → 필드와 명령 줄이 새 철자다 → 에이전트가 출력된 줄을 그대로 실행한다.
 5. F5 에이전트가 스킬이나 `canon schema`를 연다 → 명령표가 새 철자만 담는다 → 흔한 흐름의 명령을 추측 없이 만든다.
 
-<!-- canon:section detail role=normative -->
 ## Step detail
 
 ### F1 새 철자
@@ -117,7 +156,6 @@ canon query --kind task --change add-search
 canon retrieve --for-role reviewer --domain dev --subject payments
 ```
 
-<!-- canon:section acceptance role=normative -->
 ## Acceptance
 
 - F1: 14개 옵션을 새 철자로 쓴 줄이 실행된다. 0.30 바이너리가 같은 fixture에 옛 철자로 쓴 레코드와 비교한다. 시각, ULID, 다이제스트를 가리는 conformance 정규화 뒤에 바이트까지 같다. 비교 fixture에는 brief가 없다. 실패 경로: 옛 `--change-id`로 같은 줄을 실행하면 종료 2이고 레저는 그대로다.
@@ -132,7 +170,6 @@ canon retrieve --for-role reviewer --domain dev --subject payments
 - F5: 실패 경로: `--change`와 `--change-id`가 함께 있는 명령 트리를 검사기에 주면 두 철자와 명령 목록이 보고된다. 스킬 문서에 `--actor-id`가 남으면 생성 명령 파싱 검사가 실패한다.
 - F5: 스펙 코퍼스에 옛 `-id` 철자가 없고 `canon format`이 통과한다. 옛 철자를 말하던 시나리오 33개가 새 evidence와 다른 세션의 리뷰를 받은 뒤 `canon gate check`가 clean이다. 실패 경로: 리뷰를 받지 않은 시나리오는 `gate check`가 낡은 리뷰로 보고한다.
 
-<!-- canon:section questions role=question -->
 ## Questions and assumptions
 
 - 질문(정책): 옛 철자를 한 릴리스 동안 경고와 함께 실행할까, 바로 제거할까? 스킬은 가이드를 읽는 호출자에만 즉시 제거를 허용한다. 레포 안 호출자와 설치된 훅은 전부 확인했으나 레포 밖 스크립트는 알 수 없다. 가정: 즉시 제거한다. 유예 장치는 0.25에서 코드에서 없앴으므로 되살려야 하고, 옛 철자는 첫 실행에서 종료 2와 바꿀 철자로 바로 드러난다.
@@ -145,7 +182,6 @@ canon retrieve --for-role reviewer --domain dev --subject payments
 - 가정: 스펙 코퍼스의 재작성은 시나리오의 `@subject` 태그를 따라 adopt한다. 옛 철자를 말하는 시나리오 33개는 8개 subject에 있다. 레저 이름 파일에서 옵션 철자를 말하는 시나리오는 하나다. evidence 기록 결과 줄의 시나리오로 `evidence-attestation`에 속하고 이미 adopt했다. `tier-storage`의 시나리오(tier age, export, purge의 id 규칙)는 옵션 철자를 말하지 않아 adopt하지 않는다. 파일 하나에 여러 subject의 시나리오가 있으므로 파일 단위로 adopt하지 않는다.
 - 가정: 승인한 이 brief를 고치면 이 brief를 adopt한 8개 subject가 재승인 전까지 reopen, ship, evidence 기록이 막힌다. 승인 전에 brief를 확정하고, 승인 뒤에는 고치지 않는다.
 
-<!-- canon:section out-of-scope role=context -->
 ## Out of scope
 
 - 명령 이름 변경, 피연산자로 옮기는 일, `-id`가 아닌 옵션의 이름 변경.
@@ -156,18 +192,4 @@ canon retrieve --for-role reviewer --domain dev --subject payments
 - docs/research의 옛 분석 문서와, 레저와 archive의 과거 레코드 안에 남은 명령 문자열.
 - 에빌 러너 자신의 `--task-id` 옵션(canon 옵션이 아니다).
 
-<!-- canon:waive prose.length brief "옵션 14개 표, 철자 거절 규칙, 입력 문서 키, 생성 명령, 호출자 조사를 한 변경에서 정해야 해서 줄이면 사실이 빠진다" -->
-<!-- canon:waive prose.length intent "14개 옵션의 개수와 명령 수를 근거 숫자로 적어서 줄이면 현재 동작이 빠진다" -->
-<!-- canon:waive prose.length detail "단계마다 규칙과 호출자 조사 결과를 담아야 하는 변경이라 줄이면 사실이 빠진다" -->
-<!-- canon:waive prose.length questions "정책 질문 셋과 가정이 서로 다른 결정이라 함께 적어야 한다" -->
-<!-- canon:waive prose.length acceptance "여섯 단계마다 실패 경로를 요구하는 규칙과 스펙 코퍼스 재리뷰 조건 때문에 줄일 수 없다" -->
-<!-- canon:waive prose.code-citation detail "CANON_ACTOR는 사용자가 설정하는 환경 변수 이름이다" match="CANON_ACTOR" -->
-<!-- canon:waive prose.code-citation detail "scenarioId는 사용자가 쓰는 JSON 키 철자 자체다" match="scenarioId" -->
-<!-- canon:waive prose.code-citation acceptance "scenarioId는 사용자가 쓰는 JSON 키 철자 자체다" match="scenarioId" -->
-<!-- canon:waive prose.code-citation acceptance "INPUT_UNKNOWN_FIELD는 사용자가 받는 오류 코드다" match="INPUT_UNKNOWN_FIELD" -->
-<!-- canon:waive prose.code-citation acceptance "SPEC_ROOT_UNRESOLVED는 사용자가 받는 오류 코드다" match="SPEC_ROOT_UNRESOLVED" -->
-<!-- canon:waive prose.code-citation detail "INPUT_UNKNOWN_FIELD는 사용자가 받는 오류 코드다" match="INPUT_UNKNOWN_FIELD" -->
-
-<!-- The human records their answer, and only that answer, with: canon brief approve --approver <who> --note "<their words>" -->
-
-Approved: Journey Hwang 2026-10-27T10:13:52Z — "레츠고" (brief sha256:c4698decd6c6beb20ce37425dd66661bbca615358e364d8e5b1ddeb6cac716c7)
+Approved: Journey Hwang 2026-10-27T10:13:52Z — "레츠고" (brief sha256:e699cb02e64458604998d5a67cb973ac04c409fd77bc3076a1743ac57a8cdbc8)

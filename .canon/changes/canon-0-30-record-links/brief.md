@@ -1,6 +1,12 @@
+---
+waive:
+  - rule: "prose.length"
+    section: "intent"
+    reason: "끊긴 연결 다섯 곳의 목록이고 줄이면 개수와 근거 숫자가 빠진다"
+---
+
 # 0.30 레코드 연결 보강
 
-<!-- canon:section intent role=context -->
 ## Intent
 
 canon 레코드를 그래프로 조회하려는 조사에서 끊긴 연결 다섯 곳이 나왔다.
@@ -10,11 +16,9 @@ canon 레코드를 그래프로 조회하려는 조사에서 끊긴 연결 다�
 - 시나리오 색인에는 제목만 있고 시나리오 단계가 없다.
 - 레코드가 없는 대상을 가리켜도 알려 주는 곳이 없다. canon 레저에서 finding 184개가 가리키는 change에 해당하는 원본이 없다.
 - sqlite hot 저장소가 worktree마다 따로라서 hot 레코드가 worktree마다 갈린다. 어디에 있는지도 보여 주지 않는다.
-<!-- canon:waive prose.length intent "끊긴 연결 다섯 곳의 목록이고 줄이면 개수와 근거 숫자가 빠진다" -->
 
 0.30 순서: 계획 이전 → 스펙 보강 → 코드 정리 → clippy CI → 레저 이름 변경 → 이 변경. 여섯 brief는 함께 승인받는다.
 
-<!-- canon:section outcome role=normative -->
 ## Desired outcome
 
 - ==**모든 리뷰 레코드가 본문에 리뷰 id를 담고, 레코드가 옮겨지거나 다시 쓰여도 id는 그대로다.**== `review scenario`나 `review change`를 한 번 실행해 새로 쓴 레코드들은 같은 id를 갖는다.
@@ -24,7 +28,6 @@ canon 레코드를 그래프로 조회하려는 조사에서 끊긴 연결 다�
 - 조회와 `status`가 원본이 없는 참조를 표시하고 개수를 보고한다. 같은 커밋이면 어느 머신에서든 결과가 같다.
 - hot 저장소 위치가 `canon init --check`와 hot 레코드를 쓰는 명령의 출력에 나온다.
 
-<!-- canon:section flow role=normative -->
 ## User flow
 
 1. F1 reviewer가 `review scenario`를 실행한다 → canon이 리뷰 레코드들을 쓰거나 이전과 같은 리뷰는 건너뛴다 → 출력에 시나리오별 리뷰 id가 나오고, 그중 하나를 `finding add`에 넘기면 finding이 그 리뷰를 가리킨다.
@@ -33,7 +36,6 @@ canon 레코드를 그래프로 조회하려는 조사에서 끊긴 연결 다�
 4. F4 에이전트가 레코드를 조회하거나 `canon status`를 본다 → canon이 참조를 원본과 대조한다 → 원본이 없는 참조가 표시되고 종류별 개수가 보고된다.
 5. F5 사용자가 `canon init --check`를 실행하거나 hot 레코드를 쓴다 → canon이 hot 저장소를 연다 → 출력에 hot 저장소 위치가 나온다.
 
-<!-- canon:section detail role=normative -->
 ## Step detail
 
 ### F1 리뷰 id
@@ -70,7 +72,6 @@ canon 레코드를 그래프로 조회하려는 조사에서 끊긴 연결 다�
 
 - 위치 규칙은 지금과 같다(설정 파일 기준 경로, worktree마다 따로). 이 변경은 위치를 보여 주기만 한다.
 
-<!-- canon:section acceptance role=normative -->
 ## Acceptance
 
 - F1: 시나리오 셋을 한 번에 리뷰하면 레코드 셋이 같은 id를 갖고, 그 id로 만든 finding을 조회하면 id가 나온다. 같은 리뷰를 다시 실행하면 새 레코드 없이 이전 id가 나온다. ==**`canon migrate` 뒤에도 id가 같다.**== 실패 경로: 없는 리뷰 id는 거절되고 레저는 그대로다.
@@ -79,7 +80,6 @@ canon 레코드를 그래프로 조회하려는 조사에서 끊긴 연결 다�
 - F4: 원본이 없는 change를 가리키는 finding이 있는 fixture에서 조회와 `status`가 그 참조를 표시하고 개수를 보고한다. 같은 커밋을 새로 받은 곳과 기존 작업 트리에서 `status --json`이 같다. `gate check` 출력은 바뀌지 않는다.
 - F5: `canon init --check`와 hot 레코드를 쓴 명령의 출력에 hot 저장소 경로가 나온다.
 
-<!-- canon:section questions role=question -->
 ## Questions and assumptions
 
 - 질문(정책): 새 결함 finding에 결함 커밋이나 "모름"을 요구하는 것은 리뷰어의 기록 방식을 바꾼다. 요구할까, 경고로 둘까? 가정: 요구한다.
@@ -87,7 +87,6 @@ canon 레코드를 그래프로 조회하려는 조사에서 끊긴 연결 다�
 - 질문: 그래프 조회 명령도 0.30에 넣을까? 가정: 0.30은 연결 데이터만 고치고 조회 명령은 별도 변경으로 한다.
 - 가정(소유자 결정 2026-10-26): `.feature` 파싱은 표준 Gherkin 파서인 `gherkin` crate를 쓴다. 단계 색인은 그 파서의 결과에서 얻는다. canon의 자체 파서를 대체하는 경우, 코퍼스 전체에서 시나리오 해시가 대체 전과 같아야 한다. 같지 않으면 해시 계산은 자체 파서에 남긴다.
 
-<!-- canon:section out-of-scope role=context -->
 ## Out of scope
 
 - 그래프 조회 명령.
@@ -95,4 +94,4 @@ canon 레코드를 그래프로 조회하려는 조사에서 끊긴 연결 다�
 - 원본 없는 옛 참조를 고치거나 지우는 일.
 - worktree 사이 hot 저장소 공유.
 
-Approved: Journey Hwang 2026-10-26T12:59:31Z — "레츠고" (brief sha256:a60f094c31b38ed50a9c3d63d66ce173fd6f37d9852c56c397ecd03b1384fd85)
+Approved: Journey Hwang 2026-10-26T12:59:31Z — "레츠고" (brief sha256:c3d9ea528299cf8bbce2d204b3636ac16211a52d1c33b574c7c035e7433eda7a)

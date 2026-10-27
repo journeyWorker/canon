@@ -1,20 +1,19 @@
+---
+kind: chore
+---
+
 # 0.31 툴체인 고정과 CI 보강
 
-<!-- canon:kind chore -->
-
-<!-- canon:section intent role=context -->
 ## Intent
 
 0.30의 CI는 clippy 잡만 툴체인 1.99.1이고 나머지 Rust 잡은 떠 있는 `stable`이라서, 새 stable이 나오면 코드 변경 없이 잡 일부만 달라질 수 있다. 또 0.30 릴리스는 태그를 단 뒤에야 두 번 실패했다. 릴리스 워크플로 안전 검사와 맨페이지 생성기 빌드가 그것이다. 0.30 릴리스 PR은 바뀐 파일이 너무 많아 경로 필터가 걸린 워크플로가 돌지 않았을 가능성이 있다. 툴체인을 한 곳에서 고정하고, 두 검사를 태그 전에 PR에서 돌린다.
 
 0.31 순서: CI → 승인과 adopt → 버그 수정 → brief 포맷 → CLI id → 검색. 여섯 brief는 함께 승인받는다. 승인한 brief를 고치면 그 brief를 adopt한 모든 subject가 재승인 전까지 막힌다.
 
-<!-- canon:section category role=context -->
 ## Category
 
 ci
 
-<!-- canon:section invariants role=normative -->
 ## Invariants
 
 - ==**canon의 동작과 출력, 레저는 바뀌지 않는다.**== CI 정의, 툴체인 고정 파일, 검사 스크립트만 바뀐다.
@@ -25,7 +24,6 @@ ci
 - 릴리스 워크플로 안전 검사는 경로 필터 없이 매 PR에서 돈다. 새 워크플로 파일 하나가 이 검사와, 맨페이지 생성기를 디버그로 빠르게 확인하는 단계(`cargo check`)를 함께 담는다. 릴리스 모드 맨페이지 빌드는 Rust 소스, 워크플로, 스크립트, 고정 파일을 건드린 PR에서 돈다.
 - Rust를 설치한 잡은 로그에 `rustc` 버전을 남기고, 그 버전이 고정 파일의 버전과 다르면 실패한다.
 
-<!-- canon:section checks role=normative -->
 ## Checks
 
 - ==**마지막 커밋에서 모든 CI 잡이 통과한다.**== 기존 잡이 같은 결과를 낸다. 테스트 잡에는 witness와 canon 자체 gate가 들어 있다. 나머지는 clippy, 문법 변이, 벤치 모양, 런처, platformer, live tier, 네이티브 빌드, 맨페이지 잡이다.
@@ -38,7 +36,6 @@ ci
 - 테스트 워크플로의 머리 주석과 코딩 규칙 문서에 있는 "stable, 고정 안 됨" 설명도 같은 변경에서 고친다.
 - 이 변경은 워크플로와 스크립트를 바꾸므로 코드 변경으로 센다. 이 변경이 adopt된 출시된 subject는 다시 열어 새 evidence를 기록하고 출시한다. 변경 단위 리뷰는 다른 세션의 reviewer가 한다.
 
-<!-- canon:section out-of-scope role=context -->
 ## Out of scope
 
 - 툴체인 버전을 1.99.1에서 올리는 일.
@@ -49,4 +46,4 @@ ci
 - 안전 검사 스크립트가 떠 있는 `stable` 설치를 거부하게 하지 않는다. 루트 허용 목록에 고정 파일을 더하는 데서 멈추고, 버전 일치는 `rustc` 버전 확인이 지킨다.
 - 네이티브 빌드 워크플로 안의 기존 안전 잡은 릴리스 매트릭스 비교가 걸려 있으므로 그대로 둔다.
 
-Approved: Journey Hwang 2026-10-27T10:13:48Z — "레츠고" (brief sha256:6c1af15530ece72e8f2000296f59eeacff42cebf437411f2b756f3e774a565f8)
+Approved: Journey Hwang 2026-10-27T10:13:48Z — "레츠고" (brief sha256:f0d2d8bd2e3301ead2a6616eb039ef14bbc2710cfcf29934bcbae89cca4fbce2)

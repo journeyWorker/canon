@@ -1,14 +1,21 @@
+---
+waive:
+  - rule: "prose.length"
+    section: "brief"
+    reason: "명령 둘의 출력 보고서와 실패 경로를 정하는 변경이라 줄이면 필드와 실패 경로가 빠진다"
+  - rule: "prose.length"
+    section: "detail"
+    reason: "명령 둘의 입력 범위, 엣지 규칙, 사슬 구성, 실패 경로를 정하는 단계라 줄이면 규칙이 빠진다"
+---
+
 # 0.31 검색과 레코드 그래프
 
-<!-- canon:section intent role=context -->
 ## Intent
 
 canon 레코드는 서로를 가리키지만 그 그래프를 보여 주는 명령이 없고, 텍스트 검색도 없다. `canon query`는 한 번에 한 종류를 구조화된 필터로 나열할 뿐이다. 구현 → 리뷰 → finding → 수정 → 재리뷰 고리는 커밋 sha로만 이어져서, 레코드를 하나씩 읽어야 보인다. 0.30이 리뷰 id, finding의 리뷰 링크, 시나리오 단계, 원본 없는 참조 보고, hot 저장소 위치를 채워서 이제 그 그래프를 만들 수 있다.
-<!-- canon:waive prose.length brief "명령 둘의 출력 보고서와 실패 경로를 정하는 변경이라 줄이면 필드와 실패 경로가 빠진다" -->
 
 0.31 순서: CI → 승인과 adopt → 버그 수정 → brief 포맷 → CLI id → 검색. 여섯 brief는 함께 승인받는다. 승인한 brief를 고치면 그 brief를 adopt한 모든 subject가 재승인 전까지 막힌다.
 
-<!-- canon:section outcome role=normative -->
 ## Desired outcome
 
 - ==**`canon search "<텍스트>"`는 레코드, brief 섹션, 시나리오 본문을 전문 검색하고, 걸린 노드마다 그래프 이웃을 함께 낸다.**==
@@ -17,7 +24,6 @@ canon 레코드는 서로를 가리키지만 그 그래프를 보여 주는 명�
 - 한국어 본문도 검색된다.
 - 원본 없는 참조는 표시가 붙은 노드로 나오고 오류를 내지 않는다.
 
-<!-- canon:section flow role=normative -->
 ## User flow
 
 1. F1 사용자가 `canon search`를 처음 실행하거나 레코드를 쓴 뒤 실행한다 → canon이 색인이 없거나 낡았는지 보고 다시 만든다 → ==**결과에 방금 승격한 레코드까지 들어 있다.**==
@@ -25,13 +31,11 @@ canon 레코드는 서로를 가리키지만 그 그래프를 보여 주는 명�
 3. F3 리뷰어가 `canon trace`에 finding, 리뷰 id, 커밋 sha 중 하나를 준다 → canon이 같은 고리에 묶인 레코드를 따라간다 → 시간순 사슬이 나온다.
 4. F4 에이전트가 원본 없는 change를 가리키는 finding의 이웃을 본다 → canon이 그 change를 자리표시 노드로 둔다 → 표시가 붙어 나오고 오류는 없다.
 
-<!-- canon:section detail role=normative -->
 ## Step detail
 
 ### F1 색인 만들기와 갱신
 
 - 색인은 worktree마다 하나인 파일이고 `.canon/index/` 아래에 두며 -wal, -shm 파일까지 gitignore한다. `canon init`이 그 줄을 넣는다. 첫 빌드는 `.canon/index/`에 `*`만 담은 ignore 파일도 써서, init을 다시 실행하기 전에도 색인은 커밋되지 않는다. 이미 init한 레포는 init을 다시 실행해 받고, 그 전에는 `search`와 `trace`가 경고를 낸다.
-<!-- canon:waive prose.length detail "명령 둘의 입력 범위, 엣지 규칙, 사슬 구성, 실패 경로를 정하는 단계라 줄이면 규칙이 빠진다" -->
 - ==**색인은 원본이 아니다.**== 색인에서 읽어 레코드를 쓰는 일은 없고, 지우고 다시 만들어도 `search`와 `trace`의 결과는 같다.
 - 입력은 승격된 현재 버전의 레저 레코드, 이 worktree의 sqlite hot 저장소, brief, `.feature` 파일이다. 레저 archive의 finding, 리뷰, evidence 옛 버전도 읽는다(F3). evidence는 타입 레코드가 버리는 참조, 요약, 명령 결과 원문도 넣는다.
 - 승격 전에 staged인 레코드와 postgres, 객체 저장소의 레코드는 읽지 않는다. 읽지 않은 저장소 이름이 `index`에 나온다.
@@ -80,7 +84,6 @@ canon 레코드는 서로를 가리키지만 그 그래프를 보여 주는 명�
 
 - 원본 없는 참조는 `canon query`가 원본 없는 참조로 보고하는 것과 같다(`status`는 개수만 센다). 그 id마다 자리표시 노드가 하나 생기고 가리키는 곳의 수를 담는다. 본문이 없어 검색되지 않고 이웃으로만 나온다.
 
-<!-- canon:section acceptance role=normative -->
 ## Acceptance
 
 - F1: 색인이 없는 레포에서 `search`가 색인을 만들고, 색인 디렉터리에 `*`만 담은 ignore 파일이 생기고, 결과가 나온다. finding을 승격한 직후 같은 질의에 그 finding이 나온다. ==**색인 파일을 지우고 다시 실행하면 다시 만들었는지 나타내는 필드만 빼고 같은 결과가 나온다.**== 레코드 2,300건짜리 픽스처에서 낡은 색인의 전체 재구성은 5초 안에 끝난다. 실패 경로: 깨진 색인 파일은 경고와 함께 다시 만들어지고, 쓸 수 없는 디렉터리에서는 경고와 함께 결과가 나온다.
@@ -93,7 +96,6 @@ canon 레코드는 서로를 가리키지만 그 그래프를 보여 주는 명�
   - 실패 경로: 없는 id는 exit 2다.
 - F4: 원본 없는 change를 가리키는 finding을 검색하면 그 change가 자리표시로 나온다. 자리표시 id 집합은 `canon query`가 보고하는 원본 없는 참조의 서로 다른 id 집합과 같다. 실패 경로: 자리표시 id로 `trace`를 실행하면 exit 2다.
 
-<!-- canon:section questions role=question -->
 ## Questions and assumptions
 
 - 질문: 첫 판에 벡터 검색과 tree-sitter 코드 기호 엣지를 넣을까? 가정: 둘 다 넣지 않는다. 전문 검색과 그래프 확장만 한다.
@@ -106,7 +108,6 @@ canon 레코드는 서로를 가리키지만 그 그래프를 보여 주는 명�
 - 질문: 낡음 판정과 비용은? 가정: 입력 전체의 지문으로 판정하고 전체를 다시 만든다. 쓰기 뒤 첫 검색이 비용을 내고, 5초 상한은 F1 acceptance가 잰다.
 - 가정: id 옵션이 같은 릴리스에서 명사 이름으로 바뀌므로 옵션은 `--kind`, `--expand`, `--limit`다. `--limit`은 페이지 없는 hit 수 상한이다.
 
-<!-- canon:section out-of-scope role=context -->
 ## Out of scope
 
 - 벡터와 임베딩, 순위 융합(RRF).
@@ -117,4 +118,4 @@ canon 레코드는 서로를 가리키지만 그 그래프를 보여 주는 명�
 - evidence 저장 방식 변경과 finding·리뷰 레코드 스키마 변경.
 - 시나리오 해시 계산 변경.
 
-Approved: Journey Hwang 2026-10-27T10:13:53Z — "레츠고" (brief sha256:8ecb21a4a0807dfe7df00a57edf6eff1f966578332fc1985afc430c203987913)
+Approved: Journey Hwang 2026-10-27T10:13:53Z — "레츠고" (brief sha256:2eef6217002b1563753763320f80fcd026bc20d649900c61f2cb751e8673566c)

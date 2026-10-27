@@ -1,6 +1,25 @@
+---
+waive:
+  - rule: "prose.length"
+    section: "brief"
+    reason: "마이그레이션과 읽는 곳 전체를 다루는 변경이라 단계마다 조건을 빼면 사실이 빠진다"
+  - rule: "prose.length"
+    section: "detail"
+    reason: "여섯 단계의 규칙과 마이그레이션 조건을 모두 담아야 하는 변경이다"
+  - rule: "prose.length"
+    section: "acceptance"
+    reason: "여섯 단계마다 실패 경로를 요구하는 규칙 때문에 줄일 수 없다"
+  - rule: "prose.length"
+    section: "questions"
+    reason: "승인 무결성과 리뷰 핀이 정책 질문이라 가정과 함께 적어야 한다"
+  - rule: "prose.code-citation"
+    section: "acceptance"
+    reason: "BRIEF_CHANGED_SINCE_APPROVAL은 사용자가 받는 오류 코드다"
+    match: "BRIEF_CHANGED_SINCE_APPROVAL"
+---
+
 # 0.31 HTML 주석 없는 brief
 
-<!-- canon:section intent role=context -->
 ## Intent
 
 brief에는 사람이 읽지 않는 HTML 주석이 네 종류 들어 있다. 섹션 표지, 안내 문구, 면제, chore 표지다. 섹션 표지는 제목을 brief의 언어로 쓰고도 섹션을 키로 찾으려고 만들었지만, 역할은 키가 이미 정하고 지금 brief는 거의 영어 제목이라 표지가 제목을 되풀이한다. 면제는 리뷰어가 봐야 할 정보인데 주석 안에 숨는다. 에이전트가 편집하다 표지를 떨어뜨리면 섹션이 사라진 것으로 읽힌다.
@@ -9,7 +28,6 @@ Source: GitHub 이슈 #121
 
 0.31 순서: CI → 승인과 adopt → 버그 수정 → brief 포맷 → CLI id → 검색. 여섯 brief는 함께 승인받는다. 승인한 brief를 고치면 그 brief를 adopt한 모든 subject가 재승인 전까지 막힌다.
 
-<!-- canon:section outcome role=normative -->
 ## Desired outcome
 
 - ==**brief 본문에는 제목, 산문, 맨 위의 frontmatter, 끝의 `Approved:` 줄만 남는다.**== HTML 주석은 없다.
@@ -19,7 +37,6 @@ Source: GitHub 이슈 #121
 - 새 brief의 섹션은 비어 있고, 빈 섹션이 곧 아직 쓰지 않은 섹션이다. 안내 문구는 `canon brief show`와 스킬이 보여 준다.
 - `canon migrate` 한 번으로 옛 brief가 새 형식이 되고, 승인된 brief는 승인된 채로 남는다.
 
-<!-- canon:section flow role=normative -->
 ## User flow
 
 1. F1 에이전트가 영어 `##` 제목으로 brief를 쓰고 `canon brief check`를 실행한다 → canon이 제목으로 섹션을 찾는다 → 키와 역할이 제목에서 정해지고, 제목을 잘못 쓴 섹션은 가장 비슷한 제목과 함께 보고된다.
@@ -29,7 +46,6 @@ Source: GitHub 이슈 #121
 5. F5 사용자가 `canon migrate`를 실행한다 → canon이 다시 쓸 brief와 다시 묶을 승인을 계산한다 → ==**아무것도 쓰지 않고 계획과 계획 digest를 보여 준다.**==
 6. F6 사용자가 그 digest로 `canon migrate --commit`을 실행한다 → canon이 brief를 새 형식으로 다시 쓴다 → 승인된 brief는 여전히 승인된 상태이고, 본문의 산문은 바뀌지 않는다.
 
-<!-- canon:section detail role=normative -->
 ## Step detail
 
 ### F1 영어 제목으로 찾기
@@ -94,7 +110,6 @@ Source: GitHub 이슈 #121
 - canon 자기 레포의 0.30·0.31 brief는 옛 형식으로 쓰고 승인받은 것이므로 이 변경이 같은 방식으로 옮긴다. 새 파서와 이 옮기기는 한 커밋에 들어가며, 사람이 그 커밋에서 `--commit`을 실행한다. 새 파서는 옮기기 전에는 옛 brief가 있는 쓰기를 거절하기 때문이다.
 - 두 번째 실행은 할 일이 없다. 중간에 멈춘 실행은 다음 실행이 끝낸다.
 
-<!-- canon:section acceptance role=normative -->
 ## Acceptance
 
 - F1: 영어 제목만 있는 brief가 표지 없이 `brief check`를 통과하고, 대시보드 brief 페이지의 섹션이 올바른 키와 역할을 낸다. 한국어 산문 brief도 같다. 실패 경로: ==**`## Intnet`은 섹션이 없다는 말과 함께 `Intent`를 가리키고, 지운 섹션과 순서가 바뀐 섹션은 각각 섹션 없음과 순서 blocker로 보고된다.**== 대소문자만 틀린 제목도 가까운 제목으로 불린다.
@@ -113,7 +128,6 @@ Source: GitHub 이슈 #121
 - 영향을 받는 시나리오를 새 형식으로 고친다. 대상은 brief check, change new, 대시보드 brief 페이지, brief 스킬 문서, migrate다. 표지와 면제와 안내 문구를 쓰는 conformance 케이스도 고친다.
 - 테스트 하니스, 벤치 corpus 생성기, brief 스킬 문서, 0.29 fixture도 새 형식으로 고친다. 0.29 fixture는 이름 변경과 brief 다시 쓰기가 한 번의 실행으로 끝나야 한다. 마이그레이션 케이스를 하나 더한다.
 
-<!-- canon:section questions role=question -->
 ## Questions and assumptions
 
 - 질문, 승인 무결성: `Approved:` digest를 사람 없이 다시 묶어도 되는가? 승인은 사람의 행위다. 가정: 된다. 단 옛 digest가 옛 본문과 맞고 바뀐 것이 표지, 안내 문구, 승인 안내 주석의 삭제, 면제의 이동, 제목 번역뿐일 때만이다. 계획이 이 조건과 다시 묶을 brief 목록을 먼저 보여 주고, 다시 묶는 `--commit`은 사람만 실행한다(F6). 승인 뒤에 편집된 brief는 다시 묶지 않는다.
@@ -128,7 +142,6 @@ Source: GitHub 이슈 #121
 - 가정: 표지의 역할이 표와 달라 판정이 바뀌는 brief는 사람이 고친 뒤 다시 승인받는다. 이 레포의 brief에는 지금 그런 것이 없다.
 - 가정: 승인 줄 위치(파일 끝)와 `Source:` 줄 형식은 바뀌지 않는다.
 
-<!-- canon:section out-of-scope role=context -->
 ## Out of scope
 
 - 일반 Markdown directive(`:::name{…}`): CommonMark가 아니고 GitHub가 글자 그대로 보여 준다.
@@ -136,10 +149,4 @@ Source: GitHub 이슈 #121
 - 다른 언어(ja, zh) 제목의 번역.
 - 승인 줄(`Approved:`)의 형식 변경.
 
-<!-- canon:waive prose.length brief "마이그레이션과 읽는 곳 전체를 다루는 변경이라 단계마다 조건을 빼면 사실이 빠진다" -->
-<!-- canon:waive prose.length detail "여섯 단계의 규칙과 마이그레이션 조건을 모두 담아야 하는 변경이다" -->
-<!-- canon:waive prose.length acceptance "여섯 단계마다 실패 경로를 요구하는 규칙 때문에 줄일 수 없다" -->
-<!-- canon:waive prose.length questions "승인 무결성과 리뷰 핀이 정책 질문이라 가정과 함께 적어야 한다" -->
-<!-- canon:waive prose.code-citation acceptance "BRIEF_CHANGED_SINCE_APPROVAL은 사용자가 받는 오류 코드다" match="BRIEF_CHANGED_SINCE_APPROVAL" -->
-
-Approved: Journey Hwang 2026-10-27T10:13:51Z — "레츠고" (brief sha256:45211e01ba698806f57609b9b59acb46487871bacbfb7bbaf7f46d1b76d4c920)
+Approved: Journey Hwang 2026-10-27T10:13:51Z — "레츠고" (brief sha256:08531944a0ed92269602d173af74ebda2fe73569cc588f6feb93f14717cbb0b8)

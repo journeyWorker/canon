@@ -1,22 +1,49 @@
-# 0.30 Rust 코딩 규칙 정리
+---
+kind: chore
+waive:
+  - rule: "prose.length"
+    section: "invariants"
+    reason: "정리 항목 표가 확정된 항목 목록이라 문장을 줄이면 사실이 빠진다"
+  - rule: "prose.code-citation"
+    section: "invariants"
+    reason: "규칙 문서가 정하는 lint와 가시성 이름이 정리 대상 자체다"
+    match: "unwrap()"
+  - rule: "prose.code-citation"
+    section: "invariants"
+    reason: "규칙 문서가 정하는 lint와 가시성 이름이 정리 대상 자체다"
+    match: "for_each"
+  - rule: "prose.code-citation"
+    section: "invariants"
+    reason: "규칙 문서가 정하는 lint와 가시성 이름이 정리 대상 자체다"
+    match: "pub(super)"
+  - rule: "prose.code-citation"
+    section: "invariants"
+    reason: "규칙 문서가 정하는 lint와 가시성 이름이 정리 대상 자체다"
+    match: "pub(crate)"
+  - rule: "prose.code-citation"
+    section: "invariants"
+    reason: "규칙 문서가 정하는 lint 이름을 규칙 문서 변경 항목으로 그대로 가리킨다"
+    match: "result_large_err"
+  - rule: "prose.code-citation"
+    section: "checks"
+    reason: "사용자가 비교 대상에서 제외하는 JSON 필드 이름이다"
+    match: "canonVersion"
+---
 
-<!-- canon:kind chore -->
+# 0.30 Rust 코딩 규칙 정리
 
 Source: docs/design/rust-coding-rules.md (Accepted, §9)
 
-<!-- canon:section intent role=context -->
 ## Intent
 
 canon의 Rust 코드는 승인된 코딩 규칙을 아직 따르지 않는다. 0.29.0에서 규칙의 lint를 켜면 약 1,300곳이 걸리고, 기본 clippy만으로도 114곳(그중 1곳은 오류)이 걸린다. 0.29가 구조 개편을 끝냈으므로 규칙을 코드 전체에 한 번에 적용한다. 경고를 끄지 않고 원인을 고친다.
 
 0.30 순서: 계획 이전 → 스펙 보강 → 이 변경 → clippy CI → 레저 이름 변경 → 레코드 연결. 여섯 brief는 함께 승인받는다.
 
-<!-- canon:section category role=context -->
 ## Category
 
 refactor
 
-<!-- canon:section invariants role=normative -->
 ## Invariants
 
 - ==**사용자가 보는 출력은 0.29.0과 바이트 단위로 같다.**== 대상은 모든 명령의 텍스트와 `--json` 출력, 종료 코드, 명령 명세 파일이다. 오류 봉투는 코드, 메시지, hint, 필드 모두 같다.
@@ -46,14 +73,6 @@ refactor
 - 어휘 스냅샷 버전과 정책 바인딩 버전의 해시 계산에 쓰이는 `Debug` 출력이 있는 타입의 `Debug`는 바꾸지 않는다. 진단 메시지에 쓰이는 `{:?}` 출력도 그대로다.
 - 대시보드 승인 잠금은 규칙대로 poisoned 상태를 전파한다. 차이는 앞서 내부 panic이 난 뒤에만 생긴다.
 
-<!-- canon:waive prose.length invariants "정리 항목 표가 확정된 항목 목록이라 문장을 줄이면 사실이 빠진다" -->
-<!-- canon:waive prose.code-citation invariants "규칙 문서가 정하는 lint와 가시성 이름이 정리 대상 자체다" match="unwrap()" -->
-<!-- canon:waive prose.code-citation invariants "규칙 문서가 정하는 lint와 가시성 이름이 정리 대상 자체다" match="for_each" -->
-<!-- canon:waive prose.code-citation invariants "규칙 문서가 정하는 lint와 가시성 이름이 정리 대상 자체다" match="pub(super)" -->
-<!-- canon:waive prose.code-citation invariants "규칙 문서가 정하는 lint와 가시성 이름이 정리 대상 자체다" match="pub(crate)" -->
-<!-- canon:waive prose.code-citation invariants "규칙 문서가 정하는 lint 이름을 규칙 문서 변경 항목으로 그대로 가리킨다" match="result_large_err" -->
-
-<!-- canon:section checks role=normative -->
 ## Checks
 
 - 스펙 보강이 끝난 뒤 0.29.0 바이너리로 기준을 저장한다. 기준은 canon 코퍼스의 고정 사본과 0.29 벤치 합성 코퍼스에 대한 `canon gate check --json`, `canon status --json`, `canon schema --errors --json`, conformance 케이스 출력이다. ==**각 단계 커밋마다 같은 입력으로 바이트 비교한다.**== `canonVersion` 값만 제외한다.
@@ -63,9 +82,6 @@ refactor
 - 0.29 벤치 증가 모양 검사가 통과하고, 성능 3건은 같은 벤치 지점에서 전후 CPU와 peak RSS를 기록한다.
 - evidence: 0.30의 마지막 코드 커밋 뒤에 모든 subject의 시나리오를 다시 돌린다. 결과는 `canon evidence add --all-scenarios`로 한 번에 묶는다. 뒤 변경들이 코드를 다시 바꾸므로 이 변경 직후 묶은 evidence는 오래된다. 변경 단위 리뷰는 다른 세션의 reviewer가 한다.
 
-<!-- canon:waive prose.code-citation checks "사용자가 비교 대상에서 제외하는 JSON 필드 이름이다" match="canonVersion" -->
-
-<!-- canon:section out-of-scope role=context -->
 ## Out of scope
 
 - 레저 이름과 종류 이름 변경, 레코드 연결(각각 별도 변경).
@@ -74,4 +90,4 @@ refactor
 - ingest 재해시와 행 보관, `report check`의 duckdb 메모리.
 - id 플래그의 `-id` 접미사 제거.
 
-Approved: Journey Hwang 2026-10-26T12:59:28Z — "레츠고" (brief sha256:03b5528c36d1a7749a1c9be3d3191be12db6c1b21c9786bb569d32faa3d11d72)
+Approved: Journey Hwang 2026-10-26T12:59:28Z — "레츠고" (brief sha256:6365ae61dd28f489302e94fbaa29213b737c5ac64826c3c715a6b1f89e75bf6c)
