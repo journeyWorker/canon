@@ -48,6 +48,8 @@ quick-xml = "0.40"
 serde_yaml = "0.9"
 base64 = "0.22"
 sha2 = { workspace = true }
+# The derived search index (`canon search`, `canon trace`): SQLite with FTS5 and its trigram tokenizer, built from the records on demand.
+rusqlite = { version = "0.32", features = ["bundled"] }
 thiserror = { workspace = true }
 # The embedded dashboard app is stored gzip-compressed and decompressed for a browser that does not accept gzip.
 flate2 = { workspace = true }

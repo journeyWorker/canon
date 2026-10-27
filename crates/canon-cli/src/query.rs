@@ -286,6 +286,12 @@ fn fold_pg_routed_kind(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawReco
     fold_latest_by_natural_key(kind, records)
 }
 
+/// The current records of `kind` among `records`, every version a store holds: what `canon query` shows
+/// without `--history`, in the same fold (`canon search` indexes exactly these).
+pub(crate) fn current_of(kind: RecordKind, records: Vec<RawRecord>) -> Vec<RawRecord> {
+    fold_rewritten_kind(kind, fold_pg_routed_kind(kind, records))
+}
+
 /// The git-routed kinds that are nonetheless RE-WRITTEN — each append
 /// is a genuine new git-tier record at a new path
 /// (`canon_store::partition` module doc), so a bare

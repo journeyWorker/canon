@@ -142,6 +142,25 @@ refuse, never pass, when it cannot be reached. Moving an existing store with
 `canon artifacts move --tier <tier>` is the repo owner's decision, not a step
 of the loop.
 
+### Search and trace
+
+`canon search "<text>"` finds a record, a brief section or flow step, or a
+scenario's text (title, steps, tables, `Examples`, the Background and Rule it
+inherits) and lists each hit with its neighbors in the record graph: the
+records it names or that name it, the review loop around a finding, the brief
+step a scenario covers. A reference no committed source holds is a neighbor
+marked `placeholder`, never an error. `--kind` (repeatable) keeps hits of those
+kinds, `--expand <N>` sets the hops (default 1), `--limit <N>` the hits (default
+20). Korean is found from three characters; a shorter text is found as a part of
+a node's text, in id order. The text is read as typed: quotes and `AND` are not
+syntax. `canon trace <finding key|review id|sha>` follows the review, finding,
+fix, re-review and evidence chain of a loop in time order, the archive's
+earlier versions included. Both read, and first refresh, a derived index,
+`.canon/index/search.db`: gitignored, never a source of records, safe to delete
+(the next run rebuilds it, and only `data.index.rebuilt` differs). Records still
+staged, and those in postgres or an object store, are not in it; `data.index`
+names the stores not read.
+
 ## Know your role
 
 canon cannot detect a role; you declare it. Pass `--as <role>` or set

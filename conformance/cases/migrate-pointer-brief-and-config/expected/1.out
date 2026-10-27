@@ -1,8 +1,8 @@
 canon migrate: plan:
   write .canon/changes/c-checkout/brief.md (Source: openspec/changes/c-checkout/proposal.md; Approved: ana 2026-10-10 — "go"); the Approved: line stays in openspec/changes/c-checkout/proposal.md, which canon does not edit
   canon.yaml: skills.providers: [codex] (from the install lock)
-  .gitignore: add .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/
+  .gitignore: add .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/, .canon/index/
   canon.yaml: every other byte kept
   rebuild the scenario index (full sync)
   left: 1 openspec change(s) not written by `canon change new` stay where they are, read as an external plan: c-checkout
-planDigest b2fdb0096b45aee857fb14e9b29dad35e3b2e54a650cfdbbe942b3c45001ca64; nothing written. To act: canon migrate --commit --plan-digest b2fdb0096b45aee857fb14e9b29dad35e3b2e54a650cfdbbe942b3c45001ca64
+planDigest 59e480744cf403e1a277cf4e6c58ca7bcd814176e2348903d658d66897fb19f7; nothing written. To act: canon migrate --commit --plan-digest 59e480744cf403e1a277cf4e6c58ca7bcd814176e2348903d658d66897fb19f7

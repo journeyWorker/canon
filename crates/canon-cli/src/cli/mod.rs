@@ -254,6 +254,12 @@ pub enum Command {
     // ── Reading & reporting ──
     /// Read stored records across every storage tier
     Query(QueryArgs),
+    /// Search records, brief sections and scenario text, with each hit's neighbors in the record graph
+    #[command(after_help = "Examples:\n  canon search timeout\n  canon search \"token is logged\" --kind finding --json\n  canon search 한글 --expand 2 --limit 5\n\nFinds the nodes whose text holds the text typed (a record, a brief section or flow step, a\nscenario's title, steps and tables) and lists each hit with its neighbors: the records it\nnames or that name it, the review loop around a finding, the brief step a scenario covers. A\nreference no committed source holds is a neighbor marked `placeholder`. Hits are ranked by\nfull-text score (ties by id) and only current versions are hits.\n\nA read that first brings a derived index up to date: .canon/index/search.db, gitignored and\nrebuilt in full when any input changed; deleting it changes nothing but data.index.rebuilt.\nExit 0 with empty hits when nothing matches; exit 2 for an empty text.")]
+    Search(SearchArgs),
+    /// Follow a finding's review loop in time order: review, finding, fix, re-review, evidence
+    #[command(after_help = "Examples:\n  canon trace s43-findings-are-records_1_2\n  canon trace 5fa1e16 --json\n  canon trace 01J9ZXQ4M2K7V8R3T5W6Y0N1PA\n\nThe operand is a finding key, a commit sha (the first 7 or more characters) or a review id. The\nchain holds every record joined to it by the review loop (the review that raised a finding, the\nrefix commit, the re-review pinned at it, the evidence at those commits), one entry per version,\nthe ledger archive's old versions included, oldest first. Reads the same derived index as\n`canon search`. Exit 2 for an id no record says, an ambiguous sha prefix or an operand of none\nof the three shapes.")]
+    Trace(TraceArgs),
     /// Export a redacted retention manifest without deleting records
     Export(ExportArgs),
     /// Remove allowlisted records older than a cutoff: the bare run previews the removal set and its planDigest, `--commit --plan-digest <DIGEST>` deletes it

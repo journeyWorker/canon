@@ -157,6 +157,39 @@ pub struct QueryArgs {
 }
 
 #[derive(Debug, Args)]
+pub struct SearchArgs {
+    /// The text to find in records, brief sections and scenario text: read as it is typed, so quotes and words such as AND are not syntax. Korean and any other text is found from three characters; a shorter text is found as a part of a node's text, in id order
+    #[arg(value_name = "TEXT")]
+    pub text: String,
+    /// Keep only nodes of this kind among the hits (repeatable): a record kind, or `brief` for a brief section or flow step; the neighbors of the hits are of any kind
+    #[arg(long, value_name = "KIND", value_parser = clap::builder::PossibleValuesParser::new(crate::search::kind_names()))]
+    pub kind: Vec<String>,
+    /// How many edges away from a hit its neighbors are listed (0: none)
+    #[arg(long, value_name = "N", default_value_t = 1)]
+    pub expand: u32,
+    /// The most hits to list, best first (there is no next page)
+    #[arg(long, value_name = "N", default_value_t = 20, value_parser = clap::value_parser!(u32).range(1..))]
+    pub limit: u32,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
+    /// Output JSON instead of the human-readable form
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct TraceArgs {
+    /// A review id (26 characters), a commit sha (7 to 40 hex digits, the first characters are enough) or a finding key (`<change>_<round>_<seq>`, as `canon query --kind finding` shows it)
+    #[arg(value_name = "ID")]
+    pub id: String,
+    #[command(flatten)]
+    pub repo: crate::cli::RepoArgs,
+    /// Output JSON instead of the human-readable form
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Args)]
 pub struct ExportArgs {
     /// The record kind to export
     #[arg(long, value_parser = crate::query::kind_parser(), value_name = "KIND")]

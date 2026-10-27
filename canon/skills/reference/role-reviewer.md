@@ -148,6 +148,13 @@ canon schema [<PATH>]* [--errors | --error <CODE>]
 canon schema evidence add
 ```
 ```text
+# Search records, brief sections and scenario text, with each hit's neighbors in the record graph
+canon search <TEXT> [--kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|brief>]* [--expand <N>] [--limit <N>]
+```
+```bash
+canon search timeout --kind finding
+```
+```text
 # Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here
 canon skills show <NAME> [--full]
 ```
@@ -160,6 +167,13 @@ canon status [--fields <FIELDS>]
 ```
 ```bash
 canon status
+```
+```text
+# Follow a finding's review loop in time order: review, finding, fix, re-review, evidence
+canon trace <ID>
+```
+```bash
+canon trace add-login_1_1
 ```
 <!-- canon:generated commands-reviewer end -->
 
@@ -257,6 +271,10 @@ should make it fail and run it if it is cheap; if the test stays green, record
 the finding. For a fix, read `canon query --kind evidence --history --json`
 for that scenario's records: expect an earlier non-faithful version, or a
 named closest reproduction in `--ref`; record a finding when neither exists.
+`canon trace <finding key>` lists the loop around a finding in time order (the
+review that raised it, the fix, the re-review, the evidence at those commits);
+`canon search "<text>"` finds earlier findings and the scenarios about the same
+thing.
 Put one blast-radius fact in the finding or review `--summary`: what else the
 change touches that the checks do not exercise. Read the waivers too:
 `status` lists every `--override-reason` an implementer or the orchestrator

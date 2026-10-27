@@ -138,6 +138,8 @@ pub fn report_schemas() -> Vec<ReportSchema> {
         entry::<crate::inventory::InventorySyncReport<'static>>("inventory sync", "InventorySyncReport"),
         entry::<crate::plugin_sync::PluginSyncReport<'static>>("plugin sync", "PluginSyncReport"),
         entry::<crate::query::QueryReport>("query", "QueryReport"),
+        entry::<crate::search::SearchReport>("search", "SearchReport"),
+        entry::<crate::search::TraceReport>("trace", "TraceReport"),
         entry::<crate::retrieve::RegimeShowReport<'static>>("regime show", "RegimeShowReport"),
         entry::<crate::report::ReportBuildReport>("report build", "ReportBuildReport"),
         entry::<crate::report::ReportCheckReport>("report check", "ReportCheckReport"),

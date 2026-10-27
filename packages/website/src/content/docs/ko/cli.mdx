@@ -42,8 +42,10 @@ Commands without a group word.
 | `canon query` | none | `--kind <KIND>` | 읽기: Read stored records across every storage tier | `canon query --kind evidence` |
 | `canon retrieve` | none | `--for-role <ROLE>` | 읽기: Fetch role-scoped strategy guidance | `canon retrieve --for-role reviewer --domain dev --limit 20` |
 | `canon schema` | `<path>` (optional) (repeatable) | none | 읽기: Describe canon's own commands | `canon schema evidence add` |
+| `canon search` | `<text>` | none | 읽기: Search records, brief sections and scenario text, with each hit's neighbors in the record graph | `canon search timeout --kind finding` |
 | `canon selftest` | none | none | 읽기: Run canon's built-in fixture self-tests | `canon selftest --suite trust-spine-gate` |
 | `canon status` | none | none | 읽기: Show where this repo stands: subjects by status, their gaps, and the next commands | `canon status` |
+| `canon trace` | `<id>` | none | 읽기: Follow a finding's review loop in time order: review, finding, fix, re-review, evidence | `canon trace add-login_1_1` |
 {/* canon:generated cli-top end */}
 
 ### `canon adapter`
@@ -415,6 +417,23 @@ canon scenario new --input '[{"operands":["auth.login.02"],"title":"Sign out"},{
 `--json`은 `meta: {returned, total, hasMore, nextCursor}`를 더합니다.
 `canon query`와 `canon finding list`는 `--fields a,b,c`로 레코드를 투영할 수
 있으며, 모르는 필드는 `UNKNOWN_FIELD`이고 hint가 알려진 필드를 나열합니다.
+
+**검색과 추적.** `canon search "<텍스트>"`는 레코드, brief 섹션과 flow 단계, 시나리오
+본문에서 텍스트를 찾고 걸린 노드마다 레코드 그래프의 이웃을 함께 냅니다
+(`data.hits[]`, `data.neighbors[]`, `data.edges[]`, `data.counts`, `data.index`).
+`--kind`(반복)는 그 종류의 hit만 남기고, `--expand <N>`은 홉 수(기본 1), `--limit <N>`은
+hit 수(기본 20, 다음 페이지 없음)입니다. 한국어는 세 글자부터 찾고, 그보다 짧은 질의는
+노드 본문의 부분 문자열로 id순으로 찾습니다. 질의는 쓴 그대로 읽습니다. 빈 질의는
+exit 2(`SEARCH_QUERY_EMPTY`), 일치가 없으면 exit 0과 빈 `hits`입니다. 원본이 없는 참조는
+`placeholder: true`인 이웃이며 오류가 아닙니다.
+`canon trace <finding 키|리뷰 id|sha>`는 한 고리의 리뷰 → finding → 수정 → 재리뷰 →
+evidence 사슬을 시간순으로 냅니다(`data.chain[]`: 시각, id, kind, 역할, sha, 엣지). archive의
+옛 버전도 들어 있습니다. 어떤 레코드도 말하지 않는 id, 모호한 sha 앞부분, 그 밖의 모양은
+exit 2이고 메시지가 받는 모양 셋을 적습니다. 둘 다 파생 색인 `.canon/index/search.db`를 읽고,
+입력(레저 레코드와 이 worktree의 sqlite hot 저장소, brief, `.feature`)이 바뀌었으면 먼저
+전체를 다시 만듭니다. 색인은 gitignore되고(`canon init`이 줄을 넣고, 그 전에는 명령이
+경고합니다) 레코드의 원본이 아니며, 지워도 `data.index.rebuilt`만 달라집니다. staged 레코드와
+postgres, 객체 저장소의 레코드는 읽지 않고 `data.index.unreadStores`가 그 저장소를 적습니다.
 
 **쓰기 뒤의 `meta.next`.** 성공한 쓰기 명령은 다음 단계를 직접 알려 주므로,
 에이전트가 그것만 알아내려고 `canon status`를 부를 필요가 없습니다. `--json`은

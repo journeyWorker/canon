@@ -106,6 +106,7 @@ GITIGNORE = """\
 .canon/scenario-index.lock
 .canon/artifact-store.lock
 .canon/dashboard-snapshot/
+.canon/index/
 """
 
 

@@ -30,7 +30,9 @@ const PLACEHOLDERS: &[&str] = &[
 ];
 
 /// A leaf that takes an option's value from a subset of the shared set: (option, leaf).
-const DECLARED_SUBSETS: &[(&str, &str)] = &[("kind", "purge"), ("kind", "gate promote")];
+/// `search --kind` also takes `brief`, the node kind of a brief section or flow step (0.31 `canon-0-31-search`: a node is a
+/// record of any kind or a brief), so `query` and `export` take a subset of it.
+const DECLARED_SUBSETS: &[(&str, &str)] = &[("kind", "purge"), ("kind", "gate promote"), ("kind", "query"), ("kind", "export")];
 
 /// Options that name an act, not a mode; a mode is a flag, never a valued option.
 const VERBS: &[&str] = &["add", "new", "list", "show", "check", "verify", "validate", "approve", "accept", "move", "update", "get", "delete", "remove", "create", "set"];
@@ -42,8 +44,9 @@ const NO_REPO: &[&str] = &["schema", "selftest", "completion", "regime show", "s
 const SHORTS: &[(char, Option<&str>)] = &[('h', None), ('V', None), ('o', Some("output")), ('q', None)];
 
 /// An option that is repeatable on one leaf and single on another, by the per-leaf table's own rows:
-/// `finding add --scenario <SCENARIO_ID>...` names every scenario a finding is about, `evidence add` takes one.
-const REPEATABLE_DIFFERS: &[&str] = &["scenario"];
+/// `finding add --scenario <SCENARIO_ID>...` names every scenario a finding is about, `evidence add` takes one;
+/// `search --kind <KIND>...` keeps hits of several kinds, `query` reads one.
+const REPEATABLE_DIFFERS: &[&str] = &["scenario", "kind"];
 
 fn all_options() -> Vec<(String, &'static Value)> {
     let mut out = Vec::new();

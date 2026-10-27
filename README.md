@@ -197,6 +197,52 @@ them in git history, e.g. `git show 0977bce1:<path>`.
 - The dashboard's hint for an unattributed run names `canon ingest records --run` (it still named `ingest artifacts`,
   which 0.28 removed).
 
+### `canon-0-31-search`: search and the record graph
+
+- `canon search "<text>"` finds records, brief sections and flow steps, and scenario text (title, tags, steps, doc
+  strings, tables, `Examples`, and the Feature and Rule `Background` a scenario inherits), and lists each hit with its
+  neighbors. `data` holds `hits[]` (`id`, `kind`, `rank`, `score`, `title`, `snippet`, `placeholder`), `neighbors[]`
+  (`id`, `kind`, `hops`, `via`, `from`, `title`, `placeholder`, and `refs` for a placeholder), `edges[]` (`from`, `to`,
+  `rel`), `counts` (`matched`, `hits`, `neighbors`, `edges`) and `index`. `--kind` (repeatable, the record kinds and
+  `brief`) filters the hits only, `--expand <N>` is the hop count (default 1), `--limit <N>` the hit count (default 20,
+  no pages). Hits are ranked by full-text score, ties by id, and only the current version of a record is a hit. The text
+  is literal: quotes and `AND` are not syntax. From three characters the text is matched by SQLite FTS5's trigram
+  tokenizer (so Korean is found without word breaks); a shorter text is a substring match over the nodes' text, in id
+  order. No match is exit 0 with empty `hits`; an empty or all-space text is exit 2 (`SEARCH_QUERY_EMPTY`).
+- A node id is the kind and the natural key `canon query` shows (`finding:<change>_<round>_<seq>`, `review:<project>_scenario_<id>`,
+  `scenario:<project>_<scenario id>`), a brief section `brief:<change>#<section>`, a flow step `brief:<change>#F1`. Two
+  current reviews with one key are `review:<key>@<digest>`. Edges: the reference fields of each kind (the field names
+  the `rel`; a finding's `review_id` goes to every review that carries it), and the joins of the review loop:
+  `re-review` (a finding's fix commit is the reviewed commit of a later finding of the change), `fix-reviewed` (a
+  review pinned at the fix commit that covers the finding's change or scenario), `fix-of-fix` (the fix commit
+  introduced a later finding), `evidence-at-commit` (evidence at a commit a finding reviewed or fixed in, or a review
+  pinned at, when that finding or review points at the evidence's scenario; evidence is never joined to evidence), and
+  `flow` (a scenario's `@flow:<change>.<F-id>` tag to the brief step). A reference no committed source holds, the
+  ones `canon query` reports, is a placeholder node (`placeholder: true`, the number of references to it in `refs`): it
+  has no text, so only a neighbor shows it.
+- `canon trace <finding key|review id|sha>` prints the chain of one review loop in time order: `data.chain[]` of one
+  entry per record version (`at`, `id`, `kind`, `role`, `sha`, `version`, `archived`, `edges[]`), the ledger archive's
+  old versions of findings, reviews and evidence included. A finding is two entries, the version that recorded it
+  (`finding`) and the one that closed it fixed (`fix`). The operand is a 26-character review id (the start is every
+  review of that run; with no such review it is read as a sha prefix), a commit sha or its first 7 to 40 hex digits (the
+  start is every record that holds it), or a finding key. An id no record says, an ambiguous sha prefix and any other
+  operand are exit 2 (`TRACE_NOT_FOUND`, `TRACE_OPERAND_INVALID`), and the message names the three shapes.
+- Both commands are `read` and first bring a derived index up to date: `.canon/index/search.db`, built from the
+  promoted ledger records (and the archive's old versions of finding, review and evidence), this worktree's sqlite hot
+  store, the briefs and the `.feature` files. It is never a source of records; `rm -r .canon/index` changes nothing but
+  `data.index.rebuilt`. Any input change makes it stale and it is rebuilt in full before anything is read (the new file
+  is written beside the old one and renamed, so runs at the same time leave one complete index). The first build writes
+  `.canon/index/.gitignore` (`*`), and `canon init` adds `.canon/index/` to the repo's own `.gitignore`; until then both
+  commands warn. A file that is not a database is deleted and rebuilt with a warning; an unwritable directory builds
+  the index in memory for the run with a warning naming the path (`data.index.inMemory`). Staged records and those
+  routed to postgres or an object store are not read, and `data.index.unreadStores` names those backends. Records that
+  cannot be read are exit 1 (`SEARCH_INDEX_FAILED`).
+- Cost, measured: a stale index over a ledger of 2,300 records and 19 briefs rebuilds in 0.4 s (a debug build, the
+  acceptance test's fixture); in the corpus bench (`scripts/bench`, release build) 1,000 scenarios with their
+  evidence and reviews (3,860 nodes) rebuild in 0.5 s CPU and 98 MB, and a run on a current index reads and hashes
+  the inputs in 0.25 s. The brief's limit is 5 s. The bench has the rows `search (rebuild)` and `search (reuse)`, which
+  the `bench-shape` CI job holds to 20x for 10x the corpus.
+
 ### Upgrading
 
 Run `canon migrate` once on a repo with 0.30 briefs: until the human commits it, `canon evidence add` and the other writes above refuse.

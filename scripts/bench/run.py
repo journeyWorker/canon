@@ -7,6 +7,10 @@ Builds nothing: it runs the given `canon` binary. For each grid point it writes
 a synthetic corpus (gen_corpus.py) under $TMPDIR and measures
 
   * `gate check` and `status` at 1x, 3x and 10x scenarios (axis `scenarios`),
+  * `search` at the same sizes: `search (rebuild)` builds the index from nothing
+    each run (the cost of the first search after a write: the whole index is
+    rebuilt when any input changed), `search (reuse)` runs on a current index
+    and only reads and hashes the inputs (axis `scenarios`),
   * batch `evidence add --all-scenarios --report junit:...` of B records into a
     ledger that already holds 10*B scenarios' evidence (axis `batch`, size = B).
     The ledger grows with the batch on purpose: when each record rescans the
@@ -126,6 +130,21 @@ def measure_scenarios(canon, work, total, runs, rows):
         # A first, uncounted run: the first reader of a corpus may write derived files.
         measure_once([canon, *command], corpus)
         report(rows, row(" ".join(command), "scenarios", total, best_of(runs, [canon, *command], corpus)))
+    search = [canon, "search", "bench"]
+    copies = 0
+
+    def fresh():
+        nonlocal copies
+        copies += 1
+        target = work / f"search-run-{total}-{copies}"
+        shutil.copytree(corpus, target, symlinks=True)
+        return target
+
+    # No index in the corpus: every run builds it.
+    report(rows, row("search (rebuild)", "scenarios", total, best_of(runs, search, corpus, fresh=fresh)))
+    # An uncounted run builds the index; the counted ones find it current.
+    measure_once(search, corpus)
+    report(rows, row("search (reuse)", "scenarios", total, best_of(runs, search, corpus)))
     shutil.rmtree(corpus)
 
 

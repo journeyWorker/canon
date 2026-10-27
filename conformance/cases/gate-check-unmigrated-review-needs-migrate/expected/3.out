@@ -2,7 +2,7 @@ canon migrate: plan: rename 10 record file(s) to the 0.30 rule (`kind=<kind>/<co
 canon migrate: plan: record the 0.29 key, 12-hex digest and body of each of the 1 evidence file(s) first; the pre-0.23 review pins are judged against that record
 canon migrate: plan: canon.yaml: routing.evidence_record becomes `evidence`
 canon migrate: plan:
-  .gitignore: add .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/
+  .gitignore: add .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/, .canon/index/
   canon.yaml: every other byte kept
   rebuild the scenario index (full sync)
   left: .canon stays where it is: the openspec reader cannot read it (invalid-change-id-grammar)
@@ -11,4 +11,4 @@ canon migrate: plan:
   subject          would move 3 of 4 file(s) (0.8 KiB); 1 stay
 canon ledger compact: 4 superseded version(s) would move to .canon/archive; nothing written
 canon migrate: would pin 1 review(s) to what their evidence says (the verdict and the checks of its latest record): 0 were pinned to evidence records, 1 to a commit before 0.15; 1 of those could not be checked because their commit, or the scenario at it, is not in this clone, so they are pinned as the scenario stands (check out full history, `fetch-depth: 0` in CI, to check them)
-planDigest 1b1294bfb40658bbdbaa8e9b400332419f5a602212cc73cb72278e9a68eb8f07; nothing written. To act: canon migrate --commit --plan-digest 1b1294bfb40658bbdbaa8e9b400332419f5a602212cc73cb72278e9a68eb8f07
+planDigest 53d128b64f6eab13aea4993332f8f095c692dcf468eb09a3f29aca42710786d5; nothing written. To act: canon migrate --commit --plan-digest 53d128b64f6eab13aea4993332f8f095c692dcf468eb09a3f29aca42710786d5

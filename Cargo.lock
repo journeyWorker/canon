@@ -528,6 +528,7 @@ dependencies = [
  "jsonschema",
  "libc",
  "quick-xml",
+ "rusqlite",
  "rustix",
  "schemars",
  "serde",

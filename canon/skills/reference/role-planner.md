@@ -120,6 +120,13 @@ canon schema [<PATH>]* [--errors | --error <CODE>]
 canon schema evidence add
 ```
 ```text
+# Search records, brief sections and scenario text, with each hit's neighbors in the record graph
+canon search <TEXT> [--kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|brief>]* [--expand <N>] [--limit <N>]
+```
+```bash
+canon search timeout --kind finding
+```
+```text
 # Print a guide built into this binary (markdown on stdout); the installed SKILL.md is a stub that points here
 canon skills show <NAME> [--full]
 ```
@@ -153,6 +160,13 @@ canon subject unadopt <SUBJECT_ID> --change <CHANGE_ID> [--dry-run] [--input]
 ```
 ```bash
 canon subject unadopt demo --change add-login
+```
+```text
+# Follow a finding's review loop in time order: review, finding, fix, re-review, evidence
+canon trace <ID>
+```
+```bash
+canon trace add-login_1_1
 ```
 <!-- canon:generated commands-planner end -->
 

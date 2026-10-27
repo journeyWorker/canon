@@ -96,6 +96,8 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("retention.rs", &["export", "purge"]),
     ("review.rs", &["review scenario", "review change"]),
     // Every code is next to its `human("canon selftest")`.
+    // `open_index` builds the refusals of the index for both leaves; every other code is next to its emit.
+    ("search/mod.rs", &["search", "trace"]),
     ("safety.rs", &["purge", "artifacts move", "migrate", "ledger compact", "tier age"]),
     ("selftest.rs", &[]),
     // The shared scenario validation (`Planner`) builds its errors for its caller, `scenario new`.
@@ -119,7 +121,8 @@ const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans"), (
 /// error, and the refusal of an unknown `CANON_ROLE` before any command runs.
 /// Files whose `.emit(command, …)` takes the command from the caller, and the
 /// leaves that caller is: `run_report` serves the three `report` leaves.
-const CALLER_LEAVES: &[(&str, &[&str])] = &[("run/top.rs", &["report build", "report check", "report snapshot"])];
+// `open_index` takes the command of the leaf that calls it.
+const CALLER_LEAVES: &[(&str, &[&str])] = &[("run/top.rs", &["report build", "report check", "report snapshot"]), ("search/mod.rs", &["search", "trace"])];
 
 /// The leaves that record a human's decision and refuse every agent role.
 const HUMAN_ONLY_LEAVES: &[&str] = &["brief approve", "policy approve", "divergence accept"];
@@ -185,7 +188,7 @@ fn derive() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
     let codes: Vec<&'static str> = all_codes().iter().map(|info| info.code).filter(|c| !GLOBAL.contains(c)).collect();
     let defaults: BTreeMap<&str, &[&str]> = FILE_DEFAULTS.iter().copied().collect();
     let mut problems = Vec::new();
-    let mut files: Vec<PathBuf> = ["", "run"]
+    let mut files: Vec<PathBuf> = ["", "run", "search"]
         .iter()
         .flat_map(|dir| fs::read_dir(src_dir().join(dir)).expect("read src").map(|e| e.expect("dir entry").path()).filter(|p| p.extension().is_some_and(|e| e == "rs")).collect::<Vec<_>>())
         .collect();

@@ -319,6 +319,13 @@ canon schema [<PATH>]* [--errors | --error <CODE>]
 canon schema evidence add
 ```
 ```text
+# Search records, brief sections and scenario text, with each hit's neighbors in the record graph
+canon search <TEXT> [--kind <change|task|scenario|session|run|event|handoff|review|divergence|trajectory|strategy_item|evidence|subject|finding|brief>]* [--expand <N>] [--limit <N>]
+```
+```bash
+canon search timeout --kind finding
+```
+```text
 # Run canon's built-in fixture self-tests
 canon selftest [--suite <trust-spine-gate|tiered-storage|typed-authoring-vocabulary|policy-expressions|format-authority|session-ingest|canon-context|artifact-ingest|spec-ledger-selftest|plugin-overlays|plan-import>]
 ```
@@ -423,6 +430,13 @@ canon tier age [--commit --plan-digest <DIGEST>] [--input]
 ```
 ```bash
 canon tier age
+```
+```text
+# Follow a finding's review loop in time order: review, finding, fix, re-review, evidence
+canon trace <ID>
+```
+```bash
+canon trace add-login_1_1
 ```
 <!-- canon:generated commands-orchestrator end -->
 

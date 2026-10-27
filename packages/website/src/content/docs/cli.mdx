@@ -39,8 +39,10 @@ Commands without a group word.
 | `canon query` | none | `--kind <KIND>` | read: Read stored records across every storage tier | `canon query --kind evidence` |
 | `canon retrieve` | none | `--for-role <ROLE>` | read: Fetch role-scoped strategy guidance | `canon retrieve --for-role reviewer --domain dev --limit 20` |
 | `canon schema` | `<path>` (optional) (repeatable) | none | read: Describe canon's own commands | `canon schema evidence add` |
+| `canon search` | `<text>` | none | read: Search records, brief sections and scenario text, with each hit's neighbors in the record graph | `canon search timeout --kind finding` |
 | `canon selftest` | none | none | read: Run canon's built-in fixture self-tests | `canon selftest --suite trust-spine-gate` |
 | `canon status` | none | none | read: Show where this repo stands: subjects by status, their gaps, and the next commands | `canon status` |
+| `canon trace` | `<id>` | none | read: Follow a finding's review loop in time order: review, finding, fix, re-review, evidence | `canon trace add-login_1_1` |
 {/* canon:generated cli-top end */}
 
 ### `canon adapter`
@@ -418,6 +420,27 @@ continues. `--json` adds `meta: {returned, total, hasMore, nextCursor}`.
 `canon query` and `canon finding list` also take `--fields a,b,c` to
 project records; an unknown field is `UNKNOWN_FIELD` and the hint lists the
 known ones.
+
+**Search and trace.** `canon search "<text>"` finds records, brief sections and
+flow steps, and scenario text, and lists each hit with its neighbors in the
+record graph (`data.hits[]`, `data.neighbors[]`, `data.edges[]`, `data.counts`,
+`data.index`). `--kind` (repeatable) keeps hits of those kinds, `--expand <N>`
+sets the hops (default 1) and `--limit <N>` the hits (default 20, no next page).
+Korean is found from three characters; a shorter text is found as a part of a
+node's text, in id order. The text is read as typed. An empty text is exit 2
+(`SEARCH_QUERY_EMPTY`); no match is exit 0 with empty `hits`. A reference no
+committed source holds is a neighbor with `placeholder: true`, never an error.
+`canon trace <finding key|review id|sha>` follows the review → finding → fix →
+re-review → evidence chain of one loop in time order (`data.chain[]`: time, id,
+kind, role, sha, edges), the archive's earlier versions included; an id no record
+says, an ambiguous sha prefix or any other operand is exit 2 and the message
+names the three shapes. Both read a derived index, `.canon/index/search.db`,
+and first rebuild it in full when an input changed (records of the ledger and
+this worktree's sqlite hot store, briefs, `.feature` files). It is gitignored
+(`canon init` adds the line; until then the commands warn), never a source of
+records, and deleting it changes nothing but `data.index.rebuilt`. Staged
+records and those in postgres or an object store are not read; `data.index.unreadStores`
+names the stores.
 
 **`meta.next` after a write.** A write that succeeds names the next step
 itself, so an agent does not call `canon status` just to find it: `--json`

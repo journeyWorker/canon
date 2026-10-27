@@ -25,6 +25,9 @@ const INDEX_REFRESH_LEAVES: &[&str] = &["subject show"];
 
 const ALLOWED_WRITES: &[(&str, &[&str])] = &[
     ("query", &[".canon/audit/access.jsonl"]),
+    // The derived search index and its ignore file (0.31 `canon-0-31-search`): `canon init` ignores the directory.
+    ("search", &[".canon/index/search.db", ".canon/index/.gitignore"]),
+    ("trace", &[".canon/index/search.db", ".canon/index/.gitignore"]),
     // Scratch directories in the system temp dir, removed on exit: nothing under the repo.
     ("selftest", &[]),
     ("report check", &[]),
@@ -54,6 +57,10 @@ const EXTRA_INVOCATIONS: &[&str] = &[
     "context --json",
     "report check --json",
     "retrieve --for-role reviewer --domain dev --json",
+    "search Naming --json",
+    "search Si --expand 2",
+    "search Naming --kind finding --kind scenario --limit 1",
+    "trace add-login_1_1 --json",
 ];
 
 

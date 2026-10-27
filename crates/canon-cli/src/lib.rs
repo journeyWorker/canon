@@ -62,6 +62,7 @@ pub mod run;
 pub mod report;
 pub mod reverify;
 pub mod retrieve;
+pub mod search;
 pub mod review;
 pub mod role;
 pub mod safety;

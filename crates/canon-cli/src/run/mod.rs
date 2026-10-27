@@ -80,6 +80,8 @@ pub fn run(cli: Cli) -> ExitCode {
         Command::Tier { action } => tier::run(action),
         Command::Ledger { action } => ledger::run(action),
         Command::Query(args) => run_query(args),
+        Command::Search(args) => crate::search::run_search(args),
+        Command::Trace(args) => crate::search::run_trace(args),
         Command::Export(args) => ExitCode::from(crate::retention::run_export(args)),
         Command::Purge(PurgeArgs { kind, before, safety, repo, json, .. }) => {
             let base = crate::safety::command("purge", &[("--kind", kind.as_str().to_string()), ("--before", before.to_rfc3339())], &repo);

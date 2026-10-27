@@ -10153,6 +10153,150 @@
       "supportsJson": true
     },
     {
+      "about": "Search records, brief sections and scenario text, with each hit's neighbors in the record graph",
+      "aliases": [],
+      "command": "search",
+      "effect": "read",
+      "effectNote": "first brings the derived index up to date: writes the gitignored .canon/index/search.db (and the -wal and -shm files SQLite may add) and .canon/index/.gitignore when an input changed or the index is missing; a current index is not written",
+      "errorCodes": [
+        "CONFIG_MISSING",
+        "CONFIG_UNREADABLE",
+        "SEARCH_INDEX_FAILED",
+        "SEARCH_QUERY_EMPTY",
+        "UNKNOWN_ROLE",
+        "USAGE"
+      ],
+      "examples": [
+        "canon search timeout --kind finding"
+      ],
+      "exits": [
+        {
+          "code": 0,
+          "meaning": "success: a text nothing matches is exit 0 with empty hits"
+        },
+        {
+          "code": 1,
+          "meaning": "SEARCH_INDEX_FAILED: the records the index is built from cannot be read, or the index cannot be built"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: SEARCH_QUERY_EMPTY, CONFIG_MISSING, or CONFIG_UNREADABLE"
+        }
+      ],
+      "inputs": [],
+      "name": "search",
+      "nodeKind": "leaf",
+      "operands": [
+        {
+          "arity": {
+            "max": 1,
+            "min": 1
+          },
+          "description": "The text to find, read as typed: quotes and words such as AND are not syntax",
+          "kind": "TEXT",
+          "name": "text",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true
+        }
+      ],
+      "options": [
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Keep only nodes of this kind among the hits (repeatable): a record kind, or `brief` for a brief section or flow step; the neighbors of the hits are of any kind",
+          "kind": "value",
+          "name": "kind",
+          "possibleValues": [
+            "change",
+            "task",
+            "scenario",
+            "session",
+            "run",
+            "event",
+            "handoff",
+            "review",
+            "divergence",
+            "trajectory",
+            "strategy_item",
+            "evidence",
+            "subject",
+            "finding",
+            "brief"
+          ],
+          "repeatable": true,
+          "required": false,
+          "valueName": "KIND"
+        },
+        {
+          "aliases": [],
+          "default": [
+            "1"
+          ],
+          "help": "How many edges away from a hit its neighbors are listed (0: none)",
+          "kind": "value",
+          "name": "expand",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "N"
+        },
+        {
+          "aliases": [],
+          "default": [
+            "20"
+          ],
+          "help": "The most hits to list, best first (there is no next page)",
+          "kind": "value",
+          "name": "limit",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "N"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
+          "kind": "value",
+          "name": "repo",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Output JSON instead of the human-readable form",
+          "kind": "flag",
+          "name": "json",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "report",
+          "report": "SearchReport",
+          "schemaRef": "#/schemas/SearchReport",
+          "schemaVersion": "1.0"
+        }
+      ],
+      "path": [
+        "search"
+      ],
+      "requiredOneOf": [],
+      "roles": [
+        "planner",
+        "implementer",
+        "reviewer",
+        "orchestrator"
+      ],
+      "supportsJson": true
+    },
+    {
       "about": "Run canon's built-in fixture self-tests",
       "aliases": [],
       "command": "selftest",
@@ -12432,6 +12576,98 @@
         "orchestrator"
       ],
       "supportsJson": true
+    },
+    {
+      "about": "Follow a finding's review loop in time order: review, finding, fix, re-review, evidence",
+      "aliases": [],
+      "command": "trace",
+      "effect": "read",
+      "effectNote": "first brings the derived index up to date: writes the gitignored .canon/index/search.db (and the -wal and -shm files SQLite may add) and .canon/index/.gitignore when an input changed or the index is missing; a current index is not written",
+      "errorCodes": [
+        "CONFIG_MISSING",
+        "CONFIG_UNREADABLE",
+        "SEARCH_INDEX_FAILED",
+        "TRACE_NOT_FOUND",
+        "TRACE_OPERAND_INVALID",
+        "UNKNOWN_ROLE",
+        "USAGE"
+      ],
+      "examples": [
+        "canon trace add-login_1_1"
+      ],
+      "exits": [
+        {
+          "code": 0,
+          "meaning": "the chain, however short"
+        },
+        {
+          "code": 1,
+          "meaning": "SEARCH_INDEX_FAILED: the records the index is built from cannot be read, or the index cannot be built"
+        },
+        {
+          "code": 2,
+          "meaning": "refused: TRACE_OPERAND_INVALID, TRACE_NOT_FOUND (an id no record says, or an ambiguous sha prefix), CONFIG_MISSING, or CONFIG_UNREADABLE"
+        }
+      ],
+      "inputs": [],
+      "name": "trace",
+      "nodeKind": "leaf",
+      "operands": [
+        {
+          "arity": {
+            "max": 1,
+            "min": 1
+          },
+          "description": "A review id (26 characters), a commit sha (7 to 40 hex digits) or a finding key (`<change>_<round>_<seq>`)",
+          "kind": "ID",
+          "name": "id",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": true
+        }
+      ],
+      "options": [
+        {
+          "aliases": [],
+          "default": [],
+          "help": "The repo to act on (default: the nearest ancestor directory holding a canon.yaml)",
+          "kind": "value",
+          "name": "repo",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false,
+          "valueName": "DIR"
+        },
+        {
+          "aliases": [],
+          "default": [],
+          "help": "Output JSON instead of the human-readable form",
+          "kind": "flag",
+          "name": "json",
+          "possibleValues": [],
+          "repeatable": false,
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "kind": "report",
+          "report": "TraceReport",
+          "schemaRef": "#/schemas/TraceReport",
+          "schemaVersion": "1.0"
+        }
+      ],
+      "path": [
+        "trace"
+      ],
+      "requiredOneOf": [],
+      "roles": [
+        "planner",
+        "implementer",
+        "reviewer",
+        "orchestrator"
+      ],
+      "supportsJson": true
     }
   ],
   "envVars": [
@@ -13929,6 +14165,20 @@
       "retryable": false
     },
     {
+      "code": "SEARCH_INDEX_FAILED",
+      "exit": 1,
+      "fix": "Fix or restore what the message names (an unreadable store, a record file), then run the command again; the index is derived, so deleting `.canon/index` is always safe.",
+      "meaning": "`search` or `trace` could not read the records the index is built from, or could not build or read the index",
+      "retryable": false
+    },
+    {
+      "code": "SEARCH_QUERY_EMPTY",
+      "exit": 2,
+      "fix": "Pass the text to find, e.g. `canon search timeout`.",
+      "meaning": "`search` was given an empty text or one of only spaces",
+      "retryable": false
+    },
+    {
       "code": "SELFTEST_FAILED",
       "exit": 1,
       "fix": "Read the failing suite or fixture in the output and fix the behavior it checks.",
@@ -14052,6 +14302,20 @@
       "exit": 1,
       "fix": "Read the error message, fix its cause, then run tier aging again.",
       "meaning": "tier aging failed",
+      "retryable": false
+    },
+    {
+      "code": "TRACE_NOT_FOUND",
+      "exit": 2,
+      "fix": "Pass the key of a finding (`canon query --kind finding`), a review id a review printed, or enough characters of a commit sha to name one commit.",
+      "meaning": "no record says the id `trace` was given, or the sha prefix fits more than one commit",
+      "retryable": false
+    },
+    {
+      "code": "TRACE_OPERAND_INVALID",
+      "exit": 2,
+      "fix": "Pass a review id (26 characters), a commit sha (7 to 40 hex digits) or a finding key (`<change>_<round>_<seq>`).",
+      "meaning": "`trace` was given something that is none of a review id, a commit sha or a finding key (a placeholder node's id is not one)",
       "retryable": false
     },
     {
@@ -35860,6 +36124,245 @@
       "description": "`canon schema`'s report (`SchemaReport`): the command listing, one command's\nnode of the generated spec, or the error registry.",
       "title": "SchemaReport"
     },
+    "SearchReport": {
+      "$defs": {
+        "IndexInfo": {
+          "description": "What a report says about the index.",
+          "properties": {
+            "edges": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "inMemory": {
+              "description": "Whether the index lives in memory for this run because the index directory cannot be written.",
+              "type": "boolean"
+            },
+            "nodes": {
+              "description": "Nodes in the graph, placeholders included.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "path": {
+              "description": "The index file, relative to the repo.",
+              "type": "string"
+            },
+            "rebuilt": {
+              "description": "Whether this run built the index (it was missing, stale or corrupt, or lives in memory).",
+              "type": "boolean"
+            },
+            "unreadStores": {
+              "description": "The backends of the stores no record was read from (`postgres`, `s3`).",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "path",
+            "nodes",
+            "edges",
+            "rebuilt",
+            "unreadStores",
+            "inMemory"
+          ],
+          "type": "object"
+        },
+        "SearchCounts": {
+          "description": "How many of each a search found.",
+          "properties": {
+            "edges": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "hits": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "matched": {
+              "description": "Nodes that matched the query, before `--limit`.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "neighbors": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "matched",
+            "hits",
+            "neighbors",
+            "edges"
+          ],
+          "type": "object"
+        },
+        "SearchEdge": {
+          "description": "An edge between two nodes of the result.",
+          "properties": {
+            "from": {
+              "type": "string"
+            },
+            "rel": {
+              "description": "The reference field, or `re-review`, `fix-reviewed`, `fix-of-fix`, `evidence-at-commit`, `flow`.",
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "from",
+            "to",
+            "rel"
+          ],
+          "type": "object"
+        },
+        "SearchHit": {
+          "description": "One node a search found.",
+          "properties": {
+            "id": {
+              "description": "`<kind>:<natural key>`.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "placeholder": {
+              "description": "Always false: a placeholder has no text, so no query finds it.",
+              "type": "boolean"
+            },
+            "rank": {
+              "description": "1 for the best match.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "score": {
+              "description": "The full-text score, larger for a better match; 0 for a query shorter than three characters.",
+              "format": "double",
+              "type": "number"
+            },
+            "snippet": {
+              "description": "The text around the match.",
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "rank",
+            "score",
+            "title",
+            "snippet",
+            "placeholder"
+          ],
+          "type": "object"
+        },
+        "SearchNeighbor": {
+          "description": "A node next to a hit.",
+          "properties": {
+            "from": {
+              "description": "The node that edge came from.",
+              "type": "string"
+            },
+            "hops": {
+              "description": "Edges between the nearest hit and this node.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "placeholder": {
+              "description": "True for a node standing for a reference no committed source holds.",
+              "type": "boolean"
+            },
+            "refs": {
+              "description": "For a placeholder, how many references name it.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "title": {
+              "type": "string"
+            },
+            "via": {
+              "description": "The rel of the edge that reached it.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "hops",
+            "via",
+            "from",
+            "title",
+            "placeholder"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:SearchReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon search --json`'s report (`SearchReport`).",
+      "properties": {
+        "counts": {
+          "$ref": "#/$defs/SearchCounts"
+        },
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/SearchEdge"
+          },
+          "type": "array"
+        },
+        "hits": {
+          "items": {
+            "$ref": "#/$defs/SearchHit"
+          },
+          "type": "array"
+        },
+        "index": {
+          "$ref": "#/$defs/IndexInfo"
+        },
+        "neighbors": {
+          "items": {
+            "$ref": "#/$defs/SearchNeighbor"
+          },
+          "type": "array"
+        },
+        "query": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "query",
+        "hits",
+        "neighbors",
+        "edges",
+        "counts",
+        "index"
+      ],
+      "title": "SearchReport",
+      "type": "object"
+    },
     "SelftestReport": {
       "$defs": {
         "SuiteSummary": {
@@ -38988,6 +39491,199 @@
         "committed"
       ],
       "title": "TierAgeReport",
+      "type": "object"
+    },
+    "TraceReport": {
+      "$defs": {
+        "IndexInfo": {
+          "description": "What a report says about the index.",
+          "properties": {
+            "edges": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "inMemory": {
+              "description": "Whether the index lives in memory for this run because the index directory cannot be written.",
+              "type": "boolean"
+            },
+            "nodes": {
+              "description": "Nodes in the graph, placeholders included.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "path": {
+              "description": "The index file, relative to the repo.",
+              "type": "string"
+            },
+            "rebuilt": {
+              "description": "Whether this run built the index (it was missing, stale or corrupt, or lives in memory).",
+              "type": "boolean"
+            },
+            "unreadStores": {
+              "description": "The backends of the stores no record was read from (`postgres`, `s3`).",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "path",
+            "nodes",
+            "edges",
+            "rebuilt",
+            "unreadStores",
+            "inMemory"
+          ],
+          "type": "object"
+        },
+        "ResolvedAs": {
+          "description": "What the operand was read as.",
+          "enum": [
+            "review",
+            "commit",
+            "finding"
+          ],
+          "type": "string"
+        },
+        "TraceCounts": {
+          "description": "How many items of each kind a chain holds.",
+          "properties": {
+            "archived": {
+              "description": "Of those, the archive's versions.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "items": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "items",
+            "archived"
+          ],
+          "type": "object"
+        },
+        "TraceEdge": {
+          "description": "One join of an item.",
+          "properties": {
+            "direction": {
+              "description": "`out` when the item is the edge's `from` end, `in` when it is the `to` end.",
+              "type": "string"
+            },
+            "id": {
+              "description": "The item at the other end.",
+              "type": "string"
+            },
+            "rel": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string"
+            },
+            "version": {
+              "description": "That item's version, which tells two versions of one record apart.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "rel",
+            "direction",
+            "id",
+            "role",
+            "version"
+          ],
+          "type": "object"
+        },
+        "TraceItem": {
+          "description": "One version of one record in the chain.",
+          "properties": {
+            "archived": {
+              "description": "Whether the version is one the ledger's archive holds.",
+              "type": "boolean"
+            },
+            "at": {
+              "description": "The version's own time.",
+              "type": "string"
+            },
+            "edges": {
+              "items": {
+                "$ref": "#/$defs/TraceEdge"
+              },
+              "type": "array"
+            },
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "role": {
+              "description": "`finding` (the version that recorded it), `fix` (the version that closed it fixed), `review` or `evidence`.",
+              "type": "string"
+            },
+            "sha": {
+              "description": "The commit the item is about: reviewed, fixed in, pinned at, evidenced at.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "version": {
+              "description": "The version's digest: with the id, what tells two versions apart.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "at",
+            "id",
+            "kind",
+            "role",
+            "sha",
+            "version",
+            "archived",
+            "edges"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "urn:canon:report:TraceReport",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "`canon trace --json`'s report (`TraceReport`).",
+      "properties": {
+        "chain": {
+          "description": "The chain, oldest first (ties by id).",
+          "items": {
+            "$ref": "#/$defs/TraceItem"
+          },
+          "type": "array"
+        },
+        "counts": {
+          "$ref": "#/$defs/TraceCounts"
+        },
+        "index": {
+          "$ref": "#/$defs/IndexInfo"
+        },
+        "operand": {
+          "type": "string"
+        },
+        "resolvedAs": {
+          "$ref": "#/$defs/ResolvedAs"
+        }
+      },
+      "required": [
+        "operand",
+        "resolvedAs",
+        "chain",
+        "counts",
+        "index"
+      ],
+      "title": "TraceReport",
       "type": "object"
     }
   },

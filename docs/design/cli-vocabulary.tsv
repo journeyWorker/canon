@@ -37,6 +37,7 @@ evaluator	ID	external evaluator
 evaluator-digest	DIGEST	digest of the external evaluator
 evaluator-version	TEXT	version of the external evaluator
 event	NAME	hook event
+expand	N	hops from a hit out to the neighbors listed with it
 expiry	TIMESTAMP	when a deferral or acceptance lapses
 feature	FILE	feature file
 fields	FIELDS	comma list of top-level report fields

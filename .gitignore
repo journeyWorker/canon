@@ -105,3 +105,5 @@ examples/platformer/reports/
 # above); their superseded versions are derived the same way.
 .canon/archive/kind=change/
 .canon/migrate-backup/
+# the index `canon search` and `canon trace` build from the records -- derived, rebuilt when stale, never committed.
+.canon/index/

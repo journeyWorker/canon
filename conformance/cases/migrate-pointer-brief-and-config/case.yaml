@@ -3,7 +3,7 @@ env: { CANON_ACTOR: canon }
 steps:
   - args: [migrate]
     exit: 0
-  - args: [migrate, --commit, --plan-digest, "b2fdb0096b45aee857fb14e9b29dad35e3b2e54a650cfdbbe942b3c45001ca64"]
+  - args: [migrate, --commit, --plan-digest, "59e480744cf403e1a277cf4e6c58ca7bcd814176e2348903d658d66897fb19f7"]
     exit: 0
   - args: [subject, new, checkout, --domain, shop, --title, Checkout]
     exit: 0

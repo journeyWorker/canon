@@ -58,6 +58,10 @@ fn every_kind_option_value_is_a_context_kind() {
         for option in leaf.options.iter().filter(|o| o.name == "kind" && !o.possible_values.is_empty()) {
             checked.insert(node.command.clone());
             for value in &option.possible_values {
+                // A node of `canon search` is a record of any kind or a brief section: `brief` is no record kind.
+                if node.command == "search" && value == "brief" {
+                    continue;
+                }
                 assert!(kinds.contains(value), "`{} --kind {value}` is not in context.kinds", node.command);
             }
         }

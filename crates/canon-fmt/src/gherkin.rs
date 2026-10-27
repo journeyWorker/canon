@@ -255,6 +255,28 @@ const SCENARIO_DIGEST_FORMAT: &str = "canon-scenario-digest/1";
 /// every scenario that inherits it. Every scenario-id tag on one scenario
 /// gets that scenario's digest.
 pub fn scenario_digests(text: &str) -> BTreeMap<String, SpecDigest> {
+    walk_scenarios(text).digests
+}
+
+/// What one scenario says, as search reads it (0.31): its title and the text of exactly what
+/// [`scenario_digests`] covers: the inherited Feature tags and Background, the Rule header and
+/// Background, and the scenario's own tags, header, steps, doc strings, table rows and `Examples:`.
+/// One line per element; a table row is its cells joined by ` | `.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScenarioBody {
+    /// The `Scenario:` header's label.
+    pub title: String,
+    pub text: String,
+}
+
+/// The [`ScenarioBody`] of every scenario-id tag in `text`: the walk [`scenario_digests`] makes, so what a
+/// body holds and what a digest covers cannot drift apart.
+pub fn scenario_bodies(text: &str) -> BTreeMap<String, ScenarioBody> {
+    walk_scenarios(text).bodies
+}
+
+/// The walk behind [`scenario_digests`] and [`scenario_bodies`].
+fn walk_scenarios(text: &str) -> DigestWalk {
     let mut walk = DigestWalk::default();
     // An open doc string: its delimiter and the opening line's indentation.
     let mut doc_string: Option<(&str, usize)> = None;
@@ -301,7 +323,7 @@ pub fn scenario_digests(text: &str) -> BTreeMap<String, SpecDigest> {
         }
     }
     walk.close();
-    walk.digests
+    walk
 }
 
 /// One doc string content line as Gherkin reads it: up to `indent`
@@ -373,6 +395,7 @@ struct DigestWalk {
     scenario_lines: Vec<String>,
     block: Block,
     digests: BTreeMap<String, SpecDigest>,
+    bodies: BTreeMap<String, ScenarioBody>,
 }
 
 impl DigestWalk {
@@ -450,10 +473,33 @@ impl DigestWalk {
             }
         }
         let digest = SpecDigest::of(input.as_bytes());
+        let body = ScenarioBody {
+            title: lines.iter().find_map(|line| SCENARIO_HEADERS.iter().find_map(|header| line.strip_prefix(header))).map(|label| label.trim().to_string()).unwrap_or_default(),
+            text: [&self.feature_tags, &self.feature_background, &self.rule, &self.rule_background, &lines].into_iter().flatten().map(|line| shown(line)).collect::<Vec<_>>().join("\n"),
+        };
         for id in std::mem::take(&mut self.scenario_ids) {
-            self.digests.insert(id, digest.clone());
+            self.digests.insert(id.clone(), digest.clone());
+            self.bodies.insert(id, body.clone());
         }
     }
+}
+
+/// The headers that open a scenario in [`scenario_digests`]'s walk.
+const SCENARIO_HEADERS: [&str; 4] = ["Scenario Outline:", "Scenario Template:", "Scenario:", "Example:"];
+
+/// A canonical line as a reader shows it: a table row (`|` and each cell as `<byte length>:<cell>`,
+/// [`table_row`]) is its cells joined by ` | `; any other line, and a line that only looks like a row, is itself.
+fn shown(line: &str) -> String {
+    let Some(mut rest) = line.strip_prefix('|') else { return line.to_string() };
+    let mut cells: Vec<&str> = Vec::new();
+    while !rest.is_empty() {
+        let Some((length, after)) = rest.split_once(':') else { return line.to_string() };
+        let Ok(length) = length.parse::<usize>() else { return line.to_string() };
+        let Some(cell) = after.get(..length) else { return line.to_string() };
+        cells.push(cell);
+        rest = &after[length..];
+    }
+    format!("| {} |", cells.join(" | "))
 }
 
 #[cfg(test)]
@@ -734,5 +780,20 @@ mod tests {
         }
         assert_ne!(table_row("| a\\|b |"), table_row("| a | b |"), "an escaped pipe is part of one cell");
         assert_eq!(table_row("|  a  |b\\\\|"), "|1:a2:b\\", "cells are trimmed and unescaped");
+    }
+
+    /// A body holds what the digest covers, with a table row as its cells: the inherited Feature tags and
+    /// Background, the Rule header and Background, and the scenario's own tags, header, steps and Examples.
+    #[test]
+    fn a_scenario_body_holds_what_its_digest_covers() {
+        let bodies = scenario_bodies(RULED);
+        assert_eq!(bodies.keys().map(String::as_str).collect::<Vec<_>>(), ["a.b.01", "a.b.02", "a.b.03"]);
+        assert_eq!(bodies["a.b.01"].title, "One");
+        assert_eq!(bodies["a.b.03"].title, "Three");
+        assert_eq!(bodies["a.b.01"].text, "@feature-tag\nBackground:\nGiven an empty cart\n@a.b.01 @case:happy\nScenario: One\nGiven a\n\"\"\"\n# kept inside a doc string\n\n\"\"\"");
+        assert_eq!(bodies["a.b.02"].text, "@feature-tag\nBackground:\nGiven an empty cart\n@a.b.02\nScenario Outline: Two\nGiven <n>\n@examples-tag\nExamples:\n| n |\n| 1 |");
+        assert_eq!(bodies["a.b.03"].text, "@feature-tag\nBackground:\nGiven an empty cart\n@rule-tag\nRule: Within a rule\nBackground:\nGiven a rule background\n@a.b.03\nExample: Three\nGiven c");
+        assert_eq!(shown("|1:a2:bc"), "| a | bc |");
+        assert_eq!(shown("|9:a"), "|9:a", "a line that only looks like a row is itself");
     }
 }
