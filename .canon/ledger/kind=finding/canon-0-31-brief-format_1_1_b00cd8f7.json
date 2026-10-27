@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-031-b",
+    "role": "reviewer",
+    "session_id": "rev-031-w3s-2026-10-27"
+  },
+  "at": "2026-10-27T15:35:32.742428017Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-cli/src/migrate_briefs.rs:128-202",
+  "introduced_by": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "kind": "finding",
+  "resolution_code_tree": "289a66d87709265c1f5ea6e4fbfe76a4ca896a09",
+  "resolution_sha": "86317ddd27d60358a7b3f1b8287c3a6554b4e6d7",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "008e5eb34d6d920782ab69721486f43aec6994ed",
+  "reviewer": "rev-031-b",
+  "round": 1,
+  "scenario_ids": [
+    "authoring.migrate.22"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] migrate re-binds an approval whose findings change. rewrite deletes a whole-line canon comment without leaving a blank line, and equivalent compares bodies with blank lines dropped, so two paragraphs a waiver/hint comment separated become one. Repro: a 0.30 approved brief with 'A. B. C.' / <!-- canon:waive ... --> / 'D. E. F.' in Step detail; the preview says re-bind, --commit re-binds, and brief check then adds prose.paragraph-length (the same text with a blank line has none). F6 wants blockers and advisories unchanged. Fix: keep a blank line where a removed comment line sat between text lines (or compare brief_check findings before and after, minus lines) before re-binding.",
+  "worktree_dirty": false
+}

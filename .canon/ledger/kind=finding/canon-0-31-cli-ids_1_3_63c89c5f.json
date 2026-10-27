@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-031-c",
+    "role": "reviewer",
+    "session_id": "rev-031-w3-2026-10-27"
+  },
+  "at": "2026-10-27T15:33:04.750199522Z",
+  "change_id": "canon-0-31-cli-ids",
+  "code_tree": "289a66d87709265c1f5ea6e4fbfe76a4ca896a09",
+  "disposition": "open",
+  "file_ref": ".canon/changes/canon-0-31-cli-ids/brief.md",
+  "introduced_by": "a43fe36030ccb101687e5e9e9fa53ffee9479bf8",
+  "kind": "finding",
+  "reviewed_sha": "86317ddd27d60358a7b3f1b8287c3a6554b4e6d7",
+  "reviewer": "rev-031-c",
+  "round": 1,
+  "schema": 2,
+  "seq": 3,
+  "severity": "note",
+  "summary": "(spec fidelity, brief defect) The brief says its walked-flow lines only need to be syntactically valid and buildable from the new table, but `canon dispatch begin --regime implementer/canon/search/abcdef --task add-search#1 --actor impl-1 --session s-2 --skill canon` lacks the required --role and is refused USAGE before parsing reaches --task. The other ten lines parse (their remaining refusals are semantic). Human decision: fix the brief example in a later revision. Not a code defect.",
+  "worktree_dirty": false
+}

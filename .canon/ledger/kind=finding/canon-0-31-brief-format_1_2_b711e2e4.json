@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-031-b",
+    "role": "reviewer",
+    "session_id": "rev-031-w3s-2026-10-27"
+  },
+  "at": "2026-10-27T15:35:34.898544010Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "disposition": "fixed",
+  "file_ref": "crates/canon-ingest/src/brief.rs:481-483",
+  "introduced_by": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "kind": "finding",
+  "resolution_code_tree": "289a66d87709265c1f5ea6e4fbfe76a4ca896a09",
+  "resolution_sha": "86317ddd27d60358a7b3f1b8287c3a6554b4e6d7",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "008e5eb34d6d920782ab69721486f43aec6994ed",
+  "reviewer": "rev-031-b",
+  "round": 1,
+  "scenario_ids": [
+    "authoring.migrate.22"
+  ],
+  "schema": 2,
+  "seq": 2,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] The chore marker is read by a stricter rule than 0.30's, so migrate turns an approved chore into a feature and still re-binds it. 0.30 kind_of_comments took the first canon:kind comment's second token, so <!-- canon:kind chore (ci) --> was a chore; 0.31 legacy_chore and rewrite need the exact tokens [canon:kind, chore], so equivalent sees Feature on both sides. Repro: the 0.30 clippy-ci brief with that marker, approved; migrate --commit re-binds it with no kind: chore, and brief check then gives 5 brief.section-missing blockers. Fix: read the old kind with the 0.30 rule in legacy_chore/rewrite, and refuse to re-bind when a canon:kind comment does not translate exactly.",
+  "worktree_dirty": false
+}

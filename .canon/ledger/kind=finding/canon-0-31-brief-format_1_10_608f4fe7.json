@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "rev-031-b",
+    "role": "reviewer",
+    "session_id": "rev-031-w3s-2026-10-27"
+  },
+  "at": "2026-10-27T15:35:57.372719602Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "disposition": "deferred",
+  "file_ref": "crates/canon-cli/tests/brief_format.rs:559-581",
+  "introduced_by": "ab68062142c59ff1be4a9b0bf9c5406df33eda9e",
+  "kind": "finding",
+  "reason": "carried forward as r2/2 with the gaps still open at d9ea4138; the dashboard.16 part is fixed in 86317ddd",
+  "reviewed_sha": "008e5eb34d6d920782ab69721486f43aec6994ed",
+  "reviewer": "rev-031-b",
+  "round": 1,
+  "scenario_ids": [
+    "subject.lifecycle.47",
+    "report.dashboard.16",
+    "authoring.brief-check.17",
+    "authoring.brief-check.22",
+    "authoring.migrate.22",
+    "authoring.migrate.25"
+  ],
+  "schema": 2,
+  "seq": 10,
+  "severity": "note",
+  "summary": "[spec-fidelity] Six scenarios have a Then/And step their cited test never exercises, so I left them unsigned. lifecycle.47: the first ship is only asserted not OLD_BRIEF_FORMAT, the final status==verifying shows it was refused, so 'the second moves' is never shown, reopen never runs and there is one subject, not two. dashboard.16: the evidence cites the parser-only brief_format test, not dashboard_briefs.rs:272 which loads the page and the refusal. brief-check.17: no reader comparison, no dashboard page, no plan import or chore review/ship. brief-check.22: the ship check never runs. migrate.22: no chore review in the Given, no before/after findings comparison (seq 1 shows that comparison fails). migrate.25: no review fixture, refusal only for an edited brief (seq 3), not an approval or review version. Fix: extend these tests and re-record the evidence.",
+  "worktree_dirty": false
+}

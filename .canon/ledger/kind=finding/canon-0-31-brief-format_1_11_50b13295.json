@@ -1,0 +1,28 @@
+{
+  "actor": {
+    "agent_id": "rev-031-b",
+    "role": "reviewer",
+    "session_id": "rev-031-w3s-2026-10-27"
+  },
+  "at": "2026-10-27T15:35:52.481879278Z",
+  "change_id": "canon-0-31-brief-format",
+  "code_tree": "5e9f62f7c965204e3652570a2c0cd5b519263c6e",
+  "disposition": "fixed",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "resolution_code_tree": "289a66d87709265c1f5ea6e4fbfe76a4ca896a09",
+  "resolution_sha": "86317ddd27d60358a7b3f1b8287c3a6554b4e6d7",
+  "resolution_worktree_dirty": false,
+  "reviewed_sha": "008e5eb34d6d920782ab69721486f43aec6994ed",
+  "reviewer": "rev-031-b",
+  "round": 1,
+  "scenario_ids": [
+    "authoring.brief-check.12",
+    "report.dashboard.05"
+  ],
+  "schema": 2,
+  "seq": 11,
+  "severity": "note",
+  "summary": "[standards] Evidence state. The 23 brief-format records (impl-031-bf, 12:33Z) carry evidence_sha 5f89e598, worktree_dirty true and code_tree b0291e29, not the committed 5e9f62f7; I diffed the two trees and after rustfmt they differ only in line breaks (no token change), and nextest at 008e5eb3 passes 3208/3208, so I did not treat them as stale. They were recorded before 7fe07ba2 while this repo's briefs were old-format, which the 0.31 evidence guard refuses (likely why a pre-commit binary was used). Stale: authoring.brief-check.12 and report.dashboard.05 were reworded by ab680621 (frontmatter waivers, English headings) and their tests changed, but their only evidence is 0.30-era (code_tree 626a465d, dcaaa4ce). Re-record those two, and record the others at a clean commit.",
+  "worktree_dirty": false
+}

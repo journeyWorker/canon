@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "agent_id": "rev-031-a",
+    "role": "reviewer",
+    "session_id": "rev-031-w3s-2026-10-27"
+  },
+  "at": "2026-10-27T15:36:04.411633465Z",
+  "change_id": "canon-0-31-fixes",
+  "code_tree": "072600ff66fbfaa074ad942c6a41349bf7bf0a76",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/spec030_storage_gate.rs:300-306",
+  "kind": "finding",
+  "reviewed_sha": "d9ea4138b65efb90d47a1cbb84d26265d407376b",
+  "reviewer": "rev-031-a",
+  "round": 2,
+  "scenario_ids": [
+    "evidence.add.130"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "[standards] evidence_add_130 asserts two of its Then clauses weakly. The tree snapshot is compared at :302, before the indexed run at :304-306, so 'the tree is unchanged after both' is not checked for the second run. 'Prints the bytes to sign' is only !stdout.is_empty() (:306), with no canon-approval-v1 or equality with the evidence.add.121 bytes. message.contains(\"root\") (:300) also passes on the fixed words 'spec root' in the message (evidence.rs:803), so it cannot tell whether the project id is named. I signed: approval-payload is read-only and evidence_add_121 checks the tree after a successful payload on the same path. Fix: take the snapshot after the indexed run too, and assert the payload starts with the canon-approval-v1 document.",
+  "worktree_dirty": false
+}
