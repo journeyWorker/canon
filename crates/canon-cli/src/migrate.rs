@@ -1399,6 +1399,12 @@ fn rebuild_index(repo: &Path, mut log: crate::json_out::Log, plan: safety::Plan,
                     return CliError::refused("MIGRATE_PINS_FAILED", format!("the files moved and the index was rebuilt, but the reviews were not pinned to what their evidence says: {e}")).hint("fix what the message names, then run `canon migrate` again; it finishes the reviews").emit("canon migrate", json);
                 }
             }
+            // What the migrate left, for `canon migrate --revert` to tell a later change from the migrate's own.
+            if let Some(dir) = backup_dir.as_deref().filter(|_| plan.effects.iter().any(|effect| effect.action != "rebuild")) {
+                if let Err(e) = migrate_names::seal(repo, &repo.join(dir)) {
+                    log.line(format!("canon migrate: note — {e}; `canon migrate --revert` cannot tell later changes from the migrate's own"));
+                }
+            }
             if json {
                 crate::json_out::data("migrate", &MigrateReport { steps: log.into_lines(), backup_dir, index_records_written: Some(outcome.total_written()), index: None, plan });
             }

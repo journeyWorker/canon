@@ -508,6 +508,13 @@ fn search_query_01_a_keyword_search_returns_ranked_hits_with_their_neighbors_and
     }
     assert!(hits[0]["score"].as_f64().unwrap() >= hits[1]["score"].as_f64().unwrap(), "best score first");
     assert!(hits[0]["score"].as_f64().unwrap() > 0.0);
+    finding(r, "1", "4", "Identical retry wording", &[]);
+    finding(r, "1", "5", "Identical retry wording", &[]);
+    let tied = data(&search_in(r, &["Identical retry wording"]));
+    let tied_hits = tied["hits"].as_array().unwrap();
+    assert_eq!(tied_hits.len(), 2, "{tied}");
+    assert_eq!(tied_hits[0]["score"], tied_hits[1]["score"], "equal scores");
+    assert!(tied_hits[0]["id"].as_str().unwrap() < tied_hits[1]["id"].as_str().unwrap(), "equal scores order by id: {tied}");
     let neighbors = neighbor_ids(&doc);
     assert!(neighbors.contains(&"review:root_scenario_loop.run.01".to_string()), "{neighbors:?}");
     assert!(neighbors.contains(&"scenario:root_loop.run.01".to_string()), "{neighbors:?}");
@@ -810,6 +817,9 @@ fn search_trace_04_an_unknown_id_an_ambiguous_sha_prefix_and_an_unrecognized_sha
     for (n, sha) in ["abcdef0123456789abcdef0123456789abcdef01", "abcdef0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"].iter().enumerate() {
         put(r, json!({"actor": actor, "at": "2026-08-01T00:00:00Z", "evidence": {"kind": "test-run", "ref": "x"}, "evidence_sha": sha, "kind": "evidence", "project_id": "root", "run_seq": n, "scenario_id": format!("loop.run.0{}", n + 1), "schema": 1, "verdict": "faithful"}));
     }
+    assert!(search_in(r, &["loop"]).status.success());
+    let outside_index = |r: &Path| tree(r).into_iter().filter(|(path, _)| !path.starts_with(".canon/index")).collect::<Vec<_>>();
+    let before = outside_index(r);
     for (operand, code) in [("deadbeefdead", "TRACE_NOT_FOUND"), ("abcdef0", "TRACE_NOT_FOUND"), ("01ARZ3NDEKTSV4RRFFQ69G5FAV", "TRACE_NOT_FOUND"), ("loop-change_9_9", "TRACE_NOT_FOUND"), ("not a shape!", "TRACE_OPERAND_INVALID"), ("abc", "TRACE_OPERAND_INVALID"), ("", "TRACE_OPERAND_INVALID")] {
         let out = trace_in(r, operand);
         assert_eq!(out.status.code(), Some(2), "{operand}: {}", text(&out));
@@ -819,6 +829,7 @@ fn search_trace_04_an_unknown_id_an_ambiguous_sha_prefix_and_an_unrecognized_sha
         assert!(message.contains("review id") && message.contains("commit sha") && message.contains("finding key"), "{operand}: {message}");
     }
     assert!(trace_in(r, "abcdef01").status.success(), "a prefix that fits one commit needs no more characters");
+    assert_eq!(outside_index(r), before, "a trace writes nothing but the index");
 }
 
 /// search.trace.05
@@ -923,6 +934,11 @@ fn search_graph_03_the_placeholder_ids_are_the_distinct_ids_canon_query_reports_
     put(r, json!({"actor": actor, "at": "2026-08-01T00:00:00Z", "change_id": "ghost-change", "disposition": "open", "kind": "finding", "reviewer": "t", "round": 1, "schema": 2, "seq": 2, "severity": "note", "summary": "danglerword again"}));
     put(r, json!({"actor": actor, "at": "2026-08-01T00:00:00Z", "evidence": {"kind": "test-run", "ref": "x"}, "evidence_note": {"summary": "danglerword evidence"}, "kind": "evidence", "project_id": "root", "run_seq": 1, "schema": 1, "task_id": "ghost-change#1", "verdict": "faithful"}));
     put(r, json!({"actor": actor, "at": "2026-08-01T00:00:00Z", "evidence": {"kind": "test-run", "ref": "x"}, "evidence_note": {"summary": "danglerword evidence two"}, "kind": "evidence", "project_id": "root", "run_seq": 2, "scenario_id": "ghost.scenario.01", "schema": 1, "verdict": "faithful"}));
+    // Change records are git-ignored here as in this repo, so the record below is no source.
+    let ignore = std::fs::read_to_string(r.join(".gitignore")).unwrap();
+    std::fs::write(r.join(".gitignore"), format!("{ignore}.canon/ledger/kind=change/\n")).unwrap();
+    // A record for the id exists, but nothing committed holds it: query counts it as having no source.
+    put(r, json!({"actor": actor, "at": "2026-08-01T00:00:00Z", "change_id": "ghost-change", "kind": "change", "schema": 2, "status": "proposed", "subject_ids": [], "summary": "a derived change record", "title": "ghost-change"}));
     put(r, json!({"actor": actor, "at": "2026-08-01T00:00:00Z", "change_ids": ["ghost-change-two"], "domain": "dev", "kind": "subject", "owner_role": "implementer", "schema": 1, "status": "building", "subject_id": "ghost-subject", "summary": "", "title": "danglerword subject"}));
 
     let mut reported: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();

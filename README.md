@@ -89,6 +89,27 @@ them in git history, e.g. `git show 0977bce1:<path>`.
 
 ## 0.31.0 release
 
+Six canon changes under `.canon/changes/canon-0-31-*`, each with an approved
+brief, scenarios or chore checks, evidence and an independent review:
+`canon-0-31-ci`, `canon-0-31-loop`, `canon-0-31-fixes`,
+`canon-0-31-brief-format`, `canon-0-31-cli-ids` and `canon-0-31-search`.
+
+### `canon-0-31-ci`: one toolchain, release checks in every PR
+
+- `rust-toolchain.toml` pins Rust 1.99.1 for local builds and every CI job;
+  each Rust job fails when `rustc` differs from the file.
+- An unfiltered PR workflow runs the release-workflow safety check and a
+  check build of the man-page generator, the two steps that failed only after
+  the 0.30.0 tag. The safety check also scans `.github/actions/**`.
+
+### Fixed in 0.31: commands without `--repo` outside a repo
+
+The 0.30.0 release binary refused `canon schema`, `canon skills show` and the
+other commands that take no `--repo` with `CONFIG_MISSING` when run outside a
+repo. The check asked clap for an undeclared `repo` argument, which is an
+error in debug builds (so every test passed) and "absent" in release builds.
+It now asks the command tree whether the command declares `--repo`.
+
 ### `canon-0-31-loop`: approval and adopt flow
 
 - `canon brief approve` takes one or more change ids: one name, one answer and

@@ -347,14 +347,15 @@ pub fn build(corpus: &Corpus) -> Graph {
         let placeholder = format!("{}:{}", found.target, found.id);
         let from = current.iter().find(|(_, v)| v.kind == found.kind && v.key == found.key && v.digest == found.digest).map(|(id, _)| id.clone());
         let Some(from) = from else { continue };
-        if !nodes.contains_key(&placeholder) || nodes[&placeholder].placeholder {
-            *placeholder_refs.entry(placeholder.clone()).or_insert(0) += 1;
-            nodes.entry(placeholder.clone()).or_insert_with(|| Node { id: placeholder.clone(), kind: found.target.to_string(), title: format!("{} {} (no committed source)", found.target, found.id), body: String::new(), placeholder: true, refs: 0 });
-        }
+        // A non-committed record (git-ignored, derived) may hold the id: it is not a source, so the node
+        // is marked a placeholder all the same and keeps its text, which stays searchable.
+        *placeholder_refs.entry(placeholder.clone()).or_insert(0) += 1;
+        nodes.entry(placeholder.clone()).or_insert_with(|| Node { id: placeholder.clone(), kind: found.target.to_string(), title: format!("{} {} (no committed source)", found.target, found.id), body: String::new(), placeholder: true, refs: 0 });
         edges.insert(Edge { from, to: placeholder, rel: found.field.to_string() });
     }
     for (id, refs) in placeholder_refs {
         if let Some(node) = nodes.get_mut(&id) {
+            node.placeholder = true;
             node.refs = refs;
         }
     }

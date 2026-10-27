@@ -297,13 +297,16 @@ fn evidence_add_130_an_approval_payload_for_a_scenario_the_index_does_not_hold_i
     let body = stdout_json(&json);
     assert_eq!(body["error"]["code"], "EVIDENCE_SCENARIO_NOT_INDEXED", "{body}");
     let message = body["error"]["message"].as_str().unwrap();
-    assert!(message.contains("game.run.99") && message.contains("root"), "{body}");
+    assert!(message.contains("game.run.99") && message.contains("spec root `root`"), "{body}");
     assert!(body["error"]["hint"].as_str().unwrap().contains("canon inventory sync"), "{body}");
     assert_eq!(snapshot(repo.path()), before);
 
     let indexed = repo.canon(&["evidence", "approval-payload", "--scenario", "game.run.01", "--project", "root", "--approver", "alice", "--approval-at", AT]);
     assert_eq!(indexed.status.code(), Some(0), "{}", text(&indexed));
-    assert!(!indexed.stdout.is_empty());
+    let doc: Value = serde_json::from_slice(&indexed.stdout).unwrap_or_else(|e| panic!("the payload is one JSON document ({e}): {}", text(&indexed)));
+    assert_eq!((doc["namespace"].as_str(), doc["subject"].as_str(), doc["project"].as_str(), doc["actor"].as_str()), (Some("canon-approval-v1"), Some("game.run.01"), Some("root"), Some("alice")), "{doc}");
+    assert!(doc["timestamp"].as_str().unwrap().starts_with("2026-10-26T00:00:00"), "{doc}");
+    assert_eq!(snapshot(repo.path()), before, "neither the refused runs nor the payload run write anything");
 }
 
 #[test]

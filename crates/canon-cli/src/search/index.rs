@@ -191,7 +191,7 @@ fn populate(conn: &Connection, graph: &Graph, corpus: &Corpus) -> Result<(), Ind
     let mut fts = conn.prepare("INSERT INTO fts (rowid, title, body) VALUES (?1, ?2, ?3)")?;
     for n in &graph.nodes {
         node.execute(params![n.id, n.kind, n.title, n.body, n.placeholder, n.refs])?;
-        if !n.placeholder {
+        if !n.placeholder || !n.body.is_empty() {
             fts.execute(params![conn.last_insert_rowid(), n.title, n.body])?;
         }
     }
@@ -277,7 +277,8 @@ impl Index {
             return Ok((seeds, matched));
         }
         let wanted = query.to_lowercase();
-        let mut statement = self.conn.prepare(&format!("SELECT n.id, n.kind, n.title, n.body FROM node n WHERE n.placeholder = 0{kind_filter} ORDER BY n.id"))?;
+        // A placeholder node with text is a record no committed source backs; its text is searched like any record's.
+        let mut statement = self.conn.prepare(&format!("SELECT n.id, n.kind, n.title, n.body FROM node n WHERE (n.placeholder = 0 OR n.body <> ''){kind_filter} ORDER BY n.id"))?;
         let mut seeds = Vec::new();
         let mut matched = 0;
         for row in statement.query_map([], |row| Ok(Seed { id: row.get(0)?, kind: row.get(1)?, title: row.get(2)?, body: row.get(3)?, score: 0.0 }))? {

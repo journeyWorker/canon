@@ -291,9 +291,11 @@ fn context_capability_50_a_token_after_the_separator_or_an_option_value_is_never
     assert!(!never.to_string().contains("was removed"), "{never}");
     assert_eq!(never["error"]["field"], "--actor-id", "{never}");
     // The spelling 0.28 removed is valid again: the line reaches the command, which checks the task itself.
-    let task = canon(repo, &["dispatch", "begin", "--task", "add-login#1", "--regime", "implementer/canon/search/abcdef", "--json"]);
+    let task = canon(repo, &["dispatch", "begin", "--role", "implementer", "--task", "add-login#1", "--regime", "implementer/canon/search/abcdef", "--json"]);
     let said = stdout(&task);
     assert!(!said.contains("was removed"), "{said}");
+    assert_eq!(task.status.code(), Some(2), "{said}{}", stderr(&task));
+    assert_eq!(json(&task)["error"]["code"], "TASK_NOT_FOUND", "the line ran and the command checked the task: {said}");
 }
 
 /// context.capability.51: several old spellings are refused once; the hint line runs as printed.

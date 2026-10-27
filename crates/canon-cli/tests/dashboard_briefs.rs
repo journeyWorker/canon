@@ -202,12 +202,30 @@ fn without_timestamp(text: &str) -> String {
 #[test]
 fn report_dashboard_05_lists_only_live_unapproved_briefs_with_sections_and_findings() {
     let dir = repo_with_briefs();
+    for change in ["korean", "oldheading"] {
+        ok(dir.path(), &["change", "new", change, "--subject", "demo", "--title", change]);
+    }
+    std::fs::write(brief_path(dir.path(), "korean"), clean_brief("Korean change").replace("The visitor sees the form", "방문자는 입력란을 본다").replace("Visitors lose their cart", "방문자는 장바구니를 잃는다")).unwrap();
+    std::fs::write(brief_path(dir.path(), "oldheading"), clean_brief("Old heading change").replace("## User flow", "## 사용자 흐름")).unwrap();
     let live = serve(dir.path());
     let list = get(&live, "/api/briefs");
     assert_eq!(list.code, 200);
     let list = list.json();
     let ids: Vec<&str> = list["data"]["briefs"].as_array().unwrap().iter().map(|b| b["changeId"].as_str().unwrap()).collect();
-    assert_eq!(ids, ["blocked", "ready"], "settled is approved and archived is not live: {list}");
+    assert_eq!(ids, ["blocked", "korean", "oldheading", "ready"], "settled is approved and archived is not live: {list}");
+
+    // A Korean-prose brief reads the same as the English one: the sections are found by their English headings.
+    let section_keys = |brief: &Value| -> Vec<String> { brief["sections"].as_array().unwrap().iter().map(|s| s["key"].as_str().unwrap().to_string()).collect() };
+    let korean = brief_of(&live, "korean");
+    assert_eq!(section_keys(&korean), section_keys(&brief_of(&live, "ready")), "{korean}");
+    let korean_flow = korean["sections"].as_array().unwrap().iter().find(|s| s["key"] == "flow").unwrap();
+    assert_eq!(korean_flow["steps"].as_array().unwrap().iter().map(|s| s["id"].as_str().unwrap()).collect::<Vec<_>>(), ["F1", "F2"]);
+    assert!(korean_flow["steps"][0]["text"].as_str().unwrap().contains("방문자는 입력란을 본다"), "{korean}");
+    assert_eq!(korean["approvable"], true, "{korean}");
+    // A shipped Korean heading is flagged old-format and blocks approval.
+    let old = brief_of(&live, "oldheading");
+    assert!(old["findings"].as_array().unwrap().iter().any(|f| f["rule"] == "brief.old-format" && f["blocksApproval"] == true), "{old}");
+    assert_eq!(old["approvable"], false, "{old}");
 
     let ready = brief_of(&live, "ready");
     let on_disk = std::fs::read(brief_path(dir.path(), "ready")).unwrap();
