@@ -96,3 +96,5 @@
 - `gate install-hooks`가 설정 없는 저장소에 설치하는 동작. 설정 전 저장소용으로 일부러 둔 예외다.
 - `evidence add`가 색인에 없는 시나리오 id를 받는 동작. 리포트 케이스용이다.
 - `canon init`의 `.gitignore` 갱신, 서명 검증 실패의 종료 1, 여섯 밖에 남은 같은 유형의 종료 1(예: `strategy promote`의 없는 id).
+
+Approved: Journey Hwang 2026-10-27T10:13:50Z — "레츠고" (brief sha256:e9420e0dcd4001c69ae3b46ebd4b8fd6da331998cabbe38d252b72f38858c982)

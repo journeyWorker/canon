@@ -169,3 +169,5 @@ canon retrieve --for-role reviewer --domain dev --subject payments
 <!-- canon:waive prose.code-citation detail "INPUT_UNKNOWN_FIELD는 사용자가 받는 오류 코드다" match="INPUT_UNKNOWN_FIELD" -->
 
 <!-- The human records their answer, and only that answer, with: canon brief approve --approver <who> --note "<their words>" -->
+
+Approved: Journey Hwang 2026-10-27T10:13:52Z — "레츠고" (brief sha256:c4698decd6c6beb20ce37425dd66661bbca615358e364d8e5b1ddeb6cac716c7)

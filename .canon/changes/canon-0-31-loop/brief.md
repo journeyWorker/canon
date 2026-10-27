@@ -108,3 +108,5 @@ Source: GitHub 이슈 #114와 0.30 계획 리뷰.
 - brief 승인 취소와 대시보드의 일괄 거절.
 - postgres hot 백엔드 동작과 `canon query`의 거절 문구.
 - 증거와 리뷰 레코드의 형식.
+
+Approved: Journey Hwang 2026-10-27T10:13:49Z — "레츠고" (brief sha256:526d7032ccd09b0898cef4e2c912465c9671127422549bba39a55169edc8f831)

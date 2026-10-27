@@ -116,3 +116,5 @@ canon 레코드는 서로를 가리키지만 그 그래프를 보여 주는 명�
 - worktree 사이 색인 공유.
 - evidence 저장 방식 변경과 finding·리뷰 레코드 스키마 변경.
 - 시나리오 해시 계산 변경.
+
+Approved: Journey Hwang 2026-10-27T10:13:53Z — "레츠고" (brief sha256:8ecb21a4a0807dfe7df00a57edf6eff1f966578332fc1985afc430c203987913)

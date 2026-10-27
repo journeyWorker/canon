@@ -141,3 +141,5 @@ Source: GitHub 이슈 #121
 <!-- canon:waive prose.length acceptance "여섯 단계마다 실패 경로를 요구하는 규칙 때문에 줄일 수 없다" -->
 <!-- canon:waive prose.length questions "승인 무결성과 리뷰 핀이 정책 질문이라 가정과 함께 적어야 한다" -->
 <!-- canon:waive prose.code-citation acceptance "BRIEF_CHANGED_SINCE_APPROVAL은 사용자가 받는 오류 코드다" match="BRIEF_CHANGED_SINCE_APPROVAL" -->
+
+Approved: Journey Hwang 2026-10-27T10:13:51Z — "레츠고" (brief sha256:45211e01ba698806f57609b9b59acb46487871bacbfb7bbaf7f46d1b76d4c920)
