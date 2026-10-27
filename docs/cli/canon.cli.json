@@ -3636,7 +3636,6 @@
         "EVIDENCE_INVALID_ARGUMENT",
         "EVIDENCE_REFUSED",
         "EVIDENCE_REPORT_CONTRADICTION",
-        "EVIDENCE_SCENARIO_NOT_INDEXED",
         "EVIDENCE_STORE_FAILED",
         "GATE_TASK_EVIDENCE_INVALID",
         "INPUT_CONFLICT",
@@ -3649,6 +3648,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
@@ -4079,6 +4079,7 @@
         "CONFIG_UNREADABLE",
         "EVIDENCE_INVALID_ARGUMENT",
         "EVIDENCE_REFUSED",
+        "EVIDENCE_SCENARIO_NOT_INDEXED",
         "NO_COMMIT",
         "UNKNOWN_ROLE",
         "UNKNOWN_SPEC_ROOT",
@@ -4254,7 +4255,6 @@
         "EVIDENCE_INVALID_ARGUMENT",
         "EVIDENCE_REFUSED",
         "EVIDENCE_REPORT_CONTRADICTION",
-        "EVIDENCE_SCENARIO_NOT_INDEXED",
         "EVIDENCE_STORE_FAILED",
         "GATE_TASK_EVIDENCE_INVALID",
         "INPUT_CONFLICT",
@@ -4267,6 +4267,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
         "PROMOTE_FAILED",
         "PROMOTE_REFUSED",
@@ -7385,6 +7386,8 @@
       "effect": "destructive",
       "errorCodes": [
         "CONFIG_MISSING",
+        "CONFIG_UNREADABLE",
+        "HUMAN_ONLY",
         "INPUT_BATCH_UNSUPPORTED",
         "INPUT_CONFLICT",
         "INPUT_ELEMENT_FAILED",
@@ -9178,6 +9181,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "NO_COMMIT",
+        "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
         "REVIEW_ARTIFACT_REFUSED",
         "REVIEW_INVALID_ARGUMENT",
@@ -9794,6 +9798,7 @@
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
         "LAYOUT_MIGRATION_REQUIRED",
+        "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
         "REPO_UNREADABLE",
         "SCAFFOLD_INVALID_ARGUMENT",
@@ -11329,6 +11334,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
         "SUBJECT_ADOPT_REFUSED",
         "SUBJECT_GATE_VIOLATION",
@@ -11482,6 +11488,7 @@
         "INPUT_TOO_LARGE",
         "INPUT_UNKNOWN_FIELD",
         "INPUT_UNREADABLE",
+        "OLD_BRIEF_FORMAT",
         "OLD_LAYOUT",
         "POLICY_APPROVAL_UNREADABLE",
         "POLICY_CHANGED_SINCE_APPROVAL",
@@ -13730,6 +13737,13 @@
       "exit": 2,
       "fix": "Run the command inside a git work tree that has at least one commit.",
       "meaning": "a command needed a commit and the directory is not a git work tree or has no commits",
+      "retryable": false
+    },
+    {
+      "code": "OLD_BRIEF_FORMAT",
+      "exit": 2,
+      "fix": "Run `canon migrate --json` to preview the rewrite; the human runs `canon migrate --commit --plan-digest <digest>` when the plan re-binds an `Approved:` line.",
+      "meaning": "a command that writes and judges a change brief was refused because that brief is in the format canon 0.30 and earlier wrote (`canon:` comments or shipped Korean headings); nothing was written",
       "retryable": false
     },
     {
@@ -26620,6 +26634,10 @@
         "legacy": {
           "type": "boolean"
         },
+        "oldFormat": {
+          "description": "The brief is in the format canon 0.30 and earlier wrote; `canon migrate` rewrites it.",
+          "type": "boolean"
+        },
         "phase": {
           "$ref": "#/$defs/Phase"
         },
@@ -26637,6 +26655,7 @@
         "languageSource",
         "phase",
         "legacy",
+        "oldFormat",
         "approved",
         "counts",
         "findings",
@@ -26664,6 +26683,27 @@
           "required": [
             "blockers",
             "advisories"
+          ],
+          "type": "object"
+        },
+        "EmptySection": {
+          "description": "A section not yet written and what goes in it.",
+          "properties": {
+            "guidance": {
+              "type": "string"
+            },
+            "heading": {
+              "description": "The `##` heading the section is found by.",
+              "type": "string"
+            },
+            "key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "key",
+            "heading",
+            "guidance"
           ],
           "type": "object"
         },
@@ -26697,6 +26737,13 @@
         "counts": {
           "$ref": "#/$defs/Counts"
         },
+        "emptySections": {
+          "description": "The sections that hold nothing yet, each with its guidance in the brief's language.",
+          "items": {
+            "$ref": "#/$defs/EmptySection"
+          },
+          "type": "array"
+        },
         "next": {
           "items": {
             "$ref": "#/$defs/Step"
@@ -26712,6 +26759,7 @@
         "brief",
         "state",
         "counts",
+        "emptySections",
         "next"
       ],
       "title": "BriefShowReport",
@@ -28434,7 +28482,7 @@
           "type": "object"
         },
         "BriefSection": {
-          "description": "One marked section of a brief as a reader shows it: found by marker\n(never by heading text, so the `ko` headings read the same), with its\nheading and the body lines after it. Fenced code and HTML comments are\nnot part of a body, as in every other reading of the brief.",
+          "description": "One section of a brief as a reader shows it: found by its English\nheading, with that heading and the body lines after it. Fenced code and\nHTML comments are not part of a body, as in every other reading of the\nbrief.",
           "properties": {
             "body": {
               "description": "The body lines, a blank line between paragraphs.",
@@ -28454,7 +28502,7 @@
               "type": "string"
             },
             "line": {
-              "description": "The marker's line.",
+              "description": "The heading's line in the file.",
               "format": "uint",
               "minimum": 0,
               "type": "integer"

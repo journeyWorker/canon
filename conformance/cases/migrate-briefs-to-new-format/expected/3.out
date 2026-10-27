@@ -1,0 +1,11 @@
+canon migrate: briefs — this plan re-binds no `Approved:` line and no review pin; an orchestrator may run `--commit`
+  a digest is re-bound only when the old digest matches the old text and the rewrite changes nothing but comments, hints, approval notes, waiver comments, the chore marker and shipped Korean headings: the sections read (key, role and body) and the judged set are the same before and after
+  rewrite .canon/changes/add-login/brief.md (8 comment(s), 1 waiver(s) to the frontmatter, 7 heading(s) to English)
+canon migrate: plan:
+  .gitignore: add .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/
+  left: .canon stays where it is: the openspec reader cannot read it (invalid-change-id-grammar)
+  left: .git stays where it is: the openspec reader cannot read it (invalid-change-id-grammar)
+canon migrate: backed up 1 file(s) it rewrites under .canon/migrate-backup/
+canon migrate: rewrote 1 brief(s) to the 0.31 format
+canon migrate: added to .gitignore: .canon/hot.db*, .canon/audit/, .canon/ledger/kind=scenario/, .canon/archive/kind=scenario/, .canon/scenario-index.lock, .canon/artifact-store.lock, .canon/dashboard-snapshot/, .canon/learn/, .canon/r2/, .canon/migrate-backup/
+canon migrate: rebuilt the scenario index: 0 record(s) written

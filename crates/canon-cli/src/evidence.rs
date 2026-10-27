@@ -278,7 +278,7 @@ fn brief_refusals(
     flow_changes: &crate::brief_check::FlowChangesIndex,
     task_id: Option<&TaskId>,
     scenario: Option<(&ProjectId, &ScenarioId)>,
-) -> Vec<BriefRefusal> {
+) -> Result<Vec<BriefRefusal>, CliError> {
     // An unreadable `plans:` section finds no external proposal.md;
     // `canon status` warns about it.
     let plan_roots = crate::brief::plan_roots(repo).unwrap_or_default();
@@ -287,7 +287,18 @@ fn brief_refusals(
         .flatten()
         .collect::<Vec<_>>()
         .join(" and ");
-    crate::brief::attested_briefs(repo, &plan_roots, ctx, flow_changes, task_id, scenario)
+    let attested = crate::brief::attested_briefs(repo, &plan_roots, ctx, flow_changes, task_id, scenario);
+    // 0.31: a brief in the 0.30 format is not judged but refused, approved or not, and `--override-reason` does not waive it.
+    let mut old: Vec<crate::old_briefs::OldBrief> = Vec::new();
+    for found in attested.iter().filter_map(|(_, brief)| brief.old_format.as_ref()) {
+        if !old.contains(found) {
+            old.push(found.clone());
+        }
+    }
+    if let Some(error) = crate::old_briefs::refusal(&old) {
+        return Err(error);
+    }
+    Ok(attested
         .into_iter()
         .filter(|(_, brief)| brief.enforced)
         .map(|(subject, brief)| BriefRefusal {
@@ -298,7 +309,7 @@ fn brief_refusals(
             ),
             changed: brief.changed,
         })
-        .collect()
+        .collect())
 }
 
 /// One brief refusal: the `unreviewed-promotion` violation it prints, and
@@ -981,7 +992,10 @@ pub fn run_add(repo: &Path, args: &EvidenceArgs) -> u8 {
             return CliError::refused("REPO_UNREADABLE", e.clone()).hint("check that the repository is readable from here, or pass --repo <path> for its root").emit(&args.full(), args.json);
         }
     };
-    let refusals = brief_refusals(&repo, &gate_context, &crate::brief_check::FlowChangesIndex::lazy(), args.task_id.as_ref(), args.project_id.as_ref().zip(args.scenario_id.as_ref()));
+    let refusals = match brief_refusals(&repo, &gate_context, &crate::brief_check::FlowChangesIndex::lazy(), args.task_id.as_ref(), args.project_id.as_ref().zip(args.scenario_id.as_ref())) {
+        Ok(refusals) => refusals,
+        Err(error) => return error.emit(&args.full(), args.json),
+    };
     if let Err(error) = report_brief_refusals(args, &refusals) {
         return error.emit(&args.full(), args.json);
     }
@@ -1377,7 +1391,13 @@ fn run_add_all(repo: &Path, args: &EvidenceArgs, promote: bool) -> u8 {
     // One flow-change index for the whole batch: each lookup is then a map
     // read, not a walk of every spec root per scenario (0.29 D3).
     let flow_changes = crate::brief_check::FlowChangesIndex::lazy();
-    let refusals: Vec<Vec<BriefRefusal>> = scenario_ids.iter().map(|id| brief_refusals(repo, &gate_context, &flow_changes, None, Some((project_id, id)))).collect();
+    let refusals: Vec<Vec<BriefRefusal>> = match scenario_ids.iter().map(|id| brief_refusals(repo, &gate_context, &flow_changes, None, Some((project_id, id)))).collect() {
+        Ok(refusals) => refusals,
+        Err(error) => {
+            let hint = format!("no record of the batch is written; {}", error.hint_text().unwrap_or_default());
+            return error.hint(hint).emit("canon evidence add", args.json);
+        }
+    };
     if let Err(error) = report_brief_refusals(args, &refusals.concat()) {
         let hint = format!("no record of the batch is written; {}", error.hint_text().unwrap_or_default());
         return error.hint(hint).emit("canon evidence add", args.json);

@@ -157,7 +157,7 @@ fn feature_brief(repo: &Path) {
 
 fn chore_brief(approved: DateTime<Utc>) -> String {
     format!(
-        "# Bump the client\n\n<!-- canon:kind chore -->\n\n## Intent\n\nBump the client\n\nApproved: Journey {} — \"go\"\n",
+        "---\nkind: chore\n---\n\n# Bump the client\n\n## Intent\n\nBump the client\n\nApproved: Journey {} — \"go\"\n",
         approved.to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
     )
 }

@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-031-a",
+    "role": "reviewer",
+    "session_id": "rev-031-w1-2026-10-27"
+  },
+  "at": "2026-10-27T11:40:55.698980911Z",
+  "change_id": "canon-0-31-loop",
+  "code_tree": "33cb4e61f63ce191f9fc1c6897efb48c058cecdb",
+  "disposition": "open",
+  "file_ref": "canon/skills/reference/canon-subject.md:729-748; crates/canon-cli/src/cli/evidence.rs:13; crates/canon-cli/src/cli/mod.rs:129; crates/canon-cli/tests/brief_multi_approve.rs:222-250",
+  "introduced_unknown": true,
+  "kind": "finding",
+  "reviewed_sha": "344527efa7742754ac8632a769858ad05704a391",
+  "reviewer": "rev-031-a",
+  "round": 1,
+  "scenario_ids": [
+    "skills.install.73"
+  ],
+  "schema": 2,
+  "seq": 3,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] The docs do not match F3's documentation acceptance, and the test for skills.install.73 checks the wrong help. (1) The `status --json` example in canon-subject.md still shows `statusVersion: 3` and per-subject `brief` objects. (2) `canon status --help` says nothing about governing changes or `briefs`, yet the scenario's Then says the status help states the rule. The test reads `brief approve --help` instead. (3) The `evidence add` help, mirrored into docs/cli/canon.cli.json, still says the add is refused when the subject's `newest change whose proposal.md has no Approved: line`. The Reopen.change schema description also still says the newest adopted change. Fix: update the example, the status help, the evidence add help and the schema text; make the test read `status --help`.",
+  "worktree_dirty": false
+}

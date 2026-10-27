@@ -226,7 +226,7 @@ fn write_one(repo: &Path, checked: Checked, by: &str, note: &str, when: &str, po
     // Policy first: a failed policy write leaves the brief untouched, and a
     // failed brief write leaves a policy approval that is true on its own.
     if policy_approved {
-        crate::policy_approval::record(repo, by, Some(note)).map_err(|e| refuse("POLICY_APPROVAL_FAILED", &e.to_string(), EXIT_ERROR))?;
+        crate::policy_approval::record_at(repo, by, Some(note), when).map_err(|e| refuse("POLICY_APPROVAL_FAILED", &e.to_string(), EXIT_ERROR))?;
     }
     std::fs::write(&checked.path, &approved).map_err(|e| refuse("BRIEF_WRITE_FAILED", &format!("cannot write `{}`: {e}", checked.brief), EXIT_ERROR))?;
     Ok(Approved { change: checked.change.as_str().to_string(), brief: checked.brief, digest: brief_digest(&approved), approved_by: by.to_string(), policy_approved })
@@ -264,7 +264,9 @@ fn approve_checked(repo: &Path, change: Option<&ChangeId>, by: &str, note: &str,
 /// reason; nothing was written.
 fn refused_many(refused: Vec<(String, CliError)>, total: usize) -> (CliError, Refused) {
     let named = refused.iter().map(|(id, e)| format!("`{id}` ({}: {})", e.code, e.message)).collect::<Vec<_>>().join("; ");
-    let error = refuse("BRIEF_APPROVE_REFUSED", &format!("{} of {total} briefs refused, so none was approved and nothing was written: {named}", refused.len()), EXIT_REFUSED);
+    let error = refuse("BRIEF_APPROVE_REFUSED", &format!("{} of {total} briefs refused, so none was approved and nothing was written: {named}", refused.len()), EXIT_REFUSED).hint(
+        "fix what each refused id names (`canon brief check` lists blocker findings, a missing brief needs `canon change new`, an unclosed fence needs closing), then ask the human to approve again",
+    );
     let data = Refused { refused: refused.into_iter().map(|(change_id, e)| Refusal { change_id, code: e.code.to_string(), message: e.message }).collect() };
     (error, data)
 }
@@ -382,7 +384,10 @@ pub fn run_approve(repo: &Path, changes: &[ChangeId], by: &str, note: &str, json
     }
     let report = ApprovedMany { approved_by: many.approved_by.clone(), policy_approved: many.policy_approved, approvals: many.entries.into_iter().map(|(entry, _)| entry).collect() };
     if !json {
-        let policy = if report.policy_approved { "; policy approval recorded too" } else { "; no policy file, so no policy approval" };
+        let policy = match (report.policy_approved, &many.failure) {
+            (true, None) => "; policy approval recorded too",
+            (true, Some(_)) => "; the policy approval may not be recorded (see the error)",
+            (false, _) => "; no policy file, so no policy approval" };
         for entry in &report.approvals {
             let what = match entry.outcome {
                 Outcome::Written => "approved",

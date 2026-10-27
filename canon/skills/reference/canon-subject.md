@@ -441,11 +441,10 @@ canon change new: recorded change `add-login` adopted into subject `auth` — wr
 - **Writes** canon's own change dir, `.canon/changes/<slug>/`, holding
   `brief.md` only: the PRD skeleton (`# <title>`, then the sections intent,
   desired outcome, user flow, step detail, acceptance, questions and
-  assumptions, out of scope, each opened by a
-  `<!-- canon:section <key> role=… -->` marker and a hint comment, with
-  the headings in the repo's `language:`), and a comment naming
-  `canon brief approve` as where the human's answer is recorded, so the
-  file starts unapproved. The intent section's first paragraph holds the
+  assumptions, out of scope, each an empty `##` section under its English
+  heading; no comment, no hint: `canon brief show` and the brief-shape skill
+  carry each section's guidance, in the repo's `language:`), so the file
+  starts unapproved. The intent section's first paragraph holds the
   title, which imports as the change summary. `--change-kind chore` writes the
   short chore brief instead (intent, category, invariants, checks, out of
   scope; see `canon brief` below). No `tasks.md` is written:
@@ -512,15 +511,19 @@ leaves the slugs already written approved. The call is human-only for every
 slug; the `HUMAN_ONLY` hint gives the human one line with all the slugs.
 
 Without the change operand, the repo's only live change is read. The brief is the
-PRD `canon change new` writes; sections are found by their
-`<!-- canon:section <key> role=… -->` marker, never by heading text. A
-brief without markers (written before 0.19) checks as `brief.legacy`, an
-advisory, and is read as before.
+PRD `canon change new` writes; sections are found by their English `##`
+heading, never by a comment. A brief with fewer than two known headings
+(written before 0.19) checks as `brief.legacy`, an advisory, and is read as
+before. A brief with `<!-- canon:… -->` comments or Korean headings is in the
+0.30 format: `brief check` gives it one blocker (`brief.old-format`) and
+`canon migrate` rewrites it; `status`, `gate check`, `context` and `brief show`
+warn, and a command that writes and judges it is refused
+(`OLD_BRIEF_FORMAT`).
 
 - **Blockers (structure, `brief.*`)**: a missing, duplicated or
   out-of-order section; a flow with no steps or a duplicate step id;
   step detail that does not match the flow ids in order; leftover
-  placeholders (a hint comment still there, an empty section,
+  placeholders (an empty section,
   `TODO`/`TBD`); a malformed waiver; for a chore, a flow/detail/acceptance
   section, a category outside `refactor|dependency|build|ci|infra`, or
   invariants/checks that say only "none". Once the subject is `building`
@@ -533,8 +536,8 @@ advisory, and is read as before.
   length budgets, in the normative sections plus Intent and Questions;
   sentence, paragraph and key-sentence rules in normative sections.
   Never an authorship verdict. `canon skills show brief-polish` has each rule.
-- **Waivers**: `<!-- canon:waive <rule-id> <section-key> "<reason>" -->`,
-  one rule in one section, reason required; add `match="<text>"` to waive
+- **Waivers**: entries of the frontmatter `waive` list (`rule`, `section`,
+  `reason`), one rule in one section, reason required; add `match` to waive
   only the findings whose matched text contains it. Listed in the output.
 - **`approve`** records the human's answer: it writes
   `Approved: <who> <when> — "<words>" (brief sha256:<digest>)` into the
@@ -727,17 +730,17 @@ Status fails closed rather than suggest progress the gate would refuse:
 
 ```json
 {
-  "statusVersion": 3,
+  "statusVersion": 4,
   "canonVersion": "0.29.0",
   "policy": { "present": true, "spec_coverage": { "require_evidence": true, "scope": [], "exclude_lanes": [], "require_cases": ["failure"], "require_review": { "scope": ["verifying", "shipped"], "distinct_actor": true, "block_on_findings": true } } },
   "warnings": [],
   "subjects": [
     { "id": "cart", "title": "Cart", "status": "building", "scenarios": 2, "excluded": 0, "evidenced": 2, "divergent": 0,
       "reviewed": 1, "staleReviews": 0, "unsignedReviews": 0, "reviewDue": true, "openBlockers": 1, "missingCases": [],
-      "brief": { "approved": true, "enforced": false, "change": "c-cart", "brief": ".canon/changes/c-cart/brief.md", "briefExists": true, "approval": "Journey 2026-10-11 — \"approved\"" } },
+      "briefs": [{ "status": "approved", "reason": "tagged", "enforced": false, "change": "c-cart", "brief": ".canon/changes/c-cart/brief.md", "briefExists": true, "approval": "Journey 2026-10-11 — \"approved\"" }] },
     { "id": "promo", "title": "Promo", "status": "verifying", "scenarios": 1, "excluded": 0, "evidenced": 1, "divergent": 0,
       "reviewed": 1, "staleReviews": 0, "unsignedReviews": 0, "reviewDue": true, "openBlockers": 0, "missingCases": [],
-      "brief": { "approved": false, "enforced": true, "change": "c-promo", "brief": ".canon/changes/c-promo/brief.md", "briefExists": false, "source": "openspec/changes/c-promo/proposal.md" } }
+      "briefs": [{ "status": "unapproved", "reason": "tagged", "enforced": true, "change": "c-promo", "brief": ".canon/changes/c-promo/brief.md", "briefExists": false, "source": "openspec/changes/c-promo/proposal.md" }] }
   ],
   "unowned": ["cart.promo.01"]
 }

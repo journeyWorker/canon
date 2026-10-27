@@ -1,22 +1,18 @@
 # Shared calendar: busy-time preview
 
-<!-- canon:section intent role=context -->
 ## Intent
 
 Team members pick meeting times without seeing who is busy. Show each invitee's busy blocks while the organizer chooses a slot.
 
-<!-- canon:section outcome role=normative -->
 ## Desired outcome
 
 An organizer who opens the slot picker sees every invitee's busy blocks and can pick a free slot in one pass. ==**The preview shows busy or free, never the event title.**==
 
-<!-- canon:section flow role=normative -->
 ## User flow
 
 1. F1 The organizer sees the slot picker with invitees → adds an invitee → sees that person's busy blocks appear. ==**Busy blocks appear within two seconds of adding the invitee.**==
 2. F2 The organizer adds an invitee who has not shared a calendar → sees a "No calendar shared" label → can still pick a slot.
 
-<!-- canon:section detail role=normative -->
 ## Step detail
 
 ### F1 Busy blocks
@@ -29,18 +25,15 @@ An organizer who opens the slot picker sees every invitee's busy blocks and can 
 - The invitee row shows the label and no blocks.
 - The organizer's pick is saved as usual.
 
-<!-- canon:section acceptance role=normative -->
 ## Acceptance
 
 - F1: adding an invitee with a calendar draws that person's busy blocks and no titles.
 - F2: adding an invitee with no shared calendar shows the label and leaves the slot pickable. ==**An empty calendar is never drawn as free time.**==
 
-<!-- canon:section questions role=question -->
 ## Questions and assumptions
 
 - Assumed: invitees outside the organization share no calendar by default.
 
-<!-- canon:section out-of-scope role=context -->
 ## Out of scope
 
 Recurring meetings.

@@ -544,6 +544,10 @@ pub fn run_new(repo: &Path, new: &NewSubject, actor: Actor, json: bool) -> u8 {
 /// one adds that subject and says the change now belongs to each, never
 /// re-points it.
 pub fn run_adopt(repo: &Path, change_id: &ChangeId, subject_id: &SubjectId, dry_run: bool, json: bool) -> u8 {
+    // 0.31: the adoption judges the change's brief (the warning it owes), so one in the 0.30 format refuses it.
+    if let Some(error) = crate::old_briefs::refusal_among(&crate::context::resolve_repo_root(repo), std::slice::from_ref(change_id)) {
+        return error.emit("canon subject adopt", json);
+    }
     match adopt_change(repo, change_id, subject_id, dry_run) {
         Ok((subject, owners, wrote)) => {
             let (link, now_belongs) = if dry_run { ("would link", "would belong") } else { ("linked", "now belongs") };
@@ -1009,6 +1013,12 @@ pub fn run_move(
         }
         _ => (changes, Vec::new()),
     };
+    // 0.31: reopen and ship judge each of these briefs; one in the 0.30 format refuses the move.
+    if ships || reopens {
+        if let Some(error) = crate::old_briefs::refusal_among(&repo, &judged) {
+            return error.emit("canon subject move", json);
+        }
+    }
     let pending_note: Vec<String> = (!pending_drafts.is_empty()).then(|| crate::brief::pending_draft_line(&pending_drafts)).into_iter().collect();
 
     let code_tree = crate::reverify::CodeTreeMemo::lazy();

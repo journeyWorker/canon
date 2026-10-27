@@ -199,7 +199,19 @@ fn authoring_brief_check_03_a_section_in_another_script_is_judged_in_its_own_lan
 /// citation, a date and asides in it: the mechanisms the rules would read
 /// in a language canon ships a list for.
 fn cjk_brief(intent: &str, outcome: &str, step: &str, detail: &str, acceptance: &str, none: &str, headings: [&str; 7]) -> String {
-    let marked = |key: &str, role: &str, heading: &str, body: &str| format!("<!-- canon:section {key} role={role} -->\n## {heading}\n\n{body}\n\n");
+    let marked = |key: &str, role: &str, heading: &str, body: &str| {
+        let _ = (role, heading);
+        let english = match key {
+            "intent" => "Intent",
+            "outcome" => "Desired outcome",
+            "flow" => "User flow",
+            "detail" => "Step detail",
+            "acceptance" => "Acceptance",
+            "questions" => "Questions and assumptions",
+            _ => "Out of scope",
+        };
+        format!("## {english}\n\n{body}\n\n")
+    };
     format!(
         "# add-login\n\n{}{}{}{}{}{}{}",
         marked("intent", "context", headings[0], intent),
@@ -231,7 +243,7 @@ fn authoring_brief_check_04_other_cjk_scripts_are_named_and_get_no_prose_rules()
 
     // The structure rules still apply to it.
     let dir = repo_with_change(None);
-    write_brief(dir.path(), &swap(&ja, "<!-- canon:section out-of-scope role=context -->\n", ""));
+    write_brief(dir.path(), &swap(&ja, "## Out of scope\n", "Out of scope\n"));
     let (code, report) = check(dir.path());
     assert_eq!(code, 1, "{report}");
     assert_eq!(report["language"], "ja");
@@ -359,7 +371,13 @@ fn authoring_brief_check_08_dates_and_decision_notes_are_history_not_behavior() 
     assert_eq!(hits(&judged(None, &cell), "prose.decision-history").len(), 1);
 
     // A waiver keeps an effective date.
-    let waived = format!("{}<!-- canon:waive prose.decision-history detail \"effective date\" -->\n", swap(&ko, "- 태그를 읽지 못하면 책을 되돌려 주고 대출 목록은 바꾸지 않는다.", "- 2026-12-01부터 연체 시 추가 요금이 붙는다."));
+    let waived = waive(
+        &swap(&ko, "- 태그를 읽지 못하면 책을 되돌려 주고 대출 목록은 바꾸지 않는다.", "- 2026-12-01부터 연체 시 추가 요금이 붙는다."),
+        "prose.decision-history",
+        "detail",
+        "effective date",
+        None,
+    );
     assert!(hits(&judged(None, &waived), "prose.decision-history").is_empty());
 }
 
@@ -459,9 +477,8 @@ fn authoring_brief_check_12_a_waiver_clears_each_new_rule_in_its_section() {
             continue;
         }
         let section = f["section"].as_str().unwrap_or("brief");
-        let comment = format!("<!-- canon:waive {rule} {section} \"fixture waiver\" -->\n");
-        if !text.contains(&comment) {
-            text.push_str(&comment);
+        if !waived.contains(&(rule.to_string(), section.to_string())) {
+            text = waive(&text, rule, section, "fixture waiver", None);
             waived.push((rule.to_string(), section.to_string()));
         }
     }
@@ -473,14 +490,14 @@ fn authoring_brief_check_12_a_waiver_clears_each_new_rule_in_its_section() {
     assert!(report["waivers"].as_array().unwrap().iter().all(|w| w["applied"] == true && w["severity"] == "advisory"), "{report}");
 
     // A waiver for another section clears nothing.
-    let elsewhere = format!("{}<!-- canon:waive prose.ko-ending intent \"x\" -->\n", fixture("bad-ko-tidepool.md"));
+    let elsewhere = waive(&fixture("bad-ko-tidepool.md"), "prose.ko-ending", "intent", "x", None);
     assert!(!hits(&judged(None, &elsewhere), "prose.ko-ending").is_empty());
 
     // `match="<text>"` clears only the findings that contain it: an effective date is waived, the dated decision note stays.
     let ko = fixture("good-ko-lantern.md");
     let detail = swap(&ko, "- 태그를 읽지 못하면 책을 되돌려 주고 대출 목록은 바꾸지 않는다.", "- 연체 요금은 2026-12-01부터 붙는다.\n- 이 방식은 2026-09-14 회의에서 결정했다.");
     assert_eq!(hits(&judged(None, &detail), "prose.decision-history").len(), 2);
-    let only = format!("{detail}<!-- canon:waive prose.decision-history detail \"effective date\" match=\"2026-12-01\" -->\n");
+    let only = waive(&detail, "prose.decision-history", "detail", "effective date", Some("2026-12-01"));
     let report = judged(None, &only);
     let left = hits(&report, "prose.decision-history");
     assert_eq!(left.len(), 1, "{report}");
@@ -491,28 +508,35 @@ fn authoring_brief_check_12_a_waiver_clears_each_new_rule_in_its_section() {
     let unwaived = judged(None, &long);
     let cut = hits(&unwaived, "prose.decision-history")[0]["excerpt"].as_str().unwrap().to_string();
     assert!(!cut.contains("2026-12-01"), "the date is past the cut excerpt: {cut}");
-    let report = judged(None, &format!("{long}<!-- canon:waive prose.decision-history detail \"effective date\" match=\"2026-12-01\" -->\n"));
+    let report = judged(None, &waive(&long, "prose.decision-history", "detail", "effective date", Some("2026-12-01")));
     assert!(hits(&report, "prose.decision-history").is_empty(), "{report}");
     // Without match the waiver clears the rule in the whole section, as before.
-    let whole = format!("{detail}<!-- canon:waive prose.decision-history detail \"all\" -->\n");
+    let whole = waive(&detail, "prose.decision-history", "detail", "all", None);
     assert!(hits(&judged(None, &whole), "prose.decision-history").is_empty());
     // A reason that only mentions `match=` inside its quotes is a plain, section-wide waiver.
-    let inside_reason = format!("{detail}<!-- canon:waive prose.decision-history detail \"x match=y\" -->\n");
+    let inside_reason = waive(&detail, "prose.decision-history", "detail", "x match=y", None);
     let report = judged(None, &inside_reason);
     assert!(rules(&report).iter().all(|r| r != "brief.waiver-invalid") && hits(&report, "prose.decision-history").is_empty(), "{report}");
     // `match=` compares the matched text and the excerpt, never the hint: words from the hint clear nothing.
     for hint_word in ["effective date", "date", "waive", "reason"] {
-        let text = format!("{detail}<!-- canon:waive prose.decision-history detail \"x\" match=\"{hint_word}\" -->\n");
+        let text = waive(&detail, "prose.decision-history", "detail", "x", Some(hint_word));
         assert_eq!(hits(&judged(None, &text), "prose.decision-history").len(), 2, "match={hint_word:?} must clear nothing");
     }
     // A match that fits nothing waives nothing; a malformed match is a blocker.
-    let nothing = format!("{detail}<!-- canon:waive prose.decision-history detail \"x\" match=\"2030-01-01\" -->\n");
+    let nothing = waive(&detail, "prose.decision-history", "detail", "x", Some("2030-01-01"));
     let report = judged(None, &nothing);
     assert_eq!((hits(&report, "prose.decision-history").len(), report["waivers"][0]["applied"].as_bool()), (2, Some(false)));
-    for malformed in ["match=2026-12-01", "match=\"\"", "match=\"2026-12-01", "match=\"2026-12-01\" extra", "match =\"2026-12-01\"", "MATCH=\"2026-12-01\"", "Match=\"2026-12-01\"", "match=\"a\"match=\"b\""] {
-        let text = format!("{detail}<!-- canon:waive prose.decision-history detail \"x\" {malformed} -->\n");
+    for malformed in [
+        "rule: prose.nope\n    section: detail\n    reason: x\n",
+        "rule: prose.decision-history\n    section: detail\n    reason: \"\"\n",
+        "rule: prose.decision-history\n    section: detail\n    reason: x\n    match: \"\"\n",
+        "rule: prose.decision-history\n    section: detail\n    reason: x\n    when: now\n",
+        "rule: prose.decision-history\n    reason: x\n",
+    ] {
+        let text = format!("---\nwaive:\n  - {malformed}---\n\n{detail}");
         let report = judged(None, &text);
         assert_eq!(rules(&report).iter().filter(|r| *r == "brief.waiver-invalid").count(), 1, "{malformed}: {report}");
+        assert_eq!(hits(&report, "prose.decision-history").len(), 2, "an invalid waiver clears nothing: {report}");
     }
 }
 
@@ -624,4 +648,17 @@ fn authoring_brief_check_08_corpus() {
 fn authoring_brief_check_10_corpus() {
     let wrong = corpus_misses("prose-ko-ending.tsv", "prose.ko-ending");
     assert!(wrong.is_empty(), "{} row(s) wrong:\n{}", wrong.len(), wrong.join("\n"));
+}
+
+/// `text` with one more entry in its frontmatter `waive` list (a new frontmatter when it has none).
+fn waive(text: &str, rule: &str, section: &str, reason: &str, matching: Option<&str>) -> String {
+    let q = |v: &str| serde_json::to_string(v).unwrap();
+    let mut entry = format!("  - rule: {}\n    section: {}\n    reason: {}\n", q(rule), q(section), q(reason));
+    if let Some(m) = matching {
+        entry.push_str(&format!("    match: {}\n", q(m)));
+    }
+    match text.strip_prefix("---\nwaive:\n") {
+        Some(rest) => format!("---\nwaive:\n{entry}{rest}"),
+        None => format!("---\nwaive:\n{entry}---\n\n{text}"),
+    }
 }

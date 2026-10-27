@@ -49,7 +49,7 @@ Feature: report dashboard
   Scenario: The briefs page lists the live briefs that await approval, read by the checker's own parser
     Given a repository with live changes whose briefs are approved, unapproved, and archived
     When GET /api/briefs is requested
-    Then it lists only the live unapproved briefs, each with its subjects, raw text, the sha256 of the file's bytes, its sections and flow steps read by canon brief check's own parser (Korean headings included), and its findings with an approvable flag
+    Then it lists only the live unapproved briefs, each with its subjects, raw text, the sha256 of the file's bytes, its sections and flow steps read by canon brief check's own parser (found by their English headings, so a Korean-prose brief reads the same, and a shipped Korean heading is flagged old-format), and its findings with an approvable flag
 
   # canon: {"schema":1,"at":"2026-10-21T11:57:34Z","actor":{"agent_id":"canon-impl-025"}}
   @subject:report-generation
@@ -153,3 +153,14 @@ Feature: report dashboard
     When the page lists them and then a request approves both
     Then the page offers no selection for the brief with the blocker, and shows how many briefs are selected
     And the request answers 409 BRIEF_APPROVE_REFUSED naming the blocked brief, and neither brief nor the policy approval changed
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:57Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:report-generation
+  @case:happy
+  @flow:canon-0-31-brief-format.F1
+  @report.dashboard.16
+  Scenario: The dashboard brief page reads each section's key and role from its English heading and flags an old-format brief
+    Given pending briefs with English headings, one with Korean prose and one with a shipped Korean heading
+    When the dashboard briefs page is read
+    Then each section has the key and role its English heading names and the flow steps are read, a Korean-prose brief reads the same
+    And the old-format brief carries brief.old-format with a hint naming canon migrate and cannot be approved from the page

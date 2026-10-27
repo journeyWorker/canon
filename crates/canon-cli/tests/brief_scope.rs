@@ -46,13 +46,13 @@ fn ok(repo: &Path, args: &[&str]) -> Output {
 fn brief(extra: &str) -> String {
     format!(
         "# Change\n\n\
-<!-- canon:section intent role=context -->\n## Intent\n\nChange\n\nVisitors lose their cart when they switch devices.\n\n\
-<!-- canon:section outcome role=normative -->\n## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
-<!-- canon:section flow role=normative -->\n## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n\n\
-<!-- canon:section detail role=normative -->\n## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n\
-<!-- canon:section acceptance role=normative -->\n## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie. ==**F1 is the happy path.**==\n\n\
-<!-- canon:section questions role=question -->\n## Questions and assumptions\n\nNone.\n\n\
-<!-- canon:section out-of-scope role=context -->\n## Out of scope\n\nSocial sign-in.\n\n{extra}"
+## Intent\n\nChange\n\nVisitors lose their cart when they switch devices.\n\n\
+## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
+## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n\n\
+## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n\
+## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie. ==**F1 is the happy path.**==\n\n\
+## Questions and assumptions\n\nNone.\n\n\
+## Out of scope\n\nSocial sign-in.\n\n{extra}"
     )
 }
 

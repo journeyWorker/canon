@@ -481,6 +481,20 @@ fn dispatch_manifest_32_schema_error_adapter_refused_states_the_exit_of_each_ada
     let err = body(&run(d, &["schema", "--error", "ADAPTER_REFUSED"]));
     let meaning = err["data"]["error"]["meaning"].as_str().unwrap();
     assert_eq!(err["data"]["error"]["exit"], 2, "{err}");
+    let exits = |leaf: &[&str]| -> Vec<(i64, String)> {
+        let mut args = vec!["schema"];
+        args.extend_from_slice(leaf);
+        let doc = body(&run(d, &args));
+        doc["data"]["exits"].as_array().unwrap_or_else(|| panic!("{doc}")).iter().map(|e| (e["code"].as_i64().unwrap(), e["meaning"].as_str().unwrap().to_string())).collect()
+    };
+    let authorize_exits = exits(&["adapter", "authorize"]);
+    let exit2 = &authorize_exits.iter().find(|(code, _)| *code == 2).expect("authorize lists exit 2").1;
+    assert!(exit2.contains("ADAPTER_REFUSED") && exit2.contains("envelope breaks a rule") && exit2.contains("policy file is broken"), "{exit2}");
+    let exit1 = &authorize_exits.iter().find(|(code, _)| *code == 1).expect("authorize lists exit 1").1;
+    assert!(exit1.contains("ADAPTER_EXECUTION_NOT_AUTHORIZED") && exit1.contains("only exit 1"), "{exit1}");
+    let validate_exits = exits(&["adapter", "validate"]);
+    assert!(validate_exits.iter().any(|(code, m)| *code == 1 && m.contains("envelope breaks a rule")), "{validate_exits:?}");
+    assert!(validate_exits.iter().any(|(code, m)| *code == 2 && m.contains("unreadable")), "{validate_exits:?}");
     assert!(meaning.contains("adapter authorize") && meaning.contains("adapter validate") && meaning.contains("exit 1"), "{meaning}");
     let authorize = body(&run(d, &["schema", "adapter", "authorize"])).to_string();
     assert!(authorize.contains("ADAPTER_EXECUTION_NOT_AUTHORIZED") && authorize.contains("the only exit 1") && authorize.contains("policy file is broken"), "{authorize}");

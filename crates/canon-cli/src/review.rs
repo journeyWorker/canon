@@ -245,6 +245,9 @@ pub fn run_add(repo: &Path, args: &ReviewAddArgs) -> u8 {
             return CliError::refused("CONFIG_UNREADABLE", e.clone()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit(&args.full(), args.json);
         }
     };
+    if let Some(error) = args.change.as_ref().and_then(|change| crate::old_briefs::refusal_among(&repo, std::slice::from_ref(change))) {
+        return error.emit(&cmd, args.json);
+    }
     let brief_digest = match &args.change {
         Some(change) => match chore_brief_digest(&repo, change) {
             Ok(digest) => Some(digest),

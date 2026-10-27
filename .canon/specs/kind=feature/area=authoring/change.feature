@@ -65,3 +65,14 @@ Feature: authoring change
     Then the change is written under .canon/changes and nothing is written under the external source
     And the external change's proposal is byte-identical
     And canon ingest plans imports both, the canon change with canon's provenance and the external one with the openspec dialect's
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:48Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:authoring-scaffold
+  @case:happy
+  @flow:canon-0-31-brief-format.F3
+  @authoring.change.08
+  Scenario: change new writes the title and empty headed sections, with no comment, for a feature and a chore
+    Given a fresh repo, in English and with language ko, and a chore
+    When canon change new writes the brief
+    Then it holds the title, the English headings of the kind and the title under Intent, with no HTML comment and no approval note, and the chore has a frontmatter holding only kind: chore
+    And the intent summary imported from it is the title

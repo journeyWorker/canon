@@ -138,12 +138,52 @@ them in git history, e.g. `git show 0977bce1:<path>`.
   `LEARN_STRATEGY_NOT_FOUND`, exit 2, whatever the signature file is. A
   signature that does not verify stays `LEARN_ROLLBACK_FAILED`, exit 1.
 
+### `canon-0-31-brief-format`: a brief without HTML comments
+
+- A brief is a frontmatter, a title, `##` sections and the `Approved:` line.
+  Sections are found by their English heading (`Intent`, `Desired outcome`,
+  `User flow`, `Step detail`, `Acceptance`, `Questions and assumptions`,
+  `Out of scope`; chore: `Intent`, `Category`, `Invariants`, `Checks`, `Out of
+  scope`), compared exactly. A misspelt heading (`## Intnet`) is reported with
+  the nearest heading. `language:` picks only the language of the prose rules
+  and the guidance, never the headings. One shared reader
+  (`canon_ingest::brief`) serves `brief check` and `show`, `status`, the
+  dashboard, the chore review, re-verify and ship checks, `scenario new
+  --flow`, language detection and the plan import's Intent summary.
+- Waivers are entries of the frontmatter `waive` list (`rule`, `section`,
+  `reason`, optional `match`), visible on GitHub; the approval digest covers
+  the frontmatter, so adding one after the approval is a change after the
+  approval. A frontmatter that is not YAML, or has an unknown key, is a
+  blocker (`brief.frontmatter-invalid`) and no waiver of it is read. A chore
+  has `kind: chore` in the frontmatter.
+- `canon change new` writes empty sections. `canon brief check` reports each
+  with its guidance in the hint, and `canon brief show` lists the guidance of
+  every empty section (`emptySections` in JSON).
+- A brief from 0.30 (`canon:` comments or Korean headings) gets one blocker,
+  `brief.old-format`. `status`, `gate check`, `context` and `brief show` warn and
+  lead with `canon migrate --json`; a command that writes and judges such a
+  brief (`evidence add`, `subject move` to ship or reopen, `subject adopt`,
+  `scenario new --flow`, `review change`) is refused with `OLD_BRIEF_FORMAT`.
+- `canon migrate` previews, then `--commit --plan-digest` rewrites the briefs
+  (and the 0.30 ledger names in the same run). The plan says first whether it
+  re-binds `Approved:` lines or chore review pins. Re-binding needs the old
+  digest to match the old text and the rewrite to change nothing but comments,
+  waiver comments, the chore marker and Korean headings; the sections read and
+  the judged set stay the same. Such a `--commit` is the human's
+  (`HUMAN_ONLY` for every agent role); a plan that re-binds nothing runs under
+  an orchestrator. A brief edited after its approval, or whose marker role
+  differs from the table, is rewritten but not re-bound and is named.
+  `canon migrate --revert` restores the briefs and reviews byte for byte and
+  refuses, naming the file, when one changed since the migrate.
+
 ### Upgrading
+
+Run `canon migrate` once on a repo with 0.30 briefs: until the human commits it, `canon evidence add` and the other writes above refuse.
 
 `canon status --json` `statusVersion` is `4`. A subject's `brief` object is
 gone; read `briefs` instead, a list with one entry per change the subject
 answers for: `change`, `brief` (path), `status` (`approved`, `unapproved`,
-`changed`), `reason` (`tagged`, `approved`, `chore`) and `findings` (the check
+`changed`), `reason` (`tagged`, `approved`, `chore`; absent on the one entry of a subject with no such change, its newest adopted change awaiting a first approval) and `findings` (the check
 counts). `pendingDrafts` holds only pending drafts, and `flow` the steps of
 every tagged change. Tools that read the old `brief` field must read `briefs`.
 
@@ -762,7 +802,7 @@ reasons:
 - **Context sections are judged.** Intent and Questions get the phrase rules
   and the new rules.
 - **Six new advisory rules.** Each is waivable with
-  `<!-- canon:waive <rule> <section> "<reason>" -->`; the whole-brief length
+  a `waive` entry in the brief's frontmatter; the whole-brief length
   finding uses the section key `brief`.
 
   | Rule | What it reports |

@@ -64,7 +64,7 @@ fn actor(id: &str, role: &str) -> Actor {
 }
 
 fn chore_brief(approved: chrono::DateTime<Utc>) -> String {
-    format!("# Bump the client\n\n<!-- canon:kind chore -->\n\n## Intent\n\nBump the client\n\nApproved: Journey {} — \"go\"\n", approved.to_rfc3339_opts(SecondsFormat::Secs, true))
+    format!("---\nkind: chore\n---\n\n# Bump the client\n\n## Intent\n\nBump the client\n\nApproved: Journey {} — \"go\"\n", approved.to_rfc3339_opts(SecondsFormat::Secs, true))
 }
 
 /// A git repo with code, two scenarios of subject `demo` evidenced by the

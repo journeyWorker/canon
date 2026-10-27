@@ -41,24 +41,24 @@ fn ok(repo: &Path, args: &[&str]) -> Output {
 fn brief(extra: &str) -> String {
     format!(
         "# Change\n\n\
-<!-- canon:section intent role=context -->\n## Intent\n\nChange\n\nVisitors lose their cart when they switch devices.\n\n\
-<!-- canon:section outcome role=normative -->\n## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
-<!-- canon:section flow role=normative -->\n## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n\n\
-<!-- canon:section detail role=normative -->\n## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n\
-<!-- canon:section acceptance role=normative -->\n## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie. ==**F1 is the happy path.**==\n\n\
-<!-- canon:section questions role=question -->\n## Questions and assumptions\n\nNone.\n\n\
-<!-- canon:section out-of-scope role=context -->\n## Out of scope\n\nSocial sign-in.\n\n{extra}"
+## Intent\n\nChange\n\nVisitors lose their cart when they switch devices.\n\n\
+## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
+## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n\n\
+## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n\
+## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie. ==**F1 is the happy path.**==\n\n\
+## Questions and assumptions\n\nNone.\n\n\
+## Out of scope\n\nSocial sign-in.\n\n{extra}"
     )
 }
 
 /// A filled-in English chore brief.
 fn chore_brief() -> String {
-    "# Bump the client\n\n<!-- canon:kind chore -->\n\n\
-<!-- canon:section intent role=context -->\n## Intent\n\nBump the client\n\nThe client has a security fix.\n\n\
-<!-- canon:section category role=context -->\n## Category\n\n`Dependency`.\n\n\
-<!-- canon:section invariants role=normative -->\n## Invariants\n\n- Requests and responses stay byte-identical. ==**No behavior changes.**==\n\n\
-<!-- canon:section checks role=normative -->\n## Checks\n\n- The suite runs again at the chore commit. ==**The suite is the check.**==\n\n\
-<!-- canon:section out-of-scope role=context -->\n## Out of scope\n\nNone.\n"
+    "---\nkind: chore\n---\n\n# Bump the client\n\n\
+## Intent\n\nBump the client\n\nThe client has a security fix.\n\n\
+## Category\n\n`Dependency`.\n\n\
+## Invariants\n\n- Requests and responses stay byte-identical. ==**No behavior changes.**==\n\n\
+## Checks\n\n- The suite runs again at the chore commit. ==**The suite is the check.**==\n\n\
+## Out of scope\n\nNone.\n"
         .to_string()
 }
 
@@ -277,9 +277,15 @@ fn subject_lifecycle_45_a_chore_that_is_not_approved_now_refuses_reopen_and_ship
     assert_eq!((entry["status"].as_str(), entry["reason"].as_str()), (Some("unapproved"), Some("chore")), "{entry}");
 
     approve_all(repo, &["bump"]);
-    assert!(reopen(repo, "s").status.success(), "an approved chore lets the subject reopen");
     let text = std::fs::read_to_string(brief_path(repo, "bump")).unwrap();
     std::fs::write(brief_path(repo, "bump"), text.replace("security fix", "security fix, urgent")).unwrap();
+    let out = reopen(repo, "s");
+    assert_eq!(out.status.code(), Some(1), "an edited chore refuses the reopen too: {}", stderr(&out));
+    assert!(stderr(&out).contains(".canon/changes/bump/brief.md changed after its approval"), "{}", stderr(&out));
+    approve_all(repo, &["bump"]);
+    assert!(reopen(repo, "s").status.success(), "an approved chore lets the subject reopen");
+    let text = std::fs::read_to_string(brief_path(repo, "bump")).unwrap();
+    std::fs::write(brief_path(repo, "bump"), text.replace("security fix", "security fix, urgent!")).unwrap();
     let out = ship(repo, "s");
     assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
     assert!(stderr(&out).contains(".canon/changes/bump/brief.md changed after its approval"), "{}", stderr(&out));

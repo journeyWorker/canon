@@ -459,3 +459,14 @@ Feature: skills install
     When they are read for the rule on which changes a subject answers for and for the status JSON
     Then they say that reopen, ship and status judge every tagged, approved-line and chore change, that a never-approved untagged feature change blocks nothing, and that brief approve takes several ids
     And the README Upgrading section says the status brief field became the briefs list and the status schema version rose, and status --json carries that new version
+
+  # canon: {"schema":1,"at":"2026-10-27T12:04:58Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:skills-install
+  @case:happy
+  @flow:canon-0-31-brief-format.F3
+  @skills.install.74
+  Scenario: The brief skill documents carry the section table, the guidance, the frontmatter waiver and the old-format path
+    Given the brief-shape and brief-polish skill documents
+    When they are read
+    Then brief-shape carries the section table with each section's heading, role and the same guidance text brief show prints, the frontmatter waiver form and the old-format path
+    And brief-polish shows waivers as frontmatter entries and no skill document names a canon:section, canon:hint or canon:waive comment as the way to write a brief

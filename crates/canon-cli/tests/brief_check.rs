@@ -63,13 +63,13 @@ fn rules(report: &Value) -> Vec<String> {
 fn en_brief(extra: &str) -> String {
     format!(
         "# Add login\n\n\
-<!-- canon:section intent role=context -->\n## Intent\n\nAdd login\n\nVisitors lose their cart when they switch devices.\n\n\
-<!-- canon:section outcome role=normative -->\n## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
-<!-- canon:section flow role=normative -->\n## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n2. F2 The visitor submits a wrong password → sees an error → can retry.\n\n\
-<!-- canon:section detail role=normative -->\n## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n### F2 Failed submit\n\nFive failures lock the form for thirty seconds.\n\n\
-<!-- canon:section acceptance role=normative -->\n## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie.\n- F2: a wrong password shows the error and sets no cookie. ==**F2 covers the failure path.**==\n\n\
-<!-- canon:section questions role=question -->\n## Questions and assumptions\n\nNone.\n\n\
-<!-- canon:section out-of-scope role=context -->\n## Out of scope\n\nSocial sign-in.\n\n{extra}"
+## Intent\n\nAdd login\n\nVisitors lose their cart when they switch devices.\n\n\
+## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
+## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n2. F2 The visitor submits a wrong password → sees an error → can retry.\n\n\
+## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n### F2 Failed submit\n\nFive failures lock the form for thirty seconds.\n\n\
+## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie.\n- F2: a wrong password shows the error and sets no cookie. ==**F2 covers the failure path.**==\n\n\
+## Questions and assumptions\n\nNone.\n\n\
+## Out of scope\n\nSocial sign-in.\n\n{extra}"
     )
 }
 
@@ -78,23 +78,23 @@ fn a_fresh_ko_repo_writes_a_ko_brief_whose_only_findings_are_placeholders_until_
     let dir = repo_with_change(Some("ko"));
     assert!(std::fs::read_to_string(dir.path().join("canon.yaml")).unwrap().contains("\nlanguage: ko\n"));
     let brief = std::fs::read_to_string(brief_path(dir.path())).unwrap();
-    assert!(brief.contains("## 의도") && brief.contains("<!-- canon:section flow role=normative -->"), "{brief}");
+    assert!(brief.contains("## Intent") && brief.contains("## User flow") && !brief.contains("<!--"), "{brief}");
 
     let (code, report) = check(dir.path(), &[]);
     assert_eq!(code, 1);
     let found = rules(&report);
-    assert_eq!(found.len(), 7, "{report}");
+    assert_eq!(found.len(), 6, "every section but Intent (the title) is empty: {report}");
     assert!(found.iter().all(|r| r == "brief.placeholder"), "{found:?}");
-    assert_eq!(report["counts"], serde_json::json!({"blockers": 7, "advisories": 0}));
+    assert_eq!(report["counts"], serde_json::json!({"blockers": 6, "advisories": 0}));
 
     let filled = "# Add login\n\n\
-<!-- canon:section intent role=context -->\n## 의도\n\nAdd login\n\n방문자는 기기를 바꾸면 장바구니를 잃는다.\n\n\
-<!-- canon:section outcome role=normative -->\n## 원하는 결과\n\n로그인한 방문자는 저장한 장바구니를 본다. ==**장바구니는 계정을 따라간다.**==\n\n\
-<!-- canon:section flow role=normative -->\n## 사용자 흐름\n\n1. F1 방문자는 입력란을 보고 → 자격 증명을 제출하면 → 상품 목록으로 이동한다. ==**성공한 로그인만 세션을 만든다.**==\n\n\
-<!-- canon:section detail role=normative -->\n## 단계 상세\n\n### F1 제출\n\n세션은 서버가 발급한다. ==**비밀번호는 로그에 남기지 않는다.**==\n\n\
-<!-- canon:section acceptance role=normative -->\n## 인수 조건\n\n- F1: 올바른 자격 증명이면 목록이 열리고, 틀리면 오류가 보인다. ==**실패 경로도 F1이 다룬다.**==\n\n\
-<!-- canon:section questions role=question -->\n## 질문과 가정\n\n없음.\n\n\
-<!-- canon:section out-of-scope role=context -->\n## 범위 밖\n\n소셜 로그인.\n";
+## Intent\n\nAdd login\n\n방문자는 기기를 바꾸면 장바구니를 잃는다.\n\n\
+## Desired outcome\n\n로그인한 방문자는 저장한 장바구니를 본다. ==**장바구니는 계정을 따라간다.**==\n\n\
+## User flow\n\n1. F1 방문자는 입력란을 보고 → 자격 증명을 제출하면 → 상품 목록으로 이동한다. ==**성공한 로그인만 세션을 만든다.**==\n\n\
+## Step detail\n\n### F1 제출\n\n세션은 서버가 발급한다. ==**비밀번호는 로그에 남기지 않는다.**==\n\n\
+## Acceptance\n\n- F1: 올바른 자격 증명이면 목록이 열리고, 틀리면 오류가 보인다. ==**실패 경로도 F1이 다룬다.**==\n\n\
+## Questions and assumptions\n\n없음.\n\n\
+## Out of scope\n\n소셜 로그인.\n";
     std::fs::write(brief_path(dir.path()), filled).unwrap();
     let (code, report) = check(dir.path(), &[]);
     assert_eq!((code, rules(&report)), (0, Vec::<String>::new()), "{report}");
@@ -132,12 +132,8 @@ fn structure_blockers_name_duplicate_ids_a_detail_mismatch_and_section_order() {
 
     // Acceptance moved above the flow.
     let text = en_brief("");
-    let (flow_at, detail_at, acceptance_at, questions_at) = (
-        text.find("<!-- canon:section flow").unwrap(),
-        text.find("<!-- canon:section detail").unwrap(),
-        text.find("<!-- canon:section acceptance").unwrap(),
-        text.find("<!-- canon:section questions").unwrap(),
-    );
+    let (flow_at, detail_at, acceptance_at, questions_at) =
+        (text.find("## User flow").unwrap(), text.find("## Step detail").unwrap(), text.find("## Acceptance").unwrap(), text.find("## Questions and assumptions").unwrap());
     let swapped = format!("{}{}{}{}", &text[..flow_at], &text[acceptance_at..questions_at], &text[flow_at..acceptance_at], &text[questions_at..]);
     assert!(detail_at < acceptance_at);
     std::fs::write(brief_path(dir.path()), swapped).unwrap();
@@ -146,7 +142,7 @@ fn structure_blockers_name_duplicate_ids_a_detail_mismatch_and_section_order() {
     assert!(rules(&report).contains(&"brief.section-order".to_string()), "{report}");
 
     // A section whose marker is gone.
-    std::fs::write(brief_path(dir.path()), en_brief("").replace("<!-- canon:section out-of-scope role=context -->\n", "")).unwrap();
+    std::fs::write(brief_path(dir.path()), en_brief("").replace("## Out of scope", "Out of scope")).unwrap();
     let (code, report) = check(dir.path(), &[]);
     assert_eq!(code, 1);
     assert!(rules(&report).contains(&"brief.section-missing".to_string()), "{report}");
@@ -161,7 +157,7 @@ fn a_waiver_clears_one_rule_in_one_section_is_listed_and_needs_a_reason() {
     assert_eq!((code, rules(&report)), (1, vec!["brief.placeholder".to_string()]));
     assert_eq!(report["findings"][0]["section"], "out-of-scope");
 
-    let waived = format!("{with_todo}<!-- canon:waive brief.placeholder out-of-scope \"the provider list is a policy question\" -->\n");
+    let waived = waive(&with_todo, "brief.placeholder", "out-of-scope", "the provider list is a policy question", None);
     std::fs::write(brief_path(dir.path()), waived).unwrap();
     let (code, report) = check(dir.path(), &[]);
     assert_eq!((code, rules(&report)), (0, Vec::<String>::new()), "{report}");
@@ -170,10 +166,10 @@ fn a_waiver_clears_one_rule_in_one_section_is_listed_and_needs_a_reason() {
     assert_eq!(report["waivers"][0]["reason"], "the provider list is a policy question");
 
     // Another section's waiver does not clear it; a missing reason is a blocker itself.
-    let wrong_section = format!("{with_todo}<!-- canon:waive brief.placeholder outcome \"x\" -->\n");
+    let wrong_section = waive(&with_todo, "brief.placeholder", "outcome", "x", None);
     std::fs::write(brief_path(dir.path()), wrong_section).unwrap();
     assert_eq!(check(dir.path(), &[]).0, 1);
-    let no_reason = format!("{with_todo}<!-- canon:waive brief.placeholder out-of-scope -->\n");
+    let no_reason = waive(&with_todo, "brief.placeholder", "out-of-scope", "", None);
     std::fs::write(brief_path(dir.path()), no_reason).unwrap();
     let (code, report) = check(dir.path(), &[]);
     assert_eq!(code, 1);
@@ -208,7 +204,7 @@ fn prose_rules_flag_normative_intent_and_question_sections_in_en_and_ko_and_neve
     let ko = repo_with_change(Some("ko"));
     let brief = std::fs::read_to_string(brief_path(ko.path())).unwrap();
     let body = "따라서 이 기능은 매우 중요하다. 로그인이 되는지 확인해요. 이것은 폼이 아니라 세션이다.";
-    let flagged = brief.replace("<!-- canon:hint 출시되면 사용자 입장에서 눈에 보이는 상태. -->", body);
+    let flagged = brief.replace("## Desired outcome\n", &format!("## Desired outcome\n\n{body}\n"));
     std::fs::write(brief_path(ko.path()), &flagged).unwrap();
     let (_, report) = check(ko.path(), &[]);
     let in_outcome: Vec<String> = report["findings"].as_array().unwrap().iter().filter(|f| f["section"] == "outcome" && f["rule"].as_str().unwrap().starts_with("prose.")).map(|f| f["rule"].as_str().unwrap().to_string()).collect();
@@ -382,12 +378,12 @@ fn init_language_is_validated_recorded_and_checked() {
 /// A filled-in English chore brief; `category` is the category section's text.
 fn chore_brief(category: &str) -> String {
     format!(
-        "# Bump the client\n\n<!-- canon:kind chore -->\n\n\
-<!-- canon:section intent role=context -->\n## Intent\n\nBump the client\n\nThe client has a security fix.\n\n\
-<!-- canon:section category role=context -->\n## Category\n\n{category}\n\n\
-<!-- canon:section invariants role=normative -->\n## Invariants\n\n- Requests and responses stay byte-identical. ==**No behavior changes.**==\n\n\
-<!-- canon:section checks role=normative -->\n## Checks\n\n- The suite runs again at the chore commit. ==**The suite is the check.**==\n\n\
-<!-- canon:section out-of-scope role=context -->\n## Out of scope\n\nNone.\n"
+        "---\nkind: chore\n---\n\n# Bump the client\n\n\
+## Intent\n\nBump the client\n\nThe client has a security fix.\n\n\
+## Category\n\n{category}\n\n\
+## Invariants\n\n- Requests and responses stay byte-identical. ==**No behavior changes.**==\n\n\
+## Checks\n\n- The suite runs again at the chore commit. ==**The suite is the check.**==\n\n\
+## Out of scope\n\nNone.\n"
     )
 }
 
@@ -402,11 +398,11 @@ fn a_chore_brief_is_written_and_judged_by_the_chore_rule_set() {
     ok(dir.path(), &["change", "new", "bump-client", "--subject-id", "demo", "--change-kind", "chore", "--title", "클라이언트 올리기"]);
     let path = dir.path().join(".canon/changes/bump-client/brief.md");
     let brief = std::fs::read_to_string(&path).unwrap();
-    assert!(brief.contains("<!-- canon:kind chore -->") && brief.contains("## 불변 조건") && brief.contains("## 분류"), "{brief}");
-    assert!(!brief.contains("canon:section flow"), "{brief}");
+    assert!(brief.starts_with("---\nkind: chore\n---\n\n") && brief.contains("## Invariants") && brief.contains("## Category"), "{brief}");
+    assert!(!brief.contains("## User flow") && !brief.contains("<!--"), "{brief}");
     let (code, report) = check(dir.path(), &["bump-client"]);
     assert_eq!(code, 1);
-    assert_eq!(rules(&report), vec!["brief.placeholder"; 5], "{report}");
+    assert_eq!(rules(&report), vec!["brief.placeholder"; 4], "{report}");
 
     let en = |name: &str, brief: String| {
         std::fs::write(&path, brief).unwrap();
@@ -420,7 +416,7 @@ fn a_chore_brief_is_written_and_judged_by_the_chore_rule_set() {
     let (_, report) = en("bump-client", chore_brief("refactor and build"));
     assert_eq!(rules(&report), vec!["brief.chore-category"], "two categories are not one: {report}");
 
-    let with_flow = chore_brief("ci").replace("<!-- canon:section invariants", "<!-- canon:section flow role=normative -->\n## User flow\n\n1. F1 x\n\n<!-- canon:section invariants");
+    let with_flow = chore_brief("ci").replace("## Invariants", "## User flow\n\n1. F1 x\n\n## Invariants");
     let (code, report) = en("bump-client", with_flow);
     assert_eq!((code, rules(&report)), (1, vec!["brief.chore-section".to_string()]), "{report}");
 
@@ -436,4 +432,17 @@ fn a_chore_brief_is_written_and_judged_by_the_chore_rule_set() {
 
     let out = run(dir.path(), &["change", "new", "x", "--subject-id", "demo", "--change-kind", "epic", "--title", "x"]);
     assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+}
+
+/// `text` with one more entry in its frontmatter `waive` list (a new frontmatter when it has none).
+fn waive(text: &str, rule: &str, section: &str, reason: &str, matching: Option<&str>) -> String {
+    let q = |v: &str| serde_json::to_string(v).unwrap();
+    let mut entry = format!("  - rule: {}\n    section: {}\n    reason: {}\n", q(rule), q(section), q(reason));
+    if let Some(m) = matching {
+        entry.push_str(&format!("    match: {}\n", q(m)));
+    }
+    match text.strip_prefix("---\nwaive:\n") {
+        Some(rest) => format!("---\nwaive:\n{entry}{rest}"),
+        None => format!("---\nwaive:\n{entry}---\n\n{text}"),
+    }
 }

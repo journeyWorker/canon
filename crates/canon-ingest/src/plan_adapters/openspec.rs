@@ -736,31 +736,23 @@ pub(crate) fn derive_status(archived: bool, done_count: usize, open_count: usize
 }
 
 /// The change's summary: the first paragraph under proposal.md's
-/// `## Why` heading, or, in a 0.19 PRD brief (one with a
-/// `<!-- canon:section intent … -->` marker), the first paragraph of the
-/// Intent section, after its heading. Whitespace-normalized, plus
-/// whether the heading was found at all (task 2.2: an absent heading
-/// yields an empty summary AND a diagnostic — never invented prose). The
-/// paragraph ends at the first blank line or the next heading, whichever
-/// comes first; leading blank lines between the heading and its first
-/// content line are skipped. In the Intent section a comment line ends
-/// the paragraph (a template hint is not a summary).
+/// `## Why` heading, or, in a PRD brief (one the shared brief reader finds
+/// sections in, [`crate::brief`]), the first paragraph of its `## Intent`
+/// section. Whitespace-normalized, plus whether the heading was found at all
+/// (task 2.2: an absent heading yields an empty summary AND a diagnostic —
+/// never invented prose). The paragraph ends at the first blank line or the
+/// next heading, whichever comes first; leading blank lines between the
+/// heading and its first content line are skipped.
 fn why_summary(proposal_text: &str) -> (String, bool) {
-    const INTENT_MARKER: &str = "<!-- canon:section intent";
+    let brief = crate::brief::parse(proposal_text);
+    if !brief.sections.is_empty() {
+        return match crate::brief::intent_summary(&brief) {
+            Some(summary) => (summary, true),
+            None => (String::new(), false),
+        };
+    }
     let mut lines = proposal_text.lines();
-    let prd = proposal_text.lines().any(|line| line.trim_start().starts_with(INTENT_MARKER));
-    let found = if prd {
-        let marked = lines.by_ref().any(|line| line.trim_start().starts_with(INTENT_MARKER));
-        let mut rest = lines.clone();
-        // Skip the Intent heading itself, which sits between the marker
-        // and the paragraph.
-        if rest.find(|line| !line.trim().is_empty()).is_some_and(|heading| heading.trim_start().starts_with('#')) {
-            lines = rest;
-        }
-        marked
-    } else {
-        lines.by_ref().any(|line| line.trim() == "## Why")
-    };
+    let found = lines.by_ref().any(|line| line.trim() == "## Why");
     if !found {
         return (String::new(), false);
     }
@@ -775,8 +767,8 @@ fn why_summary(proposal_text: &str) -> (String, bool) {
             }
             continue; // still skipping leading blank lines
         }
-        if trimmed.starts_with('#') || (prd && trimmed.starts_with("<!--")) {
-            break; // the next heading (or, in a PRD brief, a hint) before any paragraph content
+        if trimmed.starts_with('#') {
+            break; // the next heading before any paragraph content
         }
         if paragraph_started {
             raw.push(' ');
@@ -973,15 +965,16 @@ mod tests {
         assert!(outcome.tasks.iter().all(|t| !t.task_id.as_str().starts_with("proposal-only-change#")));
     }
 
-    /// 0.19 D1: a PRD brief has no `## Why`; its summary is the first
-    /// paragraph of the Intent section, whatever language the heading is
-    /// in, and a template hint is never the summary.
+    /// 0.19 D1, 0.31: a PRD brief has no `## Why`; its summary is the first
+    /// paragraph of the Intent section, and an empty section is no summary.
     #[test]
     fn a_prd_brief_summary_is_the_intent_sections_first_paragraph() {
-        let brief = "# 제목\n\n<!-- canon:section intent role=context -->\n## 의도\n\n로그인 추가\n\n더 긴 설명.\n\n<!-- canon:section outcome role=normative -->\n## 원하는 결과\n\n본문.\n";
+        let brief = "# 제목\n\n## Intent\n\n로그인 추가\n\n더 긴 설명.\n\n## Desired outcome\n\n본문.\n";
         assert_eq!(why_summary(brief), ("로그인 추가".to_string(), true));
-        let hint_only = "<!-- canon:section intent role=context -->\n## Intent\n\n<!-- canon:hint what and why -->\n";
-        assert_eq!(why_summary(hint_only), (String::new(), true), "a hint is not a summary");
+        let empty = "# t\n\n## Intent\n\n## Desired outcome\n\nbody\n";
+        assert_eq!(why_summary(empty), (String::new(), true), "an empty section is not a summary");
+        let one_heading = "# t\n\n## Intent\n\nnote\n";
+        assert_eq!(why_summary(one_heading), (String::new(), false), "one matching heading is a pre-PRD note, not a PRD brief");
     }
 
     #[test]

@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "agent_id": "rev-031-a",
+    "role": "reviewer",
+    "session_id": "rev-031-w1-2026-10-27"
+  },
+  "at": "2026-10-27T11:40:57.985365601Z",
+  "change_id": "canon-0-31-ci",
+  "code_tree": "33cb4e61f63ce191f9fc1c6897efb48c058cecdb",
+  "disposition": "open",
+  "file_ref": "scripts/check-release-workflow-safety.py:283-288; .github/actions/setup-rust/action.yml",
+  "introduced_by": "cbfb7db731bebcb11314a9a8cb965036f4b6680b",
+  "kind": "finding",
+  "reviewed_sha": "344527efa7742754ac8632a769858ad05704a391",
+  "reviewer": "rev-031-a",
+  "round": 1,
+  "schema": 2,
+  "seq": 1,
+  "severity": "should_fix",
+  "summary": "The full-SHA rule does not reach the new composite action. Rust is now installed through .github/actions/setup-rust, but supply_chain_errors scans only .github/workflows/*.yml (_is_workflow). Seeded on a throwaway worktree, `uses: actions/cache@v5` in setup-rust/action.yml passes the safety check (rc 0); the same ref in pr-guard.yml fails it (rc 1). The action has no external `uses:` today, so the invariant holds now, but every workflow's Rust install now goes through a file the rule never reads. Fix: scan .github/actions/**/action.y*ml with _scan_action_refs/_scan_downloads as well.",
+  "worktree_dirty": false
+}

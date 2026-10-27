@@ -474,3 +474,14 @@ Feature: subject lifecycle
     When the first is reopened, re-verified and shipped, and the second is reopened
     Then the first goes through every step and canon status lists that change as a pending draft
     And the second's refusal names both briefs and its hint is one canon brief approve line holding both ids
+
+  # canon: {"schema":1,"at":"2026-10-27T12:05:01Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:subject-lifecycle
+  @case:failure
+  @flow:canon-0-31-brief-format.F4
+  @subject.lifecycle.47
+  Scenario: Reopen and ship refuse a subject that answers for an old-format brief, and a change it does not answer for never blocks
+    Given a verifying subject answering for an old-format brief, and another whose only old-format brief is a change it does not answer for
+    When each is moved to shipped, and a shipped one is reopened
+    Then the first is refused with OLD_BRIEF_FORMAT and stays where it is
+    And the second moves, because the command does not judge that change

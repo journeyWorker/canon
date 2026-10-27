@@ -84,6 +84,9 @@ const FILE_DEFAULTS: &[(&str, &[&str])] = &[
     ("run/skills.rs", &["skills install", "skills check", "skills doctor"]),
     ("run/tier.rs", &[]),
     ("migrate.rs", &["migrate"]),
+    ("migrate_briefs.rs", &["migrate"]),
+    // `refusal` builds the error for the command that judges the brief.
+    ("old_briefs.rs", &["evidence add", "evidence audit", "subject move", "subject adopt", "scenario new", "review change"]),
     // Every code is next to its emit.
     ("migrate_names.rs", &[]),
     ("policy_approval.rs", &["brief approve", "policy approve"]),
@@ -110,7 +113,7 @@ const TEMPLATED: &[(&str, &[&str])] = &[("divergence", &["divergence resolve", "
 /// A code spliced into a command's own JSON document (`to_json()`), with no
 /// `emit` to name its command (or a helper whose caller emits it for one
 /// command only): the command that prints it.
-const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans"), ("FINDING_UNKNOWN_SCENARIO", "finding add")];
+const SPLICED: &[(&str, &str)] = &[("INGEST_SOURCE_UNUSABLE", "ingest plans"), ("FINDING_UNKNOWN_SCENARIO", "finding add"), ("EVIDENCE_SCENARIO_NOT_INDEXED", "evidence approval-payload")];
 
 /// Codes every command can emit, whatever its sources say: a `--json` usage
 /// error, and the refusal of an unknown `CANON_ROLE` before any command runs.
@@ -306,4 +309,15 @@ fn every_registered_code_is_emitted_by_some_command() {
     let emitted: BTreeSet<&str> = table.values().flatten().copied().collect();
     let orphans: Vec<&str> = all_codes().iter().map(|info| info.code).filter(|c| !emitted.contains(c) && !AWAITING_WIRING.contains(c)).collect();
     assert!(orphans.is_empty(), "registered but attributed to no command: {orphans:?}");
+}
+
+/// A code the sources name for one command only is listed under that command's leaves and no other (a file default must not spread it).
+#[test]
+fn a_spliced_code_is_listed_under_its_own_command_only() {
+    let table = derive();
+    for (code, command) in SPLICED {
+        let listed: BTreeSet<&str> = table.iter().filter(|(_, codes)| codes.contains(code)).map(|(path, _)| *path).collect();
+        let expected: BTreeSet<&str> = leaves_under(command).into_iter().collect();
+        assert_eq!(listed, expected, "`{code}` must be listed under `{command}` only");
+    }
 }

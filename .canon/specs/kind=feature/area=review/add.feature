@@ -419,3 +419,13 @@ Feature: review scenario
     Then the repeat writes no record and shows the earlier review id of each scenario
     And the run after the change writes one record with a new review id and shows the earlier ids of the other two
     And the review id is left out when two reviews are compared, as the time is
+
+  # canon: {"schema":1,"at":"2026-10-27T12:05:04Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:review-attestation
+  @case:edge
+  @flow:canon-0-31-brief-format.F1
+  @review.add.103
+  Scenario: A change review of a chore pins a brief whose chore kind is in the frontmatter and refuses an old-format one
+    Given a chore whose frontmatter says kind: chore and one in the 0.30 format
+    When canon review change runs for each
+    Then the first pins the brief digest of the new text and the second is refused with OLD_BRIEF_FORMAT

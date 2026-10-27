@@ -177,12 +177,12 @@ Feature: context status
   @case:happy
   @context.status.60
   Scenario: Status reads a subject's brief approvals from the canon brief.md of each change it answers for
-    Given a building subject adopting two changes, one tagged by its scenarios and the other with an Approved line, both brief.md carrying a line starting "Approved:" with the human's words
+    Given a building subject adopting a never-approved untagged change and a newer change whose brief.md has a line starting "Approved:" with the human's words
     And a shipped subject with an approved brief and a specced subject
     When canon status runs
     Then the building and shipped subjects each show their briefs as approved, one entry per change it answers for, naming the change, its brief.md and the recorded words, in --json and the human form
     And the specced subject carries no briefs field
-    And no step is addressed to a human
+    And the never-approved change is in pendingDrafts, and the only human step reports that pending draft
 
   # canon: {"schema":1,"at":"2026-10-11T14:44:50Z","actor":{"agent_id":"canon-scaffold"}}
   @subject:context-capability
@@ -377,3 +377,13 @@ Feature: context status
     When canon status --json runs
     Then the subject lists a brief for each of the first three with its brief path, its status approved, unapproved or changed, its reason tagged, approved or chore, and the check counts
     And pendingDrafts holds only the never-approved feature change, flow holds the steps of the tagged change, and statusVersion is 4
+
+  # canon: {"schema":1,"at":"2026-10-27T12:05:02Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:context-capability
+  @case:happy
+  @flow:canon-0-31-brief-format.F4
+  @context.status.87
+  Scenario: status, gate check, context and brief show warn about an old-format brief and lead with canon migrate
+    Given a repo with a 0.30 brief
+    When canon status, canon gate check, canon context and canon brief show run
+    Then each warns without a config error and puts canon migrate first among the next steps, and still reports as before

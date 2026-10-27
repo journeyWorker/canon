@@ -1099,9 +1099,16 @@ pub struct RevertPlan {
     manifest: Manifest,
     diff: Diff,
     journal: Option<Journal>,
+    /// Restoring puts back an `Approved:` digest or a review pin: the human's (0.31 `brief-format`).
+    briefs: crate::migrate_briefs::RevertNote,
 }
 
 impl RevertPlan {
+    /// Whether the revert restores an `Approved:` line or a review pin.
+    pub fn rebinds(&self) -> bool {
+        self.briefs.rebinds
+    }
+
     /// The backup directory the plan restores from.
     pub fn backup(&self) -> &Path {
         &self.backup
@@ -1165,6 +1172,7 @@ pub fn revert_plan(repo: &Path, backup: &Path) -> Result<RevertPlan, String> {
             return Err(format!("the backup {} lacks its copy of {path}; it cannot restore the repo", backup.display()));
         }
     }
+    let briefs = crate::migrate_briefs::check_revert(repo, backup)?;
     let diff = diff(repo, &manifest)?;
     let journal = match std::fs::read_to_string(backup.join(JOURNAL)) {
         Ok(text) if !diff.is_empty() => Some(serde_json::from_str::<Journal>(&text).map_err(|e| format!("the journal in {} is unreadable: {e}", backup.display()))?),
@@ -1175,7 +1183,7 @@ pub fn revert_plan(repo: &Path, backup: &Path) -> Result<RevertPlan, String> {
             return Err(format!("the migrate re-keyed Postgres rows and ${dsn_env} is not set, so their old keys cannot be restored; set it and run the revert again"));
         }
     }
-    Ok(RevertPlan { backup: backup.to_path_buf(), manifest, diff, journal })
+    Ok(RevertPlan { backup: backup.to_path_buf(), manifest, diff, journal, briefs })
 }
 
 #[cfg(unix)]
@@ -1295,6 +1303,11 @@ pub fn run_revert(repo_args: &crate::cli::RepoArgs, backup: Option<&Path>, mode:
             crate::json_out::data_with_next("migrate", &report, &report.plan.next_step(&base, "the plan only lists what the revert would restore; applying it takes its planDigest"));
         }
         return 0;
+    }
+    if plan.rebinds() {
+        if let Some(error) = crate::migrate_briefs::human_only("canon migrate --revert", &format!("{base} --commit --plan-digest {}", safe_plan.plan_digest)) {
+            return error.emit("canon migrate", json);
+        }
     }
     let safe_plan = safe_plan.committed();
     if let Err(e) = revert_apply(&repo, &plan) {

@@ -517,6 +517,8 @@ pub fn announce(repo: &Path) {
     let legacy = detect(repo);
     // A 0.29 ledger layout (0.30 `ledger-naming`): the same `canon migrate` step; one step when both hold.
     crate::old_layout::announce(repo, legacy.is_none());
+    // 0.31 `brief-format`: a brief in the 0.30 format.
+    crate::old_briefs::announce(repo);
     if let Some(found) = legacy {
         let stale = if found.skill { format!("; {STALE_GUIDE}") } else { "; run `canon migrate --json` to preview the upgrade".to_string() };
         crate::json_out::warn(format!("this repo holds 0.27-era canon state ({}){stale}", found.what()));

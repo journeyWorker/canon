@@ -45,13 +45,13 @@ fn ok(repo: &Path, args: &[&str]) -> Output {
 /// A complete English brief, so `canon brief approve` accepts it.
 fn brief() -> String {
     "# Change\n\n\
-<!-- canon:section intent role=context -->\n## Intent\n\nChange\n\nVisitors lose their cart when they switch devices.\n\n\
-<!-- canon:section outcome role=normative -->\n## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
-<!-- canon:section flow role=normative -->\n## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n\n\
-<!-- canon:section detail role=normative -->\n## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n\
-<!-- canon:section acceptance role=normative -->\n## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie. ==**F1 is the happy path.**==\n\n\
-<!-- canon:section questions role=question -->\n## Questions and assumptions\n\nNone.\n\n\
-<!-- canon:section out-of-scope role=context -->\n## Out of scope\n\nSocial sign-in.\n"
+## Intent\n\nChange\n\nVisitors lose their cart when they switch devices.\n\n\
+## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
+## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n\n\
+## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n\
+## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie. ==**F1 is the happy path.**==\n\n\
+## Questions and assumptions\n\nNone.\n\n\
+## Out of scope\n\nSocial sign-in.\n"
         .to_string()
 }
 
@@ -118,6 +118,8 @@ fn skills_install_69_one_call_approves_several_changes_with_one_answer_and_one_t
         assert_eq!(without_time(many.path(), change), without_time(each.path(), change), "{change} reads as approved one at a time");
     }
     assert_eq!(policy_approval(many.path()), policy_approval(each.path()));
+    let recorded: Value = serde_json::from_str(&std::fs::read_to_string(many.path().join(".canon/policy.approval.json")).unwrap()).unwrap();
+    assert_eq!(recorded["approved_at"], times[0].as_str(), "the policy approval carries the call's one time");
     let status: Value = serde_json::from_str(&stdout(&ok(many.path(), &["brief", "check", "a", "--json"]))).unwrap();
     assert_eq!(status["data"]["change"], "a");
 
@@ -241,10 +243,44 @@ fn skills_install_73_the_docs_state_the_governing_change_rule_and_the_briefs_lis
 
     let help = run(Path::new("."), &["brief", "approve", "--help"]);
     assert!(stdout(&help).contains("[CHANGE_ID]...") && stdout(&help).contains("one refused id refuses the call"), "{}", stdout(&help));
+    let status_help = run(Path::new("."), &["status", "--help"]);
+    assert!(stdout(&status_help).contains("pending draft") && stdout(&status_help).contains("`briefs` lists one entry per change the subject answers for"), "{}", stdout(&status_help));
+    let evidence_help = run(Path::new("."), &["evidence", "add", "--help"]);
+    assert!(stdout(&evidence_help).contains("an unapproved chore or a pending draft never blocks evidence"), "{}", stdout(&evidence_help));
+    assert!(repo_file("canon/skills/reference/canon-subject.md").contains("\"statusVersion\": 4"));
     let spec = repo_file("docs/cli/canon.cli.json");
     assert!(spec.contains("BriefApproveManyReport") && spec.contains("\"briefs\"") && spec.contains("brief approve --json"), "the schema document carries the new shapes");
 
     let dir = repo();
     let status: Value = serde_json::from_str(&stdout(&ok(dir.path(), &["status", "--json"]))).unwrap();
     assert_eq!(status["data"]["statusVersion"], 4);
+}
+
+/// skills.install.72: a disk error while writing exits 1, leaves the ids written
+/// before it approved, marks the failed id and skips the rest; a rerun after the
+/// fix reports the written ones unchanged.
+#[test]
+#[cfg(unix)]
+fn skills_install_72_a_write_failure_keeps_earlier_ids_and_skips_the_rest() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = repo();
+    let repo = dir.path();
+    let locked = brief_path(repo, "b");
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o444)).unwrap();
+    if std::fs::OpenOptions::new().write(true).open(&locked).is_ok() {
+        eprintln!("skipping: the files are writable despite mode 0444 (running as root)");
+        return;
+    }
+    let out = run(repo, &[&["brief", "approve", "a", "b", "c", "--json"][..], &ANSWER].concat());
+    assert_eq!(out.status.code(), Some(1), "{}", stdout(&out));
+    let doc: Value = serde_json::from_str(&stdout(&out)).unwrap();
+    let outcomes: Vec<&str> = doc["data"]["approvals"].as_array().unwrap().iter().map(|a| a["outcome"].as_str().unwrap()).collect();
+    assert_eq!(outcomes, ["written", "failed", "skipped"], "{doc}");
+    assert!(std::fs::read_to_string(brief_path(repo, "a")).unwrap().contains("Approved: Ana "));
+    assert!(!std::fs::read_to_string(brief_path(repo, "c")).unwrap().contains("Approved:"));
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o644)).unwrap();
+    let again = ok(repo, &[&["brief", "approve", "a", "b", "c", "--json"][..], &ANSWER].concat());
+    let doc: Value = serde_json::from_str(&stdout(&again)).unwrap();
+    let outcomes: Vec<&str> = doc["data"]["approvals"].as_array().unwrap().iter().map(|a| a["outcome"].as_str().unwrap()).collect();
+    assert_eq!(outcomes, ["unchanged", "written", "written"], "{doc}");
 }

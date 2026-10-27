@@ -12,7 +12,7 @@ use tempfile::TempDir;
 
 const FEATURE: &str = ".canon/specs/kind=feature/area=shop/cart.feature";
 const SCENARIO: &str = "shop.cart.01";
-const CHORE_BRIEF: &str = "# Bump the client\n\n<!-- canon:kind chore -->\n\n## Intent\n\nBump the client\n\nApproved: Journey 2026-10-12T00:00:00Z — \"go\"\n";
+const CHORE_BRIEF: &str = "---\nkind: chore\n---\n\n# Bump the client\n\n## Intent\n\nBump the client\n\nApproved: Journey 2026-10-12T00:00:00Z — \"go\"\n";
 
 fn canon(repo: &Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_canon")).args(args).env("CANON_ACTOR", "canon").env_remove("CANON_ROLE").current_dir(repo).output().expect("spawn canon")

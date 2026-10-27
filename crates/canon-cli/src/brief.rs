@@ -226,6 +226,10 @@ pub struct BriefStatus {
     /// planner step's polish hint); never serialized.
     #[serde(skip)]
     pub advisory_rules: Vec<String>,
+    /// The brief is in the format canon 0.30 and earlier wrote (0.31): a
+    /// command that writes and judges it is refused ([`crate::old_briefs`]).
+    #[serde(skip)]
+    pub old_format: Option<crate::old_briefs::OldBrief>,
 }
 
 impl BriefStatus {
@@ -327,6 +331,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
             legacy_approval: false,
             findings: None,
             advisory_rules: Vec::new(),
+            old_format: None,
         });
     };
     let brief = canon_brief(repo, change);
@@ -336,6 +341,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
             let text = std::fs::read_to_string(&path).unwrap_or_default();
             let verdict = approval_of(&text);
             let approval = field(&text, "Approved:").map(str::to_string);
+            let old_format = canon_ingest::brief::parse(&text).old_format.map(|old| crate::old_briefs::OldBrief { change: change.as_str().to_string(), path: rel(repo, &path), what: old.describe() });
             BriefStatus {
                 status: BriefState::of(&verdict),
                 reason: None,
@@ -350,6 +356,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 legacy_approval: matches!(verdict, Approval::Unbound { .. }),
                 findings: None,
                 advisory_rules: Vec::new(),
+                old_format,
             }
         }
         None => match external() {
@@ -367,6 +374,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 legacy_approval: false,
                 findings: None,
                 advisory_rules: Vec::new(),
+                old_format: None,
             },
             None if proposed => return None,
             None => BriefStatus {
@@ -383,6 +391,7 @@ pub fn brief_of(repo: &Path, plan_roots: &[PathBuf], subject: &Subject, changes:
                 legacy_approval: false,
                 findings: None,
                 advisory_rules: Vec::new(),
+                old_format: None,
             },
         },
     };
@@ -572,9 +581,11 @@ fn first_adopted_at(ctx: &GateContext, subject: &Subject) -> Option<DateTime<Utc
 ///    behavior, attested before any approved scope, so a subject built
 ///    before briefs existed keeps re-verifying (a waiver never becomes a
 ///    standing exemption);
-/// 3. otherwise the newest adopted change, so a new subject's first
-///    scenarios wait for its first brief.
-fn untagged_scope(repo: &Path, changes: &[ChangeId], evidenced: impl FnOnce() -> bool) -> Vec<ChangeId> {
+/// 3. otherwise the change the subject waits on for a first approval: its
+///    newest tagged change, or, with no governing change at all, its newest
+///    adopted change ([`Governing::awaiting`]). A chore or a pending draft
+///    is never it, so neither blocks evidence.
+fn untagged_scope(repo: &Path, changes: &[ChangeId], waiting_on: Option<ChangeId>, evidenced: impl FnOnce() -> bool) -> Vec<ChangeId> {
     let approved: Vec<ChangeId> = changes.iter().filter(|change| has_approved_line(repo, change)).cloned().collect();
     if !approved.is_empty() {
         return approved;
@@ -582,7 +593,7 @@ fn untagged_scope(repo: &Path, changes: &[ChangeId], evidenced: impl FnOnce() ->
     if evidenced() {
         return Vec::new();
     }
-    changes.last().cloned().into_iter().collect()
+    waiting_on.into_iter().collect()
 }
 
 /// Every subject an attestation for `task` and/or `scenario` builds
@@ -635,7 +646,9 @@ pub fn attested_briefs<'a>(
                             })
                     })
                 };
-                answers.extend(untagged_scope(repo, &changes, evidenced));
+                let governing = governing(repo, ctx, flow_changes, subject, &changes);
+                let waiting_on = governing.governed.iter().rev().find(|(_, reason)| *reason == Reason::Tagged).map(|(change, _)| change.clone()).or(governing.awaiting.clone());
+                answers.extend(untagged_scope(repo, &changes, waiting_on, evidenced));
             } else {
                 answers.extend(counted);
             }

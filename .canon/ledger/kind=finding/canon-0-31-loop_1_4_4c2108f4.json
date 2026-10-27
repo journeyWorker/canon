@@ -1,0 +1,25 @@
+{
+  "actor": {
+    "agent_id": "rev-031-a",
+    "role": "reviewer",
+    "session_id": "rev-031-w1-2026-10-27"
+  },
+  "at": "2026-10-27T11:40:55.980728913Z",
+  "change_id": "canon-0-31-loop",
+  "code_tree": "33cb4e61f63ce191f9fc1c6897efb48c058cecdb",
+  "disposition": "open",
+  "file_ref": "crates/canon-cli/tests/status.rs:695-736",
+  "introduced_by": "344527efa7742754ac8632a769858ad05704a391",
+  "kind": "finding",
+  "reviewed_sha": "344527efa7742754ac8632a769858ad05704a391",
+  "reviewer": "rev-031-a",
+  "round": 1,
+  "scenario_ids": [
+    "context.status.60"
+  ],
+  "schema": 2,
+  "seq": 4,
+  "severity": "should_fix",
+  "summary": "[spec-fidelity] The context.status.60 test contradicts the reworded scenario. The Given wants a building subject with two changes, one tagged and one approved-line, both approved. The test seeds c-first with no approval and no tagged scenario, so c-first is a pending draft. The test then asserts the human step `demo-subject`, while the Then says `no step is addressed to a human`. The `reason: tagged` entry is never produced, and the doc comment still describes the newest-change rule. Fix: seed a tagged approved change plus an approved-line change and assert two approved entries and no human step.",
+  "worktree_dirty": false
+}

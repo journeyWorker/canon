@@ -44,14 +44,13 @@ use canon_model::{paths, Change, ChangeId, SubjectId, SubjectStatus};
 use crate::cli_error::CliError;
 use crate::context::resolve_repo_root;
 use crate::brief_template::ChangeKind;
-use crate::language::Language;
 
 /// `brief.md`: the PRD brief or, for a chore, the chore brief
-/// ([`crate::brief_template`], 0.19 D1/D5) in the repo's `language:`.
-/// The Intent section's first paragraph is the title, which imports as
-/// `Change.summary`.
-fn brief_md(kind: ChangeKind, title: &str, language: &Language) -> String {
-    crate::brief_template::brief(kind, title, language)
+/// ([`crate::brief_template`], 0.19 D1/D5, 0.31): empty `##` sections under
+/// the title. The Intent section's first paragraph is the title, which
+/// imports as `Change.summary`.
+fn brief_md(kind: ChangeKind, title: &str) -> String {
+    crate::brief_template::brief(kind, title)
 }
 
 /// `path` relative to `repo` for output, or as-is when it is not under it.
@@ -96,10 +95,10 @@ fn first_missing_ancestor(dir: &Path) -> PathBuf {
 /// the native `canon` plan adapter: the one `Change` it yields is
 /// exactly what `canon ingest plans` would import from the published
 /// dir.
-fn stage_change(staging: &Path, slug: &ChangeId, kind: ChangeKind, title: &str, language: &Language) -> Result<Change, String> {
+fn stage_change(staging: &Path, slug: &ChangeId, kind: ChangeKind, title: &str) -> Result<Change, String> {
     let dir = staging.join(slug.as_str());
     fs::create_dir_all(&dir).map_err(|e| format!("failed to create the staging dir `{}`: {e}", dir.display()))?;
-    fs::write(dir.join("brief.md"), brief_md(kind, title, language)).map_err(|e| format!("failed to stage `brief.md`: {e}"))?;
+    fs::write(dir.join("brief.md"), brief_md(kind, title)).map_err(|e| format!("failed to stage `brief.md`: {e}"))?;
     let entry = native_plan_adapter();
     let outcome = entry.adapter.parse(&PlanSourceHandle::Path(staging.to_path_buf()));
     if !outcome.malformed.is_empty() {
@@ -131,12 +130,10 @@ impl crate::reports::Report for ChangeNewReport<'_> {}
 /// refused or failed with nothing left behind.
 pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: ChangeKind, title: &str, json: bool) -> u8 {
     let repo = resolve_repo_root(repo);
-    let language = match crate::language::configured(&repo) {
-        Ok(language) => language,
-        Err(e) => {
-            return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon change new", json);
-        }
-    };
+    // The brief no longer carries the language, but a `canon.yaml` canon cannot read is still refused here.
+    if let Err(e) = crate::language::configured(&repo) {
+        return CliError::refused("CONFIG_UNREADABLE", e.to_string()).hint("fix canon.yaml so it parses (`canon init --check` reports what is wrong), then run the command again").emit("canon change new", json);
+    }
 
     let subject = match crate::subject::lookup_adoption(&repo, subject_id, slug) {
         Ok((None, _)) => {
@@ -161,7 +158,7 @@ pub fn run_new(repo: &Path, slug: &ChangeId, subject_id: &SubjectId, kind: Chang
 
     let staging_path = repo.join(paths::CANON_DIR).join(format!("change-new-{}-{}", slug.as_str(), std::process::id()));
     let staging = Created(Some(first_missing_ancestor(&staging_path)));
-    let change = match stage_change(&staging_path, slug, kind, title, &language) {
+    let change = match stage_change(&staging_path, slug, kind, title) {
         Ok(change) => change,
         Err(e) => {
             return CliError::refused("CHANGE_INVALID_ARGUMENT", e.clone()).hint("`canon schema change new` lists the accepted arguments and their forms").emit("canon change new", json);

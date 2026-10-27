@@ -151,7 +151,7 @@ still draws a finding. Never waive the rule for the whole section.
 
 - en. Before: "On 3 March the team agreed on a grid as the default view." After: "The default view is a grid."
 - ko. 전: "3월 3일 회의에서 기본 보기를 격자로 하기로 했다." 후: "기본 보기는 격자다."
-- waive one date: `<!-- canon:waive prose.decision-history detail "연체 요금은 2026-12-01부터 적용되는 동작이다" match="2026-12-01" -->`
+- waive one date: frontmatter entry `rule: prose.decision-history`, `section: detail`, `reason: "연체 요금은 2026-12-01부터 적용되는 동작이다"`, `match: "2026-12-01"`
 
 What it misses: a decision written in other words ("회의에서 정한 대로" is not
 listed on purpose, it reads as behavior). Over-reports: a date that is
@@ -209,8 +209,8 @@ uses the section key `brief`.
 
 - `canon brief check --json`: read the `prose.*` findings, then the sections they sit in. Fix by section, not by rule.
 - A finding is a prompt to reread, not a verdict. When the flagged text is the precise term (a state name, a quoted label, a command), keep it and waive that rule in that section:
-  `<!-- canon:waive <rule-id> <section-key> "<reason>" -->`
-  To waive one finding and keep the rest of the rule live in that section, add the text the finding names: `<!-- canon:waive <rule-id> <section-key> "<reason>" match="<text>" -->` (after the reason's closing quote only a whole `match="<text>"` is allowed; `match =`, `MATCH=`, an unquoted or empty match or extra text is a blocker, and a reason holds no double quote).
+  an entry of the frontmatter `waive` list: `- rule: <rule-id>`, `section: <section-key>`, `reason: "<reason>"`.
+  To waive one finding and keep the rest of the rule live in that section, add the text the finding names as `match: "<text>"` (an empty reason or match, an unknown rule id or an unknown key is a blocker).
   A waiver is right when the text is a quotation or a fixed term, and wrong when it excuses a sentence you could simply rewrite. One rule, one section, a reason the human can read.
 
 ## The loop
@@ -224,7 +224,7 @@ uses the section key `brief`.
 
 - Never change meaning: no flow step, rule, limit or failure path added, removed or softened while rewording.
 - Never rewrite to dodge a rule (a near synonym, a list used to hide a long sentence); say the concrete thing.
-- Never touch flow ids or subheadings, and never polish the markers.
+- Never touch flow ids or subheadings, and never polish the headings.
 - Never translate the brief to match a `language:` setting.
 - Never treat a clean run as a claim about who wrote the brief.
 

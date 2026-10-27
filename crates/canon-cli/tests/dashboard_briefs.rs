@@ -32,13 +32,13 @@ fn ok(repo: &Path, args: &[&str]) {
 fn clean_brief(title: &str) -> String {
     format!(
         "# {title}\n\n\
-<!-- canon:section intent role=context -->\n## Intent\n\n{title}\n\nVisitors lose their cart when they switch devices.\n\n\
-<!-- canon:section outcome role=normative -->\n## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
-<!-- canon:section flow role=normative -->\n## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n2. F2 The visitor submits a wrong password → sees an error → can retry.\n\n\
-<!-- canon:section detail role=normative -->\n## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n### F2 Failed submit\n\nFive failures lock the form for thirty seconds.\n\n\
-<!-- canon:section acceptance role=normative -->\n## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie.\n- F2: a wrong password shows the error and sets no cookie. ==**F2 covers the failure path.**==\n\n\
-<!-- canon:section questions role=question -->\n## Questions and assumptions\n\nNone.\n\n\
-<!-- canon:section out-of-scope role=context -->\n## Out of scope\n\nSocial sign-in.\n"
+## Intent\n\n{title}\n\nVisitors lose their cart when they switch devices.\n\n\
+## Desired outcome\n\nA visitor who signs in sees the saved cart. ==**The cart follows the account.**==\n\n\
+## User flow\n\n1. F1 The visitor sees the form → submits credentials → lands on the catalog. ==**Only a valid sign-in opens a session.**==\n2. F2 The visitor submits a wrong password → sees an error → can retry.\n\n\
+## Step detail\n\n### F1 Submit\n\nThe server issues the session. ==**The password is never logged.**==\n\n### F2 Failed submit\n\nFive failures lock the form for thirty seconds.\n\n\
+## Acceptance\n\n- F1: valid credentials open the catalog and set a session cookie.\n- F2: a wrong password shows the error and sets no cookie. ==**F2 covers the failure path.**==\n\n\
+## Questions and assumptions\n\nNone.\n\n\
+## Out of scope\n\nSocial sign-in.\n"
     )
 }
 
@@ -266,19 +266,32 @@ fn report_dashboard_11_lists_the_advisory_findings_of_a_brief_without_blockers()
     assert_eq!(ready["counts"], json!({ "blockers": 0, "advisories": advisories }), "{ready}");
 }
 
-/// report.dashboard.05: sections are found by marker, so a Korean brief reads the same.
+/// report.dashboard.16: sections are found by their English heading, so the page reads the key, the role and the
+/// flow steps from it, a Korean-prose brief reads the same, and a brief with a shipped Korean heading is flagged old-format.
 #[test]
-fn report_dashboard_05_reads_korean_headings_by_their_markers() {
+fn report_dashboard_16_reads_sections_by_their_english_headings() {
     let dir = repo_with_briefs();
-    let text = clean_brief("Ready change").replace("## User flow", "## 사용자 흐름").replace("## Acceptance", "## 인수 기준");
+    let text = clean_brief("Ready change").replace("The visitor sees the form", "방문자는 입력란을 본다");
     std::fs::write(brief_path(dir.path(), "ready"), text).unwrap();
     let live = serve(dir.path());
     let ready = brief_of(&live, "ready");
-    let flow = ready["sections"].as_array().unwrap().iter().find(|s| s["key"] == "flow").unwrap();
-    assert_eq!(flow["heading"], "사용자 흐름");
-    assert_eq!(flow["steps"].as_array().unwrap().len(), 2);
-    let acceptance = ready["sections"].as_array().unwrap().iter().find(|s| s["key"] == "acceptance").unwrap();
-    assert_eq!(acceptance["heading"], "인수 기준");
+    let sections = ready["sections"].as_array().unwrap();
+    let flow = sections.iter().find(|s| s["key"] == "flow").unwrap();
+    assert_eq!((flow["heading"].as_str(), flow["role"].as_str(), flow["steps"].as_array().unwrap().len()), (Some("User flow"), Some("normative"), 2));
+    let roles: Vec<(&str, &str)> = sections.iter().map(|s| (s["key"].as_str().unwrap(), s["role"].as_str().unwrap())).collect();
+    assert_eq!(
+        roles,
+        [("intent", "context"), ("outcome", "normative"), ("flow", "normative"), ("detail", "normative"), ("acceptance", "normative"), ("questions", "question"), ("out-of-scope", "context")]
+    );
+
+    // A shipped Korean heading is the old format: the page names `canon migrate` as the way out and approval is blocked.
+    let old = clean_brief("Ready change").replace("## User flow", "## 사용자 흐름");
+    std::fs::write(brief_path(dir.path(), "ready"), old).unwrap();
+    let live = serve(dir.path());
+    let ready = brief_of(&live, "ready");
+    let found = ready["findings"].as_array().unwrap();
+    assert!(found.iter().any(|f| f["rule"] == "brief.old-format" && f["blocksApproval"] == true && f["hint"].as_str().unwrap().contains("canon migrate")), "{ready}");
+    assert_eq!(ready["approvable"], false, "{ready}");
 }
 
 /// report.dashboard.06: approving from the page records what the CLI records.

@@ -886,3 +886,14 @@ Feature: evidence add
     Then the first exits 2 with EVIDENCE_SCENARIO_NOT_INDEXED, its message names the id and the spec root and its hint points to canon inventory sync, and stdout is empty
     And the indexed scenario exits 0 and prints the bytes to sign
     And the tree is unchanged after both
+
+  # canon: {"schema":1,"at":"2026-10-27T12:05:00Z","actor":{"agent_id":"impl-031-bf","role":"implementer","session_id":"bf-2026-10-27"}}
+  @subject:evidence-attestation
+  @case:failure
+  @flow:canon-0-31-brief-format.F4
+  @evidence.add.131
+  Scenario: evidence add is refused, writing nothing, when a brief it judges is in the 0.30 format, approved or not
+    Given a subject whose adopted change has a brief in the 0.30 format, approved with a matching digest and not
+    When canon evidence add runs for a scenario the subject answers for
+    Then it exits 2 with OLD_BRIEF_FORMAT whose hint is canon migrate, writes nothing, and --override-reason does not waive it
+    And an approved old brief whose digest matches still reads as approved by status

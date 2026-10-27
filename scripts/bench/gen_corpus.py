@@ -258,31 +258,28 @@ def review_body(clock, sid, reviewer, pin, tree, digest, verdict):
 
 
 CHORE_BRIEF = """\
+---
+kind: chore
+---
+
 # Chore for {sid}
 
-<!-- canon:kind chore -->
-
-<!-- canon:section intent role=context -->
 ## Intent
 
 Keep the build of {sid} tidy.
 
-<!-- canon:section category role=context -->
 ## Category
 
 refactor
 
-<!-- canon:section invariants role=normative -->
 ## Invariants
 
 The behavior of every scenario of {sid} does not change.
 
-<!-- canon:section checks role=normative -->
 ## Checks
 
 The bench suite is run again at the chore commit.
 
-<!-- canon:section out-of-scope role=context -->
 ## Out of scope
 
 None.

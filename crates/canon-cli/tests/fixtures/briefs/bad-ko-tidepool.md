@@ -1,26 +1,22 @@
 # 여객선 예약 좌석 임시 확보 해제
 
-<!-- canon:section intent role=context -->
-## 의도
+## Intent
 
 Tidepool 앱의 booking flow에서 사용자가 seat hold를 만든 뒤 결제 화면을 벗어나면 hold가 release되지 않아 (2026-09-14 현장 제보 기준 하루 평균 40석 이상) 다른 승객이 같은 선실을 예약하지 못하는 문제가 있으며, 이 문제는 성수기(7월~8월)에 특히 두드러지고 (운영팀 집계), 따라서 hold의 lifecycle을 payment intent와 분리해서 관리하는 쪽으로 2026-09-20 회의에서 결정했다. 이를 통해 원활하고 견고한 예약 경험을 제공하는 것이 이번 변경의 north star다 (관련 논의는 10월 3일 스레드 참고).
 
 현장 제보가 처음 들어온 것은 8월 말이었고 (고객센터 티켓 기준 14건) 그때는 개별 승객의 실수로 보았으나, 9월 들어 같은 패턴이 반복되어 (선착장별 집계 `reports/hold_leak_2026w37.csv`) 구조적인 문제로 판단했다. 이번 변경은 hold를 결제와 분리하는 첫 단계이며 후속으로 대기자 알림과 환불 흐름 정리를 이어 갈 계획이다 (범위 밖 참고).
 
-<!-- canon:section outcome role=normative -->
-## 원하는 결과
+## Desired outcome
 
 승객이 결제 화면을 벗어나면 확보해 둔 좌석이 정해진 시간 안에 풀려 다른 승객이 예약할 수 있습니다 (기본 10분, 설정값 `hold_ttl_seconds`로 조정 가능). 매우 중요한 점은 결제가 이미 시작된 좌석은 풀리지 않는다는 것이다 (`src/booking/seat_hold.rs:88`).
 
-<!-- canon:section flow role=normative -->
-## 사용자 흐름
+## User flow
 
 1. F1 승객은 좌석 선택 화면에서 선실을 고르고 → "계속"을 누르면 → 선실이 10분 동안 확보되고 남은 시간이 표시된다 (타이머는 `HoldTimer` 컴포넌트).
 2. F2 승객은 결제 화면에서 뒤로 가기를 누르고 → 좌석 선택 화면으로 돌아오면 → 확보가 유지되고 남은 시간이 이어서 줄어든다 (2026-10-02 변경).
 3. F3 승객은 10분 동안 아무것도 하지 않고 → 만료 안내를 보면 → 선실이 풀리고 처음 화면으로 돌아간다 (`SeatHold::release()`).
 
-<!-- canon:section detail role=normative -->
-## 단계 상세
+## Step detail
 
 ### F1 좌석 확보
 
@@ -49,8 +45,7 @@ Tidepool 앱의 booking flow에서 사용자가 seat hold를 만든 뒤 결제 �
 - 결제 도중 앱이 종료되면 서버는 PG사 확정 응답이 올 때까지 hold를 유지하고 (최대 15분) 그 안에 응답이 없으면 결제 실패로 간주해 hold를 푼다 (`crates/tide-jobs/src/stale_payment.rs:40`). 이 15분은 PG사 계약상 응답 한도를 따른 값이며 2026-09-25 PG사 회의에서 확인했다.
 - 선착장 현장 단말에서 만든 hold는 승객 세션이 없으므로 단말 식별자를 키로 쓰고 (`terminal_id`), 만료 시간은 3분으로 줄인다 (현장 줄이 길어 오래 잡아 두면 안 된다는 운영팀 의견을 반영했다).
 
-<!-- canon:section acceptance role=normative -->
-## 인수 조건
+## Acceptance
 
 - F1: 선실을 고르고 계속을 누르면 hold가 한 건 생기고 타이머가 10분에서 시작합니다 (`tests/holds_create.rs:12`).
 - F2: 결제 화면에서 뒤로 가도 hold가 유지되고 타이머가 이어집니다 (`tests/holds_back.rs:30`, 2026-10-02 추가).
@@ -60,14 +55,12 @@ Tidepool 앱의 booking flow에서 사용자가 seat hold를 만든 뒤 결제 �
 - 성수기 부하를 고려해 만료 작업은 1회에 최대 500건만 지운다 (`crates/tide-jobs/src/expire.rs:63`, 2026-10-09 추가). 남은 건은 다음 주기에 처리하며 이 경우 최대 지연은 10분이다 (5분 주기 두 번).
 - 운영 대시보드에는 확보 건수, 만료 건수, 결제 전환 건수가 각각 집계되어야 한다 (`ops/dashboards/holds.json`). 각 집계는 5분 단위로 갱신하며 (기존에는 1시간 단위였다) 이 변경은 2026-10-10 운영 회의에서 합의했다.
 
-<!-- canon:section questions role=question -->
-## 질문과 가정
+## Questions and assumptions
 
 - hold 시간 10분이 적절한지 (성수기에는 더 짧아야 할 수도 있다) 운영팀과 다시 이야기해 보면 좋겠습니다. 2026-09-20 회의에서는 일단 10분으로 하기로 했다.
 - PG사 pending 응답이 평균 얼마나 걸리는지 (현재는 30초 안팎으로 추정) 확인이 필요하다.
 - 만료 작업 주기 5분이 너무 길지 않은지 (최대 5분 늦게 풀릴 수 있다) 검토해 주세요.
 
-<!-- canon:section out-of-scope role=context -->
-## 범위 밖
+## Out of scope
 
 환불 처리(`src/billing/refund.rs`)와 대기자 알림 기능은 이번 변경에서 다루지 않습니다.
