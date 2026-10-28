@@ -1,0 +1,34 @@
+{
+  "actor": {
+    "agent_id": "rev-031-d",
+    "role": "reviewer",
+    "session_id": "rev-031-d-2026-10-28"
+  },
+  "at": "2026-10-28T09:46:43.868372Z",
+  "code_tree": "de016efbe9c3455f006369945acb6c977c0f156e",
+  "kind": "review",
+  "pin": "51d3138ea2d7bb34b584c8fcb97f34817f2d4837",
+  "pins": {
+    "checks": [
+      {
+        "checks": [
+          "junit:partition::tests::review_add_05_a_reviews_coordinate_comes_from_its_scenario_id_not_a_plausible_directory"
+        ],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "bf46050c9eb1861eb0997dabe2e76b033cce0197220f2ddbc74c1d1bdf2e1ac6",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "canon",
+  "provenance_ref": {
+    "upstream_ref": "feat/0.31"
+  },
+  "review_id": "01M60YF8RW85KYMEYQPZX9TASV",
+  "reviewer": "rev-031-d",
+  "reviewer_harness": "omp",
+  "scenario_id": "review.add.05",
+  "schema": 2,
+  "worktree_dirty": true
+}
