@@ -1022,6 +1022,15 @@ fn authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and
     assert_eq!(tree(r), before_refusal, "a refused preview writes nothing");
     write_brief(r, "z", &z_text);
 
+    // A file the migrate left that was deleted since is a change too: the revert would bring it back.
+    fs::remove_file(brief_file(r, "z")).unwrap();
+    let before_refusal = tree(r);
+    let out = canon(r, &["migrate", "--revert", "--json"]);
+    assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
+    assert!(json(&out)["error"]["message"].as_str().unwrap().contains(".canon/changes/z/brief.md"), "{}", out_text(&out));
+    assert_eq!(tree(r), before_refusal, "a refused preview writes nothing");
+    write_brief(r, "z", &z_text);
+
     // And for a record version the migrate's journal does not hold: a finding written after it.
     let finding = canon_as(r, Some("reviewer"), &["finding", "add", "--change", "z", "--round", "1", "--seq", "1", "--severity", "note", "--actor", "rev", "--summary", "later", "--promote", "--json"]);
     assert!(finding.status.success(), "{}", out_text(&finding));

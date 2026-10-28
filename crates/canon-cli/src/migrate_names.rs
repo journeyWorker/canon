@@ -1081,8 +1081,9 @@ pub fn seal(repo: &Path, backup: &Path) -> Result<(), String> {
     std::fs::write(backup.join(SEALED), text).map_err(|e| format!("could not write {SEALED}: {e}"))
 }
 
-/// The files the revert would restore or remove that differ from what the migrate left (or did not exist then): a
-/// later edit, approval or record version, whoever's. Empty when the backup holds no seal (an older one).
+/// The files the revert would restore or remove that differ from what the migrate left (or did not exist then, or
+/// were deleted since): a later edit, deletion, approval or record version, whoever's. Empty when the backup holds no
+/// seal (an older one).
 fn changed_since_migrate(repo: &Path, backup: &Path, manifest: &Manifest, diff: &Diff) -> Result<Vec<String>, String> {
     let Ok(text) = std::fs::read_to_string(backup.join(SEALED)) else { return Ok(Vec::new()) };
     let sealed: BTreeMap<String, String> = serde_json::from_str(&text).map_err(|e| format!("{SEALED} in {} is unreadable: {e}", backup.display()))?;
@@ -1093,7 +1094,7 @@ fn changed_since_migrate(repo: &Path, backup: &Path, manifest: &Manifest, diff: 
         .iter()
         .chain(&diff.remove)
         .filter(|path| !path.ends_with('/') && !derived(path) && !rewritten.contains(path.as_str()))
-        .filter(|path| now.files.get(path.as_str()).is_some_and(|entry| sealed.get(path.as_str()) != Some(&entry.sha256)))
+        .filter(|path| sealed.get(path.as_str()) != now.files.get(path.as_str()).map(|entry| &entry.sha256))
         .cloned()
         .collect();
     changed.sort();

@@ -163,9 +163,9 @@ pub struct SqliteTier {
 
 impl Drop for SqliteTier {
     fn drop(&mut self) {
-        if self.created_sidecars.is_empty() {
-            return;
-        }
+        // Close every connection before returning: sqlx closes a dropped pool's connections on
+        // their worker threads, so SQLite's last-close checkpoint (which removes `-wal`/`-shm`)
+        // would otherwise run after the tier is gone, while the caller already reads the tree.
         self.rt.block_on(self.pool.close());
         for sidecar in &self.created_sidecars {
             let _ = std::fs::remove_file(sidecar);
