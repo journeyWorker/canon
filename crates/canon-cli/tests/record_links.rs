@@ -108,31 +108,55 @@ fn review_add_101_one_review_run_gives_every_scenario_it_writes_the_same_review_
     }
 }
 
+/// Record evidence for `scenario`, promoted to the ledger; `extra` adds options (an `--artifact`).
+fn attest(repo: &Path, scenario: &str, extra: &[&str]) {
+    let mut args = vec!["evidence", "add", "--scenario", scenario, "--class", "test-run", "--ref", "cargo test", "--role", "implementer", "--actor", "impl", "--promote"];
+    args.extend_from_slice(extra);
+    let out = canon(&args, repo);
+    assert!(out.status.success(), "{}", text(&out));
+}
+
 #[test]
 fn review_add_102_running_the_same_review_again_writes_nothing_and_shows_the_earlier_review_ids() {
     let dir = fixture();
     let repo = dir.path();
+    // The log the changed evidence binds later is there from the start, so the code the reviews see never changes.
+    std::fs::write(repo.join("run.log"), "ok\n").unwrap();
+    for scenario in ["cart.add.01", "cart.add.02", "cart.add.03"] {
+        attest(repo, scenario, &[]);
+    }
     let first = review_ids(&review(repo, &["cart.add.01", "cart.add.02", "cart.add.03"]));
+    let stored_first = ledger(repo, "review");
+    assert_eq!(stored_first.len(), 3);
     let again = review(repo, &["cart.add.01", "cart.add.02", "cart.add.03"]);
-    assert_eq!(ledger(repo, "review").len(), 3, "no new record");
+    assert_eq!(ledger(repo, "review"), stored_first, "the repeat writes no record");
     let mut shown = review_ids(&again);
     shown.sort();
     let mut expected = first.clone();
     expected.sort();
     assert_eq!(shown, expected);
-    assert!(again["data"]["reviews"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .all(|r| r["unchanged"] == true));
+    assert!(again["data"]["reviews"].as_array().unwrap().iter().all(|r| r["unchanged"] == true), "{again}");
 
+    // The evidence of one scenario changes (it now binds a log, so its checks differ): the run writes one record with a
+    // new id and keeps the ids of the other two.
+    attest(repo, "cart.add.01", &["--artifact", "run.log"]);
+    let mixed_doc = review(repo, &["cart.add.01", "cart.add.02", "cart.add.03"]);
+    let mixed = review_ids(&mixed_doc);
+    let id_of = |ids: &[(String, String)], scenario: &str| ids.iter().find(|(s, _)| s == scenario).unwrap().1.clone();
+    assert_ne!(id_of(&mixed, "cart.add.01"), id_of(&first, "cart.add.01"), "the scenario whose evidence changed is written with a new id");
+    assert_eq!((id_of(&mixed, "cart.add.02"), id_of(&mixed, "cart.add.03")), (id_of(&first, "cart.add.02"), id_of(&first, "cart.add.03")));
+    let unchanged: Vec<(String, bool)> = mixed_doc["data"]["reviews"].as_array().unwrap().iter().map(|r| (r["scenarioId"].as_str().unwrap().to_string(), r["unchanged"] == true)).collect();
+    assert_eq!(unchanged.iter().filter(|(_, same)| !same).map(|(s, _)| s.as_str()).collect::<Vec<_>>(), ["cart.add.01"], "{mixed_doc}");
+    let written: Vec<Value> = ledger(repo, "review").into_iter().map(|(_, body)| body).filter(|body| !stored_first.iter().any(|(_, old)| old == body)).collect();
+    assert_eq!(written.len(), 1, "one new record: {written:?}");
+    assert_eq!((written[0]["scenario_id"].as_str(), written[0]["review_id"].as_str()), (Some("cart.add.01"), Some(id_of(&mixed, "cart.add.01").as_str())));
+
+    // A changed step does the same.
     std::fs::write(feature_path(repo), feature("Given a changed one")).unwrap();
     assert!(canon(&["inventory", "sync"], repo).status.success());
-    let mixed = review_ids(&review(repo, &["cart.add.01", "cart.add.02", "cart.add.03"]));
-    let id_of = |ids: &[(String, String)], scenario: &str| ids.iter().find(|(s, _)| s == scenario).unwrap().1.clone();
-    assert_ne!(id_of(&mixed, "cart.add.01"), id_of(&first, "cart.add.01"), "the changed scenario is written with a new id");
-    assert_eq!(id_of(&mixed, "cart.add.02"), id_of(&first, "cart.add.02"));
-    assert_eq!(id_of(&mixed, "cart.add.03"), id_of(&first, "cart.add.03"));
+    let stepped = review_ids(&review(repo, &["cart.add.01", "cart.add.02", "cart.add.03"]));
+    assert_ne!(id_of(&stepped, "cart.add.01"), id_of(&mixed, "cart.add.01"));
+    assert_eq!((id_of(&stepped, "cart.add.02"), id_of(&stepped, "cart.add.03")), (id_of(&first, "cart.add.02"), id_of(&first, "cart.add.03")));
 }
 
 fn copy_tree(from: &Path, to: &Path) {
@@ -410,13 +434,26 @@ fn downgrade_index_to_0_29(repo: &Path) {
 fn inventory_sync_54_a_0_29_index_record_without_steps_is_rewritten_with_them_on_the_next_sync() {
     let dir = fixture();
     let repo = dir.path();
+    // A scenario with no steps at all, in a feature with no background.
+    let empty = repo.join(".canon/specs/kind=feature/area=cart/empty.feature");
+    std::fs::write(&empty, format!("Feature: cart empty\n  {PROVENANCE}\n\n  @cart.empty.01\n  Scenario: Not written yet\n  {PROVENANCE}\n")).unwrap();
+    let out = canon(&["inventory", "sync"], repo);
+    assert!(out.status.success(), "{}", text(&out));
     downgrade_index_to_0_29(repo);
-    assert!(ledger(repo, "scenario")
-        .iter()
-        .all(|(_, v)| v.get("steps").is_none()));
+    let legacy = ledger(repo, "scenario");
+    assert_eq!(legacy.len(), 4);
+    assert!(legacy.iter().all(|(_, v)| v.get("steps").is_none()));
+    let stepless = |records: &[(PathBuf, Value)]| records.iter().find(|(_, v)| v["scenario_id"] == "cart.empty.01").map(|(path, _)| (path.clone(), std::fs::read(path).unwrap())).expect("the step-free record");
+    let stepless_before = stepless(&legacy);
     let out = canon(&["inventory", "sync", "--json"], repo);
     assert!(out.status.success(), "{}", text(&out));
-    assert!(ledger(repo, "scenario").iter().all(|(_, v)| v["steps"].as_array().is_some_and(|s| !s.is_empty())), "every scenario has steps now");
+    let synced = ledger(repo, "scenario");
+    assert_eq!(synced.len(), 4, "{synced:?}");
+    for (_, v) in synced.iter().filter(|(_, v)| v["scenario_id"] != "cart.empty.01") {
+        assert!(v["steps"].as_array().is_some_and(|s| !s.is_empty()), "every scenario with steps carries them now: {v}");
+    }
+    assert_eq!(stepless(&synced), stepless_before, "the record of a scenario with no steps is not rewritten");
+    assert!(!archive(repo, "scenario").iter().any(|(_, v)| v["scenario_id"] == "cart.empty.01"), "nor archived");
     let again = json(&canon(&["inventory", "sync", "--json"], repo));
     assert_eq!(again["meta"]["unchanged"], true, "a second sync writes nothing: {again}");
 }
@@ -470,11 +507,38 @@ fn query_read_83_a_query_marks_a_reference_to_a_source_that_is_not_committed_and
 fn query_read_84_a_query_whose_references_all_resolve_marks_nothing_and_counts_zero() {
     let dir = fixture();
     let repo = dir.path();
-    assert!(add_finding(repo, "kept", "1", "note", &[]).status.success());
-    let doc = query_findings(repo);
-    assert_eq!(doc["data"]["dangling"]["count"], 0, "{doc}");
-    assert_eq!(doc["data"]["dangling"]["references"].as_array().unwrap().len(), 0);
-    assert!(!text(&canon(&["query", "--kind", "finding"], repo)).contains("no committed source"));
+    std::fs::write(repo.join("canon.yaml"), "tiers:\n  local: { backend: git, root: .canon/ledger }\nrouting:\n  finding: local\n  review: local\n  evidence: local\n  subject: local\n  change: local\n  task: local\n").unwrap();
+    std::fs::write(repo.join(".canon/changes/kept/tasks.md"), "- [ ] 1 Keep the cart\n").unwrap();
+    git(repo, &["add", "-A"]);
+    git(repo, &["commit", "-q", "-m", "tasks"]);
+    // finding.change_id and finding.review_id: a finding of the committed change `kept` citing a committed review.
+    let review_id = review_ids(&review(repo, &["cart.add.01"]))[0].1.clone();
+    assert!(add_finding(repo, "kept", "1", "note", &["--review", &review_id]).status.success());
+    // evidence.task_id and evidence.scenario_id: the task `kept#1` its plan declares, and a scenario of the corpus.
+    let out = canon(&["evidence", "add", "--task", "kept#1", "--scenario", "cart.add.01", "--class", "test-run", "--ref", "x", "--role", "implementer", "--actor", "a", "--promote"], repo);
+    assert!(out.status.success(), "{}", text(&out));
+    // subject.change_ids: a subject that adopted `kept`, imported from its plan.
+    for args in [&["ingest", "plans"][..], &["subject", "new", "demo", "--domain", "d", "--title", "T", "--actor", "a"], &["subject", "adopt", "demo", "--change", "kept"]] {
+        let out = canon(args, repo);
+        assert!(out.status.success(), "{args:?}: {}", text(&out));
+    }
+    git(repo, &["add", "-A"]);
+    git(repo, &["commit", "-q", "-m", "records"]);
+
+    for (kind, references) in [("finding", &["change_id", "review_id"][..]), ("evidence", &["task_id", "scenario_id"]), ("subject", &["change_ids"])] {
+        let out = canon(&["query", "--kind", kind, "--json"], repo);
+        assert!(out.status.success(), "{kind}: {}", text(&out));
+        let doc = json(&out);
+        let records = doc["data"]["records"].as_array().unwrap();
+        // Each reference the check reads is there, so a zero count means it resolved, not that it was absent.
+        for field in references {
+            assert!(records.iter().any(|r| r[*field].as_str().is_some_and(|v| !v.is_empty()) || r[*field].as_array().is_some_and(|v| !v.is_empty())), "{kind}.{field}: {doc}");
+        }
+        assert_eq!(doc["data"]["dangling"]["count"], 0, "{kind}: {doc}");
+        assert_eq!(doc["data"]["dangling"]["references"], serde_json::json!([]), "no record is marked: {kind}: {doc}");
+        let human = text(&canon(&["query", "--kind", kind], repo));
+        assert!(!human.contains("no committed source"), "{kind}: {human}");
+    }
 }
 
 fn status_dangling(repo: &Path) -> Value {

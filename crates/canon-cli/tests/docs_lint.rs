@@ -418,8 +418,9 @@ fn next_commands(spec: &Value) -> Vec<Cmd> {
     out
 }
 
+/// context.capability.57: every command line of the skills, the website and the hints parses against the clap tree.
 #[test]
-fn every_command_in_the_docs_and_hints_parses() {
+fn context_capability_57_every_command_in_the_docs_and_hints_parses() {
     let spec = canon_cli::spec::generate();
     let root = canon_cli::cli::command();
     let mut commands = markdown_commands(&doc_gen::repo_root());
@@ -428,10 +429,10 @@ fn every_command_in_the_docs_and_hints_parses() {
     assert_all_parse(&root, &commands, true);
 }
 
-/// The `meta.next` commands the example sweep prints: an agent runs these, so they parse too.
+/// context.capability.56: the `meta.next` commands the example sweep prints: an agent runs these, so they parse too.
 /// (A step that has a `<placeholder>` for what only the agent knows is checked as a syntax line.)
 #[test]
-fn every_meta_next_command_parses() {
+fn context_capability_56_every_meta_next_command_parses() {
     let spec = canon_cli::spec::generate();
     let root = canon_cli::cli::command();
     let commands = next_commands(&spec);

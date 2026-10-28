@@ -1,8 +1,10 @@
 //! 0.31 (`canon-0-31-cli-ids`): an option that takes an id is the bare noun, through the real binary. Every test is
 //! named by the scenario it proves (`context.capability.47` to `.60`).
 //!
-//! The 0.30 → 0.31 parity of what the renamed options write is the conformance corpus: `conformance/cases` was re-blessed
-//! with the new spellings and every expected file differs from the 0.30 one in nothing but the spelling.
+//! The 0.30 → 0.31 parity of what the renamed options write is `tests/fixtures/cli-ids-030`: a line of each of the 24
+//! commands that take an id, the output and stored records canon 0.30 gave for its spelling, and
+//! [`context_capability_47_every_id_option_is_the_bare_noun_and_writes_the_record_the_old_spelling_wrote`] replaying it
+//! with the bare spelling. The conformance corpus (`conformance/cases`) was re-blessed the same way.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -184,10 +186,104 @@ fn ledger_records(repo: &Path, kind: &str) -> Vec<Value> {
     files.iter().map(|f| serde_json::from_str(&std::fs::read_to_string(f).unwrap()).unwrap()).collect()
 }
 
+/// The 0.30 → 0.31 parity fixture: the lines in the 0.30 spelling and what 0.30 printed and stored for them.
+fn parity_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/cli-ids-030")
+}
+
+/// `word` in the 0.31 spelling: a `--<noun>-id` of the 14 nouns, alone or with `=value`, is `--<noun>`.
+fn bare_spelling(word: &str) -> String {
+    for noun in NOUNS {
+        let old = format!("--{noun}-id");
+        if let Some(rest) = word.strip_prefix(&old).filter(|rest| rest.is_empty() || rest.starts_with('=')) {
+            return format!("--{noun}{rest}");
+        }
+    }
+    word.to_string()
+}
+
+/// `text` with every `--<noun>-id` of the 14 nouns that stands as a whole option name written `--<noun>`.
+fn bare_spellings_in(text: &str) -> String {
+    let mut out = text.to_string();
+    for noun in NOUNS {
+        let (old, new) = (format!("--{noun}-id"), format!("--{noun}"));
+        let mut result = String::with_capacity(out.len());
+        let mut rest = out.as_str();
+        while let Some(at) = rest.find(&old) {
+            let after = &rest[at + old.len()..];
+            let whole = !after.starts_with(|c: char| c.is_ascii_alphanumeric() || c == '-');
+            result.push_str(&rest[..at]);
+            result.push_str(if whole { &new } else { &old });
+            rest = after;
+        }
+        result.push_str(rest);
+        out = result;
+    }
+    out
+}
+
+/// What a run of the parity lines printed and stored, normalized: the repo path, the version, times, ULIDs and digests
+/// masked, and, for the 0.30 run, the old spellings in the output written the bare way (the one change it has).
+fn parity_transcript(binary: &Path, old_spelling: bool) -> String {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = dir.path();
+    let home = tempfile::tempdir().unwrap();
+    let run = |args: &[String]| -> Output {
+        Command::new(binary).args(args).env_clear().env("PATH", std::env::var_os("PATH").unwrap_or_default()).env("HOME", home.path()).env("LC_ALL", "C").env("TZ", "UTC").env("CANON_ACTOR", "canon").current_dir(repo).output().expect("spawn canon")
+    };
+    let version = String::from_utf8(run(&["--version".to_string()]).stdout).unwrap().trim().trim_start_matches("canon ").to_string();
+    let real = repo.canonicalize().unwrap();
+    let normalize = |text: &str| -> String {
+        let text = text.replace(&*real.to_string_lossy(), "<repo>").replace(&*repo.to_string_lossy(), "<repo>").replace(&version, "<version>");
+        let text = if old_spelling { bare_spellings_in(&text) } else { text };
+        // The blockers of the brief template `change new` writes are the brief-format change's (0.31 dropped a section
+        // comment), and the fixture removes the brief right after, so the count is masked.
+        let text = text.replace("7 blocker(s): write the brief", "<n> blocker(s): write the brief").replace("6 blocker(s): write the brief", "<n> blocker(s): write the brief");
+        masked(&text)
+    };
+    git(repo, &["init", "-q", "-b", "main"]);
+    let init = run(&["init", "--repo", ".", "--no-policy", "--providers", "none"].map(String::from));
+    assert!(init.status.success(), "{}{}", stdout(&init), stderr(&init));
+    git(repo, &["add", "-A"]);
+    git(repo, &["commit", "-q", "-m", "init"]);
+    let mut out = String::new();
+    let lines = std::fs::read_to_string(parity_dir().join("lines.txt")).unwrap();
+    for line in lines.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')) {
+        let words = harness::words(line);
+        if words[0] == "git" {
+            let args: Vec<&str> = words[1..].iter().map(String::as_str).collect();
+            git(repo, &args);
+            continue;
+        }
+        if words[0] == "rm" {
+            std::fs::remove_file(repo.join(&words[1])).unwrap();
+            continue;
+        }
+        let args: Vec<String> = if old_spelling { words } else { words.iter().map(|w| bare_spelling(w)).collect() };
+        let result = run(&args);
+        out.push_str(&format!("$ canon {}\nexit {}\n", harness::words(line).iter().map(|w| bare_spelling(w)).collect::<Vec<_>>().join(" "), result.status.code().unwrap_or(-1)));
+        out.push_str(&format!("--- stdout\n{}\n--- stderr\n{}\n", normalize(&stdout(&result)), normalize(&stderr(&result))));
+    }
+    // The stored records: every text file canon keeps under `.canon/`, by path. The briefs are the brief-format
+    // change's (0.31 writes the template without comments), not this one's; the access log is no record.
+    out.push_str("=== stored\n");
+    let mut stored: Vec<(String, String)> = harness::tree(&repo.join(".canon"))
+        .into_iter()
+        .filter_map(|(path, bytes)| Some((path, String::from_utf8(bytes?).ok()?)))
+        .filter(|(path, _)| !path.ends_with("brief.md") && !path.starts_with("audit"))
+        .map(|(path, text)| (normalize(&path.to_string_lossy()), normalize(&text)))
+        .collect();
+    stored.sort();
+    for (path, text) in stored {
+        out.push_str(&format!("### {path}\n{text}\n"));
+    }
+    out
+}
+
 // ── F1 ───────────────────────────────────────────────────────────────────
 
-/// context.capability.47: the 14 options are the bare nouns on the 67 places of 24 commands, and a record written
-/// through them keeps the `*_id` keys it had.
+/// context.capability.47: the 14 options are the bare nouns on the 67 places of 24 commands, and a line of each of the
+/// 24 commands exits, prints and stores what canon 0.30 did for the same line in its spelling.
 #[test]
 fn context_capability_47_every_id_option_is_the_bare_noun_and_writes_the_record_the_old_spelling_wrote() {
     let by_name = options_by_name();
@@ -203,25 +299,38 @@ fn context_capability_47_every_id_option_is_the_bare_noun_and_writes_the_record_
     assert!(by_name.keys().all(|name| !name.ends_with("-id")), "{:?}", by_name.keys().filter(|n| n.ends_with("-id")).collect::<Vec<_>>());
     assert_eq!((places, commands.len()), (67, 24));
 
-    let dir = repo_with_change();
-    let repo = dir.path();
-    ok(repo, &["scenario", "new", "demo.login.01", "--title", "One", "--subject", "demo", "--actor", "impl-1", "--session", "s-1", "--project", "root"]);
-    ok(repo, &["inventory", "sync"]);
-    let feature = std::fs::read_to_string(repo.join(".canon/specs/kind=feature/area=demo/login.feature")).unwrap();
-    assert!(feature.contains(r#""agent_id":"impl-1""#) && feature.contains(r#""session_id":"s-1""#), "{feature}");
-    let attested = repo_with_roots(&["root"]);
-    let report = json(&ok(attested.path(), &["evidence", "add", "--project", "root", "--scenario", "cart.add.01", "--class", "test-run", "--ref", "npm test", "--role", "implementer", "--actor", "impl-1", "--session", "s-1", "--json"]));
-    assert_eq!(report["ok"], true, "{report}");
-    ok(attested.path(), &["gate", "promote"]);
-    let evidence = &ledger_records(attested.path(), "evidence")[0];
-    assert_eq!(evidence["scenario_id"], "cart.add.01", "{evidence}");
-    assert_eq!(evidence["project_id"], "root", "{evidence}");
-    assert_eq!(evidence["actor"]["agent_id"], "impl-1", "{evidence}");
-    assert_eq!(evidence["actor"]["session_id"], "s-1", "{evidence}");
-    ok(repo, &["finding", "add", "--change", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--introduced-unknown", "--actor", "rev-1", "--session", "s-2", "--scenario", "demo.login.01", "--summary", "Token is logged"]);
-    let finding = &ledger_records(repo, "finding")[0];
-    assert_eq!(finding["change_id"], "add-login", "{finding}");
-    assert_eq!(finding["scenario_ids"], serde_json::json!(["demo.login.01"]), "{finding}");
+    // The parity replay. With CANON_030_BIN naming a canon 0.30 binary the fixture is blessed from it instead.
+    let expected_path = parity_dir().join("expected.txt");
+    if let Some(old) = std::env::var_os("CANON_030_BIN") {
+        std::fs::write(&expected_path, parity_transcript(Path::new(&old), true)).unwrap();
+    }
+    let expected = std::fs::read_to_string(&expected_path).expect("the 0.30 transcript is checked in");
+    let actual = parity_transcript(Path::new(env!("CARGO_BIN_EXE_canon")), false);
+    if actual != expected {
+        // Each step (`$ canon …`) and each stored file (`### …`) is one block; name every block that differs.
+        let blocks = |text: &str| -> Vec<String> {
+            let mut out: Vec<String> = Vec::new();
+            for line in text.lines() {
+                if line.starts_with("$ canon ") || line.starts_with("### ") || out.is_empty() {
+                    out.push(String::new());
+                }
+                let last = out.last_mut().unwrap();
+                last.push_str(line);
+                last.push('\n');
+            }
+            out
+        };
+        let (want, got) = (blocks(&expected), blocks(&actual));
+        let differing: Vec<String> = (0..want.len().max(got.len()))
+            .filter(|i| want.get(*i) != got.get(*i))
+            .map(|i| format!("--- 0.30\n{}--- 0.31\n{}", want.get(i).map_or("(none)\n", String::as_str), got.get(i).map_or("(none)\n", String::as_str)))
+            .collect();
+        panic!("the bare spelling does not do what 0.30 did in {} block(s):\n{}", differing.len(), differing.join("\n"));
+    }
+    for kind in ["evidence", "finding", "review", "scenario", "subject"] {
+        assert!(expected.contains(&format!("kind={kind}/")), "the transcript stores a {kind} record");
+    }
+    assert!(expected.contains("\"scenario_id\"") && expected.contains("\"change_id\"") && expected.contains("\"session_id\""), "the stored records keep their id-suffixed keys");
 }
 
 /// context.capability.48: the id-suffixed spelling on the same line exits 2 and writes nothing.
@@ -316,14 +425,22 @@ fn context_capability_51_a_line_with_several_old_id_spellings_is_refused_once_an
     let feature = std::fs::read_to_string(repo.join(".canon/specs/kind=feature/area=demo/login.feature")).unwrap();
     assert!(feature.contains("@flow:add-login.F1") && feature.contains("@case:happy"), "{feature}");
 
-    // A value that moved into an operand in 0.28 on the same line.
-    let adopt = usage_error(&canon(repo, &["subject", "adopt", "--subject-id", "demo", "--change-id", "add-login", "--json"]));
-    assert_eq!(adopt["error"]["field"], "--subject-id", "{adopt}");
-    let line = hint_line(&adopt);
-    assert_eq!(line[..3], ["subject", "adopt", "demo"], "{line:?}");
-    assert!(old_spellings(&line.join(" ")).is_empty(), "{line:?}");
-    let refs: Vec<&str> = line.iter().map(String::as_str).collect();
-    ok(repo, &refs);
+    // A value that moved into an operand in 0.28 on the same line, before and after a renamed option: the error names
+    // the first spelling typed, and the hint applies both, so it runs as printed.
+    for (typed, first) in [
+        (&["subject", "adopt", "--change-id", "add-login", "--subject-id", "demo", "--json"][..], "--change-id"),
+        (&["subject", "unadopt", "--subject-id", "demo", "--change-id", "add-login", "--json"], "--subject-id"),
+    ] {
+        let before = harness::tree(repo);
+        let body = usage_error(&canon(repo, typed));
+        assert_eq!(body["error"]["field"], first, "{typed:?}: {body}");
+        assert_eq!(body["error"]["message"], format!("{first} was removed in {}", if first == "--change-id" { "0.31.0" } else { "0.28.0" }), "{body}");
+        let line = hint_line(&body);
+        assert_eq!(line, [typed[0], typed[1], "demo", "--change", "add-login", "--json"], "{typed:?}: {body}");
+        unchanged(repo, &before, "the refused line");
+        let refs: Vec<&str> = line.iter().map(String::as_str).collect();
+        ok(repo, &refs);
+    }
 }
 
 // ── F3 ───────────────────────────────────────────────────────────────────
@@ -428,6 +545,116 @@ fn context_capability_55_an_unknown_project_root_and_an_unknown_finding_review_a
     unchanged(repo, &before, "a refused finding add");
 }
 
+/// The `canon …` command lines in one output: every backtick span that starts with `canon `, and in a JSON document the
+/// `command` of every step and every `argv` array.
+fn command_lines(text: &str) -> Vec<Vec<String>> {
+    fn walk(value: &Value, strings: &mut Vec<String>, out: &mut Vec<Vec<String>>) {
+        match value {
+            Value::String(s) => strings.push(s.clone()),
+            Value::Array(items) => {
+                for item in items {
+                    walk(item, strings, out);
+                }
+            }
+            Value::Object(map) => {
+                for (key, v) in map {
+                    match (key.as_str(), v) {
+                        ("command", Value::String(s)) if s.starts_with("canon ") => out.push(harness::words(s)),
+                        ("argv", Value::Array(words)) if !words.is_empty() => out.push(words.iter().filter_map(|w| w.as_str().map(str::to_string)).collect()),
+                        _ => walk(v, strings, out),
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut strings = vec![text.to_string()];
+    let mut out = Vec::new();
+    if let Ok(doc) = serde_json::from_str::<Value>(text) {
+        walk(&doc, &mut strings, &mut out);
+    }
+    for s in &strings {
+        out.extend(s.split('`').skip(1).step_by(2).filter(|span| span.starts_with("canon ")).map(harness::words));
+    }
+    out
+}
+
+/// The example command lines of a `--help` text, read as a shell would: the lines of the `Examples:` block (it ends
+/// at a blank line) that start with `canon `, a `\` continuation joined, a redirect, a pipe or a two-space comment
+/// column cut off, and a `$(...)` substitution one word.
+fn help_examples(text: &str) -> Vec<Vec<String>> {
+    let Some((_, examples)) = text.split_once("Examples:") else { return Vec::new() };
+    let mut joined: Vec<String> = Vec::new();
+    let mut continued = false;
+    for line in examples.lines().map(str::trim) {
+        if line.is_empty() && !joined.is_empty() {
+            break;
+        }
+        let (body, continues) = line.strip_suffix('\\').map_or((line, false), |body| (body.trim_end(), true));
+        if continued {
+            if let Some(last) = joined.last_mut() {
+                last.push(' ');
+                last.push_str(body);
+            }
+        } else if body.starts_with("canon ") {
+            joined.push(body.to_string());
+        } else {
+            continue;
+        }
+        continued = continues;
+    }
+    joined
+        .iter()
+        .map(|line| {
+            let line = [" > ", " | ", "  "].iter().fold(line.as_str(), |line, cut| line.split(cut).next().unwrap_or_default());
+            let mut out = String::new();
+            let mut rest = line;
+            while let Some(at) = rest.find("$(") {
+                out.push_str(&rest[..at]);
+                out.push('x');
+                rest = rest[at..].split_once(')').map_or("", |(_, after)| after);
+            }
+            out.push_str(rest);
+            harness::words(&out)
+        })
+        .collect()
+}
+
+/// Parses `words` (`canon` first) against the clap tree: in full when it holds no placeholder; a line that only names
+/// a command (`canon feature new`), or one with a `<placeholder>`, `[optional]` part or ellipsis, as a syntax line:
+/// the command path resolves to a leaf and every `--option` is one of it.
+fn parse_line(root: &clap::Command, words: &[String]) -> Result<(), String> {
+    let mut built = root.clone();
+    built.build();
+    let mut cmd = &built;
+    let mut path_len = 1;
+    for word in &words[1..] {
+        match cmd.find_subcommand(word) {
+            Some(sub) => cmd = sub,
+            None => break,
+        }
+        path_len += 1;
+    }
+    let placeholder = words.iter().any(|w| w.contains('<') || w.contains('[') || w.contains('…') || w.contains("..."));
+    if !placeholder && path_len < words.len() {
+        return match root.clone().try_get_matches_from(words) {
+            Ok(_) => Ok(()),
+            Err(e) if e.kind() == clap::error::ErrorKind::DisplayHelp => Ok(()),
+            Err(e) => Err(e.to_string().lines().next().unwrap_or_default().to_string()),
+        };
+    }
+    if cmd.has_subcommands() {
+        return Err(format!("`{}` names no command", words.join(" ")));
+    }
+    for word in words.iter().filter(|w| w.starts_with("--")) {
+        let name = word[2..].split('=').next().unwrap_or_default();
+        if !cmd.get_arguments().any(|a| a.get_long() == Some(name)) {
+            return Err(format!("`{}` has no option --{name}", cmd.get_name()));
+        }
+    }
+    Ok(())
+}
+
 /// context.capability.56: what canon prints as a command spells no old option, and parses.
 #[test]
 fn context_capability_56_every_command_line_canon_generates_uses_the_bare_spelling_and_parses() {
@@ -446,33 +673,65 @@ fn context_capability_56_every_command_line_canon_generates_uses_the_bare_spelli
         args.push("--help");
         texts.push((format!("{path} --help"), stdout(&canon(dir.path(), &args))));
     }
-    // The steps, violations and refusals of a repo.
+    // The steps, violations, remedies and refusals of a repo with a change and a scenario that lacks evidence, of one
+    // under the starter policy (the gate reports that scenario), and of one with two spec roots.
     let dir = repo_with_change();
     let repo = dir.path();
-    for args in [&["status", "--json"][..], &["status"], &["gate", "check", "--json"], &["brief", "check", "add-login", "--json"]] {
-        texts.push((args.join(" "), format!("{}{}", stdout(&canon(repo, args)), stderr(&canon(repo, args)))));
-    }
+    ok(repo, &["scenario", "new", "demo.login.01", "--title", "One", "--subject", "demo", "--change", "add-login", "--flow", "F1", "--case", "happy"]);
+    let gated = tempfile::tempdir().unwrap();
+    git(gated.path(), &["init", "-q"]);
+    ok(gated.path(), &["init", "--repo", ".", "--providers", "none"]);
+    ok(gated.path(), &["subject", "new", "demo", "--domain", "dev", "--title", "Demo"]);
+    ok(gated.path(), &["scenario", "new", "demo.login.01", "--title", "One", "--subject", "demo", "--case", "happy"]);
     let two = repo_with_roots(&["game", "ui"]);
-    for args in [&["status", "--json"][..], &["gate", "check", "--json"], &["feature", "new", "a.b", "--title", "T", "--json"]] {
-        texts.push((format!("two roots: {}", args.join(" ")), stdout(&canon(two.path(), args))));
+    let generated: Vec<(&str, Vec<&str>)> = vec![
+        ("repo", vec!["status", "--json"]),
+        ("repo", vec!["status"]),
+        ("repo", vec!["brief", "check", "add-login", "--json"]),
+        ("repo", vec!["evidence", "add", "--scenario", "demo.login.01", "--class", "test-run", "--ref", "r", "--role", "implementer", "--json"]),
+        ("repo", vec!["subject", "move", "demo", "--to", "shipped", "--json"]),
+        ("repo", vec!["finding", "add", "--change-id", "add-login", "--round", "1", "--seq", "1", "--severity", "note", "--actor-id", "r", "--summary", "s", "--json"]),
+        ("policy", vec!["gate", "check", "--json"]),
+        ("policy", vec!["gate", "check"]),
+        ("policy", vec!["status", "--json"]),
+        ("two roots", vec!["status", "--json"]),
+        ("two roots", vec!["gate", "check", "--json"]),
+        ("two roots", vec!["feature", "new", "a.b", "--title", "T", "--json"]),
+    ];
+    for (which, args) in &generated {
+        let at = match *which {
+            "repo" => repo,
+            "policy" => gated.path(),
+            _ => two.path(),
+        };
+        let out = canon(at, args);
+        texts.push((format!("{which}: {}", args.join(" ")), format!("{}{}", stdout(&out), stderr(&out))));
     }
+    let mut parsed: BTreeMap<String, usize> = BTreeMap::new();
+    let mut problems = Vec::new();
     for (what, text) in &texts {
-        assert!(old_spellings(text).is_empty(), "{what} spells {:?}", old_spellings(text));
-    }
-    // Every `meta.next` argv without a placeholder parses.
-    let status = json(&canon(repo, &["status", "--json"]));
-    let mut parsed = 0;
-    for step in status["meta"]["next"].as_array().into_iter().flatten() {
-        let argv: Vec<String> = step["argv"].as_array().unwrap().iter().map(|w| w.as_str().unwrap().to_string()).collect();
-        if argv.iter().any(|w| w.contains('<')) {
-            continue;
+        // A refusal of a typed old spelling names it; the command lines it prints spell none.
+        if old_spellings(what).is_empty() {
+            assert!(old_spellings(text).is_empty(), "{what} spells {:?}", old_spellings(text));
         }
-        if let Err(e) = root.clone().try_get_matches_from(argv.clone()) {
-            panic!("`{}` does not parse: {e}", argv.join(" "));
+        let lines: Vec<Vec<String>> = if what.ends_with("--help") {
+            help_examples(text)
+        } else {
+            command_lines(text)
+        };
+        for words in lines {
+            assert!(old_spellings(&words.join(" ")).is_empty(), "{what}: {words:?}");
+            match parse_line(&root, &words) {
+                Ok(()) => *parsed.entry(what.clone()).or_default() += 1,
+                Err(e) => problems.push(format!("{what}: {e}\n    {}", words.join(" "))),
+            }
         }
-        parsed += 1;
     }
-    let _ = parsed;
+    assert!(problems.is_empty(), "{} generated line(s) do not parse:\n{}", problems.len(), problems.join("\n"));
+    // Each kind of output gave lines to parse: the next steps, the violations' remedies, the refusals' hints.
+    for what in ["repo: status --json", "policy: gate check --json", "policy: gate check", "repo: evidence add", "repo: finding add", "two roots: feature new"] {
+        assert!(parsed.iter().any(|(k, n)| k.starts_with(what) && *n > 0), "no command line parsed from `{what}`: {parsed:?}");
+    }
 }
 
 // ── F5 ───────────────────────────────────────────────────────────────────

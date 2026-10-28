@@ -197,6 +197,18 @@ fn tree(repo: &Path) -> BTreeMap<String, Vec<u8>> {
     out
 }
 
+/// Puts every file of `snapshot` (a [`tree`]) back and removes every other file, `.git` and the backups untouched.
+fn restore(repo: &Path, snapshot: &BTreeMap<String, Vec<u8>>) {
+    for path in tree(repo).keys().filter(|path| !snapshot.contains_key(*path)) {
+        fs::remove_file(repo.join(path)).unwrap();
+    }
+    for (path, bytes) in snapshot {
+        let path = repo.join(path);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, bytes).unwrap();
+    }
+}
+
 fn check(repo: &Path, change: &str) -> (i32, Value) {
     let out = canon(repo, &["brief", "check", change, "--json"]);
     let parsed = json(&out);
@@ -260,6 +272,20 @@ fn authoring_brief_check_17_english_headings_without_comments_pass_and_every_rea
         let out = canon_as(r, Some("implementer"), &["scenario", "new", id, "--title", "t", "--subject", "demo", "--change", "a", "--flow", flow, "--case", "happy", "--json"]);
         assert_eq!(out.status.code(), code, "{flow}: {}", out_text(&out));
     }
+
+    // A chore's review and ship read the new brief the same way: the 0.31 chore has the sections and roles of the 0.30
+    // chore, `review change` pins it, and the ship check counts it as an approved chore.
+    let sections = |text: &str| canon_ingest::brief::parse(text).sections.iter().map(|s| (s.key, s.role)).collect::<Vec<_>>();
+    assert_eq!(sections(NEW_CHORE), sections(&old_chore("K")), "the chore sections read the same in both formats");
+    ok(r, &["change", "new", "k", "--subject", "demo", "--title", "K", "--change-kind", "chore"]);
+    write_brief(r, "k", NEW_CHORE);
+    commit_all(r);
+    ok(r, &["policy", "approve", "--approver", "Ana"]);
+    let reviewed = canon_as(r, Some("reviewer"), &["review", "change", "k", "--original-spec-ref", ".canon/changes/k/brief.md", "--actor", "rev", "--role", "reviewer"]);
+    assert!(reviewed.status.success(), "{}", out_text(&reviewed));
+    assert!(out_text(&reviewed).contains(&canon_cli::brief::brief_spec_digest(NEW_CHORE).as_str()[..12]), "the review pins the new chore: {}", out_text(&reviewed));
+    let (error, names_chore) = ship_check_after(NEW_CHORE);
+    assert!(names_chore, "the ship check reads the new chore: {error}");
 }
 
 /// authoring.brief-check.18
@@ -436,15 +462,14 @@ fn authoring_brief_check_22_kind_chore_in_the_frontmatter_makes_a_chore_and_its_
     let out = canon_as(r, Some("reviewer"), &["review", "change", "k", "--original-spec-ref", ".canon/changes/k/brief.md", "--actor", "rev", "--role", "reviewer"]);
     assert!(out_text(&out).contains("is not a chore"), "a brief without the frontmatter is no chore: {}", out_text(&out));
 
-    // The ship check reads it too: with `kind: chore` the change governs the subject as a chore, without it as a draft.
-    write_brief(r, "k", NEW_CHORE);
-    let governing = |r: &Path| {
-        let status = json(&ok(r, &["status", "--json"]));
-        status["data"]["subjects"][0]["briefs"].as_array().unwrap().iter().filter(|b| b["change"] == "k").map(|b| b["reason"].clone()).collect::<Vec<_>>()
-    };
-    assert_eq!(governing(r), vec![Value::from("chore")], "the status reads the chore from the frontmatter");
-    write_brief(r, "k", &stripped);
-    assert_ne!(governing(r), vec![Value::from("chore")], "and a feature draft without it");
+    // The ship check reads it too: an approved chore with `kind: chore` asks for evidence recorded after its approval and
+    // refuses the ship naming it; the same brief without the frontmatter is no chore, and the ship check never names it.
+    let (error, names_chore) = ship_check_after(NEW_CHORE);
+    assert!(names_chore, "the ship check reads the chore from the frontmatter: {error}");
+    assert!(error.to_string().contains("cart.add.01"), "{error}");
+    let (error, names_chore) = ship_check_after(&stripped);
+    assert_eq!(error["code"], "SUBJECT_GATE_VIOLATION", "the ship check ran: {error}");
+    assert!(!names_chore, "a brief without the frontmatter is no chore to the ship check: {error}");
 }
 
 // ─────────────────────────────── F3 ───────────────────────────────
@@ -562,6 +587,29 @@ fn building_repo() -> TempDir {
     }
     commit_all(r);
     dir
+}
+
+/// What the ship check says about the change `k` whose brief is `brief`, approved now: subject `demo` is verifying with
+/// evidence for `cart.add.01` recorded before the approval and code changed since, so an approved chore leaves that
+/// evidence older than the chore. Returns the refusal's `error` and whether it names the chore `k`.
+fn ship_check_after(brief: &str) -> (Value, bool) {
+    let dir = building_repo();
+    let r = dir.path();
+    write_brief(r, "a", &new_brief("A", "", ""));
+    ok(r, &["brief", "approve", "a", "--approver", "Ana", "--note", "ok"]);
+    ok(r, &["evidence", "add", "--project", "root", "--scenario", "cart.add.01", "--class", "test-run", "--ref", "run", "--role", "implementer", "--actor", "impl", "--promote", "--override-reason", "no review in this test"]);
+    ok(r, &["subject", "move", "demo", "--to", "verifying", "--override-reason", "no review in this test"]);
+    ok(r, &["change", "new", "k", "--subject", "demo", "--title", "K", "--change-kind", "chore"]);
+    // The approval's time has whole seconds: one second later it is after the evidence.
+    std::thread::sleep(std::time::Duration::from_millis(1100));
+    let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    write_brief(r, "k", &format!("{brief}Approved: Ana Kim {now} — \"ship it\" (brief {})\n", canon_cli::brief::brief_digest(brief)));
+    write_text(r, "src/lib.rs", "pub fn changed() {}\n");
+    let out = canon(r, &["subject", "move", "demo", "--to", "shipped", "--json"]);
+    assert_ne!(out.status.code(), Some(0), "{}", out_text(&out));
+    let error = json(&out)["error"].clone();
+    let names_chore = error.to_string().contains("chore change `k` approved");
+    (error, names_chore)
 }
 
 /// evidence.add.131
@@ -830,36 +878,32 @@ fn authoring_migrate_21_a_dirty_brief_is_refused_and_edited_or_role_mismatched_b
     assert!(!rebinds.contains(&".canon/changes/a/brief.md") && !rebinds.contains(&".canon/changes/m/brief.md"), "{rebinds:?}");
 }
 
-/// authoring.migrate.22
-#[test]
-fn authoring_migrate_22_commit_rewrites_every_brief_keeps_approvals_and_a_second_run_has_nothing_to_do() {
-    let dir = old_repo();
-    let r = dir.path();
-    // A comment line between two lines of a paragraph, and a chore marker with its category, as 0.30 read them.
-    ok(r, &["change", "new", "p", "--subject", "demo", "--title", "P"]);
+/// The review records of `change`'s change-level reviews in the ledger and the archive: path and body.
+fn change_reviews(r: &Path, change: &str) -> Vec<(String, Value)> {
+    let mut found = Vec::new();
+    for (path, bytes) in tree(r) {
+        if path.contains("kind=review") && path.ends_with(".json") {
+            let body: Value = serde_json::from_slice(&bytes).unwrap();
+            if body["change_id"] == change {
+                found.push((path, body));
+            }
+        }
+    }
+    found
+}
+
+/// Gives `r` a chore change `d` with an approved 0.30 brief and a change review pinned to it, as 0.30 left them,
+/// committed. Returns the review's body.
+fn old_chore_with_review(r: &Path) -> Value {
     ok(r, &["change", "new", "d", "--subject", "demo", "--title", "D"]);
-    let split = "Visitors lose their cart.\n<!-- canon:hint what -->\nThey switch devices.";
-    write_brief(r, "p", &approved(&old_brief("P", false, "").replace(BODIES[0], split)));
     let old_d = approved(&old_chore("D").replace("canon:kind chore", "canon:kind chore (ci)"));
-    // A review pinned to the chore: made on the brief in the new format (the old one is refused), then pinned to the old text as 0.30 left it.
+    // Made on the brief in the new format (the old one is refused), then pinned to the old text.
     write_brief(r, "d", &NEW_CHORE.replace("# K", "# D"));
     ok(r, &["policy", "approve", "--approver", "Ana"]);
     commit_all(r);
     let reviewed = canon_as(r, Some("reviewer"), &["review", "change", "d", "--original-spec-ref", ".canon/changes/d/brief.md", "--actor", "rev", "--role", "reviewer"]);
     assert!(reviewed.status.success(), "{}", out_text(&reviewed));
-    let review_files = |r: &Path| -> Vec<(String, Value)> {
-        let mut found = Vec::new();
-        for (path, bytes) in tree(r) {
-            if path.contains("kind=review") && path.ends_with(".json") {
-                let body: Value = serde_json::from_slice(&bytes).unwrap();
-                if body["change_id"] == "d" {
-                    found.push((path, body));
-                }
-            }
-        }
-        found
-    };
-    let found = review_files(r);
+    let found = change_reviews(r, "d");
     assert_eq!(found.len(), 1, "{found:?}");
     let (path, mut body) = found[0].clone();
     body["pins"]["scenario_digest"] = Value::from(canon_cli::brief::brief_spec_digest(&old_d).as_str());
@@ -867,9 +911,21 @@ fn authoring_migrate_22_commit_rewrites_every_brief_keeps_approvals_and_a_second
     let ledger = Path::new(&path).ancestors().find(|a| a.ends_with("ledger")).unwrap().to_path_buf();
     let pinned = ledger.join(canon_store::partition::expected_relative_path(canon_model::RecordKind::Review, &body).unwrap());
     fs::write(r.join(&pinned), serde_json::to_vec_pretty(&body).unwrap()).unwrap();
-    let old_review = body.clone();
     write_brief(r, "d", &old_d);
     commit_all(r);
+    body
+}
+
+/// authoring.migrate.22
+#[test]
+fn authoring_migrate_22_commit_rewrites_every_brief_keeps_approvals_and_a_second_run_has_nothing_to_do() {
+    let dir = old_repo();
+    let r = dir.path();
+    // A comment line between two lines of a paragraph, and a chore marker with its category, as 0.30 read them.
+    ok(r, &["change", "new", "p", "--subject", "demo", "--title", "P"]);
+    let split = "Visitors lose their cart.\n<!-- canon:hint what -->\nThey switch devices.";
+    write_brief(r, "p", &approved(&old_brief("P", false, "").replace(BODIES[0], split)));
+    let old_review = old_chore_with_review(r);
     let before: BTreeMap<&str, String> = ["a", "b", "c", "d", "p"].iter().map(|c| (*c, read_brief(r, c))).collect();
     let (_, digest) = plan(r);
     let out = commit(r, None, &digest);
@@ -894,7 +950,7 @@ fn authoring_migrate_22_commit_rewrites_every_brief_keeps_approvals_and_a_second
     }
     assert!(read_brief(r, "d").starts_with("---\nkind: chore\n---\n\n# D\n"), "the marker with its category is a chore");
     // The chore review is a new version pinned to the new digest with every other field as before; the old version is archived.
-    let versions = review_files(r);
+    let versions = change_reviews(r, "d");
     assert_eq!(versions.len(), 2, "the old version moved to the archive and a new one is in the ledger: {versions:?}");
     let new_pin = canon_cli::brief::brief_spec_digest(&read_brief(r, "d"));
     let (new_versions, old_versions): (Vec<_>, Vec<_>) = versions.iter().partition(|(_, v)| v["pins"]["scenario_digest"] == new_pin.as_str());
@@ -996,11 +1052,26 @@ fn authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and
     ok(r, &["change", "new", "z", "--subject", "demo", "--title", "Z"]);
     write_brief(r, "z", &new_brief("Z", "", ""));
     commit_all(r);
+    // A review pinned to the 0.30 chore `d`: the migrate writes a new version pinned to the new digest.
+    let old_review = old_chore_with_review(r);
     let before = tree(r);
     let (_, digest) = plan(r);
     assert!(commit(r, None, &digest).status.success());
     let migrated = tree(r);
     assert_ne!(migrated, before);
+    assert_eq!(change_reviews(r, "d").len(), 2, "the migrate wrote a new version of the chore review");
+
+    // A later version of the review than the one the migrate wrote: the revert refuses naming it, and writes nothing.
+    let rereviewed = canon_as(r, Some("reviewer"), &["review", "change", "d", "--original-spec-ref", ".canon/changes/d/brief.md", "--actor", "rev", "--role", "reviewer", "--review-outcome", "indeterminate"]);
+    assert!(rereviewed.status.success(), "{}", out_text(&rereviewed));
+    assert_eq!(change_reviews(r, "d").len(), 3, "a third version of the review");
+    let before_refusal = tree(r);
+    let out = canon(r, &["migrate", "--revert", "--json"]);
+    assert_eq!(out.status.code(), Some(2), "{}", out_text(&out));
+    let message = json(&out)["error"]["message"].as_str().unwrap().to_string();
+    assert!(message.contains("kind=review") && message.contains("nothing was written"), "{message}");
+    assert_eq!(tree(r), before_refusal, "a refused preview writes nothing");
+    restore(r, &migrated);
 
     // A later edit of a rewritten brief makes the revert refuse, naming it, and nothing is written.
     let edited = format!("{}\nlater\n", read_brief(r, "b"));
@@ -1051,12 +1122,15 @@ fn authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and
     assert!(out_text(&refused).contains(".canon/changes/z/brief.md"), "{}", out_text(&refused));
     assert!(read_brief(r, "z").contains("Approved:"), "the approval is still there");
     git(r, &["checkout", "--", ".canon/changes/z"]);
-    let _ = fs::remove_file(r.join(".canon/policy.approval.json"));
-    ok(r, &["policy", "approve", "--approver", "Ana"]);
+    // `brief approve` recorded the policy approval too; the one the migrate left is put back after the check.
+    let policy = r.join(".canon/policy.approval.json");
+    let approval = migrated[".canon/policy.approval.json"].clone();
+    fs::remove_file(&policy).unwrap();
+    ok(r, &["policy", "approve", "--approver", "Bo"]);
     let refused = canon(r, &["migrate", "--revert", "--json"]);
     assert_eq!(refused.status.code(), Some(2), "{}", out_text(&refused));
-    assert!(out_text(&refused).contains(".canon/policy.approval.json") && r.join(".canon/policy.approval.json").is_file(), "{}", out_text(&refused));
-    fs::remove_file(r.join(".canon/policy.approval.json")).unwrap();
+    assert!(out_text(&refused).contains(".canon/policy.approval.json") && policy.is_file(), "{}", out_text(&refused));
+    fs::write(&policy, approval).unwrap();
 
     // The revert puts back an Approved: digest, so committing it is the human's.
     let out = ok(r, &["migrate", "--revert", "--json"]);
@@ -1066,7 +1140,10 @@ fn authoring_migrate_25_revert_restores_byte_for_byte_refuses_a_changed_file_and
     assert_eq!(json(&refused)["error"]["code"], "HUMAN_ONLY");
     let done = canon(r, &["migrate", "--revert", "--commit", "--plan-digest", &revert_digest, "--json"]);
     assert!(done.status.success(), "{}", out_text(&done));
-    assert_eq!(tree(r), before, "the old briefs and digests are back byte for byte");
+    assert_eq!(tree(r), before, "the old briefs, digests and reviews are back byte for byte");
+    let reviews = change_reviews(r, "d");
+    assert_eq!(reviews.len(), 1, "the review version the migrate wrote is gone: {reviews:?}");
+    assert_eq!(reviews[0].1, old_review, "the old review is back");
 
     // A stopped run: a brief back in the old format and its journal incomplete; the next run finishes it.
     commit_all(r);

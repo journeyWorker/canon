@@ -1,0 +1,728 @@
+$ canon subject new demo --domain dev --title Demo --actor planner-1 --session s-1 --json
+exit 0
+--- stdout
+{"ok":true,"data":{"schema":1,"kind":"subject","at":"<time>","actor":{"agent_id":"planner-1","role":"implementer","session_id":"s-1"},"subject_id":"demo","title":"Demo","summary":"","domain":"dev","status":"proposed","owner_role":"implementer"},"meta":{"command":"subject new","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[{"command":"canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject demo --case happy --actor <unit> --session <session>","argv":[],"why":"demo owns no scenario; specify its behavior, one scenario per behavior","actor":"agent","role":"implementer"}]}}
+
+--- stderr
+
+$ canon change new add-login --subject demo --title Add login --json
+exit 0
+--- stdout
+{"ok":true,"data":{"changeId":"add-login","subjectId":"demo","brief":".canon/changes/add-login/brief.md"},"meta":{"command":"change new","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[{"command":"canon brief check add-login","argv":["canon","brief","check","add-login"],"why":"demo: <n> blocker(s): write the brief in .canon/changes/add-login/brief.md until `canon brief check` is clean; only then does the human answer it","actor":"agent","role":"planner"}]}}
+
+--- stderr
+
+$ canon subject unadopt demo --change add-login --json
+exit 0
+--- stdout
+{"ok":true,"data":{"schema":1,"kind":"subject","at":"<time>","actor":{"agent_id":"planner-1","role":"implementer","session_id":"s-1"},"subject_id":"demo","title":"Demo","summary":"","domain":"dev","status":"proposed","owner_role":"implementer"},"meta":{"command":"subject unadopt","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[{"command":"canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject demo --case happy --actor <unit> --session <session>","argv":[],"why":"demo owns no scenario; specify its behavior, one scenario per behavior","actor":"agent","role":"implementer"}]}}
+
+--- stderr
+
+$ canon subject adopt demo --change add-login --json
+exit 0
+--- stdout
+{"ok":true,"data":{"schema":1,"kind":"subject","at":"<time>","actor":{"agent_id":"planner-1","role":"implementer","session_id":"s-1"},"subject_id":"demo","title":"Demo","summary":"","domain":"dev","status":"proposed","owner_role":"implementer","change_ids":["add-login"]},"meta":{"command":"subject adopt","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[{"command":"canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject demo --case happy --actor <unit> --session <session>","argv":[],"why":"demo owns no scenario; specify its behavior, one scenario per behavior","actor":"agent","role":"implementer"}]}}
+
+--- stderr
+
+$ canon subject unadopt demo --change add-login --json
+exit 0
+--- stdout
+{"ok":true,"data":{"schema":1,"kind":"subject","at":"<time>","actor":{"agent_id":"planner-1","role":"implementer","session_id":"s-1"},"subject_id":"demo","title":"Demo","summary":"","domain":"dev","status":"proposed","owner_role":"implementer"},"meta":{"command":"subject unadopt","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[{"command":"canon scenario new <area>.<surface>.01 --title \"<behavior>\" --subject demo --case happy --actor <unit> --session <session>","argv":[],"why":"demo owns no scenario; specify its behavior, one scenario per behavior","actor":"agent","role":"implementer"}]}}
+
+--- stderr
+
+$ canon retrieve --for-role reviewer --domain dev --subject demo --json
+exit 0
+--- stdout
+{"ok":true,"data":[],"meta":{"command":"retrieve","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."}}}
+
+--- stderr
+
+$ canon scenario new demo.login.01 --title Signs in --subject demo --case happy --actor planner-1 --session s-1 --project root --json
+exit 0
+--- stdout
+{"ok":true,"data":{"scenarioId":"demo.login.01","feature":"<repo>/.canon/specs/kind=feature/area=demo/login.feature"},"meta":{"command":"scenario new","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[{"command":"canon subject move demo --to specced --actor <unit> --session <session>","argv":[],"why":"demo has its scenarios and every required case; move it on","actor":"agent","role":"orchestrator"}],"note":"keep the `# canon: {...}` provenance lines when you fill in the scenario: one right after `Feature:` and one above the scenario's tags; without them `canon inventory sync` aborts on missing-provenance"}}
+
+--- stderr
+
+$ canon feature new demo.signup --title Signup --actor planner-1 --session s-1 --project root --json
+exit 0
+--- stdout
+{"ok":true,"data":{"feature":"<repo>/.canon/specs/kind=feature/area=demo/signup.feature","next":"canon scenario new demo.signup.01 --title '<label>' [--feature <path>]"},"meta":{"command":"feature new","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[{"command":"canon scenario new demo.signup.01 --title '<label>' [--feature <path>]","argv":[],"why":"the stub holds no scenario yet, so it is not fmt-clean; add the first","actor":"agent","role":"planner"}]}}
+
+--- stderr
+
+$ canon inventory sync --json
+exit 0
+--- stdout
+{"ok":true,"data":{"dryRun":false,"clean":true,"totalWritten":1,"roots":[{"id":"root","root":"<repo>/.canon/specs","clean":true,"scanned":1,"written":1,"removed":0,"violations":[],"syncErrors":[],"tagDiagnostics":[]}]},"meta":{"command":"inventory sync","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[{"command":"canon subject move demo --to specced --actor <unit> --session <session>","argv":[],"why":"demo has its scenarios and every required case; move it on","actor":"agent","role":"orchestrator"}],"coverage":{"scenarios":1,"skipped":[],"specRoots":[{"examined":1,"id":"root","path":".canon/specs"}]}}}
+
+--- stderr
+
+$ canon evidence add --scenario demo.login.01 --project root --class test-run --ref npm test --role implementer --actor impl-1 --session s-2 --json
+exit 0
+--- stdout
+{"ok":true,"data":{"records":[{"staged":"kind=evidence/root_scenario_demo.login.01_<digest>.json","committed":"kind=evidence/root_scenario_demo.login.01_<digest>.json","subject":"demo.login.01","outcome":"verdict faithful","next":"then `canon gate check`"}],"staleReviews":[],"overrides":[]},"meta":{"command":"evidence add","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[{"command":"canon subject move demo --to specced --actor <unit> --session <session>","argv":[],"why":"demo has its scenarios and every required case; move it on","actor":"agent","role":"orchestrator"}]}}
+
+--- stderr
+
+$ canon evidence add --scenario demo.login.01 --project root --run 01ARZ3NDEKTSV4RRFFQ69G5FAV --class test-run --ref npm test --role implementer --actor impl-1 --session s-2 --json
+exit 0
+--- stdout
+{"ok":true,"data":{"records":[{"staged":"kind=evidence/root_scenario_demo.login.01_<digest>.json","committed":"kind=evidence/root_scenario_demo.login.01_<digest>.json","subject":"demo.login.01","outcome":"verdict faithful","next":"then `canon gate check`"}],"staleReviews":[],"overrides":[]},"meta":{"command":"evidence add","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[{"command":"canon subject move demo --to specced --actor <unit> --session <session>","argv":[],"why":"demo has its scenarios and every required case; move it on","actor":"agent","role":"orchestrator"}]}}
+
+--- stderr
+
+$ canon evidence add --task add-login#1 --project root --class test-run --ref npm test --role implementer --actor impl-1 --session s-2 --json
+exit 2
+--- stdout
+{"ok":false,"error":{"code":"TASK_NOT_FOUND","message":"--task `add-login#1` names no task in this repo's plan corpus (consulted: canon @ <repo>/.canon/changes) — fix the id, or dispatch without --task rather than record a dangling binding","suggestions":[],"hint":"task ids look like <change_id>#<n>; open the change's plan document to find the right number","retryable":false},"meta":{"command":"evidence add","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}
+
+--- stderr
+
+$ canon evidence approval-payload --scenario demo.login.01 --project root --approver alice --approval-at 2030-01-01T00:00:00Z
+exit 0
+--- stdout
+{"namespace":"canon-approval-v1","subject":"demo.login.01","project":"root","artifact_sha":"<digest>","run_id":null,"surface":[".canon/archive/kind=change/add-login_<digest>.json",".canon/archive/kind=change/add-login_<digest>.json",".canon/archive/kind=change/add-login_<digest>.json",".canon/archive/kind=subject/demo_<digest>.json",".canon/archive/kind=subject/demo_<digest>.json",".canon/archive/kind=subject/demo_<digest>.json",".canon/archive/kind=subject/demo_<digest>.json",".canon/ledger/kind=change/add-login_<digest>.json",".canon/ledger/kind=subject/demo_<digest>.json",".canon/specs/kind=feature/area=demo/login.feature"],"effects":[],"actor":"alice","timestamp":"<time>"}
+--- stderr
+
+$ canon evidence approval-payload --task add-login#1 --run 01ARZ3NDEKTSV4RRFFQ69G5FAV --approver alice --approval-at 2030-01-01T00:00:00Z
+exit 2
+--- stdout
+
+--- stderr
+canon evidence approval-payload: EVIDENCE_REFUSED — --task `add-login#1` names no task in this repo's plan corpus (consulted: canon @ <repo>/.canon/changes) — fix the id, or dispatch without --task rather than record a dangling binding
+hint: fix what the message names, then run `canon evidence add` again (`canon schema evidence add` lists the arguments)
+
+$ canon evidence audit demo.login.01 --project root --ref audit.json --evaluator eval-1 --evaluator-version 2.1 --evaluator-digest 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef --audit-result confirmed --role implementer --actor impl-1 --session s-2 --json
+exit 0
+--- stdout
+{"ok":true,"data":{"records":[{"staged":"kind=evidence/root_scenario_demo.login.01_<digest>.json","committed":"kind=evidence/root_scenario_demo.login.01_<digest>.json","subject":"demo.login.01","outcome":"audit confirmed","next":"then `canon gate check`"}],"staleReviews":[],"overrides":[]},"meta":{"command":"evidence audit","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[{"command":"canon subject move demo --to specced --actor <unit> --session <session>","argv":[],"why":"demo has its scenarios and every required case; move it on","actor":"agent","role":"orchestrator"}]}}
+
+--- stderr
+
+$ canon gate promote --json
+exit 0
+--- stdout
+{"ok":true,"data":{"dryRun":false,"promoted":[],"recovered":[],"refused":[]},"meta":{"command":"gate promote","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[{"command":"canon subject move demo --to specced --actor <unit> --session <session>","argv":[],"why":"demo has its scenarios and every required case; move it on","actor":"agent","role":"orchestrator"}],"unchanged":true}}
+
+--- stderr
+
+$ canon review scenario demo.login.01 --project root --actor rev-1 --session s-3 --role reviewer --original-spec-ref login.feature --json
+exit 0
+--- stdout
+{"ok":true,"data":{"outcome":"signed","reviews":[{"location":"kind=review/root_scenario_demo.login.01_<digest>.json","deduped":false,"scenarioId":"demo.login.01","reviewId":"<ulid>"}],"blobsStored":0},"meta":{"command":"review scenario","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[{"command":"canon subject move demo --to specced --actor <unit> --session <session>","argv":[],"why":"demo has its scenarios and every required case; move it on","actor":"agent","role":"orchestrator"}]}}
+
+--- stderr
+
+$ canon review change add-login --project root --actor rev-1 --session s-3 --role reviewer --original-spec-ref brief.md --json
+exit 2
+--- stdout
+{"ok":false,"error":{"code":"REVIEW_INVALID_ARGUMENT","message":"change `add-login` has no brief in the repository","field":"CHANGE_ID","suggestions":[],"hint":"a change-level review is for a chore change whose brief is in the repository; review feature scenarios with `canon review scenario <SCENARIO_ID>...`","retryable":false},"meta":{"command":"review change","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}
+
+--- stderr
+
+$ canon finding add --change add-login --round 1 --seq 1 --severity note --actor rev-1 --session s-3 --scenario demo.login.01 --summary Token is logged --json
+exit 0
+--- stdout
+{"ok":true,"data":{"staged":"kind=finding/add-login_1_1_<digest>.json","committed":"kind=finding/add-login_1_1_<digest>.json","changeId":"add-login","round":1,"seq":1,"severity":"note","disposition":"open","unsourced":true},"meta":{"command":"finding add","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}
+
+--- stderr
+
+$ canon finding add --change add-login --round 1 --seq 2 --severity note --actor rev-1 --session s-3 --review 01ARZ3NDEKTSV4RRFFQ69G5FAV --summary Unknown review --json
+exit 2
+--- stdout
+{"ok":false,"error":{"code":"FINDING_REVIEW_NOT_FOUND","message":"no review in the ledger or the archive carries review id `<ulid>`; a finding points only at a review that exists","field":"--review","suggestions":[],"hint":"pass the review id `canon review scenario` or `canon review change` printed (`canon query --kind review --json` shows the ids), or leave --review out","retryable":false},"meta":{"command":"finding add","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}
+
+--- stderr
+
+$ canon finding close add-login --round 1 --seq 1 --disposition rejected --reason accepted --actor impl-1 --session s-2 --json
+exit 0
+--- stdout
+{"ok":true,"data":{"staged":"kind=finding/add-login_1_1_<digest>.json","committed":"kind=finding/add-login_1_1_<digest>.json","changeId":"add-login","round":1,"seq":1,"from":"open","disposition":"rejected"},"meta":{"command":"finding close","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}
+
+--- stderr
+
+$ canon gate promote --json
+exit 0
+--- stdout
+{"ok":true,"data":{"dryRun":false,"promoted":[],"recovered":[],"refused":[]},"meta":{"command":"gate promote","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[{"command":"canon subject move demo --to specced --actor <unit> --session <session>","argv":[],"why":"demo has its scenarios and every required case; move it on","actor":"agent","role":"orchestrator"}],"unchanged":true}}
+
+--- stderr
+
+$ canon finding list --change add-login --json
+exit 0
+--- stdout
+{"ok":true,"data":{"changeId":"add-login","findings":[{"round":1,"seq":1,"severity":"note","disposition":"rejected","reviewer":"rev-1","summary":"Token is logged","resolutionSha":null,"fileRef":null,"reason":"accepted"}]},"meta":{"command":"finding list","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"hasMore":false,"nextCursor":null,"returned":1,"total":1}}
+
+--- stderr
+
+$ canon query --kind change --change add-login --json
+exit 0
+--- stdout
+{"ok":true,"data":{"kind":"change","since":null,"count":1,"violations":0,"records":[{"actor":{"agent_id":"canon-plan-import-canon"},"at":"<time>","change_id":"add-login","kind":"change","schema":2,"status":"proposed","summary":"Add login","title":"add-login"}]},"meta":{"command":"query","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"hasMore":false,"nextCursor":null,"returned":1,"total":1}}
+
+--- stderr
+
+$ canon query --kind evidence --plugin none --json
+exit 0
+--- stdout
+{"ok":true,"data":{"kind":"evidence","since":null,"count":2,"violations":0,"records":[{"actor":{"agent_id":"impl-1","role":"implementer","session_id":"s-2"},"at":"<time>","code_tree":"<digest>","evidence":{"kind":"test-run","ref":"npm test"},"evidence_sha":"<digest>","kind":"evidence","project_id":"root","run_id":"<ulid>","run_seq":2,"scenario_id":"demo.login.01","schema":1,"staging_id":"<digest>","verdict":"faithful","worktree_dirty":false},{"actor":{"agent_id":"impl-1","role":"implementer","session_id":"s-2"},"at":"<time>","audit":{"evaluator_digest":"<digest>","evaluator_id":"eval-1","evaluator_version":"2.1","result":"confirmed"},"code_tree":"<digest>","evidence":{"kind":"audit","ref":"audit.json"},"evidence_sha":"<digest>","kind":"evidence","project_id":"root","run_seq":3,"scenario_id":"demo.login.01","schema":1,"staging_id":"<digest>","verdict":"faithful","worktree_dirty":false}],"dangling":{"count":0,"byReference":{},"references":[]}},"meta":{"command":"query","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"warnings":["canon query --plugin none: plugin `none` has no installed manifest under `.canon/plugins/` -- unmodified core view"],"hasMore":false,"nextCursor":null,"returned":2,"total":2}}
+
+--- stderr
+
+$ canon divergence add demo.login.01 --project root --actor rev-1 --session s-3 --role reviewer --reason differs --json
+exit 0
+--- stdout
+{"ok":true,"data":{"staged":"kind=divergence/root_demo.login.01_0_1_<digest>.json","committed":"kind=divergence/root_demo.login.01_1_1_<digest>.json"},"meta":{"command":"divergence add","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}
+
+--- stderr
+
+$ canon divergence defer demo.login.01 --project root --actor rev-1 --session s-3 --role reviewer --reason vendor --expiry 2030-01-01T00:00:00Z --json
+exit 0
+--- stdout
+{"ok":true,"data":{"committed":"kind=divergence/root_demo.login.01_2_1_<digest>.json"},"meta":{"command":"divergence defer","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}
+
+--- stderr
+
+$ canon divergence resolve demo.login.01 --project root --actor rev-1 --session s-3 --role reviewer --json
+exit 0
+--- stdout
+{"ok":true,"data":{"committed":"kind=divergence/root_demo.login.01_3_1_<digest>.json"},"meta":{"command":"divergence resolve","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}
+
+--- stderr
+
+$ canon divergence accept demo.login.01 --project root --actor alice --session s-4 --reason the engine drops the event --tracking https://example.com/engine/issues/118 --expiry 2030-01-01 --role reviewer --json
+exit 2
+--- stdout
+{"ok":false,"error":{"code":"DIVERGENCE_ACCEPT_REFUSED","message":"demo.login.01's latest evidence is not divergent (faithful): there is no gap to accept","suggestions":[],"hint":"an independent reviewer, in a session that did not attest the evidence, accepts a divergent verdict; otherwise fix the behavior and re-attest","retryable":false},"meta":{"command":"divergence accept","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}
+
+--- stderr
+
+$ canon subject move demo --to specced --actor planner-1 --session s-1 --json
+exit 0
+--- stdout
+{"ok":true,"data":{"schema":1,"kind":"subject","at":"<time>","actor":{"agent_id":"planner-1","role":"implementer","session_id":"s-1"},"subject_id":"demo","title":"Demo","summary":"","domain":"dev","status":"specced","owner_role":"implementer","overrides":[]},"meta":{"command":"subject move","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[{"command":"canon subject move demo --to building --actor <unit> --session <session>","argv":[],"why":"demo has its scenarios and every required case; move it on","actor":"agent","role":"orchestrator"}]}}
+
+--- stderr
+
+$ canon dispatch begin --role implementer --regime implementer/canon/search/abcdef --task add-login#1 --actor impl-1 --session s-2 --skill canon --parent-run 01ARZ3NDEKTSV4RRFFQ69G5FAV --json
+exit 2
+--- stdout
+{"ok":false,"error":{"code":"TASK_NOT_FOUND","message":"--task `add-login#1` names no task in this repo's plan corpus (consulted: canon @ <repo>/.canon/changes) — fix the id, or dispatch without --task rather than record a dangling binding","suggestions":[],"hint":"task ids look like <change_id>#<n>; open the change's plan document to find the right number","retryable":false},"meta":{"command":"dispatch begin","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}
+
+--- stderr
+
+$ canon ingest records --run 01ARZ3NDEKTSV4RRFFQ69G5FAV --json
+exit 1
+--- stdout
+{"ok":false,"error":{"code":"INGEST_FAILED","message":"--run `<ulid>` has no dispatch manifest at <repo>/.canon/dispatch/<ulid>.json — only a run begun by `canon dispatch begin` on this repo can be attributed; omit --run to ingest without attribution","suggestions":[],"hint":"check that the source is readable and run the command again","retryable":false},"meta":{"command":"ingest records","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}
+
+--- stderr
+
+$ canon strategy rollback 01ARZ3NDEKTSV4RRFFQ69G5FAV --actor planner-1 --contradicting-trajectory 01ARZ3NDEKTSV4RRFFQ69G5FAW --json
+exit 2
+--- stdout
+{"ok":false,"error":{"code":"USAGE","message":"the following required arguments were not provided:","field":"--reason","suggestions":[],"hint":"a working call: canon strategy rollback <ulid> --reason \"regressed in production\" --actor alice --signature-file approval.sig --approval-at <time>; `canon schema strategy rollback` lists every argument","retryable":false},"meta":{"command":"strategy rollback","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"next":[]}}
+
+--- stderr
+
+$ canon query --kind subject --all --json
+exit 0
+--- stdout
+{"ok":true,"data":{"kind":"subject","since":null,"count":1,"violations":0,"records":[{"actor":{"agent_id":"planner-1","role":"implementer","session_id":"s-1"},"at":"<time>","domain":"dev","kind":"subject","owner_role":"implementer","schema":1,"status":"specced","subject_id":"demo","summary":"","title":"Demo"}],"dangling":{"count":0,"byReference":{},"references":[]}},"meta":{"command":"query","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"hasMore":false,"nextCursor":null,"returned":1,"total":1}}
+
+--- stderr
+
+$ canon query --kind change --all --json
+exit 0
+--- stdout
+{"ok":true,"data":{"kind":"change","since":null,"count":1,"violations":0,"records":[{"actor":{"agent_id":"canon-plan-import-canon"},"at":"<time>","change_id":"add-login","kind":"change","schema":2,"status":"proposed","summary":"Add login","title":"add-login"}]},"meta":{"command":"query","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"hasMore":false,"nextCursor":null,"returned":1,"total":1}}
+
+--- stderr
+
+$ canon query --kind scenario --all --json
+exit 0
+--- stdout
+{"ok":true,"data":{"kind":"scenario","since":null,"count":1,"violations":0,"records":[{"actor":{"agent_id":"canon-inventory-sync"},"at":"<time>","case":"happy","kind":"scenario","project_id":"root","scenario_digest":"<digest>","scenario_id":"demo.login.01","schema":1,"source_digest":"<digest>","steps":[{"keyword":"Given","text":"a step"}],"subject_id":"demo","title":"Signs in"}]},"meta":{"command":"query","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"hasMore":false,"nextCursor":null,"returned":1,"total":1}}
+
+--- stderr
+
+$ canon query --kind evidence --all --json
+exit 0
+--- stdout
+{"ok":true,"data":{"kind":"evidence","since":null,"count":2,"violations":0,"records":[{"actor":{"agent_id":"impl-1","role":"implementer","session_id":"s-2"},"at":"<time>","code_tree":"<digest>","evidence":{"kind":"test-run","ref":"npm test"},"evidence_sha":"<digest>","kind":"evidence","project_id":"root","run_id":"<ulid>","run_seq":2,"scenario_id":"demo.login.01","schema":1,"staging_id":"<digest>","verdict":"faithful","worktree_dirty":false},{"actor":{"agent_id":"impl-1","role":"implementer","session_id":"s-2"},"at":"<time>","audit":{"evaluator_digest":"<digest>","evaluator_id":"eval-1","evaluator_version":"2.1","result":"confirmed"},"code_tree":"<digest>","evidence":{"kind":"audit","ref":"audit.json"},"evidence_sha":"<digest>","kind":"evidence","project_id":"root","run_seq":3,"scenario_id":"demo.login.01","schema":1,"staging_id":"<digest>","verdict":"faithful","worktree_dirty":false}],"dangling":{"count":0,"byReference":{},"references":[]}},"meta":{"command":"query","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"hasMore":false,"nextCursor":null,"returned":2,"total":2}}
+
+--- stderr
+
+$ canon query --kind review --all --json
+exit 0
+--- stdout
+{"ok":true,"data":{"kind":"review","since":null,"count":1,"violations":0,"records":[{"actor":{"agent_id":"rev-1","role":"reviewer","session_id":"s-3"},"at":"<time>","code_tree":"<digest>","kind":"review","pin":"<digest>","pins":{"checks":[{"checks":[],"role":"implementer","verdict":"faithful"}],"scenario_digest":"<digest>","scenario_digest_scope":"scenario"},"project_id":"root","provenance_ref":{"original_spec_ref":"login.feature"},"review_id":"<ulid>","reviewer":"rev-1","scenario_id":"demo.login.01","schema":2,"worktree_dirty":false}]},"meta":{"command":"query","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"hasMore":false,"nextCursor":null,"returned":1,"total":1}}
+
+--- stderr
+
+$ canon query --kind finding --all --json
+exit 0
+--- stdout
+{"ok":true,"data":{"kind":"finding","since":null,"count":1,"violations":0,"records":[{"actor":{"agent_id":"impl-1","role":"reviewer","session_id":"s-2"},"at":"<time>","change_id":"add-login","code_tree":"<digest>","disposition":"rejected","kind":"finding","reason":"accepted","reviewed_sha":"<digest>","reviewer":"rev-1","round":1,"scenario_ids":["demo.login.01"],"schema":2,"seq":1,"severity":"note","summary":"Token is logged","worktree_dirty":false}],"dangling":{"count":0,"byReference":{},"references":[]}},"meta":{"command":"query","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"hasMore":false,"nextCursor":null,"returned":1,"total":1}}
+
+--- stderr
+
+$ canon query --kind divergence --all --json
+exit 0
+--- stdout
+{"ok":true,"data":{"kind":"divergence","since":null,"count":1,"violations":0,"records":[{"actor":{"agent_id":"rev-1","role":"reviewer","session_id":"s-3"},"at":"<time>","code_tree":"<digest>","kind":"divergence","project_id":"root","reviewer":"rev-1","round":1,"run_seq":3,"scenario_id":"demo.login.01","schema":1,"sha":"<digest>","staging_id":"<digest>","status":"resolved","worktree_dirty":false}]},"meta":{"command":"query","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"hasMore":false,"nextCursor":null,"returned":1,"total":1}}
+
+--- stderr
+
+$ canon query --kind session --all --json
+exit 0
+--- stdout
+{"ok":true,"data":{"kind":"session","since":null,"count":0,"violations":0,"records":[]},"meta":{"command":"query","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"hasMore":false,"nextCursor":null,"returned":0,"total":0}}
+
+--- stderr
+
+$ canon query --kind run --all --json
+exit 0
+--- stdout
+{"ok":true,"data":{"kind":"run","since":null,"count":0,"violations":0,"records":[]},"meta":{"command":"query","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"hasMore":false,"nextCursor":null,"returned":0,"total":0}}
+
+--- stderr
+
+$ canon query --kind strategy_item --all --json
+exit 0
+--- stdout
+{"ok":true,"data":{"kind":"strategy_item","since":null,"count":0,"violations":0,"records":[]},"meta":{"command":"query","schemaVersion":"1.0","canonVersion":"<version>","context":{"role":null,"actor":"canon","repo":"."},"hasMore":false,"nextCursor":null,"returned":0,"total":0}}
+
+--- stderr
+
+=== stored
+### archive/kind=change/add-login_<digest>.json
+{
+  "actor": {
+    "agent_id": "canon-plan-import-canon"
+  },
+  "at": "<time>",
+  "change_id": "add-login",
+  "kind": "change",
+  "schema": 2,
+  "status": "proposed",
+  "subject_ids": [
+    "demo"
+  ],
+  "summary": "Add login",
+  "title": "add-login"
+}
+### archive/kind=change/add-login_<digest>.json
+{
+  "actor": {
+    "agent_id": "canon-plan-import-canon"
+  },
+  "at": "<time>",
+  "change_id": "add-login",
+  "kind": "change",
+  "schema": 2,
+  "status": "proposed",
+  "subject_ids": [
+    "demo"
+  ],
+  "summary": "Add login",
+  "title": "add-login"
+}
+### archive/kind=change/add-login_<digest>.json
+{
+  "actor": {
+    "agent_id": "canon-plan-import-canon"
+  },
+  "at": "<time>",
+  "change_id": "add-login",
+  "kind": "change",
+  "schema": 2,
+  "status": "proposed",
+  "summary": "Add login",
+  "title": "add-login"
+}
+### archive/kind=divergence/root_demo.login.01_1_1_<digest>.json
+{
+  "actor": {
+    "agent_id": "rev-1",
+    "role": "reviewer",
+    "session_id": "s-3"
+  },
+  "at": "<time>",
+  "code_tree": "<digest>",
+  "kind": "divergence",
+  "project_id": "root",
+  "reviewer": "rev-1",
+  "round": 1,
+  "run_seq": 1,
+  "scenario_id": "demo.login.01",
+  "schema": 1,
+  "sha": "<digest>",
+  "staging_id": "<digest>",
+  "status": "open",
+  "worktree_dirty": false
+}
+### archive/kind=divergence/root_demo.login.01_2_1_<digest>.json
+{
+  "actor": {
+    "agent_id": "rev-1",
+    "role": "reviewer",
+    "session_id": "s-3"
+  },
+  "at": "<time>",
+  "code_tree": "<digest>",
+  "kind": "divergence",
+  "project_id": "root",
+  "reviewer": "rev-1",
+  "round": 1,
+  "run_seq": 2,
+  "scenario_id": "demo.login.01",
+  "schema": 1,
+  "sha": "<digest>",
+  "staging_id": "<digest>",
+  "status": {
+    "deferred": {
+      "expiry": "<time>",
+      "reason": "vendor"
+    }
+  },
+  "worktree_dirty": false
+}
+### archive/kind=evidence/root_scenario_demo.login.01_<digest>.json
+{
+  "actor": {
+    "agent_id": "impl-1",
+    "role": "implementer",
+    "session_id": "s-2"
+  },
+  "at": "<time>",
+  "code_tree": "<digest>",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "npm test"
+  },
+  "evidence_sha": "<digest>",
+  "kind": "evidence",
+  "project_id": "root",
+  "run_seq": 1,
+  "scenario_id": "demo.login.01",
+  "schema": 1,
+  "staging_id": "<digest>",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
+### archive/kind=finding/add-login_1_1_<digest>.json
+{
+  "actor": {
+    "agent_id": "rev-1",
+    "role": "reviewer",
+    "session_id": "s-3"
+  },
+  "at": "<time>",
+  "change_id": "add-login",
+  "code_tree": "<digest>",
+  "disposition": "open",
+  "kind": "finding",
+  "reviewed_sha": "<digest>",
+  "reviewer": "rev-1",
+  "round": 1,
+  "scenario_ids": [
+    "demo.login.01"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Token is logged",
+  "worktree_dirty": false
+}
+### archive/kind=subject/demo_<digest>.json
+{
+  "actor": {
+    "agent_id": "planner-1",
+    "role": "implementer",
+    "session_id": "s-1"
+  },
+  "at": "<time>",
+  "change_ids": [
+    "add-login"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "proposed",
+  "subject_id": "demo",
+  "summary": "",
+  "title": "Demo"
+}
+### archive/kind=subject/demo_<digest>.json
+{
+  "actor": {
+    "agent_id": "planner-1",
+    "role": "implementer",
+    "session_id": "s-1"
+  },
+  "at": "<time>",
+  "change_ids": [
+    "add-login"
+  ],
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "proposed",
+  "subject_id": "demo",
+  "summary": "",
+  "title": "Demo"
+}
+### archive/kind=subject/demo_<digest>.json
+{
+  "actor": {
+    "agent_id": "planner-1",
+    "role": "implementer",
+    "session_id": "s-1"
+  },
+  "at": "<time>",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "proposed",
+  "subject_id": "demo",
+  "summary": "",
+  "title": "Demo"
+}
+### archive/kind=subject/demo_<digest>.json
+{
+  "actor": {
+    "agent_id": "planner-1",
+    "role": "implementer",
+    "session_id": "s-1"
+  },
+  "at": "<time>",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "proposed",
+  "subject_id": "demo",
+  "summary": "",
+  "title": "Demo"
+}
+### archive/kind=subject/demo_<digest>.json
+{
+  "actor": {
+    "agent_id": "planner-1",
+    "role": "implementer",
+    "session_id": "s-1"
+  },
+  "at": "<time>",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "proposed",
+  "subject_id": "demo",
+  "summary": "",
+  "title": "Demo"
+}
+### ledger/kind=change/add-login_<digest>.json
+{
+  "actor": {
+    "agent_id": "canon-plan-import-canon"
+  },
+  "at": "<time>",
+  "change_id": "add-login",
+  "kind": "change",
+  "schema": 2,
+  "status": "proposed",
+  "summary": "Add login",
+  "title": "add-login"
+}
+### ledger/kind=divergence/root_demo.login.01_3_1_<digest>.json
+{
+  "actor": {
+    "agent_id": "rev-1",
+    "role": "reviewer",
+    "session_id": "s-3"
+  },
+  "at": "<time>",
+  "code_tree": "<digest>",
+  "kind": "divergence",
+  "project_id": "root",
+  "reviewer": "rev-1",
+  "round": 1,
+  "run_seq": 3,
+  "scenario_id": "demo.login.01",
+  "schema": 1,
+  "sha": "<digest>",
+  "staging_id": "<digest>",
+  "status": "resolved",
+  "worktree_dirty": false
+}
+### ledger/kind=evidence/root_scenario_demo.login.01_<digest>.json
+{
+  "actor": {
+    "agent_id": "impl-1",
+    "role": "implementer",
+    "session_id": "s-2"
+  },
+  "at": "<time>",
+  "audit": {
+    "evaluator_digest": "<digest>",
+    "evaluator_id": "eval-1",
+    "evaluator_version": "2.1",
+    "result": "confirmed"
+  },
+  "code_tree": "<digest>",
+  "evidence": {
+    "kind": "audit",
+    "ref": "audit.json"
+  },
+  "evidence_sha": "<digest>",
+  "kind": "evidence",
+  "project_id": "root",
+  "run_seq": 3,
+  "scenario_id": "demo.login.01",
+  "schema": 1,
+  "staging_id": "<digest>",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
+### ledger/kind=evidence/root_scenario_demo.login.01_<digest>.json
+{
+  "actor": {
+    "agent_id": "impl-1",
+    "role": "implementer",
+    "session_id": "s-2"
+  },
+  "at": "<time>",
+  "code_tree": "<digest>",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "npm test"
+  },
+  "evidence_sha": "<digest>",
+  "kind": "evidence",
+  "project_id": "root",
+  "run_id": "<ulid>",
+  "run_seq": 2,
+  "scenario_id": "demo.login.01",
+  "schema": 1,
+  "staging_id": "<digest>",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
+### ledger/kind=finding/add-login_1_1_<digest>.json
+{
+  "actor": {
+    "agent_id": "impl-1",
+    "role": "reviewer",
+    "session_id": "s-2"
+  },
+  "at": "<time>",
+  "change_id": "add-login",
+  "code_tree": "<digest>",
+  "disposition": "rejected",
+  "kind": "finding",
+  "reason": "accepted",
+  "reviewed_sha": "<digest>",
+  "reviewer": "rev-1",
+  "round": 1,
+  "scenario_ids": [
+    "demo.login.01"
+  ],
+  "schema": 2,
+  "seq": 1,
+  "severity": "note",
+  "summary": "Token is logged",
+  "worktree_dirty": false
+}
+### ledger/kind=review/root_scenario_demo.login.01_<digest>.json
+{
+  "actor": {
+    "agent_id": "rev-1",
+    "role": "reviewer",
+    "session_id": "s-3"
+  },
+  "at": "<time>",
+  "code_tree": "<digest>",
+  "kind": "review",
+  "pin": "<digest>",
+  "pins": {
+    "checks": [
+      {
+        "checks": [],
+        "role": "implementer",
+        "verdict": "faithful"
+      }
+    ],
+    "scenario_digest": "<digest>",
+    "scenario_digest_scope": "scenario"
+  },
+  "project_id": "root",
+  "provenance_ref": {
+    "original_spec_ref": "login.feature"
+  },
+  "review_id": "<ulid>",
+  "reviewer": "rev-1",
+  "scenario_id": "demo.login.01",
+  "schema": 2,
+  "worktree_dirty": false
+}
+### ledger/kind=scenario/root_demo.login.01_<digest>.json
+{
+  "actor": {
+    "agent_id": "canon-inventory-sync"
+  },
+  "at": "<time>",
+  "case": "happy",
+  "kind": "scenario",
+  "project_id": "root",
+  "scenario_digest": "<digest>",
+  "scenario_id": "demo.login.01",
+  "schema": 1,
+  "source_digest": "<digest>",
+  "steps": [
+    {
+      "keyword": "Given",
+      "text": "a step"
+    }
+  ],
+  "subject_id": "demo",
+  "title": "Signs in"
+}
+### ledger/kind=subject/demo_<digest>.json
+{
+  "actor": {
+    "agent_id": "planner-1",
+    "role": "implementer",
+    "session_id": "s-1"
+  },
+  "at": "<time>",
+  "domain": "dev",
+  "kind": "subject",
+  "owner_role": "implementer",
+  "schema": 1,
+  "status": "specced",
+  "subject_id": "demo",
+  "summary": "",
+  "title": "Demo"
+}
+### scenario-index.lock
+
+### specs/kind=feature/area=demo/login.feature
+Feature: demo login
+  # canon: {"schema":1,"at":"<time>","actor":{"agent_id":"planner-1","session_id":"s-1"}}
+
+  # canon: {"schema":1,"at":"<time>","actor":{"agent_id":"planner-1","session_id":"s-1"}}
+  @subject:demo
+  @case:happy
+  @demo.login.01
+  Scenario: Signs in
+    Given a step
+
