@@ -1,0 +1,52 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-031-r",
+    "role": "implementer",
+    "session_id": "canon-impl-031-r-2026-10-28"
+  },
+  "at": "2026-10-28T10:25:37.583432Z",
+  "attachments": [
+    {
+      "case": "ledger_migrate_10_sqlite_rows_take_their_0_30_keys",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/031r-junit.xml",
+      "sha256": "b7e4a2362608d1a8144d1763a7b84870ce4fbd5aa2529d2b0af2f5fae0f2abb9"
+    },
+    {
+      "case": "ledger_migrate_10c_an_object_holding_a_planned_key_with_other_json_refuses_the_run",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/031r-junit.xml",
+      "sha256": "b7e4a2362608d1a8144d1763a7b84870ce4fbd5aa2529d2b0af2f5fae0f2abb9"
+    },
+    {
+      "case": "ledger_migrate_10b_a_row_holding_a_planned_key_with_other_json_refuses_the_run",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/031r-junit.xml",
+      "sha256": "b7e4a2362608d1a8144d1763a7b84870ce4fbd5aa2529d2b0af2f5fae0f2abb9"
+    },
+    {
+      "case": "ledger_migrate_10_a_postgres_row_holding_a_planned_key_with_other_json_refuses_the_run",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/031r-junit.xml",
+      "sha256": "b7e4a2362608d1a8144d1763a7b84870ce4fbd5aa2529d2b0af2f5fae0f2abb9"
+    }
+  ],
+  "code_tree": "58d375c7471d005928f5ec57ef66bcfda918ca7c",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/031r-junit.xml"
+  },
+  "evidence_sha": "eac30bbcc34f1d90101b95d81d0fd4cb509525f3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 72,
+  "scenario_id": "ledger.migrate.10",
+  "schema": 1,
+  "staging_id": "76453e92",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

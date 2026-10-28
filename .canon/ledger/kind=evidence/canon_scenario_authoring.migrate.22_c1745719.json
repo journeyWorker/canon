@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-031-r",
+    "role": "implementer",
+    "session_id": "canon-impl-031-r-2026-10-28"
+  },
+  "at": "2026-10-28T10:24:49.352580Z",
+  "attachments": [
+    {
+      "case": "authoring_migrate_22_commit_rewrites_every_brief_keeps_approvals_and_a_second_run_has_nothing_to_do",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/031r-junit.xml",
+      "sha256": "b7e4a2362608d1a8144d1763a7b84870ce4fbd5aa2529d2b0af2f5fae0f2abb9"
+    }
+  ],
+  "code_tree": "58d375c7471d005928f5ec57ef66bcfda918ca7c",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/031r-junit.xml"
+  },
+  "evidence_sha": "eac30bbcc34f1d90101b95d81d0fd4cb509525f3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 160,
+  "scenario_id": "authoring.migrate.22",
+  "schema": 1,
+  "staging_id": "3abdb695",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}

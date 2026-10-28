@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "agent_id": "canon-impl-031-r",
+    "role": "implementer",
+    "session_id": "canon-impl-031-r-2026-10-28"
+  },
+  "at": "2026-10-28T10:24:46.284084Z",
+  "attachments": [
+    {
+      "case": "authoring_brief_check_17_english_headings_without_comments_pass_and_every_reader_finds_the_same_sections",
+      "format": "junit",
+      "outcome": "passed",
+      "path": "target/031r-junit.xml",
+      "sha256": "b7e4a2362608d1a8144d1763a7b84870ce4fbd5aa2529d2b0af2f5fae0f2abb9"
+    }
+  ],
+  "code_tree": "58d375c7471d005928f5ec57ef66bcfda918ca7c",
+  "evidence": {
+    "kind": "test-run",
+    "ref": "target/031r-junit.xml"
+  },
+  "evidence_sha": "eac30bbcc34f1d90101b95d81d0fd4cb509525f3",
+  "kind": "evidence",
+  "project_id": "canon",
+  "run_seq": 142,
+  "scenario_id": "authoring.brief-check.17",
+  "schema": 1,
+  "staging_id": "87ea11ee",
+  "verdict": "faithful",
+  "worktree_dirty": false
+}
